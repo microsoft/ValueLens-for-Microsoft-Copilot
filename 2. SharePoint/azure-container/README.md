@@ -102,12 +102,14 @@ SharePoint).
 
 - [ ] **Validate** a PAX `-Dashboard AIBV` rollup matches this repo's standalone
       v4.0.0 output (column set + a row-level spot check).
-- [ ] **Filename mapping.** The PBIT parameters point at fixed names
-      (`copilot_interactions_rollup.csv`, `copilot_users_rollup.csv`); PAX writes
-      timestamped rollup filenames. Decide between (a) pointing the PBIT at the
-      PAX names, (b) a small post-upload rename, or (c) a PAX fixed-name option —
-      the Task Scheduler path currently handles this in
-      [`../scripts/Upload-Rollups-SharePoint.ps1`](../scripts/Upload-Rollups-SharePoint.ps1).
+- [ ] **Confirm filenames (don't rename).** PAX's `-Dashboard AIBV` rollup is
+      built to emit the exact filenames the AIBV PBIT reads — PAX's docs say the
+      rollup output names *"are the exact files expected by the Copilot Analytics
+      Lab Power BI templates — do not rename them."* Just confirm the PBIT's
+      default parameter URL matches PAX's emitted rollup name. (The old
+      [`../scripts/Upload-Rollups-SharePoint.ps1`](../scripts/Upload-Rollups-SharePoint.ps1)
+      rename step belonged to the standalone-processor path and is no longer
+      needed.)
 - [ ] **Permissions decision** — accept PAX's tenant-wide
       `Sites.ReadWrite.All` / `Files.ReadWrite.All` for the managed identity (see
       the warning above), or hold for a `Sites.Selected`-compatible path. The

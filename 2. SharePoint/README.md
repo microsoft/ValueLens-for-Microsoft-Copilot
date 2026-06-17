@@ -38,27 +38,27 @@ app registration before you start.
 
 ## Authentication
 
-This deployment authenticates to Microsoft Graph and SharePoint with an
-**Entra app registration** (client secret or certificate). That is the
-**supported path today** — and currently the only working one for the scheduled
-SharePoint refresh. The scheduling helper below
-([`Register-TaskScheduler.ps1`](./scripts/Register-TaskScheduler.ps1)) runs the
-extract and upload scripts under that app registration.
+There are **two ways** to authenticate. Pick by **where the job runs**.
 
-> **⏳ Managed identity (secretless) is planned, not yet available.**
-> [Microsoft PAX](https://github.com/microsoft/PAX) itself supports
-> `-Auth ManagedIdentity` for unattended, Azure-hosted runs with no secret to
-> rotate. In **this** repo, that route depends on the Azure Container Apps Job in
-> [`azure-container/`](./azure-container/), which is **still WIP**. The earlier
-> schema blocker is now **resolved** — PAX **v1.11.5+** produces the AIBV rollup
-> natively via `-Dashboard AIBV` (embedded v4.0.0 processor), so no custom
-> container layer is needed; what remains is committing and testing the ACA Job.
-> **Until that lands, use the app registration.**
->
-> Managed identity is an **alternative** to the app registration, not an
-> addition — you won't run both. When the ACA Job ships, the managed identity
-> simply replaces the client secret while reusing the **same** Graph permissions
-> and the **same** `Sites.Selected` grant provisioned in Setup below.
+| | **Option A — App registration** | **Option B — Managed identity** |
+|---|---|---|
+| **Best when** | You run the job on a Windows host or CI (Task Scheduler, GitHub Actions) | You host the job in Azure (Container Apps Job) |
+| **`-Auth`** | `AppRegistration` (client secret **or** certificate) | `ManagedIdentity` |
+| **Secret to manage** | Yes — or use a certificate to avoid rotation | None |
+| **SharePoint write permission** | `Sites.Selected` (per-library, least privilege) | `Sites.ReadWrite.All` + `Files.ReadWrite.All` |
+| **Status in this repo** | ✅ Available now | ⏳ Pending the ACA Job — see [`azure-container/`](./azure-container/) |
+
+Both options use the **same Graph read permissions** (listed under *What you need*);
+they differ only in **how the identity signs in** and the **SharePoint write scope**.
+You run **one** of them, never both.
+
+- **Option A** is what the rest of this guide uses. The scheduling helper
+  ([`Register-TaskScheduler.ps1`](./scripts/Register-TaskScheduler.ps1)) runs the
+  extract and upload under the app registration.
+- **Option B** runs PAX as an Azure Container Apps Job with no secret to rotate.
+  The earlier schema blocker is resolved (PAX **v1.11.5+** produces the AIBV
+  rollup natively via `-Dashboard AIBV`); what remains is committing and testing
+  the ACA Job. See [`azure-container/`](./azure-container/).
 
 ---
 
