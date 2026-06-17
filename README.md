@@ -1,305 +1,124 @@
-> 🚨 **April 2026 — Microsoft Graph Audit Log Query API permission change**  
-> Microsoft began enforcing a new permission for the `/security/auditLog/queries` endpoint. The broader `AuditLog.Read.All` scope is **no longer sufficient on its own** — `AuditLogsQuery.Read.All` is now required.  
-> **Symptom**: scripts run successfully but `CopilotInteraction` queries silently return **0 records** even when activity exists.  
-> **Fix**: have your tenant admin grant `AuditLogsQuery.Read.All` to the app registration / consented account before running the scripts. See [`scripts/readme.md`](scripts/readme.md#permissions-april-2026-graph-api-change) for details.
-
-> ⚠️ **Support Notice**
-> This repository is not supported through Microsoft support channels. Please report issues by opening an issue in this repo.
-
 # 💼 AI Business Value Dashboard
 
-<p style="font-size:small; font-weight:normal;">
-This repository contains the <strong>AI Business Value Dashboard</strong> Power BI template. It quantifies the business value of Microsoft Copilot and agent activity — translating raw audit signals into hours saved, assisted value, and a defensible ROI narrative aligned to Microsoft's Frontier Firm framework.
-</p>
-
----
-
-## 📸 Dashboard Preview
+A Power BI template that turns Microsoft **Copilot & agent** activity into a business‑value story —
+hours saved, assisted value, and a defensible ROI narrative aligned to Microsoft's Frontier Firm
+framework.
 
 ![AI Business Value Dashboard preview](Images/ABV-Preview.gif)
 
-*Animated walkthrough of all dashboard pages. Static page images are in [`Images/pages/`](Images/pages) and the source PDF is at [`Images/source/AI Business Value Dashboard - Sample.pdf`](Images/source/AI%20Business%20Value%20Dashboard%20-%20Sample.pdf).*
-
----
-
 <details>
-<summary>⚠️ <strong>Important usage & compliance disclaimer</strong></summary>
+<summary>⚠️ <strong>Usage & compliance disclaimer</strong></summary>
 
-Please note:
+While this tool helps customers understand the business value of their AI usage data, Microsoft has
+**no visibility** into the data customers input, nor control over how the template is used. Customers
+are solely responsible for ensuring their use complies with all applicable laws and regulations
+(including data privacy and security). **Microsoft disclaims all liability** arising from use of this
+template.
 
-While this tool helps customers better understand the business value of their AI usage data, Microsoft has **no visibility** into the data that customers input into this template/tool, nor does Microsoft have any control over how customers will use this template/tool in their environment.
-
-Customers are solely responsible for ensuring that their use of the template tool complies with all applicable laws and regulations, including those related to data privacy and security.
-
-**Microsoft disclaims any and all liability** arising from or related to customers' use of the template tool.
-
-**Experimental Template Notice:**
-This is an experimental template with audit logs as the primary source. The audit logs from Microsoft Purview are intended to support security and compliance use cases. While they provide visibility into Copilot and agent interactions, they are not intended to serve as the sole source of truth for licensing or full-fidelity reporting on Copilot activity.
-
+This is an **experimental** template with Purview audit logs as the primary source. Audit logs
+provide visibility into Copilot/agent interactions but are not intended as the sole source of truth
+for licensing or full‑fidelity reporting. Not supported through Microsoft support channels — please
+open an issue in this repo.
 </details>
 
 ---
 
-## 📁 Choose your deployment path
+## 🚀 Pick a deployment path
 
-Pick the path that matches your environment. Each folder is self-contained — README, PBIT/PBIP, and the scripts you need are all in one place.
+There are **two** ways to run the dashboard. Both use the same data; they differ only in *how* the
+data gets in and how it refreshes.
 
-| Path | Folder | Best when… | Volume ceiling |
-|---|---|---|---|
-| **Manual** | [`1. Manual/`](1.%20Manual/) | One-off, ad-hoc, or single-user. Customer manually exports audit CSV from Purview UI, drops into the local PBIT | < ~100K events lifetime |
-| **SharePoint — Single File** *(recommended default)* | [`2. SharePoint/Single File/`](2.%20SharePoint/Single%20File/) | Scheduled refresh in PBI Service without a Gateway. Script overwrites one CSV per refresh — no folder iteration, no privacy firewall errors | Rolling 30 days, refreshes weekly or daily |
-| **SharePoint — Folder** *(advanced)* | [`2. SharePoint/Folder/`](2.%20SharePoint/Folder/) | Need > 30 days of accumulated history but no Fabric. Folder iteration auto-unions all daily CSVs | Up to 180 days (Graph cap), heavier PBI memory footprint |
-| **Fabric / Lakehouse** | [`3. Fabric/`](3.%20Fabric/) | Have Fabric capacity. JSON parsing happens upstream in a notebook → best performance, multi-year history, sub-second dashboard | Millions of events, multi-year |
-
-Inside each path:
-- The PBIT/PBIP for that pattern (and a README explaining what parameters to fill in)
-- `scripts/interactive/` — manual one-shot PowerShell (admin signs in via browser)
-- `scripts/appreg/` — unattended app-registration scripts (service principal for scheduled jobs)
-- `scripts/azure/` *(SharePoint / Single File only)* — Bicep + runbooks for Azure Automation
-
-**Not sure which path?** Most customers should start with **SharePoint / Single File** — it covers 80% of real deployments and avoids the data-combination errors that the Folder pattern is prone to. If you have Fabric capacity, **Fabric / Lakehouse** is the long-term home for any serious volume.
-
----
-
-## 📊 What This Dashboard Provides
-
-- **Quantified business value** of Copilot and agent activity — hours saved and dollar-equivalent assisted value, grounded in research-sourced time baselines
-- **Frontier Firm maturity view** — where your organisation sits on the Pattern 1 (human + Copilot) → Pattern 2 (human + agent) → Pattern 3 (agents run workflows) journey
-- **Functional value breakdown** — value per function (Sales, HR, IT, Legal, Finance, Marketing, Customer Service) with defensible task-level attribution
-- **Work archetype analysis** — Copilot activity mapped to Creating, Finding, Consuming, Producing, Automating
-- **User maturity tracker** — Beginner → Developing → Proficient progression using behavioural breadth, agent adoption, and active days
-- **Business case output** — projected annualised value, ROI multiple, and licence investment net
-
----
-
-## 🚀 How This Helps Leaders
-
-- **Build a defensible business case** for continued Copilot investment — tie value directly to the KPIs your CFO, CHRO, and CIO already care about
-- **Identify Frontier Firm maturity by function** — see which functions are stuck in Pattern 1 and where Pattern 3 autonomy is emerging
-- **Prioritise enablement investment** — see which work archetypes and functions have the highest value potential
-- **Track progression over time** — compare functional value and maturity quarter-on-quarter as adoption matures
-
----
-
-## ✅ What You'll Do
-
-**Quick Overview**: Export 3–4 data sources → Connect them to Power BI → Analyse your AI value
-
-### Choose Your Template
-
-Two PBIT variants ship with this repo — pick one based on where your CSVs live:
-
-| Template | Use when… | Data source format |
+| Path | Best when… | What it gives you |
 |---|---|---|
-| **`AI-Business-Value-Dashboard-29-04-csv-path.pbit`** | CSVs sit on a local drive or network share, or you only need a one-off load | Direct file path per CSV |
-| **`AI-Business-Value-Dashboard-29-04-sharepoint-refresh.pbit`** | You want scheduled refresh in Power BI Service from SharePoint / OneDrive | SharePoint **folder URL** per data source |
+| **[1. Fabric](1.%20Fabric/)** *(recommended)* | You have **Fabric capacity** (or Premium / PPU) — or any Spark + SQL stack. | Notebooks parse the data into a Lakehouse → best performance, sub‑second dashboard, and the optional billing & feedback pages. The same notebooks + template also run on Databricks, Synapse, or Azure SQL. |
+| **[2. SharePoint](2.%20SharePoint/)** | Power BI Pro, **no Fabric** / Premium. You want scheduled refresh without a gateway. | [Microsoft PAX](https://github.com/microsoft/PAX) extracts in parallel partitions, a Python processor produces two rollup CSVs, the template refreshes from those SharePoint URLs. The simplest core deployment. |
 
-> ⚠️ **The SharePoint Refresh template needs four separate folders** — one each for **Interactions**, **Licensed Users**, **Org Data**, and **Agent 365**. The Interactions query unions every CSV in its folder; the others pick the most recently modified CSV. Pointing multiple parameters at the same folder will fail (the wrong file gets picked, or non-audit CSVs get parsed as audit logs).
+**Not sure?** **Fabric** is the recommended path — it scales furthest and unlocks the optional
+billing/feedback pages. No Fabric or Premium capacity? **SharePoint** runs the core dashboard on just
+Power BI Pro.
 
-### Choose Your Method
-
-<details>
-<summary>🖱️ Option A: Manual Export via Web Portal (Recommended for first-time setup)</summary>
-
-Follow the traditional workflow using browser-based portals to export your data:
-
-1. **Export Copilot audit logs** from Microsoft Purview
-2. **Download licensed user data** from Microsoft 365 Admin Center
-3. **Export org data** from Microsoft Entra Admin Center
-4. *(Optional)* **Export Agent 365** data from Microsoft Admin Center
-5. **Connect CSV files** to Power BI template
-
-**Best for**: One-time setup, first-time users, or those who prefer GUI-based workflows
-
-👉 **See detailed instructions below** in the [Detailed Steps](#-detailed-steps) section
-
-</details>
-
-<details>
-<summary>⚡ Option B: Automated PowerShell Scripts (For regular refreshes)</summary>
-
-The `scripts/` folder contains PowerShell scripts that automate the audit-log export. They produce CSVs that plug straight into the template parameters. *(Originally from the [Microsoft AI-in-One Dashboard](https://github.com/microsoft/AI-in-One-Dashboard/tree/main/scripts) — MIT licensed.)*
-
-**Quick Start (Local, interactive):**
-```powershell
-# 1. Install required modules (one-off)
-Install-Module Microsoft.Graph.Beta.Security -Scope CurrentUser
-
-# 2. Run the export scripts
-cd scripts
-.\create-query.ps1              # Creates a Purview audit-log query
-.\get-copilot-interactions.ps1  # Exports the query results
-.\get-copilot-users.ps1         # Exports the licensed users list
-```
-
-**Scheduled / unattended:** see `scripts/automation/` for two deployment paths:
-- `scripts/automation/appreg/` — run the export weekly as PowerShell scheduled runbooks against an app registration (SharePoint-backed queue)
-- `scripts/automation/azure/` — deploy an Azure Automation account via Bicep that runs the same runbooks on schedule
-
-Each subfolder has its own README with prerequisites and step-by-step setup.
-
-</details>
+> Each path folder has its **own README** with the exact, step‑by‑step setup. This page is just the
+> map.
 
 ---
 
-## 📁 Detailed Steps
+## 📊 What it measures
 
-<details>
-<summary>🔍 Step 1: Download Copilot Interactions Audit Logs (Microsoft Purview)</summary>
+- **Quantified value** — hours saved and dollar‑equivalent assisted value, grounded in research‑sourced time baselines.
+- **Frontier Firm maturity** — where you sit on the Pattern 1 (human + Copilot) → Pattern 2 (human + agent) → Pattern 3 (agents run workflows) journey.
+- **Value by function** — Sales, HR, IT, Legal, Finance, Marketing, Customer Service, with task‑level attribution.
+- **User maturity** — Beginner → Developing → Proficient, from behavioural breadth and agent adoption.
+- **Business case** — projected annual value, ROI multiple, and licence investment net.
 
-### What This Data Provides
-This log provides detailed records of Copilot interactions across all surfaces (Chat, M365 apps, Agents). The template classifies each signal into an AI task, maps it to a research-sourced human-time baseline, and computes the hours saved and assisted value.
-
-### Requirements
-- Access level required: **Audit Reader** or **Compliance Administrator**
-- Portal: Microsoft Purview Compliance Portal
-- Permissions needed: View and export audit logs
-
-### Step-by-Step Instructions
-
-1. **Navigate to the portal**
-   - Go to: [security.microsoft.com](https://security.microsoft.com)
-   - In the left pane, click **Audit**
-
-2. **Configure the audit search**
-   - In **Activities > Friendly Names**, select:
-     - `Copilot Activities – Interacted with Copilot` *(required)*
-   - Set a **Date Range** (recommended: 3 months for meaningful trend)
-   - Give your search a name (e.g., `Copilot Audit - Apr 2026`)
-
-3. **Run and export the search**
-   - Click **Search**
-   - Wait until the status changes to **Completed**
-   - Click into the completed search
-   - Select **Export > Download all results**
-   - Save the CSV file to a known location (e.g., `C:\Data\Copilot_Audit_Logs.csv`)
-
-📖 **Learn more**: [Export, configure, and view audit log records – Microsoft Learn](https://learn.microsoft.com/en-us/microsoft-365/compliance/audit-log-search)
-
-</details>
-
-<details>
-<summary>👤 Step 2: Download Copilot Licensed User List (Microsoft 365 Admin Center)</summary>
-
-### What This Data Provides
-A list of users with Copilot licences. Used by the template to compute licence investment, licensed-user coverage, and cost baseline.
-
-### Requirements
-- Access level: **Global Administrator** or **Reports Reader**
-- Portal: Microsoft 365 Admin Center
-
-### Step-by-Step Instructions
-
-1. Go to [admin.microsoft.com](https://admin.microsoft.com) → **Users > Active users**
-2. Filter by licence: **Microsoft 365 Copilot**
-3. **Export > Export users**
-4. Save as `Copilot_Licensed_Users.csv`
-
-</details>
-
-<details>
-<summary>🏢 Step 3: Download Org Data (Microsoft Entra Admin Center)</summary>
-
-### What This Data Provides
-Organisation, department, job title, and country per user. Used to attribute value by function (Sales, HR, IT, Legal, Finance, etc.) via the auto-classifier and customer-editable override map.
-
-### Requirements
-- Access level: **User Administrator** or **Global Reader**
-- Portal: Microsoft Entra Admin Center
-
-### Step-by-Step Instructions
-
-1. Go to [entra.microsoft.com](https://entra.microsoft.com) → **Users > All users**
-2. Select **Download users**
-3. Save as `Org_Data.csv`
-
-### Function Classification
-The template includes two layers:
-- **Auto-classifier** (built in): pattern-matches on Organization + JobTitle to tag users as Sales / IT / HR / Legal / Finance / Marketing / Customer Service / Operations / Health & Safety
-- **Org Function Map** (customer-editable): override the auto-classifier for org labels specific to your tenant. Edit via **Transform data > Org Function Map** in Power Query.
-
-</details>
-
-<details>
-<summary>🤖 Step 4 (Optional): Agent 365 Export</summary>
-
-If your tenant has Agent 365, export the agent list and supply it to the `Agent 365` parameter in the template. This enables agent-level attribution on the Agent Value page (agent leaderboards, shared agent reach, creator insights).
-
-If you don't have Agent 365 data, leave this parameter blank — the rest of the dashboard works without it.
-
-</details>
-
-<details>
-<summary>🧩 Step 5: Connect CSVs to the Template</summary>
-
-1. Open the PBIT for your chosen variant in **Power BI Desktop**:
-   - **CSV Path**: `AI-Business-Value-Dashboard-29-04-csv-path.pbit` — supply a **file path** for each parameter
-   - **SharePoint Refresh**: `AI-Business-Value-Dashboard-29-04-sharepoint-refresh.pbit` — supply a **SharePoint Site URL** (root site / teams URL) plus a **folder URL** for each data source (one folder per source — see warning above)
-2. When prompted for parameters, supply:
-   - **Copilot Interactions File** → audit log CSV(s)
-   - **Copilot Licensed Users** → licensed users CSV
-   - **Org Data File** → Entra org data CSV
-   - **Agent 365** *(optional)* → Agent 365 export
-3. Click **Load** — the model will refresh against your data
-4. *(Optional)* Adjust slicers on the Overview page:
-   - Hourly Salary (default $40 — adjust to your org's average)
-   - Licence PPUM (default $30 — adjust to your blended licence cost)
-
-</details>
+**How:** every interaction → classified into an **AI Task** → mapped to a research‑sourced **time
+baseline** → summed to **Hours Saved** → × hourly rate = **Assisted Value**.
 
 ---
 
-## 🧮 How Value Is Calculated
+## 🔌 Data sources
 
-Every Copilot interaction generates an audit signal — what app was used, what resources were accessed, what actions were taken. Each signal is classified into an **AI Task** (e.g., Email Drafting, Data Querying, Meeting Prep). Each task maps to a **Value Category**: either **Time Saved** (how much faster the work gets done) or **Augmented Skill** (specialist expertise AI provides that the user doesn't have). Each task carries a research-sourced human-time baseline — the hours a person would spend doing that work manually. The sum of these baselines is the **Hours Saved**. Multiply by an average hourly rate to get the **Assisted Value** — the dollar return on your AI investment.
+| Source | Required? | Where it comes from |
+|---|---|---|
+| Copilot interactions (audit logs) | ✅ Core | Microsoft Purview |
+| Licensed users | ✅ Core | Microsoft 365 Admin Center |
+| Org data (department / function) | ✅ Core | Microsoft Entra |
+| Agents 365 | ⬜ Optional | Agent 365 export (Fabric path) |
+| Credit consumption (billing) | ⬜ Optional | Power Platform Admin Center export → see [`1. Fabric/CREDIT-CONSUMPTION-SETUP.md`](1.%20Fabric/CREDIT-CONSUMPTION-SETUP.md) |
+| Product feedback | ⬜ Optional | M365 Admin Center → Health → Product Feedback export |
 
-**Signal → AI Task → Hours Saved / Augmented Skill → Assisted Value**
-
-Maturity progresses through three **Frontier Firm patterns**: Pattern 1 (Human uses Copilot) → Pattern 2 (Human + Agent) → Pattern 3 (Agents run workflows). The **Autonomy Mix** cards show how your organisation's value is currently split across these patterns — and where the biggest growth opportunity lies.
+Optional sources are gated by `Enable_*` toggles — the dashboard works fine without them. The exact
+export + connect steps live in the path README you choose above.
 
 ---
 
-## 📚 Dashboard Pages
+## 📚 Dashboard pages
 
 | Page | Purpose |
 |---|---|
-| **Overview** | Executive summary — total hours saved, assisted value, weekly rhythm |
-| **User Maturity** | User progression across 5 stages: Asking → Finding → Consuming → Producing → Automating |
-| **Copilot Value** | Detailed Copilot usage, tasks, and value breakdown |
-| **Agent Value** | Agent-specific tasks, shared agents, autonomous agent activity |
-| **Agent Governance** | Agent deployment patterns, creator insights, sensitivity exposure |
-| **Functional Value** | Value per business function, work archetype analysis, success metrics aligned to the Microsoft Frontier Firm scenario framework |
+| **User Activation** | Activation across teams — licensed vs unlicensed, active vs inactive |
 | **Adoption & Reach** | User counts, coverage %, licensed vs unlicensed |
+| **Activity & Value** | Copilot and agent usage, tasks, hours saved and assisted value |
+| **Usage Maturity** | Progression: Asking → Finding → Consuming → Producing → Automating |
 | **Leaderboards** | Top users, agents, and functions |
-| **Trends** | Time-series trends across all value metrics |
-| **Signal > Behavior > Value** | Trace raw audit signals through to dollar value — defensibility and audit trail |
-| **Glossary & Guide** | Metric definitions, methodology, and research sources |
+| **Agent Governance** | Deployment patterns, creator insights, sensitivity exposure |
+| **User Feedback** | Thumbs up/down sentiment and verbatim feedback themes |
+| **License Readiness** | Ranks unlicensed users by upgrade‑priority score |
+| **Heatmap Trend** | Activity heatmap across the reporting period |
+| **Copilot Studio: Credits Consumed** | Agent credit consumption and billing breakdown |
+| **Copilot Studio: Agent Evaluation** | Agent resolution, abandonment, escalation and response time |
+| **Copilot Studio: Topic Analysis** | Most‑asked topics, resolution and abandonment by agent |
+| **Appendix: Key Concepts** | Methodology and key‑concept explainers |
+| **Appendix: Glossary** | Metric definitions and research sources |
+| **Appendix: Signal Table** | Trace raw signals through to value (audit trail) |
 
 ---
 
-## 🔬 Research Sources
+## 🔬 Research sources
 
-Human-time baselines are sourced from published research including:
-- Microsoft Research (Iqbal & Horvitz 2007; Branham & Brush 2015)
-- Noy & Zhang (MIT/Science 2023)
-- Brynjolfsson et al. (NBER 2023)
-- BCG/Harvard (Dell'Acqua et al. 2023)
-- McKinsey (2023)
-- Forrester TEI (2022, 2024)
-- IDC (2014, 2018, 2023)
-- HDI, MetricNet, SHRM, Deloitte, Gartner (various)
-
-See the **📖 Metric Glossary** table in the template for the full per-task source list.
+Human‑time baselines are drawn from published research — Microsoft Research, MIT/Science (Noy &
+Zhang 2023), NBER (Brynjolfsson et al. 2023), BCG/Harvard (Dell'Acqua et al. 2023), McKinsey,
+Forrester TEI, IDC, and others. The full per‑task source list is in the **📖 Metric Glossary** page
+inside the template.
 
 ---
 
-## 🙏 Acknowledgements
+## 🔒 Security
 
-- Microsoft Copilot Growth & ROI practice — for the core measurement framework
-- The broader Microsoft community that shaped the AI-in-One Dashboard — this template builds on its structure
+Please see [SECURITY.md](SECURITY.md) for information on reporting security vulnerabilities.
 
 ---
 
-## 📝 License
+## 🙏 Acknowledgements & licence
 
-MIT — see [LICENSE](LICENSE).
+Built by the Microsoft Copilot Growth & ROI practice, building on the structure of the community
+AI‑in‑One Dashboard. Licensed **MIT** — see [LICENSE.md](LICENSE.md).
+
+---
+
+## Trademarks
+
+This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
+trademarks or logos is subject to and must follow
+[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
+Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
+Any use of third-party trademarks or logos are subject to those third-party's policies.

@@ -20,5 +20,8 @@ Thumbs.db
 # Logs
 *.log
 
-# Environment variables
-*.env
+*.abf
+
+*.parquet
+
+*.xlsx
