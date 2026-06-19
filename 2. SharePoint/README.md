@@ -45,12 +45,16 @@ There are **two ways** to authenticate. Pick by **where the job runs**.
 | **Best when** | You run the job on a Windows host or CI (Task Scheduler, GitHub Actions) | You host the job in Azure (Container Apps Job) |
 | **`-Auth`** | `AppRegistration` (client secret **or** certificate) | `ManagedIdentity` |
 | **Secret to manage** | Yes — or use a certificate to avoid rotation | None |
-| **SharePoint write permission** | `Sites.Selected` (per-library, least privilege) | `Sites.ReadWrite.All` + `Files.ReadWrite.All` |
+| **SharePoint write permission** | `Sites.Selected` (per-library, least privilege) | `Sites.Selected` is also supported when you control the upload step (e.g. an Azure Automation runbook or your own ACA job). PAX's bundled `Deploy-PAXAcaJob.ps1` script requires the broader `Sites.ReadWrite.All` + `Files.ReadWrite.All` — that's a PAX upstream constraint, not an MI limitation. |
 | **Status in this repo** | ✅ Available now | ⏳ Pending the ACA Job — see [`azure-container/`](./azure-container/) |
 
-Both options use the **same Graph read permissions** (listed under *What you need*);
-they differ only in **how the identity signs in** and the **SharePoint write scope**.
-You run **one** of them, never both.
+Both options use the **same Graph read permissions** (listed under *What you need*).
+They differ only in **how the identity signs in**. Either auth model can use the
+least-privilege `Sites.Selected` SharePoint scope **as long as you own the upload
+step** (Automation runbook, custom ACA job, Task Scheduler). The only path that
+forces the broader `Sites.ReadWrite.All` + `Files.ReadWrite.All` is PAX's own
+`Deploy-PAXAcaJob.ps1` deployment script as-shipped — see the note in
+[`azure-container/`](./azure-container/). You run **one** option, never both.
 
 - **Option A** is what the rest of this guide uses. The scheduling helper
   ([`Register-TaskScheduler.ps1`](./scripts/Register-TaskScheduler.ps1)) runs the
