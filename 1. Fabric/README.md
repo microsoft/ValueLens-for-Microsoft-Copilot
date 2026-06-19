@@ -4,6 +4,8 @@ The recommended path. Notebooks pull your Copilot data from Microsoft Graph and 
 straight into a Lakehouse. The Power BI template is a thin client over the Lakehouse SQL endpoint, so
 all the heavy JSON parsing happens in Spark and the dataset stays small and fast.
 
+![Fabric architecture](./AIBV_Fabric_Architecture.png)
+
 > **Not only Fabric.** The same notebooks and template also run on **Azure Databricks**, **Synapse
 > Spark**, **Azure SQL**, or a **Fabric Warehouse** with no real changes. See
 > [Works beyond Fabric](#works-beyond-fabric).
