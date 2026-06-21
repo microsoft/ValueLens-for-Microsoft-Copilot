@@ -65,6 +65,7 @@ baseline** → summed to **Hours Saved** → × hourly rate = **Assisted Value**
 | Agents 365 | ⬜ Optional | Agent 365 export (Fabric path) |
 | Credit consumption (billing) | ⬜ Optional | Power Platform Admin Center export → see [`1. Fabric/CREDIT-CONSUMPTION-SETUP.md`](1.%20Fabric/CREDIT-CONSUMPTION-SETUP.md) |
 | Product feedback | ⬜ Optional | M365 Admin Center → Health → Product Feedback export |
+| Copilot Studio agent transcripts | ⬜ Optional | Dataverse `ConversationTranscript` table (Power Apps / Power Automate export, or direct Dataverse connection) |
 
 Optional sources are gated by `Enable_*` toggles — the dashboard works fine without them. The exact
 export + connect steps live in the path README you choose above.
