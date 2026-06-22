@@ -122,7 +122,7 @@ Produced by `Copilot_Agent_Transcript_Parser` (`SOURCE_MODE='dataverse'`, `AUTH_
 **app-registration service principal** added as an **Application User** (e.g. *Bot Transcript Viewer*
 role) in each environment. When Dataverse is not configured these six tables load empty.
 
-**`agent_sessions`** (23)
+**`agent_sessions`** (23, +`primary_topic_derived` when enrichment cell 5b runs)
 ```
 conversation_id, session_start_utc, session_duration_ms, user_id_hash,
 primary_agent_schema, connected_agent_schemas, connected_agent_count,
@@ -133,7 +133,7 @@ error_count, first_error_code,
 feedback_offered_count, feedback_submitted, feedback_verdict, feedback_comment,
 first_user_prompt
 ```
-**`agent_turns`** (17)
+**`agent_turns`** (17, +`topic_derived`, `role_inferred`, `role_mismatch` when enrichment cell 5b runs)
 ```
 conversation_id, turn_id, turn_timestamp_utc, turn_role, turn_channel,
 from_user_hash, text_preview_500, text_length,
@@ -141,6 +141,18 @@ intent_title, intent_id, intent_score,
 knowledge_searched, knowledge_answered, knowledge_sources,
 feedback_offered, feedback_verdict, feedback_comment
 ```
+
+**Transcript enrichment (notebook cell 5b — non-destructive, added)**
+A post-build step tags topics from the **full turn text** and infers speaker from message content. Originals (`turn_role`, `intent_title`) are kept untouched.
+
+| Column | Table | Meaning |
+| --- | --- | --- |
+| `topic_derived` | `agent_turns` | Business topic of the message — keyword taxonomy (default) or Azure OpenAI when `TOPIC_METHOD='llm'`. Noise buckets are prefixed 🚫. Far higher coverage than the export's sparse `intent_title`. |
+| `role_inferred` | `agent_turns` | Speaker inferred from content shape (official markup / length / question form). Falls back to `turn_role` when undecided. |
+| `role_mismatch` | `agent_turns` | `True` where `role_inferred` ≠ `turn_role` — a direct measure of source role-label quality (high on some channels). |
+| `primary_topic_derived` | `agent_sessions` | Most frequent non-noise `topic_derived` across the conversation's turns. |
+
+Config flags (cell 2): `TOPIC_METHOD` (`'keyword'`\|`'llm'`), `ROLE_INFERENCE` (bool), `TOPIC_TAXONOMY` (list), and `AOAI_*` for the optional LLM path.
 **`agent_errors`** (6)
 ```
 conversation_id, error_timestamp_utc, error_code, error_sub_code, error_message, is_user_error
@@ -184,6 +196,8 @@ StatusCode, StateCode
 | C | `agents_365` | Fabric model read a SharePoint URL | **Fixed** — `Copilot_Agent365_Lander` lands `dbo.agents_365`; table now `FabricTable` + `Enable_Agent365` |
 | D | Audit/Licensed/Org core M | Staged from an older snapshot assuming RAW audit JSON (unconditional adds + `Json.Document`) → "field already exists" on pre-flattened producer output | **Fixed** — re-based on the §7-fixed versions (17 `HasColumns` guards, conditional parse) |
 | E | `Agent Sessions → Org` (credits) | Join `user_id_hash → id` dangled because org producer never emitted `id`; credit-by-org showed 100% per org | **Fixed (producer)** — org ingester now emits Graph `id` (AAD objectId). Requires org re-land. |
+| F | `agent_turns.turn_role` | On some channels (esp. `m365copilot`) the source `from.role` does not match message content — agent-style answers tagged *user*, user questions tagged *bot* (a Copilot Studio transcript-export quirk, not a parser bug). | **Diagnosed + mitigated** — enrichment cell 5b adds `role_inferred` + `role_mismatch` (content heuristics) **without** altering `turn_role`. Run the cell to see per-channel mismatch rates; the dashboard can opt into `role_inferred`. A source-side fix needs raw `content_json` inspection in Fabric. |
+| G | `agent_turns.intent_title` | Topic field is populated for only ~4% of turns and is mostly system labels (`Logging`, `[System] - Response Preparation`), so topic analysis on it is near-empty. | **Mitigated** — cell 5b adds `topic_derived` mined from full message text (keyword default; Azure OpenAI optional). Upgrade path: switch `TOPIC_METHOD='llm'`. |
 
 ## Known limitation — cross-environment / cross-tenant user identity
 
