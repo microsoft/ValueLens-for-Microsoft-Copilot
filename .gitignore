@@ -1,7 +1,9 @@
-# Customer data — never commit
+﻿# Customer data â€” never commit
 *.csv
 !sample-data/*.csv
 !docs/*.csv
+# Synthetic anonymised smoke-test fixture (kept in repo for CI)
+!1. Fabric/notebooks/samples/**/*.csv
 
 # Power BI workspace artefacts
 *.pbip.local
@@ -25,3 +27,5 @@ Thumbs.db
 *.parquet
 
 *.xlsx
+
+

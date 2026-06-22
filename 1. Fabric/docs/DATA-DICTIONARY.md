@@ -122,7 +122,7 @@ Produced by `Copilot_Agent_Transcript_Parser` (`SOURCE_MODE='dataverse'`, `AUTH_
 **app-registration service principal** added as an **Application User** (e.g. *Bot Transcript Viewer*
 role) in each environment. When Dataverse is not configured these six tables load empty.
 
-**`agent_sessions`** (23, +`primary_topic_derived` when enrichment cell 5b runs)
+**`agent_sessions`** (23, +`primary_topic_derived` when enrichment cell 5b runs, **+4** when enrichment cell 5c runs)
 ```
 conversation_id, session_start_utc, session_duration_ms, user_id_hash,
 primary_agent_schema, connected_agent_schemas, connected_agent_count,
@@ -131,7 +131,9 @@ total_displayed_cost, total_latency_ms,
 knowledge_searched, knowledge_answered, knowledge_sources_count,
 error_count, first_error_code,
 feedback_offered_count, feedback_submitted, feedback_verdict, feedback_comment,
-first_user_prompt
+first_user_prompt,
+session_outcome_explicit, session_outcome_reason_explicit,
+is_authenticated, is_returning_user
 ```
 **`agent_turns`** (17, +`topic_derived`, `role_inferred`, `role_mismatch` when enrichment cell 5b runs)
 ```
@@ -167,7 +169,7 @@ user_id_hash, plan_step_id
 ```
 agent_schema, agent_display_name, agent_class
 ```
-**`agent_performance`** (39)
+**`agent_performance`** (39, **+18** when enrichment cell 5c runs)
 ```
 ConversationTranscriptId, ConversationStartTime, SchemaVersion, BotName, BotId,
 AADTenantId, BatchId, SessionStartTimeUtc, SessionEndTimeUtc,
@@ -180,9 +182,52 @@ DurationSeconds, AverageLatencyMs,
 Var_ESS_UserContext_UPN, Var_ESS_Message_Disclaimer,
 Var_ESS_UserContext_RefreshInterval_Hours, Var_ESS_UserContext_Conversation_Initialized,
 AllVariables, TotalActivityCount, TraceActivityCount, EventActivityCount,
-StatusCode, StateCode
+StatusCode, StateCode,
+SessionOutcomeExplicit, SessionOutcomeReasonExplicit, IsAuthenticated,
+TopicsStarted, TopicsCompleted, TopicCompletionRate,
+PrimaryTopicDwellMs, TotalTopicDwellMs,
+LLMCallCount, PromptTokenCount, CompletionTokenCount, TotalTokenCount,
+PluginCallCount, PluginSuccessCount, GenerativeResponseCount,
+MultiAgentSession, FirstErrorCode, ErrorCategory
 ```
-*When `TAG_ENVIRONMENT=True`, the five fact tables also carry `source_environment` (and
+
+**Deep-dive transcript enrichment (notebook cell 5c — non-destructive, added)**
+A second post-build step derives Copilot Studio platform-emitted signals from
+`parsed['content_json']` and joins them onto `agent_sessions` and
+`agent_performance` (no edits to the build_* functions). Also produces the new
+`agent_variables` fact table. All matchers calibrated to the **real** Copilot
+Studio transcript schema (`SessionInfo`, `IntentRecognition`, `GPTAnswer`,
+`VariableAssignment`, `ConnectedAgentInitializeTraceData`,
+`AuthenticationTraceData`, `ErrorTraceData`) — verified end-to-end with a
+8-transcript files-mode smoke test (7 tables, all enrichment columns populating).
+
+| Column | Table | Source | Meaning |
+| --- | --- | --- | --- |
+| `session_outcome_explicit` | `agent_sessions` | `SessionInfo.outcome` | Platform-emitted explicit outcome (replaces the heuristic). Falls back to legacy `ConversationEnd*` traces if a future export emits them. |
+| `session_outcome_reason_explicit` | `agent_sessions` | `SessionInfo.outcomeReason` | Reason string from the same trace. |
+| `is_authenticated` | `agent_sessions` | `AuthenticationTraceData` OR `aadObjectId` on any message | `True` when the user resolved to Entra (explicit auth success **or** implicit aadObjectId). |
+| `is_returning_user` | `agent_sessions` | Computed post-build | `True` when the user has at least one earlier session in the same batch (ordered by `session_start_utc`). |
+| `SessionOutcomeExplicit` / `SessionOutcomeReasonExplicit` / `IsAuthenticated` | `agent_performance` | (same sources) | PascalCase mirror of the `agent_sessions` columns, on the KPI fact. |
+| `TopicsStarted` / `TopicsCompleted` / `TopicCompletionRate` | `agent_performance` | `IntentRecognition` (preferred) or `TopicStart`/`TopicEndTrace` | Count of recognised intents (Copilot Studio's actual unit of "topic"); completion = no `ErrorTraceData` followed. |
+| `PrimaryTopicDwellMs` / `TotalTopicDwellMs` | `agent_performance` | Time between consecutive `IntentRecognition` events | Coarse dwell measure — gap to next intent (or session end). |
+| `LLMCallCount` / `PromptTokenCount` / `CompletionTokenCount` / `TotalTokenCount` | `agent_performance` | `LLMCallTraceData` / `LlmCallTraceData` / `GenerativeAnswer` | LLM cost proxy; tokens summed across all calls in the session. |
+| `PluginCallCount` / `PluginSuccessCount` | `agent_performance` | `*Plugin*` / `*Tool*` / `ConnectorAction` traces | Connector / Power Automate / plugin invocations + success counter. |
+| `GenerativeResponseCount` | `agent_performance` | `GPTAnswer` trace (real Copilot Studio schema) | Number of generative answers in the session. |
+| `MultiAgentSession` | `agent_performance` | Any `ConnectedAgentInitializeTraceData` present | Flag for sessions that crossed into a child / connected agent. |
+| `FirstErrorCode` / `ErrorCategory` | `agent_performance` | First `ErrorTraceData` in the session | Categorised into Knowledge / Flow-Plugin / Auth / LLM-Model / Transient / Runtime / User. |
+
+### 12. `agent_variables` — Copilot Studio variable assignments fact
+Built by enrichment cell 5c. One row per `(conversation_id, variable_name)` —
+decomposes the `VariableAssignment` trace activities that Copilot Studio writes
+on every turn, exposing every custom variable an agent author has defined as a
+first-class slicer in the dashboard. Most-recent value wins on conflict within
+a session. Long values are truncated to 1,000 chars.
+
+```
+conversation_id, variable_name, variable_value
+```
+
+*When `TAG_ENVIRONMENT=True`, the six fact tables also carry `source_environment` (and
 `agent_catalogue` carries `source_environments`).*
 
 ---
