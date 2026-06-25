@@ -1,7 +1,7 @@
 /// Fabric Lakehouse/Warehouse SQL connection string (the SQL analytics endpoint).
 /// Find it in Fabric: open the Lakehouse → Settings → SQL analytics endpoint → Connection string,
 /// e.g. xxxxxxxxxxxx.datawarehouse.fabric.microsoft.com
-expression 'Fabric SQL Endpoint' = "ekozrqaqpe7uzfbn7zp2lqr3ke-zilaekog6zpejjsartknneu53y.datawarehouse.fabric.microsoft.com" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+expression 'Fabric SQL Endpoint' = ""
 	lineageTag: 1a2b3c4d-fab1-4001-8001-000000000001
 
 	annotation PBI_NavigationStepName = Navigation
@@ -9,7 +9,7 @@ expression 'Fabric SQL Endpoint' = "ekozrqaqpe7uzfbn7zp2lqr3ke-zilaekog6zpejjsar
 	annotation PBI_ResultType = Text
 
 /// Name of the Lakehouse (or Warehouse) that holds the Delta tables written by the four Fabric notebooks.
-expression 'Lakehouse Name' = "CopilotAdoptionLakeTEST" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+expression 'Lakehouse Name' = ""
 	lineageTag: 1a2b3c4d-fab1-4002-8002-000000000002
 
 	annotation PBI_NavigationStepName = Navigation
@@ -37,13 +37,13 @@ expression EmptyTable = (columns as list) as table => #table(columns, {})
 	annotation PBI_ResultType = Function
 
 /// Toggle (optional): load the Dataverse agent tables. False => they load empty.
-expression Enable_Dataverse = "Include" meta [IsParameterQuery=true, List={"Include", "Exclude"}, DefaultValue="Include", Type="Text", IsParameterQueryRequired=true]
+expression Enable_Dataverse = "Include"
 	lineageTag: 1a2b3c4d-fab1-4005-8005-000000000005
 
 	annotation PBI_ResultType = Text
 
 /// Toggle (optional): load the Product Feedback (OCV) table user_feedback.
-expression Enable_ProductFeedback = "Include" meta [IsParameterQuery=true, List={"Include", "Exclude"}, DefaultValue="Include", Type="Text", IsParameterQueryRequired=true]
+expression Enable_ProductFeedback = "Exclude"
 	lineageTag: 1a2b3c4d-fab1-4006-8006-000000000006
 
 	annotation PBI_ResultType = Text
@@ -67,70 +67,13 @@ expression Enable_Consumption = "Include" meta [IsParameterQuery=true, List={"In
 /// "Fabric"        => read the pre-parsed Delta tables from the Lakehouse (original behaviour).
 /// "Dataverse"     => pull conversationtranscripts straight from Dataverse and parse in Power Query.
 /// "TranscriptCSV" => parse a local conversationtranscripts.csv (same JSON content schema as Dataverse) —
-///                    used to validate the parser offline / on exported data. Credit + Agents 365 stay CSV.
-expression 'Source Mode' = "Fabric" meta [IsParameterQuery=true, List={"Fabric", "Dataverse", "TranscriptCSV"}, DefaultValue="Fabric", Type="Text", IsParameterQueryRequired=true]
+/// used to validate the parser offline / on exported data. Credit + Agents 365 stay CSV.
+expression 'Source Mode' = "Dataverse"
 	lineageTag: 1a2b3c4d-dv01-4101-8101-000000000101
 
 	annotation PBI_NavigationStepName = Navigation
 
 	annotation PBI_ResultType = Text
-
-/// Path to a conversationtranscripts.csv (columns: conversationtranscriptid, content, conversationstarttime,
-/// name). Used when Source Mode = "TranscriptCSV". The `content` column holds the per-conversation JSON.
-expression 'Transcript CSV Path' = "" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
-	lineageTag: 1a2b3c4d-dv01-4104-8104-000000000104
-
-	annotation PBI_NavigationStepName = Navigation
-
-	annotation PBI_ResultType = Text
-
-/// Folder holding the supporting CSV exports for the non-Fabric paths — the credit-consumption files,
-/// Agents 365, and the org/people file. Files are read by their canonical names (see CsvTable). Populate
-/// it however you like: the manual portal exports, or the Power Automate / Entra-Graph-to-SharePoint
-/// landing flows. Used when Source Mode = "Dataverse" or "TranscriptCSV".
-expression 'CSV Folder Path' = "" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
-	lineageTag: 1a2b3c4d-dv01-4110-8110-000000000110
-
-	annotation PBI_NavigationStepName = Navigation
-
-	annotation PBI_ResultType = Text
-
-/// Helper: read a supporting CSV by its canonical base name from the CSV Folder Path (e.g.
-/// CsvTable("copilot_org_data") -> {folder}\copilot_org_data.csv). Headers promoted, all columns text;
-/// each consuming table applies its own type coercion downstream (matches the old files-mode behaviour).
-/// Returns an empty table if the file is missing, so an absent optional export never breaks refresh.
-/// Helper: read a supporting CSV by its canonical base name from the CSV Folder Path (e.g.
-/// CsvTable("copilot_org_data") -> {folder}\copilot_org_data.csv). Headers promoted as-is (raw). Errors
-/// if the file is missing, so callers can `try CsvTable(...) otherwise EmptyTable(...)` to degrade
-/// gracefully. Used for sources whose table has its own column detection (org data, Agents 365).
-expression CsvTable =
-		(fileName as text) as table =>
-			let
-				Path = Text.TrimEnd(#"CSV Folder Path", "\") & "\" & fileName & ".csv",
-				Doc = Csv.Document(File.Contents(Path), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
-				Prom = Table.PromoteHeaders(Doc, [PromoteAllScalars = true])
-			in
-				Prom
-	lineageTag: 1a2b3c4d-dv01-4111-8111-000000000111
-
-	annotation PBI_ResultType = Function
-
-/// Helper: like CsvTable but normalises headers to the underscore convention the Fabric SQL endpoint
-/// returns (space / slash / dash -> underscore, parens stripped) so raw portal exports bind to the exact
-/// column names the model's credit-consumption tables expect. Errors if the file is missing.
-expression CsvTableNorm =
-		(fileName as text) as table =>
-			let
-				Path = Text.TrimEnd(#"CSV Folder Path", "\") & "\" & fileName & ".csv",
-				Doc = Csv.Document(File.Contents(Path), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
-				Prom = Table.PromoteHeaders(Doc, [PromoteAllScalars = true]),
-				Norm = Table.TransformColumnNames(Prom, each
-						Text.Trim(Text.Replace(Text.Replace(Text.Replace(Text.Replace(Text.Replace(_, " ", "_"), "/", "_"), "-", "_"), "(", ""), ")", "")))
-			in
-				Norm
-	lineageTag: 1a2b3c4d-dv01-4112-8112-000000000112
-
-	annotation PBI_ResultType = Function
 
 /// Dataverse environment URL (e.g. https://yourorg.crm.dynamics.com). Used when Source Mode = "Dataverse".
 /// Find it in Power Platform Admin Center → Environments → <your env> → Environment URL.
@@ -158,6 +101,85 @@ expression DataverseEntity =
 
 	annotation PBI_ResultType = Function
 
+/// Path to a conversationtranscripts.csv (columns: conversationtranscriptid, content, conversationstarttime,
+/// name). Used when Source Mode = "TranscriptCSV". The `content` column holds the per-conversation JSON.
+expression 'Transcript CSV Path' = ""
+	lineageTag: 1a2b3c4d-dv01-4104-8104-000000000104
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Text
+
+/// Folder holding the supporting CSV exports for the non-Fabric paths — the credit-consumption files,
+/// Agents 365, and the org/people file. Files are read by their canonical names (see CsvTable). Populate
+/// it however you like: the manual portal exports, or the Power Automate / Entra-Graph-to-SharePoint
+/// landing flows. Used when Source Mode = "Dataverse" or "TranscriptCSV".
+expression 'CSV Folder Path' = "" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 1a2b3c4d-dv01-4110-8110-000000000110
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Text
+
+/// Helper: fetch the binary for a canonical CSV by base name, auto-detecting the source of
+/// CSV Folder Path. If it starts with "https://" it's treated as a SharePoint site URL and the
+/// file is located with SharePoint.Files (matched on file name, anywhere in the site — the five
+/// canonical names are unique). Otherwise it's a local / synced / UNC folder read with
+/// File.Contents. SharePoint URLs refresh in the Service cloud-to-cloud (OAuth2, no gateway);
+/// local/synced folders need an on-premises data gateway.
+expression CsvBinary =
+		(fileName as text) as binary =>
+			let
+				Root = #"CSV Folder Path",
+				IsSharePoint = Text.StartsWith(Text.Lower(Root), "https://"),
+				Target = fileName & ".csv",
+				Bin =
+					if IsSharePoint then
+						let
+							Site = Text.TrimEnd(Root, "/"),
+							Files = SharePoint.Files(Site, [ApiVersion = 15]),
+							Match = Table.SelectRows(Files, each Text.Lower([Name]) = Text.Lower(Target)){0}[Content]
+						in
+							Match
+					else
+						File.Contents(Text.TrimEnd(Root, "\") & "\" & Target)
+			in
+				Bin
+	lineageTag: 1a2b3c4d-dv01-4113-8113-000000000113
+
+	annotation PBI_ResultType = Function
+
+/// Helper: read a supporting CSV by its canonical base name from the CSV Folder Path (e.g.
+/// CsvTable("copilot_org_data") -> {folder}\copilot_org_data.csv). Headers promoted as-is (raw). Errors
+/// if the file is missing, so callers can `try CsvTable(...) otherwise EmptyTable(...)` to degrade
+/// gracefully. Used for sources whose table has its own column detection (org data, Agents 365).
+expression CsvTable =
+		(fileName as text) as table =>
+			let
+				Doc = Csv.Document(CsvBinary(fileName), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+				Prom = Table.PromoteHeaders(Doc, [PromoteAllScalars = true])
+			in
+				Prom
+	lineageTag: 1a2b3c4d-dv01-4111-8111-000000000111
+
+	annotation PBI_ResultType = Function
+
+/// Helper: like CsvTable but normalises headers to the underscore convention the Fabric SQL endpoint
+/// returns (space / slash / dash -> underscore, parens stripped) so raw portal exports bind to the exact
+/// column names the model's credit-consumption tables expect. Errors if the file is missing.
+expression CsvTableNorm =
+		(fileName as text) as table =>
+			let
+				Doc = Csv.Document(CsvBinary(fileName), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+				Prom = Table.PromoteHeaders(Doc, [PromoteAllScalars = true]),
+				Norm = Table.TransformColumnNames(Prom, each
+						Text.Trim(Text.Replace(Text.Replace(Text.Replace(Text.Replace(Text.Replace(_, " ", "_"), "/", "_"), "-", "_"), "(", ""), ")", "")))
+			in
+				Norm
+	lineageTag: 1a2b3c4d-dv01-4112-8112-000000000112
+
+	annotation PBI_ResultType = Function
+
 /// Helper: the RAW conversation transcripts, returned identically whichever source mode is active —
 /// columns conversationtranscriptid | content | conversationstarttime | name | agent_schema_hint. The
 /// parser consumes this, so logic is source-agnostic. agent_schema_hint comes from the Dataverse bot
@@ -171,11 +193,18 @@ expression RawTranscripts =
 				Output =
 					if #"Source Mode" = "Dataverse" then
 						let
-							Src = DataverseEntity("conversationtranscripts", "?$select=conversationtranscriptid,content,conversationstarttime,name&$expand=bot_conversationtranscriptid($select=schemaname)"),
+							// Try WITH the bot-schema expand; some environments don't expose the
+							// bot_conversationtranscriptid navigation property, so fall back to a plain
+							// select (agent_schema_hint = null; the parser then derives the agent from
+							// the JSON content). Keeps the Dataverse path robust across environments.
+							SrcExpanded = try DataverseEntity("conversationtranscripts", "?$select=conversationtranscriptid,content,conversationstarttime,name&$expand=bot_conversationtranscriptid($select=schemaname)"),
+							SrcPlain    = DataverseEntity("conversationtranscripts", "?$select=conversationtranscriptid,content,conversationstarttime,name"),
+							HasExpand   = SrcExpanded[HasError] = false and List.Contains(Table.ColumnNames(SrcExpanded[Value]), "bot_conversationtranscriptid"),
+							Src         = if SrcExpanded[HasError] = false then SrcExpanded[Value] else SrcPlain,
 							Have = List.Intersect({Cols, Table.ColumnNames(Src)}),
-							Sel = Table.SelectColumns(Src, Have, MissingField.UseNull),
 							// Flatten the bot lookup record to a schemaname text hint when present.
 							WithHint = Table.AddColumn(Src, "agent_schema_hint", each
+									if not HasExpand then null else
 									let b = try [bot_conversationtranscriptid] otherwise null
 									in if b = null then null else (try Text.From(Record.FieldOrDefault(b, "schemaname", null)) otherwise null), type text),
 							Keep = Table.SelectColumns(WithHint, List.Combine({Have, {"agent_schema_hint"}}), MissingField.UseNull)
@@ -504,7 +533,7 @@ expression Parse_SubAgents =
 	annotation PBI_ResultType = Function
 
 /// M port of build_agent_performance(): one row per conversation with the per-conversation KPI fact
-/// (outcome, implied success, topics, durations, user UPN). Matches the agent_performance Delta contract
+/// (outcome, implied success, topics, durations, ESS UPN). Matches the agent_performance Delta contract
 /// (39 source columns). Drives the Quality & Performance / Agent Evaluation pages.
 expression Parse_Performance =
 		() as table =>
