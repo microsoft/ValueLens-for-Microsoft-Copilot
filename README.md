@@ -31,7 +31,7 @@ data gets in and how it refreshes.
 | Path | Best when… | What it gives you |
 |---|---|---|
 | **[1. Fabric](1.%20Fabric/)** *(recommended)* | You have **Fabric capacity** (or Premium / PPU) — or any Spark + SQL stack. | Notebooks parse the data into a Lakehouse → best performance, sub‑second dashboard, and the optional billing & feedback pages. The same notebooks + template also run on Databricks, Synapse, or Azure SQL. |
-| **[2. SharePoint](2.%20SharePoint/)** | Power BI Pro, **no Fabric** / Premium. You want scheduled refresh without a gateway. | [Microsoft PAX](https://github.com/microsoft/PAX) extracts in parallel partitions, a Python processor produces two rollup CSVs, the template refreshes from those SharePoint URLs. The simplest core deployment. |
+| **[2. SharePoint](2.%20SharePoint/)** | Power BI Pro, **no Fabric** / Premium. | Two ways in: a **manual first-run** (export two CSVs → run one Python processor → connect the Local-CSV template — great for a quick look at the numbers), or **automated** scheduled refresh via [Microsoft PAX](https://github.com/microsoft/PAX) → SharePoint. The simplest core deployment. |
 
 **Not sure?** **Fabric** is the recommended path — it scales furthest and unlocks the optional
 billing/feedback pages. No Fabric or Premium capacity? **SharePoint** runs the core dashboard on just
@@ -74,6 +74,9 @@ export + connect steps live in the path README you choose above.
 
 ## 📚 Dashboard pages
 
+<details>
+<summary>15 report pages — adoption, value, maturity, governance, billing & appendices</summary>
+
 | Page | Purpose |
 |---|---|
 | **User Activation** | Activation across teams — licensed vs unlicensed, active vs inactive |
@@ -92,14 +95,21 @@ export + connect steps live in the path README you choose above.
 | **Appendix: Glossary** | Metric definitions and research sources |
 | **Appendix: Signal Table** | Trace raw signals through to value (audit trail) |
 
+</details>
+
 ---
 
 ## 🔬 Research sources
+
+<details>
+<summary>Published time-baseline sources behind the value model</summary>
 
 Human‑time baselines are drawn from published research — Microsoft Research, MIT/Science (Noy &
 Zhang 2023), NBER (Brynjolfsson et al. 2023), BCG/Harvard (Dell'Acqua et al. 2023), McKinsey,
 Forrester TEI, IDC, and others. The full per‑task source list is in the **📖 Metric Glossary** page
 inside the template.
+
+</details>
 
 ---
 

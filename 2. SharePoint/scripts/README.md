@@ -11,7 +11,7 @@ reference.
 | `Upload-Rollups-SharePoint.ps1` | Uploads the two rollup CSVs to fixed file names in your SharePoint library (overwrites the previous run). | **Every refresh, after the extract.** |
 | `Register-TaskScheduler.ps1` | Registers the above two as a single daily Windows Scheduled Task. | **Once, when you want to schedule.** |
 | `Get-Agents365Registry.ps1` | Optional. Exports the Agents 365 registry for the dashboard's Agents 365 page. | Ad-hoc. |
-| `Purview_CopilotInteraction_Processor_v4.0.0.py` | Legacy fallback processor. The main wrapper now uses the PAX release script directly. | Edge cases only. |
+| `Purview_CopilotInteraction_Processor_v4.0.0.py` | **Manual extract.** Turns a raw Purview audit CSV + an Entra users CSV into the two rollup CSVs the template reads — without running PAX. | **First run / quick look** (see Option A in the [folder README](../README.md)). |
 
 ---
 
@@ -110,3 +110,28 @@ Unregister-ScheduledTask -TaskName 'AIBV-Rollup-Refresh' -Confirm:$false
 
 The client secret is **not** stored in the task — both scripts pull it at
 runtime via the resolution chain above.
+
+---
+
+## `Purview_CopilotInteraction_Processor_v4.0.0.py`
+
+The **manual** alternative to PAX. Bring two exports yourself — it produces the same two rollup CSVs
+the template reads. Use it for a **first run / quick look** with no app registration or scheduling
+(this is **Option A** in the [folder README](../README.md)).
+
+```bash
+python "Purview_CopilotInteraction_Processor_v4.0.0.py" \
+    --purview  "<raw_copilot_interactions.csv>" \   # Purview audit export (CopilotInteraction)
+    --entra    "<entra_users_with_licensing.csv>" \ # Entra users export incl. Copilot licence flag
+    --profile  aibv                                 # default; AI Business Value fact superset
+```
+
+Outputs (in `--out-dir`, default = the `--purview` folder):
+- `<purview_stem>_Interactions_<ts>.csv` — fact table
+- `<entra_stem>_Users_<ts>.csv` — users dim
+
+Point the **`… - SharePoint (Local CSV).pbit`** template at those two files, or upload them to
+SharePoint with `Upload-Rollups-SharePoint.ps1` to use the standard template. Run with `--help` for
+all options (`--out-dir`, `--with-aggregates`, `--profile aio`). Requires **Python 3.9+**
+(`pip install orjson` optional, for faster parsing). Column contract:
+[`../../1. Fabric/docs/DATA-DICTIONARY.md`](../../1.%20Fabric/docs/DATA-DICTIONARY.md).
