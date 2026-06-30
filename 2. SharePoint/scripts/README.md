@@ -12,6 +12,7 @@ reference.
 | `Register-TaskScheduler.ps1` | Registers the above two as a single daily Windows Scheduled Task. | **Once, when you want to schedule.** |
 | `Get-Agents365Registry.ps1` | Optional. Exports the Agents 365 registry for the dashboard's Agents 365 page. | Ad-hoc. |
 | `Purview_CopilotInteraction_Processor_v4.0.0.py` | **Manual extract.** Turns a raw Purview audit CSV + an Entra users CSV into the two rollup CSVs the template reads — without running PAX. | **First run / quick look** (see Option A in the [folder README](../README.md)). |
+| `Adapt-OrgFile-To-EntraUsers.py` | Optional helper for the manual extract. Normalises a **custom HR/org export** (any headers/delimiter) into the EntraUsers-shaped `--entra` input the processor expects. | Before the processor, when your org file isn't a standard Entra users export. |
 
 ---
 
@@ -135,3 +136,24 @@ SharePoint with `Upload-Rollups-SharePoint.ps1` to use the standard template. Ru
 all options (`--out-dir`, `--with-aggregates`, `--profile aio`). Requires **Python 3.9+**
 (`pip install orjson` optional, for faster parsing). Column contract:
 [`../../1. Fabric/docs/DATA-DICTIONARY.md`](../../1.%20Fabric/docs/DATA-DICTIONARY.md).
+
+---
+
+## `Adapt-OrgFile-To-EntraUsers.py`
+
+Optional pre-step for the manual extract. The processor's `--entra` input must be in PAX's
+**EntraUsers** shape (it joins to the audit log on `userPrincipalName`). If your org/HR export uses
+different headers, an employee-ID key, a semicolon delimiter or UTF-16, this adapter maps it into the
+expected shape (and can flatten the manager chain into the `Level0..N` hierarchy for org drill-down).
+
+```bash
+python "Adapt-OrgFile-To-EntraUsers.py" \
+    --in   "<custom_org_export.csv>" \
+    --out  "EntraUsers_adapted.csv" \
+    --upn-col "<your UPN column>"
+# then feed EntraUsers_adapted.csv to the processor's --entra
+```
+
+> **Critical:** the `--upn-col` value must be the **same UPN** that appears in the Purview audit log,
+> or users won't join and every interaction shows as unmatched. Run with `--help` for the full
+> column-mapping options.

@@ -7,6 +7,12 @@ billing pages on the Fabric version of the dashboard. **No coding required for t
 > stay empty and everything else works. Only do this if you want the **Credits Consumed**,
 > **Agent Evaluation** billing cards, etc.
 
+> **Credit vs Cost — don't confuse the two.** *This* guide covers **Copilot Studio credit
+> consumption** — the Power Platform Admin Center `MCSMessages` exports (per-agent / per-user /
+> per-environment **message** credits). A separate, newer source — the **Microsoft 365 Admin Center →
+> Copilot → Cost management → Consumption** export — breaks credits down by **Cowork / WorkIQ / Other**
+> surface and is documented separately. Different portals, different grain.
+
 ---
 
 ## What you're setting up

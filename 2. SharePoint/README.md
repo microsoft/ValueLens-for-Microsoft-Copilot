@@ -20,8 +20,11 @@ Both produce the **same two rollup CSVs** the dashboard reads
 
 ## Option A — Manual (first run)
 
-> The fastest way to see real numbers. You supply two exports; the processor turns them into the
-> two rollup CSVs the template reads. Nothing is uploaded and no app registration is needed.
+> The fastest way to see real numbers — supply two exports, run one script, connect the template.
+> No upload, no app registration. **Great for a first look at how the numbers land.**
+
+<details>
+<summary><strong>Manual extract — step by step</strong></summary>
 
 **You need:** any shell, **Python 3.9+**, and read access to the two admin exports below.
 
@@ -31,6 +34,9 @@ Both produce the **same two rollup CSVs** the dashboard reads
 |---|---|---|
 | Raw **Copilot interactions** (audit log CSV) | Microsoft **Purview** -> Audit -> search `CopilotInteraction` -> Export | `--purview` input |
 | **Users + licensing** (Entra users CSV with each user's Copilot licence flag) | Microsoft **Entra** / M365 Admin Center -> Users -> Export | `--entra` input |
+
+> Got a custom HR/org export instead of a standard Entra users file? Normalise it first with
+> [`scripts/Adapt-OrgFile-To-EntraUsers.py`](./scripts/Adapt-OrgFile-To-EntraUsers.py) to produce the `--entra` input.
 
 **2. Run the processor** ([`scripts/Purview_CopilotInteraction_Processor_v4.0.0.py`](./scripts/Purview_CopilotInteraction_Processor_v4.0.0.py))
 
@@ -60,6 +66,8 @@ parameters at the rollup CSVs from step 2:
 
 > Want this on a schedule instead? Upload the same two CSVs to SharePoint (see **Option B → Daily
 > refresh → Upload** below) and use the standard `…- SharePoint.pbit` template.
+
+</details>
 
 ---
 

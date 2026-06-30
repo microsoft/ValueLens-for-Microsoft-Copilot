@@ -6,6 +6,7 @@
 # Power BI workspace artefacts
 *.pbip.local
 *.pbix
+*BACKUP*.pbit
 .pbi/
 .DS_Store
 Thumbs.db

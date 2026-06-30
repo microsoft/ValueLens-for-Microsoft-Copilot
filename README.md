@@ -40,6 +40,19 @@ Power BI Pro.
 > Each path folder has its **own README** with the exact, step‑by‑step setup. This page is just the
 > map.
 
+<details>
+<summary>📁 <strong>Repo layout</strong></summary>
+
+```
+README.md  ·  LICENSE  ·  Images/
+1. Fabric/      Fabric.pbit  +  deeper Studio-analysis build (richer agent/topic/CSAT pages)
+                docs/  ·  flows/  ·  notebooks/  ·  pipelines/  ·  CREDIT-CONSUMPTION-SETUP.md
+2. SharePoint/  SharePoint.pbit  ·  SharePoint (Local CSV).pbit  ·  scripts/  ·  azure-container/
+3. Dataverse/   Dataverse.pbit  ·  model_expressions_reference.tmdl
+archive/        superseded versions — kept for reference, not maintained
+```
+</details>
+
 ---
 
 ## 📊 What it measures
