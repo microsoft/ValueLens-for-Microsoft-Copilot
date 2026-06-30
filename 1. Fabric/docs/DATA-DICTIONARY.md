@@ -108,6 +108,35 @@ Landed into the Lakehouse by `Copilot_Agent365_Lander` (CSV → `dbo.agents_365`
 preserves spaced header names like `Agent name`) and read via `FabricTable("agents_365")`, wrapped with
 `Enable_Agent365`. The Fabric model is now **100% Lakehouse-sourced**. Columns from the Agents MAC export.
 
+#### Agent identity resolution (3-key bridge: Entra → Title ID → Name)
+
+The interactions fact joins the Agents dimension through a **resolved key** (`Agent_LinkID`) rather
+than the raw `Agent_TitleID`. This is necessary because the **audit log and the MAC Agents export use
+different identifier namespaces** — the audit `AgentId` is an `SPO_…` blob, a built-in name
+(`WordDraftingAgent`), or an **Entra Agent ID GUID** (Agent 365), while the export keys on `T_…`
+Title IDs. On real tenant data the raw `Agent_TitleID → Title ID` join matches **0%**; resolving the
+shared **display name** lifts that to ~**84% of distinct agents** (the unmatched remainder are mostly
+Microsoft first-party agents that legitimately have no registry row).
+
+Resolution is done in Power Query (no DAX circular-dependency risk; mirrors the existing license merge),
+as a **priority chain** that always lands on a real registry `Title ID` or null:
+
+1. **Entra Agent ID** — `Agent_EntraId → agents_365[Entra Agent ID]` (future Agent 365 agents).
+2. **Direct Title ID** — `Agent_TitleID` only when it already *is* a registry Title ID.
+3. **Normalised name** — `lower(trim(AgentName)) → agents_365[Agent name]` (the high-yield fallback).
+
+`Agent_LinkID = COALESCE(EntraTitle, DirectTitle, NameTitle)`. All three lookup maps are deduped and
+null-guarded, so the 1.2M-row fact never fans out. The relationship is
+**`Chat + Agent Interactions[Agent_LinkID] → agents_365[Title ID]`** (replaces the old `Agent_TitleID`
+relationship; cross-filter direction unchanged).
+
+**Zero-touch identity detection.** `agents_365` is given an add-if-missing **`Entra Agent ID`** column
+that **auto-detects** the GUID from whatever the export provides — it picks the first present of
+`Entra Agent ID → EntraAgentId → Agent ID → Bot Id` (and common variants). The customer never has to
+create or populate a column by hand; a non-matching GUID simply does not join (no false links). Until
+an export carries Entra GUIDs, custom agents still resolve by name.
+**Dataverse path:** not applicable — it keys agents on `botSchemaName` (transcript trace), not audit `AgentId`.
+
 ### 5. `user_feedback` — Product Feedback (OCV export)
 **Not** a Dataverse source — it is an OCV/Viva feedback **CSV** dropped at
 `Files/copilot_transcripts/feedback.csv`, parsed by `build_feedback()`. The dashboard's
