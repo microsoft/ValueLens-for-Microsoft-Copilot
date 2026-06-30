@@ -160,17 +160,25 @@ Produced by `Copilot_Agent_Transcript_Parser` (`SOURCE_MODE='dataverse'`, `AUTH_
 **app-registration service principal** added as an **Application User** (e.g. *Bot Transcript Viewer*
 role) in each environment. When Dataverse is not configured these six tables load empty.
 
-**`agent_sessions`** (23)
+**`agent_sessions`** (31)
 ```
 conversation_id, session_start_utc, session_duration_ms, user_id_hash,
-primary_agent_schema, connected_agent_schemas, connected_agent_count,
+primary_agent_schema, agent_name, agent_id,
+connected_agent_schemas, connected_agent_count,
 msg_count, user_msg_count, bot_msg_count, plan_step_count,
 total_displayed_cost, total_latency_ms,
-knowledge_searched, knowledge_answered, knowledge_sources_count,
+knowledge_searched, knowledge_answered, knowledge_sources_count, grounding_source,
 error_count, first_error_code,
 feedback_offered_count, feedback_submitted, feedback_verdict, feedback_comment,
-first_user_prompt
+first_user_prompt,
+session_outcome_explicit, session_outcome_reason_explicit,
+is_authenticated, is_returning_user, primary_topic_derived
 ```
+> `primary_agent_schema` is the agent **join key** (→ `agent_catalogue.agent_schema`). It is
+> resolved from the most reliable signal available — Dataverse bot lookup, then bot-message
+> `from.name`/`from.id`, then user-message `recipient`, then orchestration trace, then the
+> transcript `name` — so single-agent transcripts (no orchestration trace) are still attributed.
+> `agent_name` / `agent_id` carry the real resolved bot display name and id for richer binding.
 **`agent_turns`** (17)
 ```
 conversation_id, turn_id, turn_timestamp_utc, turn_role, turn_channel,
