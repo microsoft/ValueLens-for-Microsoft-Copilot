@@ -23,6 +23,7 @@ and the measures simply return `0`/blank.
 | `Enable_ProductFeedback` | `"Include"` | `user_feedback` (ProductFeedback) |
 | `Enable_Agent365` | `"Include"` | `agents_365` (Agents 365) |
 | `Enable_Consumption` | `"Include"` | the 3 billing tables (`credit_consumption_tenant/agent/user`) |
+| `Enable_CostConsumption` | `"Include"` | `copilot_cost_consumption` (Cowork / WorkIQ / Other credits — MAC Cost management export) |
 
 Set a toggle to `"Exclude"` to skip that source entirely (no fetch attempt) — useful when a customer
 hasn't licensed/exported it, or to speed up refresh.

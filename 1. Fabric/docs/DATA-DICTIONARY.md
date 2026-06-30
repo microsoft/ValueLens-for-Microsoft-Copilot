@@ -37,6 +37,7 @@ template never breaks. See `OPTIONAL-SOURCES.md` for the `EmptyTable` + `try…o
 | 12 | Credit Consumption (Tenant) | `credit_consumption_tenant` | *Optional* (billing) | `Copilot_Credit_Consumption_Ingester` | n/a |
 | 13 | Credit Consumption (Agent) | `credit_consumption_agent` | *Optional* (billing) | `Copilot_Credit_Consumption_Ingester` | n/a |
 | 14 | Credit Consumption (User) | `credit_consumption_user` | *Optional* (billing) | `Copilot_Credit_Consumption_Ingester` | n/a |
+| 15 | Copilot Cost Consumption | `copilot_cost_consumption` | *Optional* (billing) | `Copilot_Cost_Consumption_Ingester` | SharePoint CSV (`Cost Consumption File`) |
 
 All other model tables (Calendar, legends, ranking/summary, glossary, value maps, etc.) are
 **calculated/DAX or static** — they have no external source and are version-independent.
@@ -218,6 +219,33 @@ StatusCode, StateCode
 ```
 *When `TAG_ENVIRONMENT=True`, the five fact tables also carry `source_environment` (and
 `agent_catalogue` carries `source_environments`).*
+
+### 15. `copilot_cost_consumption` — Copilot credit usage (MAC Cost management export)
+Produced by `Copilot_Cost_Consumption_Ingester` from the **Microsoft 365 Admin Center → Copilot →
+Cost management** per-user CSV export (export-only; no API). **Auto-detects two export shapes** and maps
+both to one unified contract: the **surface split** (`Cowork`/`WorkIQ`/`Other` credits) and the
+**per-user usage** export (monthly limit / used / % used / sessions). This is the **only**
+customer-pullable place Cowork/WorkIQ credits appear. **Additive**, not a replacement, to the PPAC
+`credit_consumption_*` (MCSMessages) tables. Gated by `Enable_CostConsumption`; both Fabric and
+SharePoint paths produce the identical contract. Header matching is **case-insensitive**.
+
+```
+User_Principal_Name   (text; join key → org PersonId_Normalized / UPN)
+Display_Name          (text; usage export)
+Cowork_Credits        (double; surface export; blank for usage)
+WorkIQ_Credits        (double; surface export; blank for usage)
+Other_Credits         (double; surface export; blank for usage)
+Total_Credits         (double; = Cowork+WorkIQ+Other, or Monthly credits used)
+Monthly_Credit_Limit  (double; usage export — per-user budget)
+Pct_Used              (double 0–1 fraction; usage export)
+Session_Count         (int64; usage export)
+M365_Copilot_Licensed (text; usage export)
+Last_Activity_Date    (date; parses ISO timestamp + en-US M/d/yyyy)
+SourceFile, LoadDate  (lineage)
+```
+Columns absent from a given export load as null. Grain is a **per-user snapshot**. UPN match isn't 100% —
+unmatched users surface under an **"(Unattributed)"** organization bucket. See
+`../flows/COST-CONSUMPTION.md`.
 
 ---
 
