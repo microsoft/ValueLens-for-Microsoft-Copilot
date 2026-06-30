@@ -116,15 +116,20 @@ runtime via the resolution chain above.
 
 ## `Purview_CopilotInteraction_Processor_v4.0.0.py`
 
-The **manual** alternative to PAX. Bring two exports yourself — it produces the same two rollup CSVs
+The **manual** alternative to PAX. Bring your exports yourself — it produces the same two rollup CSVs
 the template reads. Use it for a **first run / quick look** with no app registration or scheduling
 (this is **Option A** in the [folder README](../README.md)).
 
+Inputs join on **UPN**: org attributes come from **Entra** (`--entra`), the Copilot **licence** flag
+from the **M365 Admin Center** (`--licensing`). Supply them as two files, or pass a single combined
+users+licence file as `--entra` and omit `--licensing` (licence column auto-detected).
+
 ```bash
 python "Purview_CopilotInteraction_Processor_v4.0.0.py" \
-    --purview  "<raw_copilot_interactions.csv>" \   # Purview audit export (CopilotInteraction)
-    --entra    "<entra_users_with_licensing.csv>" \ # Entra users export incl. Copilot licence flag
-    --profile  aibv                                 # default; AI Business Value fact superset
+    --purview    "<raw_copilot_interactions.csv>" \  # Purview audit export (CopilotInteraction)
+    --entra      "<entra_users_org.csv>" \           # Entra users: UPN, department, title, manager
+    --licensing  "<m365_copilot_licence_list.csv>" \ # M365 Admin Center; omit if --entra has licence
+    --profile    aibv                                # default; AI Business Value fact superset
 ```
 
 Outputs (in `--out-dir`, default = the `--purview` folder):

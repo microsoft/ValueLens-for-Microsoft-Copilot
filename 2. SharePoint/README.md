@@ -20,31 +20,40 @@ Both produce the **same two rollup CSVs** the dashboard reads
 
 ## Option A — Manual (first run)
 
-> The fastest way to see real numbers — supply two exports, run one script, connect the template.
+> The fastest way to see real numbers — export your data, run one script, connect the template.
 > No upload, no app registration. **Great for a first look at how the numbers land.**
 
 <details>
 <summary><strong>Manual extract — step by step</strong></summary>
 
-**You need:** any shell, **Python 3.9+**, and read access to the two admin exports below.
+**You need:** any shell, **Python 3.9+**, and read access to the admin exports below.
 
-**1. Export the two source files**
+**1. Export the source files**
+
+The processor takes the raw audit log plus **users** and **licence** info. Org attributes come from
+**Entra**; the Copilot **licence** flag comes from the **M365 Admin Center** — they're different
+exports, joined on **UPN**. Supply them as two files (recommended) or pre-merged as one:
 
 | Export | Where | Becomes |
 |---|---|---|
-| Raw **Copilot interactions** (audit log CSV) | Microsoft **Purview** -> Audit -> search `CopilotInteraction` -> Export | `--purview` input |
-| **Users + licensing** (Entra users CSV with each user's Copilot licence flag) | Microsoft **Entra** / M365 Admin Center -> Users -> Export | `--entra` input |
+| Raw **Copilot interactions** (audit log CSV) | Microsoft **Purview** -> Audit -> search `CopilotInteraction` -> Export | `--purview` |
+| **Org / users** (UPN, department, job title, manager) | Microsoft **Entra** -> Users -> Export | `--entra` |
+| **Licensing** (UPN + a `Has License` flag) | **M365 Admin Center** -> Copilot user export | `--licensing` |
 
-> Got a custom HR/org export instead of a standard Entra users file? Normalise it first with
+> **One combined file instead?** If your users export already contains a licence column, pass it as
+> `--entra` and **omit** `--licensing` — the licence column is auto-detected.
+>
+> Got a custom HR/org export? Normalise it first with
 > [`scripts/Adapt-OrgFile-To-EntraUsers.py`](./scripts/Adapt-OrgFile-To-EntraUsers.py) to produce the `--entra` input.
 
 **2. Run the processor** ([`scripts/Purview_CopilotInteraction_Processor_v4.0.0.py`](./scripts/Purview_CopilotInteraction_Processor_v4.0.0.py))
 
 ```bash
 python "scripts/Purview_CopilotInteraction_Processor_v4.0.0.py" \
-    --purview  "<raw_copilot_interactions.csv>" \
-    --entra    "<entra_users_with_licensing.csv>" \
-    --profile  aibv
+    --purview    "<raw_copilot_interactions.csv>" \
+    --entra      "<entra_users_org.csv>" \
+    --licensing  "<m365_copilot_licence_list.csv>" \   # omit if --entra already has a licence column
+    --profile    aibv
 ```
 
 It writes the two rollup CSVs next to your inputs (`*_Interactions_*.csv`, `*_Users_*.csv`).
