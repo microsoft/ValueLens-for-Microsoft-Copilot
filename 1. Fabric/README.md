@@ -15,10 +15,9 @@ all the heavy JSON parsing happens in Spark and the dataset stays small and fast
 | Item | Purpose |
 |---|---|
 | `AI Business Value Dashboard - Fabric.pbit` | The Power BI template (thin client over a Lakehouse SQL endpoint). |
-| `notebooks/Copilot_Audit_Log_Direct_Ingester.ipynb` | **Core.** Graph audit-log API -> `dbo.copilot_interactions_parsed`. |
-| `notebooks/Copilot_Licensed_Users_Direct_Ingester.ipynb` | **Core.** Graph M365 active-user report -> `dbo.copilot_licensed_users`. |
-| `notebooks/Copilot_Org_Data_Direct_Ingester.ipynb` | **Core.** Graph `/users` (+ manager) -> `dbo.copilot_org_data`. |
-| `notebooks/` (the rest) | *Optional* sources: agent transcripts, credit/billing consumption, product feedback, Agents 365. See [Optional sources](#optional-sources). |
+| `notebooks/core/` | **Core.** The seven ingesters the base (*No Studio*) template needs. See [`notebooks/README.md`](notebooks/README.md). |
+| `notebooks/optional/copilot-studio/` | *Optional.* Transcript parser + Agents 365 registry preview — add for the **+ Copilot Studio** template. |
+| `notebooks/optional/m365/` | *Optional (preview).* M365 Unified Audit Log work-behaviour ingester for the *AI vs Manual Work* comparison. |
 | `pipelines/`, `flows/`, `docs/` | Optional: a Fabric pipeline to run the core notebooks on a schedule, Power Automate flows for export-only sources, and reference docs. |
 
 ## Quick start
@@ -48,9 +47,9 @@ cell and run.
 
 | Notebook | Cadence | Output table |
 |---|---|---|
-| `Copilot_Audit_Log_Direct_Ingester.ipynb` | Daily (Graph caps audit queries to a 7-day window) | `dbo.copilot_interactions_parsed` |
-| `Copilot_Licensed_Users_Direct_Ingester.ipynb` | Weekly / monthly | `dbo.copilot_licensed_users` |
-| `Copilot_Org_Data_Direct_Ingester.ipynb` | Weekly | `dbo.copilot_org_data` |
+| `core/Copilot_Audit_Log_Direct_Ingester.ipynb` | Daily (Graph caps audit queries to a 7-day window) | `dbo.copilot_interactions_parsed` |
+| `core/Copilot_Licensed_Users_Direct_Ingester.ipynb` | Weekly / monthly | `dbo.copilot_licensed_users` |
+| `core/Copilot_Org_Data_Direct_Ingester.ipynb` | Weekly | `dbo.copilot_org_data` |
 
 Use each notebook's **Schedule** button, or wire all three into a single Fabric pipeline (see
 `pipelines/`).
@@ -86,10 +85,10 @@ load empty. To switch one on, set its toggle to `Include` and run the matching n
 
 | Page(s) | Toggle | Notebook |
 |---|---|---|
-| Agent transcripts (Copilot Studio) | `Enable_Dataverse` | `Copilot_Agent_Transcript_Parser.ipynb` |
-| Credit / billing consumption | `Enable_Consumption` | `Copilot_Credit_Consumption_Ingester.ipynb` ([setup guide](CREDIT-CONSUMPTION-SETUP.md)) |
-| Product feedback | `Enable_ProductFeedback` | `Copilot_ProductFeedback_Ingester.ipynb` |
-| Agents 365 | `Enable_Agent365` | `Copilot_Agent365_Lander.ipynb` (supported export lander) |
+| Agent transcripts (Copilot Studio) | `Enable_Dataverse` | `optional/copilot-studio/Copilot_Agent_Transcript_Parser.ipynb` |
+| Credit / billing consumption | `Enable_Consumption` | `core/Copilot_Credit_Consumption_Ingester.ipynb` ([setup guide](CREDIT-CONSUMPTION-SETUP.md)) |
+| Product feedback | `Enable_ProductFeedback` | `core/Copilot_ProductFeedback_Ingester.ipynb` |
+| Agents 365 | `Enable_Agent365` | `core/Copilot_Agent365_Lander.ipynb` (supported export lander) |
 
 Credit consumption and product feedback are **export-only** in Microsoft's portals (no API) - the
 `flows/` folder has Power Automate flows that auto-land those exports for you. Full detail in
