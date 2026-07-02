@@ -16,8 +16,8 @@ all the heavy JSON parsing happens in Spark and the dataset stays small and fast
 |---|---|
 | `AI Business Value Dashboard - Fabric.pbit` | The Power BI template (thin client over a Lakehouse SQL endpoint). |
 | `notebooks/core/` | **Core.** The seven ingesters the base (*No Studio*) template needs. See [`notebooks/README.md`](notebooks/README.md). |
-| `notebooks/optional/copilot-studio/` | *Optional.* Transcript parser + Agents 365 registry preview — add for the **+ Copilot Studio** template. |
 | `notebooks/optional/m365/` | *Optional (preview).* M365 Unified Audit Log work-behaviour ingester for the *AI vs Manual Work* comparison. |
+| `+ Studio Agent Deepdive/` | *Optional add-on.* The **+ Studio Agent Deepdive** template plus its Copilot Studio notebooks (transcript parser + Agents 365 registry preview). See [`+ Studio Agent Deepdive/README.md`](./+%20Studio%20Agent%20Deepdive/README.md). |
 | `pipelines/`, `flows/`, `docs/` | Optional: a Fabric pipeline to run the core notebooks on a schedule, Power Automate flows for export-only sources, and reference docs. |
 
 ## Quick start
@@ -85,7 +85,7 @@ load empty. To switch one on, set its toggle to `Include` and run the matching n
 
 | Page(s) | Toggle | Notebook |
 |---|---|---|
-| Agent transcripts (Copilot Studio) | `Enable_Dataverse` | `optional/copilot-studio/Copilot_Agent_Transcript_Parser.ipynb` |
+| Agent transcripts (Copilot Studio) | `Enable_Dataverse` | `+ Studio Agent Deepdive/notebooks/Copilot_Agent_Transcript_Parser.ipynb` (see [+ Studio Agent Deepdive](./+%20Studio%20Agent%20Deepdive/README.md)) |
 | Credit / billing consumption | `Enable_Consumption` | `core/Copilot_Credit_Consumption_Ingester.ipynb` ([setup guide](CREDIT-CONSUMPTION-SETUP.md)) |
 | Product feedback | `Enable_ProductFeedback` | `core/Copilot_ProductFeedback_Ingester.ipynb` |
 | Agents 365 | `Enable_Agent365` | `core/Copilot_Agent365_Lander.ipynb` (supported export lander) |

@@ -18,16 +18,25 @@ semantic model reads via the `FabricTable(...)` helper.
 | `Copilot_ProductFeedback_Ingester` | `user_feedback` | User Feedback page |
 | `Copilot_Agent365_Lander` | `agents_365` | Agent Governance |
 
-## `optional/copilot-studio/` — add for the **+ Copilot Studio** template
+## `Copilot_Agent365_Registry_Ingester` (root) — optional, No-Studio compatible
 
-Only needed if you deploy the fuller *+ Copilot Studio* template, which adds the
-seven Studio pages (Quality & Performance, Topic Explorer, Conversation Flow,
-Knowledge Files, Error Analysis, Studio Credit Consumption, Studio User Feedback).
+Sits at the notebooks root (not under `optional/`). The **GA, app-only** Agent 365 registry
+ingester — writes `agent365_catalog` with the richer capability/permission detail for the base
+template's **Agents 365** page. Runs headless on a schedule. Use this in preference to the older
+PREVIEW notebook in the deepdive add-on.
 
-| Notebook | Output tables | Feeds |
+## `+ Studio Agent Deepdive/` — the **+ Studio Agent Deepdive** add-on
+
+The Copilot Studio notebooks now live with the deepdive template in
+[`../+ Studio Agent Deepdive/`](../+%20Studio%20Agent%20Deepdive/README.md). Add them only if you
+deploy the fuller *+ Studio Agent Deepdive* template, which adds the seven Studio pages (Quality &
+Performance, Topic Explorer, Conversation Flow, Knowledge Files, Error Analysis, Studio Credit
+Consumption, Studio User Feedback).
+
+| Notebook (in `+ Studio Agent Deepdive/notebooks/`) | Output tables | Feeds |
 |---|---|---|
 | `Copilot_Agent_Transcript_Parser` | `agent_sessions`, `agent_turns`, `agent_performance`, `agent_errors`, `agent_subagents`, `agent_variables`, `agent_catalogue` | All Copilot Studio pages |
-| `Copilot_Agent365_Registry_Ingester_PREVIEW` | `agent365_catalog` | Optional live Agent 365 registry enrichment (preview) |
+| `Copilot_Agent365_Registry_Ingester_PREVIEW` | `agent365_catalog` | Older delegated/interactive preview of the registry ingester above |
 
 ## `optional/m365/` — add for the **M365 Signals** template (preview)
 
