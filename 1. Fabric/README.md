@@ -22,6 +22,30 @@ all the heavy JSON parsing happens in Spark and the dataset stays small and fast
 > work-behaviour comparison are **separate optional add-ons** — see
 > [Optional sources](#optional-sources). Everything in this Quick start is the core, Studio-free path.
 
+## 📚 Dashboard pages
+
+<details>
+<summary>14 report pages — activation, adoption, value, maturity, governance, feedback &amp; appendices</summary>
+
+| Page | Purpose |
+|---|---|
+| **◆ Activation** | Activation across teams — licensed vs unlicensed, active vs inactive |
+| **🎯 Readiness** | Ranks unlicensed / low-adoption users by upgrade‑priority score |
+| **📡 Adoption** | User counts, coverage %, licensed vs unlicensed reach |
+| **🪙 Consumption** | Copilot &amp; agent consumption — credits / messages over time |
+| **🔮 Activity** | Copilot and agent usage, tasks and behaviour mix |
+| **🚀 Value** | Hours saved, dollar‑equivalent assisted value, and the business case |
+| **🌱 Maturity** | Progression: Asking → Finding → Consuming → Producing → Delegating |
+| **🛡 Agent Health** | Agent resolution, abandonment, escalation and response time |
+| **💬 Feedback** | Thumbs up/down sentiment and verbatim feedback themes |
+| **📈 Heatmap** | Activity heatmap across the reporting period |
+| **🏅 Leaderboard** | Top users, agents, and functions |
+| **📘 Appendix: Key Concepts** | Methodology and key‑concept explainers |
+| **🧬 Appendix: Signal - Impact Table** | Trace raw signals through to value (audit trail) |
+| **📘 Appendix: Glossary** | Metric definitions and research sources |
+
+</details>
+
 ## Quick start
 
 Three core notebooks land the Delta tables; the template is a thin client over them. At a glance:

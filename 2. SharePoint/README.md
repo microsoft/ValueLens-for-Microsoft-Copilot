@@ -19,6 +19,31 @@ Both produce the **same two rollup CSVs** the dashboard reads
 
 ---
 
+## 📚 Dashboard pages
+
+<details>
+<summary>13 report pages — activation, adoption, value, maturity, governance &amp; appendices</summary>
+
+| Page | Purpose |
+|---|---|
+| **◆ Activation** | Activation across teams — licensed vs unlicensed, active vs inactive |
+| **🎯 Readiness** | Ranks unlicensed / low-adoption users by upgrade‑priority score |
+| **📡 Adoption** | User counts, coverage %, licensed vs unlicensed reach |
+| **🪙 Consumption** | Copilot &amp; agent consumption — credits / messages over time |
+| **🔮 Activity** | Copilot and agent usage, tasks and behaviour mix |
+| **🚀 Value** | Hours saved, dollar‑equivalent assisted value, and the business case |
+| **🌱 Maturity** | Progression: Asking → Finding → Consuming → Producing → Delegating |
+| **🛡 Agent Health** | Agent resolution, abandonment, escalation and response time |
+| **📈 Heatmap** | Activity heatmap across the reporting period |
+| **🏅 Leaderboard** | Top users, agents, and functions |
+| **📘 Appendix: Glossary** | Metric definitions and research sources |
+| **🧬 Appendix: Signal Table** | Trace raw signals through to value (audit trail) |
+| **📘 Appendix: Key Concepts** | Methodology and key‑concept explainers |
+
+</details>
+
+---
+
 ## Option A — Manual (first run)
 
 > The fastest way to see real numbers — export your data, run one script, connect the template.
