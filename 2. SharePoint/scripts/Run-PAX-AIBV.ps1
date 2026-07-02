@@ -27,8 +27,13 @@
   GitHub release tag to use. Default: latest.
 
 .PARAMETER IncludeAgent365Info
-  Passes the PAX -IncludeAgent365Info switch so the optional Agent 365 output
-  is produced.
+  Passes the PAX -IncludeAgent365Info switch so the optional Agent 365 catalogue
+  output is produced. As of PAX purview-v1.11.11 the catalogue export honours
+  app-only auth (AppRegistration secret/certificate or ManagedIdentity), reusing
+  this run's own -Auth mode, so it works unattended - no separate interactive
+  sign-in. Requires the app's admin-consented Application permissions
+  CopilotPackages.Read.All + Application.Read.All, and an Agent 365 licence in the
+  tenant (a missing licence returns 403).
 
 .PARAMETER Auth
   PAX auth mode. Default: AppRegistration.
@@ -36,8 +41,28 @@
 .PARAMETER RollupPlusRaw
   Use PAX -RollupPlusRaw instead of the default -Rollup mode.
 
+.PARAMETER AppendFile
+  Interactions incremental append (PAX -AppendFile). Filename (resolved in the run's processed
+  folder) or full path of the cumulative interactions CSV to append this run's rows into. Leave
+  UNSET on the very first run to seed the file with a back-fill window (e.g. -Days 30); set it on
+  every subsequent scheduled run (e.g. -Days 2) so PAX appends only the latest window. As of PAX
+  purview-v1.11.11 the append de-duplicates on each interaction's stable message identity, so
+  overlapping days are reconciled (nothing dropped or double-counted). The file must already exist
+  (created by the seed run). Applies to interactions only - the Users snapshot is overwritten, not
+  appended. Keep -Deidentify consistent across all appends to the same file.
+
 .PARAMETER IncludeUserInfo
   Include the Users output by default. Pass -IncludeUserInfo:$false to disable.
+
+.PARAMETER UserInfoFile
+  BYOD - bring your own user directory (PAX purview-v1.11.11 -UserInfoFile). Path to a CSV of
+  users (UserPrincipalName required; DisplayName / Department / Manager / License etc. optional,
+  header names are alias-aware) used instead of pulling the directory live from Entra. Drives
+  enrichment, org/manager hierarchy, the rolled-up Users dimension, de-identification and upload.
+  The path can be local, a SharePoint URL, or a Fabric/OneLake path. License handling is hybrid:
+  provided values are used as-is and blanks are resolved online by UPN, so the run is fully offline
+  only when every row supplies a license value (a single blank triggers a tenant lookup needing
+  User.Read.All + Organization.Read.All). Mutually exclusive with PAX -GroupNames (not used here).
 
 .PARAMETER Deidentify
   Passes the PAX -Deidentify switch.
@@ -56,6 +81,15 @@
 
 .EXAMPLE
   .\Run-PAX-AIBV.ps1 -TenantId <guid> -ClientId <guid> -Days 30 -IncludeAgent365Info
+
+.EXAMPLE
+  .\Run-PAX-AIBV.ps1 -TenantId <guid> -ClientId <guid> -UserInfoFile .\users.csv
+
+.EXAMPLE
+  # First run - seed the interactions file with a back-fill (no -AppendFile):
+  .\Run-PAX-AIBV.ps1 -TenantId <guid> -ClientId <guid> -Days 30
+  # Subsequent scheduled runs - append only the latest window:
+  .\Run-PAX-AIBV.ps1 -TenantId <guid> -ClientId <guid> -Days 2 -AppendFile Purview_CopilotInteraction_Rollup.csv
 #>
 [CmdletBinding()]
 param(
@@ -68,7 +102,9 @@ param(
   [ValidateSet('WebLogin', 'DeviceCode', 'Credential', 'Silent', 'AppRegistration', 'ManagedIdentity')]
   [string]$Auth = 'AppRegistration',
   [switch]$RollupPlusRaw,
+  [string]$AppendFile,
   [bool]$IncludeUserInfo = $true,
+  [string]$UserInfoFile,
   [switch]$Deidentify,
   [ValidateSet('Blank', 'RepeatSelf', 'RepeatManager', 'Fixed')]
   [string]$FillerLabel,
@@ -86,6 +122,14 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
 
 if ($FillerLabel -eq 'Fixed' -and -not $FillerLabelText) {
   throw "-FillerLabelText is required when -FillerLabel Fixed is selected."
+}
+
+if ($UserInfoFile) {
+  # Only validate local paths; SharePoint URLs and Fabric/OneLake paths are resolved by PAX itself.
+  $isRemote = $UserInfoFile -match '^(https?://|abfss://|onelake:)'
+  if (-not $isRemote -and -not (Test-Path -LiteralPath $UserInfoFile)) {
+    throw "-UserInfoFile '$UserInfoFile' not found. Provide a local path, a SharePoint URL, or a Fabric/OneLake path."
+  }
 }
 
 function Resolve-Secret {
@@ -235,9 +279,29 @@ if ($RollupPlusRaw) {
   $paxParams.Rollup = $true
 }
 
+if ($AppendFile) {
+  $paxParams.AppendFile = $AppendFile
+  # Resolve a bare filename against the processed dir for a friendly pre-check (PAX also validates).
+  $appendProbe = if ([System.IO.Path]::IsPathRooted($AppendFile)) { $AppendFile } else { Join-Path $OutDir $AppendFile }
+  if (Test-Path -LiteralPath $appendProbe) {
+    Write-Host ("Mode     : APPEND interactions -> {0}" -f $AppendFile) -ForegroundColor Cyan
+  } else {
+    Write-Host ("Mode     : APPEND requested but '{0}' not found in {1}." -f $AppendFile, $OutDir) -ForegroundColor Yellow
+    Write-Host "            Seed it first with a back-fill run WITHOUT -AppendFile, then append on subsequent runs." -ForegroundColor DarkGray
+  }
+} else {
+  Write-Host "Mode     : SEED (no -AppendFile) - creates a fresh interactions file; add -AppendFile on scheduled runs." -ForegroundColor DarkGray
+}
+
 if ($IncludeUserInfo) {
   $paxParams.IncludeUserInfo = $true
   $paxParams.OutputPathUserInfo = $OutDir
+}
+
+if ($UserInfoFile) {
+  $paxParams.UserInfoFile = $UserInfoFile
+  Write-Host ("Users src : BYOD directory -> {0}" -f $UserInfoFile) -ForegroundColor Cyan
+  Write-Host "            (UserPrincipalName required; blank License rows fall back to a tenant lookup needing User.Read.All + Organization.Read.All)." -ForegroundColor DarkGray
 }
 
 if ($Deidentify) {
@@ -254,6 +318,8 @@ if ($FillerLabelText) {
 
 if ($IncludeAgent365Info) {
   $paxParams.IncludeAgent365Info = $true
+  Write-Host ("Agent 365 : catalogue export ON (app-only via -Auth {0}). " -f $Auth) -ForegroundColor Cyan
+  Write-Host "            Needs Application perms CopilotPackages.Read.All + Application.Read.All (admin-consented) and an Agent 365 licence (else 403)." -ForegroundColor DarkGray
 }
 
 & $pax.Path @paxParams
@@ -294,6 +360,9 @@ $manifest = [pscustomobject]@{
   pax_auth_mode      = $Auth
   rollup_mode        = if ($RollupPlusRaw) { 'RollupPlusRaw' } else { 'Rollup' }
   include_userinfo   = [bool]$IncludeUserInfo
+  user_info_file     = $UserInfoFile
+  append_file        = $AppendFile
+  append_mode        = [bool]$AppendFile
   deidentify         = [bool]$Deidentify
   filler_label       = $FillerLabel
   filler_label_text  = $FillerLabelText

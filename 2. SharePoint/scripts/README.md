@@ -40,7 +40,9 @@ reference.
     [-PaxReleaseTag latest] `
     [-Auth AppRegistration|ManagedIdentity|DeviceCode|WebLogin|Credential|Silent] `
     [-RollupPlusRaw] `
+    [-AppendFile <interactions.csv>] `
     [-IncludeUserInfo:$false] `
+    [-UserInfoFile <path|SharePoint-URL|OneLake-path>] `
     [-Deidentify] `
     [-FillerLabel Blank|RepeatSelf|RepeatManager|Fixed] `
     [-FillerLabelText "<text>"] `
@@ -60,6 +62,45 @@ Outputs to `<WorkRoot>\processed\`:
 - `rollup-manifest.json` (paths + timings for the upload step)
 The wrapper downloads the selected PAX release script into `<WorkRoot>\pax\releases\`.
 Defaults are `-Auth AppRegistration`, `-Rollup`, and `-IncludeUserInfo`.
+
+**Seed once, then append (interactions)** — `-AppendFile`: the Purview interactions data is a growing
+time-series, so run the **first** extract as a **back-fill with no `-AppendFile`** (e.g. `-Days 30`)
+to create the file, then have **every scheduled run** use `-AppendFile <that file>` with a short
+window (e.g. `-Days 2`). As of PAX `purview-v1.11.11` the append de-duplicates on each interaction's
+stable message identity, so overlapping days reconcile (nothing dropped or double-counted). Applies
+to interactions only; the Users/org and Agent 365 outputs are **snapshots** (overwritten each run).
+Keep `-Deidentify` consistent across all appends to the same file.
+```powershell
+# First run — seed with a back-fill (no -AppendFile)
+.\Run-PAX-AIBV.ps1 -TenantId <id> -ClientId <id> -Days 30
+# Scheduled runs — append only the latest window
+.\Run-PAX-AIBV.ps1 -TenantId <id> -ClientId <id> -Days 2 -AppendFile Purview_CopilotInteraction_Rollup.csv
+```
+
+`-IncludeAgent365Info` (optional): produces the Agent 365 catalogue export. As of PAX
+`purview-v1.11.11` it runs **app-only/unattended** under the same `-Auth` mode (no separate
+interactive sign-in). Requires the app's admin-consented **Application** permissions
+`CopilotPackages.Read.All` + `Application.Read.All` and an **Agent 365 licence** in the tenant
+(a missing licence returns `403`).
+
+`-UserInfoFile` (optional, BYOD): supply your own user directory CSV (PAX `purview-v1.11.11`
+`-UserInfoFile`) instead of pulling it live from Entra. `UserPrincipalName` is required (header
+aliases `UPN` / `PersonId` also accepted, values must be UPNs not GUIDs); other columns
+(DisplayName / Department / Manager / License…) are optional and alias-aware. `HasLicense` must be
+the literal word `TRUE` or `FALSE` (`Yes/No`, `1/0` are **not** recognised). The path can be
+**local, a SharePoint URL, or a Fabric/OneLake path**. License handling is hybrid — rows with a
+license value are used as-is; blanks fall back to a tenant lookup (needs `User.Read.All` +
+`Organization.Read.All`), so a run is fully offline only when every row supplies a license.
+
+> **Privacy-restricted tenants:** pair `-UserInfoFile` (no live Entra pull) with `-Deidentify`
+> (masks user identities in the output) so no real user IDs land in the report.
+
+**Required CSV schema** (UTF-8, header row):
+`UserPrincipalName` (required, key) · `DisplayName`, `Department`, `JobTitle`, `ManagerUpn` (recommended) · `HasLicense` = `TRUE`/`FALSE` (optional) · extra columns pass through. Example header:
+```csv
+UserPrincipalName,DisplayName,Department,JobTitle,ManagerUpn,HasLicense
+```
+Full field reference: [PAX v1.11.x `-UserInfoFile` CSV schema](https://github.com/microsoft/PAX/blob/release/release_documentation/Purview_Audit_Log_Processor/PAX_Purview_Audit_Log_Processor_Documentation_v1.11.x.md#-userinfofile-csv-schema-shareable-reference).
 
 ---
 

@@ -39,6 +39,12 @@
 .PARAMETER Days
   Lookback window for PAX. Default: 7 (sensible for daily incrementals).
 
+.PARAMETER AppendFile
+  Interactions CSV to append into on each scheduled run (passed to Run-PAX-AIBV -AppendFile).
+  Recommended for the daily task: seed the file once manually with a back-fill run (no -AppendFile),
+  then set this so the scheduled runs append only the latest window (de-duplicated). Omit to have the
+  task run in non-append mode.
+
 .PARAMETER RunAt
   Local time the task fires daily. Default: 02:00.
 
@@ -85,6 +91,7 @@ param(
   [Parameter(Mandatory=$true)] [string]$DriveId,
                                  [string]$FolderPath = '/AIBV',
                                  [int]$Days  = 7,
+                                 [string]$AppendFile,
                                  [string]$RunAt = '02:00',
                                  [string]$RunAsUser
 )
@@ -105,6 +112,7 @@ if (-not $pwshPath) { throw "pwsh.exe not found on PATH. Install PowerShell 7+."
 # Build one inline command so both scripts run sequentially in one task action.
 # Quoting note: ScheduledTasks doesn't expand variables, so all params are baked into the string.
 $extract = "& '$(Join-Path $ScriptsRoot 'Run-PAX-AIBV.ps1')' -TenantId '$TenantId' -ClientId '$ClientId' -Days $Days -WorkRoot '$WorkRoot'"
+if ($AppendFile) { $extract += " -AppendFile '$AppendFile'" }
 $upload  = "& '$(Join-Path $ScriptsRoot 'Upload-Rollups-SharePoint.ps1')' -Manifest '$WorkRoot\processed\rollup-manifest.json' -TenantId '$TenantId' -ClientId '$ClientId' -SiteId '$SiteId' -DriveId '$DriveId' -FolderPath '$FolderPath'"
 $inline  = "$extract; if (`$LASTEXITCODE -ne 0) { exit `$LASTEXITCODE }; $upload"
 

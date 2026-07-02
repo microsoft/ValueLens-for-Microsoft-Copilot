@@ -6,11 +6,12 @@ Pick how you get the data in:
 | Option | Best for | What you do |
 |---|---|---|
 | **A — Manual (first run)** ⭐ | A **quick first look** to see how the numbers land, or a one-off refresh. | Export two CSVs by hand → run one [processor script](#option-a--manual-first-run) → connect the **(Local CSV)** template. No app registration, no scheduling. |
-| **B — Automated (PAX)** | An **ongoing**, scheduled refresh. | [Microsoft PAX](https://github.com/microsoft/PAX) extracts + rolls up automatically → upload to SharePoint → the template refreshes on a schedule. |
+| **B — Automated (PAX)** | An **ongoing**, scheduled refresh. | Use the first-party **[PAX Cookbook](https://microsoft.github.io/PAX-Cookbook)** app (built-in **AI Business Value** recipe) — or the optional scripts — to extract + roll up, write to SharePoint, and refresh on a schedule. |
 
 ```
-Option A (manual):    [export 2 CSVs] -> [Processor .py] -> [ (Local CSV) PBIT ]
-Option B (automated): [Run-PAX-AIBV] -> [Upload-Rollups-SharePoint] -> [ SharePoint PBIT, scheduled ]
+Option A (manual):     [export 2 CSVs] -> [Processor .py] -> [ (Local CSV) PBIT ]
+Option B1 (Cookbook):  [PAX Cookbook: AIBV recipe] --(direct)--> [ SharePoint PBIT, scheduled ]
+Option B2 (scripts):   [Run-PAX-AIBV] -> [Upload-Rollups-SharePoint] -> [ SharePoint PBIT, scheduled ]
 ```
 
 Both produce the **same two rollup CSVs** the dashboard reads
@@ -82,8 +83,30 @@ parameters at the rollup CSVs from step 2:
 
 ## Option B — Automated (PAX)
 
-Scheduled refresh from a SharePoint library. Three scripts: provision once, then extract + upload
-on a cadence.
+Scheduled refresh from a SharePoint library. **Two ways to run PAX** — pick one:
+
+- **B1 — PAX Cookbook** ⭐ *(recommended, first-party)*: Microsoft's own [PAX Cookbook](https://microsoft.github.io/PAX-Cookbook) Windows app runs the PAX engine for you — a built-in **"AI Business Value Dashboard" recipe**, credentials in Windows Credential Manager ("Chef's Keys"), and one-click **scheduled bakes**. It already exposes the switches this dashboard needs (**`UserInfoFile`** for a non-Entra org file, **`AppendFile`** for incremental interactions, **`Deidentify`**, **`IncludeAgent365Info`**) and writes **directly to SharePoint / OneLake** — no upload step.
+- **B2 — PAX scripts** *(optional / advanced)*: the wrapper scripts in [`scripts/`](./scripts/) (`Run-PAX-AIBV.ps1` → `Upload-Rollups-SharePoint.ps1` → `Register-TaskScheduler.ps1`). Use these only if you want a fully scripted/CI pipeline instead of the Cookbook app. They predate the Cookbook's SharePoint output; the Cookbook is now the simpler path for most customers.
+
+<details>
+<summary><strong>B1 — PAX Cookbook (recommended)</strong></summary>
+
+1. **Provision SharePoint write access + get SiteId/DriveId** — still do the **one-time setup** in B2 below (the Cookbook doesn't set up Entra app permissions or `Sites.Selected` for you).
+2. **Install the Cookbook** — [Get PAX Cookbook →](https://microsoft.github.io/PAX-Cookbook). Add your app-registration credentials as a **Chef's Key** (stored in Windows Credential Manager).
+3. **Pick the "AI Business Value Dashboard" recipe** (emits `-Dashboard AIBV -Rollup -IncludeUserInfo`). Then set, as needed:
+   - **Own org file instead of Entra:** set **`UserInfoFile`** to your CSV (local, SharePoint, or OneLake). Only `UserPrincipalName` required; leave `HasLicense` blank to auto-resolve, or fill `TRUE`/`FALSE` from your MAC export.
+   - **Incremental interactions:** seed once with a back-fill (no `AppendFile`), then set **`AppendFile`** to the fixed interactions file on scheduled runs (de-duplicated).
+   - **Privacy:** enable **`Deidentify`** to anonymise identities.
+   - **Agent 365 (optional):** enable **`IncludeAgent365Info`** (needs `CopilotPackages.Read.All` + `Application.Read.All` and an Agent 365 licence).
+4. **Destination:** point the recipe's output at your **SharePoint library** (interactions = append/fixed name; users + Agent 365 = overwrite snapshots).
+5. **Schedule:** hand the recipe to a **scheduled bake** (daily). Then **connect the template** (see the SharePoint-refresh steps below) once and enable Power BI scheduled refresh.
+
+> Prefer the command line? [Mini-Kitchen](https://microsoft.github.io/PAX-Cookbook/mini-kitchen) builds the exact `pwsh` command from the same AIBV recipe for you to run yourself.
+</details>
+
+### B2 — PAX scripts (optional / advanced)
+
+Provision once, then extract + upload on a cadence.
 
 <details>
 <summary><strong>Prerequisites</strong></summary>
@@ -96,6 +119,8 @@ on a cadence.
 **In your tenant:**
 - An Entra app registration with these admin-consented **Microsoft Graph Application** permissions:
   `AuditLogsQuery.Read.All`, `Reports.Read.All`, `User.Read.All`, `Organization.Read.All`, `Sites.Selected`.
+  - *Only if you use `-IncludeAgent365Info`* (optional Agent 365 catalogue): also add
+    `CopilotPackages.Read.All` + `Application.Read.All`, and an **Agent 365 licence** in the tenant.
 - A SharePoint document library to hold the two CSVs.
 - A Power BI Pro (or Premium / PPU) workspace to publish into.
 
@@ -141,13 +166,31 @@ The scripts read it from here at runtime.
 <summary><strong>Daily refresh</strong> — extract → upload → schedule</summary>
 
 ### Extract — [`Run-PAX-AIBV.ps1`](./scripts/Run-PAX-AIBV.ps1)
+
+**Seed once, then append.** The Purview interactions data is a growing time-series, so the pattern is:
+a **first back-fill run** to create the file, then **automated short-window append runs** on a schedule.
+
 ```powershell
 cd scripts
+# 1. First run — seed the interactions file with a back-fill (no -AppendFile)
 .\Run-PAX-AIBV.ps1 -TenantId <tenant-id> -ClientId <client-id> -Days 30
+
+# 2. Subsequent (scheduled) runs — append only the latest window
+.\Run-PAX-AIBV.ps1 -TenantId <tenant-id> -ClientId <client-id> -Days 2 `
+    -AppendFile Purview_CopilotInteraction_Rollup.csv
 ```
+The append (PAX `purview-v1.11.11`) de-duplicates on each interaction's stable message identity, so
+overlapping days reconcile — nothing dropped or double-counted. **Interactions append; the Users/org
+and Agent 365 outputs are snapshots (overwritten each run).**
+
 Produces `.\processed\*_Interactions_*.csv`, `.\processed\*_Users_*.csv`, and `rollup-manifest.json`
-(5–15 min for 30 days). Add `-IncludeAgent365Info` for the optional Agents 365 output. See
-[`scripts/README.md`](./scripts/README.md) for all parameters.
+(5–15 min for 30 days). Add `-IncludeAgent365Info` for the optional Agents 365 output — as of PAX
+`purview-v1.11.11` this runs **app-only/unattended** under your `-Auth` mode (needs
+`CopilotPackages.Read.All` + `Application.Read.All` and an Agent 365 licence; a missing licence
+returns `403`). To supply your own user directory instead of pulling it live from Entra, add
+`-UserInfoFile <path|SharePoint-URL|OneLake-path>` (BYOD; `UserPrincipalName` required, other columns
+optional/alias-aware). For privacy-restricted tenants, pair it with `-Deidentify` to anonymise user
+identities. See [`scripts/README.md`](./scripts/README.md) for all parameters.
 
 ### Upload — [`Upload-Rollups-SharePoint.ps1`](./scripts/Upload-Rollups-SharePoint.ps1)
 ```powershell
@@ -159,11 +202,13 @@ Produces `.\processed\*_Interactions_*.csv`, `.\processed\*_Users_*.csv`, and `r
 Lands as fixed names `copilot_interactions_rollup.csv` + `copilot_users_rollup.csv` (overwrites the previous run).
 
 ### Schedule — [`Register-TaskScheduler.ps1`](./scripts/Register-TaskScheduler.ps1)
+Seed the interactions file once manually (the back-fill run above), then register the daily task with
+`-AppendFile` so each run appends only the latest window:
 ```powershell
 .\Register-TaskScheduler.ps1 `
     -TenantId <tenant-id> -ClientId <client-id> `
     -SiteId '<host>,<siteguid>,<webguid>' -DriveId 'b!...' `
-    -FolderPath '/AIBV' -RunAt '02:00'
+    -FolderPath '/AIBV' -Days 2 -AppendFile Purview_CopilotInteraction_Rollup.csv -RunAt '02:00'
 ```
 Add `-RunAsUser DOMAIN\svc_aibv` for a service account. Runs under the app registration; the secret
 is **not** stored in the task. (Secretless managed-identity scheduling is WIP — see [`azure-container/`](./azure-container/).)
@@ -184,6 +229,10 @@ is **not** stored in the task. (Secretless managed-identity scheduling is WIP �
 3. **Load** → **Publish** to a Power BI workspace.
 4. In Power BI Service: dataset **Settings → Data source credentials** → sign in to SharePoint, **Privacy: None**.
 5. **Scheduled refresh** → enable, set to run after your extract (e.g. extract 02:00, refresh 04:00).
+
+> **Using your own org data (BYOD)?** If you ran the extract with `-UserInfoFile`, your directory
+> still lands in the same `copilot_users_rollup.csv` — so **this template step is unchanged**: point
+> `Org Data File` at that file exactly as above. Nothing else to configure.
 </details>
 
 ---
