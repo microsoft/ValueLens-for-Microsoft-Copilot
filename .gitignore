@@ -2,10 +2,13 @@
 *.csv
 !sample-data/*.csv
 !docs/*.csv
+!1. SharePoint/scripts/OrgData-Template.csv
+!3. Fabric Extended/Fabric + Copilot Studio/notebooks/samples/**/*.csv
 
 # Power BI workspace artefacts
 *.pbip.local
 *.pbix
+*BACKUP*.pbit
 .pbi/
 .DS_Store
 Thumbs.db
@@ -20,5 +23,11 @@ Thumbs.db
 # Logs
 *.log
 
-# Environment variables
-*.env
+*.abf
+
+*.parquet
+
+*.xlsx
+
+__pycache__/
+*.pyc
