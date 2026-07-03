@@ -1,13 +1,14 @@
-﻿# Customer data â€” never commit
+# Customer data — never commit
 *.csv
 !sample-data/*.csv
 !docs/*.csv
-# Synthetic anonymised smoke-test fixture (kept in repo for CI)
-!1. Fabric/notebooks/samples/**/*.csv
+!1. SharePoint/scripts/OrgData-Template.csv
+!3. Fabric Extended/Fabric + Copilot Studio/notebooks/samples/**/*.csv
 
 # Power BI workspace artefacts
 *.pbip.local
 *.pbix
+*BACKUP*.pbit
 .pbi/
 .DS_Store
 Thumbs.db
@@ -28,4 +29,5 @@ Thumbs.db
 
 *.xlsx
 
-
+__pycache__/
+*.pyc

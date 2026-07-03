@@ -1,0 +1,5 @@
+UserPrincipalName,DisplayName,Department,JobTitle,ManagerUpn,HasLicense
+avery.diaz@contoso.com,Avery Diaz,Sales,Account Executive,jordan.lee@contoso.com,TRUE
+sam.patel@contoso.com,Sam Patel,Marketing,Content Strategist,jordan.lee@contoso.com,FALSE
+jordan.lee@contoso.com,Jordan Lee,Sales,Regional Sales Manager,taylor.kim@contoso.com,TRUE
+taylor.kim@contoso.com,Taylor Kim,Executive,VP Commercial,,TRUE

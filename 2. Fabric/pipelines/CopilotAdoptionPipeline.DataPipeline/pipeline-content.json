@@ -1,0 +1,228 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/pipeline/definition/pipeline/1.0.0/schema.json",
+  "properties": {
+    "description": "Orchestrates the Direct Ingester notebooks. Core: Audit log + Licensed Users always run; Org Data is optional via EnableOrgDataPull. Optional sources (Dataverse transcripts, credit consumption, product feedback, Agents 365) are opt-in via their Enable* parameters (default false). Export-only sources (consumption, feedback) require their CSVs to be landed first (manually or via the flows in flows/). See docs/PERMISSIONS.md for roles.",
+    "activities": [
+      {
+        "name": "Run_Audit_Log_Ingester",
+        "description": "Calls Microsoft Graph audit log API, polls until Purview is ready, fetches records, parses + flattens, writes Delta table dbo.copilot_interactions_parsed. Typical runtime 5-15 min.",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 60,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "REPLACE_WITH_AUDIT_LOG_NOTEBOOK_ID",
+          "workspaceId": "REPLACE_WITH_WORKSPACE_ID",
+          "parameters": {}
+        }
+      },
+      {
+        "name": "Run_Licensed_Users_Ingester",
+        "description": "Calls Microsoft Graph M365 active user report, derives HasCopilot flag, writes Delta table dbo.copilot_licensed_users. Typical runtime <30 sec.",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:15:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 60,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "REPLACE_WITH_LICENSED_USERS_NOTEBOOK_ID",
+          "workspaceId": "REPLACE_WITH_WORKSPACE_ID",
+          "parameters": {}
+        }
+      },
+      {
+        "name": "Conditionally_Run_Org_Data",
+        "description": "Wraps the Org Data Ingester in an IfCondition so it only runs when EnableOrgDataPull = true. Customers who upload Entra/HRIS data manually can set this to false to skip the Graph pull.",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@pipeline().parameters.EnableOrgDataPull",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Run_Org_Data_Ingester",
+              "description": "Calls Microsoft Graph /users with manager expansion, writes Delta table dbo.copilot_org_data. Typical runtime <30 sec.",
+              "type": "TridentNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:15:00",
+                "retry": 2,
+                "retryIntervalInSeconds": 60,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "notebookId": "REPLACE_WITH_ORG_DATA_NOTEBOOK_ID",
+                "workspaceId": "REPLACE_WITH_WORKSPACE_ID",
+                "parameters": {}
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "Conditionally_Run_Dataverse_Transcripts",
+        "description": "Optional. Runs the Agent Transcript Parser (Dataverse conversationtranscripts -> agent_* Delta tables) only when EnableDataverse = true. Needs an app reg added as a Dataverse Application User with Read on Conversation Transcript (see docs/PERMISSIONS.md).",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@pipeline().parameters.EnableDataverse",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Run_Agent_Transcript_Parser",
+              "type": "TridentNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.02:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 60,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "notebookId": "REPLACE_WITH_TRANSCRIPT_PARSER_NOTEBOOK_ID",
+                "workspaceId": "REPLACE_WITH_WORKSPACE_ID",
+                "parameters": {}
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "Conditionally_Run_Credit_Consumption",
+        "description": "Optional. Runs the Credit Consumption Ingester (reads exported CSVs already in Files/credit_consumption/ -> credit_consumption_* Delta tables) only when EnableConsumption = true. Export-only source: the CSVs must already be landed (manually or via the Power Automate flow in flows/).",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@pipeline().parameters.EnableConsumption",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Run_Credit_Consumption_Ingester",
+              "type": "TridentNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:15:00",
+                "retry": 2,
+                "retryIntervalInSeconds": 60,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "notebookId": "REPLACE_WITH_CREDIT_CONSUMPTION_NOTEBOOK_ID",
+                "workspaceId": "REPLACE_WITH_WORKSPACE_ID",
+                "parameters": {}
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "Conditionally_Run_Product_Feedback",
+        "description": "Optional. Runs the Product Feedback Ingester (reads exported CSVs already in Files/product_feedback/ -> user_feedback Delta table) only when EnableProductFeedback = true. Export-only source: the CSVs must already be landed (manually or via the Power Automate flow in flows/).",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@pipeline().parameters.EnableProductFeedback",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Run_ProductFeedback_Ingester",
+              "type": "TridentNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:15:00",
+                "retry": 2,
+                "retryIntervalInSeconds": 60,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "notebookId": "REPLACE_WITH_PRODUCT_FEEDBACK_NOTEBOOK_ID",
+                "workspaceId": "REPLACE_WITH_WORKSPACE_ID",
+                "parameters": {}
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "Conditionally_Run_Agent365",
+        "description": "Optional. Runs the Agents 365 Lander (exported agent registry CSV -> agents_365 Delta table) only when EnableAgent365 = true.",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@pipeline().parameters.EnableAgent365",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Run_Agent365_Lander",
+              "type": "TridentNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:15:00",
+                "retry": 2,
+                "retryIntervalInSeconds": 60,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "notebookId": "REPLACE_WITH_AGENT365_NOTEBOOK_ID",
+                "workspaceId": "REPLACE_WITH_WORKSPACE_ID",
+                "parameters": {}
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      }
+    ],
+    "annotations": [],
+    "parameters": {
+      "EnableOrgDataPull": {
+        "type": "Boolean",
+        "defaultValue": true
+      },
+      "EnableDataverse": {
+        "type": "Boolean",
+        "defaultValue": false
+      },
+      "EnableConsumption": {
+        "type": "Boolean",
+        "defaultValue": false
+      },
+      "EnableProductFeedback": {
+        "type": "Boolean",
+        "defaultValue": false
+      },
+      "EnableAgent365": {
+        "type": "Boolean",
+        "defaultValue": false
+      }
+    }
+  }
+}

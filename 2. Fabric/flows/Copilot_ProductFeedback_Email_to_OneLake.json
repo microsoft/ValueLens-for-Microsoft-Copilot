@@ -1,0 +1,126 @@
+{
+  "$comment": "Power Automate / Logic Apps flow definition. Lands Microsoft 365 Copilot USER PRODUCT FEEDBACK CSV exports (from the Microsoft 365 Admin Center > Health > Product Feedback > Export) straight into the Fabric Lakehouse Files/product_feedback folder via the OneLake DFS (ADLS Gen2) API. MAC product feedback has NO API (export-only), so this clones the credit-consumption landing pattern. Import via Power Automate > My flows > Import, then fix up the connection + parameters. Pair with a feedback ingester notebook that reads Files/product_feedback and writes the `user_feedback` Delta table. See README.md.",
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "$connections": { "defaultValue": {}, "type": "Object" },
+      "OneLakeWorkspace": {
+        "defaultValue": "<your-workspace>",
+        "type": "String",
+        "metadata": { "description": "Fabric workspace name (or GUID) that holds the lakehouse." }
+      },
+      "OneLakeLakehouse": {
+        "defaultValue": "<your-lakehouse>",
+        "type": "String",
+        "metadata": { "description": "Lakehouse name WITHOUT the .Lakehouse suffix." }
+      },
+      "TargetFolder": {
+        "defaultValue": "Files/product_feedback",
+        "type": "String",
+        "metadata": { "description": "Destination folder inside the lakehouse. Must match SOURCE_DIR in the feedback ingester notebook." }
+      },
+      "SubjectFilter": {
+        "defaultValue": "Copilot Product Feedback",
+        "type": "String",
+        "metadata": { "description": "Only emails whose subject contains this text are processed. Set this to whatever subject the feedback export is mailed under." }
+      },
+      "FilePrefix": {
+        "defaultValue": "feedback",
+        "type": "String",
+        "metadata": { "description": "Only .csv attachments whose file name STARTS WITH this (case-insensitive) are landed. Default 'feedback' matches the MAC export 'feedback.csv' / 'feedback*.csv'. Set blank to accept any .csv on a subject-matched email." }
+      },
+      "TenantId":     { "defaultValue": "<tenant-guid>", "type": "String" },
+      "ClientId":     { "defaultValue": "<app-reg-client-id>", "type": "String" },
+      "ClientSecret": { "defaultValue": "<keyvault-reference>", "type": "SecureString" }
+    },
+    "triggers": {
+      "When_a_new_email_arrives_V3": {
+        "type": "OpenApiConnectionNotification",
+        "inputs": {
+          "host": {
+            "connectionName": "shared_office365",
+            "operationId": "OnNewEmailV3",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+          },
+          "parameters": {
+            "subjectFilter": "@parameters('SubjectFilter')",
+            "hasAttachments": "Yes",
+            "includeAttachments": true,
+            "importance": "Any"
+          }
+        },
+        "splitOn": "@triggerOutputs()?['body/value']"
+      }
+    },
+    "actions": {
+      "For_each_attachment": {
+        "type": "Foreach",
+        "foreach": "@triggerOutputs()?['body/attachments']",
+        "actions": {
+          "Only_feedback_CSVs": {
+            "type": "If",
+            "expression": {
+              "and": [
+                { "endsWith": [ "@toLower(items('For_each_attachment')?['name'])", ".csv" ] },
+                { "startsWith": [ "@toLower(items('For_each_attachment')?['name'])", "@toLower(parameters('FilePrefix'))" ] }
+              ]
+            },
+            "actions": {
+              "Create_file_PUT": {
+                "type": "Http",
+                "inputs": {
+                  "method": "PUT",
+                  "uri": "https://onelake.dfs.fabric.microsoft.com/@{encodeURIComponent(parameters('OneLakeWorkspace'))}/@{encodeURIComponent(concat(parameters('OneLakeLakehouse'), '.Lakehouse'))}/@{parameters('TargetFolder')}/@{items('For_each_attachment')?['name']}?resource=file",
+                  "authentication": {
+                    "type": "ActiveDirectoryOAuth",
+                    "authority": "https://login.microsoftonline.com",
+                    "tenant": "@parameters('TenantId')",
+                    "audience": "https://storage.azure.com/",
+                    "clientId": "@parameters('ClientId')",
+                    "secret": "@parameters('ClientSecret')"
+                  }
+                }
+              },
+              "Append_content_PATCH": {
+                "type": "Http",
+                "runAfter": { "Create_file_PUT": [ "Succeeded" ] },
+                "inputs": {
+                  "method": "PATCH",
+                  "uri": "https://onelake.dfs.fabric.microsoft.com/@{encodeURIComponent(parameters('OneLakeWorkspace'))}/@{encodeURIComponent(concat(parameters('OneLakeLakehouse'), '.Lakehouse'))}/@{parameters('TargetFolder')}/@{items('For_each_attachment')?['name']}?action=append&position=0",
+                  "headers": { "Content-Type": "application/octet-stream" },
+                  "body": "@items('For_each_attachment')?['contentBytes']",
+                  "authentication": {
+                    "type": "ActiveDirectoryOAuth",
+                    "authority": "https://login.microsoftonline.com",
+                    "tenant": "@parameters('TenantId')",
+                    "audience": "https://storage.azure.com/",
+                    "clientId": "@parameters('ClientId')",
+                    "secret": "@parameters('ClientSecret')"
+                  }
+                }
+              },
+              "Flush_content_PATCH": {
+                "type": "Http",
+                "runAfter": { "Append_content_PATCH": [ "Succeeded" ] },
+                "inputs": {
+                  "method": "PATCH",
+                  "uri": "https://onelake.dfs.fabric.microsoft.com/@{encodeURIComponent(parameters('OneLakeWorkspace'))}/@{encodeURIComponent(concat(parameters('OneLakeLakehouse'), '.Lakehouse'))}/@{parameters('TargetFolder')}/@{items('For_each_attachment')?['name']}?action=flush&position=@{length(items('For_each_attachment')?['contentBytes'])}",
+                  "authentication": {
+                    "type": "ActiveDirectoryOAuth",
+                    "authority": "https://login.microsoftonline.com",
+                    "tenant": "@parameters('TenantId')",
+                    "audience": "https://storage.azure.com/",
+                    "clientId": "@parameters('ClientId')",
+                    "secret": "@parameters('ClientSecret')"
+                  }
+                }
+              }
+            },
+            "else": { "actions": {} }
+          }
+        }
+      }
+    }
+  }
+}
