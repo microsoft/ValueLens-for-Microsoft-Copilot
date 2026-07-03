@@ -1,0 +1,140 @@
+{
+  "$comment": "Power Automate / Logic Apps flow definition. SHAREPOINT PATH variant. Lands the Microsoft 365 Admin Center > Copilot > Cost management > Consumption per-user CSV export (columns: User Principal Name, Cowork Credits, WorkIQ Credits, Other Credits, Last Activity Date) into the Fabric Lakehouse Files/cost_consumption folder via the OneLake DFS (ADLS Gen2) API. Fires when a CSV is created/modified in a governed SharePoint document library. This is the Cowork/WorkIQ/Other credit surface split that the Power Platform MCSMessages exports do NOT contain. Import via Power Automate > My flows > Import, then fix up the SharePoint connection + parameter values. See COST-CONSUMPTION.md.",
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "$connections": { "defaultValue": {}, "type": "Object" },
+      "SharePointSite": {
+        "defaultValue": "https://contoso.sharepoint.com/sites/CopilotAnalytics",
+        "type": "String",
+        "metadata": { "description": "SharePoint site that holds the drop library." }
+      },
+      "SharePointLibrary": {
+        "defaultValue": "Shared Documents",
+        "type": "String"
+      },
+      "SharePointFolder": {
+        "defaultValue": "/Copilot Cost Drop",
+        "type": "String",
+        "metadata": { "description": "Folder watched for new cost-consumption CSVs." }
+      },
+      "OneLakeWorkspace": { "defaultValue": "<your-workspace>", "type": "String" },
+      "OneLakeLakehouse": { "defaultValue": "<your-lakehouse>", "type": "String" },
+      "TargetFolder": {
+        "defaultValue": "Files/cost_consumption",
+        "type": "String",
+        "metadata": { "description": "Destination folder inside the lakehouse. Matches SOURCE_DIR in Copilot_Cost_Consumption_Ingester.ipynb." }
+      },
+      "FileNamePrefix": {
+        "defaultValue": "",
+        "type": "String",
+        "metadata": { "description": "Optional case-insensitive filename guard. The MAC Cost management export filename is not fixed, so this defaults to empty (accept any .csv in the watched folder). Set it once you know the real export prefix to be stricter." }
+      },
+      "TenantId":     { "defaultValue": "<tenant-guid>", "type": "String" },
+      "ClientId":     { "defaultValue": "<app-reg-client-id>", "type": "String" },
+      "ClientSecret": { "defaultValue": "<keyvault-reference>", "type": "SecureString" }
+    },
+    "triggers": {
+      "When_a_file_is_created_or_modified_(properties_only)": {
+        "type": "OpenApiConnection",
+        "recurrence": { "frequency": "Minute", "interval": 15 },
+        "inputs": {
+          "host": {
+            "connectionName": "shared_sharepointonline",
+            "operationId": "GetOnUpdatedFileItems",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+          },
+          "parameters": {
+            "dataset": "@parameters('SharePointSite')",
+            "table": "@parameters('SharePointLibrary')",
+            "folderPath": "@parameters('SharePointFolder')"
+          }
+        }
+      }
+    },
+    "actions": {
+      "Only_cost_CSVs": {
+        "type": "If",
+        "expression": {
+          "and": [
+            { "endsWith": [ "@toLower(triggerOutputs()?['body/{FilenameWithExtension}'])", ".csv" ] },
+            {
+              "or": [
+                { "equals": [ "@parameters('FileNamePrefix')", "" ] },
+                { "startsWith": [ "@toLower(triggerOutputs()?['body/{FilenameWithExtension}'])", "@toLower(parameters('FileNamePrefix'))" ] }
+              ]
+            }
+          ]
+        },
+        "actions": {
+          "Get_file_content": {
+            "type": "OpenApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_sharepointonline",
+                "operationId": "GetFileContent",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+              },
+              "parameters": {
+                "dataset": "@parameters('SharePointSite')",
+                "id": "@triggerOutputs()?['body/{Identifier}']"
+              }
+            }
+          },
+          "Create_file_PUT": {
+            "type": "Http",
+            "runAfter": { "Get_file_content": [ "Succeeded" ] },
+            "inputs": {
+              "method": "PUT",
+              "uri": "https://onelake.dfs.fabric.microsoft.com/@{encodeURIComponent(parameters('OneLakeWorkspace'))}/@{encodeURIComponent(concat(parameters('OneLakeLakehouse'), '.Lakehouse'))}/@{parameters('TargetFolder')}/@{triggerOutputs()?['body/{FilenameWithExtension}']}?resource=file",
+              "authentication": {
+                "type": "ActiveDirectoryOAuth",
+                "authority": "https://login.microsoftonline.com",
+                "tenant": "@parameters('TenantId')",
+                "audience": "https://storage.azure.com/",
+                "clientId": "@parameters('ClientId')",
+                "secret": "@parameters('ClientSecret')"
+              }
+            }
+          },
+          "Append_content_PATCH": {
+            "type": "Http",
+            "runAfter": { "Create_file_PUT": [ "Succeeded" ] },
+            "inputs": {
+              "method": "PATCH",
+              "uri": "https://onelake.dfs.fabric.microsoft.com/@{encodeURIComponent(parameters('OneLakeWorkspace'))}/@{encodeURIComponent(concat(parameters('OneLakeLakehouse'), '.Lakehouse'))}/@{parameters('TargetFolder')}/@{triggerOutputs()?['body/{FilenameWithExtension}']}?action=append&position=0",
+              "headers": { "Content-Type": "application/octet-stream" },
+              "body": "@body('Get_file_content')",
+              "authentication": {
+                "type": "ActiveDirectoryOAuth",
+                "authority": "https://login.microsoftonline.com",
+                "tenant": "@parameters('TenantId')",
+                "audience": "https://storage.azure.com/",
+                "clientId": "@parameters('ClientId')",
+                "secret": "@parameters('ClientSecret')"
+              }
+            }
+          },
+          "Flush_content_PATCH": {
+            "type": "Http",
+            "runAfter": { "Append_content_PATCH": [ "Succeeded" ] },
+            "inputs": {
+              "method": "PATCH",
+              "uri": "https://onelake.dfs.fabric.microsoft.com/@{encodeURIComponent(parameters('OneLakeWorkspace'))}/@{encodeURIComponent(concat(parameters('OneLakeLakehouse'), '.Lakehouse'))}/@{parameters('TargetFolder')}/@{triggerOutputs()?['body/{FilenameWithExtension}']}?action=flush&position=@{length(body('Get_file_content'))}",
+              "authentication": {
+                "type": "ActiveDirectoryOAuth",
+                "authority": "https://login.microsoftonline.com",
+                "tenant": "@parameters('TenantId')",
+                "audience": "https://storage.azure.com/",
+                "clientId": "@parameters('ClientId')",
+                "secret": "@parameters('ClientSecret')"
+              }
+            }
+          }
+        },
+        "else": { "actions": {} }
+      }
+    }
+  }
+}
