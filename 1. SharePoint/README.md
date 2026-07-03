@@ -6,12 +6,11 @@ Pick how you get the data in:
 | Option | Best for | What you do |
 |---|---|---|
 | **A — Manual (first run)** ⭐ | A **quick first look** to see how the numbers land, or a one-off refresh. | Export two CSVs by hand → run one [processor script](#option-a--manual-first-run) → connect the **(Local CSV)** template. No app registration, no scheduling. |
-| **B — Automated (PAX)** | An **ongoing**, scheduled refresh. | Use the first-party **[PAX Cookbook](https://microsoft.github.io/PAX-Cookbook)** app (built-in **AI Business Value** recipe) — or the optional scripts — to extract + roll up, write to SharePoint, and refresh on a schedule. |
+| **B — Automated (scheduled script)** | An **ongoing**, scheduled refresh. | Run the [extract script](#option-b--automated-scheduled-script) on a schedule — it pulls the data, rolls it up, writes to SharePoint, and Power BI refreshes automatically. No manual export. |
 
 ```
 Option A (manual):     [export 2 CSVs] -> [Processor .py] -> [ (Local CSV) PBIT ]
-Option B1 (Cookbook):  [PAX Cookbook: AIBV recipe] --(direct)--> [ SharePoint PBIT, scheduled ]
-Option B2 (scripts):   [Run-PAX-AIBV] -> [Upload-Rollups-SharePoint] -> [ SharePoint PBIT, scheduled ]
+Option B (automated):  [Run-PAX-AIBV] -> [Upload-Rollups-SharePoint] -> [ SharePoint PBIT, scheduled ]
 ```
 
 Both produce the **same two rollup CSVs** the dashboard reads
@@ -63,14 +62,16 @@ exports, joined on **UPN**. Supply them as two files (recommended) or pre-merged
 | Export | Where | Becomes |
 |---|---|---|
 | Raw **Copilot interactions** (audit log CSV) | Microsoft **Purview** -> Audit -> search `CopilotInteraction` -> Export | `--purview` |
-| **Org / users** (UPN, department, job title, manager) | Microsoft **Entra** -> Users -> Export | `--entra` |
+| **Org / users** (UPN, department, job title, manager) | Microsoft **Entra** -> Users -> Export, **or your own org/HR file** ([sample template](./scripts/OrgData-Template.csv)) | `--entra` |
 | **Licensing** (UPN + a `Has License` flag) | **M365 Admin Center** -> Copilot user export | `--licensing` |
 
 > **One combined file instead?** If your users export already contains a licence column, pass it as
 > `--entra` and **omit** `--licensing` — the licence column is auto-detected.
 >
-> Got a custom HR/org export? Normalise it first with
-> [`scripts/Adapt-OrgFile-To-EntraUsers.py`](./scripts/Adapt-OrgFile-To-EntraUsers.py) to produce the `--entra` input.
+> **Bring your own org data (instead of Entra)?** Copy the
+> [sample template](./scripts/OrgData-Template.csv) — the same shape a **Viva Insights** org-data file
+> uses — fill in your users, and pass it as `--entra`. Got a messy HR export with different headers?
+> Run it through [`scripts/Adapt-OrgFile-To-EntraUsers.py`](./scripts/Adapt-OrgFile-To-EntraUsers.py) first.
 
 **2. Run the processor** ([`scripts/Purview_CopilotInteraction_Processor_v4.0.0.py`](./scripts/Purview_CopilotInteraction_Processor_v4.0.0.py))
 
@@ -106,30 +107,20 @@ parameters at the rollup CSVs from step 2:
 
 ---
 
-## Option B — Automated (PAX)
+## Option B — Automated (scheduled script)
 
-Scheduled refresh from a SharePoint library. **Two ways to run PAX** — pick one:
+Scheduled refresh from a SharePoint library: the script extracts + rolls up your data, uploads the
+two CSVs to SharePoint, and Power BI refreshes on a schedule. Provision once, then it runs hands-off.
 
-- **B1 — PAX Cookbook** ⭐ *(recommended, first-party)*: Microsoft's own [PAX Cookbook](https://microsoft.github.io/PAX-Cookbook) Windows app runs the PAX engine for you — a built-in **"AI Business Value Dashboard" recipe**, credentials in Windows Credential Manager ("Chef's Keys"), and one-click **scheduled bakes**. It already exposes the switches this dashboard needs (**`UserInfoFile`** for a non-Entra org file, **`AppendFile`** for incremental interactions, **`Deidentify`**, **`IncludeAgent365Info`**) and writes **directly to SharePoint / OneLake** — no upload step.
-- **B2 — PAX scripts** *(optional / advanced)*: the wrapper scripts in [`scripts/`](./scripts/) (`Run-PAX-AIBV.ps1` → `Upload-Rollups-SharePoint.ps1` → `Register-TaskScheduler.ps1`). Use these only if you want a fully scripted/CI pipeline instead of the Cookbook app. They predate the Cookbook's SharePoint output; the Cookbook is now the simpler path for most customers.
+Three helper scripts do the work, in order —
+[`Run-PAX-AIBV.ps1`](./scripts/Run-PAX-AIBV.ps1) (extract) →
+[`Upload-Rollups-SharePoint.ps1`](./scripts/Upload-Rollups-SharePoint.ps1) (upload) →
+[`Register-TaskScheduler.ps1`](./scripts/Register-TaskScheduler.ps1) (schedule).
 
-<details>
-<summary><strong>B1 — PAX Cookbook (recommended)</strong></summary>
-
-1. **Provision SharePoint write access + get SiteId/DriveId** — still do the **one-time setup** in B2 below (the Cookbook doesn't set up Entra app permissions or `Sites.Selected` for you).
-2. **Install the Cookbook** — [Get PAX Cookbook →](https://microsoft.github.io/PAX-Cookbook). Add your app-registration credentials as a **Chef's Key** (stored in Windows Credential Manager).
-3. **Pick the "AI Business Value Dashboard" recipe** (emits `-Dashboard AIBV -Rollup -IncludeUserInfo`). Then set, as needed:
-   - **Own org file instead of Entra:** set **`UserInfoFile`** to your CSV (local, SharePoint, or OneLake). Only `UserPrincipalName` required; leave `HasLicense` blank to auto-resolve, or fill `TRUE`/`FALSE` from your MAC export.
-   - **Incremental interactions:** seed once with a back-fill (no `AppendFile`), then set **`AppendFile`** to the fixed interactions file on scheduled runs (de-duplicated).
-   - **Privacy:** enable **`Deidentify`** to anonymise identities.
-   - **Agent 365 (optional):** enable **`IncludeAgent365Info`** (needs `CopilotPackages.Read.All` + `Application.Read.All` and an Agent 365 licence).
-4. **Destination:** point the recipe's output at your **SharePoint library** (interactions = append/fixed name; users + Agent 365 = overwrite snapshots).
-5. **Schedule:** hand the recipe to a **scheduled bake** (daily). Then **connect the template** (see the SharePoint-refresh steps below) once and enable Power BI scheduled refresh.
-
-> Prefer the command line? [Mini-Kitchen](https://microsoft.github.io/PAX-Cookbook/mini-kitchen) builds the exact `pwsh` command from the same AIBV recipe for you to run yourself.
-</details>
-
-### B2 — PAX scripts (optional / advanced)
+> **Using your own org data instead of Entra?** Point the extract at your own org/HR file with
+> `-UserInfoFile <path|SharePoint-URL|OneLake-path>` — copy the
+> [sample template](./scripts/OrgData-Template.csv) (same shape as a Viva Insights org-data file) to
+> get started. Only `UserPrincipalName` is required. See the **Daily refresh** step below.
 
 Provision once, then extract + upload on a cadence.
 
@@ -138,8 +129,8 @@ Provision once, then extract + upload on a cadence.
 
 **On the machine that runs the extract:**
 - PowerShell 7+ (`pwsh`) — [install guide](https://learn.microsoft.com/en-us/powershell/scripting/install/install-powershell-on-windows). Run scripts with `pwsh`, not Windows PowerShell.
-- Internet access to GitHub Releases (the wrapper downloads the current PAX release).
-- Python 3.10+ (PAX bootstraps it internally for the rollup).
+- Internet access to GitHub Releases (the script downloads the current extract tool automatically).
+- Python 3.10+ (the script bootstraps it internally for the rollup).
 
 **In your tenant:**
 - An Entra app registration with these admin-consented **Microsoft Graph Application** permissions:
@@ -160,7 +151,7 @@ You'll need the **Tenant ID**, **Client ID**, and **Client Secret** before you s
 | **Best when** | Windows host or CI (Task Scheduler, GitHub Actions) | Hosted in Azure (Container Apps Job) |
 | **`-Auth`** | `AppRegistration` (secret **or** certificate) | `ManagedIdentity` |
 | **Secret to manage** | Yes — or a certificate to avoid rotation | None |
-| **SharePoint write** | `Sites.Selected` (per-library, least privilege) | `Sites.Selected` when you own the upload step; PAX's bundled `Deploy-PAXAcaJob.ps1` needs the broader `Sites.ReadWrite.All` + `Files.ReadWrite.All` — an upstream PAX constraint. |
+| **SharePoint write** | `Sites.Selected` (per-library, least privilege) | `Sites.Selected` when you own the upload step; the bundled `Deploy-PAXAcaJob.ps1` needs the broader `Sites.ReadWrite.All` + `Files.ReadWrite.All` — an upstream constraint of that script. |
 | **Status here** | ✅ Available now | ⏳ Pending the ACA Job — see [`azure-container/`](./azure-container/) |
 
 Both use the **same Graph read permissions**; they differ only in how the identity signs in. Run
@@ -204,13 +195,17 @@ cd scripts
 .\Run-PAX-AIBV.ps1 -TenantId <tenant-id> -ClientId <client-id> -Days 2 `
     -AppendFile Purview_CopilotInteraction_Rollup.csv
 ```
-The append (PAX `purview-v1.11.11`) de-duplicates on each interaction's stable message identity, so
-overlapping days reconcile — nothing dropped or double-counted. **Interactions append; the Users/org
+The append de-duplicates on each interaction's stable message identity, so overlapping days
+reconcile — nothing dropped or double-counted. **Interactions append; the Users/org
 and Agent 365 outputs are snapshots (overwritten each run).**
 
+> **Upgrading from an older run?** If you already have an append file from a previous version, start a
+> **fresh** output file and re-run your full date range — earlier versions could under-count on append.
+> Nothing is lost: your source data is still queryable, so re-running rebuilds the complete picture.
+
 Produces `.\processed\*_Interactions_*.csv`, `.\processed\*_Users_*.csv`, and `rollup-manifest.json`
-(5–15 min for 30 days). Add `-IncludeAgent365Info` for the optional Agents 365 output — as of PAX
-`purview-v1.11.11` this runs **app-only/unattended** under your `-Auth` mode (needs
+(5–15 min for 30 days). Add `-IncludeAgent365Info` for the optional Agents 365 output — this runs
+**app-only/unattended** under your `-Auth` mode (needs
 `CopilotPackages.Read.All` + `Application.Read.All` and an Agent 365 licence; a missing licence
 returns `403`). To supply your own user directory instead of pulling it live from Entra, add
 `-UserInfoFile <path|SharePoint-URL|OneLake-path>` (BYOD; `UserPrincipalName` required, other columns
@@ -279,7 +274,7 @@ is **not** stored in the task. (Secretless managed-identity scheduling is WIP �
 | Symptom | Fix |
 |---|---|
 | `python: command not found` | Install Python 3.10+ and retry. |
-| `0 records returned` (PAX) | `AuditLogsQuery.Read.All` consent missing — re-grant in Entra. |
+| `0 records returned` | `AuditLogsQuery.Read.All` consent missing — re-grant in Entra. |
 | Masked UPNs (32-char hex) | M365 Admin → Org settings → Reports → untick "Display concealed names". |
 | `403 Forbidden` on upload | App lacks per-site write — re-run [`ProvisionSiteAccess-SP-AppReg.ps1`](./scripts/ProvisionSiteAccess-SP-AppReg.ps1). |
 | `404 Not Found` on upload | `-FolderPath` doesn't exist in SharePoint — create it, or use `/` for the library root. |

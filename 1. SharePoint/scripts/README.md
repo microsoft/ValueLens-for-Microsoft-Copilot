@@ -7,12 +7,13 @@ reference.
 | Script | What it does | When you run it |
 |---|---|---|
 | `ProvisionSiteAccess-SP-AppReg.ps1` | Grants your Entra app `Sites.Selected` write access to one SharePoint site. Prints the `SiteId` and `DriveId` the upload script needs. | **Once per site.** |
-| `Run-PAX-AIBV.ps1` | Downloads the latest PAX release script, runs the built-in AIBV rollup, and drops two rollup CSVs into `.\processed\`. | **Every refresh.** |
+| `Run-PAX-AIBV.ps1` | Downloads the latest extract tool, runs the AIBV rollup, and drops two rollup CSVs into `.\processed\`. | **Every refresh.** |
 | `Upload-Rollups-SharePoint.ps1` | Uploads the two rollup CSVs to fixed file names in your SharePoint library (overwrites the previous run). | **Every refresh, after the extract.** |
 | `Register-TaskScheduler.ps1` | Registers the above two as a single daily Windows Scheduled Task. | **Once, when you want to schedule.** |
 | `Get-Agents365Registry.ps1` | Optional. Exports the Agents 365 registry for the dashboard's Agents 365 page. | Ad-hoc. |
-| `Purview_CopilotInteraction_Processor_v4.0.0.py` | **Manual extract.** Turns a raw Purview audit CSV + an Entra users CSV into the two rollup CSVs the template reads — without running PAX. | **First run / quick look** (see Option A in the [folder README](../README.md)). |
+| `Purview_CopilotInteraction_Processor_v4.0.0.py` | **Manual extract.** Turns a raw Purview audit CSV + an Entra users CSV into the two rollup CSVs the template reads — no scheduling or app registration. | **First run / quick look** (see Option A in the [folder README](../README.md)). |
 | `Adapt-OrgFile-To-EntraUsers.py` | Optional helper for the manual extract. Normalises a **custom HR/org export** (any headers/delimiter) into the EntraUsers-shaped `--entra` input the processor expects. | Before the processor, when your org file isn't a standard Entra users export. |
+| `OrgData-Template.csv` | Sample **bring-your-own org data** file — copy it, fill in your users, and pass it as `--entra` (manual) or `-UserInfoFile` (automated). Same shape as a Viva Insights org-data export. | When you supply org data yourself instead of Entra. |
 
 ---
 
@@ -60,13 +61,13 @@ Outputs to `<WorkRoot>\processed\`:
 - `<purview-stem>_Interactions_<ts>.csv`
 - `<entra-stem>_Users_<ts>.csv`
 - `rollup-manifest.json` (paths + timings for the upload step)
-The wrapper downloads the selected PAX release script into `<WorkRoot>\pax\releases\`.
+The script downloads the selected extract-tool release into `<WorkRoot>\pax\releases\`.
 Defaults are `-Auth AppRegistration`, `-Rollup`, and `-IncludeUserInfo`.
 
 **Seed once, then append (interactions)** — `-AppendFile`: the Purview interactions data is a growing
 time-series, so run the **first** extract as a **back-fill with no `-AppendFile`** (e.g. `-Days 30`)
 to create the file, then have **every scheduled run** use `-AppendFile <that file>` with a short
-window (e.g. `-Days 2`). As of PAX `purview-v1.11.11` the append de-duplicates on each interaction's
+window (e.g. `-Days 2`). The append de-duplicates on each interaction's
 stable message identity, so overlapping days reconcile (nothing dropped or double-counted). Applies
 to interactions only; the Users/org and Agent 365 outputs are **snapshots** (overwritten each run).
 Keep `-Deidentify` consistent across all appends to the same file.
@@ -77,14 +78,15 @@ Keep `-Deidentify` consistent across all appends to the same file.
 .\Run-PAX-AIBV.ps1 -TenantId <id> -ClientId <id> -Days 2 -AppendFile Purview_CopilotInteraction_Rollup.csv
 ```
 
-`-IncludeAgent365Info` (optional): produces the Agent 365 catalogue export. As of PAX
-`purview-v1.11.11` it runs **app-only/unattended** under the same `-Auth` mode (no separate
+`-IncludeAgent365Info` (optional): produces the Agent 365 catalogue export. It runs
+**app-only/unattended** under the same `-Auth` mode (no separate
 interactive sign-in). Requires the app's admin-consented **Application** permissions
 `CopilotPackages.Read.All` + `Application.Read.All` and an **Agent 365 licence** in the tenant
 (a missing licence returns `403`).
 
-`-UserInfoFile` (optional, BYOD): supply your own user directory CSV (PAX `purview-v1.11.11`
-`-UserInfoFile`) instead of pulling it live from Entra. `UserPrincipalName` is required (header
+`-UserInfoFile` (optional, BYOD): supply your own user directory CSV instead of pulling it live from
+Entra — copy [`OrgData-Template.csv`](./OrgData-Template.csv) as a starting point. `UserPrincipalName`
+is required (header
 aliases `UPN` / `PersonId` also accepted, values must be UPNs not GUIDs); other columns
 (DisplayName / Department / Manager / License…) are optional and alias-aware. `HasLicense` must be
 the literal word `TRUE` or `FALSE` (`Yes/No`, `1/0` are **not** recognised). The path can be
@@ -100,7 +102,7 @@ license value are used as-is; blanks fall back to a tenant lookup (needs `User.R
 ```csv
 UserPrincipalName,DisplayName,Department,JobTitle,ManagerUpn,HasLicense
 ```
-Full field reference: [PAX v1.11.x `-UserInfoFile` CSV schema](https://github.com/microsoft/PAX/blob/release/release_documentation/Purview_Audit_Log_Processor/PAX_Purview_Audit_Log_Processor_Documentation_v1.11.x.md#-userinfofile-csv-schema-shareable-reference).
+Full field reference: [`-UserInfoFile` CSV schema (upstream docs)](https://github.com/microsoft/PAX/blob/release/release_documentation/Purview_Audit_Log_Processor/PAX_Purview_Audit_Log_Processor_Documentation_v1.11.x.md#-userinfofile-csv-schema-shareable-reference).
 
 ---
 
@@ -157,7 +159,7 @@ runtime via the resolution chain above.
 
 ## `Purview_CopilotInteraction_Processor_v4.0.0.py`
 
-The **manual** alternative to PAX. Bring your exports yourself — it produces the same two rollup CSVs
+The **manual** alternative to the automated script. Bring your exports yourself — it produces the same two rollup CSVs
 the template reads. Use it for a **first run / quick look** with no app registration or scheduling
 (this is **Option A** in the [folder README](../README.md)).
 
@@ -187,7 +189,7 @@ all options (`--out-dir`, `--with-aggregates`, `--profile aio`). Requires **Pyth
 
 ## `Adapt-OrgFile-To-EntraUsers.py`
 
-Optional pre-step for the manual extract. The processor's `--entra` input must be in PAX's
+Optional pre-step for the manual extract. The processor's `--entra` input must be in the
 **EntraUsers** shape (it joins to the audit log on `userPrincipalName`). If your org/HR export uses
 different headers, an employee-ID key, a semicolon delimiter or UTF-16, this adapter maps it into the
 expected shape (and can flatten the manager chain into the `Level0..N` hierarchy for org drill-down).

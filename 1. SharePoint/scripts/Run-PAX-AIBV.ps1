@@ -28,7 +28,7 @@
 
 .PARAMETER IncludeAgent365Info
   Passes the PAX -IncludeAgent365Info switch so the optional Agent 365 catalogue
-  output is produced. As of PAX purview-v1.11.11 the catalogue export honours
+  output is produced. As of PAX purview-v1.11.12 the catalogue export honours
   app-only auth (AppRegistration secret/certificate or ManagedIdentity), reusing
   this run's own -Auth mode, so it works unattended - no separate interactive
   sign-in. Requires the app's admin-consented Application permissions
@@ -46,7 +46,7 @@
   folder) or full path of the cumulative interactions CSV to append this run's rows into. Leave
   UNSET on the very first run to seed the file with a back-fill window (e.g. -Days 30); set it on
   every subsequent scheduled run (e.g. -Days 2) so PAX appends only the latest window. As of PAX
-  purview-v1.11.11 the append de-duplicates on each interaction's stable message identity, so
+  purview-v1.11.12 the append de-duplicates on each interaction's stable message identity, so
   overlapping days are reconciled (nothing dropped or double-counted). The file must already exist
   (created by the seed run). Applies to interactions only - the Users snapshot is overwritten, not
   appended. Keep -Deidentify consistent across all appends to the same file.
@@ -55,7 +55,7 @@
   Include the Users output by default. Pass -IncludeUserInfo:$false to disable.
 
 .PARAMETER UserInfoFile
-  BYOD - bring your own user directory (PAX purview-v1.11.11 -UserInfoFile). Path to a CSV of
+  BYOD - bring your own user directory (PAX purview-v1.11.12 -UserInfoFile). Path to a CSV of
   users (UserPrincipalName required; DisplayName / Department / Manager / License etc. optional,
   header names are alias-aware) used instead of pulling the directory live from Entra. Drives
   enrichment, org/manager hierarchy, the rolled-up Users dimension, de-identification and upload.

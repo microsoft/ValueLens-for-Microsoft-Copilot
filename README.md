@@ -45,7 +45,7 @@ Dataverse‑native build? That lives in a separate companion repo (called out be
 
 | Path | Pick this when… | What you need |
 |---|---|---|
-| **[1. SharePoint](1.%20SharePoint/)** · *simplest* | You want the fastest start on **Power BI Pro** — no Fabric or Premium. | Export two CSVs → run one Python step → open the template. Optional: automate the refresh via [Microsoft PAX](https://github.com/microsoft/PAX) → SharePoint. The simplest core deployment. |
+| **[1. SharePoint](1.%20SharePoint/)** · *simplest* | You want the fastest start on **Power BI Pro** — no Fabric or Premium. | Export two CSVs → run one Python step → open the template. Optional: automate the refresh with a scheduled script → SharePoint. The simplest core deployment. |
 | **[2. Fabric](2.%20Fabric/)** · *standard · recommended* | You have **Fabric capacity** (or Premium / PPU), or any Spark + SQL stack. | Notebooks shape the data into a Lakehouse → best performance and sub‑second pages, plus the optional billing & feedback pages. The same notebooks + template also run on Databricks, Synapse, or Azure SQL. |
 | **[3. Fabric Extended](3.%20Fabric%20Extended/)** · *advanced add‑ons* | You run **Copilot Studio agents** and want the deeper agent / topic / CSAT pages. *(An M365 work‑pattern build is coming soon.)* | Everything in path 2, **plus** the Copilot Studio layer. Stand up path 2 first, then add this. |
 

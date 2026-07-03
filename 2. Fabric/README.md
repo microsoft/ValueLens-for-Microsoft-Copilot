@@ -186,6 +186,9 @@ produces a CSV you can drop into the Lakehouse `Files/` area and ingest with the
 - **Role:** User Administrator or Global Reader
 - **Required columns:** `UserPrincipalName`, `Department`. Recommended: `JobTitle`, `Office`, `City`, `Country`, `Manager`
 - **Output:** **Download users** (CSV)
+- **Bring your own org data (instead of Entra)?** Set the pipeline parameter `EnableOrgDataPull=false`
+  and upload your own users CSV (same columns as above — the shape a **Viva Insights** org-data file
+  uses). See [`pipelines/README.md`](pipelines/README.md).
 
 ### Agent 365 — Microsoft Admin Center
 - **Automated path (preferred):** `notebooks/Copilot_Agent365_Registry_Ingester.ipynb` pulls the catalog directly through the Microsoft Graph app registration (app-only — `CopilotPackages.Read.All` + `Application.Read.All`, admin-consented), so no manual export is needed and it can run scheduled/unattended. The manual export below is the delegated, zero-permission fallback (`notebooks/Copilot_Agent365_Lander.ipynb`).

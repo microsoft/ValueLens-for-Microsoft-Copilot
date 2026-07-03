@@ -2,6 +2,7 @@
 *.csv
 !sample-data/*.csv
 !docs/*.csv
+!1. SharePoint/scripts/OrgData-Template.csv
 
 # Power BI workspace artefacts
 *.pbip.local
