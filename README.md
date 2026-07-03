@@ -64,9 +64,9 @@ them natively — no Fabric or SharePoint needed.
 ```
 README.md  ·  LICENSE  ·  Images/
 1. SharePoint/     SharePoint.pbit  ·  SharePoint (Local CSV).pbit  ·  scripts/  ·  azure-container/
-2. Fabric/         Fabric.pbit  ·  docs/  ·  flows/  ·  notebooks/  ·  pipelines/  ·  CREDIT-CONSUMPTION-SETUP.md
+2. Fabric/         Fabric.pbit  ·  docs/  ·  flows/  ·  notebooks/  ·  pipelines/
 3. Fabric Extended/
-     Fabric + Copilot Studio/   deeper agent-transcript & topic/CSAT build (Studio pages)
+     Fabric + Copilot Studio/   deeper agent-transcript, topic/CSAT & PPAC credit build (Studio pages)
      Fabric + M365/             work-pattern build — 🧪 coming soon
 archive/           superseded versions — kept for reference, not maintained
 
@@ -97,7 +97,8 @@ baseline** → summed to **Hours Saved** → × hourly rate = **Assisted Value**
 | Licensed users | ✅ Core | Microsoft 365 Admin Center |
 | Org data (department / function) | ✅ Core | Microsoft Entra |
 | Agents 365 | ⬜ Optional | Agent 365 export (Fabric path) |
-| Credit consumption (billing) | ⬜ Optional | Power Platform Admin Center export → see [`2. Fabric/CREDIT-CONSUMPTION-SETUP.md`](2.%20Fabric/CREDIT-CONSUMPTION-SETUP.md) |
+| Cowork / Work IQ consumption | ⬜ Optional | Microsoft 365 Admin Center export → see [`2. Fabric/flows/COST-CONSUMPTION.md`](2.%20Fabric/flows/COST-CONSUMPTION.md) |
+| Credit consumption (billing) | ⬜ Optional | Power Platform Admin Center export → see [`3. Fabric Extended/Fabric + Copilot Studio/CREDIT-CONSUMPTION-SETUP.md`](3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/CREDIT-CONSUMPTION-SETUP.md) *(Studio add-on)* |
 | Product feedback | ⬜ Optional | M365 Admin Center → Health → Product Feedback export |
 | Copilot Studio agent transcripts | ⬜ Optional | Dataverse `ConversationTranscript` table — use the [Dataverse companion repo ↗](https://github.com/Keithland89/Copilot-Studio-Agent-Analytics) |
 

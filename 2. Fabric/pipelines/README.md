@@ -62,7 +62,7 @@ To switch one on: set its parameter to `true` **and** replace its notebook GUID 
 | Toggle | Activity | Notebook | Notebook-ID placeholder | Notes |
 |---|---|---|---|---|
 | `EnableDataverse` | `Conditionally_Run_Dataverse_Transcripts` | `Copilot_Agent_Transcript_Parser.ipynb` | `REPLACE_WITH_TRANSCRIPT_PARSER_NOTEBOOK_ID` | Live Dataverse pull. Needs the app reg as a Dataverse **Application User** (see [`../docs/PERMISSIONS.md`](../docs/PERMISSIONS.md)). |
-| `EnableConsumption` | `Conditionally_Run_Credit_Consumption` | `Copilot_Credit_Consumption_Ingester.ipynb` | `REPLACE_WITH_CREDIT_CONSUMPTION_NOTEBOOK_ID` | **Export-only.** Land the 3 CSVs in `Files/credit_consumption/` first (manually or via a [flow](../flows/)). |
+| `EnableConsumption` | `Conditionally_Run_Credit_Consumption` | `Copilot_Credit_Consumption_Ingester.ipynb` | `REPLACE_WITH_CREDIT_CONSUMPTION_NOTEBOOK_ID` | **PPAC credit build — now a [Fabric + Copilot Studio](../../3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/) add-on**, kept here transitionally. Land the 3 CSVs in `Files/credit_consumption/` first (see [`CREDIT-CONSUMPTION-SETUP.md`](../../3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/CREDIT-CONSUMPTION-SETUP.md)). |
 | `EnableProductFeedback` | `Conditionally_Run_Product_Feedback` | `Copilot_ProductFeedback_Ingester.ipynb` | `REPLACE_WITH_PRODUCT_FEEDBACK_NOTEBOOK_ID` | **Export-only.** Land the CSV in `Files/product_feedback/` first (manually or via a [flow](../flows/)). |
 | `EnableAgent365` | `Conditionally_Run_Agent365` | `Copilot_Agent365_Lander.ipynb` | `REPLACE_WITH_AGENT365_NOTEBOOK_ID` | Reads an exported agent registry CSV. |
 

@@ -39,6 +39,12 @@ template never breaks. See `OPTIONAL-SOURCES.md` for the `EmptyTable` + `try…o
 | 14 | Credit Consumption (User) | `credit_consumption_user` | *Optional* (billing) | `Copilot_Credit_Consumption_Ingester` | n/a |
 | 15 | Copilot Cost Consumption | `copilot_cost_consumption` | *Optional* (billing) | `Copilot_Cost_Consumption_Ingester` | SharePoint CSV (`Cost Consumption File`) |
 
+> **Rows 12–14 (PPAC credit consumption)** are the **Power Platform Admin Center** per-agent Copilot
+> Studio message-credit build, now a [Fabric + Copilot Studio](../../3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/)
+> add-on. The tables remain in the base PBIT transitionally (gated by `Enable_Consumption`); the
+> ingester notebook and setup guide live with the Studio Extended template. Row 15 (`copilot_cost_consumption`)
+> is the **MAC Cowork / Work IQ** consumption build that stays standard across all templates.
+
 All other model tables (Calendar, legends, ranking/summary, glossary, value maps, etc.) are
 **calculated/DAX or static** — they have no external source and are version-independent.
 

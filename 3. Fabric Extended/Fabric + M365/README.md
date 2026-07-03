@@ -15,6 +15,9 @@ work-pattern signals** alongside the Copilot value model:
   patterns.
 - **AI-readiness headroom** — which everyday tasks are ripe for Copilot but still done manually.
 
+> The work-behaviour ingester notebook (`notebooks/Copilot_M365_Work_Behavior_Ingester.ipynb`) already
+> lives in this folder as an early preview — it isn't wired into a shipping template yet.
+
 ## In the meantime
 
 Use **[2. Fabric](../../2.%20Fabric/)** (or **[1. SharePoint](../../1.%20SharePoint/)** on Power BI Pro)

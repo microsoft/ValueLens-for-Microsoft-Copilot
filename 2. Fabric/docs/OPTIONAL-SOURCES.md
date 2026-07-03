@@ -22,7 +22,7 @@ and the measures simply return `0`/blank.
 | `Enable_Dataverse` | `"Include"` | the 6 agent tables (`agent_sessions`, `agent_turns`, `agent_errors`, `agent_subagents`, `agent_catalogue`, `agent_performance`) |
 | `Enable_ProductFeedback` | `"Include"` | `user_feedback` (ProductFeedback) |
 | `Enable_Agent365` | `"Include"` | `agents_365` (Agents 365) |
-| `Enable_Consumption` | `"Include"` | the 3 billing tables (`credit_consumption_tenant/agent/user`) |
+| `Enable_Consumption` | `"Include"` | the 3 billing tables (`credit_consumption_tenant/agent/user`) — **PPAC credit build; now a [Fabric + Copilot Studio](../../3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/) add-on** (leave `"Exclude"` in the lean build) |
 | `Enable_CostConsumption` | `"Include"` | `copilot_cost_consumption` (Cowork / WorkIQ / Other credits — MAC Cost management export) |
 
 Set a toggle to `"Exclude"` to skip that source entirely (no fetch attempt) — useful when a customer
