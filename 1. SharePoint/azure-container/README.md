@@ -4,7 +4,7 @@
 > **The schema blocker that held this up is now resolved.** As of
 > **PAX v1.11.5** (and **v1.11.6**, the current release) PAX embeds the
 > **v4.0.0** CopilotInteraction processor and a new **`-Dashboard AIBV`** switch
-> that produces the AI Business Value rollup **natively** — the same 50-column
+> that produces the ValueLens rollup **natively** — the same 50-column
 > profile the AIBV PBIT consumes. A custom container layer is **no longer
 > needed**: you can run PAX's own container image directly.
 >

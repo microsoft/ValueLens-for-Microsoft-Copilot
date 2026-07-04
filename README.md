@@ -1,13 +1,13 @@
 <div align="center">
 
-# 💼 AI Business Value Dashboard
+# 🔎 ValueLens
 
-### One Power BI template for every Microsoft **Copilot &amp; agent** adoption signal.
+### *for Microsoft Copilot* — one Power BI template for every **Copilot &amp; agent** adoption signal.
 
-[![Built by Microsoft](https://img.shields.io/badge/BUILT_BY-MICROSOFT-4F73B8?style=for-the-badge&labelColor=1C2632)](https://github.com/Keithland89/AI-Business-Value-Dashboard)
+[![Built by Microsoft](https://img.shields.io/badge/BUILT_BY-MICROSOFT-4F73B8?style=for-the-badge&labelColor=1C2632)](https://github.com/Keithland89/ValueLens-for-Microsoft-Copilot)
 [![Power BI Template](https://img.shields.io/badge/POWER_BI-TEMPLATE-F2C811?style=for-the-badge&logo=powerbi&logoColor=1C2632&labelColor=1C2632)](#-pick-a-deployment-path)
 [![Deploy](https://img.shields.io/badge/DEPLOY-FABRIC_%2B_SHAREPOINT_%2B_DATAVERSE-09B39D?style=for-the-badge&labelColor=1C2632)](#-pick-a-deployment-path)
-[![Stars](https://img.shields.io/github/stars/Keithland89/AI-Business-Value-Dashboard?style=for-the-badge&color=7F215D&labelColor=1C2632)](https://github.com/Keithland89/AI-Business-Value-Dashboard/stargazers)
+[![Stars](https://img.shields.io/github/stars/Keithland89/ValueLens-for-Microsoft-Copilot?style=for-the-badge&color=7F215D&labelColor=1C2632)](https://github.com/Keithland89/ValueLens-for-Microsoft-Copilot/stargazers)
 
 **Hours saved · assisted value · adoption &amp; readiness** — a defensible ROI narrative aligned to
 Microsoft's **Frontier Firm** framework.
@@ -16,7 +16,7 @@ Found this useful? ⭐ **Star this repo to help others discover it!**
 
 **[Deployment paths ↓](#-pick-a-deployment-path)** · **[What it measures ↓](#-what-it-measures)** · **[Data sources ↓](#-data-sources)** · **[Dashboard pages ↓](#-dashboard-pages)** · **[Research ↓](#-research-sources)**
 
-![AI Business Value Dashboard preview](Images/ABV-Preview.gif)
+![ValueLens preview](Images/ValueLens-Preview.gif)
 
 </div>
 

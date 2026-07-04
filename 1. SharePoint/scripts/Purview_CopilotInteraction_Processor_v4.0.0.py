@@ -2,11 +2,11 @@
 """
 Purview CopilotInteraction Processor v4.0.0
 -------------------------------------------
-Two-input / two-output preprocessor for the AI Business Value Dashboard
+Two-input / two-output preprocessor for the ValueLens
 and AI-in-One Rollup PBIPs.
 
 Output profiles (--profile):
-    aibv  (default) : AI Business Value Dashboard. 50-column fact superset —
+    aibv  (default) : ValueLens. 50-column fact superset —
                       3-value Environment {Cowork, Licensed, Unlicensed},
                       all DAX calc-columns pre-computed (Behavior_*, Usage_Mode,
                       Expertise_Role, Efficiency_Breakdown, Human_Baseline_Min,
@@ -2195,7 +2195,7 @@ def main() -> None:
             f"Purview CopilotInteraction Processor v{SCRIPT_VERSION} - "
             "Two/three-input, two-output preprocessor that produces a rolled-up "
             "Interactions fact CSV (~85% row reduction via PromptCount grain) "
-            "and a Users dim CSV for the AI Business Value Dashboard PBIP."
+            "and a Users dim CSV for the ValueLens PBIP."
         )
     )
     parser.add_argument(
@@ -2248,7 +2248,7 @@ def main() -> None:
         choices=("aibv", "aio"),
         default="aibv",
         help=(
-            "Output profile. 'aibv' (default) = AI Business Value Dashboard "
+            "Output profile. 'aibv' (default) = ValueLens "
             "superset (50-col fact, 3-value Environment). 'aio' = AI-in-One "
             "Dashboard (36-col fact, 5-value Environment) — reproduces the "
             "v3.1.0 AIO output exactly."

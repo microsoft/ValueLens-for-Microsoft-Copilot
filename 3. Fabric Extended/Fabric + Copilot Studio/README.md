@@ -2,7 +2,7 @@
 
 *(Formerly "Studio Agent Deepdive".)* An **optional extension** of the standard Fabric dashboard for
 tenants running **Copilot Studio agents**. The base
-[`../../2. Fabric/AI Business Value Dashboard - Fabric.pbit`](../../2.%20Fabric/AI%20Business%20Value%20Dashboard%20-%20Fabric.pbit)
+[`../../2. Fabric/ValueLens - Fabric.pbit`](../../2.%20Fabric/ValueLens%20-%20Fabric.pbit)
 is the recommended starting point for everyone; add this layer only when you want a deeper view of
 **agent transcripts** and the **Agent 365 registry**.
 
@@ -12,7 +12,7 @@ Everything Copilot-Studio-specific lives here so the base path stays clean.
 
 | Item | Purpose |
 |---|---|
-| `AI Business Value Dashboard - Fabric (+ Studio Agent Deepdive).pbit` | The base dashboard **plus** the Copilot Studio agent pages (transcript analysis, agent registry detail). |
+| `ValueLens - Fabric (+ Studio Agent Deepdive).pbit` | The base dashboard **plus** the Copilot Studio agent pages (transcript analysis, agent registry detail). |
 | `notebooks/Copilot_Agent_Transcript_Parser.ipynb` | Parses **Copilot Studio agent transcripts** (Dataverse `ConversationTranscript`) into a Lakehouse Delta table for the agent pages. |
 | `notebooks/Copilot_Agent365_Registry_Ingester_PREVIEW.ipynb` | Earlier **delegated/interactive PREVIEW** of the Agent 365 registry ingester. For scheduled, app-only runs prefer the GA notebook in the base path: [`../../2. Fabric/notebooks/Copilot_Agent365_Registry_Ingester.ipynb`](../../2.%20Fabric/notebooks/Copilot_Agent365_Registry_Ingester.ipynb). |
 | `notebooks/Copilot_Credit_Consumption_Ingester.ipynb` | Ingests the **Power Platform Admin Center (PPAC) per-agent Copilot Studio message credit** export into the `credit_consumption_*` Lakehouse tables (gated by `Enable_Consumption`). |
@@ -41,7 +41,7 @@ agents** and you want:
    [`CREDIT-CONSUMPTION-SETUP.md`](CREDIT-CONSUMPTION-SETUP.md) to land the Power Platform Admin Center
    export (via the [`flows/`](flows/README.md) or manually) and run
    `notebooks/Copilot_Credit_Consumption_Ingester.ipynb`, then set `Enable_Consumption = Include`.
-5. Open **`AI Business Value Dashboard - Fabric (+ Studio Agent Deepdive).pbit`** in Power BI Desktop,
+5. Open **`ValueLens - Fabric (+ Studio Agent Deepdive).pbit`** in Power BI Desktop,
    supply the same Lakehouse parameters as the base template, and set `Enable_Dataverse = Include` to
    light up the agent pages.
 

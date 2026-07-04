@@ -4,7 +4,7 @@ The recommended path. Notebooks pull your Copilot data from Microsoft Graph and 
 straight into a Lakehouse. The Power BI template is a thin client over the Lakehouse SQL endpoint, so
 all the heavy JSON parsing happens in Spark and the dataset stays small and fast.
 
-![Fabric architecture](./AIBV_Fabric_Architecture.png)
+![Fabric architecture](./ValueLens_Fabric_Architecture.png)
 
 > **Not only Fabric.** The same notebooks and template also run on **Azure Databricks**, **Synapse
 > Spark**, **Azure SQL**, or a **Fabric Warehouse** with no real changes. See
@@ -14,7 +14,7 @@ all the heavy JSON parsing happens in Spark and the dataset stays small and fast
 
 | Item | Purpose |
 |---|---|
-| `AI Business Value Dashboard - Fabric.pbit` | The Power BI template (thin client over a Lakehouse SQL endpoint). |
+| `ValueLens - Fabric.pbit` | The Power BI template (thin client over a Lakehouse SQL endpoint). |
 | `notebooks/` | The base (*No Studio*) ingester notebooks — audit logs, licensed users, org data, plus optional feedback, Agents 365 and Cowork / Work IQ consumption. See [`notebooks/README.md`](notebooks/README.md). |
 | `pipelines/`, `flows/`, `docs/` | Optional: a Fabric pipeline to run the core notebooks on a schedule, Power Automate flows for export-only sources, and reference docs. |
 
@@ -101,7 +101,7 @@ Use each notebook's **Schedule** button, or wire all three into a single Fabric 
 <details>
 <summary><b>4. Connect the template</b></summary>
 
-Open `AI Business Value Dashboard - Fabric.pbit` in Power BI Desktop and supply the parameters:
+Open `ValueLens - Fabric.pbit` in Power BI Desktop and supply the parameters:
 
 | Parameter | Required? | Value |
 |---|---|---|
