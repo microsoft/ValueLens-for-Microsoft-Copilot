@@ -3,7 +3,6 @@
 !sample-data/*.csv
 !docs/*.csv
 !1. SharePoint/scripts/OrgData-Template.csv
-!3. Fabric Extended/Fabric + Copilot Studio/notebooks/samples/**/*.csv
 
 # Power BI workspace artefacts
 *.pbip.local

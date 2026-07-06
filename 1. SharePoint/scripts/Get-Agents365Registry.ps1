@@ -4,7 +4,7 @@
 # Script to extract the Agent 365 Registry (Copilot agents catalog) from
 # Microsoft Graph and export to CSV. Output is a flat CSV with one row per
 # registered agent / package, suitable as the "Agent 365" input to the
-# AI-in-One / AI Business Value PBIP dashboards.
+# AI-in-One / ValueLens PBIP dashboards.
 #
 # *** STATUS: NOT YET VALIDATED ***
 # The Microsoft Graph endpoint for the Agent 365 admin registry is in flux
