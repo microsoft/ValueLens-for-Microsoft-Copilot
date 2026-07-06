@@ -131,7 +131,7 @@ load empty. To switch one on, set its toggle to `Include` and run the matching n
 
 | Source | Toggle | Notebook |
 |---|---|---|
-| Cowork / Work IQ consumption (MAC) | `Enable_CostConsumption` | `notebooks/Copilot_Cost_Consumption_Ingester.ipynb` ([setup guide](flows/COST-CONSUMPTION.md)) |
+| Cowork / Work IQ consumption (MAC) | `Enable_CostConsumption` | `notebooks/Copilot_Cost_Consumption_Ingester.ipynb` ([setup guide](flows/COST-CONSUMPTION-SETUP.md)) |
 | Product feedback | `Enable_ProductFeedback` | `notebooks/Copilot_ProductFeedback_Ingester.ipynb` |
 | Agents 365 | `Enable_Agent365` | `notebooks/Copilot_Agent365_Registry_Ingester.ipynb` (app-registration catalog pull — scheduled/unattended) or `notebooks/Copilot_Agent365_Lander.ipynb` (delegated CSV-export fallback) |
 
@@ -199,7 +199,8 @@ produces a CSV you can drop into the Lakehouse `Files/` area and ingest with the
 ### Cowork / Work IQ consumption — Microsoft 365 Admin Center
 The Cowork / Work IQ per-user credit export is **export-only**. Land it in the Lakehouse
 `Files/cost_consumption/` folder and ingest it with `notebooks/Copilot_Cost_Consumption_Ingester.ipynb`
-— full portal steps and the auto-landing flow are in [`flows/COST-CONSUMPTION.md`](flows/COST-CONSUMPTION.md).
+— full portal steps are in [`flows/COST-CONSUMPTION-SETUP.md`](flows/COST-CONSUMPTION-SETUP.md);
+schema and model wiring in [`flows/COST-CONSUMPTION.md`](flows/COST-CONSUMPTION.md).
 
 ### Credit consumption — Power Platform Admin Center *(Studio build)*
 The **per-agent Copilot Studio message credit** export now ships with the **[Fabric + Copilot Studio](../3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/README.md)**
@@ -266,6 +267,6 @@ CSVs upstream? The [`../1. SharePoint/`](../1.%20SharePoint/) path consumes them
 - **Roles & permissions (all sources):** [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md)
 - **Table schemas:** [`docs/DATA-DICTIONARY.md`](docs/DATA-DICTIONARY.md)
 - **Optional sources in depth:** [`docs/OPTIONAL-SOURCES.md`](docs/OPTIONAL-SOURCES.md)
-- **Cowork / Work IQ consumption, step by step:** [`flows/COST-CONSUMPTION.md`](flows/COST-CONSUMPTION.md)
+- **Cowork / Work IQ consumption, step by step:** [`flows/COST-CONSUMPTION-SETUP.md`](flows/COST-CONSUMPTION-SETUP.md) (start here) · [`flows/COST-CONSUMPTION.md`](flows/COST-CONSUMPTION.md) (schema + model wiring)
 - **PPAC credit consumption (Studio build):** [`Fabric + Copilot Studio/CREDIT-CONSUMPTION-SETUP.md`](../3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/CREDIT-CONSUMPTION-SETUP.md)
 - **Audit-log JSON schema:** [Microsoft Learn - CopilotInteraction](https://learn.microsoft.com/en-us/office/office-365-management-api/copilot-schema)
