@@ -16,7 +16,9 @@ work-pattern signals** alongside the Copilot value model:
 - **AI-readiness headroom** — which everyday tasks are ripe for Copilot but still done manually.
 
 > The work-behaviour ingester notebook (`notebooks/Copilot_M365_Work_Behavior_Ingester.ipynb`) already
-> lives in this folder as an early preview — it isn't wired into a shipping template yet.
+> lives in this folder as an early preview — it isn't wired into a shipping template yet. The
+> `notebooks/_core/` folder mirrors the base ingesters from `2. Fabric/notebooks/` so this add-on will
+> be self-contained the moment its template ships.
 
 ## In the meantime
 
