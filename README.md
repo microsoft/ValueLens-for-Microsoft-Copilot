@@ -1,13 +1,15 @@
 <div align="center">
 
-# 💼 AI Business Value Dashboard
+# 🔎 ValueLens
 
-### One Power BI template for every Microsoft **Copilot &amp; agent** adoption signal.
+#### by Microsoft Business Value Advisory (BVA)
 
-[![Built by Microsoft](https://img.shields.io/badge/BUILT_BY-MICROSOFT-4F73B8?style=for-the-badge&labelColor=1C2632)](https://github.com/Keithland89/AI-Business-Value-Dashboard)
+### *for Microsoft Copilot* — one Power BI template for every **Copilot &amp; agent** adoption signal.
+
+[![Built by Microsoft BVA](https://img.shields.io/badge/BUILT_BY-MICROSOFT_BVA-4F73B8?style=for-the-badge&labelColor=1C2632)](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot)
 [![Power BI Template](https://img.shields.io/badge/POWER_BI-TEMPLATE-F2C811?style=for-the-badge&logo=powerbi&logoColor=1C2632&labelColor=1C2632)](#-pick-a-deployment-path)
 [![Deploy](https://img.shields.io/badge/DEPLOY-FABRIC_%2B_SHAREPOINT_%2B_DATAVERSE-09B39D?style=for-the-badge&labelColor=1C2632)](#-pick-a-deployment-path)
-[![Stars](https://img.shields.io/github/stars/Keithland89/AI-Business-Value-Dashboard?style=for-the-badge&color=7F215D&labelColor=1C2632)](https://github.com/Keithland89/AI-Business-Value-Dashboard/stargazers)
+[![Stars](https://img.shields.io/github/stars/microsoft/ValueLens-for-Microsoft-Copilot?style=for-the-badge&color=7F215D&labelColor=1C2632)](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/stargazers)
 
 **Hours saved · assisted value · adoption &amp; readiness** — a defensible ROI narrative aligned to
 Microsoft's **Frontier Firm** framework.
@@ -16,7 +18,7 @@ Found this useful? ⭐ **Star this repo to help others discover it!**
 
 **[Deployment paths ↓](#-pick-a-deployment-path)** · **[What it measures ↓](#-what-it-measures)** · **[Data sources ↓](#-data-sources)** · **[Dashboard pages ↓](#-dashboard-pages)** · **[Research ↓](#-research-sources)**
 
-![AI Business Value Dashboard preview](Images/ABV-Preview.gif)
+![ValueLens preview](Images/ValueLens-Preview.gif)
 
 </div>
 
@@ -62,7 +64,7 @@ them natively — no Fabric or SharePoint needed.
 <summary>📁 <strong>Repo layout</strong></summary>
 
 ```
-README.md  ·  LICENSE.md  ·  SECURITY.md  ·  Images/
+README.md  ·  LICENSE  ·  Images/
 1. SharePoint/     SharePoint.pbit  ·  SharePoint (Local CSV).pbit  ·  scripts/  ·  azure-container/
 2. Fabric/         Fabric.pbit  ·  docs/  ·  flows/  ·  notebooks/  ·  pipelines/
 3. Fabric Extended/
@@ -148,23 +150,7 @@ inside the template.
 
 ---
 
-## 🔒 Security
-
-Please see [SECURITY.md](SECURITY.md) for information on reporting security vulnerabilities.
-
----
-
 ## 🙏 Acknowledgements & licence
 
 Built by the Microsoft Copilot Growth & ROI practice, building on the structure of the community
-AI‑in‑One Dashboard. Licensed **MIT** — see [LICENSE.md](LICENSE.md).
-
----
-
-## Trademarks
-
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
-trademarks or logos is subject to and must follow
-[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
-Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
-Any use of third-party trademarks or logos are subject to those third-party's policies.
+AI‑in‑One Dashboard. Licensed **MIT** — see [LICENSE](LICENSE).

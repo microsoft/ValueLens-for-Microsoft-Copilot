@@ -172,7 +172,7 @@ python "Purview_CopilotInteraction_Processor_v4.0.0.py" \
     --purview    "<raw_copilot_interactions.csv>" \  # Purview audit export (CopilotInteraction)
     --entra      "<entra_users_org.csv>" \           # Entra users: UPN, department, title, manager
     --licensing  "<m365_copilot_licence_list.csv>" \ # M365 Admin Center; omit if --entra has licence
-    --profile    aibv                                # default; AI Business Value fact superset
+    --profile    aibv                                # default; ValueLens fact superset
 ```
 
 Outputs (in `--out-dir`, default = the `--purview` folder):

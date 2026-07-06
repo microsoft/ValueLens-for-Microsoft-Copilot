@@ -1,6 +1,6 @@
 # SharePoint deployment
 
-Run the AI Business Value Dashboard on **Power BI Pro** — no Fabric capacity, no gateway.
+Run **ValueLens** on **Power BI Pro** — no Fabric capacity, no gateway.
 Pick how you get the data in:
 
 | Option | Best for | What you do |
@@ -89,7 +89,7 @@ are in [`../2. Fabric/docs/DATA-DICTIONARY.md`](../2.%20Fabric/docs/DATA-DICTION
 
 **3. Connect the template**
 
-Open **`AI Business Value Dashboard - SharePoint (Local CSV).pbit`**, and when prompted point the two
+Open **`ValueLens - SharePoint (Local CSV).pbit`**, and when prompted point the two
 parameters at the rollup CSVs from step 2:
 
 | Parameter | Value |
@@ -237,7 +237,7 @@ is **not** stored in the task. (Secretless managed-identity scheduling is WIP �
 <details>
 <summary><strong>Connect the template</strong> (SharePoint refresh)</summary>
 
-1. Open **`AI Business Value Dashboard - SharePoint.pbit`** in Power BI Desktop.
+1. Open **`ValueLens - SharePoint.pbit`** in Power BI Desktop.
 2. **Transform data → Edit parameters**:
 
    | Parameter | Value |
@@ -261,8 +261,8 @@ is **not** stored in the task. (Secretless managed-identity scheduling is WIP �
 
 | Item | Purpose |
 |---|---|
-| `AI Business Value Dashboard - SharePoint.pbit` | The dashboard template (refreshes from SharePoint URLs). |
-| `AI Business Value Dashboard - SharePoint (Local CSV).pbit` | Same dashboard, parameters take **local** CSV paths — used by **Option A**. |
+| `ValueLens - SharePoint.pbit` | The dashboard template (refreshes from SharePoint URLs). |
+| `ValueLens - SharePoint (Local CSV).pbit` | Same dashboard, parameters take **local** CSV paths — used by **Option A**. |
 | [`scripts/`](./scripts/) | Extract / upload / schedule helpers + the manual processor. See [`scripts/README.md`](./scripts/README.md). |
 | [`azure-container/`](./azure-container/) | Planned ACA Job for secretless managed-identity scheduling (WIP). |
 

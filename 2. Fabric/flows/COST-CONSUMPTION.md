@@ -1,5 +1,10 @@
 # Copilot Cost Consumption — Cowork / WorkIQ / Other credits
 
+> **New to this source?** Start with the **[setup guide](./COST-CONSUMPTION-SETUP.md)** — it walks
+> through getting the CSV out of the Microsoft 365 Admin Center, dropping it in the Lakehouse, and
+> running the ingester. This file is the **schema + model-wiring reference**; use it after you have
+> the export landing.
+
 This source brings in the **per-user Cowork / WorkIQ / Other credit split** that the Power Platform
 message-consumption exports (`credit_consumption_*`) do **not** contain. It is **additive** to those
 billing tables — the two answer different questions (per-agent Copilot Studio *message* credits vs

@@ -29,7 +29,7 @@
 #   - Drive ID (Graph drive ID for the default Documents library)
 #   - Permission status (granted / already-granted)
 #
-# Contact: the Microsoft Copilot Growth & ROI practice
+# Contact: keithmcgrane@microsoft.com
 #############################################################
 
 param (
