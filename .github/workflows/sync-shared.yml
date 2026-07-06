@@ -1,0 +1,28 @@
+name: sync-shared
+
+on:
+  push:
+    paths:
+      - '2. Fabric/notebooks/**'
+      - '3. Fabric Extended/**/notebooks/_core/**'
+      - '3. Fabric Extended/_shared/notebooks/**'
+      - 'scripts/sync-shared.ps1'
+      - '.github/workflows/sync-shared.yml'
+  pull_request:
+    paths:
+      - '2. Fabric/notebooks/**'
+      - '3. Fabric Extended/**/notebooks/_core/**'
+      - '3. Fabric Extended/_shared/notebooks/**'
+      - 'scripts/sync-shared.ps1'
+      - '.github/workflows/sync-shared.yml'
+
+jobs:
+  check-shared:
+    name: Verify _core / _shared notebooks match 2. Fabric/notebooks
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run sync-shared in check mode
+        shell: pwsh
+        run: |
+          ./scripts/sync-shared.ps1 -Check
