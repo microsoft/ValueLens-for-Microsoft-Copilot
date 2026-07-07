@@ -62,7 +62,7 @@ to be baked into an image:
    ```powershell
    ./Deploy-PAXAcaJob.ps1 `
        -SubscriptionId 'xxx' -ResourceGroup 'rg-pax' -EnvironmentName 'cae-pax' `
-       -JobName 'aibv-sharepoint-daily' -AcrName 'paxacr' -ImageTag '1.11.6' `
+       -JobName 'aibv-sharepoint-daily' -AcrName 'paxacr' -ImageTag '1.11.14' `
        -ManagedIdentityResourceId '/subscriptions/.../userAssignedIdentities/uai-aibv' `
        -ManagedIdentityClientId '<uami-client-id>' `
        -BootstrapLogStorageAccount 'aibvbootstraplogs' `
@@ -82,6 +82,13 @@ to be baked into an image:
 Because PAX emits AIBV directly, the in-container flow is a **single step**
 (PAX → SharePoint) rather than the old two-step (PAX → v4.0.0 processor →
 SharePoint).
+
+> **Pin `-ImageTag '1.11.14'` or newer.** Earlier `purview-v1.11.x` container
+> builds had a bug where the Agent 365 catalog CSV was generated but not
+> uploaded to a SharePoint (or Fabric/OneLake) `-OutputPath`. Fixed in
+> [`purview-v1.11.14`](https://github.com/microsoft/PAX/releases/tag/purview-v1.11.14).
+> Local-output runs via this repo's [`../scripts/Run-PAX-AIBV.ps1`](../scripts/Run-PAX-AIBV.ps1)
+> wrapper were never affected — the bug is remote-output-only.
 
 > [!WARNING]
 > **Permissions differ from the app-registration path — decide this before

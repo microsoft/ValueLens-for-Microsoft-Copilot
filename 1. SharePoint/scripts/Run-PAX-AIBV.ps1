@@ -33,7 +33,10 @@
   this run's own -Auth mode, so it works unattended - no separate interactive
   sign-in. Requires the app's admin-consented Application permissions
   CopilotPackages.Read.All + Application.Read.All, and an Agent 365 licence in the
-  tenant (a missing licence returns 403).
+  tenant (a missing licence returns 403). (Tested with PAX purview-v1.11.14;
+  v1.11.14 additionally fixes remote-output upload of the catalogue CSV to
+  SharePoint / Fabric-OneLake destinations - local-output runs via this wrapper
+  were never affected.)
 
 .PARAMETER Auth
   PAX auth mode. Default: AppRegistration.
