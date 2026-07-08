@@ -133,7 +133,7 @@ load empty. To switch one on, set its toggle to `Include` and run the matching n
 |---|---|---|
 | Cowork / Work IQ consumption (MAC) | `Enable_CostConsumption` | `notebooks/Copilot_Cost_Consumption_Ingester.ipynb` ([setup guide](flows/COST-CONSUMPTION-SETUP.md)) |
 | Product feedback | `Enable_ProductFeedback` | `notebooks/Copilot_ProductFeedback_Ingester.ipynb` |
-| Agents 365 | `Enable_Agent365` | `notebooks/Copilot_Agent365_Registry_Ingester.ipynb` (app-registration catalog pull — scheduled/unattended) or `notebooks/Copilot_Agent365_Lander.ipynb` (delegated CSV-export fallback) |
+| Agents 365 | `Enable_Agent365` | **`notebooks/Copilot_Agent365_Registry_Ingester.ipynb`** *(default — Graph API app-only, scheduled/unattended)* **·** `notebooks/Copilot_Agent365_Lander.ipynb` *(CSV-export fallback — use only when the Ingester's app-reg permissions aren't available)* |
 
 Cowork / Work IQ consumption and product feedback are **export-only** in Microsoft's portals (no API) -
 the `flows/` folder has Power Automate flows that auto-land those exports for you. Full detail in
@@ -191,7 +191,8 @@ produces a CSV you can drop into the Lakehouse `Files/` area and ingest with the
   uses). See [`pipelines/README.md`](pipelines/README.md).
 
 ### Agent 365 — Microsoft Admin Center
-- **Automated path (preferred):** `notebooks/Copilot_Agent365_Registry_Ingester.ipynb` pulls the catalog directly through the Microsoft Graph app registration (app-only — `CopilotPackages.Read.All` + `Application.Read.All`, admin-consented), so no manual export is needed and it can run scheduled/unattended. The manual export below is the delegated, zero-permission fallback (`notebooks/Copilot_Agent365_Lander.ipynb`).
+- **Default path:** **`notebooks/Copilot_Agent365_Registry_Ingester.ipynb`** pulls the catalog directly through the Microsoft Graph app registration (app-only — `CopilotPackages.Read.All` + `Application.Read.All`, admin-consented), so no manual export is needed and it can run scheduled/unattended.
+- **Fallback:** `notebooks/Copilot_Agent365_Lander.ipynb` reads the manual admin-center CSV export from `Files/agent365/agents.csv`. Use this only when your tenant can't grant the Ingester's app-reg permissions, or for one-off / evaluation runs. The two notebooks target the same `dbo.agents_365` table — pick one, don't run both.
 - **Portal:** [admin.microsoft.com](https://admin.microsoft.com) → **Agents**
 - **Role:** Global Administrator or Reports Reader (with AI Admin in a Frontier-enrolled tenant)
 - **Output:** **Export** from the Agents Overview (CSV: agent name, ID, availability status, last activity, template, assigned users)

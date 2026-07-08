@@ -27,8 +27,8 @@ ingester; fall back to the lander only if you can't get app-only permissions.
 
 | Notebook | Output table | When to use |
 |---|---|---|
-| `Copilot_Agent365_Registry_Ingester` | `agent365_catalog` | **Standard / recommended.** GA, **app-only** ingester (`CopilotPackages.Read.All` + `Application.Read.All`). Runs headless on a schedule and writes the richer capability / permission detail. Gated by `Enable_Agent365`. |
-| `Copilot_Agent365_Lander` | `agents_365` | **Fallback only.** Delegated / interactive CSV lander — use this **only if** the app-only registry ingester isn't available to you. |
+| `Copilot_Agent365_Registry_Ingester` | `agents_365` | **Default.** GA, **app-only** ingester (`CopilotPackages.Read.All` + `Application.Read.All`). Runs headless on a schedule and writes the full capability / permission detail. Gated by `Enable_Agent365`. |
+| `Copilot_Agent365_Lander` | `agents_365` | **Fallback.** CSV lander — use only when the Ingester's app-reg permissions aren't available in the tenant, or for one-off / evaluation runs. The two write to the **same** `dbo.agents_365` table, so pick one — don't run both. |
 
 ## Optional — Cowork / Work IQ credit consumption (MAC)
 

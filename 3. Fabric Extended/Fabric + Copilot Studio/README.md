@@ -54,7 +54,10 @@ agents** and you want:
    permissions the core ingesters need. (You only need to *read* that guide; you'll run the notebooks
    from this folder.)
 2. Run the notebooks in **`notebooks/_core/`** in order — audit logs → licensed users → org data →
-   product feedback → cost consumption → Agent 365 registry (or lander).
+   product feedback → cost consumption → **Agent 365 registry**. For Agent 365 use
+   **`Copilot_Agent365_Registry_Ingester.ipynb`** by default (Graph API app-only). Fall back to
+   `Copilot_Agent365_Lander.ipynb` (CSV drop) only if you can't grant the Ingester's app-reg
+   permissions. Both target the same `dbo.agents_365` table — pick one, don't run both.
 3. Run **`notebooks/Copilot_Agent_Transcript_Parser.ipynb`** to land the Copilot Studio transcript
    tables. Needs Dataverse read on `ConversationTranscript`.
 4. *(Optional)* Light up **agent credit consumption** — follow
