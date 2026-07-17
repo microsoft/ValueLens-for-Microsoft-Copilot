@@ -35,14 +35,13 @@ template never breaks. See `OPTIONAL-SOURCES.md` for the `EmptyTable` + `try…o
 | 10 | Agent Catalogue | `agent_catalogue` | *Optional* (Dataverse) | `Copilot_Agent_Transcript_Parser` | n/a |
 | 11 | Agent Performance | `agent_performance` | *Optional* (Dataverse) | `Copilot_Agent_Transcript_Parser` | n/a |
 | 12 | Credit Consumption (Tenant) | `credit_consumption_tenant` | *Optional* (billing) | `Copilot_Credit_Consumption_Ingester` | n/a |
-| 13 | Credit Consumption (Agent) | `credit_consumption_agent` | *Optional* (billing) | `Copilot_Credit_Consumption_Ingester` | n/a |
-| 14 | Credit Consumption (User) | `credit_consumption_user` | *Optional* (billing) | `Copilot_Credit_Consumption_Ingester` | n/a |
-| 15 | Copilot Cost Consumption | `copilot_cost_consumption` | *Optional* (billing) | `Copilot_Cost_Consumption_Ingester` | SharePoint CSV (`Cost Consumption File`) |
+| 13 | Copilot Cost Consumption | `copilot_cost_consumption` | *Optional* (billing) | `Copilot_Cost_Consumption_Ingester` | SharePoint CSV (`Cost Consumption File`) |
 
-> **Rows 12–14 (PPAC credit consumption)** are the **Power Platform Admin Center** per-agent Copilot
+> **Row 12 (PPAC credit consumption)** is the **Power Platform Admin Center** tenant-level Copilot
 > Studio message-credit build, now a [Fabric + Copilot Studio](../../3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/)
-> add-on. The tables remain in the base PBIT transitionally (gated by `Enable_Consumption`); the
-> ingester notebook and setup guide live with the Studio Extended template. Row 15 (`copilot_cost_consumption`)
+> add-on. The tenant-grain table remains in the base PBIT transitionally (gated by `Enable_AgentConsumption`);
+> the per-agent and per-user credit grains, the ingester notebook, and the setup guide live only with the
+> Studio Extended template. Row 13 (`copilot_cost_consumption`)
 > is the **MAC Cowork / Work IQ** consumption build that stays standard across all templates.
 
 All other model tables (Calendar, legends, ranking/summary, glossary, value maps, etc.) are
@@ -226,7 +225,7 @@ StatusCode, StateCode
 *When `TAG_ENVIRONMENT=True`, the five fact tables also carry `source_environment` (and
 `agent_catalogue` carries `source_environments`).*
 
-### 15. `copilot_cost_consumption` — Copilot credit usage (MAC Cost management export)
+### 13. `copilot_cost_consumption` — Copilot credit usage (MAC Cost management export)
 Produced by `Copilot_Cost_Consumption_Ingester` from the **Microsoft 365 Admin Center → Copilot →
 Cost management** per-user CSV export (export-only; no API). **Auto-detects two export shapes** and maps
 both to one unified contract: the **surface split** (`Cowork`/`WorkIQ`/`Other` credits) and the
