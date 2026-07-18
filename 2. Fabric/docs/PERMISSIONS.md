@@ -30,13 +30,17 @@ One app registration covers all three. Put the client secret in **Azure Key Vaul
 
 | Source | API? | Automated-pull permission | Manual-export role |
 |---|---|---|---|
-| **Agent transcripts** (Dataverse) | ✅ Dataverse Web API | App reg added as an **Application User** in the Dataverse environment, with a security role granting **Read** on the **Conversation Transcript** table (System Customizer, or a custom read-only role). Auth is client-credentials to `{env}/.default` — **no Graph permission needed**. | System Administrator / System Customizer / Environment Maker |
-| **Credit consumption** (Power Platform) | ❌ export-only | None — there is no API. The CSVs are landed by the Power Automate flow (see below), then the ingester notebook reads them. | Global Administrator or Billing Administrator |
-| **Product feedback** (M365 Health) | ❌ export-only | None — there is no API. Landed by the Power Automate flow, then ingested. | Global Administrator or Reports Reader |
+| **Cost consumption** (M365 Admin Center → Copilot → Cost management) | ❌ export-only | None — there is no API. The per-user CSV is exported and landed (Power Automate flow or manually), then the ingester notebook reads it. | Global Administrator or Billing Administrator |
+| **Product feedback** (OCV / M365 Health) | ❌ export-only | None — there is no API. Landed by the Power Automate flow, then ingested. | Global Administrator or Reports Reader |
 | **Agents 365** | export/lander | Lander notebook reads an exported registry CSV. | Global Administrator or Reports Reader (with **AI Admin** in a Frontier-enrolled tenant) |
 
 For the two **export-only** sources, the only "permission" to automate is the flow's **OneLake write**
 right (next section) — the data itself must be exported by an admin (or a scheduled portal export) first.
+
+> **Studio add-ons.** Copilot Studio agent-transcript (Dataverse) analytics and PPAC per-agent /
+> per-user message-credit consumption need extra grants (a Dataverse **Application User** with read on
+> the **Conversation Transcript** table; Power Platform admin export). Those are covered in the separate
+> [Fabric + Copilot Studio](../../3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/) build.
 
 ---
 
@@ -54,8 +58,7 @@ right (next section) — the data itself must be exported by an admin (or a sche
 ## Quick "who do I ask?" summary
 
 - **Just the core dashboard:** one Entra app reg (3 Graph perms, admin-consented) + Contributor on the workspace.
-- **+ Agent transcripts:** also add that app reg as a Dataverse **Application User** with read on Conversation Transcript.
-- **+ Credit / Feedback:** an admin exports the CSVs (or schedules a portal export); the flow lands them — no extra API permission.
+- **+ Cost / Feedback:** an admin exports the CSVs (or schedules a portal export); the flow lands them — no extra API permission.
 - **+ Agents 365:** an admin with Reports Reader (+ AI Admin) exports the registry.
 
 See [`README.md`](../README.md) for the step-by-step, and [`OPTIONAL-SOURCES.md`](OPTIONAL-SOURCES.md)
