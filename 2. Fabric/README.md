@@ -122,6 +122,12 @@ Lake works without cross-capacity overhead.
 
 In the Service: dataset **Settings -> Data source credentials** -> sign in to the SQL endpoint, then
 enable **Scheduled refresh** on a cadence that matches your notebook schedule.
+
+> **Incremental refresh is pre-configured.** The template ships with an Import-mode incremental-refresh
+> policy on the `Chat + Agent Interactions (Audit Logs)` fact table (rolling 12-month window, last
+> ~7 days re-queried each run), so the first refresh loads history once and every scheduled refresh
+> after that only appends recent days. It needs a **Premium / PPU / Fabric** capacity. To change the
+> window - or to use **Direct Lake** instead - see [`docs/INCREMENTAL-REFRESH.md`](docs/INCREMENTAL-REFRESH.md).
 </details>
 
 ## Optional sources
@@ -259,7 +265,7 @@ CSVs upstream? The [`../1. SharePoint/`](../1.%20SharePoint/) path consumes them
 | `Login failed` / `cannot open database` (Power BI) | The SQL endpoint host or database name is wrong - recheck the Lakehouse settings page. |
 | `the key didn't match any rows` | A notebook ran against the wrong Lakehouse - pin your Lakehouse as default and re-run. |
 | All users show "Unlicensed" | The licensed-users notebook hasn't run yet, or its report period is too narrow (`REPORT_PERIOD = 'D30'`). |
-| Refresh slow (over a minute) | Dataset is in Import mode - put the workspace on a Fabric capacity and convert to **Direct Lake**. |
+| Refresh slow (over a minute) | Import mode re-imports everything each run. The template ships with **incremental refresh** pre-configured (first load is full, then only recent days) - it needs a Premium/PPU/Fabric capacity; see [`docs/INCREMENTAL-REFRESH.md`](docs/INCREMENTAL-REFRESH.md). For the fastest option on Fabric, convert to **Direct Lake**. |
 
 </details>
 
@@ -267,6 +273,7 @@ CSVs upstream? The [`../1. SharePoint/`](../1.%20SharePoint/) path consumes them
 
 - **Roles & permissions (all sources):** [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md)
 - **Table schemas:** [`docs/DATA-DICTIONARY.md`](docs/DATA-DICTIONARY.md)
+- **Incremental refresh (Import mode):** [`docs/INCREMENTAL-REFRESH.md`](docs/INCREMENTAL-REFRESH.md)
 - **Optional sources in depth:** [`docs/OPTIONAL-SOURCES.md`](docs/OPTIONAL-SOURCES.md)
 - **Cowork / Work IQ consumption, step by step:** [`flows/COST-CONSUMPTION-SETUP.md`](flows/COST-CONSUMPTION-SETUP.md) (start here) · [`flows/COST-CONSUMPTION.md`](flows/COST-CONSUMPTION.md) (schema + model wiring)
 - **PPAC credit consumption (Studio build):** [`Fabric + Copilot Studio/CREDIT-CONSUMPTION-SETUP.md`](../3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/CREDIT-CONSUMPTION-SETUP.md)
