@@ -19,11 +19,9 @@ and the measures simply return `0`/blank.
 
 | Parameter | Default | Controls |
 | --- | --- | --- |
-| `Enable_Dataverse` | `"Include"` | the 6 agent tables (`agent_sessions`, `agent_turns`, `agent_errors`, `agent_subagents`, `agent_catalogue`, `agent_performance`) |
-| `Enable_ProductFeedback` | `"Include"` | `user_feedback` (ProductFeedback) |
-| `Enable_Agent365` | `"Include"` | `agents_365` (Agents 365) |
-| `Enable_Consumption` | `"Include"` | the 3 billing tables (`credit_consumption_tenant/agent/user`) — **PPAC credit build; now a [Fabric + Copilot Studio](../../3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/) add-on** (leave `"Exclude"` in the lean build) |
-| `Enable_CostConsumption` | `"Include"` | `copilot_cost_consumption` (Cowork / WorkIQ / Other credits — MAC Cost management export) |
+| `Enable_ProductFeedback` | `"Include"` | `user_feedback` (ProductFeedback — OCV export) |
+| `Enable_Agent365` | `"Include"` | `agents_365` (Agents 365 registry) |
+| `Enable_CostConsumption` | `"Include"` | `copilot_cost_consumption` (Cowork / Work IQ / Other credits — MAC Cost management export) |
 
 Set a toggle to `"Exclude"` to skip that source entirely (no fetch attempt) — useful when a customer
 hasn't licensed/exported it, or to speed up refresh.
@@ -31,14 +29,18 @@ hasn't licensed/exported it, or to speed up refresh.
 > These are **list parameters** offering `"Include"` / `"Exclude"` (they render as a dropdown in
 > *Edit Parameters*), not boolean `true`/`false`.
 
+> **Studio add-ons.** Copilot Studio agent-transcript tables (`Enable_Dataverse`) and PPAC per-agent /
+> per-user message-credit tables (`Enable_Consumption`) belong to the separate
+> [Fabric + Copilot Studio](../../3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/) build, not this one.
+
 ## 3. The per-table wrapper
 
-Each optional table's M entry point is wrapped like this (Agent Sessions shown):
+Each optional table's M entry point is wrapped like this (Product Feedback shown):
 
 ```m
 Promoted =
-    if Enable_Dataverse = "Include"
-    then (try FabricTable("agent_sessions") otherwise EmptyTable({ ...contract columns... }))
+    if Enable_ProductFeedback = "Include"
+    then (try FabricTable("user_feedback") otherwise EmptyTable({ ...contract columns... }))
     else EmptyTable({ ...contract columns... }),
 ```
 
@@ -68,12 +70,12 @@ Promoted =
 
 Before release, confirm a green refresh for each combination (at minimum):
 
-| Dataverse | Product Feedback | Agent 365 | Expected |
+| Product Feedback | Agent 365 | Cost Consumption | Expected |
 | --- | --- | --- | --- |
 | on (data) | on (data) | on (data) | full dashboard |
 | off | off | off | core-only, no errors |
-| on (empty/missing) | on (missing) | on (missing) | empty optional tables, no errors |
-| on (data) | off | on (data) | feedback page blank, rest populated |
+| on (missing) | on (missing) | on (missing) | empty optional tables, no errors |
+| on (data) | on (data) | off | cost page blank, rest populated |
 
 > ⚠️ These M changes must be opened & refreshed once in **Power BI Desktop** to validate (the edits
 > were made directly in TMDL). Desktop will also assign proper lineage on first save.
