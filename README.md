@@ -28,9 +28,9 @@ Both play here in the page — no download.
 
 https://github.com/user-attachments/assets/a037e428-f966-4fdf-bf44-7a1d04155a63
 
-**Setup guide — getting your own data in, every source, start to finish** *(5m 37s)*
+**Setup guide — getting your own data in, every source, start to finish** *(7m 07s)*
 
-https://github.com/user-attachments/assets/93ed2b50-957f-43ce-ab83-0f6143e7661f
+https://github.com/user-attachments/assets/bc0712c0-e50b-4c8d-91f4-e9aa61e999a1
 
 > **Just want to look around first?** [`sample-data/`](sample-data/) has a fabricated
 > dataset that fills the whole dashboard — open the **(Local CSV)** template, point it at
@@ -79,7 +79,7 @@ them natively — no Fabric or SharePoint needed.
 Both are at the [top of this page](#watch-first) and play inline.
 
 - **Demo** *(1m 49s)* — a tour of the pages and how the value model fits together.
-- **Setup guide** *(5m 37s)* — every data source (Purview audit, Entra, M365 usage), the permissions each needs, the parameters you fill in, and how the **Fabric** path differs: PySpark notebooks instead of scripts, and the same notebooks and template running on Databricks, Synapse or Azure SQL.
+- **Setup guide** *(7m 07s)* — every data source (Purview audit, Entra, M365 usage), the permissions each needs, the parameters you fill in, and the **Fabric** path in full: PySpark notebooks instead of scripts, the Graph permissions per notebook, the ingester-then-processor run order, and the same notebooks and template running on Databricks, Synapse or Azure SQL.
 
 <details>
 <summary>📁 <strong>Repo layout</strong></summary>
