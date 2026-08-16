@@ -4,7 +4,7 @@ The simplest way to run the dashboard with **scheduled refresh** and **no Fabric
 PowerShell (using the Microsoft Graph API) extracts your Copilot data to CSVs, drops them into a
 SharePoint library, and Power BI Service refreshes straight from there — **no gateway needed**.
 
-> Need millions of events or multi‑year history? Use [`../1. Fabric/`](../1.%20Fabric/) instead.
+> Need millions of events or multi‑year history? Use [`../../3. Fabric/`](../../3.%20Fabric/) instead.
 
 ## What's in this folder
 
@@ -42,7 +42,7 @@ This is the **original, core dashboard** — three required sources plus optiona
 Agents 365 parameter blank and that page stays empty; the core dashboard works without it.
 
 > Want the **extra** pages — agent transcripts, credit/billing consumption, and product feedback?
-> Those live in the [`../1. Fabric/`](../1.%20Fabric/) path, which parses higher‑volume data into a
+> Those live in the [`../../3. Fabric/`](../../3.%20Fabric/) path, which parses higher‑volume data into a
 > Lakehouse.
 
 ## Quick start
@@ -108,4 +108,4 @@ To automate, see [`azure-automation/README.md`](azure-automation/README.md) (Bic
 | `ClientSecretCredential authentication failed` | Secret expired/mistyped | Generate a fresh secret, re‑run |
 | `0 records returned` | Missing `AuditLogsQuery.Read.All` consent | Re‑grant in Entra → API permissions |
 | Masked UPNs (32‑char hex) | M365 report concealment is on | Admin → Settings → Org settings → Reports → untick "Display concealed names" |
-| Refresh hits 1 GB / 2‑hour caps | Volume too high for Pro/shared | Move to [`../1. Fabric/`](../1.%20Fabric/) |
+| Refresh hits 1 GB / 2‑hour caps | Volume too high for Pro/shared | Move to [`../../3. Fabric/`](../../3.%20Fabric/) |

@@ -34,4 +34,4 @@ Breadth, value-focus and agent use are still reported - as the IsBroad /
 IsValueFocused / IsFrontier badge columns on UserMonthMetrics - but they are no
 longer gates on the ladder.
 
-Not maintained. Use [`1. SharePoint/`](../../1.%20SharePoint/) instead.
+Not maintained. Use [`2. SharePoint/`](../../2.%20SharePoint/) instead.
