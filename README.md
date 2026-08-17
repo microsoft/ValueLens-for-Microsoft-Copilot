@@ -102,9 +102,8 @@ Dataverse path → companion repo: Keithland89/Copilot-Studio-Agent-Analytics
 ## 📊 What it measures
 
 - **Quantified value** — hours saved and dollar‑equivalent assisted value, grounded in research‑sourced time baselines.
-- **Frontier Firm maturity** — where you sit on the Pattern 1 (human + Copilot) → Pattern 2 (human + agent) → Pattern 3 (agents run workflows) journey.
 - **Value by function** — Sales, HR, IT, Legal, Finance, Marketing, Customer Service, with task‑level attribution.
-- **User maturity** — Beginner → Developing → Proficient, from behavioural breadth and agent adoption.
+- **User maturity** — Beginner → Developing → Power, from usage breadth and agent adoption.
 - **Business case** — projected annual value, ROI multiple, and licence investment net.
 
 **How:** every interaction → classified into an **AI Task** → mapped to a research‑sourced **time
