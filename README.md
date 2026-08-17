@@ -32,9 +32,11 @@ https://github.com/user-attachments/assets/a037e428-f966-4fdf-bf44-7a1d04155a63
 
 https://github.com/user-attachments/assets/bc0712c0-e50b-4c8d-91f4-e9aa61e999a1
 
-> **Just want to look around first?** [`sample-data/`](sample-data/) has a fabricated
-> dataset that fills the whole dashboard — open the **(Local CSV)** template, point it at
-> three CSVs, done. No tenant, no exports, no setup.
+> ### 👉 New here? Start with **[1. Local CSV](1.%20Local%20CSV/)**
+>
+> It ships with a **fabricated sample dataset** that fills the whole dashboard. Open the
+> template, point it at three CSVs, done — **no tenant, no exports, no setup**. Roughly two
+> minutes, and it tells you whether the numbers are worth wiring up before you wire anything up.
 
 <details>
 <summary>⚠️ <strong>Usage & compliance disclaimer</strong></summary>
@@ -55,21 +57,24 @@ open an issue in this repo.
 
 ## 🚀 Pick a deployment path
 
-The dashboard ships as **three folders** — pick the one that matches your setup. They all produce the
-same pages and value model; they differ only in *how the data gets in and refreshes*. Prefer a
-Dataverse‑native build? That lives in a separate companion repo (called out below the table).
+**Three paths, same dashboard.** They produce identical pages and the same value model — they differ
+only in *how the data gets in and refreshes*. Work down the table: each one is a step up in effort
+and a step up in automation.
 
-| Path | Pick this when… | What you need |
+| Path | Pick this when… | Setup |
 |---|---|---|
-| **[1. SharePoint](1.%20SharePoint/)** · *simplest* | You want the fastest start on **Power BI Pro** — no Fabric or Premium. | Export two CSVs → run one Python step → open the template. Optional: automate the refresh with a scheduled script → SharePoint. The simplest core deployment. |
-| **[2. Fabric](2.%20Fabric/)** · *standard · recommended* | You have **Fabric capacity** (or Premium / PPU), or any Spark + SQL stack. | Notebooks shape the data into a Lakehouse → best performance and sub‑second pages, plus the optional billing & feedback pages. The same notebooks + template also run on Databricks, Synapse, or Azure SQL. |
-| **[3. Fabric Extended](3.%20Fabric%20Extended/)** · *advanced add‑ons* | You run **Copilot Studio agents** and want the deeper agent / topic / CSAT pages. | Everything in path 2, **plus** the Copilot Studio layer. Stand up path 2 first, then add this. |
+| **[1. Local CSV](1.%20Local%20CSV/)** · *start here* 🧪 | You want to **see it working now** — or run a one-off look at your own numbers. | **Sample data included.** Open the template, point it at three CSVs. No tenant, no exports, no scripts. Then swap in your own export when ready. |
+| **[2. SharePoint](2.%20SharePoint/)** · *scheduled, Pro* | You want it **refreshing on its own** on **Power BI Pro** — no Fabric or Premium. | A scheduled script extracts, rolls up and uploads to SharePoint; Power BI refreshes on a timer. |
+| **[3. Fabric](3.%20Fabric/)** · *scale · recommended* | You have **Fabric capacity** (or Premium / PPU), or any Spark + SQL stack. | Notebooks shape the data into a Lakehouse — best performance, plus the optional billing & feedback pages. Also runs on Databricks, Synapse or Azure SQL. |
 
-**Not sure?** Start with **SharePoint** if you only have Power BI Pro, or **Fabric** if you have
-capacity — both run the full core dashboard. Only reach for **Fabric Extended** once you're running
-Copilot Studio agents. Landing agent transcripts in **Dataverse**? Use the
-[Dataverse companion repo ↗](https://github.com/Keithland89/Copilot-Studio-Agent-Analytics), which reads
-them natively — no Fabric or SharePoint needed.
+**Not sure?** **Start with path 1.** It takes minutes and tells you whether the numbers are worth
+automating — *before* you set up any automation. Move to 2 or 3 when you want it hands-off.
+
+> Running **Copilot Studio agents** and want the deeper agent / topic / CSAT pages? That's an
+> optional add-on inside path 3 — see [`3. Fabric/extended/`](3.%20Fabric/extended/). Stand up
+> path 3 first. Landing agent transcripts in **Dataverse** instead? Use the
+> [Dataverse companion repo ↗](https://github.com/Keithland89/Copilot-Studio-Agent-Analytics), which
+> reads them natively — no Fabric or SharePoint needed.
 
 > Each path folder has its **own README** with the exact, step‑by‑step setup. This page is just the
 > map.
@@ -86,11 +91,11 @@ Both are at the [top of this page](#watch-first) and play inline.
 
 ```
 README.md  ·  LICENSE  ·  Images/
-sample-data/       fabricated demo dataset — try the dashboard with no tenant setup
-1. SharePoint/     SharePoint.pbit  ·  SharePoint (Local CSV).pbit  ·  scripts/  ·  azure-container/
-2. Fabric/         Fabric.pbit  ·  docs/  ·  flows/  ·  notebooks/  ·  pipelines/
-3. Fabric Extended/
-     Fabric + Copilot Studio/   deeper agent-transcript, topic/CSAT & PPAC credit build (Studio pages)
+
+1. Local CSV/      Local CSV.pbit  ·  sample-data/   ← start here, fabricated demo dataset
+2. SharePoint/     SharePoint.pbit  ·  scripts/  ·  azure-container/
+3. Fabric/         Fabric.pbit  ·  docs/  ·  flows/  ·  notebooks/  ·  pipelines/
+     extended/     optional Copilot Studio add-on — deeper agent, topic/CSAT & PPAC credit pages
 archive/           superseded versions — kept for reference, not maintained
 
 Dataverse path → companion repo: Keithland89/Copilot-Studio-Agent-Analytics
@@ -119,8 +124,8 @@ baseline** → summed to **Hours Saved** → × hourly rate = **Assisted Value**
 | Licensed users | ✅ Core | Microsoft 365 Admin Center |
 | Org data (department / function) | ✅ Core | Microsoft Entra |
 | Agents 365 | ⬜ Optional | Agent 365 export (Fabric path) |
-| Cowork / Work IQ consumption | ⬜ Optional | Microsoft 365 Admin Center export → see [`2. Fabric/flows/COST-CONSUMPTION.md`](2.%20Fabric/flows/COST-CONSUMPTION.md) |
-| Credit consumption (billing) | ⬜ Optional | Power Platform Admin Center export → see [`3. Fabric Extended/Fabric + Copilot Studio/CREDIT-CONSUMPTION-SETUP.md`](3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/CREDIT-CONSUMPTION-SETUP.md) *(Studio add-on)* |
+| Cowork / Work IQ consumption | ⬜ Optional | Microsoft 365 Admin Center export → see [`3. Fabric/flows/COST-CONSUMPTION.md`](3.%20Fabric/flows/COST-CONSUMPTION.md) |
+| Credit consumption (billing) | ⬜ Optional | Power Platform Admin Center export → see [`3. Fabric/extended/Fabric + Copilot Studio/CREDIT-CONSUMPTION-SETUP.md`](3.%20Fabric/extended/Fabric%20+%20Copilot%20Studio/CREDIT-CONSUMPTION-SETUP.md) *(Studio add-on)* |
 | Product feedback | ⬜ Optional | M365 Admin Center → Health → Product Feedback export |
 | Copilot Studio agent transcripts | ⬜ Optional | Dataverse `ConversationTranscript` table — use the [Dataverse companion repo ↗](https://github.com/Keithland89/Copilot-Studio-Agent-Analytics) |
 
@@ -158,7 +163,7 @@ each page — see the path README for that build's own list.
 template — same page, different tab name.
 
 **Copilot Studio add-on** — three extra pages in the
-[Fabric + Copilot Studio](3.%20Fabric%20Extended/Fabric%20+%20Copilot%20Studio/) build:
+[Fabric + Copilot Studio](3.%20Fabric/extended/Fabric%20+%20Copilot%20Studio/) build:
 
 | Page | Purpose |
 |---|---|
