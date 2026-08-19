@@ -60,6 +60,7 @@ BASELINE = {
     "Agent: Sales & Customer": 35, "Agent: Research & Analysis": 45,
     "Agent: Compliance & Policy": 25, "Agent: Coaching": 45,
     "Agent: Data & Reporting": 35, "Agent: Knowledge Base": 12,
+    "Agent: Cowork Planning": 25,
 }
 
 # Relative frequency - roughly what a real tenant looks like: lots of email and
@@ -78,6 +79,7 @@ WEIGHTS = {
     "Agent: Sales & Customer": 2, "Agent: Research & Analysis": 1,
     "Agent: Compliance & Policy": 1, "Agent: Coaching": 1,
     "Agent: Data & Reporting": 1, "Agent: Knowledge Base": 1,
+    "Agent: Cowork Planning": 2,
 }
 
 VALUE_OUTCOME = {
@@ -99,22 +101,26 @@ VALUE_OUTCOME = {
     "Agent: HR & People": "Service Resolution", "Agent: Sales & Customer": "Revenue Support",
     "Agent: Compliance & Policy": "Risk & Compliance", "Agent: Coaching": "Skills Development",
     "Agent: Knowledge Base": "Knowledge Access",
+    "Agent: Cowork Planning": "Process Automation",
 }
 
+# The numeric prefixes are part of the value, not decoration: the template
+# filters on literals such as [Usage_Mode] = "5 - Delegating". Mirrors
+# compute_usage_mode in the production processor.
 USAGE_MODE = {
-    "Email Drafting": "Producing", "Document Drafting": "Producing",
-    "Presentation Creation": "Producing", "Image Generation": "Producing",
-    "Code Writing": "Producing", "Note Taking": "Producing",
-    "Excel Assistance": "Producing", "Data Querying": "Producing",
-    "Spreadsheet Analysis": "Producing", "Teams Messaging": "Producing",
-    "Task Management": "Producing", "Meeting Scheduling": "Producing",
-    "Email Summarising": "Consuming", "Document Summarising": "Consuming",
-    "Presentation Summarising": "Consuming", "PDF Analysis": "Consuming",
-    "Email Thread Summary": "Consuming", "Meeting Prep": "Consuming",
-    "Code Analysis": "Consuming", "Email Triage": "Consuming",
-    "Enterprise Searching": "Finding", "Web Searching": "Finding",
-    "File Retrieval": "Finding", "People Lookup": "Finding",
-    "SharePoint Access": "Finding", "General Chat": "Asking",
+    "Email Drafting": "4 - Producing", "Document Drafting": "4 - Producing",
+    "Presentation Creation": "4 - Producing", "Image Generation": "4 - Producing",
+    "Code Writing": "4 - Producing", "Note Taking": "4 - Producing",
+    "Excel Assistance": "4 - Producing", "Data Querying": "4 - Producing",
+    "Spreadsheet Analysis": "4 - Producing", "Teams Messaging": "4 - Producing",
+    "Task Management": "4 - Producing", "Meeting Scheduling": "4 - Producing",
+    "Email Summarising": "3 - Consuming", "Document Summarising": "3 - Consuming",
+    "Presentation Summarising": "3 - Consuming", "PDF Analysis": "3 - Consuming",
+    "Email Thread Summary": "3 - Consuming", "Meeting Prep": "3 - Consuming",
+    "Code Analysis": "3 - Consuming", "Email Triage": "3 - Consuming",
+    "Enterprise Searching": "2 - Finding", "Web Searching": "2 - Finding",
+    "File Retrieval": "2 - Finding", "People Lookup": "2 - Finding",
+    "SharePoint Access": "2 - Finding", "General Chat": "1 - Asking",
 }
 
 APP_HOSTS = ["Microsoft Teams", "Word", "Outlook", "Excel", "PowerPoint",
@@ -143,8 +149,26 @@ AGENTS = [
     ("T_1006", "Learning Coach Agent", "Agent: Coaching", "Employee Services"),
     ("T_1007", "Finance Reporting Agent", "Agent: Data & Reporting", "Contoso Demo Ltd"),
     ("T_1008", "Product Knowledge Agent", "Agent: Knowledge Base", "Contoso Demo Ltd"),
+    # "cowork" in the name is what drives Environment = "Cowork" in the
+    # production processor, which the AI Fluency / Cowork measures filter on.
+    ("T_1009", "Cowork Planning Agent", "Agent: Cowork Planning", "Contoso Demo Ltd"),
 ]
 AGENT_BY_BEHAVIOUR = {b: (t, n) for t, n, b, _ in AGENTS}
+
+# Behaviours an UNLICENSED user can plausibly perform in free Copilot Chat.
+# Mirrors _UNLICENSED_PLAUSIBLE in the production processor
+# (1. Local CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py).
+UNLICENSED_PLAUSIBLE = [
+    "General Chat", "Web Searching", "PDF Analysis", "Document Summarising",
+    "Image Generation", "Code Analysis",
+]
+UNLICENSED_WEIGHTS = [30, 22, 10, 16, 6, 8]
+
+# When an unlicensed user performs a licence-only behaviour they are really
+# pasting content into free chat. The processor relabels these; we never emit
+# them for unlicensed users, so Behavior_Plausible always equals the behaviour.
+UNLICENSED_HOSTS = ["Microsoft365Chat", "Microsoft Edge"]
+
 
 INTERACTION_COLS = [
     "CreationDate", "Audit_UserId", "AppHost", "Context_Type", "Message_Id",
@@ -237,26 +261,56 @@ def build_interactions(users, days: int, rng: random.Random):
     start = end - timedelta(days=days - 1)
 
     # Adoption is uneven: a power tail, a long middle, and some dormant licences.
-    actives = [u for u in users if u["licensed"] and rng.random() < 0.88]
+    # Unlicensed staff still appear: they use free Copilot Chat, which is exactly
+    # the cohort the Licence Readiness page ranks as upgrade candidates. They are
+    # rarer and lighter users than licensed staff.
+    actives = [u for u in users
+               if (u["licensed"] and rng.random() < 0.88)
+               or (not u["licensed"] and rng.random() < 0.55)]
     rows = []
     for u in actives:
         tier = rng.random()
-        n_days = rng.randint(14, 22) if tier > 0.85 else \
-                 rng.randint(7, 14) if tier > 0.55 else \
-                 rng.randint(3, 8) if tier > 0.25 else rng.randint(1, 3)
+        if u["licensed"]:
+            n_days = rng.randint(14, 22) if tier > 0.85 else \
+                     rng.randint(7, 14) if tier > 0.55 else \
+                     rng.randint(3, 8) if tier > 0.25 else rng.randint(1, 3)
+        else:
+            # free-chat users are markedly lighter than licensed staff
+            n_days = rng.randint(5, 10) if tier > 0.80 else \
+                     rng.randint(2, 5) if tier > 0.45 else rng.randint(1, 3)
         chosen = rng.sample(range(days), min(n_days, days))
         for off in chosen:
             d = start + timedelta(days=off)
             if d.weekday() >= 5 and rng.random() < 0.8:
                 continue                       # weekday-heavy
-            for _ in range(rng.randint(1, 6)):
-                b = rng.choices(behaviours, weights)[0]
+            n_per_day = rng.randint(1, 6) if u["licensed"] else rng.randint(1, 3)
+            for _ in range(n_per_day):
+                if u["licensed"]:
+                    b = rng.choices(behaviours, weights)[0]
+                else:
+                    # Unlicensed staff have no Office-embedded Copilot, so they
+                    # can only perform free-chat behaviours.
+                    b = rng.choices(UNLICENSED_PLAUSIBLE, UNLICENSED_WEIGHTS)[0]
                 ts = datetime(d.year, d.month, d.day,
                               rng.randint(8, 18), rng.randint(0, 59), rng.randint(0, 59))
                 is_agent = b.startswith("Agent:")
                 tid, aname = AGENT_BY_BEHAVIOUR.get(b, ("", ""))
-                host = "Copilot Studio" if is_agent else rng.choice(APP_HOSTS)
-                mode = USAGE_MODE.get(b, "Delegating" if is_agent else "Asking")
+                if is_agent:
+                    host = "Copilot Studio"
+                elif u["licensed"]:
+                    host = rng.choice(APP_HOSTS)
+                else:
+                    host = rng.choice(UNLICENSED_HOSTS)
+                mode = USAGE_MODE.get(b, "5 - Delegating" if is_agent else "1 - Asking")
+                # Vocabulary must match the production processor exactly, or the
+                # template's DAX filters silently return zero. See
+                # compute_license_status / compute_environment in
+                # 1. Local CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py
+                lic_status = "M365 Copilot Licensed" if u["licensed"] else "Unlicensed"
+                if "cowork" in (aname or "").lower():
+                    environment = "Cowork"
+                else:
+                    environment = "Licensed" if u["licensed"] else "Unlicensed"
                 rows.append({
                     "CreationDate": ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "Audit_UserId": u["upn"],
@@ -266,7 +320,7 @@ def build_interactions(users, days: int, rng: random.Random):
                     "Message_isPrompt": "TRUE",
                     "ModelTransparencyDetails_ModelName": rng.choice(MODELS),
                     "AgentId": tid, "AgentName": aname,
-                    "Has license": "Yes",
+                    "Has license": "TRUE" if u["licensed"] else "FALSE",
                     "AISystemPlugin_Id": "", "AISystemPlugin_Name": "",
                     "Agent_TitleID": tid, "ThreadId": f"thr-{rng.randint(10**6, 10**7-1)}",
                     "AccessedResource_Type": rng.choice(["", "file", "email", "site"]),
@@ -287,14 +341,14 @@ def build_interactions(users, days: int, rng: random.Random):
                     "AppIdentity_AppId": "", "AppIdentity_DisplayName": host,
                     "ApplicationName": host,
                     "ActivityDate": d.isoformat(),
-                    "License Status": "Licensed",
-                    "Environment": "Work",
+                    "License Status": lic_status,
+                    "Environment": environment,
                     "Is_Sensitive": "FALSE",
                     "AI_Model": rng.choice(MODELS),
                     "Autonomy_Pattern": "Pattern 2 - Human + Agent" if is_agent else "Pattern 1 - Human + Copilot",
                     "UserMonthKey": f"{u['upn']}|{d.strftime('%Y-%m')}",
-                    "Web_Grounded_Signal": "FALSE",
-                    "Behavior_Plausible": "TRUE",
+                    "Web_Grounded_Signal": "TRUE" if not u["licensed"] else "FALSE",
+                    "Behavior_Plausible": b,
                     "Workflow_Action": "Delegated" if is_agent else "Assisted",
                     "Is_Agent_Activity": "TRUE" if is_agent else "FALSE",
                     "Agent Filter": aname or "(No Agent)",
@@ -368,21 +422,22 @@ def agent_rows(users, rng):
             "Title ID": tid, "Agent name": name,
             "Agent creator": creator["display"],
             "Agent creator ID": creator["upn"], "Creator Id": creator["upn"],
-            "Agent type (A365)": "Declarative agent",
+            "Agent type (A365)": "Shared" if i % 3 else "Personal",
             "Agent description": f"Sample {behaviour.replace('Agent: ','').lower()} agent for demonstration data.",
             "Version": "1.0.0", "Availability": "Everyone",
             "Supported in": "Microsoft 365 Copilot;Teams",
             "Date created": "2026-03-02T10:00:00Z",
             "Last updated": "2026-06-20T14:30:00Z",
-            "Created in": "Copilot Studio", "Status": "Published",
+            "Created in": "Copilot Studio" if i % 2 else "Microsoft 365 Copilot Agent Builder",
+            "Status": "Available",
             "Channel": "Microsoft Teams", "Sensitivity": "General",
-            "Can read OneDrive files": "FALSE",
-            "Can read Sharepoint sites and files": "TRUE",
-            "Can extend to Graph connector": "FALSE",
-            "Can generate images using user prompt": "FALSE",
-            "Can use code interpreter": "FALSE",
-            "Contains uploaded files": "TRUE",
-            "Can read OneDrive and Sharepoint items": "TRUE",
+            "Can read OneDrive files": "Yes" if i % 3 == 0 else "No",
+            "Can read Sharepoint sites and files": "Yes",
+            "Can extend to Graph connector": "Yes" if i % 4 == 0 else "No",
+            "Can generate images using user prompt": "Yes" if i % 5 == 0 else "No",
+            "Can use code interpreter": "Yes" if i % 4 == 1 else "No",
+            "Contains uploaded files": "Yes" if i % 2 == 0 else "No",
+            "Can read OneDrive and Sharepoint items": "Yes",
             "Environment Id": f"env-{i+1:04d}", "Bot Id": f"bot-{i+1:04d}",
             "Groups shared": rng.randint(1, 4),
             "Users shared": rng.randint(20, 180),
@@ -425,7 +480,10 @@ def main():
     print(f"  copilot_users_sample.csv         {len(users):>6,} rows  {f2/1024:>7,.0f} KB")
     print(f"  agents_365_sample.csv            {len(AGENTS):>6,} rows  {f3/1024:>7,.0f} KB")
     print()
-    print(f"  active users        : {len({r['Audit_UserId'] for r in inter})} of {lic} licensed ({a.users} total)")
+    lic_actives = len({r["Audit_UserId"] for r in inter if r["License Status"] == "M365 Copilot Licensed"})
+    unlic_actives = len({r["Audit_UserId"] for r in inter if r["License Status"] == "Unlicensed"})
+    print(f"  active licensed     : {lic_actives} of {lic} licensed")
+    print(f"  active unlicensed   : {unlic_actives} of {a.users - lic} unlicensed (free chat)")
     print(f"  date range          : {inter[0]['InteractionDate']} -> {inter[-1]['InteractionDate']}")
     print(f"  raw hours modelled  : {hours:,.0f}  (x0.70 uplift -> ~{hours*0.7:,.0f} hours saved)")
 
