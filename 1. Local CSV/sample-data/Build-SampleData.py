@@ -14,6 +14,11 @@ derived from any tenant, export or audit log, so the output is synthetic by
 construction rather than by redaction — you can verify that by reading this file
 rather than by trusting a scrub.
 
+Agent_LinkID is deliberately NOT emitted here. The template derives it by
+joining these rows to the Agents 365 registry, so shipping it in the CSV makes
+that step fail with "The field 'Agent_LinkID' already exists in the record".
+The production processor does not emit it either.
+
 Behaviour names and their Human_Baseline_Min values are kept consistent with the
 production classifier in
 `1. Local CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py`, so the
@@ -155,7 +160,7 @@ INTERACTION_COLS = [
     "Web_Grounded_Signal", "Behavior_Plausible", "Workflow_Action", "Is_Agent_Activity",
     "Agent Filter", "Agent Publish Status", "Resource_Count", "Audit_UserKey",
     "Workload", "ClientRegion", "Delegation_Event_Key", "Human_Baseline_Min",
-    "UserKey", "Audit_UserId_Normalized", "Agent_EntraId", "Agent_LinkID",
+    "UserKey", "Audit_UserId_Normalized", "Agent_EntraId",
 ]
 
 USER_COLS = [
@@ -303,7 +308,6 @@ def build_interactions(users, days: int, rng: random.Random):
                     "UserKey": u["upn"].lower(),
                     "Audit_UserId_Normalized": u["upn"].lower(),
                     "Agent_EntraId": "",
-                    "Agent_LinkID": tid,
                 })
     rows.sort(key=lambda r: r["CreationDate"])
     for i, r in enumerate(rows, 1):
@@ -398,7 +402,8 @@ def write_csv(path, cols, rows):
 
 def main():
     ap = argparse.ArgumentParser(description="Generate the ValueLens sample dataset.")
-    ap.add_argument("--out", default="sample-data")
+    ap.add_argument("--out", default=os.path.dirname(os.path.abspath(__file__)),
+                    help="output folder (default: alongside this script)")
     ap.add_argument("--users", type=int, default=260)
     ap.add_argument("--days", type=int, default=60)
     a = ap.parse_args()
