@@ -38,7 +38,7 @@ usage, and eight Copilot Studio agents.
 ## Regenerating
 
 ```bash
-python Build-SampleData.py                          # writes ./sample-data
+python Build-SampleData.py                          # rewrites the CSVs in this folder
 python Build-SampleData.py --users 500 --days 90    # bigger tenant
 ```
 
