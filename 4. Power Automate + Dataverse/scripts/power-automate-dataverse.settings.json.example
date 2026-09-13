@@ -1,0 +1,35 @@
+{
+  "purpose": "Reference checklist only. Generate PAC deployment settings from each actual solution package; do not pass this file to pac solution import.",
+  "coreParameters": {
+    "Agent 365": "",
+    "Cost Consumption File": "",
+    "Dataverse URL": "https://contoso.crm.dynamics.com",
+    "Core Snapshot ID": "<completed-bridge-run-id>",
+    "Use SharePoint CSV fallback": false,
+    "Include SharePoint agent inventory": false
+  },
+  "coreBridge": {
+    "rawAuditJsonl": "C:\\path\\to\\full-copilotinteraction-audit.jsonl",
+    "rawCaptureScript": "Invoke-CopilotAuditRawCapture.ps1",
+    "entraUsersCsv": "C:\\path\\to\\entra-users.csv",
+    "licensingCsv": "C:\\path\\to\\copilot-licensing.csv",
+    "rawRetentionTable": "poc_valuelensrawaudits",
+    "curatedInteractionTable": "poc_valuelensinteractions",
+    "curatedUsersTable": "poc_valuelensusers"
+  },
+  "sharePointAgentLogging": {
+    "solutionZip": "C:\\path\\to\\SharePointAgentLogging_managed.zip",
+    "environmentUrl": "https://org.crm.dynamics.com",
+    "environmentVariables": {
+      "poc_SP_Tenant": "<tenant-guid>",
+      "poc_SP_AppRegID": "<client-id>",
+      "poc_SP_Secret": "<secret-or-keyvault-placeholder>",
+      "poc_SP_UsingAKVtruefalse": "false",
+      "poc_SP_KeyVaultSecret": "",
+      "poc_SP_Authority": "https://login.microsoftonline.com",
+      "poc_SP_Audience": "https://graph.microsoft.com",
+      "poc_SP_LookbackDays": "180",
+      "poc_SP_PollSeconds": "20"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+# Runtime audit payloads, curated customer data and private adapted solutions.
+processed/
+private/
+*.jsonl
+*.zip
+*.settings.json
+!scripts/power-automate-dataverse.settings.json.example

@@ -18,6 +18,12 @@ from there on a timer. Provision once, then it runs hands-off.
 >
 > That path produces the **same two rollup CSVs** this one uploads, so nothing is wasted when you
 > come back here to automate it.
+>
+> Need the **same dashboard** with Dataverse as the core transport? Use
+> **[4. Power Automate + Dataverse](../4.%20Power%20Automate%20+%20Dataverse/)**. It preserves this
+> path as an explicit fallback, but defaults to full raw audit retention + canonical ValueLens processing
+> into Dataverse curated tables. This additional preview requires a Python refresh runner and
+> Power Automate/Dataverse licensing; a bounded demo interval has been validated end-to-end.
 
 ---
 
