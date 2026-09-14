@@ -139,13 +139,13 @@ class LicenseClassificationTests(unittest.TestCase):
 
     def test_active_pbits_consume_flags_not_assigned_product_classifiers(self):
         paths = [p for p in ROOT.rglob("*.pbit") if "archive" not in p.parts]
-        self.assertEqual(len(paths), 4)
+        self.assertEqual(len(paths), 5)
         # Keep the moved Studio template in the existing classifier checks.
         paths.append(
             ROOT / "3. Fabric" / "archive" / "extended" / "Fabric + Copilot Studio"
             / "ValueLens - Fabric (+ Studio Agent Deepdive).pbit"
         )
-        self.assertEqual(len(paths), 5)
+        self.assertEqual(len(paths), 6)
         for path in paths:
             with self.subTest(path=path), zipfile.ZipFile(path) as archive:
                 self.assertIsNone(archive.testzip())

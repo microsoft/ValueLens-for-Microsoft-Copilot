@@ -57,15 +57,16 @@ open an issue in this repo.
 
 ## 🚀 Pick a deployment path
 
-**Three paths, same dashboard.** They produce identical pages and the same value model — they differ
-only in *how the data gets in and refreshes*. Work down the table: each one is a step up in effort
-and a step up in automation.
+**Same dashboard, a choice of data pathways.** Paths 1–3 remain unchanged. Path 4 is an
+additional preview for Power Automate and Dataverse, exercised end-to-end on a bounded demo interval.
+Choose based on your available sources, licensing and refresh operating model.
 
 | Path | Pick this when… | Setup |
 |---|---|---|
 | **[1. Local CSV](1.%20Local%20CSV/)** · *start here* 🧪 | You want to **see it working now** — or run a one-off look at your own numbers. | **Sample data included.** Open the template, point it at three CSVs. No tenant, no exports, no scripts. Then swap in your own export when ready. |
 | **[2. SharePoint](2.%20SharePoint/)** · *scheduled, Pro* | You want it **refreshing on its own** on **Power BI Pro** — no Fabric or Premium. | A scheduled script extracts, rolls up and uploads to SharePoint; Power BI refreshes on a timer. |
 | **[3. Fabric](3.%20Fabric/)** · *scale · recommended* | You have **Fabric capacity** (or Premium / PPU) and want the reviewed notebook + Lakehouse path. | Two **Import-mode** templates over the same Lakehouse outputs (SQL analytics endpoint or OneLake), plus optional feedback / Agent 365 / consumption sources. |
+| **[4. Power Automate + Dataverse](4.%20Power%20Automate%20+%20Dataverse/)** · *preview* | You want a Dataverse-backed pathway using a compatible collector solution as the dashboard's core data source. | Extend a compatible source collector to retain full audit records, combine them with an Entra/licence snapshot using the existing ValueLens processor, and publish a complete Dataverse snapshot. Requires a Python refresh runner as well as Power Automate/Dataverse licensing; not a flow-only deployment. |
 
 **Not sure?** **Start with path 1.** It takes minutes and tells you whether the numbers are worth
 automating — *before* you set up any automation. Move to 2 or 3 when you want it hands-off.
@@ -97,6 +98,7 @@ README.md  ·  LICENSE  ·  Images/
 3. Fabric/         Fabric.pbit  ·  docs/  ·  flows/  ·  notebooks/  ·  pipelines/
      archive/extended/  archived Copilot Studio add-on reference (core notebook mirrors still synchronized)
      archive/flows/     archived cost-consumption flows and guides, not active setup
+4. Power Automate + Dataverse/  Power Automate + Dataverse.pbit  ·  scripts/  ·  source-map.json
 archive/           superseded versions — kept for reference, not maintained
 
 Dataverse path → companion repo: Keithland89/Copilot-Studio-Agent-Analytics
@@ -123,9 +125,9 @@ Availability varies by deployment path. Use the path README for the maintained s
 
 | Source | Required? | Where it comes from |
 |---|---|---|
-| Copilot interactions (audit logs) | ✅ Core | Microsoft Purview |
-| Licensed users | ✅ Core | Microsoft 365 Admin Center |
-| Org data (department / function) | ✅ Core | Microsoft Entra |
+| Copilot interactions (audit logs) | ✅ Core | Microsoft Purview; path 4 retains full raw payloads in Dataverse before processing |
+| Licensed users | ✅ Core | Microsoft 365 Admin Center / Graph; path 4 publishes curated users to Dataverse |
+| Org data (department / function) | ✅ Core | Microsoft Entra / BYOD equivalent |
 | Agents 365 | ⬜ Optional | Agent 365 export (Fabric path) |
 | Cowork / Work IQ consumption | ⬜ Optional | Microsoft 365 Admin Center export → see the path README; [archived landing-flow reference](3.%20Fabric/archive/flows/COST-CONSUMPTION.md), not active setup |
 | Credit consumption (billing) | Archived reference only | Power Platform Admin Center export → [archived Fabric + Copilot Studio add-on](3.%20Fabric/archive/extended/) |
@@ -144,6 +146,7 @@ Maintained page lists live in the path READMEs:
 - [`1. Local CSV/README.md`](1.%20Local%20CSV/README.md)
 - [`2. SharePoint/README.md`](2.%20SharePoint/README.md)
 - [`3. Fabric/README.md`](3.%20Fabric/README.md)
+- [`4. Power Automate + Dataverse/README.md`](4.%20Power%20Automate%20+%20Dataverse/README.md)
 
 Archived Studio page reference (not an active deployment):
 [`3. Fabric/archive/extended/Fabric + Copilot Studio/README.md`](3.%20Fabric/archive/extended/Fabric%20+%20Copilot%20Studio/README.md).

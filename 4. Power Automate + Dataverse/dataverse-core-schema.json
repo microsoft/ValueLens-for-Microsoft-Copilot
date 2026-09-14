@@ -1,0 +1,95 @@
+{
+  "version": "1.0",
+  "publisherPrefix": "poc",
+  "apiVersion": "v9.2",
+  "primaryAttribute": {
+    "logicalName": "poc_name",
+    "displayName": "Name",
+    "type": "String",
+    "maxLength": 100
+  },
+  "commonColumns": [
+    {
+      "logicalName": "poc_rowkey",
+      "displayName": "Row Key",
+      "type": "String",
+      "maxLength": 100,
+      "required": true,
+      "alternateKey": true
+    },
+    {
+      "logicalName": "poc_runid",
+      "displayName": "Run ID",
+      "type": "String",
+      "maxLength": 100,
+      "required": false
+    },
+    {
+      "logicalName": "poc_payloadhash",
+      "displayName": "Payload Hash",
+      "type": "String",
+      "maxLength": 64,
+      "required": false
+    },
+    {
+      "logicalName": "poc_payloadjson",
+      "displayName": "Payload JSON",
+      "type": "Memo",
+      "maxLength": 1048576,
+      "required": false
+    }
+  ],
+  "alternateKey": {
+    "schemaName": "poc_rowkey_key",
+    "displayName": "Row Key",
+    "keyAttributes": [
+      "poc_rowkey"
+    ]
+  },
+  "tables": [
+    {
+      "entitySetName": "poc_valuelensrawaudits",
+      "logicalName": "poc_valuelensrawaudit",
+      "schemaName": "poc_valuelensrawaudit",
+      "displayName": "poc_valuelensrawaudit",
+      "displayCollectionName": "poc_valuelensrawaudits",
+      "description": "Full raw Graph/Purview audit payload retention (collector-owned).",
+      "ownershipType": "UserOwned",
+      "hasActivities": false,
+      "hasNotes": false
+    },
+    {
+      "entitySetName": "poc_valuelensinteractions",
+      "logicalName": "poc_valuelensinteraction",
+      "schemaName": "poc_valuelensinteraction",
+      "displayName": "poc_valuelensinteraction",
+      "displayCollectionName": "poc_valuelensinteractions",
+      "description": "Curated ValueLens interaction rows consumed by the PBIT.",
+      "ownershipType": "UserOwned",
+      "hasActivities": false,
+      "hasNotes": false
+    },
+    {
+      "entitySetName": "poc_valuelensusers",
+      "logicalName": "poc_valuelensuser",
+      "schemaName": "poc_valuelensuser",
+      "displayName": "poc_valuelensuser",
+      "displayCollectionName": "poc_valuelensusers",
+      "description": "Curated ValueLens users/licensing rows consumed by the PBIT.",
+      "ownershipType": "UserOwned",
+      "hasActivities": false,
+      "hasNotes": false
+    },
+    {
+      "entitySetName": "poc_valuelensruns",
+      "logicalName": "poc_valuelensrun",
+      "schemaName": "poc_valuelensrun",
+      "displayName": "poc_valuelensrun",
+      "displayCollectionName": "poc_valuelensruns",
+      "description": "Bridge run manifests and completion status, one row per runID.",
+      "ownershipType": "UserOwned",
+      "hasActivities": false,
+      "hasNotes": false
+    }
+  ]
+}

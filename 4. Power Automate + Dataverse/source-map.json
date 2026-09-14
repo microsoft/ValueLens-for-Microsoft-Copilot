@@ -1,0 +1,101 @@
+{
+  "pathway": "4. Power Automate + Dataverse",
+  "summary": "Additional Power Automate + Dataverse route for the same ValueLens dashboard. Full raw CopilotInteraction audit payloads are retained in Dataverse, transformed through the existing canonical ValueLens processor, then published as curated Dataverse tables consumed directly by the PBIT.",
+  "status": "Preview with representative live bounded collection, scoped snapshot and Power BI Desktop refresh validated; production-scale and unattended refresh remain outside this validation",
+  "snapshotContract": {
+    "parameter": "Core Snapshot ID",
+    "manifestEntitySet": "poc_valuelensruns",
+    "manifestKey": "poc_rowkey = poc_runid = selected snapshot ID",
+    "requiredStatus": "succeeded",
+    "consistency": "Every core table filters to the same immutable run ID and verifies counts against its completed manifest.",
+    "refreshHandoff": "The runner publishes the snapshot, not the Power BI report. Update Core Snapshot ID and refresh Power BI only after successful publication."
+  },
+  "collectors": {
+    "interactions": "Prepare-CollectorRawCapture.py extends a separately supplied authorized local unmanaged CopilotInteractionLogging package; the adapted private package is never written into this repository.",
+    "directory": "Export-EntraCoreSnapshot.py reads Graph users and subscribedSkus for basic org fields and verified assigned Copilot licences.",
+    "orchestration": "Invoke-DataverseCoreRefresh.ps1 runs the directory exporter and canonical processor bridge; dry-run by default."
+  },
+  "requiredFeeds": [
+    {
+      "modelTable": "Chat + Agent Interactions (Audit Logs)",
+      "required": true,
+      "sourceType": "Dataverse curated JSON payload rows",
+      "producer": "4. Power Automate + Dataverse\\scripts\\Build-DataverseCoreFeeds.py",
+      "sourceContract": "poc_valuelensinteractions[poc_payloadjson]",
+      "upstreamRequiredEvidence": "Full original Graph/Purview CopilotInteraction AuditData including CopilotEventData.Messages with original Id values",
+      "reason": "Reuses Purview_CopilotInteraction_Processor_v4.0.0.py so behavior/value/rollup semantics stay aligned with the original ValueLens model."
+    },
+    {
+      "modelTable": "Copilot Licensed",
+      "required": true,
+      "sourceType": "Dataverse curated JSON payload rows",
+      "producer": "4. Power Automate + Dataverse\\scripts\\Build-DataverseCoreFeeds.py",
+      "sourceContract": "poc_valuelensusers[poc_payloadjson]",
+      "upstreamRequiredEvidence": "Actual Graph/Admin Center Entra user and Copilot licence attributes, or a BYOD CSV with equivalent userPrincipalName and Has license fields",
+      "reason": "License status is not inferred from activity. It is carried through the canonical users output."
+    },
+    {
+      "modelTable": "Chat + Agent Org Data",
+      "required": true,
+      "sourceType": "Dataverse curated JSON payload rows",
+      "producer": "4. Power Automate + Dataverse\\scripts\\Build-DataverseCoreFeeds.py",
+      "sourceContract": "poc_valuelensusers[poc_payloadjson]",
+      "upstreamRequiredEvidence": "Actual Graph Entra user/org attributes or equivalent BYOD export",
+      "reason": "Preserves the shared UserKey/UserId surrogate map and the existing ValueLens user/org relationship contract."
+    }
+  ],
+  "optionalFeeds": [
+    {
+      "modelTable": "Agents 365",
+      "required": false,
+      "sourceType": "SharePoint CSV",
+      "producer": "2. SharePoint\\scripts\\Get-Agents365Registry.ps1",
+      "sourceContract": "Agent 365 export or PAX -IncludeAgent365Info",
+      "reason": "Unchanged optional registry feed."
+    },
+    {
+      "modelTable": "copilot_cost_consumption",
+      "required": false,
+      "sourceType": "SharePoint CSV",
+      "producer": "Microsoft 365 Admin Center export",
+      "sourceContract": "Cost Consumption File parameter",
+      "reason": "Unchanged optional consumption feed; not inferred from audit."
+    },
+    {
+      "modelTable": "SharePoint Agents",
+      "required": false,
+      "sourceType": "Dataverse",
+      "producer": "Compatible SharePointAgentLogging lane E",
+      "sourceContract": "poc_sharepointagents",
+      "join": "Chat + Agent Interactions (Audit Logs)[SharePointAgentKey] -> SharePoint Agents[AgentKey]",
+      "coverage": "Observed-retention inventory keyed by ListItemUniqueId and joined through decoded SPO_* usage identity.",
+      "reason": "Additive inventory lane; never used as a display-name relationship."
+    }
+  ],
+  "documentedGaps": [
+    {
+      "lane": "B",
+      "feed": "systemusers",
+      "status": "Optional provenance only",
+      "whyNotRequired": "Useful for owner/creator identities but not enough for ValueLens licence/org rollups."
+    },
+    {
+      "lane": "C",
+      "feed": "poc_copilotinteractions",
+      "status": "Implemented with raw-payload extension",
+      "whyExtensionRequired": "The shipped lane C summaries omit full AuditData/messages. The local bridge requires poc_valuelensrawaudits or equivalent full payload input and rejects summaries/truncated resources."
+    },
+    {
+      "lane": "D",
+      "feed": "poc_agentknowledgesources",
+      "status": "Optional future reporting",
+      "whyNotDirectlyWired": "Valuable for governance, but the base ValueLens report has no required page or measure contract for it."
+    },
+    {
+      "lane": "E",
+      "feed": "poc_sharepointagents",
+      "status": "Implemented",
+      "whyNotCore": "Implemented additively as an optional exact-key dimension; it does not replace full audit interaction facts."
+    }
+  ]
+}
