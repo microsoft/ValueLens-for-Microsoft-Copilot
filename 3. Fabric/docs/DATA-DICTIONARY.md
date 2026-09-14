@@ -221,6 +221,53 @@ that **auto-detects** the GUID from whatever the export provides — it picks th
 create or populate a column by hand; a non-matching GUID simply does not join (no false links). Until
 an export carries Entra GUIDs, custom agents still resolve by name.
 
+#### Agent creator attribution (`Agent creator UPN` / `Agent creator source`)
+
+The registry export's `Agent creator` field is a **display string** (often the publisher, a service
+principal, or blank) — it is not a resolvable identity, so it can't be joined to
+`copilot_licensed_users` or used to answer *"who in my org is building agents?"*.
+
+`Copilot_Agent365_Registry_Ingester` therefore emits two extra columns:
+
+| Column | Meaning |
+|---|---|
+| `Agent creator UPN` | resolved user principal name of the agent's creator, or blank |
+| `Agent creator source` | which tier resolved it — `ownerId`, `servicePrincipalOwner`, `auditLog`, or `unattributed` |
+
+Three tiers run in order; each only processes agents still unresolved, and each is independently
+switchable via a `RESOLVE_VIA_*` flag at the top of the notebook:
+
+| Tier | Method | Extra permission |
+|---|---|---|
+| 1 | package `ownerId` → `/users/{id}` (batched) | **`User.Read.All`** (new) |
+| 2 | `appId` / `agentIdentityId` → `/servicePrincipals/{id}/owners` | `Application.Read.All` (already required) |
+| 3 | earliest agent-creation event in the Purview audit table | none (reads the Lakehouse) |
+
+> **`User.Read.All` is a new application permission** on top of `CopilotPackages.Read.All` and
+> `Application.Read.All`. Without it tier 1 is skipped and coverage falls back to tiers 2–3; the
+> notebook still runs. Tier 3 requires a **parseable timestamp** column in the audit table — if the
+> date is an unparseable string the tier **skips visibly** rather than guessing, so an agent is left
+> `unattributed` instead of being attributed to the wrong person.
+
+Because attribution is best-effort, always surface `Agent creator source` alongside any
+creator-based visual — filtering out `unattributed` silently understates your builder counts.
+
+#### Optional raw API passthrough (`INCLUDE_RAW_PASSTHROUGH`)
+
+The ingester maps the Graph payload onto the model's canonical column names. Fields the model does
+not declare are dropped. Setting `INCLUDE_RAW_PASSTHROUGH = True` additionally carries **every**
+field the API returned into the Delta table under its raw API name (nested objects/arrays are
+JSON-serialised).
+
+**It ships `False`, on purpose.** The PBIT's `Agents 365` query has no `Table.SelectColumns` — it is
+purely additive — so every extra Delta column lands in the semantic model as an unmodelled field.
+Turn it on only when you're deliberately exploring the payload, and expect ~30 extra columns.
+
+Where a raw key collides case-insensitively with a canonical column (e.g. `version` vs `Version`,
+`categories` vs `Categories`), the canonical column wins; the raw value is kept under `<key>_raw`
+only when it actually differs. Spark resolves column names case-insensitively, so without this the
+write fails outright with `AMBIGUOUS_REFERENCE`.
+
 ### 5. `user_feedback` — Product Feedback (OCV export)
 An OCV/Viva feedback **CSV** dropped at `Files/product_feedback/`, parsed by
 `Copilot_ProductFeedback_Ingester.ipynb`. The dashboard's `ProductFeedback` table renames the OCV
