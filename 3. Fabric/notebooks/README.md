@@ -89,7 +89,7 @@ Both notebooks feed the **Agents 365** page and write the **same** `dbo.agents_3
 
 | Notebook | Output table | When to use |
 |---|---|---|
-| `Copilot_Agent365_Registry_Ingester` | `agents_365` | **Default notebook.** GA, app-only ingester (`CopilotPackages.Read.All` + `Application.Read.All`). Rejects missing `Title ID` rows and conflicting duplicates before overwrite. |
+| `Copilot_Agent365_Registry_Ingester` | `agents_365` | **Default notebook.** GA, app-only ingester (`CopilotPackages.Read.All` + `Application.Read.All` + `User.Read.All`). Rejects missing `Title ID` rows and conflicting duplicates before overwrite. Resolves **`Agent creator UPN`** via a 3-tier chain and can optionally pass the raw API payload through. |
 | `Copilot_Agent365_Lander` | `agents_365` | **Fallback notebook.** CSV lander for `Files/agent365/agents.csv`. The shipped pipeline JSON currently uses this branch when `EnableAgent365 = true`. |
 
 ## Optional — product feedback &amp; Cowork / Work IQ credit consumption
