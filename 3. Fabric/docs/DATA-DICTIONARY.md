@@ -83,7 +83,19 @@ what the Fabric template's `Chat + Agent Interactions (Audit Logs)` partition bi
 same shape the template's Power Query used to produce, but computed once in Spark and V-Ordered on
 disk so the shipped Import templates can read a flat fact table quickly.
 
-**Schema = every column of `copilot_interactions_parsed`, plus these 26 enrichment columns:**
+**Schema:** additive canonical shaping plus the 26 enrichment columns below, **not**
+a verbatim copy of every parsed column. By default the processor consumes/drops
+`AppIdentity`, `AccessedResources`, `AISystemPlugin` and `Audit_UserId_Normalized`,
+and removes internal join/enrichment helpers.
+
+With `INCLUDE_RAW_PASSTHROUGH = True`, the first three payloads are retained as string
+columns `AppIdentity_Raw`, `AccessedResources_Raw` and `AISystemPlugin_Raw`; the original
+`Audit_UserId_Normalized` is retained when supplied. Unknown/nested/case-variant JSON
+keys remain in these complete raw payloads, not dynamically flattened columns. Canonical
+values and resource-row grain do not change. The entire resource array is repeated for
+each exploded row, and the raw plugin array includes elements after the first.
+See [processor settings, privacy and schema transitions](../notebooks/README.md#audit-processor-copilot_audit_log_processor)
+before enabling this default-off option.
 
 ```
 Environment, License Status, Is_Sensitive, AI_Model,

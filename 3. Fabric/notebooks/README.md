@@ -77,6 +77,74 @@ after it and before the model refresh. Full setup in the add-on's
 - If those conditions are not met, the notebook refuses the merge rather than silently
   producing an ambiguous curated table.
 
+**Optional raw passthrough** is disabled by default (`INCLUDE_RAW_PASSTHROUGH = False`).
+Enable it to retain `AppIdentity_Raw`, `AccessedResources_Raw`, `AISystemPlugin_Raw`,
+and the original `Audit_UserId_Normalized` when present. Existing canonical parsing,
+resource explosion, licence/agent joins, behaviour enrichment and join-helper cleanup
+are unchanged. Raw resource arrays are repeated on each exploded resource row; plugin
+arrays retain **all** elements even though canonical plugin fields use only the first.
+
+Strings are retained exactly, including invalid JSON, whitespace and empty values;
+missing payload columns become typed nulls. Complex raw values are JSON-serialized with
+null members retained (the canonical resource/plugin parser still requires string inputs).
+Unknown or case-variant keys stay inside the raw JSON, **not new inferred columns**:
+there is no sample limit, schema inference, or automatic overwrite of canonical values
+such as `AccessedResource_SensitivityLabelId`. Inspect/project approved keys explicitly
+from these payloads in your own downstream transformation. A case-insensitive collision
+with a reserved `_Raw` output name fails before writing, rather than replacing source data.
+The opt-in pre-write guard checks source-column presence (including actual raw aliases);
+it does not prove value equality for columns deliberately transformed by the processor.
+
+This deliberately differs from the supplied sampled-inference patch: it retains complete
+payloads without changing the canonical schema based on the first 2,000 records or promoting
+the internal identity join helper. For example, inspect approved resource keys with Spark SQL:
+
+```sql
+SELECT from_json(
+    AccessedResources_Raw,
+    'array<struct<Type:string,SensitivityLabelId:string>>'
+) AS ApprovedResourceFields
+FROM dbo.copilot_interactions_curated
+LIMIT 20;
+```
+
+This returns an array, not one value for the current exploded resource row. Do not explode
+it again and sum interaction metrics without accounting for the repeated source arrays.
+
+**Privacy and deployment:** raw payloads can contain identities, file names, URLs and
+additional sensitive metadata. Both shipped Fabric template fact queries pass through
+the entire curated table; they do not select a fixed list of columns. Review access,
+retention, model exposure and refresh behaviour before enabling. This flag is not a
+redaction boundary for arbitrary columns already in the parsed table. After either
+flag change, use a deliberate `WRITE_MODE = "overwrite"` rebuild to align the persisted
+schema, then return to merge only with valid unique curated-row keys. Turning the flag
+off during merge does **not** remove existing raw columns or historical raw values.
+An overwrite does not purge Delta history or downstream copies; apply your retention
+policy separately. `Audit_UserId_Normalized` is retained as supplied, not recomputed;
+the internal `_NormUPN` is never promoted into another identity field.
+
+**Reproducible regression:** run the portable checks with
+`python -m unittest discover -s tests -p "test_audit*.py"` from the repo root.
+For real Spark/Delta coverage, generate an isolated notebook:
+
+```powershell
+python tests\fabric_audit_passthrough.py --output C:\scratch\audit-verification.ipynb
+# Optional read-only subset of the attached test lakehouse's parsed table:
+python tests\fabric_audit_passthrough.py --output C:\scratch\audit-live-verification.ipynb --live-source dbo.copilot_interactions_parsed
+```
+
+Import it into a **test** lakehouse and Run all. The generator embeds verbatim baseline
+(`5d20fb9`, override with `--baseline-ref`) and current processor cells; fetch the baseline
+commit first if using a shallow checkout. It runs full processing plus isolated Delta
+writes for original/OFF/ON, compares every canonical column's type and complete row
+multiset, checks raw retention, and exercises unique-key merge/flag transitions.
+It uses uniquely named scratch views/tables, removes those tables, and leaves an aggregate
+report plus diagnostic stdout under `Files/vl_audit_pt_<run-id>/`. Keep diagnostic stdout
+private. It never writes production tables. `RUN_OPTIMIZE=False` is a test override;
+VORDER compaction, scheduled ingestion, production-scale performance, Power BI refresh,
+relationships and visuals are outside this regression. An empty live source is explicitly
+reported as **not live-validated**, not a passing end-to-end test.
+
 ### E7 licensing update
 
 `Copilot_Licensed_Users_Direct_Ingester` now recognizes the reviewed Microsoft 365 E7
