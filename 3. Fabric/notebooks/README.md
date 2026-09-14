@@ -28,38 +28,21 @@ This README focuses on the **current reviewed notebook behaviour** in the base
 > `copilot_interactions_curated`. First rebuild: `WRITE_MODE = "overwrite"`.
 > Ongoing runs after the parsed-table key upgrade: `"merge"`.
 
-## Recommended — HRIS org attributes
+## Optional — HRIS / Workday org attributes
 
-| Notebook | Reads | Output table |
-|---|---|---|
-| `Copilot_Org_Data_Workday_Lander` | `Files/org_workday/` + `copilot_org_data` | `copilot_org_data` |
+| Add-on | Output table |
+|---|---|
+| [`optional/workday-org-data/`](./optional/workday-org-data/README.md) | `copilot_org_data` *(enriched in place)* |
 
-Entra carries the **manager hierarchy**; a Workday worker extract carries the **HR attributes**
-(job family, persona, worker type, compensation grade) that make org analysis useful. Neither is
-complete on its own, so this notebook joins them on work email — the same identity the model already
-keys on (`PersonId_Normalized`).
+An **edge case**, kept out of the core path. Entra carries the manager hierarchy; a Workday worker
+extract carries the HR attributes (job family, persona, worker type, compensation grade) that Entra
+doesn't. `Copilot_Org_Data_Workday_Lander` joins them on work email and enriches `copilot_org_data`
+in place.
 
-**Run it in Step 3, after `Copilot_Org_Data_Direct_Ingester` and before the model refresh.** The
-Graph ingester writes `copilot_org_data` with `mode('overwrite')`, so refreshing the Entra baseline
-drops the Workday columns until this notebook runs again. Order matters every time, not just on
-first install.
-
-Default `MODE = 'enrich'` overlays Workday onto the Entra snapshot and keeps `managerUPN`,
-`displayName`, `OrgLevel`, `HierarchyPath`, `IsManager` and `DirectReports`. `MODE = 'standalone'`
-is for tenants where Workday is the only org source; it writes a schema-compatible table with those
-hierarchy columns blank.
-
-`ORGANIZATION_SOURCE` (default `Job_Family_Group`) decides which Workday column drives the
-dashboard's main **Organization** dimension — it reshapes every org breakdown in the report, so set
-it deliberately. `ATTRIBUTE_PRECEDENCE` (default `workday`) decides who wins where both systems
-supply `Organization` / `JobTitle` / `country` / `officeLocation`.
-
-The notebook refuses rather than shipping a quietly-wrong org dimension: fewer than
-`MIN_WORKDAY_MATCH_RATE` (default 50%) of Workday rows matching an Entra identity, a duplicate work
-email with conflicting attributes, a blank work email, or a join that would fan out `PersonId` all
-stop the run. A **missing** export is not an error — it leaves the existing snapshot untouched.
-
-See [`samples/README.md`](./samples/README.md) for a synthetic extract to smoke-test against.
+Only relevant if you have a Workday (or comparable HRIS) extract. **If you run it, order matters on
+every run** — `Copilot_Org_Data_Direct_Ingester` overwrites `copilot_org_data`, so the lander goes
+after it and before the model refresh. Full setup in the add-on's
+[README](./optional/workday-org-data/README.md).
 
 ## Reviewed behaviour
 

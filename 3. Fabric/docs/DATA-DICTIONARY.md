@@ -31,7 +31,7 @@ template never breaks. See `OPTIONAL-SOURCES.md` for the `EmptyTable` + `try…o
 | --- | --- | --- | --- | --- | --- |
 | 1 | Chat + Agent Interactions (Audit Logs) | `copilot_interactions_curated` | **Core** | `Copilot_Audit_Log_Direct_Ingester` → `Copilot_Audit_Log_Processor` | `GetCopilotInteractions*` |
 | 2 | Copilot Licensed | `copilot_licensed_users` | **Core** | `Copilot_Licensed_Users_Direct_Ingester` | `GetCopilotUsers*` |
-| 3 | Chat + Agent Org Data | `copilot_org_data` | **Core** | `Copilot_Org_Data_Direct_Ingester` *(+ optional `Copilot_Org_Data_Workday_Lander` overlay)* | `Get-EntraOrgData*` |
+| 3 | Chat + Agent Org Data | `copilot_org_data` | **Core** | `Copilot_Org_Data_Direct_Ingester` *(+ optional `notebooks/optional/workday-org-data/` overlay)* | `Get-EntraOrgData*` |
 | 4 | Agents 365 | `agents_365` | *Optional* | `Copilot_Agent365_Registry_Ingester` *(default)* · `Copilot_Agent365_Lander` *(CSV fallback)* | `Get-Agents365Registry` |
 | 5 | ProductFeedback | `user_feedback` | *Optional* | `Copilot_ProductFeedback_Ingester` | OCV feedback CSV |
 | 6 | Copilot Cost Consumption | `copilot_cost_consumption` | *Optional* | `Copilot_Cost_Consumption_Ingester` | SharePoint CSV (`Cost Consumption File`) |
@@ -130,9 +130,11 @@ officeLocation, city, country, accountEnabled, managerUPN
 
 #### Optional Workday / HRIS overlay
 
-`Copilot_Org_Data_Workday_Lander` overlays a Workday worker extract from `Files/org_workday/` onto
+`Copilot_Org_Data_Workday_Lander` ([`notebooks/optional/workday-org-data/`](../notebooks/optional/workday-org-data/README.md))
+overlays a Workday worker extract from `Files/org_workday/` onto
 the Entra snapshot above, joining on **work email → `PersonId_Normalized`**. Entra supplies the
-manager hierarchy; Workday supplies the HR attributes Entra doesn't carry.
+manager hierarchy; Workday supplies the HR attributes Entra doesn't carry. It is an **optional
+edge-case add-on**, not part of the core path.
 
 ```
 Job_Profile, Job_Family, Job_Family_Group, Persona, Compensation_Grade,
