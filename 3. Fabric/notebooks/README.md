@@ -28,6 +28,22 @@ This README focuses on the **current reviewed notebook behaviour** in the base
 > `copilot_interactions_curated`. First rebuild: `WRITE_MODE = "overwrite"`.
 > Ongoing runs after the parsed-table key upgrade: `"merge"`.
 
+## Optional — HRIS / Workday org attributes
+
+| Add-on | Output table |
+|---|---|
+| [`optional/workday-org-data/`](./optional/workday-org-data/README.md) | `copilot_org_data` *(enriched in place)* |
+
+An **edge case**, kept out of the core path. Entra carries the manager hierarchy; a Workday worker
+extract carries the HR attributes (job family, persona, worker type, compensation grade) that Entra
+doesn't. `Copilot_Org_Data_Workday_Lander` joins them on work email and enriches `copilot_org_data`
+in place.
+
+Only relevant if you have a Workday (or comparable HRIS) extract. **If you run it, order matters on
+every run** — `Copilot_Org_Data_Direct_Ingester` overwrites `copilot_org_data`, so the lander goes
+after it and before the model refresh. Full setup in the add-on's
+[README](./optional/workday-org-data/README.md).
+
 ## Reviewed behaviour
 
 ### Audit ingester (`Copilot_Audit_Log_Direct_Ingester`)

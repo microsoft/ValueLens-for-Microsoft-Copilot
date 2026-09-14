@@ -24,6 +24,7 @@ Both are **Import**, not Direct Lake.
 | `ValueLens - Fabric.pbit` | Import template using the Lakehouse SQL analytics endpoint. |
 | `ValueLens - Fabric OneLake.pbit` | Import template using the OneLake Tables endpoint over HTTPS/443. |
 | `notebooks/` | Core ingesters, `Copilot_Audit_Log_Processor`, and optional-source ingesters. |
+| `notebooks/optional/` | Edge-case add-ons outside the core path, each self-contained with its own README. |
 | `pipelines/` | Fabric pipeline JSON for the reviewed **core** orchestration plus opt-in branches. |
 | `docs/` | Reference notes, including the read-only SQL checker pack. |
 | `archive/extended/` | Archived Fabric + Copilot Studio reference, not a recommended active deployment; core notebook mirrors remain synchronized. |
@@ -168,6 +169,7 @@ deployment before switching production.
 | Agents 365 CSV fallback | `notebooks/Copilot_Agent365_Lander.ipynb` | Manual/export fallback. The shipped pipeline invokes this branch. |
 | Product feedback | `notebooks/Copilot_ProductFeedback_Ingester.ipynb` | Reads landed files from `Files/product_feedback/`; safe overwrite snapshot only. |
 | Cowork / Work IQ consumption | `notebooks/Copilot_Cost_Consumption_Ingester.ipynb` | Optional export-only source; landing flows and guides are [archived reference](archive/flows/COST-CONSUMPTION.md), not active setup. |
+| Workday / HRIS org attributes | [`notebooks/optional/workday-org-data/`](notebooks/optional/workday-org-data/README.md) | Edge case. Enriches `copilot_org_data` in place with job family / persona / worker type, joining on work email. Must run **after** `Copilot_Org_Data_Direct_Ingester`, which overwrites that table. |
 
 The former [Copilot Studio add-on](archive/extended/Fabric%20+%20Copilot%20Studio/README.md)
 for transcripts and PPAC credit detail is archived reference, not a recommended active deployment.

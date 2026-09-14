@@ -31,7 +31,7 @@ template never breaks. See `OPTIONAL-SOURCES.md` for the `EmptyTable` + `try…o
 | --- | --- | --- | --- | --- | --- |
 | 1 | Chat + Agent Interactions (Audit Logs) | `copilot_interactions_curated` | **Core** | `Copilot_Audit_Log_Direct_Ingester` → `Copilot_Audit_Log_Processor` | `GetCopilotInteractions*` |
 | 2 | Copilot Licensed | `copilot_licensed_users` | **Core** | `Copilot_Licensed_Users_Direct_Ingester` | `GetCopilotUsers*` |
-| 3 | Chat + Agent Org Data | `copilot_org_data` | **Core** | `Copilot_Org_Data_Direct_Ingester` | `Get-EntraOrgData*` |
+| 3 | Chat + Agent Org Data | `copilot_org_data` | **Core** | `Copilot_Org_Data_Direct_Ingester` *(+ optional `notebooks/optional/workday-org-data/` overlay)* | `Get-EntraOrgData*` |
 | 4 | Agents 365 | `agents_365` | *Optional* | `Copilot_Agent365_Registry_Ingester` *(default)* · `Copilot_Agent365_Lander` *(CSV fallback)* | `Get-Agents365Registry` |
 | 5 | ProductFeedback | `user_feedback` | *Optional* | `Copilot_ProductFeedback_Ingester` | OCV feedback CSV |
 | 6 | Copilot Cost Consumption | `copilot_cost_consumption` | *Optional* | `Copilot_Cost_Consumption_Ingester` | SharePoint CSV (`Cost Consumption File`) |
@@ -127,6 +127,33 @@ officeLocation, city, country, accountEnabled, managerUPN
 
 **Join key:** `PersonId` = **userPrincipalName (UPN)** — used by the **Audit Logs** path
 (`Audit_UserId → PersonId`). `id` (AAD object id) is also emitted for downstream joins.
+
+#### Optional Workday / HRIS overlay
+
+`Copilot_Org_Data_Workday_Lander` ([`notebooks/optional/workday-org-data/`](../notebooks/optional/workday-org-data/README.md))
+overlays a Workday worker extract from `Files/org_workday/` onto
+the Entra snapshot above, joining on **work email → `PersonId_Normalized`**. Entra supplies the
+manager hierarchy; Workday supplies the HR attributes Entra doesn't carry. It is an **optional
+edge-case add-on**, not part of the core path.
+
+```
+Job_Profile, Job_Family, Job_Family_Group, Persona, Compensation_Grade,
+Worker_Type, Worker_SubType, On_Leave, IsOnLeave, sub_Country,
+Function, Location, primaryWorkEmail, OrgData_Source
+```
+
+The PBIT's org query keeps every source column, so these arrive in the model as slicer-ready fields
+with no report edit. `Function` and `Location` are already model-declared columns, so they populate
+existing visuals directly. `OrgData_Source` records which path produced the row
+(`workday:enrich` / `workday:standalone`).
+
+`Organization` is overlaid from `ORGANIZATION_SOURCE` (default `Job_Family_Group`) and `JobTitle`
+from `Job_Profile`; both **coalesce** rather than replace, so a worker missing from the Workday file
+keeps their Entra value instead of going blank.
+
+> **Order matters on every run.** `Copilot_Org_Data_Direct_Ingester` writes `copilot_org_data` with
+> `mode('overwrite')`, so it drops the Workday columns. Run the Graph ingester first, then the
+> Workday lander, then refresh the model.
 
 ---
 
