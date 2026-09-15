@@ -45,7 +45,7 @@ Remove an exclusion when a separate, validated template fix resolves it.
 
 - Keep the four numbered deployment paths stable. Put setup details in the relevant
   path README and shared column contracts in the
-  [Fabric data dictionary](3.%20Fabric/docs/DATA-DICTIONARY.md).
+  [data dictionary](docs/DATA-DICTIONARY.md).
 - Preserve existing names, formatting and README tone. Separate measured signals
   from estimates, and document optional sources, toggles and blank-data behaviour.
 - Use fabricated fixtures only. Never commit tenant exports, user identities,

@@ -54,7 +54,7 @@ Promoted =
 - **Toggle on, table present** → real data.
 - **Toggle on, table missing** → `try…otherwise` catches the error → empty table.
 
-In every case the table has the contract columns from `DATA-DICTIONARY.md`, so the refresh succeeds.
+In every case the table has the contract columns from [`DATA-DICTIONARY.md`](../../docs/DATA-DICTIONARY.md), so the refresh succeeds.
 
 ### ProductFeedback extra hardening
 `ProductFeedback` additionally uses `Table.RenameColumns(..., MissingField.Ignore)` so a **partial**

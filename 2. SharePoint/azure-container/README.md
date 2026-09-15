@@ -11,7 +11,7 @@
 > What remains is to **commit and test** the deployment, so until the files in
 > the table below land here, the supported way to schedule the SharePoint
 > refresh is still the **app registration** path documented in the
-> [folder README](../README.md#authentication) (via
+> [folder README](../README.md#-prerequisites) (via
 > [`Register-TaskScheduler.ps1`](../scripts/Register-TaskScheduler.ps1)).
 > Managed identity is an **alternative** to that app registration, not an
 > addition.
@@ -144,7 +144,7 @@ deploy script:
 
 ## Until this lands
 
-Use one of the scheduling options the [folder README](../README.md#schedule-it)
+Use one of the scheduling options the [folder README](../README.md#-setup)
 documents (both authenticate with the app registration):
 
 - **Windows Task Scheduler** — see

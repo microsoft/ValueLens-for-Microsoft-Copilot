@@ -99,4 +99,4 @@ hand-off never blanks the dashboard.
 ## Related
 
 - [`../../README.md`](../../README.md) — core notebooks and run order
-- [`../../../docs/DATA-DICTIONARY.md`](../../../docs/DATA-DICTIONARY.md) — `copilot_org_data` schema
+- [`../../../../docs/DATA-DICTIONARY.md`](../../../../docs/DATA-DICTIONARY.md) — `copilot_org_data` schema

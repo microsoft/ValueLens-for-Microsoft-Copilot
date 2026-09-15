@@ -139,5 +139,5 @@ export covers (read straight from the data).
 
 *Related: [`flows/README.md`](flows/README.md) (automated landing) ·
 [`OPTIONAL-SOURCES.md`](../../../docs/OPTIONAL-SOURCES.md) (how optional sources stay
-"green" when absent) · [`DATA-DICTIONARY.md`](../../../docs/DATA-DICTIONARY.md)
+"green" when absent) · [`DATA-DICTIONARY.md`](../../../../docs/DATA-DICTIONARY.md)
 (column reference).*
