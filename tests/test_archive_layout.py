@@ -147,7 +147,7 @@ class ArchiveSyncTests(unittest.TestCase):
         self.assert_synced()
         result = self.run_sync(check=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("8 notebook(s) x 1 destinations", result.stdout)
+        self.assertIn("8 notebook(s) x 1 destination(s)", result.stdout)
 
     def test_drift_in_archive_is_detected_without_writes_and_repaired(self):
         result = self.run_sync()

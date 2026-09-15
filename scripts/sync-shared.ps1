@@ -86,7 +86,7 @@ if ($Check -and $drift.Count -gt 0) {
 }
 
 Write-Host ""
-Write-Host "sync-shared: OK ($($notebooks.Count) notebook(s) x $($destinations.Count) destinations)"
+Write-Host "sync-shared: OK ($($notebooks.Count) notebook(s) x $($destinations.Count) destination(s))"
 if ($excluded) {
     Write-Host "  not mirrored: $($excluded -join ', ')"
 }
