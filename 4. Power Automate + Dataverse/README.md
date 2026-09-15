@@ -22,6 +22,44 @@ Compatible CopilotInteractionLogging collector package, with local raw-retention
 Optional: compatible SharePointAgentLogging -> Dataverse SharePoint-agent inventory
 ```
 
+## 📚 Dashboard pages
+
+<details>
+<summary>12 report pages — Dataverse core signals, with separate optional agent enrichment</summary>
+
+These are the pages in the shipped preview template, not a promise that every optional
+signal is collected by Power Automate:
+
+| Page | Purpose / source |
+|---|---|
+| **📘 Introduction: Key Concepts** | Methodology and key-concept explainers |
+| **◆ Activation** | Licensed vs unlicensed, active vs inactive users |
+| **🎯 Readiness** | Upgrade-priority signals |
+| **📡 Adoption** | User counts, coverage and reach |
+| **🌱 Power Users** | Usage maturity and behaviour-stage progression |
+| **🔮 Activity** | Copilot and agent usage, tasks and behaviour mix |
+| **🚀 Value** | Hours saved, assisted value and business case |
+| **🛡 Agent Health (A365)** | Agent inventory / health signals; Agent 365 enrichment needs the **optional, separate SharePoint CSV** |
+| **📈 Heatmap** | Activity across the reporting period |
+| **🏅 Leaderboard** | Top users, agents and functions |
+| **📘 Appendix: Glossary** | Metric definitions and research sources |
+| **🧬 Appendix: Signal Table** | Trace raw signals through to value |
+
+The curated Dataverse snapshot supplies core interactions and users/licences; it does
+**not** manufacture Agent 365 telemetry, transcript outcomes or billing credits.
+Optional SharePoint-agent inventory enriches observed agent identity, not agent health.
+Registry-only Agent 365 data is not an observability export — see the
+[source contract](../3.%20Fabric/docs/DATA-DICTIONARY.md#4-agents_365) and this path's
+[source map](source-map.json).
+
+The model retains optional cost-consumption and feedback inputs, but this packaged
+report has **no Credit Meter / Consumption or Feedback page**. Its page list therefore
+differs from the current SharePoint template; supplying those inputs does not create
+the missing pages. The wider layout-parity claim in Development below should not be
+read as an exact page-count guarantee.
+
+</details>
+
 ## Collector package compatibility
 
 The local package adapter **extends a separately supplied authorized interaction

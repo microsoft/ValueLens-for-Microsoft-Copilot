@@ -4,10 +4,11 @@
 
 ### *for Microsoft Copilot* — one Power BI template for every **Copilot &amp; agent** adoption signal.
 
-[![Built by Microsoft](https://img.shields.io/badge/BUILT_BY-MICROSOFT-4F73B8?style=for-the-badge&labelColor=1C2632)](https://github.com/Keithland89/ValueLens-for-Microsoft-Copilot)
+[![Built by Microsoft](https://img.shields.io/badge/BUILT_BY-MICROSOFT-4F73B8?style=for-the-badge&labelColor=1C2632)](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot)
 [![Power BI Template](https://img.shields.io/badge/POWER_BI-TEMPLATE-F2C811?style=for-the-badge&logo=powerbi&logoColor=1C2632&labelColor=1C2632)](#-pick-a-deployment-path)
 [![Deploy](https://img.shields.io/badge/DEPLOY-FABRIC_%2B_SHAREPOINT_%2B_DATAVERSE-09B39D?style=for-the-badge&labelColor=1C2632)](#-pick-a-deployment-path)
-[![Stars](https://img.shields.io/github/stars/Keithland89/ValueLens-for-Microsoft-Copilot?style=for-the-badge&color=7F215D&labelColor=1C2632)](https://github.com/Keithland89/ValueLens-for-Microsoft-Copilot/stargazers)
+[![Stars](https://img.shields.io/github/stars/microsoft/ValueLens-for-Microsoft-Copilot?style=for-the-badge&color=7F215D&labelColor=1C2632)](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/stargazers)
+[![Tests](https://img.shields.io/github/actions/workflow/status/microsoft/ValueLens-for-Microsoft-Copilot/tests.yml?branch=main&style=for-the-badge&label=tests&labelColor=1C2632)](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/actions/workflows/tests.yml)
 
 **Hours saved · assisted value · adoption &amp; readiness** — a defensible ROI narrative aligned to
 Microsoft's **Frontier Firm** framework.
@@ -74,7 +75,7 @@ automating — *before* you set up any automation. Move to 2 or 3 when you want 
 > The former **Copilot Studio** agent / topic / CSAT add-on is retained as
 > [archived reference](3.%20Fabric/archive/extended/), not a recommended active deployment.
 > For agent transcripts in **Dataverse**, use the
-> [Dataverse companion repo ↗](https://github.com/Keithland89/Copilot-Studio-Agent-Analytics), which
+> [Dataverse companion repo ↗](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio), which
 > reads them natively — no Fabric or SharePoint needed.
 
 > Each path folder has its **own README** with the exact, step‑by‑step setup. This page is just the
@@ -101,7 +102,7 @@ README.md  ·  LICENSE  ·  Images/
 4. Power Automate + Dataverse/  Power Automate + Dataverse.pbit  ·  scripts/  ·  source-map.json
 archive/           superseded versions — kept for reference, not maintained
 
-Dataverse path → companion repo: Keithland89/Copilot-Studio-Agent-Analytics
+Dataverse path → companion repo: microsoft/AgentEvaluator-for-Copilot-Studio
 ```
 </details>
 
@@ -132,7 +133,7 @@ Availability varies by deployment path. Use the path README for the maintained s
 | Cowork / Work IQ consumption | ⬜ Optional | Microsoft 365 Admin Center export → see the path README; [archived landing-flow reference](3.%20Fabric/archive/flows/COST-CONSUMPTION.md), not active setup |
 | Credit consumption (billing) | Archived reference only | Power Platform Admin Center export → [archived Fabric + Copilot Studio add-on](3.%20Fabric/archive/extended/) |
 | Product feedback | ⬜ Optional | M365 Admin Center → Health → Product Feedback export (Fabric path optional source) |
-| Copilot Studio agent transcripts | ⬜ Optional | Dataverse `ConversationTranscript` table — use the [Dataverse companion repo ↗](https://github.com/Keithland89/Copilot-Studio-Agent-Analytics) |
+| Copilot Studio agent transcripts | ⬜ Optional | Dataverse `ConversationTranscript` table — use the [Dataverse companion repo ↗](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio) |
 
 Optional sources are gated by `Enable_*` toggles — the dashboard works fine without them. The exact
 export + connect steps live in the path README you choose above.

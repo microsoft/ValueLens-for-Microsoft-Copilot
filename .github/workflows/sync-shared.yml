@@ -6,7 +6,6 @@ on:
       - '3. Fabric/pipelines/**'
       - '3. Fabric/notebooks/**'
       - '3. Fabric/archive/extended/**/notebooks/_core/**'
-      - '3. Fabric/archive/extended/_shared/notebooks/**'
       - '3. Fabric/archive/flows/**'
       - '3. Fabric/*.pbit'
       - 'tests/**'
@@ -17,7 +16,6 @@ on:
       - '3. Fabric/pipelines/**'
       - '3. Fabric/notebooks/**'
       - '3. Fabric/archive/extended/**/notebooks/_core/**'
-      - '3. Fabric/archive/extended/_shared/notebooks/**'
       - '3. Fabric/archive/flows/**'
       - '3. Fabric/*.pbit'
       - 'tests/**'
@@ -26,18 +24,11 @@ on:
 
 jobs:
   check-shared:
-    name: Verify _core / _shared notebooks match 3. Fabric/notebooks
+    name: Verify archived _core notebooks match 3. Fabric/notebooks
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
       - name: Run sync-shared in check mode
         shell: pwsh
         run: |
           ./scripts/sync-shared.ps1 -Check
-      - name: Check core templates and notebook distribution
-        shell: pwsh
-        run: |
-          python -B -m unittest discover -s tests -v
