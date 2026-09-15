@@ -2,7 +2,7 @@
 
 Older versions and moved add-ons/flows are kept as **archived reference, not recommended active
 deployment paths**. **You don't need anything in here for a new deployment** —
-use the current files in [`../`](../). The [repository license](../../LICENSE.md) still applies.
+use the current files in [`../`](../). The [repository license](../../LICENSE) still applies.
 
 | File | What it is | Why it's archived |
 |---|---|---|
@@ -19,7 +19,7 @@ transformation runs* changed (Power Query → Spark).
 | [`flows/`](flows/COST-CONSUMPTION.md) | Cost-consumption email and SharePoint landing flows, plus their [setup guide](flows/COST-CONSUMPTION-SETUP.md) and schema reference. Not recommended for new deployments. |
 
 The [core notebooks](../notebooks/) and [ProductFeedback flow](../flows/Copilot_ProductFeedback_Email_to_OneLake.json)
-remain active. The archived extension's `_shared/notebooks/` and `notebooks/_core/` mirrors remain
+remain active. The archived extension's `notebooks/_core/` mirrors remain
 **synchronized, not frozen**: edit the canonical notebooks, then run
 [`scripts/sync-shared.ps1`](../../scripts/sync-shared.ps1) from the repository root.
 See the [mirror maintenance contract](extended/_shared/README.md).

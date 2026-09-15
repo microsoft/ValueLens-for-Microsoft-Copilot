@@ -15,6 +15,40 @@ lands — *before* you spend any effort on exports or automation.
 
 ---
 
+## 📚 Dashboard pages
+
+<details>
+<summary>11 report pages — activation, adoption, value, maturity, governance &amp; appendices</summary>
+
+These are the pages in the shipped **Local CSV** template. The rollup CSV contract is
+shared with SharePoint, but the packaged layouts are **not identical**.
+
+| Page | Purpose / source |
+|---|---|
+| **◆ User Activation** | Licensed vs unlicensed, active vs inactive users |
+| **📡 Adoption & Reach** | User counts and coverage across the organisation |
+| **🔮 Activity & Value** | Usage, behaviour mix, hours saved and assisted value in one page |
+| **🌱 Usage Maturity** | Progression through the behaviour stages |
+| **🏅 Leaderboards** | Top users, agents and functions |
+| **🎯 License Readiness** | Upgrade-priority signals for unlicensed / low-adoption users |
+| **📈 Heatmap Trend** | Activity across the reporting period |
+| **🛡 Agent Governance** | Agent inventory and governance; enrichment needs the optional **Agent 365** CSV |
+| **📘 Appendix: Glossary** | Metric definitions and research sources |
+| **🧬 Appendix: Signal Table** | Trace raw signals through to value |
+| **📘 Appendix: Key Concepts** | Methodology and key-concept explainers |
+
+The two core rollups supply the adoption/value signals; the sample dataset also includes
+Agent 365 data. With your own data, registry-only exports do **not** supply observability
+telemetry — unavailable agent fields remain blank. See the
+[Agent 365 source contract](../3.%20Fabric/docs/DATA-DICTIONARY.md#4-agents_365).
+
+This template has **no separate Consumption or Feedback page**, and no cost-consumption
+input. Do not infer billing credits or transcript health from the audit rollups.
+
+</details>
+
+---
+
 ## A — Sample data (no tenant needed)
 
 1. Open **`ValueLens - Local CSV.pbit`** in Power BI Desktop.

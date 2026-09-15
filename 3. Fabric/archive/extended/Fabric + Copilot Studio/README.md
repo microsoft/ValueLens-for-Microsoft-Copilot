@@ -82,9 +82,10 @@ The `_core/` copies are **mirrors** — do not edit them directly. Edit the sour
 ```
 
 from the repo root. All eight canonical notebooks continue to sync into
-`3. Fabric/archive/extended/_shared/notebooks/` and
 `3. Fabric/archive/extended/Fabric + Copilot Studio/notebooks/_core/` — archiving does **not**
-freeze these mirrors. CI enforces zero drift on every push.
+freeze these mirrors. The redundant `_shared/notebooks/` second copy has been removed;
+historical setup still uses this local `_core/` folder. CI enforces zero drift on matching
+pushes and pull requests.
 
 > This add-on is a superset of the base template — it reads the same core tables plus the agent
 > tables, so it works only once the core ingesters are producing data.

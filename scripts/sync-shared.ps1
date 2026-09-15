@@ -1,15 +1,15 @@
 <#
 .SYNOPSIS
 Mirrors the eight shared Fabric notebooks from `3. Fabric/notebooks/`
-into every self-contained location under `3. Fabric/archive/extended/`.
+into the archived Copilot Studio add-on's local `_core` folder.
 
 .DESCRIPTION
 The source of truth for the shared notebooks is `3. Fabric/notebooks/`. To keep
-the archived add-on copies consistent with the core, we duplicate those
-notebooks into:
+the archived add-on copies consistent with the core, we mirror those notebooks into:
 
-  3. Fabric/archive/extended/_shared/notebooks/
   3. Fabric/archive/extended/Fabric + Copilot Studio/notebooks/_core/
+
+The former `_shared/notebooks/` second copy was redundant and is no longer generated.
 
 Run this after editing any file in `3. Fabric/notebooks/`.
 
@@ -34,7 +34,6 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $source   = Join-Path $repoRoot '3. Fabric\notebooks'
 
 $destinations = @(
-    (Join-Path $repoRoot '3. Fabric\archive\extended\_shared\notebooks'),
     (Join-Path $repoRoot '3. Fabric\archive\extended\Fabric + Copilot Studio\notebooks\_core')
 )
 

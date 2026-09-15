@@ -11,7 +11,6 @@ FABRIC = ROOT / "3. Fabric"
 EXTENDED = FABRIC / "archive" / "extended"
 STUDIO = EXTENDED / "Fabric + Copilot Studio"
 MIRRORS = (
-    Path("3. Fabric") / "archive" / "extended" / "_shared" / "notebooks",
     Path("3. Fabric") / "archive" / "extended" / "Fabric + Copilot Studio" / "notebooks" / "_core",
 )
 SHARED_NAMES = {
@@ -78,7 +77,10 @@ class ArchiveLayoutTests(unittest.TestCase):
         self.assertTrue(namespace["NB_PATH"].is_file())
         self.assertTrue(namespace["SAMPLE"].is_file())
 
-    def test_workflow_checks_both_archived_mirrors_on_push_and_pull_request(self):
+    def test_redundant_shared_notebooks_are_absent(self):
+        self.assertFalse(any((EXTENDED / "_shared").rglob("*.ipynb")))
+
+    def test_workflow_checks_archived_mirror_on_push_and_pull_request(self):
         workflow = (ROOT / ".github" / "workflows" / "sync-shared.yml").read_text(encoding="utf-8")
         push, pull_request = workflow.split("  push:\n", 1)[1].split("  pull_request:\n", 1)
         pull_request = pull_request.split("\njobs:", 1)[0]
@@ -87,7 +89,6 @@ class ArchiveLayoutTests(unittest.TestCase):
                 "3. Fabric/pipelines/**",
                 "3. Fabric/notebooks/**",
                 "3. Fabric/archive/extended/**/notebooks/_core/**",
-                "3. Fabric/archive/extended/_shared/notebooks/**",
                 "3. Fabric/archive/flows/**",
                 "3. Fabric/*.pbit",
                 "tests/**",
@@ -97,7 +98,8 @@ class ArchiveLayoutTests(unittest.TestCase):
                 self.assertIn(f"      - '{pattern}'", block)
             self.assertNotIn("'3. Fabric/extended/", block)
         self.assertIn("sync-shared.ps1 -Check", workflow)
-        self.assertIn("python -B -m unittest discover -s tests -v", workflow)
+        self.assertNotIn("3. Fabric/archive/extended/_shared/notebooks/**", workflow)
+        self.assertNotIn("unittest discover", workflow)
 
 
 class ArchiveSyncTests(unittest.TestCase):
@@ -115,11 +117,12 @@ class ArchiveSyncTests(unittest.TestCase):
 
     def run_sync(self, check=False):
         result = subprocess.run(
-            ["pwsh", "-NoProfile", "-File", str(self.root / "scripts" / "sync-shared.ps1")]
+            ["pwsh", "-NoProfile", "-NonInteractive", "-File", str(self.root / "scripts" / "sync-shared.ps1")]
             + (["-Check"] if check else []),
             cwd=self.root, capture_output=True, text=True, timeout=60,
         )
         self.assertFalse((self.root / "3. Fabric" / "extended").exists())
+        self.assertFalse((self.root / "3. Fabric" / "archive" / "extended" / "_shared").exists())
         return result
 
     def assert_synced(self):
@@ -133,16 +136,16 @@ class ArchiveSyncTests(unittest.TestCase):
     def test_missing_archive_check_is_read_only_and_write_creates_only_archive(self):
         result = self.run_sync(check=True)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertEqual(result.stdout.count("MISSING DIR:"), 2)
+        self.assertEqual(result.stdout.count("MISSING DIR:"), 1)
         self.assertFalse((self.root / "3. Fabric" / "archive").exists())
         result = self.run_sync()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assert_synced()
         result = self.run_sync(check=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("8 notebook(s) x 2 destinations", result.stdout)
+        self.assertIn("8 notebook(s) x 1 destinations", result.stdout)
 
-    def test_drift_in_either_archive_is_detected_without_writes_and_repaired(self):
+    def test_drift_in_archive_is_detected_without_writes_and_repaired(self):
         result = self.run_sync()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         name = "ValueLens_Data_Check.ipynb"
