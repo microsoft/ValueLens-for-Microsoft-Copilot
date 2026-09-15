@@ -4,7 +4,7 @@
 > Historical Cowork / WorkIQ / Other credit instructions and model wiring are retained below.
 > The [core Cost Consumption ingester](../../notebooks/Copilot_Cost_Consumption_Ingester.ipynb),
 > [ProductFeedback flow](../../flows/Copilot_ProductFeedback_Email_to_OneLake.json), and
-> [base Fabric build](../../README.md) remain active. The [repository license](../../../LICENSE.md) applies.
+> [base Fabric build](../../README.md) remain active. The [repository license](../../../LICENSE) applies.
 
 > **New to this source?** Start with the **[setup guide](COST-CONSUMPTION-SETUP.md)** — it walks
 > through getting the CSV out of the Microsoft 365 Admin Center, dropping it in the Lakehouse, and

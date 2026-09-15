@@ -153,10 +153,11 @@ silently merged into an override. After changing the licensed-user snapshot, rer
 processor, then refresh Power BI. `ValueLens_Data_Check` shows stored flags only; it
 does not independently classify licences or verify service plans.
 
-The canonical notebooks here are synchronized to `3. Fabric/archive/extended/_shared/notebooks`
-and `3. Fabric/archive/extended/Fabric + Copilot Studio/notebooks/_core` using
+The canonical notebooks here are synchronized to
+`3. Fabric/archive/extended/Fabric + Copilot Studio/notebooks/_core` using
 [`scripts/sync-shared.ps1`](../../scripts/sync-shared.ps1). These archived reference
-mirrors remain maintained, not frozen. The processor is inherited, not mirrored.
+mirrors remain maintained, not frozen. The redundant `_shared/notebooks` copy is no longer
+generated. The processor is inherited, not mirrored.
 
 ## Recommended — Agent 365 governance
 

@@ -30,6 +30,44 @@ Both are **Import**, not Direct Lake.
 | `archive/extended/` | Archived Fabric + Copilot Studio reference, not a recommended active deployment; core notebook mirrors remain synchronized. |
 | `archive/flows/` | Archived cost-consumption landing flows and guides, not active setup. |
 
+## 📚 Dashboard pages
+
+<details>
+<summary>13 report pages — shared by the SQL and OneLake templates, with optional Agent 365 and feedback signals</summary>
+
+Both shipped Import templates contain the same pages:
+
+| Page | Purpose / source |
+|---|---|
+| **📘 Key Concepts** | Methodology and key-concept explainers |
+| **◆ Activation** | Licensed vs unlicensed, active vs inactive users |
+| **🎯 Readiness** | Upgrade-priority signals |
+| **📡 Adoption** | User counts, coverage and reach |
+| **🌱 Power Users** | Usage maturity and behaviour-stage progression |
+| **🔮 Activity** | Copilot and agent usage, tasks and behaviour mix |
+| **🚀 Value** | Hours saved, assisted value and business case; feedback-bound visuals need the optional feedback source |
+| **🛡 Agent Health** | Agent inventory / telemetry; Agent 365 enrichment is **optional**, gated by `Enable_Agent365` |
+| **💬 Feedback** | Product-feedback analysis — **optional**, requires `user_feedback` and `Enable_ProductFeedback = Include` |
+| **📈 Heatmap** | Activity across the reporting period |
+| **🏅 Leaderboard** | Top users, agents and functions |
+| **📘 Appendix: Glossary** | Metric definitions and research sources |
+| **🧬 Appendix: Signal - Impact Table** | Trace signals through to their value impact |
+
+Core pages use audit interactions, licences and org data. Leave optional toggles at
+`Exclude` until their tables are ready. A registry-only `agents_365` export supplies
+inventory, **not** observability telemetry; unavailable health fields remain blank.
+See the [source contract](docs/DATA-DICTIONARY.md#optional-tables).
+
+**Consumption boundary:** the optional Cowork / Work IQ ingester and the
+[documented consumption contract](docs/DATA-DICTIONARY.md#6-copilot_cost_consumption--copilot-credit-usage-mac-cost-management-export)
+exist, but the shipped Fabric templates currently contain **no Consumption page,
+cost-consumption model table or `Enable_CostConsumption` parameter**. Ingesting that
+source alone does not add a report page. The dictionary's broader cross-template
+claim is not a guarantee of packaged report support. PPAC credit detail and Studio
+transcript pages remain archived, not part of this active build.
+
+</details>
+
 ## Quick start
 
 1. **Create a Lakehouse** and note the SQL analytics endpoint.

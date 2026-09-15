@@ -4,7 +4,7 @@
 > [`1. Local CSV`](../../../1.%20Local%20CSV/), [`2. SharePoint`](../../../2.%20SharePoint/) and
 > [`3. Fabric`](../../) each run the **full core dashboard** on their own.
 > The historical instructions below are retained for reference; use the active builds for new deployments.
-> The [repository license](../../../LICENSE.md) still applies.
+> The [repository license](../../../LICENSE) still applies.
 
 This formerly optional extension served tenants running **Copilot Studio agents** that wanted
 deeper agent pages. It is a *superset* of the base Fabric build and historically required
@@ -25,9 +25,12 @@ is not mirrored; it remains part of the base Fabric build.
 
 ## Maintaining the mirrored core notebooks
 
-The `Fabric + Copilot Studio/notebooks/_core/` and `_shared/notebooks/` folders under
-`3. Fabric/archive/extended/` remain **synchronized, not frozen**. They are **copies** of the eight
+The `Fabric + Copilot Studio/notebooks/_core/` folder under
+`3. Fabric/archive/extended/` remains **synchronized, not frozen**. It contains **copies** of the eight
 canonical notebooks (seven ingesters/landers plus `ValueLens_Data_Check.ipynb`) in
 [`3. Fabric/notebooks/`](../../notebooks/). Do not edit them directly — edit the source,
 then run [`sync-shared.ps1`](../../../scripts/sync-shared.ps1) from the repository root. See
 [`_shared/README.md`](_shared/README.md) for the full rationale.
+
+The redundant `_shared/notebooks/` second copy has been removed. Historical setup
+continues to use the add-on's local `_core/` files; the sync script only targets that folder.

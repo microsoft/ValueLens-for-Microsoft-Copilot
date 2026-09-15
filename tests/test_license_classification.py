@@ -14,7 +14,6 @@ CORE = ROOT / "3. Fabric" / "notebooks"
 NOTEBOOK = "Copilot_Licensed_Users_Direct_Ingester.ipynb"
 COPIES = (
     CORE / NOTEBOOK,
-    ROOT / "3. Fabric" / "archive" / "extended" / "_shared" / "notebooks" / NOTEBOOK,
     ROOT / "3. Fabric" / "archive" / "extended" / "Fabric + Copilot Studio" / "notebooks" / "_core" / NOTEBOOK,
 )
 E7 = (
