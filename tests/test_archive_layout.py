@@ -100,6 +100,8 @@ class ArchiveLayoutTests(unittest.TestCase):
         self.assertIn("sync-shared.ps1 -Check", workflow)
         self.assertNotIn("3. Fabric/archive/extended/_shared/notebooks/**", workflow)
         self.assertNotIn("unittest discover", workflow)
+        tests_workflow = (ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+        self.assertIn("pytest tests", tests_workflow)
 
 
 class ArchiveSyncTests(unittest.TestCase):
