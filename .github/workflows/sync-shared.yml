@@ -22,6 +22,9 @@ on:
       - 'scripts/sync-shared.ps1'
       - '.github/workflows/sync-shared.yml'
 
+permissions:
+  contents: read
+
 jobs:
   check-shared:
     name: Verify archived _core notebooks match 3. Fabric/notebooks
