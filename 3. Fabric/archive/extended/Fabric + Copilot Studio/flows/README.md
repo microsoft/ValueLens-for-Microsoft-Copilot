@@ -86,4 +86,4 @@ the transcript-native `Total Cost Units` (displayedCost) view keeps working rega
 The same `PUT → append → flush` landing mechanism works for **any** export-only Microsoft report —
 only the **trigger filter** and **target folder** change. The *No Studio* template documents the
 generalised pattern (and the product-feedback example that ships in every build) in
-[`3. Fabric/flows/README.md`](../../../../flows/README.md#generalising-to-other-export-only-sources).
+[`3. Fabric/flows/README.md`](../../../../flows/README.md).

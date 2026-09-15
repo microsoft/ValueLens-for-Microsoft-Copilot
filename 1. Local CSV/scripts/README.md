@@ -54,7 +54,7 @@ same two files.
 ## Column reference
 
 Full expectations for every column, both files:
-[`../../3. Fabric/docs/DATA-DICTIONARY.md`](../../3.%20Fabric/docs/DATA-DICTIONARY.md).
+[`../../docs/DATA-DICTIONARY.md`](../../docs/DATA-DICTIONARY.md).
 
 ---
 

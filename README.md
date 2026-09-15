@@ -15,7 +15,7 @@ Microsoft's **Frontier Firm** framework.
 
 Found this useful? ⭐ **Star this repo to help others discover it!**
 
-**[Deployment paths ↓](#-pick-a-deployment-path)** · **[What it measures ↓](#-what-it-measures)** · **[Data sources ↓](#-data-sources)** · **[Dashboard pages ↓](#-dashboard-pages)** · **[Research ↓](#-research-sources)**
+**[Deployment paths ↓](#-pick-a-deployment-path)** · **[Repo layout ↓](#-repo-layout)** · **[What it measures ↓](#-what-it-measures)** · **[Data sources ↓](#-data-sources)** · **[Dashboard pages ↓](#-dashboard-pages)** · **[Research ↓](#-research-sources)**
 
 ![ValueLens preview](Images/ValueLens-Preview.gif)
 
@@ -27,9 +27,16 @@ Both play here in the page — no download.
 
 **Demo — what the dashboard measures, page by page** *(1m 49s)*
 
+A tour of the pages and how the value model fits together.
+
 https://github.com/user-attachments/assets/a037e428-f966-4fdf-bf44-7a1d04155a63
 
 **Setup guide — getting your own data in, every source, start to finish** *(7m 07s)*
+
+Every data source (Purview audit, Entra, M365 usage), the permissions each needs, the parameters
+you fill in, and the **Fabric** path in full: PySpark notebooks instead of scripts, the Graph
+permissions per notebook, the ingester-then-processor run order, and the same notebooks and
+template running on Databricks, Synapse or Azure SQL.
 
 https://github.com/user-attachments/assets/bc0712c0-e50b-4c8d-91f4-e9aa61e999a1
 
@@ -60,14 +67,16 @@ open an issue in this repo.
 
 **Same dashboard, a choice of data pathways.** Paths 1–3 remain unchanged. Path 4 is an
 additional preview for Power Automate and Dataverse, exercised end-to-end on a bounded demo interval.
-Choose based on your available sources, licensing and refresh operating model.
 
-| Path | Pick this when… | Setup |
-|---|---|---|
-| **[1. Local CSV](1.%20Local%20CSV/)** · *start here* 🧪 | You want to **see it working now** — or run a one-off look at your own numbers. | **Sample data included.** Open the template, point it at three CSVs. No tenant, no exports, no scripts. Then swap in your own export when ready. |
-| **[2. SharePoint](2.%20SharePoint/)** · *scheduled, Pro* | You want it **refreshing on its own** on **Power BI Pro** — no Fabric or Premium. | A scheduled script extracts, rolls up and uploads to SharePoint; Power BI refreshes on a timer. |
-| **[3. Fabric](3.%20Fabric/)** · *scale · recommended* | You have **Fabric capacity** (or Premium / PPU) and want the reviewed notebook + Lakehouse path. | Two **Import-mode** templates over the same Lakehouse outputs (SQL analytics endpoint or OneLake), plus optional feedback / Agent 365 / consumption sources. |
-| **[4. Power Automate + Dataverse](4.%20Power%20Automate%20+%20Dataverse/)** · *preview* | You want a Dataverse-backed pathway using a compatible collector solution as the dashboard's core data source. | Extend a compatible source collector to retain full audit records, combine them with an Entra/licence snapshot using the existing ValueLens processor, and publish a complete Dataverse snapshot. Requires a Python refresh runner as well as Power Automate/Dataverse licensing; not a flow-only deployment. |
+**Quick decision:** no tenant access → **1** · Power BI Pro only → **2** · Fabric capacity → **3** ·
+Dataverse-centric → **4**.
+
+| Path | Licence needed | Refresh | Setup | Scale | Best for |
+|---|---|---|---|---|---|
+| **[1. Local CSV](1.%20Local%20CSV/)** · *start here* 🧪 | Power BI Desktop only | Manual — re-export, re-run, refresh | **Sample data included.** Open the template, point it at three CSVs. ~2 min | One-off; a local file path, so high volumes get slow | Seeing it working now, or a one-off look at your own numbers |
+| **[2. SharePoint](2.%20SharePoint/)** | Power BI **Pro** | Scheduled, hands-off | App registration + a SharePoint library + a scheduled extract task | Up to Pro's 1 GB model / 2-hour refresh cap | Automatic refresh without Fabric or Premium |
+| **[3. Fabric](3.%20Fabric/)** · *recommended* | **Fabric capacity** (F2+ or trial), Premium or PPU | Pipeline-orchestrated, plus a success-gated model refresh | Lakehouse + app registration + notebooks + pipeline | Tenant scale — Lakehouse ingestion, no file caps | High volume, plus the optional feedback and Agent 365 sources |
+| **[4. Power Automate + Dataverse](4.%20Power%20Automate%20+%20Dataverse/)** · *preview* | Power Automate premium + Dataverse capacity, plus Power BI | Scheduled collector + runner; you advance the snapshot parameter by hand | Collector solution + Dataverse tables + a Python refresh runner | Preview — validated on a bounded demo interval; benchmark before a production cadence | Tenants already collecting Copilot interactions into Dataverse |
 
 **Not sure?** **Start with path 1.** It takes minutes and tells you whether the numbers are worth
 automating — *before* you set up any automation. Move to 2 or 3 when you want it hands-off.
@@ -81,30 +90,25 @@ automating — *before* you set up any automation. Move to 2 or 3 when you want 
 > Each path folder has its **own README** with the exact, step‑by‑step setup. This page is just the
 > map.
 
-### 🎬 Narrated walkthroughs
-
-Both are at the [top of this page](#watch-first) and play inline.
-
-- **Demo** *(1m 49s)* — a tour of the pages and how the value model fits together.
-- **Setup guide** *(7m 07s)* — every data source (Purview audit, Entra, M365 usage), the permissions each needs, the parameters you fill in, and the **Fabric** path in full: PySpark notebooks instead of scripts, the Graph permissions per notebook, the ingester-then-processor run order, and the same notebooks and template running on Databricks, Synapse or Azure SQL.
-
-<details>
-<summary>📁 <strong>Repo layout</strong></summary>
+## 📁 Repo layout
 
 ```
-README.md  ·  LICENSE  ·  Images/
+README.md  ·  CHANGELOG.md  ·  LICENSE  ·  Images/
+CONTRIBUTING.md  ·  CODE_OF_CONDUCT.md  ·  SECURITY.md  ·  SUPPORT.md
 
+docs/              DATA-DICTIONARY.md  ·  PERMISSIONS.md   ← cross-path reference
 1. Local CSV/      Local CSV.pbit  ·  sample-data/   ← start here, fabricated demo dataset
 2. SharePoint/     SharePoint.pbit  ·  scripts/  ·  azure-container/
 3. Fabric/         Fabric.pbit  ·  docs/  ·  flows/  ·  notebooks/  ·  pipelines/
+     docs/              Fabric-only notes: ingestion, storage modes, troubleshooting, checker pack
      archive/extended/  archived Copilot Studio add-on reference (core notebook mirrors still synchronized)
      archive/flows/     archived cost-consumption flows and guides, not active setup
 4. Power Automate + Dataverse/  Power Automate + Dataverse.pbit  ·  scripts/  ·  source-map.json
 archive/           superseded versions — kept for reference, not maintained
+tests/             offline pytest regressions, run in CI by .github/workflows/tests.yml
 
 Dataverse path → companion repo: microsoft/AgentEvaluator-for-Copilot-Studio
 ```
-</details>
 
 ---
 
@@ -176,3 +180,26 @@ inside the template.
 
 Built by the Microsoft Copilot Growth & ROI practice, building on the structure of the community
 AI‑in‑One Dashboard. Licensed **MIT** — see [LICENSE](LICENSE).
+
+---
+
+## 🔗 Project links
+
+| | |
+|---|---|
+| **Getting help** | [SUPPORT.md](SUPPORT.md) · [open an issue](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues) |
+| **Reporting a vulnerability** | [SECURITY.md](SECURITY.md) — please don't use public issues |
+| **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
+| **What changed** | [CHANGELOG.md](CHANGELOG.md) |
+| **Reference** | [Data dictionary](docs/DATA-DICTIONARY.md) · [Roles & permissions](docs/PERMISSIONS.md) |
+
+**Running the tests.** The offline regression suite needs only Python 3.12 and `pytest`:
+
+```bash
+python -m pip install pytest
+python -m pytest tests -q
+```
+
+It runs on every pull request via
+[`.github/workflows/tests.yml`](.github/workflows/tests.yml). No tenant, credentials or Spark
+cluster required — the suite is deliberately offline.

@@ -1,4 +1,4 @@
-# 4. Power Automate + Dataverse
+# 4. Power Automate + Dataverse — preview: the same dashboard, Dataverse as the core transport
 
 **Additional preview pathway, same ValueLens dashboard.** The original Local CSV,
 SharePoint and Fabric templates are unchanged. This template reads its required
@@ -22,45 +22,24 @@ Compatible CopilotInteractionLogging collector package, with local raw-retention
 Optional: compatible SharePointAgentLogging -> Dataverse SharePoint-agent inventory
 ```
 
-## 📚 Dashboard pages
+**Jump to:** [Who it's for](#-who-its-for) · [Prerequisites](#-prerequisites) ·
+[Setup](#-setup) · [Dashboard pages](#-dashboard-pages) ·
+[Troubleshooting](#-troubleshooting) · [Related paths & reference](#-related-paths--reference)
 
-<details>
-<summary>12 report pages — Dataverse core signals, with separate optional agent enrichment</summary>
+---
 
-These are the pages in the shipped preview template, not a promise that every optional
-signal is collected by Power Automate:
+## 👤 Who it's for
 
-| Page | Purpose / source |
-|---|---|
-| **📘 Introduction: Key Concepts** | Methodology and key-concept explainers |
-| **◆ Activation** | Licensed vs unlicensed, active vs inactive users |
-| **🎯 Readiness** | Upgrade-priority signals |
-| **📡 Adoption** | User counts, coverage and reach |
-| **🌱 Power Users** | Usage maturity and behaviour-stage progression |
-| **🔮 Activity** | Copilot and agent usage, tasks and behaviour mix |
-| **🚀 Value** | Hours saved, assisted value and business case |
-| **🛡 Agent Health (A365)** | Agent inventory / health signals; Agent 365 enrichment needs the **optional, separate SharePoint CSV** |
-| **📈 Heatmap** | Activity across the reporting period |
-| **🏅 Leaderboard** | Top users, agents and functions |
-| **📘 Appendix: Glossary** | Metric definitions and research sources |
-| **🧬 Appendix: Signal Table** | Trace raw signals through to value |
+You want a **Dataverse-backed** pathway — typically because a compatible Power Automate
+collector solution already runs in your tenant and you'd rather keep the audit records there
+than in SharePoint CSVs or a Lakehouse. Expect to run a scheduled Python/PowerShell refresh
+runner alongside it, and to advance the snapshot parameter by hand. This is a **preview**:
+if you want the settled, supported routes, use [2. SharePoint](../2.%20SharePoint/) or
+[3. Fabric](../3.%20Fabric/).
 
-The curated Dataverse snapshot supplies core interactions and users/licences; it does
-**not** manufacture Agent 365 telemetry, transcript outcomes or billing credits.
-Optional SharePoint-agent inventory enriches observed agent identity, not agent health.
-Registry-only Agent 365 data is not an observability export — see the
-[source contract](../3.%20Fabric/docs/DATA-DICTIONARY.md#4-agents_365) and this path's
-[source map](source-map.json).
+---
 
-The model retains optional cost-consumption and feedback inputs, but this packaged
-report has **no Credit Meter / Consumption or Feedback page**. Its page list therefore
-differs from the current SharePoint template; supplying those inputs does not create
-the missing pages. The wider layout-parity claim in Development below should not be
-read as an exact page-count guarantee.
-
-</details>
-
-## Collector package compatibility
+## 🧩 Collector package compatibility
 
 The local package adapter **extends a separately supplied authorized interaction
 collector package**: it retains the existing audit query, polling, pagination,
@@ -84,7 +63,9 @@ See [NOTICE.md](NOTICE.md) for component-boundary guidance and
 [source-map.json](source-map.json) for required sources, optional sources and
 unsupported signals.
 
-## Prerequisites
+---
+
+## ✅ Prerequisites
 
 | Component | Required configuration |
 |---|---|
@@ -100,7 +81,9 @@ unsupported signals.
 Use commercial-cloud `https://<org>.crm[region].dynamics.com` environment origins.
 Sovereign-cloud endpoints are not supported by the current runner.
 
-## Setup
+---
+
+## 🛠 Setup
 
 Run commands from this pathway's `scripts` directory. Paths below are examples;
 keep private solution packages, deployment settings, credentials and tenant data
@@ -269,7 +252,7 @@ environment variables and connections, then run its backfill. Enable
 `Include SharePoint agent inventory` in the PBIT afterward. If explicitly enabled
 but absent or invalid, the inventory query fails rather than hiding the problem.
 
-## Scheduling, security and limits
+### Scheduling, security and limits
 
 - Schedule the collector first, then the refresh runner after collection succeeds.
   **The runner does not update Power BI parameters or trigger a report refresh.**
@@ -296,7 +279,83 @@ but absent or invalid, the inventory query fails rather than hiding the problem.
 - Agent 365 catalogue, Copilot Studio health and billing/consumption sources remain
   separate optional evidence. This pathway does not infer those metrics.
 
-## Development
+---
+
+## 📚 Dashboard pages
+
+<details>
+<summary>12 report pages — Dataverse core signals, with separate optional agent enrichment</summary>
+
+These are the pages in the shipped preview template, not a promise that every optional
+signal is collected by Power Automate:
+
+| Page | Purpose / source |
+|---|---|
+| **📘 Introduction: Key Concepts** | Methodology and key-concept explainers |
+| **◆ Activation** | Licensed vs unlicensed, active vs inactive users |
+| **🎯 Readiness** | Upgrade-priority signals |
+| **📡 Adoption** | User counts, coverage and reach |
+| **🌱 Power Users** | Usage maturity and behaviour-stage progression |
+| **🔮 Activity** | Copilot and agent usage, tasks and behaviour mix |
+| **🚀 Value** | Hours saved, assisted value and business case |
+| **🛡 Agent Health (A365)** | Agent inventory / health signals; Agent 365 enrichment needs the **optional, separate SharePoint CSV** |
+| **📈 Heatmap** | Activity across the reporting period |
+| **🏅 Leaderboard** | Top users, agents and functions |
+| **📘 Appendix: Glossary** | Metric definitions and research sources |
+| **🧬 Appendix: Signal Table** | Trace raw signals through to value |
+
+The curated Dataverse snapshot supplies core interactions and users/licences; it does
+**not** manufacture Agent 365 telemetry, transcript outcomes or billing credits.
+Optional SharePoint-agent inventory enriches observed agent identity, not agent health.
+Registry-only Agent 365 data is not an observability export — see the
+[source contract](../docs/DATA-DICTIONARY.md#4-agents_365) and this path's
+[source map](source-map.json).
+
+The model retains optional cost-consumption and feedback inputs, but this packaged
+report has **no Credit Meter / Consumption or Feedback page**. Its page list therefore
+differs from the current SharePoint template; supplying those inputs does not create
+the missing pages. The wider layout-parity claim in Development below should not be
+read as an exact page-count guarantee.
+
+</details>
+
+---
+
+## 🩺 Troubleshooting
+
+<details>
+<summary><strong>Common symptoms and fixes</strong></summary>
+
+| Symptom | Fix |
+|---|---|
+| The PBIT refuses to load a snapshot | The three core queries require the **same immutable run ID** with consistent row counts. Point `Core Snapshot ID` at a run that completed successfully; missing, incomplete or count-inconsistent snapshots are rejected by design. |
+| Dashboard doesn't move after a scheduled runner run | Expected. The runner does **not** update Power BI parameters or trigger a refresh. Set `Core Snapshot ID` to the newly completed run, then refresh. |
+| A Dataverse write fails on a large record | Payloads above the 1,048,576-character Dataverse memo limit fail rather than truncate. |
+| Snapshot contains partial or duplicated windows | Pin the bridge with `-SourceRunId` / `-RawStartUtc` / `-RawEndUtc` to a **completed** collector run, and check the collector's terminal status and page/write results first. |
+| Agent inventory query fails | `Include SharePoint agent inventory` is enabled but the optional solution is absent or invalid. It fails rather than hiding the problem — either import the inventory solution or set the parameter back to `false`. |
+| Graph or Dataverse calls rejected | Consent to Graph does **not** grant Dataverse access. Check the runner's application user and its privileges separately — see [`/docs/PERMISSIONS.md`](../docs/PERMISSIONS.md). |
+| Sovereign-cloud endpoint rejected | Not supported by the current runner. Use a commercial-cloud `https://<org>.crm[region].dynamics.com` origin. |
+
+</details>
+
+---
+
+## ➡️ Related paths & reference
+
+| Path | When you'd go there instead |
+|---|---|
+| [1. Local CSV](../1.%20Local%20CSV/) | You want to see the dashboard working in two minutes, no tenant needed. |
+| [2. SharePoint](../2.%20SharePoint/) | Settled scheduled refresh on Power BI Pro. This path keeps it as an explicit fallback. |
+| [3. Fabric](../3.%20Fabric/) | Fabric capacity, Lakehouse ingestion at scale — the recommended route. |
+
+Reference:
+
+- [`NOTICE.md`](NOTICE.md) — component-boundary guidance
+- [`source-map.json`](source-map.json) — required sources, optional sources, unsupported signals
+- [`/docs/DATA-DICTIONARY.md`](../docs/DATA-DICTIONARY.md) — the shared source contract
+- [`/docs/PERMISSIONS.md`](../docs/PERMISSIONS.md) — least-privilege grants
+
+### Development
 
 Rebuild from the current SharePoint template:
 
