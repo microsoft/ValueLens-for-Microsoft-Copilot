@@ -7,7 +7,7 @@ Use it to smoke-test the lander before pointing it at a production export:
 
 1. Upload it to your Lakehouse at `Files/org_workday/`.
 2. Open `Copilot_Org_Data_Workday_Lander.ipynb`, set `MODE = 'standalone'` and
-   `ALLOW_EMPTY_SNAPSHOT = False`, then Run all.
+   `OUTPUT_TABLE = 'dbo.copilot_org_data_sample'`, then Run all.
 3. Confirm the run reports 5 rows and an `Organization` split across
    `Customer` / `Business Strategy & Delivery` / `Risk` / `Technology`.
 
@@ -22,6 +22,6 @@ The row set deliberately covers the cases the notebook has to handle:
 |---|---|
 | `avery.diaz` | the ordinary case |
 | `blake.nkemi` | a contingent worker (`Worker_Type` / `Worker_SubType` split) |
-| `casey.obrien` | `On_Leave = 1` → `IsOnLeave = TRUE`, and `accountEnabled = False` in standalone mode |
+| `casey.obrien` | `On_Leave = 1` → `IsOnLeave = TRUE`; unavailable Entra `accountEnabled` remains null |
 | `dana.whitfield` | a **quoted** `Job_Profile` containing a comma — proves the CSV parser options are right |
 | `elliot.marsh` | a second worker in the same `Job_Family_Group`, so the `Organization` grouping is non-trivial |

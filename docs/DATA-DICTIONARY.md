@@ -140,13 +140,18 @@ officeLocation, city, country, accountEnabled, managerUPN
 **Join key:** `PersonId` = **userPrincipalName (UPN)** — used by the **Audit Logs** path
 (`Audit_UserId → PersonId`). `id` (AAD object id) is also emitted for downstream joins.
 
-#### Optional Workday / HRIS overlay
+#### Optional Workday / HRIS enrichment or standalone source
 
 `Copilot_Org_Data_Workday_Lander` ([`notebooks/optional/workday-org-data/`](../3.%20Fabric/notebooks/optional/workday-org-data/README.md))
-overlays a Workday worker extract from `Files/org_workday/` onto
-the Entra snapshot above, joining on **work email → `PersonId_Normalized`**. Entra supplies the
-manager hierarchy; Workday supplies the HR attributes Entra doesn't carry. It is an **optional
-edge-case add-on**, not part of the core path.
+lands a worker extract from `Files/org_workday/` as a user-level org table. Default `MODE='auto'`
+uses additive enrichment if `BASE_TABLE` exists, or standalone mode if it is absent. An invalid
+existing baseline is rejected, not silently replaced. It remains an optional source, not a
+required step in the core pipeline.
+
+Enrichment joins normalized **work email to `PersonId`** and preserves every existing baseline
+column and value, including blank attributes and the Entra hierarchy. Only new column names are
+added; comparisons ignore case and account for output-name sanitization. Workday-only people are
+excluded. A user ID that is not an email needs an explicit upstream mapping.
 
 ```
 Job_Profile, Job_Family, Job_Family_Group, Persona, Compensation_Grade,
@@ -154,18 +159,27 @@ Worker_Type, Worker_SubType, On_Leave, IsOnLeave, sub_Country,
 Function, Location, primaryWorkEmail, OrgData_Source
 ```
 
-The PBIT's org query keeps every source column, so these arrive in the model as slicer-ready fields
-with no report edit. `Function` and `Location` are already model-declared columns, so they populate
-existing visuals directly. `OrgData_Source` records which path produced the row
-(`workday:enrich` / `workday:standalone`).
+The PBIT's org query reads `copilot_org_data`; its existing `Audit_UserId` to `PersonId` relationship
+connects matching users to interactions after refresh. This notebook does not create new model
+relationships. Review the refreshed schema before using additional columns in visuals.
+Existing baseline metadata is preserved rather than relabelled as Workday data.
 
-`Organization` is overlaid from `ORGANIZATION_SOURCE` (default `Job_Family_Group`) and `JobTitle`
-from `Job_Profile`; both **coalesce** rather than replace, so a worker missing from the Workday file
-keeps their Entra value instead of going blank.
+Enrichment adds absent source columns without interpreting differently named Workday fields as
+Entra attributes. No existing field is overwritten or filled, even if its Entra value is null.
+This intentionally changes the earlier lander's Workday-precedence behavior. The safe default
+output is `dbo.copilot_org_data_workday_preview`; publishing to the model requires explicitly
+selecting `dbo.copilot_org_data` and allowing baseline overwrite when it is also the input.
 
-> **Order matters on every run.** `Copilot_Org_Data_Direct_Ingester` writes `copilot_org_data` with
-> `mode('overwrite')`, so it drops the Workday columns. Run the Graph ingester first, then the
-> Workday lander, then refresh the model.
+Standalone mode needs no Entra input. It uses Workday work email for `PersonId` and
+`PersonId_Normalized`, retains the extract's attributes, and supplies canonical nullable columns
+where unavailable. Only standalone mode supplies missing canonical mappings such as `JobTitle`
+from `Job_Profile`. It does not invent a manager hierarchy or a matching audit identity.
+
+> **Refresh behavior:** run the Graph ingester first, then this lander, then refresh the model.
+> Alternatively keep a separate fresh Graph baseline and enriched output. Additive enrichment
+> against yesterday's enriched table preserves yesterday's already-existing Workday columns.
+> For recurring no-Entra refreshes, explicitly choose `MODE='standalone'`: auto checks table
+> existence and would otherwise see the table created by its first standalone run.
 
 ---
 

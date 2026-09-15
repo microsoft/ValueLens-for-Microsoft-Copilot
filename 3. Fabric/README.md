@@ -156,7 +156,7 @@ recorded in [`CHANGELOG.md`](../CHANGELOG.md).
 | Agents 365 CSV fallback | `notebooks/Copilot_Agent365_Lander.ipynb` | Manual/export fallback. The shipped pipeline invokes this branch. |
 | Product feedback | `notebooks/Copilot_ProductFeedback_Ingester.ipynb` | Reads landed files from `Files/product_feedback/`; safe overwrite snapshot only. |
 | Cowork / Work IQ consumption | `notebooks/Copilot_Cost_Consumption_Ingester.ipynb` | Optional export-only source; landing flows and guides are [archived reference](archive/flows/COST-CONSUMPTION.md), not active setup. |
-| Workday / HRIS org attributes | [`notebooks/optional/workday-org-data/`](notebooks/optional/workday-org-data/README.md) | Edge case. Enriches `copilot_org_data` in place with job family / persona / worker type, joining on work email. Must run **after** `Copilot_Org_Data_Direct_Ingester`, which overwrites that table. |
+| Workday / HRIS org attributes | [`notebooks/optional/workday-org-data/`](notebooks/optional/workday-org-data/README.md) | Optional. Adds only missing columns to an existing org snapshot, joining on work email; existing Entra values remain authoritative. Can also land a standalone user-level org table without Entra. For enrichment, run after a fresh Graph org ingestion; for recurring HRIS-only refreshes, use explicit standalone mode. |
 
 The former [Copilot Studio add-on](archive/extended/Fabric%20+%20Copilot%20Studio/README.md)
 for transcripts and PPAC credit detail is archived reference, not a recommended active deployment.
