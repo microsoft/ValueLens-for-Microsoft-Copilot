@@ -221,6 +221,19 @@ would fail with `AMBIGUOUS_REFERENCE`.
 Switching the flag rewrites the table with a new schema, so run it against a scratch table first
 and confirm your report still refreshes before changing the value feeding `dbo.agents_365`.
 
+### Long runs and Graph token expiry
+
+The snapshot issues one Graph call per package, so on a large tenant the run can last longer
+than the lifetime of a single app-only token (commonly ~60 minutes). The notebook therefore
+caches its token against the `expires_in` the token endpoint returns, renews it a few minutes
+early, and retries any call once with a freshly minted token if Graph rejects it with `401`.
+No manual re-authentication or re-run is needed.
+
+Because of that retry, a `401` that still reaches you is **not** an expiry problem — it means
+the app registration genuinely lacks admin-consented `CopilotPackages.Read.All`,
+`Application.Read.All` and `User.Read.All`. A `403` on the catalog means the tenant has no
+Agent 365 licence.
+
 ## Optional — product feedback &amp; Cowork / Work IQ credit consumption
 
 | Notebook | Output table | Feeds | Gated by |
