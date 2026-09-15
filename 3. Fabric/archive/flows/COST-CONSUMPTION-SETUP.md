@@ -181,5 +181,5 @@ The ingester and column contract are stable regardless of where MAC hides the ex
 *Related: [archived credit-consumption flow README](../extended/Fabric%20+%20Copilot%20Studio/flows/README.md) (shared landing setup) ·
 [`COST-CONSUMPTION.md`](COST-CONSUMPTION.md) (column contract + model wiring) ·
 [`3. Fabric/docs/OPTIONAL-SOURCES.md`](../../docs/OPTIONAL-SOURCES.md) (how optional sources stay "green"
-when absent) · [`3. Fabric/docs/DATA-DICTIONARY.md`](../../docs/DATA-DICTIONARY.md) (column reference) ·
+when absent) · [`docs/DATA-DICTIONARY.md`](../../../docs/DATA-DICTIONARY.md) (column reference) ·
 [archived Copilot Studio credit guide](../extended/Fabric%20+%20Copilot%20Studio/CREDIT-CONSUMPTION-SETUP.md) (the different, PPAC-side credit guide).*
