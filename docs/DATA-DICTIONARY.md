@@ -273,7 +273,13 @@ JSON-serialised).
 
 **It ships `False`, on purpose.** The PBIT's `Agents 365` query has no `Table.SelectColumns` — it is
 purely additive — so every extra Delta column lands in the semantic model as an unmodelled field.
-Turn it on only when you're deliberately exploring the payload, and expect ~30 extra columns.
+Turn it on only when you're deliberately exploring the payload. Measured against a 469-agent
+tenant the table goes from **48 to 80 columns** (41 raw additions). Only `appId`, `assetId`,
+`requestType`, `requestStatus`, `manifestId` and `governanceMetadata` are reachable *exclusively*
+through the flag, and all six were empty in that tenant; the rest duplicate columns you already
+have. Note also that `allowedUsersAndGroups`, `acquireUsersAndGroups` and `sharedWithUsersAndGroups`
+carry user and group identifiers, so enabling this permanently is a privacy review decision rather
+than a display preference. `Agent creator UPN` is canonical and is **not** gated by this flag.
 
 Where a raw key collides case-insensitively with a canonical column (e.g. `version` vs `Version`,
 `categories` vs `Categories`), the canonical column wins; the raw value is kept under `<key>_raw`

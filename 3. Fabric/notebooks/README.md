@@ -177,6 +177,50 @@ Both notebooks feed the **Agents 365** page and write the **same** `dbo.agents_3
 | `Copilot_Agent365_Registry_Ingester` | `agents_365` | **Default notebook.** GA, app-only ingester (`CopilotPackages.Read.All` + `Application.Read.All` + `User.Read.All`). Rejects missing `Title ID` rows and conflicting duplicates before overwrite. Resolves **`Agent creator UPN`** via a 3-tier chain and can optionally pass the raw API payload through. |
 | `Copilot_Agent365_Lander` | `agents_365` | **Fallback notebook.** CSV lander for `Files/agent365/agents.csv`. The shipped pipeline JSON currently uses this branch when `EnableAgent365 = true`. |
 
+### Raw API passthrough (`INCLUDE_RAW_PASSTHROUGH`) — registry ingester
+
+Set in the first configuration cell of `Copilot_Agent365_Registry_Ingester`; it ships `False`.
+
+```python
+INCLUDE_RAW_PASSTHROUGH = True
+```
+
+`False` writes the shaped columns only: the canonical Admin Center schema plus the handful of
+API-only fields the model declares. Fields the model does not declare are **dropped**. `True`
+additionally carries **every** field the API returned under its raw API name, with nested
+objects and arrays JSON-serialised.
+
+Measured against a real tenant of 469 agents, the difference is **48 columns → 80 columns**.
+Only six fields are reachable *exclusively* through the flag — `appId`, `assetId`, `requestType`,
+`requestStatus`, `manifestId`, `governanceMetadata` — and all six were empty in that tenant.
+Everything else the flag adds is a raw duplicate of a column you already have.
+
+**`Agent creator UPN` is not one of them.** It is a canonical column produced by the 3-tier
+resolver and is present either way; you do not need the flag to join agents to org data.
+
+Turn it on when you are deliberately exploring the payload or chasing a field the model does not
+yet map. Consider before leaving it on permanently:
+
+- **Identity exposure.** `allowedUsersAndGroups`, `acquireUsersAndGroups` and
+  `sharedWithUsersAndGroups` carry user and group identifiers into the Delta table, and the
+  PBIT's `Agents 365` query is purely additive — it has no `Table.SelectColumns`, so every extra
+  column lands in the semantic model and in every report author's field list. Treat this as a
+  privacy review item, not a display preference.
+- **Payload bulk.** `elementDetails` is the full agent definition as JSON on every row.
+- **Zero versus blank.** Shaped numeric columns render a genuine `0` as blank (`str(x or '')`),
+  while the raw copy keeps `"0"`. Counts of "populated" rows therefore differ between the two for
+  the same underlying data — in that 469-agent tenant, `Active Users` read 2 populated against
+  `activeUsers` at 465, purely because 463 agents have zero usage. Neither is wrong; do not read
+  the gap as data loss.
+
+Where a raw key collides case-insensitively with a canonical column (`version` vs `Version`,
+`categories` vs `Categories`), the canonical column wins and the raw value is kept as `<key>_raw`
+only when it genuinely differs. Spark resolves names case-insensitively, so without this the write
+would fail with `AMBIGUOUS_REFERENCE`.
+
+Switching the flag rewrites the table with a new schema, so run it against a scratch table first
+and confirm your report still refreshes before changing the value feeding `dbo.agents_365`.
+
 ## Optional — product feedback &amp; Cowork / Work IQ credit consumption
 
 | Notebook | Output table | Feeds | Gated by |

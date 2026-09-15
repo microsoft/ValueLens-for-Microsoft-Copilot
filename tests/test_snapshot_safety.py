@@ -42,6 +42,16 @@ def extract(name, index, *, functions=(), assigns=(), import_names=None):
                 selected.append(node)
         elif isinstance(node, ast.FunctionDef) and node.name in set(functions):
             selected.append(node)
+    missing = (set(functions) | set(assigns)) - {
+        node.name if isinstance(node, ast.FunctionDef) else target.id
+        for node in selected
+        for target in (getattr(node, "targets", None) or [node])
+        if isinstance(node, ast.FunctionDef) or isinstance(target, ast.Name)
+    }
+    if missing:
+        raise AssertionError(
+            f"{name} cell {index} does not define {sorted(missing)}; cell indices have drifted."
+        )
     namespace = {}
     exec(compile(ast.Module(body=selected, type_ignores=[]), f"{name}:cell{index}", "exec"), namespace)
     return namespace
@@ -135,7 +145,7 @@ class SnapshotSafetyTests(unittest.TestCase):
                 ]
             )
 
-    def test_registry_helpers_reject_malformed_pages_details_and_duplicate_keys(self):
+    def test_registry_helpers_validate_pages_tolerate_bad_elements_and_reject_duplicate_keys(self):
         page = extract(
             "Copilot_Agent365_Registry_Ingester.ipynb",
             4,
@@ -147,14 +157,31 @@ class SnapshotSafetyTests(unittest.TestCase):
 
         shape = extract(
             "Copilot_Agent365_Registry_Ingester.ipynb",
-            6,
-            functions=("_normalise_registry_key", "_elements", "_dedupe_registry_rows"),
+            11,
+            functions=(
+                "_normalise_registry_key",
+                "_note_element_skip",
+                "_elements",
+                "_dedupe_registry_rows",
+            ),
+            assigns=("_ELEMENT_SKIPS",),
             import_names=("_json",),
         )
-        with self.assertRaisesRegex(ValueError, "Invalid elementDetails JSON"):
+        shape.setdefault("_json", json)
+        # A malformed publisher payload must be counted and skipped, never fatal:
+        # one bad element used to discard the entire tenant snapshot.
+        self.assertEqual(
             shape["_elements"](
                 {"elementDetails": [{"elementType": "command", "elements": [{"definition": "{"}]}]}
-            )
+            ),
+            ("command", "", ""),
+        )
+        self.assertEqual(shape["_elements"]({"elementDetails": "not-a-list"}), ("", "", ""))
+        self.assertEqual(
+            shape["_elements"]({"elementDetails": [{"elementType": "x", "elements": "bad"}, "bad"]}),
+            ("x", "", ""),
+        )
+        self.assertEqual(sum(shape["_ELEMENT_SKIPS"].values()), 4)
         with self.assertRaisesRegex(ValueError, "Conflicting Agent 365 rows"):
             shape["_dedupe_registry_rows"](
                 [
@@ -163,7 +190,29 @@ class SnapshotSafetyTests(unittest.TestCase):
                 ]
             )
 
-    def test_feedback_snapshot_helpers_preserve_existing_and_reject_unsafe_append(self):
+    def test_audit_creator_tier_detects_this_repos_own_audit_column_names(self):
+        # The curated audit table this notebook reads exposes Audit_UserId / AgentId /
+        # CreationDate. If tier 3's candidate lists miss them, creator resolution
+        # silently degrades to "UNATTRIBUTED" on every real tenant.
+        source = code_from_cell("Copilot_Agent365_Registry_Ingester.ipynb", 8)
+        tree = ast.parse(source)
+        resolver = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "_audit_creator_map"
+        )
+        candidates = [
+            {element.value.lower() for element in node.elts if isinstance(element, ast.Constant)}
+            for node in ast.walk(resolver)
+            if isinstance(node, ast.Tuple)
+        ]
+        for column in ("audit_userid", "agentid", "creationdate"):
+            self.assertTrue(
+                any(column in group for group in candidates),
+                f"tier 3 cannot detect the audit column {column}",
+            )
+
+
         ns = extract(
             "Copilot_ProductFeedback_Ingester.ipynb",
             8,
