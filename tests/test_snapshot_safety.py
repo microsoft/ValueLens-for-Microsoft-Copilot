@@ -326,5 +326,162 @@ class SnapshotSafetyTests(unittest.TestCase):
         )
 
 
+class FakeResponse:
+    def __init__(self, status_code=200, payload=None):
+        self.status_code = status_code
+        self._payload = payload or {}
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise AssertionError(f"HTTP {self.status_code}")
+
+    def json(self):
+        return self._payload
+
+
+class FakeRequests:
+    """Minimal stand-in for the requests module - records every call."""
+
+    def __init__(self, token_lifetime=3600, statuses=None):
+        self.token_lifetime = token_lifetime
+        self.statuses = list(statuses or [])
+        self.minted = []
+        self.calls = []
+
+    def post(self, url, data=None, timeout=None):
+        self.minted.append(data)
+        return FakeResponse(
+            200,
+            {
+                "access_token": f"token-{len(self.minted)}",
+                "expires_in": self.token_lifetime,
+            },
+        )
+
+    def request(self, method, url, headers=None, **kwargs):
+        self.calls.append((method, url, dict(headers or {})))
+        status = self.statuses.pop(0) if self.statuses else 200
+        return FakeResponse(status)
+
+
+class FakeClock:
+    def __init__(self):
+        self.now = 1_000.0
+
+    def time(self):
+        return self.now
+
+
+class Agent365TokenRefreshTests(unittest.TestCase):
+    """The registry ingester must survive a token expiring mid-snapshot.
+
+    A full snapshot issues one Graph request per package, so a large tenant can run
+    past the ~60 minute lifetime of a client-credentials token. Minting once at the
+    top of the notebook made every later call fail with 401.
+    """
+
+    NOTEBOOK = "Copilot_Agent365_Registry_Ingester.ipynb"
+
+    def build(self, token_lifetime=3600, statuses=None):
+        ns = extract(
+            self.NOTEBOOK,
+            2,
+            functions=("_get_graph_token", "graph_headers", "graph_request"),
+            assigns=("_TOKEN_CACHE",),
+            import_names=set(),
+        )
+        fake = FakeRequests(token_lifetime=token_lifetime, statuses=statuses)
+        clock = FakeClock()
+        ns.update(
+            requests=fake,
+            time=clock,
+            TENANT_ID="tenant",
+            CLIENT_ID="client",
+            CLIENT_SECRET="secret",
+        )
+        return ns, fake, clock
+
+    def test_token_is_cached_rather_than_reminted_per_call(self):
+        ns, fake, _ = self.build()
+        first = ns["_get_graph_token"]()
+        second = ns["_get_graph_token"]()
+        self.assertEqual(first, second)
+        self.assertEqual(len(fake.minted), 1)
+
+    def test_token_is_reminted_once_the_cached_one_goes_stale(self):
+        ns, fake, clock = self.build(token_lifetime=3600)
+        self.assertEqual(ns["_get_graph_token"](), "token-1")
+        # Still inside the lifetime, minus the early-renewal margin.
+        clock.now += 3000
+        self.assertEqual(ns["_get_graph_token"](), "token-1")
+        self.assertEqual(len(fake.minted), 1)
+        # Past the renewal point: a long snapshot must not keep using the old token.
+        clock.now += 600
+        self.assertEqual(ns["_get_graph_token"](), "token-2")
+        self.assertEqual(len(fake.minted), 2)
+
+    def test_short_lived_token_still_gets_a_usable_cache_window(self):
+        ns, fake, clock = self.build(token_lifetime=60)
+        ns["_get_graph_token"]()
+        clock.now += 30
+        ns["_get_graph_token"]()
+        self.assertEqual(len(fake.minted), 1, "margin must not force a mint per call")
+
+    def test_graph_request_retries_once_with_a_fresh_token_on_401(self):
+        ns, fake, _ = self.build(statuses=[401, 200])
+        response = ns["graph_request"]("GET", "https://graph.microsoft.com/v1.0/thing")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(fake.calls), 2)
+        self.assertEqual(len(fake.minted), 2, "retry must mint a new token, not reuse")
+        self.assertEqual(fake.calls[0][2]["Authorization"], "Bearer token-1")
+        self.assertEqual(fake.calls[1][2]["Authorization"], "Bearer token-2")
+
+    def test_graph_request_surfaces_a_persistent_401(self):
+        ns, fake, _ = self.build(statuses=[401, 401])
+        response = ns["graph_request"]("GET", "https://graph.microsoft.com/v1.0/thing")
+        self.assertEqual(response.status_code, 401, "consent failures must stay visible")
+        self.assertEqual(len(fake.calls), 2, "retry exactly once - no infinite loop")
+
+    def test_graph_request_does_not_retry_a_successful_call(self):
+        ns, fake, _ = self.build(statuses=[200])
+        ns["graph_request"]("GET", "https://graph.microsoft.com/v1.0/thing")
+        self.assertEqual(len(fake.calls), 1)
+
+    def test_graph_request_preserves_caller_supplied_headers(self):
+        ns, fake, _ = self.build()
+        ns["graph_request"](
+            "POST",
+            "https://graph.microsoft.com/v1.0/$batch",
+            headers={"Content-Type": "application/json"},
+        )
+        _, _, headers = fake.calls[0]
+        self.assertEqual(headers["Content-Type"], "application/json")
+        self.assertTrue(headers["Authorization"].startswith("Bearer "))
+
+    def test_no_graph_call_bypasses_the_refreshing_wrapper(self):
+        """Any direct requests.get/post outside the token plumbing reintroduces the bug."""
+        allowed = {"_get_graph_token", "graph_request"}
+        offenders = []
+        for index, cell in enumerate(notebook(self.NOTEBOOK)["cells"]):
+            if cell["cell_type"] != "code":
+                continue
+            tree = ast.parse("".join(cell["source"]))
+            enclosing = {}
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    for child in ast.walk(node):
+                        enclosing[child] = node.name
+            for node in ast.walk(tree):
+                func = node.func if isinstance(node, ast.Call) else None
+                if not isinstance(func, ast.Attribute):
+                    continue
+                if not (isinstance(func.value, ast.Name) and func.value.id == "requests"):
+                    continue
+                if enclosing.get(node) in allowed:
+                    continue
+                offenders.append(f"cell {index}: requests.{func.attr} at line {node.lineno}")
+        self.assertEqual(offenders, [], "call Graph through graph_request so the token refreshes")
+
+
 if __name__ == "__main__":
     unittest.main()
