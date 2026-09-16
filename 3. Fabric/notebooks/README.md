@@ -34,14 +34,15 @@ This README focuses on the **current reviewed notebook behaviour** in the base
 |---|---|
 | [`optional/workday-org-data/`](./optional/workday-org-data/README.md) | `copilot_org_data` *(enriched in place)* |
 
-An **edge case**, kept out of the core path. Entra carries the manager hierarchy; a Workday worker
-extract carries the HR attributes (job family, persona, worker type, compensation grade) that Entra
-doesn't. `Copilot_Org_Data_Workday_Lander` joins them on work email and enriches `copilot_org_data`
-in place.
+An optional source, kept out of the core path. `Copilot_Org_Data_Workday_Lander` adds Workday/HRIS
+columns absent from the existing org snapshot, joining on work email. Existing Entra values,
+including blanks, identities, hierarchy and population are preserved. It also supports a standalone
+user-level org table when no Entra snapshot exists; unavailable hierarchy fields stay blank.
 
-Only relevant if you have a Workday (or comparable HRIS) extract. **If you run it, order matters on
-every run** — `Copilot_Org_Data_Direct_Ingester` overwrites `copilot_org_data`, so the lander goes
-after it and before the model refresh. Full setup in the add-on's
+The default `auto` mode checks whether the baseline table exists, failing if an existing baseline
+has an invalid schema. For enrichment, use a fresh Graph baseline each cycle (or separate baseline
+and output tables), then run the lander before model refresh. Without Entra, use explicit
+`standalone` mode for recurring refreshes. Full setup and migration notes in the add-on's
 [README](./optional/workday-org-data/README.md).
 
 ## Reviewed behaviour
