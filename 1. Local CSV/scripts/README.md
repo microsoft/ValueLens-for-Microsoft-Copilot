@@ -114,6 +114,8 @@ The scheduled [`../../2. SharePoint/`](../../2.%20SharePoint/) path accepts the 
 
 ## Keeping the sample data honest
 
-[`../sample-data/Build-SampleData.py`](../sample-data/Build-SampleData.py) mirrors this processor's
-behaviour taxonomy and baseline minutes. If you change the taxonomy or the baselines here, update
-`BASELINE` in the generator too — otherwise the sample dataset drifts from the real pipeline.
+[`../sample-data/Build-SampleData.py`](../sample-data/Build-SampleData.py) **imports this
+processor** and calls its `compute_*` functions (profile `aibv`) for every derived column, rather
+than duplicating the behaviour taxonomy and baseline minutes. Change the taxonomy or the baselines
+here, re-run the generator, and the sample dataset follows — there is no second copy to keep in
+step.

@@ -5,9 +5,9 @@ land before wiring anything up to your own tenant.
 
 | File | Feeds the template parameter | Rows |
 |---|---|---|
-| `copilot_interactions_sample.csv` | **Copilot Interactions File** | ~3,300 |
+| `copilot_interactions_sample.csv` | **Copilot Interactions File** | 3,271 |
 | `copilot_users_sample.csv` | **Org Data File** | 260 |
-| `agents_365_sample.csv` | **Agent 365** *(optional)* | 8 |
+| `agents_365_sample.csv` | **Agent 365** *(optional)* | 50 |
 
 ## Quick start
 
@@ -32,8 +32,31 @@ can confirm by reading the generator rather than by trusting a scrub.
 - No real UPNs, tenant IDs, workspace endpoints, URLs or prompt text
 
 It models a ~260-person company over roughly two months: ~62% licensed, uneven
-adoption (a power-user tail, a long middle, some dormant licences), weekday-heavy
-usage, and eight Copilot Studio agents.
+adoption (a power-user tail, a long middle, some dormant licences) and weekday-heavy
+usage.
+
+## Coverage — the whole Copilot estate
+
+The dataset deliberately spans every surface the template reports on, not just chat,
+so no page loads empty. The 50-agent registry covers five kinds:
+
+| Slice | Share of interactions | What it is |
+|---|---|---|
+| User-led Copilot | ~60% | Licensed Copilot in Word, Outlook, Excel, PowerPoint, Teams — plus unlicensed free Copilot Chat, the licence-upgrade cohort |
+| Copilot Studio | ~16% | 18 custom engine agents published over ServiceNow, Dynamics 365, SAP, Workday, Salesforce, Dataverse and more |
+| Declarative agents | ~13% | 16 Agent Builder / Microsoft 365 Copilot agents |
+| Copilot Cowork | ~5% | 6 skills doing multi-step, multi-app work with human approval |
+| Autonomous agents | ~4% | 5 unattended workflow agents |
+| Microsoft Scout | ~3% | 5 proactive, always-on assistants running outside office hours |
+
+Resulting `Environment` mix: **Licensed ~87% / Unlicensed ~9% / Cowork ~5%** — the same
+three values the template already knows about. Cowork rows are derived the way the
+processor derives them, from `cowork` appearing in the agent name, and Scout appears as
+agent activity under the `Microsoft Scout` app host, so **no new vocabulary is
+introduced and the `.pbit` is untouched**. All 50 agents are exercised.
+
+Cowork and Scout adoption ramps up across the window and is gated per user, rather than
+appearing fully formed on day one.
 
 ## Regenerating
 
@@ -41,6 +64,19 @@ usage, and eight Copilot Studio agents.
 python Build-SampleData.py                          # rewrites the CSVs in this folder
 python Build-SampleData.py --users 500 --days 90    # bigger tenant
 ```
+
+Run it from inside the repo — it imports the production classifier by relative path.
+
+Re-balance the estate mix with:
+
+| Flag | Default | Effect |
+|---|---|---|
+| `--agent-share` | `0.34` | share of licensed interactions handled by agents (declarative / Studio / autonomous) |
+| `--cowork-share` | `0.12` | share handled by Copilot Cowork |
+| `--scout-share` | `0.10` | share handled by Microsoft Scout |
+
+Cowork and Scout shares are additionally scaled by the adoption ramp and by whether the
+user has that surface switched on, so the realised shares are lower than the flags.
 
 Deterministic — the same seed gives byte-identical output, so a regenerated file
 produces an empty diff unless you actually changed something.
@@ -61,19 +97,36 @@ auditable rather than asserted.
 
 ## Also useful as a test fixture
 
-Because the files satisfy the template's full column contract — 56 interaction columns,
+Because the files satisfy the template's full column contract — 55 interaction columns,
 84 org columns, 38 agent columns — they double as a regression fixture for template
 changes. If a model edit breaks the load path, loading this dataset surfaces it without
 needing tenant access.
 
 ## Value model note
 
-`Human_Baseline_Min` is precomputed per row, and the behaviour names and their baseline
-minutes are kept in step with the production classifier in
-[`../scripts/Purview_CopilotInteraction_Processor_v4.0.0.py`](../scripts/).
+The generator **does not re-implement the classification maps**. It imports the
+production classifier —
+[`../scripts/Purview_CopilotInteraction_Processor_v4.0.0.py`](../scripts/) — and calls
+its `compute_*` functions under the `aibv` profile for every derived column:
+`Environment`, `Behavior_Enriched`, `Value_Outcome`, `Usage_Mode`, `Expertise_Role`,
+`Efficiency_Breakdown`, `Autonomy_Pattern`, `Behavior_Source`, `Human_Baseline_Min`,
+`Workflow_Action`, `Web_Grounded_Signal`, `Behavior_Plausible`, `Delegation_Event_Key`,
+`Agent Publish Status` and the rest.
+
+So the sample data **cannot drift from the shipping pipeline**: change the taxonomy or
+the baselines in the processor, re-run the generator, and the CSVs follow. There is no
+duplicated map to keep in step.
+
+Every behaviour the generator emits is a member of the processor's Behavior Value Map,
+so agent rows contribute real modelled hours instead of silently scoring zero. A small
+number of rows carry a blank `Human_Baseline_Min` — those are behaviours the processor
+itself holds outside the BVM bridge (`Email Triage`, `Email Thread Summary`,
+`Spreadsheet Analysis`, `Cross-Org Agent`), and the blank is the correct classifier
+output, not a gap in the fixture.
+
 Hours saved and assisted value therefore compute exactly as they would on real data —
 the totals are fictional, but the arithmetic behind them is the shipping model, not a
 placeholder.
 
-If you change the behaviour taxonomy or the baselines in the processor, update
-`BASELINE` in the generator too, or the sample dataset will drift from the real pipeline.
+`Agent_LinkID` is deliberately not emitted: the template derives it by joining these
+rows to the Agents 365 registry, so shipping it in the CSV breaks the load.
