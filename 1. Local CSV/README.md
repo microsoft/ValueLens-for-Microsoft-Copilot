@@ -73,7 +73,9 @@ lands — *before* you spend any effort on exports or automation.
 That's it. Every page fills in.
 
 The data models a ~260-person company over roughly two months — uneven adoption, a power-user
-tail, some dormant licences, eight Copilot Studio agents. It is **generated, not anonymised**:
+tail, some dormant licences, and a 50-agent estate spanning declarative agents, Copilot Studio
+custom engine agents, autonomous agents, Copilot Cowork and Microsoft Scout. It is
+**generated, not anonymised**:
 see [`sample-data/README.md`](sample-data/README.md) for how, and why that distinction matters.
 
 > The figures are fictional, but the **arithmetic is the shipping value model** — the same
