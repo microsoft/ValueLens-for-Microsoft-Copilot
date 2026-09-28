@@ -43,6 +43,7 @@ const env = found.reduce((acc, file) => ({ ...parseEnvFile(file), ...acc }), {})
 const portal = (env.VITE_FABRIC_PORTAL_URL || '').replace(/\/$/, '');
 const ws = env.VITE_FABRIC_WORKSPACE_ID;
 const item = env.VITE_FABRIC_ITEM_ID;
+const tenant = env.VITE_FABRIC_TENANT_ID;
 const dev = process.env.DEV_URL || 'http://localhost:5173';
 
 if (!portal || !ws || !item) {
@@ -52,7 +53,11 @@ if (!portal || !ws || !item) {
     process.exit(1);
 }
 
-const url = `${portal}/groups/${ws}/appbackends/${item}?experience=power-bi&devUri=${encodeURIComponent(dev)}`;
+// Without ctid the portal single-signs-on with whatever account the OS offers,
+// which lands in the wrong tenant whenever the deployment tenant differs from
+// the signed-in one.
+const ctid = tenant ? `&ctid=${tenant}` : '';
+const url = `${portal}/groups/${ws}/appbackends/${item}?experience=power-bi${ctid}&devUri=${encodeURIComponent(dev)}`;
 
 console.log(`Opening Fabric portal embed → ${url}`);
 console.log('First run: sign in to Microsoft when prompted; cookies persist for the next run.');

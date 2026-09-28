@@ -1,4 +1,4 @@
-﻿EVALUATE
+EVALUATE
 SUMMARIZECOLUMNS(
     'Chat + Agent Interactions (Audit Logs)'[WeekStart],
     "Licensed", [Observed Licensed Sessions per User],

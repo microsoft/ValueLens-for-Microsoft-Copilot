@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import type { ColumnMetadataMap } from "@/lib/to-data-table";
-import { connection, FORMAT_HOURS, FORMAT_RATE, FORMAT_WHOLE } from "../shared";
+import { connection, FORMAT_HOURS, FORMAT_PERCENT, FORMAT_RATE, FORMAT_WHOLE } from "../shared";
 import query from "./adoption-summary.dax?raw";
 
 const columnMetadata: ColumnMetadataMap = {
@@ -21,7 +21,11 @@ const columnMetadata: ColumnMetadataMap = {
     "[Unlicensed SPUW]": { name: "Unlicensed SPUW", displayName: "Unlicensed sessions per user per week", format: FORMAT_RATE },
     "[Agent Users]": { name: "Agent Users", displayName: "Agent users", format: FORMAT_WHOLE },
     "[Agent SPUW]": { name: "Agent SPUW", displayName: "Agent sessions per user per week", format: FORMAT_RATE },
-    "[Agent Return Rate]": { name: "Agent Return Rate", displayName: "Agent return rate", format: FORMAT_RATE },
+    "[Agent Return Rate]": {
+        name: "Agent Return Rate",
+        displayName: "Agent return rate",
+        format: FORMAT_PERCENT,
+    },
     "[Cowork Users]": { name: "Cowork Users", displayName: "Cowork users", format: FORMAT_WHOLE },
     "[Cowork SPUW]": { name: "Cowork SPUW", displayName: "Cowork sessions per user per week", format: FORMAT_RATE },
     "[Cowork Hours Wk]": { name: "Cowork Hours Wk", displayName: "Cowork hours per week", format: FORMAT_HOURS },

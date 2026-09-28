@@ -18,3 +18,10 @@ rayfin/.env
 
 # Local scratch: DAX experiments and captured query output
 tmp-dax/
+
+# Records the Fabric item a deploy created, including a publishable key.
+# Each person deploys into their own workspace, so this stays local.
+rayfin/.deployments.json
+
+# Playwright CLI session state from `npm run test:fabric`
+.playwright-cli/

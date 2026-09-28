@@ -128,7 +128,7 @@ export function AdoptionStage() {
                                             <KpiStat
                                                 label="Return rate"
                                                 value={readNumber(summaryRow, "[Agent Return Rate]")}
-                                                format="rate"
+                                                format="percent"
                                             />
                                         )}
                                     </div>

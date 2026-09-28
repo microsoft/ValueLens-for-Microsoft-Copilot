@@ -1,4 +1,4 @@
-﻿EVALUATE
+EVALUATE
 SUMMARIZECOLUMNS(
     'Chat + Agent Interactions (Audit Logs)'[MonthStart],
     'Stage Legend'[Stage],

@@ -3,20 +3,30 @@
   "width": "container",
   "height": "container",
   "mark": { "type": "area", "interpolate": "monotone", "line": false },
+  "transform": [
+    {
+      "calculate": "toDate(datum['Chat + Agent Interactions (Audit Logs)MonthStart'])",
+      "as": "Month"
+    }
+  ],
   "encoding": {
     "x": {
-      "field": "Chat + Agent Interactions (Audit Logs)MonthStart",
+      "field": "Month",
       "type": "temporal",
       "title": null,
-      "axis": { "format": "%b %y", "tickCount": 6 }
+      "axis": {
+        "format": "%b %Y",
+        "tickCount": { "interval": "month", "step": 1 },
+        "labelAngle": 0
+      }
     },
     "y": {
       "aggregate": "sum",
       "field": "Users",
       "type": "quantitative",
-      "title": "Users",
+      "title": "Share of users",
       "stack": "normalize",
-      "axis": { "format": ".0%" }
+      "axis": { "labelExpr": "format(datum.value, '.0%')" }
     },
     "color": {
       "field": "Stage LegendStage",
@@ -32,7 +42,7 @@
     },
     "tooltip": [
       {
-        "field": "Chat + Agent Interactions (Audit Logs)MonthStart",
+        "field": "Month",
         "type": "temporal",
         "title": "Month",
         "format": "%b %Y"

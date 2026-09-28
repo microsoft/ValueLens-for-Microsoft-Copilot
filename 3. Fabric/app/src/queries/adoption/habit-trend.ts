@@ -40,7 +40,8 @@ export function habitTrend(params?: HabitTrendParams) {
 
     if (params?.scale === "count") {
         vegaLiteSpec.encoding.y.stack = "zero";
-        vegaLiteSpec.encoding.y.axis = { format: ",.0f" };
+        vegaLiteSpec.encoding.y.title = "Users";
+        vegaLiteSpec.encoding.y.axis = { labelExpr: "format(datum.value, ',.0f')" };
     }
 
     return { connection, query, columnMetadata, vegaLiteSpec: vegaLiteSpec as unknown as VisualizationSpec };
@@ -49,6 +50,6 @@ export function habitTrend(params?: HabitTrendParams) {
 /** Narrow view of the spec covering only the parts this factory rewrites. */
 interface MutableSpec {
     encoding: {
-        y: { stack: string; axis: { format: string } };
+        y: { stack: string; title: string; axis: { labelExpr: string } };
     };
 }

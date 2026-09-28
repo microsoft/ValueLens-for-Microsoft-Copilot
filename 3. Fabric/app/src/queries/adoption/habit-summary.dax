@@ -1,4 +1,4 @@
-﻿EVALUATE
+EVALUATE
 ROW(
     "Power", [Power Users, Last Month], "Power Pct", [Power Users %, Last Month],
     "Habitual", [Habitual Users, Last Month], "Habitual Pct", [Habitual Users %, Last Month],

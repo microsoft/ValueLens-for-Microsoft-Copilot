@@ -85,7 +85,13 @@ describe("adoption query contract", () => {
     });
 
     it.each(modules)("$name ships a non-empty DAX query", ({ factory }) => {
-        expect(factory().query.trim()).toMatch(/^EVALUATE/);
+        const raw = factory().query;
+        // `trim()` treats U+FEFF as whitespace, so the BOM has to be checked on
+        // the raw string — it survives Vite's ?raw import and would otherwise be
+        // sent to the query service as part of the statement.
+        expect(raw.charCodeAt(0)).not.toBe(0xfeff);
+        expect(raw.trim()).toMatch(/^(EVALUATE|DEFINE)\b/);
+        expect(raw).toContain("EVALUATE");
     });
 });
 
@@ -113,6 +119,31 @@ describe("adoption spec field references", () => {
     it("leaves no unsubstituted placeholders in the org spec", () => {
         const serialized = JSON.stringify(activationByOrg().vegaLiteSpec);
         expect(serialized).not.toMatch(/__[A-Z]+__/);
+    });
+
+    // DAX returns dates as ISO strings. Vega-Lite's `timeUnit` does not parse
+    // them, so every point collapses onto one x position and the marks render
+    // with empty geometry - a failure no type check or unit test can see.
+    // Dates must be converted with an explicit `toDate` calculate transform.
+    it.each(specModules)("$name never relies on timeUnit to parse dates", ({ factory }) => {
+        const serialized = JSON.stringify(factory().vegaLiteSpec);
+        expect(serialized).not.toMatch(/"timeUnit"/);
+    });
+
+    it("derives the habit trend month with an explicit date conversion", () => {
+        const spec = habitTrend().vegaLiteSpec as {
+            transform: { calculate?: string; as?: string }[];
+            encoding: { x: { field: string; type: string } };
+        };
+        const monthField = spec.encoding.x.field;
+
+        expect(spec.encoding.x.type).toBe("temporal");
+        expect(
+            spec.transform.some(
+                (step) => step.as === monthField && step.calculate?.includes("toDate("),
+            ),
+            `x field "${monthField}" must come from a toDate transform`,
+        ).toBe(true);
     });
 
     it("drops the colour legend when a single series is plotted", () => {
