@@ -226,8 +226,8 @@ is **not** stored in the task. (Secretless managed-identity scheduling is WIP �
 | **🛡 Agent Registry** | Agent catalogue, tenant builds and observed use; registry detail needs the optional **Agent 365** source |
 | **🔮 Task Breakdown** | What Copilot, agents and Cowork are used for, by task category |
 | **🚀 Estimated Value** | Hours saved and assisted value, by task and function |
-| **🧠 Model Fit** | Which AI models handle which tasks, and how well each session's model fits the task (High / Medium / Low) |
-| **🧭 Cowork Fit** | How well each Cowork task suits Cowork (High / Medium / Low fit), and why |
+| **🧠 Model Fit** | Which AI models handle which tasks, and whether each session's model suits the work (Good match / Lighter model may do / Try stronger) |
+| **🧭 Cowork Fit** | How well each Cowork task suits Cowork (Strong fit / Fair fit / Worth a look), why, and who might benefit from coaching. Grading is adjustable: Balanced by default, or Strict / Lenient |
 | **🎯 Cowork Readiness** | Where to roll out Cowork next, from observed signals, ranked by organization, then user |
 | **🎯 License Readiness** | Where to roll out Copilot licences next, from observed unlicensed use |
 | **💬 User Feedback** | User satisfaction and sentiment; needs the optional feedback export |

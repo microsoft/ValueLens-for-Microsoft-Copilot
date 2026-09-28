@@ -15,6 +15,35 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-09-29 — gentler, adjustable fit grading
+
+Feedback on Cowork Fit was that it read as too critical (about half of graded Cowork sessions
+came out Low fit) and that the rule behind it was hard to see. The grades are now plainer, the
+default is less strict, and you can choose how strict it is. All five templates carry the change.
+
+- **New labels.** High / Medium / Low fit are now **Strong fit**, **Fair fit** and **Worth a
+  look**. On Model Fit, "Try cheaper" is now **Lighter model may do**; Good match and Try
+  stronger are unchanged. Measure names are unchanged, so custom visuals built on them keep
+  working.
+- **Grading setting.** `Assumptions[Fit Grading]` is a calculated column set to `"Balanced"`. To
+  change it, select the column in Power BI Desktop and edit its formula to `"Strict"` or
+  `"Lenient"`.
+  - **Strict** reproduces the previous grade exactly.
+  - **Balanced** (default) grades two kinds of session Fair fit instead of Worth a look:
+    Cowork sessions that read messages (inbox and channel work, which Cowork logs as message
+    reads, previously graded as plain chat) and work done in a single app.
+  - **Lenient** also grades multi-turn chats Fair fit.
+- **Coaching flag.** The Cowork Fit people table has a ⚑ column. It marks anyone with at least
+  five graded Cowork sessions of which half or more are Worth a look; organisation and total
+  rows show how many people are flagged. It is a coaching prompt, not a ranking.
+- **Clearer notices.** The "how to read" notes on Model Fit and Cowork Fit name the grading
+  setting in use and say what a flag means.
+- **Task categories.** Estimated Value and Task Breakdown note that their task categories are
+  rule-based, so they won't match the AI-inferred categories in Copilot Analytics.
+- **Glossary.** The fit rows use the new wording, and a new row explains the grading setting.
+
+---
+
 ## 2026-09-28 — sample product feedback
 
 - New `1. Local CSV/sample-data/product_feedback_sample.csv` (172 rows): a fabricated

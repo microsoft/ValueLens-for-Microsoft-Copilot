@@ -147,11 +147,11 @@ class OneLakeSourceTests(unittest.TestCase):
         source = table["partitions"][0]["source"]
         self.assertEqual(source["type"], "calculated")
         rows = glossary_rows(source["expression"])
-        self.assertEqual(len(rows), 98)
+        self.assertEqual(len(rows), 99)
         columns = {column["name"]: column for column in table["columns"]}
         self.assertEqual(set(columns), {name for name, _ in HEADERS})
         for label, order, label_index, order_index, count in (
-            ("Metric", "MetricOrder", 2, 5, 98),
+            ("Metric", "MetricOrder", 2, 5, 99),
             ("Page", "PageOrder", 0, 4, 15),
         ):
             self.assertEqual(columns[label]["sortByColumn"], order)
@@ -167,14 +167,14 @@ class OneLakeSourceTests(unittest.TestCase):
             document = json.loads(archive.read("DataModelSchema").decode("utf-16-le"))
         table = next(table for table in document["model"]["tables"] if table["name"] == GLOSSARY)
         rows = glossary_rows(table["partitions"][0]["source"]["expression"])
-        # Baselines from the lean release package: all non-MetricOrder values in
+        # Baselines from the fit-grading release package: all non-MetricOrder values in
         # row order, and the minimum order for each casefolded label.
         self.assertEqual(content_hash([row[:5] for row in rows]),
-                         "8f5a0a21e629ce4f2f9e9b833398c4467fc62fbea783837d5dfc6a53e1442f36")
+                         "7724402fea866159ee18eb8b5c45c5e70f2efecd76d7cc1da6bfbead4be2638f")
         groups = sort_groups(rows, 2, 5)
         self.assertTrue(all(len(values) == 1 for values in groups.values()))
         self.assertEqual(content_hash(sorted((label, min(values)) for label, values in groups.items())),
-                         "c626b6000fb01d07ad2b780a6891c344e601adff8735f2a4c1b40c6717c81882")
+                         "5ac2ca08e8bf2ee4994d428e558e72631a48469ad719c767be1ee8bc3b1d1e0b")
 
     def test_glossary_parser_handles_escaped_strings_comments_and_case_variants(self):
         header = "DATATABLE(" + "".join(f'"{name}", {dtype},' for name, dtype in HEADERS)
