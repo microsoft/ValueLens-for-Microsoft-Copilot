@@ -31,16 +31,16 @@ One app registration covers all three. Put the client secret in **Azure Key Vaul
 
 | Source | API? | Automated-pull permission | Manual-export role |
 |---|---|---|---|
-| **Cost consumption** (M365 Admin Center → Copilot → Cost management) | ❌ export-only | None — there is no API. Export and land the per-user CSV manually or via your own automation, then the active core ingester notebook reads it. | Global Administrator or Billing Administrator |
+| **Cost consumption** (M365 Admin Center → Copilot → Cost management) | ❌ export-only | Not read by the current templates (the Credit Meter page was retired). The Fabric ingester is archived in [`3. Fabric/archive/notebooks/`](../3.%20Fabric/archive/notebooks/). | Global Administrator or Billing Administrator |
 | **Product feedback** (OCV / M365 Health) | ❌ export-only | None — there is no API. Landed by the Power Automate flow, then ingested. | Global Administrator or Reports Reader |
-| **Agents 365** | export/lander | Lander notebook reads an exported registry CSV. | Global Administrator or Reports Reader (with **AI Admin** in a Frontier-enrolled tenant) |
+| **Agents 365** | ✅ Graph | `CopilotPackages.Read.All` + `Application.Read.All` (+ `User.Read.All` to resolve creators), admin-consented, **and an Agent 365 licence** in the tenant (else `403`). Used by `Copilot_Agent365_Registry_Ingester` (Fabric) and `Get-Agents365Registry.ps1` (every other path). | Global Administrator or Reports Reader (with **AI Admin** in a Frontier-enrolled tenant), for the CSV fallback via the admin centre |
 
 For the two **export-only** sources, the only "permission" to automate landing is the automation's **OneLake write**
 right (next section) — the data itself must be exported by an admin (or a scheduled portal export) first.
 
 The four `COST-CONSUMPTION` guides and cost flow JSON in [archive/flows](../3.%20Fabric/archive/flows/) are
-**archived reference**, not recommended active deployment instructions. The core cost ingester
-and model support remain **active**.
+**archived reference**, not recommended active deployment instructions. The cost ingester remains,
+but no current template reads its table.
 
 > **Studio add-ons.** Copilot Studio agent-transcript (Dataverse) analytics and PPAC per-agent /
 > per-user message-credit consumption need extra grants (a Dataverse **Application User** with read on
@@ -64,8 +64,8 @@ and model support remain **active**.
 ## Quick "who do I ask?" summary
 
 - **Just the core dashboard:** one Entra app reg (3 Graph perms, admin-consented) + Contributor on the workspace.
-- **+ Cost / Feedback:** an admin exports the CSVs (or schedules a portal export); land cost CSVs manually or via your own automation, and feedback via its flow — no extra API permission.
-- **+ Agents 365:** an admin with Reports Reader (+ AI Admin) exports the registry.
+- **+ Cost / Feedback:** an admin exports the feedback CSV (or schedules a portal export) and lands it via its flow — no extra API permission. Cost consumption is no longer read by the templates.
+- **+ Agents 365:** add `CopilotPackages.Read.All` + `Application.Read.All` (+ `User.Read.All`) to the same app reg, and confirm the tenant has an Agent 365 licence.
 
 See the path README you're following for the step-by-step —
 [1](../1.%20Local%20CSV/README.md) · [2](../2.%20SharePoint/README.md) ·

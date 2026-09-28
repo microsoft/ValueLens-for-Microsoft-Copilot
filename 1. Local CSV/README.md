@@ -140,7 +140,8 @@ Open **`ValueLens - Local CSV.pbit`** and point the parameters at the rollup CSV
 |---|---|
 | Copilot Interactions File | local path to `*_Interactions_*.csv` |
 | Org Data File | local path to `*_Users_*.csv` |
-| Agent 365 *(optional)* | blank, or a local Agents 365 CSV |
+| Agent 365 *(optional)* | blank, or a local path to the `Get-Agents365Registry.ps1` output ([how](../2.%20SharePoint/scripts/README.md#get-agents365registryps1-on-its-own)); without an Agent 365 licence, the Microsoft 365 admin centre **Agents** export works too |
+| Feedback File *(optional)* | blank, or a local path to the admin centre feedback export |
 
 **Load** — done. To refresh: re-export, re-run the processor, **Refresh** in Desktop.
 
@@ -151,32 +152,41 @@ Open **`ValueLens - Local CSV.pbit`** and point the parameters at the rollup CSV
 ## 📚 Dashboard pages
 
 <details>
-<summary>11 report pages — activation, adoption, value, maturity, governance &amp; appendices</summary>
+<summary>15 report pages — activation, adoption, habits, agents, tasks, value, model and Cowork fit, readiness &amp; appendices</summary>
 
-These are the pages in the shipped **Local CSV** template. The rollup CSV contract is
-shared with SharePoint, but the packaged layouts are **not identical**.
-
-| Page | Purpose / source |
+| Page | Purpose |
 |---|---|
-| **◆ User Activation** | Licensed vs unlicensed, active vs inactive users |
-| **📡 Adoption & Reach** | User counts and coverage across the organisation |
-| **🔮 Activity & Value** | Usage, behaviour mix, hours saved and assisted value in one page |
-| **🌱 Usage Maturity** | Progression through the behaviour stages |
-| **🏅 Leaderboards** | Top users, agents and functions |
-| **🎯 License Readiness** | Upgrade-priority signals for unlicensed / low-adoption users |
-| **📈 Heatmap Trend** | Activity across the reporting period |
-| **🛡 Agent Governance** | Agent inventory and governance; enrichment needs the optional **Agent 365** CSV |
-| **📘 Appendix: Glossary** | Metric definitions and research sources |
-| **🧬 Appendix: Signal Table** | Trace raw signals through to value |
-| **📘 Appendix: Key Concepts** | Methodology and key-concept explainers |
+| **◆ Activation** | Licensed vs unlicensed, active vs inactive users, across teams |
+| **📡 Adoption** | Adoption and reach, and usage trends by tool |
+| **🌱 Habit Formation** | How usage matures into habits over time |
+| **🛡 Agent Registry** | Agent catalogue, tenant builds and observed use; registry detail needs the optional **Agent 365** source |
+| **🔮 Task Breakdown** | What Copilot, agents and Cowork are used for, by task category |
+| **🚀 Estimated Value** | Hours saved and assisted value, by task and function |
+| **🧠 Model Fit** | Which AI models handle which tasks, and how well each session's model fits the task (High / Medium / Low) |
+| **🧭 Cowork Fit** | How well each Cowork task suits Cowork (High / Medium / Low fit), and why |
+| **🎯 Cowork Readiness** | Where to roll out Cowork next, from observed signals, ranked by organization, then user |
+| **🎯 License Readiness** | Where to roll out Copilot licences next, from observed unlicensed use |
+| **💬 User Feedback** | User satisfaction and sentiment; needs the optional feedback export |
+| **🏅 Leaderboard** | Usage rankings for users, agents and functions |
+| **📈 Trend Heatmap** | Weekly trend of a selected metric |
+| **📘 Appendix: Glossary** | Definitions, evidence limits and guidance |
+| **🧬 Appendix: Signal - Impact Table** | AI tasks performed → human-time estimate → value, with editable assumptions |
+
+A hidden **⚖ License Allocation** page (expansion candidates and dormancy review) is kept for
+drill-through. Every template ships this same report; only the data connection differs.
+The Tool pills at the top of each page filter on `Agent Filter` (Copilot, Agents, Cowork);
+`Environment` is licensing only (Licensed / Unlicensed).
 
 The two core rollups supply the adoption/value signals; the sample dataset also includes
-Agent 365 data. With your own data, registry-only exports do **not** supply observability
-telemetry — unavailable agent fields remain blank. See the
+Agent 365 data. With your own data, export the registry with
+[`Get-Agents365Registry.ps1`](../2.%20SharePoint/scripts/Get-Agents365Registry.ps1) (the same
+48-column shape the Fabric notebook writes). Registry exports do **not** carry observability
+telemetry, so those agent fields stay blank. See the
 [Agent 365 source contract](../docs/DATA-DICTIONARY.md#4-agents_365).
 
-This template has **no separate Consumption or Feedback page**, and no cost-consumption
-input. Do not infer billing credits or transcript health from the audit rollups.
+User Feedback loads empty unless you set the optional `Feedback File` parameter. There is no
+Credit Meter / cost-consumption input. Do not infer billing credits or transcript health from
+the audit rollups.
 
 </details>
 
@@ -193,7 +203,7 @@ input. Do not infer billing credits or transcript health from the audit rollups.
 | `python: command not found` | Install Python 3.9+ and retry. |
 | `0 records returned` from the export | `AuditLogsQuery.Read.All` consent missing — re-grant in Entra. |
 | Masked UPNs (32-char hex) | M365 Admin → Org settings → Reports → untick "Display concealed names". |
-| Agent Health visuals blank | Expected without an Agent 365 observability export — see [`../docs/DATA-DICTIONARY.md`](../docs/DATA-DICTIONARY.md#4-agents_365). |
+| Agent Registry usage fields blank | Expected without an Agent 365 observability export — see [`../docs/DATA-DICTIONARY.md`](../docs/DATA-DICTIONARY.md#4-agents_365). |
 | Refresh is slow or hits limits | Volume is too high for a local file path — move to [`../3. Fabric/`](../3.%20Fabric/). |
 
 </details>

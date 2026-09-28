@@ -49,11 +49,18 @@ so no page loads empty. The 50-agent registry covers five kinds:
 | Autonomous agents | ~4% | 5 unattended workflow agents |
 | Microsoft Scout | ~3% | 5 proactive, always-on assistants running outside office hours |
 
-Resulting `Environment` mix: **Licensed ~87% / Unlicensed ~9% / Cowork ~5%** — the same
-three values the template already knows about. Cowork rows are derived the way the
-processor derives them, from `cowork` appearing in the agent name, and Scout appears as
-agent activity under the `Microsoft Scout` app host, so **no new vocabulary is
-introduced and the `.pbit` is untouched**. All 50 agents are exercised.
+Resulting `Environment` mix: **Licensed ~91% / Unlicensed ~9%**. `Environment` is
+licensing only; Cowork is flagged in `Agent Filter` (**Cowork ~5%**, beside **Agents ~35%**),
+which is what the template's Tool pills and Cowork pages filter on. Cowork rows are
+derived the way the processor derives them, from `cowork` appearing in the app host or
+agent name. Their prompts attach files and mail (about 35% attach nothing), so the
+Cowork task breakdown spreads across categories instead of landing in General
+assistance. Scout appears as agent activity under the `Microsoft Scout` app host. All
+50 agents are exercised.
+
+`agents_365_sample.csv` carries the canonical registry extras the template reads
+(`Entra Agent ID`, `Is Blocked`, `Agent creator UPN`, `Agent creator source`), so the
+Agent Registry page populates the same way it does from `Get-Agents365Registry.ps1`.
 
 Cowork and Scout adoption ramps up across the window and is gated per user, rather than
 appearing fully formed on day one.

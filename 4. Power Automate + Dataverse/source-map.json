@@ -50,16 +50,8 @@
       "required": false,
       "sourceType": "SharePoint CSV",
       "producer": "2. SharePoint\\scripts\\Get-Agents365Registry.ps1",
-      "sourceContract": "Agent 365 export or PAX -IncludeAgent365Info",
-      "reason": "Unchanged optional registry feed."
-    },
-    {
-      "modelTable": "copilot_cost_consumption",
-      "required": false,
-      "sourceType": "SharePoint CSV",
-      "producer": "Microsoft 365 Admin Center export",
-      "sourceContract": "Cost Consumption File parameter",
-      "reason": "Unchanged optional consumption feed; not inferred from audit."
+      "sourceContract": "Canonical 48-column registry CSV (Get-Agents365Registry.ps1, the same columns as the Fabric agents_365 table) in the 'Agent 365' parameter; the PAX -IncludeAgent365Info 28-column export and the admin centre export are also accepted",
+      "reason": "Optional registry feed. Paging, detail calls and creator resolution run in the script; Power Query only reads the file once through the hidden 'Agents 365 Staging' query."
     },
     {
       "modelTable": "SharePoint Agents",
@@ -69,7 +61,8 @@
       "sourceContract": "poc_sharepointagents",
       "join": "Chat + Agent Interactions (Audit Logs)[SharePointAgentKey] -> SharePoint Agents[AgentKey]",
       "coverage": "Observed-retention inventory keyed by ListItemUniqueId and joined through decoded SPO_* usage identity.",
-      "reason": "Additive inventory lane; never used as a display-name relationship."
+      "reason": "Additive inventory lane; never used as a display-name relationship.",
+      "status": "Not read by the current report: the lean model has no SharePoint Agents table or 'Include SharePoint agent inventory' parameter. The Dataverse table and lane E remain."
     }
   ],
   "documentedGaps": [
@@ -94,7 +87,7 @@
     {
       "lane": "E",
       "feed": "poc_sharepointagents",
-      "status": "Implemented",
+      "status": "Implemented upstream; not read by the current report",
       "whyNotCore": "Implemented additively as an optional exact-key dimension; it does not replace full audit interaction facts."
     }
   ]

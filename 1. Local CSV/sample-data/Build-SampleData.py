@@ -67,10 +67,27 @@ SEED = 20260807          # fixed: regenerating gives byte-identical output
 DOMAIN = "contoso-demo.com"
 COMPANY = "Contoso Demo Ltd"
 
-# The template's AIBV profile: 3-value Environment {Cowork, Licensed,
-# Unlicensed} plus the offloaded calc columns. Must match the profile the
-# processor is run with for real tenants.
+# The template's AIBV profile: licensing Environment {Licensed, Unlicensed},
+# Cowork flagged in Agent Filter, plus the offloaded calc columns. Must match
+# the profile the processor is run with for real tenants.
 PROFILE = "aibv"
+
+# Cowork attaches real files and mail, and the template's Cowork Task Category
+# reads their MIME types from AccessedResource_Type. Pools per skill, drawn from
+# a separate RNG so the rest of the dataset is unchanged; COWORK_BLANK_SHARE of
+# Cowork prompts attach nothing and land in "General assistance / Other".
+_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+_PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+COWORK_MIME = {
+    "T_4001": ["message/rfc822", _XLSX, "message"],
+    "T_4002": ["application/pdf", "text/html", "text/markdown"],
+    "T_4003": [_DOCX, _PPTX, "text/markdown", "image/png"],
+    "T_4004": ["message/rfc822", "message", "text/markdown"],
+    "T_4005": [_XLSX, "text/csv", "application/json"],
+    "T_4006": [_DOCX, _PPTX, "message/rfc822"],
+}
+COWORK_BLANK_SHARE = 0.35
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 PROCESSOR = os.path.normpath(os.path.join(
@@ -143,8 +160,8 @@ CITIES = [("London", "GB"), ("Manchester", "GB"), ("Dublin", "IE"),
 #   declarative  Agent Builder / M365 Copilot agent, used inside Teams/BizChat
 #   studio       Copilot Studio custom engine agent  -> AppHost "Copilot Studio"
 #   autonomous   unattended workflow agent           -> AppHost "Autonomous"
-#   cowork       Copilot Cowork skill                -> Environment "Cowork"
-#                (the processor keys Cowork off "cowork" in the agent name)
+#   cowork       Copilot Cowork skill                -> Agent Filter "Cowork"
+#                (the processor keys Cowork off "cowork" in the host or agent name)
 #   scout        Microsoft Scout, proactive assistance -> AppHost "Microsoft Scout"
 #
 # behaviours are drawn from the template's Behavior Value Map, so each agent
@@ -284,6 +301,8 @@ AGENT_COLS = [
     "Sharepoint files", "Sharepoint sites", "Graph connector details", "Uploaded files",
     "Status", "Channel", "Creator Id", "Environment Id", "Bot Id", "Custom action list",
     "Instructions", "Groups shared", "Users shared", "Entra Agent ID",
+    # Canonical registry extras (Get-Agents365Registry.ps1 / Fabric ingester).
+    "Is Blocked", "Agent creator UPN", "Agent creator source",
 ]
 
 FIRST = ["Alex", "Sam", "Jordan", "Riley", "Casey", "Morgan", "Taylor", "Jamie",
@@ -337,6 +356,7 @@ def build_interactions(users, days: int, rng: random.Random, proc,
                        agent_share: float, cowork_share: float, scout_share: float):
     behaviours = list(WEIGHTS)
     weights = [WEIGHTS[b] for b in behaviours]
+    mime_rng = random.Random(SEED + 1)     # Cowork attachments only; keeps `rng` untouched
     end = date.today().replace(day=1) - timedelta(days=1)
     start = end - timedelta(days=days - 1)
 
@@ -412,6 +432,10 @@ def build_interactions(users, days: int, rng: random.Random, proc,
                 elif kind in {"studio", "autonomous", "cowork"}:
                     res_type = rng.choice(["flow", "connector", "file", "site"])
                     site_url = "https://contoso-demo.sharepoint.com/sites/ops" if res_type == "site" else ""
+                    if kind == "cowork":
+                        res_type = "" if mime_rng.random() < COWORK_BLANK_SHARE \
+                            else mime_rng.choice(COWORK_MIME[tid])
+                        site_url = ""
                 elif kind == "scout":
                     res_type = rng.choice(["", "email", "file", "meeting"])
                     site_url = ""
@@ -427,7 +451,8 @@ def build_interactions(users, days: int, rng: random.Random, proc,
                 # ---- every derived column below comes from the processor ----
                 license_status = proc.compute_license_status(has_license_raw)
                 environment = proc.compute_environment(PROFILE, has_license_raw, aname, tid, host)
-                behavior_enriched = proc.compute_behavior_enriched(PROFILE, behaviour, aname, environment)
+                class_env = proc.compute_classifier_environment(PROFILE, environment, aname, host)
+                behavior_enriched = proc.compute_behavior_enriched(PROFILE, behaviour, aname, class_env)
                 behavior_full = proc.compute_behavior_enriched_full(behavior_enriched)
                 is_sensitive = proc.compute_is_sensitive(sens_label, "")
                 is_agent_activity = proc.compute_is_agent_activity(aname, tid, host, res_type)
@@ -449,18 +474,18 @@ def build_interactions(users, days: int, rng: random.Random, proc,
                     "AccessedResource_Action": res_action,
                     "SensitivityLabelId": sens_label,
                     "Behavior_Source": proc.compute_behavior_source(
-                        PROFILE, behaviour, environment, aname, "", host),
+                        PROFILE, behaviour, class_env, aname, "", host),
                     "Behavior_Enriched_Full": behavior_full,
                     "AccessedResource_SiteUrl": site_url,
                     "Behavior_Category": behaviour,
                     "Value_Outcome": proc.compute_value_outcome(
-                        PROFILE, behavior_enriched, environment, is_sensitive),
+                        PROFILE, behavior_enriched, class_env, is_sensitive),
                     "Behavior_Enriched": behavior_enriched,
                     "AccessedResource_SensitivityLabelId": "",
                     "WeekStart": week_start(d).isoformat(),
                     "InteractionDate": d.isoformat(),
                     "MonthStart": d.replace(day=1).isoformat(),
-                    "Usage_Mode": proc.compute_usage_mode(behavior_full, environment, host),
+                    "Usage_Mode": proc.compute_usage_mode(behavior_full, class_env, host),
                     "Expertise_Role": proc.compute_expertise_role(behavior_full),
                     "Efficiency_Breakdown": proc.compute_efficiency_breakdown(behavior_full, behaviour),
                     "AppIdentity_AppId": "", "AppIdentity_DisplayName": host,
@@ -471,14 +496,14 @@ def build_interactions(users, days: int, rng: random.Random, proc,
                     "Is_Sensitive": is_sensitive,
                     "AI_Model": proc.compute_ai_model(model),
                     "Autonomy_Pattern": proc.compute_autonomy_pattern(
-                        PROFILE, environment, is_agent_activity),
+                        PROFILE, class_env, is_agent_activity),
                     "UserMonthKey": proc.compute_user_month_key(
                         u["upn"], d.replace(day=1).isoformat()),
                     "Web_Grounded_Signal": proc.compute_web_grounded_signal(res_type, site_url),
                     "Behavior_Plausible": proc.compute_behavior_plausible(license_status, behaviour),
                     "Workflow_Action": workflow_action,
                     "Is_Agent_Activity": is_agent_activity,
-                    "Agent Filter": aname or "(No Agent)",
+                    "Agent Filter": proc.compute_agent_filter(PROFILE, aname, host, is_agent_activity),
                     "Agent Publish Status": proc.compute_agent_publish_status(tid, aname),
                     "Resource_Count": rng.randint(0, 3),
                     "Audit_UserKey": u["upn"].lower(),
@@ -592,6 +617,11 @@ def agent_rows(users, rng):
             "Entra Agent ID": f"agt-{tid.lower()}" if kind in {"autonomous", "cowork", "scout"} else "",
             "Groups shared": rng.randint(1, 6),
             "Users shared": rng.randint(20, 260),
+            # Tenant-built agents resolve to their owner; one is blocked by an admin
+            # so the Agent Lifecycle states all have something to show.
+            "Is Blocked": "true" if tid == "T_2012" else "false",
+            "Agent creator UPN": "" if kind == "scout" else creator["upn"].lower(),
+            "Agent creator source": "unattributed" if kind == "scout" else "ownerId",
         })
         out.append(r)
     return out
@@ -658,6 +688,13 @@ def main():
     for r in inter:
         envs[r["Environment"]] = envs.get(r["Environment"], 0) + 1
     for k, n in sorted(envs.items(), key=lambda kv: -kv[1]):
+        print(f"    {k:<20} {n:>6,}  ({n/len(inter):.1%})")
+    print()
+    print("  agent filter")
+    filt = {}
+    for r in inter:
+        filt[r["Agent Filter"] or "(Copilot)"] = filt.get(r["Agent Filter"] or "(Copilot)", 0) + 1
+    for k, n in sorted(filt.items(), key=lambda kv: -kv[1]):
         print(f"    {k:<20} {n:>6,}  ({n/len(inter):.1%})")
     print()
     agents_seen = len({r["AgentName"] for r in inter if r["AgentName"]})

@@ -32,17 +32,24 @@ template never breaks. See [`OPTIONAL-SOURCES.md`](../3.%20Fabric/docs/OPTIONAL-
 | 1 | Chat + Agent Interactions (Audit Logs) | `copilot_interactions_curated` | **Core** | `Copilot_Audit_Log_Direct_Ingester` → `Copilot_Audit_Log_Processor` | `GetCopilotInteractions*` |
 | 2 | Copilot Licensed | `copilot_licensed_users` | **Core** | `Copilot_Licensed_Users_Direct_Ingester` | `GetCopilotUsers*` |
 | 3 | Chat + Agent Org Data | `copilot_org_data` | **Core** | `Copilot_Org_Data_Direct_Ingester` *(+ optional `notebooks/optional/workday-org-data/` overlay)* | `Get-EntraOrgData*` |
-| 4 | Agents 365 | `agents_365` | *Optional* | `Copilot_Agent365_Registry_Ingester` *(default)* · `Copilot_Agent365_Lander` *(CSV fallback)* | `Get-Agents365Registry` |
-| 5 | ProductFeedback | `user_feedback` | *Optional* | `Copilot_ProductFeedback_Ingester` | OCV feedback CSV |
-| 6 | Copilot Cost Consumption | `copilot_cost_consumption` | *Optional* | `Copilot_Cost_Consumption_Ingester` | SharePoint CSV (`Cost Consumption File`) |
+| 4 | Agents 365 | `agents_365` | *Optional* | `Copilot_Agent365_Registry_Ingester` *(API, primary)* → `Copilot_Agent365_Lander` *(CSV fallback if the API step fails)* | `Get-Agents365Registry.ps1` *(API)*, or an admin centre export via `-Agents365Csv` *(fallback)* → `Agent 365` CSV (also Local CSV and the Dataverse template) |
+| 5 | ProductFeedback | `user_feedback` | *Optional* | `Copilot_ProductFeedback_Ingester` | OCV feedback CSV (`Feedback File`) |
+| 6 | Copilot Cost Consumption | `copilot_cost_consumption` | *Archived — not read by the templates* | `archive/notebooks/Copilot_Cost_Consumption_Ingester` | — (retired with the Credit Meter page) |
 
 > **Delta table names are lower-case** throughout (`copilot_interactions_parsed`,
 > `copilot_interactions_curated`, …). The dashboard table names in column 2 are the *model* names and
 > may contain spaces.
 
 > **Cost consumption (row 6)** is the **Microsoft 365 Admin Center → Copilot → Cost management** export
-> (Cowork / Work IQ credits). It's standard across all templates. The **PPAC** message-credit tables
-> (per-agent / per-user) are an archived Studio add-on — see the archived Extended reference above.
+> (Cowork / Work IQ credits). The Credit Meter page that read it has been retired from every template,
+> so no template reads it now; the Fabric ingester remains for your own analysis. The **PPAC**
+> message-credit tables (per-agent / per-user) are an archived Studio add-on — see the archived
+> Extended reference above.
+
+> **`Environment` is licensing only** (`Licensed` / `Unlicensed`). Cowork is identified by
+> `Agent Filter = "Cowork"`. Older processor output that still carries `Environment = "Cowork"`
+> is mapped back to its licence (`Licensed`, or `Unlicensed` when `License Status` says so) by the
+> non-Fabric templates' interactions query, so Cowork never appears in the Environment slicer.
 
 All other model tables (Calendar, legends, ranking/summary, glossary, value maps, etc.) are
 **calculated/DAX or static** — they have no external source and are version-independent.
@@ -188,18 +195,30 @@ from `Job_Profile`. It does not invent a manager hierarchy or a matching audit i
 ### 4. `agents_365`
 Landed into the Lakehouse by **`Copilot_Agent365_Registry_Ingester`** (the default — Graph app-only,
 runs unattended) or by `Copilot_Agent365_Lander` (CSV fallback → `dbo.agents_365`; Delta
-column-mapping preserves spaced header names like `Agent name`). **Pick one, never run both** — they
-write the same table. Read via `FabricTable("agents_365")`, wrapped with `Enable_Agent365`. The Fabric
-model is now **100% Lakehouse-sourced**. Columns from the Agents MAC export.
+column-mapping preserves spaced header names like `Agent name`). Both write the same table, so the
+shipped pipeline runs the Ingester **first** and the Lander **only if the Ingester fails**
+(`Run_Agent365_CSV_Fallback`, e.g. no Agent 365 licence). Read via `FabricTable("agents_365")`, wrapped with `Enable_Agent365`. The Fabric
+model is now **100% Lakehouse-sourced**.
+
+**Local CSV, SharePoint and Dataverse templates** read the same contract from a CSV set in the
+`Agent 365` parameter (blank = the page loads empty). Produce it with
+[`Get-Agents365Registry.ps1`](../2.%20SharePoint/scripts/Get-Agents365Registry.ps1), which calls the
+same Graph endpoints as the ingester and writes the same **48 columns in the same order**, with the
+same value rules; a parity test runs one mocked Graph response through both. `Run-PAX-AIBV.ps1
+-IncludeAgent365Info` runs it for you and `Upload-Rollups-SharePoint.ps1` lands it as
+`agents_365.csv`. Paging, detail calls and creator resolution all happen in the script, so Power
+Query only reads and types the file. A hidden staging query (`Agents 365 Staging`) reads it once;
+both the `Agents 365` table and the interactions query's `Agent_LinkID` resolution use it, so they
+always agree. The PAX 28-column catalogue and the admin centre export are still accepted.
 
 #### ⚠️ Two different Agent 365 exports — registry vs observability
 
 Microsoft exposes Agent 365 data as **two separate exports**, and they do **not** carry the same
-columns. Which one you land decides how much of the **🛡 Agent Health** page populates:
+columns. Which one you land decides how much of the **🛡 Agent Registry** page populates:
 
 | Export | Source | Carries |
 |---|---|---|
-| **Registry / catalogue** | Graph `/beta/copilot/admin/catalog/packages` — used by `Copilot_Agent365_Registry_Ingester` and by PAX `-IncludeAgent365Info` | A **28-column inventory**: agent name, Title ID, publisher/developer, version, availability, sensitivity, capability and permission flags, created/last-updated metadata |
+| **Registry / catalogue** | Graph `/copilot/admin/catalog/packages` — used by `Copilot_Agent365_Registry_Ingester`, `Get-Agents365Registry.ps1` and PAX `-IncludeAgent365Info` | An inventory: agent name, Title ID, publisher/developer, version, availability, sensitivity, capability and permission flags, created/last-updated metadata. The ingester and the script write **48 columns** (adding Entra Agent ID, Bot/App/Asset IDs, Is Blocked, sharing, element types and resolved creator); PAX writes **28** |
 | **Observability** | Microsoft Admin Center → **Agents** export ([agent map docs](https://learn.microsoft.com/en-us/microsoft-365/admin/manage/agent-map)) | Usage telemetry: `Users shared`, `Active Users`, `Total sessions`, `Exception rate`, `Last Activity Date` |
 
 The **registry export does not emit the observability columns.** If you land only the registry /
@@ -318,12 +337,15 @@ Date Submitted Date, Sentiment
 *(The model should also keep `MissingField.Ignore` on `Table.RenameColumns` so partial OCV exports remain tolerant.)*
 
 ### 6. `copilot_cost_consumption` — Copilot credit usage (MAC Cost management export)
-Produced by `Copilot_Cost_Consumption_Ingester` from the **Microsoft 365 Admin Center → Copilot →
+> **Not read by any current template.** The Credit Meter page and its cost tables were retired from
+> every variant, and the `Cost Consumption File` parameter was removed. The ingester is archived
+> (`3. Fabric/archive/notebooks/`); it and the contract below remain for your own analysis.
+
+Produced by the archived `Copilot_Cost_Consumption_Ingester` from the **Microsoft 365 Admin Center → Copilot →
 Cost management** per-user CSV export (export-only; no API). **Auto-detects two export shapes** and maps
 both to one unified contract: the **surface split** (`Cowork`/`WorkIQ`/`Other` credits) and the
 **per-user usage** export (monthly limit / used / % used / sessions). This is the **only**
-customer-pullable place Cowork/WorkIQ credits appear. Gated by `Enable_CostConsumption`; both Fabric and
-SharePoint paths produce the identical contract. Header matching is **case-insensitive**.
+customer-pullable place Cowork/WorkIQ credits appear. Header matching is **case-insensitive**.
 
 ```
 User_Principal_Name   (text; join key → org PersonId_Normalized / UPN)
@@ -340,10 +362,9 @@ Last_Activity_Date    (date; parses ISO timestamp + en-US M/d/yyyy)
 SourceFile, LoadDate  (lineage)
 ```
 Columns absent from a given export load as null. Grain is a **per-user snapshot**. UPN match isn't 100% —
-unmatched users surface under an **"(Unattributed)"** organization bucket. The core
-`Copilot_Cost_Consumption_Ingester` and model support remain **active**. The four `COST-CONSUMPTION`
-guides and cost flow JSON are now under `../archive/flows/`, kept as **archived reference**, not
-recommended active deployment instructions. See the
+unmatched users surface under an **"(Unattributed)"** organization bucket. The ingester, the two
+`COST-CONSUMPTION` guides and the cost flow JSON are all **archived reference** under
+`3. Fabric/archive/` (`notebooks/` and `flows/`), not recommended active deployment instructions. See the
 [archived cost guide](../3.%20Fabric/archive/flows/COST-CONSUMPTION.md).
 
 ---

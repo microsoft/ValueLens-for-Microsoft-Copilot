@@ -162,21 +162,23 @@ generated. The processor is inherited, not mirrored.
 
 ## Recommended — Agent 365 governance
 
-Both notebooks feed the **Agents 365** page and write the **same** `dbo.agents_365` table, so
-**pick exactly ONE — never run both.** Decision rule:
+Both notebooks feed the **Agents 365** page and write the **same** `dbo.agents_365` table. The
+shipped pipeline runs them as **API first, CSV fallback** — never both on success:
 
-- **`Copilot_Agent365_Registry_Ingester` — the default.** Use it whenever the tenant has an
-  **Agent 365 licence** and you can grant the app-only Graph permissions. It pulls the registry live
-  and runs unattended on a schedule — no upload step.
-- **`Copilot_Agent365_Lander` — manual fallback only.** Use it *only* when you can't grant those
-  permissions (or for a one-off / evaluation), by hand-dropping the admin-center CSV export at
-  `Files/agent365/agents.csv`. **The Ingester replaces this Lander** the moment the API / licence
-  becomes available on the tenant.
+- **`Copilot_Agent365_Registry_Ingester` — the primary source.** Runs whenever `EnableAgent365 = true`.
+  It needs an **Agent 365 licence** and the app-only Graph permissions, pulls the registry live and
+  runs unattended — no upload step.
+- **`Copilot_Agent365_Lander` — the fallback.** The pipeline runs it **only if the Ingester fails**
+  (for example `403` in a tenant with no Agent 365 licence, or missing consent). It lands the
+  admin-center CSV export you drop at `Files/agent365/agents.csv`; with no file it keeps the existing
+  snapshot. Tenants without the licence therefore use this path every run. See the
+  [pipeline notes](../pipelines/README.md#activity-design-notes). If you run the notebooks by hand,
+  run one, not both.
 
 | Notebook | Output table | When to use |
 |---|---|---|
-| `Copilot_Agent365_Registry_Ingester` | `agents_365` | **Default notebook.** GA, app-only ingester (`CopilotPackages.Read.All` + `Application.Read.All` + `User.Read.All`). Rejects missing `Title ID` rows and conflicting duplicates before overwrite. Resolves **`Agent creator UPN`** via a 3-tier chain and can optionally pass the raw API payload through. |
-| `Copilot_Agent365_Lander` | `agents_365` | **Fallback notebook.** CSV lander for `Files/agent365/agents.csv`. The shipped pipeline JSON currently uses this branch when `EnableAgent365 = true`. |
+| `Copilot_Agent365_Registry_Ingester` | `agents_365` | **Primary (API).** GA, app-only ingester (`CopilotPackages.Read.All` + `Application.Read.All` + `User.Read.All`). Rejects missing `Title ID` rows and conflicting duplicates before overwrite. Resolves **`Agent creator UPN`** via a 3-tier chain and can optionally pass the raw API payload through. Pipeline activity `Run_Agent365_Registry_Ingester`. |
+| `Copilot_Agent365_Lander` | `agents_365` | **Fallback (CSV).** Lands `Files/agent365/agents.csv`. Pipeline activity `Run_Agent365_CSV_Fallback`, which runs only when the API step fails. Once the API works, remove an old `agents.csv` so a transient API failure can't reload an older export. |
 
 ### Raw API passthrough (`INCLUDE_RAW_PASSTHROUGH`) — registry ingester
 
@@ -235,22 +237,22 @@ the app registration genuinely lacks admin-consented `CopilotPackages.Read.All`,
 `Application.Read.All` and `User.Read.All`. A `403` on the catalog means the tenant has no
 Agent 365 licence.
 
-## Optional — product feedback &amp; Cowork / Work IQ credit consumption
+## Optional — product feedback
 
 | Notebook | Output table | Feeds | Gated by |
 |---|---|---|---|
-| `Copilot_ProductFeedback_Ingester` | `user_feedback` | 💬 **Feedback** page | `Enable_ProductFeedback` |
-| `Copilot_Cost_Consumption_Ingester` | `copilot_cost_consumption` | 🪙 **Credit Meter** page | `Enable_CostConsumption` |
+| `Copilot_ProductFeedback_Ingester` | `user_feedback` | 💬 **User Feedback** page | `Enable_ProductFeedback` |
 
 **Product feedback** reads the Microsoft Admin Center → Health → Product feedback (OCV)
 export from `Files/product_feedback/`. It is a snapshot source: `append` is rejected,
 and a missing export preserves the existing snapshot unless you deliberately allow an
 empty first placeholder.
 
-**Cowork / Work IQ** lands the **Microsoft 365 Admin Center** credit-consumption export
-into `Files/cost_consumption/`. See
-[the archived cost-consumption guide](../archive/flows/COST-CONSUMPTION.md) for historical
-landing-flow reference, not recommended active setup. The core ingester remains available here.
+**Cowork / Work IQ credit consumption is archived.** `Copilot_Cost_Consumption_Ingester`
+(which landed the Microsoft 365 Admin Center credit export from `Files/cost_consumption/`
+into `copilot_cost_consumption`) moved to [`../archive/notebooks/`](../archive/notebooks/)
+when the Credit Meter page was retired, because no template reads that table. Its
+[guide and landing flows](../archive/flows/COST-CONSUMPTION.md) are archived alongside it.
 
 ---
 

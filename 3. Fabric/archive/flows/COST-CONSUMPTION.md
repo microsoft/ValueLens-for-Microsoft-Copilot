@@ -2,8 +2,9 @@
 
 > **ARCHIVED / reference only — these landing flows are not recommended for new deployments.**
 > Historical Cowork / WorkIQ / Other credit instructions and model wiring are retained below.
-> The [core Cost Consumption ingester](../../notebooks/Copilot_Cost_Consumption_Ingester.ipynb),
-> [ProductFeedback flow](../../flows/Copilot_ProductFeedback_Email_to_OneLake.json), and
+> The [Cost Consumption ingester](../notebooks/Copilot_Cost_Consumption_Ingester.ipynb) is archived
+> too: no template reads its table since the Credit Meter page was retired. The
+> [ProductFeedback flow](../../flows/Copilot_ProductFeedback_Email_to_OneLake.json) and
 > [base Fabric build](../../README.md) remain active. The [repository license](../../../LICENSE) applies.
 
 > **New to this source?** Start with the **[setup guide](COST-CONSUMPTION-SETUP.md)** — it walks
@@ -42,7 +43,7 @@ The ingester **auto-detects two export shapes** (case-insensitive headers) and m
 
 Both write to OneLake with the **DFS (ADLS Gen2) three-step pattern** (`PUT ?resource=file` →
 `PATCH ?action=append` → `PATCH ?action=flush`), audience `https://storage.azure.com/`, landing in
-**`Files/cost_consumption/`** (must match `SOURCE_DIR` in `../../notebooks/Copilot_Cost_Consumption_Ingester.ipynb`).
+**`Files/cost_consumption/`** (must match `SOURCE_DIR` in `../notebooks/Copilot_Cost_Consumption_Ingester.ipynb`).
 The MAC export filename is not fixed, so the `FileNamePrefix` guard defaults to empty (accept any
 `.csv`); set it once you know the real prefix to be stricter. Import & OneLake-permission steps are
 identical to the credit-consumption flows — see the

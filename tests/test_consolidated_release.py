@@ -12,16 +12,15 @@ MIRRORS = (
     ROOT / "3. Fabric" / "archive" / "extended" / "Fabric + Copilot Studio" / "notebooks" / "_core",
 )
 
-# SQL bytes remain pinned; OneLake pins the reviewed glossary correction while
-# checking the helper separately against its canonical source.
+# DataModelSchema bytes stay pinned (the templates ship no UnappliedChanges part);
+# OneLake pins every field except its FabricTable helper, which is checked
+# separately against its canonical source.
 SCHEMA_HASHES = {
     "ValueLens - Fabric.pbit": {
-        "DataModelSchema": "54d6b739e72d9ec61a7c1dd23872cf868012020dabc24ed7340a5564101455aa",
-        "UnappliedChanges": "77ac91786bb9cdc370bbb6c427fd86418bcd392a62ded03fdc4004f0e972f0fb",
+        "DataModelSchema": "65ae39cae77b135b6b3f4af357ee1eb309469cba6eca00953b3e1e40f37c12df",
     },
     "ValueLens - Fabric OneLake.pbit": {
-        "DataModelSchema": "58160bccbc84bec95477bbd5d086649a5e1bc32b2e8b8e135e0c3f8e45e2ef29",
-        "UnappliedChanges": "c17c69d874ed2924d9f26a884867d04892b79823552cd95936dcc3f94e46cd0e",
+        "DataModelSchema": "e9588a4f4519c0eaabc20095a634f3a86e9554c20af38060b8af707b281afe80",
     },
 }
 
@@ -56,7 +55,7 @@ class ConsolidatedReleaseTests(unittest.TestCase):
 
     def test_all_shared_notebooks_match_canonical_bytes(self):
         sources = [p for p in CORE.glob("*.ipynb") if p.name != "Copilot_Audit_Log_Processor.ipynb"]
-        self.assertEqual(len(sources), 8)
+        self.assertEqual(len(sources), 7)
         for source in sources:
             for folder in MIRRORS:
                 self.assertTrue((folder / source.name).is_file(), (folder, source.name))

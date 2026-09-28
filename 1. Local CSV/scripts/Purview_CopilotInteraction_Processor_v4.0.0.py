@@ -7,7 +7,9 @@ and AI-in-One Rollup PBIPs.
 
 Output profiles (--profile):
     aibv  (default) : ValueLens. 50-column fact superset —
-                      3-value Environment {Cowork, Licensed, Unlicensed},
+                      Environment {Licensed, Unlicensed} (licensing only;
+                      Cowork is flagged in Agent Filter = Cowork/Agents/blank,
+                      as in the Fabric notebook),
                       all DAX calc-columns pre-computed (Behavior_*, Usage_Mode,
                       Expertise_Role, Efficiency_Breakdown, Human_Baseline_Min,
                       Behavior_Plausible, Workflow_Action, Delegation_Event_Key,
@@ -113,7 +115,7 @@ SCRIPT_VERSION = "4.0.0"
 #                     (36-col fact, 5-value Environment vocabulary). This is
 #                     the contract the AI-in-One dashboard already consumes;
 #                     it must remain byte-identical to v3.1.0.
-#   --profile aibv  : the AIBV-faithful superset (50-col fact, 3-value
+#   --profile aibv  : the AIBV-faithful superset (50-col fact, licensing-only
 #                     Environment, all offloaded calc cols + grain-promoted
 #                     sliceable flags) built in this v4.0.0 effort.
 #
@@ -524,14 +526,36 @@ def compute_environment(profile: str, has_license_raw: str, agent_name: str, age
         if license_val in _LICENSE_TRUTHY:
             return "Licensed M365 Copilot"
         return "Unlicensed Chat"
-    # AIBV vocabulary (verbatim port of current AIBV calc col `Environment`):
-    #   IF(CONTAINSSTRING(LOWER(TRIM(AgentName)),"cowork"),"Cowork",
-    #   IF(isLicensed,"Licensed","Unlicensed"))
-    if "cowork" in (agent_name or "").strip().lower():
-        return "Cowork"
+    # AIBV: Environment is the LICENSING dimension only, as in the Fabric
+    # notebook. Cowork is a surface: it is carried in `Agent Filter` and drives
+    # the classifiers through compute_classifier_environment() instead. Tagging
+    # it here made an Environment = "Licensed" filter drop licensed Cowork work.
     if license_val in _LICENSE_TRUTHY:
         return "Licensed"
     return "Unlicensed"
+
+
+@functools.lru_cache(maxsize=None)
+def compute_is_cowork(agent_name: str, app_host: str) -> bool:
+    # Same test as the Fabric notebook's classify_actor_environment().
+    host = " ".join((app_host or "").strip().lower().split())
+    name = " ".join((agent_name or "").strip().lower().split())
+    return "cowork" in host or "cowork" in name
+
+
+def compute_classifier_environment(profile: str, environment: str, agent_name: str, app_host: str) -> str:
+    # The value the AIBV classifiers key on: "Cowork" for Cowork activity,
+    # otherwise the licensing Environment. AIO is unchanged.
+    if profile != "aio" and compute_is_cowork(agent_name, app_host):
+        return "Cowork"
+    return environment
+
+
+def compute_agent_filter(profile: str, agent_name: str, app_host: str, is_agent_activity_str: str) -> str:
+    # Fabric notebook parity: Cowork, then Agents, else blank.
+    if profile != "aio" and compute_is_cowork(agent_name, app_host):
+        return "Cowork"
+    return "Agents" if is_agent_activity_str == "TRUE" else ""
 
 
 @functools.lru_cache(maxsize=None)
@@ -750,7 +774,8 @@ _AGENT_NAME_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
 @functools.lru_cache(maxsize=None)
 def compute_behavior_enriched(profile: str, behavior_category: str, agent_name: str, environment: str) -> str:
     # AIO enriches agent/autonomous rows; AIBV enriches agents/cowork rows.
-    # (In practice AIBV `Environment` never returns "Agents", so only Cowork enriches.)
+    # (AIBV classifiers receive "Cowork" or the licensing value, never "Agents",
+    # so only Cowork enriches.)
     enrich_envs = {"Agents", "Autonomous Agent"} if profile == "aio" else {"Agents", "Cowork"}
     if environment not in enrich_envs:
         return behavior_category
@@ -1606,6 +1631,9 @@ def explode_record(
     has_license_raw = user_rec.get("Has license", "")
     license_status = user_rec.get("License Status") or compute_license_status(has_license_raw)
     environment = compute_environment(profile, has_license_raw, agent_name, agent_id, app_host_str)
+    # What the classifiers key on (AIBV: "Cowork" for Cowork activity); the
+    # emitted Environment stays the licensing value.
+    class_env = compute_classifier_environment(profile, environment, agent_name, app_host_str)
     ai_model = compute_ai_model(model_name_str)
     user_month_key = compute_user_month_key(audit_user_id_raw, month_start_str)
 
@@ -1689,15 +1717,15 @@ def explode_record(
                 res_site_str, plugin_id_str, has_agent_ctx,
             )
             behavior_enriched = compute_behavior_enriched(
-                profile, behavior_category, agent_name, environment
+                profile, behavior_category, agent_name, class_env
             )
             is_sensitive_str = compute_is_sensitive(sens_label_str, res_sens_label_str)
             behavior_source = compute_behavior_source(
-                profile, behavior_category, environment, agent_name,
+                profile, behavior_category, class_env, agent_name,
                 aisystem_plugin_name_str, app_host_str,
             )
             value_outcome = compute_value_outcome(
-                profile, behavior_enriched, environment, is_sensitive_str,
+                profile, behavior_enriched, class_env, is_sensitive_str,
             )
 
             nongrain = dict(base_nongrain)
@@ -1731,11 +1759,11 @@ def explode_record(
                 web_grounded_str = compute_web_grounded_signal(res_type_str, res_site_str)
                 # Autonomy_Pattern depends on per-resource Is_Agent_Activity (AIBV).
                 autonomy_pattern = compute_autonomy_pattern(
-                    profile, environment, is_agent_activity_str
+                    profile, class_env, is_agent_activity_str
                 )
                 # Downstream chain (faithful without Agents 365 per F2).
                 behavior_enriched_full = compute_behavior_enriched_full(behavior_enriched)
-                usage_mode = compute_usage_mode(behavior_enriched_full, environment, app_host_str)
+                usage_mode = compute_usage_mode(behavior_enriched_full, class_env, app_host_str)
                 expertise_role = compute_expertise_role(behavior_enriched_full)
                 efficiency_breakdown = compute_efficiency_breakdown(
                     behavior_enriched_full, behavior_category
@@ -1758,7 +1786,9 @@ def explode_record(
                     web_grounded_str,
                     workflow_action,
                 )
-                nongrain["Agent Filter"] = "Agents" if is_agent_activity_str == "TRUE" else ""
+                nongrain["Agent Filter"] = compute_agent_filter(
+                    profile, agent_name, app_host_str, is_agent_activity_str
+                )
                 nongrain["Behavior_Enriched_Full"] = behavior_enriched_full
                 nongrain["Usage_Mode"] = usage_mode
                 nongrain["Expertise_Role"] = expertise_role
@@ -2249,7 +2279,7 @@ def main() -> None:
         default="aibv",
         help=(
             "Output profile. 'aibv' (default) = ValueLens "
-            "superset (50-col fact, 3-value Environment). 'aio' = AI-in-One "
+            "superset (50-col fact, Licensed/Unlicensed Environment). 'aio' = AI-in-One "
             "Dashboard (36-col fact, 5-value Environment) — reproduces the "
             "v3.1.0 AIO output exactly."
         ),

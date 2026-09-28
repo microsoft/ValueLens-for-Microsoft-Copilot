@@ -7,10 +7,10 @@ reference.
 | Script | What it does | When you run it |
 |---|---|---|
 | `ProvisionSiteAccess-SP-AppReg.ps1` | Grants your Entra app `Sites.Selected` write access to one SharePoint site. Prints the `SiteId` and `DriveId` the upload script needs. | **Once per site.** |
-| `Run-PAX-AIBV.ps1` | Downloads the latest extract tool, runs the AIBV rollup, and drops two rollup CSVs into `.\processed\`. | **Every refresh.** |
-| `Upload-Rollups-SharePoint.ps1` | Uploads the two rollup CSVs to fixed file names in your SharePoint library (overwrites the previous run). | **Every refresh, after the extract.** |
+| `Run-PAX-AIBV.ps1` | Downloads the latest extract tool, runs the AIBV rollup, and drops two rollup CSVs into `.\processed\` (plus the Agent 365 registry CSV with `-IncludeAgent365Info`). | **Every refresh.** |
+| `Upload-Rollups-SharePoint.ps1` | Uploads the rollup CSVs (and the registry CSV, when the manifest lists one) to fixed file names in your SharePoint library (overwrites the previous run). | **Every refresh, after the extract.** |
 | `Register-TaskScheduler.ps1` | Registers the above two as a single daily Windows Scheduled Task. | **Once, when you want to schedule.** |
-| `Get-Agents365Registry.ps1` | Optional. Exports the Agents 365 registry for the dashboard's Agents 365 page. | Ad-hoc. |
+| `Get-Agents365Registry.ps1` | Optional. Exports the Agent 365 registry as the canonical 48-column CSV every template's `Agent 365` parameter reads (same shape as the Fabric notebook's `agents_365`). `Run-PAX-AIBV.ps1 -IncludeAgent365Info` calls it for you. | Ad-hoc, or every refresh via the extract. |
 
 > **Looking for the manual Python processor?** It moved to
 > [`../../1. Local CSV/scripts/`](../../1.%20Local%20CSV/scripts/) along with the org-data helpers,
@@ -52,7 +52,9 @@ reference.
     [-Deidentify] `
     [-FillerLabel Blank|RepeatSelf|RepeatManager|Fixed] `
     [-FillerLabelText "<text>"] `
-    [-IncludeAgent365Info]
+    [-IncludeAgent365Info] `
+    [-Agent365Source Canonical|PAX] `
+    [-Agents365Csv <admin-centre-agents-export.csv>]
 ```
 
 Secret resolution (first match wins):
@@ -65,7 +67,9 @@ Secret resolution (first match wins):
 Outputs to `<WorkRoot>\processed\`:
 - `<purview-stem>_Interactions_<ts>.csv`
 - `<entra-stem>_Users_<ts>.csv`
-- `rollup-manifest.json` (paths + timings for the upload step)
+- `Agents365Registry.csv` (with `-IncludeAgent365Info`)
+- `rollup-manifest.json` (paths + timings for the upload step; `agents365_csv` points at the registry,
+  or at your `-Agents365Csv` file when the fallback was used)
 The script downloads the selected extract-tool release into `<WorkRoot>\pax\releases\`.
 Defaults are `-Auth AppRegistration`, `-Rollup`, and `-IncludeUserInfo`.
 
@@ -83,11 +87,52 @@ Keep `-Deidentify` consistent across all appends to the same file.
 .\Run-PAX-AIBV.ps1 -TenantId <id> -ClientId <id> -Days 2 -AppendFile Purview_CopilotInteraction_Rollup.csv
 ```
 
-`-IncludeAgent365Info` (optional): produces the Agent 365 catalogue export. It runs
-**app-only/unattended** under the same `-Auth` mode (no separate
-interactive sign-in). Requires the app's admin-consented **Application** permissions
-`CopilotPackages.Read.All` + `Application.Read.All` and an **Agent 365 licence** in the tenant
-(a missing licence returns `403`).
+`-IncludeAgent365Info` (optional): exports the Agent 365 registry. By default
+(`-Agent365Source Canonical`) the extract runs `Get-Agents365Registry.ps1` after PAX and writes
+the canonical 48-column CSV (the same columns as the Fabric notebook, including `Entra Agent ID`,
+`Publisher`, `Is Blocked` and `Agent creator UPN`). Auth follows `-Auth`: `AppRegistration`
+reuses this run's app and secret (unattended); `WebLogin`, `DeviceCode`, `Credential` and
+`Silent` sign in interactively; `ManagedIdentity` falls back to PAX. Requires admin-consented
+`CopilotPackages.Read.All` + `Application.Read.All` + `User.Read.All` and an **Agent 365
+licence** in the tenant (a missing licence returns `403`). A registry failure prints a warning
+and leaves the rollups untouched; the last good `agents_365.csv` in SharePoint stays in place.
+
+`-Agent365Source PAX`: pass `-IncludeAgent365Info` to PAX instead (app-only as of PAX
+purview-v1.11.12). Its catalogue has 28 columns and no Entra Agent ID, publisher, blocked flag
+or creator, so fewer agents join and the Agent Registry page shows less. The template still
+reads it.
+
+`-Agents365Csv <file>` (optional): the **CSV fallback**, matching the Fabric pipeline's API-first
+design. With `-IncludeAgent365Info` the file is used only when the API export fails or produces no
+file (for example `403` with no Agent 365 licence). Without `-IncludeAgent365Info` it is used
+directly, with no API call, which suits tenants without an Agent 365 licence. Point it at the
+Microsoft 365 admin centre **Agents** export (or any earlier registry CSV). The manifest records
+`agent365_source = CsvFallback`, and the upload lands the file as `agents_365.csv`. A missing
+file is a warning only. The script never edits the file, so re-export it when agents change; if
+the API works reliably, drop the parameter so an old export can't stand in after a transient
+failure.
+
+```powershell
+# API first, admin-centre export if the API step fails
+.\Run-PAX-AIBV.ps1 -TenantId <id> -ClientId <id> -IncludeAgent365Info -Agents365Csv .\agents.csv
+# No Agent 365 licence: CSV only
+.\Run-PAX-AIBV.ps1 -TenantId <id> -ClientId <id> -Agents365Csv .\agents.csv
+```
+
+### `Get-Agents365Registry.ps1` on its own
+
+```powershell
+.\Get-Agents365Registry.ps1 -OutputCsv .\Agents365Registry.csv `
+    [-Auth Auto|AppRegistration|Interactive] [-TenantId <id>] [-ClientId <id>] [-ClientSecret <secret>] `
+    [-ApiVersion v1.0|beta] [-SkipDetail] [-SkipCreatorResolution] [-AllowEmpty]
+```
+
+`Auto` uses the app registration when `-ClientId` is given (secret from `-ClientSecret`,
+`$env:AIBV_CLIENT_SECRET`, Credential Manager `PAX-AIBV-<TenantId>`, then a prompt), otherwise an
+interactive Graph sign-in. The script refuses to replace an existing
+file with an empty snapshot, and `-AllowEmpty` is for an intentional empty first export only.
+Point the template's `Agent 365` parameter at the output (Local CSV) or upload it
+(SharePoint, Dataverse CSV fallback).
 
 `-UserInfoFile` (optional, BYOD): supply your own user directory CSV instead of pulling it live from
 Entra — copy [`OrgData-Template.csv`](../../1.%20Local%20CSV/scripts/OrgData-Template.csv) as a
@@ -127,6 +172,7 @@ Full field reference: [`-UserInfoFile` CSV schema (upstream docs)](https://githu
 Uploads as fixed names:
 - `copilot_interactions_rollup.csv`
 - `copilot_users_rollup.csv`
+- `agents_365.csv` (only when the manifest's `agents365_csv` is set, or `-Agents365Csv <path>` is passed)
 
 Or skip the manifest and pass CSVs directly:
 
@@ -148,6 +194,8 @@ Or skip the manifest and pass CSVs directly:
     -SiteId     '<host>,<siteguid>,<webguid>' `
     -DriveId    'b!...' `
     [-FolderPath /AIBV] `
+    [-IncludeAgent365Info] `
+    [-Agents365Csv <admin-centre-agents-export.csv>] `
     [-RunAt 02:00] `
     [-RunAsUser DOMAIN\svc_aibv]
 ```

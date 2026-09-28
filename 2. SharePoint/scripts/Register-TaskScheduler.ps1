@@ -45,6 +45,16 @@
   then set this so the scheduled runs append only the latest window (de-duplicated). Omit to have the
   task run in non-append mode.
 
+.PARAMETER IncludeAgent365Info
+  Also refresh the Agent 365 registry on each run (passed to Run-PAX-AIBV
+  -IncludeAgent365Info). The upload step then lands it as agents_365.csv beside
+  the rollups. Runs unattended under the app registration.
+
+.PARAMETER Agents365Csv
+  Optional admin-centre Agents export used when the Agent 365 API step fails, or
+  on its own when -IncludeAgent365Info is not set (tenants without an Agent 365
+  licence). Passed to Run-PAX-AIBV -Agents365Csv. Refresh the file yourself.
+
 .PARAMETER RunAt
   Local time the task fires daily. Default: 02:00.
 
@@ -92,6 +102,8 @@ param(
                                  [string]$FolderPath = '/AIBV',
                                  [int]$Days  = 7,
                                  [string]$AppendFile,
+                                 [switch]$IncludeAgent365Info,
+                                 [string]$Agents365Csv,
                                  [string]$RunAt = '02:00',
                                  [string]$RunAsUser
 )
@@ -113,6 +125,8 @@ if (-not $pwshPath) { throw "pwsh.exe not found on PATH. Install PowerShell 7+."
 # Quoting note: ScheduledTasks doesn't expand variables, so all params are baked into the string.
 $extract = "& '$(Join-Path $ScriptsRoot 'Run-PAX-AIBV.ps1')' -TenantId '$TenantId' -ClientId '$ClientId' -Days $Days -WorkRoot '$WorkRoot'"
 if ($AppendFile) { $extract += " -AppendFile '$AppendFile'" }
+if ($IncludeAgent365Info) { $extract += " -IncludeAgent365Info" }
+if ($Agents365Csv) { $extract += " -Agents365Csv '$Agents365Csv'" }
 $upload  = "& '$(Join-Path $ScriptsRoot 'Upload-Rollups-SharePoint.ps1')' -Manifest '$WorkRoot\processed\rollup-manifest.json' -TenantId '$TenantId' -ClientId '$ClientId' -SiteId '$SiteId' -DriveId '$DriveId' -FolderPath '$FolderPath'"
 $inline  = "$extract; if (`$LASTEXITCODE -ne 0) { exit `$LASTEXITCODE }; $upload"
 

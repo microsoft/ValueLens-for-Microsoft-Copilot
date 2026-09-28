@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Mirrors the eight shared Fabric notebooks from `3. Fabric/notebooks/`
+Mirrors the seven shared Fabric notebooks from `3. Fabric/notebooks/`
 into the archived Copilot Studio add-on's local `_core` folder.
 
 .DESCRIPTION

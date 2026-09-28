@@ -1,4 +1,4 @@
-"""Structural checks for the additive Power Automate + Dataverse pathway."""
+"""Structural checks for the Power Automate + Dataverse pathway."""
 import json
 import csv
 import importlib.util
@@ -12,10 +12,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PATHWAY = ROOT / "4. Power Automate + Dataverse"
 SOURCE = ROOT / "2. SharePoint" / "ValueLens - SharePoint.pbit"
+ONELAKE = ROOT / "3. Fabric" / "ValueLens - Fabric OneLake.pbit"
 TEMPLATE = PATHWAY / "ValueLens - Power Automate + Dataverse.pbit"
-SCRIPT = PATHWAY / "scripts" / "Build-PowerAutomateDataverse-Template.py"
 BRIDGE = PATHWAY / "scripts" / "Build-DataverseCoreFeeds.py"
 SOURCE_MAP = PATHWAY / "source-map.json"
+FACT = "Chat + Agent Interactions (Audit Logs)"
+GLOSSARY = "\U0001f4d6 Metric Glossary"
+
+
+def text(value):
+    return "\n".join(value) if isinstance(value, list) else value
 
 
 class PowerAutomateDataversePathTests(unittest.TestCase):
@@ -28,8 +34,12 @@ class PowerAutomateDataversePathTests(unittest.TestCase):
                 raise AssertionError("Corrupt Power Automate + Dataverse template archive")
             cls.template_members = {name: template_archive.read(name) for name in template_archive.namelist()}
         cls.model = json.loads(cls.template_members["DataModelSchema"].decode("utf-16-le"))["model"]
-        cls.queries = json.loads(cls.template_members["UnappliedChanges"].decode("utf-16-le"))["queries"]
+        cls.expressions = {item["name"]: item for item in cls.model["expressions"]}
+        cls.tables = {item["name"]: item for item in cls.model["tables"]}
         cls.source_map = json.loads(SOURCE_MAP.read_text(encoding="utf-8"))
+
+    def partition(self, table_name):
+        return text(self.tables[table_name]["partitions"][0]["source"]["expression"])
 
     def test_expected_files_exist(self):
         for relative in (
@@ -38,7 +48,8 @@ class PowerAutomateDataversePathTests(unittest.TestCase):
             "ValueLens - Power Automate + Dataverse.pbit",
             "dataverse-core-schema.json",
             "source-map.json",
-            "scripts/Build-PowerAutomateDataverse-Template.py",
+            "archive/README.md",
+            "archive/scripts/Build-PowerAutomateDataverse-Template.py",
             "scripts/Build-DataverseCoreFeeds.py",
             "scripts/Invoke-CopilotAuditRawCapture.ps1",
             "scripts/Test-PowerAutomateDataverse-Preflight.ps1",
@@ -46,178 +57,111 @@ class PowerAutomateDataversePathTests(unittest.TestCase):
             "scripts/power-automate-dataverse.settings.json.example",
         ):
             self.assertTrue((PATHWAY / relative).exists(), relative)
+        # The retired generator rebuilds the pre-lean model; it must not sit beside the live scripts.
+        self.assertFalse((PATHWAY / "scripts" / "Build-PowerAutomateDataverse-Template.py").exists())
 
-    def test_template_report_is_inherited_unchanged(self):
+    def test_template_report_matches_sharepoint(self):
         self.assertEqual(
             {name: data for name, data in self.source_members.items() if name.startswith("Report/")},
             {name: data for name, data in self.template_members.items() if name.startswith("Report/")},
         )
 
-    def test_dataverse_parameter_and_query_added(self):
-        expressions = {expression["name"]: expression for expression in self.model["expressions"]}
-        self.assertIn("Dataverse URL", expressions)
-        self.assertIn("Use SharePoint CSV fallback", expressions)
-        self.assertIn("Core Snapshot ID", expressions)
-        self.assertIn("Include SharePoint agent inventory", expressions)
-        self.assertIn("ValueLensDataverseRows", expressions)
+    def test_template_ships_the_applied_model_only(self):
+        self.assertNotIn("UnappliedChanges", self.template_members)
+        self.assertNotIn("DataModel", self.template_members)
+
+    def test_dataverse_parameters_and_helpers(self):
+        for name in (
+            "Dataverse URL",
+            "Use SharePoint CSV fallback",
+            "Core Snapshot ID",
+            "ValueLensDataverseEntity",
+            "ValueLensDataverseRows",
+        ):
+            self.assertIn(name, self.expressions)
         self.assertEqual(
-            expressions["Dataverse URL"]["expression"],
+            text(self.expressions["Dataverse URL"]["expression"]),
             'null meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=false]',
         )
         self.assertEqual(
-            expressions["Use SharePoint CSV fallback"]["expression"],
+            text(self.expressions["Use SharePoint CSV fallback"]["expression"]),
             'false meta [IsParameterQuery=true, Type="Logical", IsParameterQueryRequired=true]',
         )
-        parameter_query = next(query for query in self.queries if query.get("name") == "Dataverse URL")
-        self.assertTrue(parameter_query["loadAsTableDisabled"])
-        self.assertIn("curated valuelens core tables", parameter_query["description"].lower())
-
-    def test_unapplied_query_lineage_matches_static_model_objects(self):
-        expressions = {expression["name"]: expression["lineageTag"] for expression in self.model["expressions"]}
-        tables = {table["name"]: table["lineageTag"] for table in self.model["tables"]}
-        for query in self.queries:
-            name = query.get("name")
-            if name in expressions:
-                self.assertEqual(query["lineageTag"], expressions[name], name)
-            elif name in tables:
-                self.assertEqual(query["lineageTag"], tables[name], name)
+        self.assertIn("dataverse environment url", text(self.expressions["Dataverse URL"]["description"]).lower())
 
     def test_core_tables_default_to_dataverse_curated_feeds(self):
         for table_name, entity_name in (
-            ("Chat + Agent Interactions (Audit Logs)", "poc_valuelensinteractions"),
+            (FACT, "poc_valuelensinteractions"),
             ("Copilot Licensed", "poc_valuelensusers"),
             ("Chat + Agent Org Data", "poc_valuelensusers"),
         ):
-            table = next(table for table in self.model["tables"] if table["name"] == table_name)
-            expression = "\n".join(table["partitions"][0]["source"]["expression"])
+            expression = self.partition(table_name)
             self.assertIn(f'ValueLensDataverseRows("{entity_name}")', expression)
-            self.assertIn("UseSharePointCsvFallback", expression)
+            self.assertIn('#"Use SharePoint CSV fallback"', expression)
 
     def test_org_data_dataverse_path_backfills_all_model_columns(self):
-        table = next(table for table in self.model["tables"] if table["name"] == "Chat + Agent Org Data")
-        expression = "\n".join(table["partitions"][0]["source"]["expression"])
-        for column in table["columns"]:
+        table = self.tables["Chat + Agent Org Data"]
+        expression = self.partition("Chat + Agent Org Data")
+        data_columns = [c for c in table["columns"] if c.get("type", "data") == "data"]
+        self.assertGreater(len(data_columns), 0)
+        for column in data_columns:
             self.assertIn(json.dumps(column["name"]), expression)
 
-    def test_power_automate_template_repairs_known_calculated_column_metadata(self):
-        table = next(table for table in self.model["tables"] if table["name"] == "Agents 365")
-        column = next(column for column in table["columns"] if column["name"] == "Return Rate Category")
-        expression = "\n".join(column["expression"])
-        self.assertTrue(expression.startswith("VAR Rate"))
-        self.assertNotIn("lineageTag:", expression)
-        partition = "\n".join(table["partitions"][0]["source"]["expression"])
-        self.assertIn('{"Status", type text}', partition)
-        glossary = next(table for table in self.model["tables"] if table["name"] == "📖 Metric Glossary")
-        metric = next(column for column in glossary["columns"] if column["name"] == "Metric")
-        self.assertNotIn("sortByColumn", metric)
+    def test_calculated_columns_carry_no_serialised_metadata(self):
+        for table in self.model["tables"]:
+            for column in table.get("columns", []):
+                if column.get("type") == "calculated":
+                    self.assertNotIn("lineageTag:", text(column["expression"]), (table["name"], column["name"]))
+        self.assertIn('{"Status", type text}', self.partition("Agents 365"))
 
-    def test_sharepoint_agents_dimension_added(self):
-        tables = {table["name"]: table for table in self.model["tables"]}
-        self.assertIn("SharePoint Agents", tables)
-        table = tables["SharePoint Agents"]
-        self.assertGreaterEqual(len(table["columns"]), 21)
-        self.assertEqual(table["partitions"][0]["source"]["type"], "m")
-        measure_names = {measure["name"] for measure in table["measures"]}
-        self.assertTrue(
-            {"SharePoint Agents", "Current SharePoint Agents", "Deleted SharePoint Agents", "SharePoint Audit Events"}
-            <= measure_names
+    def test_glossary_matches_the_sort_checked_onelake_glossary(self):
+        # test_onelake_source proves each Metric/Page maps to one sort order in this table.
+        with zipfile.ZipFile(ONELAKE) as archive:
+            onelake = json.loads(archive.read("DataModelSchema").decode("utf-16-le"))["model"]
+        mine = self.tables[GLOSSARY]
+        theirs = next(table for table in onelake["tables"] if table["name"] == GLOSSARY)
+        self.assertEqual(mine["partitions"][0]["source"], theirs["partitions"][0]["source"])
+        self.assertEqual(
+            {column["name"]: column.get("sortByColumn") for column in mine["columns"]},
+            {column["name"]: column.get("sortByColumn") for column in theirs["columns"]},
         )
 
-    def test_interactions_table_enriched_and_related(self):
-        table = next(table for table in self.model["tables"] if table["name"] == "Chat + Agent Interactions (Audit Logs)")
-        columns = {column["name"] for column in table["columns"]}
-        self.assertTrue(
-            {
-                "SharePointAgentKey",
-                "SharePointAgentName",
-                "SharePointSiteUrl",
-                "SharePointObjectUrl",
-                "SharePointLibraryPath",
-                "SharePointIsDeleted",
-            }
-            <= columns
+    def test_sharepoint_agent_inventory_is_not_modelled(self):
+        self.assertNotIn("SharePoint Agents", self.tables)
+        self.assertNotIn("Include SharePoint agent inventory", self.expressions)
+        self.assertEqual(
+            [c["name"] for c in self.tables[FACT]["columns"] if c["name"].startswith("SharePointAgent")], []
         )
-        expression = "\n".join(table["partitions"][0]["source"]["expression"])
-        self.assertIn('Table.SelectRows(#"SharePoint Agents"', expression)
-        self.assertIn('AppIdentity_AppId', expression)
-        relationship = next(
-            (
-                relationship
-                for relationship in self.model["relationships"]
-                if relationship["fromTable"] == "Chat + Agent Interactions (Audit Logs)"
-                and relationship["fromColumn"] == "SharePointAgentKey"
-                and relationship["toTable"] == "SharePoint Agents"
-                and relationship["toColumn"] == "AgentKey"
-            ),
-            None,
-        )
-        self.assertIsNotNone(relationship)
-
-    def test_unapplied_queries_include_dataverse_lane(self):
-        names = {query.get("name") for query in self.queries}
-        self.assertIn("SharePoint Agents", names)
-        query = next(query for query in self.queries if query.get("name") == "SharePoint Agents")
-        text = "\n".join(query["text"])
-        self.assertIn('ValueLensDataverseEntity', text)
-        self.assertIn('poc_sharepointagents', text)
-        interaction_query = next(query for query in self.queries if query.get("name") == "Chat + Agent Interactions (Audit Logs)")
-        interaction_text = "\n".join(interaction_query["text"])
-        self.assertIn("SharePointAgentKey", interaction_text)
-        self.assertIn("__spoGuid", interaction_text)
+        self.assertFalse(any(
+            "SharePoint Agents" in (relationship["fromTable"], relationship["toTable"])
+            for relationship in self.model["relationships"]
+        ))
 
     def test_pinned_snapshot_manifest_guards_all_core_reads(self):
-        expressions = {item["name"]: item for item in self.model["expressions"]}
-        text = "\n".join(expressions["ValueLensDataverseRows"]["expression"])
-        self.assertIn('#"Core Snapshot ID"', text)
-        self.assertIn('Manifest[status] <> "succeeded"', text)
-        self.assertIn('[poc_runid] = SnapshotId', text)
-        self.assertIn('Table.RowCount(Kept) <> ExpectedCount', text)
-        self.assertIn('Table.FromRecords(Records, Columns, MissingField.Error)', text)
-        self.assertNotIn("MissingField.UseNull", text)
-
-    def test_inventory_is_genuinely_optional_and_keys_are_validated(self):
-        expressions = {item["name"]: item for item in self.model["expressions"]}
-        self.assertTrue(expressions["Include SharePoint agent inventory"]["expression"].startswith("false meta"))
-        table = next(item for item in self.model["tables"] if item["name"] == "SharePoint Agents")
-        text = "\n".join(table["partitions"][0]["source"]["expression"])
-        self.assertIn('if not #"Include SharePoint agent inventory" then', text)
-        self.assertIn("DuplicateSharePointAgentKey", text)
-        self.assertIn("InvalidSharePointAgentKey", text)
-
-    def test_interaction_patch_separates_bindings_and_handles_null_identifiers(self):
-        table = next(item for item in self.model["tables"] if item["name"] == "Chat + Agent Interactions (Audit Logs)")
-        text = "\n".join(table["partitions"][0]["source"]["expression"])
-        before, _ = text.split("__withAppIdentity =", 1)
-        self.assertTrue(before.rstrip().endswith(","), "M let bindings need a comma before the first inserted step")
-        self.assertIn('app = if [AppIdentity_AppId] = null then ""', text)
-        self.assertIn('agent = if [AgentId] = null then ""', text)
-        self.assertNotIn('app = try Text.Trim', text)
-        self.assertIn('DecodeItemGuid = (driveItemId as text) as nullable text =>', text)
-        query = next(item for item in self.queries if item.get("name") == table["name"])
-        self.assertEqual(text, "\n".join(query["text"]))
-        self.assertEqual(text, json.loads(query["lastLoadedAsTableFormulaText"])["RootFormulaText"])
+        rows = text(self.expressions["ValueLensDataverseRows"]["expression"])
+        self.assertIn('#"Core Snapshot ID"', rows)
+        self.assertIn('Manifest[status] <> "succeeded"', rows)
+        self.assertIn('"poc_runid eq " & ODataText(SnapshotId)', rows)
+        self.assertIn("Table.RowCount(Kept) <> ExpectedCount", rows)
+        self.assertIn("Table.FromRecords(Records, Columns, MissingField.Error)", rows)
+        self.assertNotIn("MissingField.UseNull", rows)
 
     def test_core_csv_parameters_are_not_required_in_dataverse_mode(self):
-        expressions = {item["name"]: item for item in self.model["expressions"]}
         for name in ("Copilot Interactions File", "Org Data File"):
-            self.assertIn('IsParameterQueryRequired=false', expressions[name]["expression"])
-            query = next(item for item in self.queries if item.get("name") == name)
-            self.assertIn('IsParameterQueryRequired=false', "\n".join(query["text"]))
+            self.assertIn("IsParameterQueryRequired=false", text(self.expressions[name]["expression"]))
 
     def test_query_order_and_source_mapping_document_gaps(self):
-        query_order = next(annotation["value"] for annotation in self.model["annotations"] if annotation["name"] == "PBI_QueryOrder")
-        self.assertIn("Dataverse URL", query_order)
-        self.assertIn("Use SharePoint CSV fallback", query_order)
-        self.assertIn("SharePoint Agents", query_order)
+        query_order = json.loads(next(
+            annotation["value"] for annotation in self.model["annotations"] if annotation["name"] == "PBI_QueryOrder"
+        ))
+        for name in ("Dataverse URL", "Use SharePoint CSV fallback", "Core Snapshot ID"):
+            self.assertIn(name, query_order)
+        self.assertNotIn("SharePoint Agents", query_order)
         required = {item["modelTable"] for item in self.source_map["requiredFeeds"]}
-        self.assertEqual(required, {"Chat + Agent Interactions (Audit Logs)", "Copilot Licensed", "Chat + Agent Org Data"})
+        self.assertEqual(required, {FACT, "Copilot Licensed", "Chat + Agent Org Data"})
         gaps = {item["lane"]: item["status"] for item in self.source_map["documentedGaps"]}
-        self.assertEqual(gaps["E"], "Implemented")
+        self.assertEqual(gaps["E"], "Implemented upstream; not read by the current report")
         self.assertEqual(gaps["C"], "Implemented with raw-payload extension")
-
-    def test_builder_is_idempotent(self):
-        proc = subprocess.run([sys.executable, str(SCRIPT), "--check"], capture_output=True, text=True)
-        self.assertEqual(proc.returncode, 0, proc.stderr or proc.stdout)
 
 
 class DataverseCoreBridgeTests(unittest.TestCase):

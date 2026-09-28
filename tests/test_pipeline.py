@@ -8,10 +8,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PIPELINES = ROOT / "3. Fabric" / "pipelines"
 PROCESSOR = "Run_Audit_Log_Processor"
+AGENT365 = "Conditionally_Run_Agent365"
+FALLBACK = "Run_Agent365_CSV_Fallback"
 INPUTS = {
     "Run_Audit_Log_Ingester",
     "Run_Licensed_Users_Ingester",
-    "Conditionally_Run_Agent365",
+    FALLBACK,
 }
 
 
@@ -43,10 +45,11 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(len(dependencies), len(INPUTS))
         self.assertEqual({d["activity"] for d in dependencies}, INPUTS)
         for dependency in dependencies:
-            self.assertEqual(dependency["dependencyConditions"], ["Succeeded"])
+            expected = ["Succeeded", "Skipped"] if dependency["activity"] == FALLBACK else ["Succeeded"]
+            self.assertEqual(dependency["dependencyConditions"], expected, dependency["activity"])
 
-    def test_agent365_disabled_branch_allows_outer_condition_to_complete(self):
-        condition = self.activities["Conditionally_Run_Agent365"]
+    def test_agent365_runs_api_first_with_top_level_csv_fallback(self):
+        condition = self.activities[AGENT365]
         self.assertEqual(condition["type"], "IfCondition")
         self.assertIs(self.properties["parameters"]["EnableAgent365"]["defaultValue"], False)
         self.assertEqual(condition["typeProperties"]["expression"], {
@@ -56,11 +59,58 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(condition["typeProperties"]["ifFalseActivities"], [])
         enabled = condition["typeProperties"]["ifTrueActivities"]
         self.assertEqual(len(enabled), 1)
-        self.assertEqual(enabled[0]["name"], "Run_Agent365_Lander")
+        self.assertEqual(enabled[0]["name"], "Run_Agent365_Registry_Ingester")
         self.assertEqual(enabled[0]["type"], "TridentNotebook")
+        self.assertEqual(enabled[0]["typeProperties"]["notebookId"], "REPLACE_WITH_AGENT365_REGISTRY_NOTEBOOK_ID")
+        fallback = self.activities[FALLBACK]
+        self.assertEqual(fallback["type"], "TridentNotebook")
+        self.assertEqual(fallback["typeProperties"]["notebookId"], "REPLACE_WITH_AGENT365_LANDER_NOTEBOOK_ID")
+        self.assertEqual(fallback["dependsOn"], [{"activity": AGENT365, "dependencyConditions": ["Failed"]}])
         dependencies = {d["activity"] for d in self.activities[PROCESSOR]["dependsOn"]}
-        self.assertIn(condition["name"], dependencies)
+        self.assertNotIn(AGENT365, dependencies)
         self.assertNotIn(enabled[0]["name"], dependencies)
+        for path in ("Copilot_Agent365_Registry_Ingester.ipynb", "Copilot_Agent365_Lander.ipynb"):
+            self.assertTrue((ROOT / "3. Fabric" / "notebooks" / path).is_file(), path)
+
+    def simulate(self, outcomes, enabled):
+        """Apply Data Factory's documented dependency and leaf-status rules to the Agent 365 path."""
+        order = ["Run_Audit_Log_Ingester", "Run_Licensed_Users_Ingester", AGENT365, FALLBACK, PROCESSOR]
+        status = {}
+        for name in order:
+            activity = self.activities[name]
+            if not all(status[d["activity"]] in d["dependencyConditions"] for d in activity["dependsOn"]):
+                status[name] = "Skipped"
+            elif activity["type"] == "IfCondition":
+                branch = "ifTrueActivities" if enabled else "ifFalseActivities"
+                inner = activity["typeProperties"][branch]
+                status[name] = "Failed" if any(outcomes.get(a["name"]) == "Failed" for a in inner) else "Succeeded"
+            else:
+                status[name] = outcomes.get(name, "Succeeded")
+        parents = {n: [d["activity"] for d in self.activities[n]["dependsOn"]] for n in order}
+
+        def evaluated(name):
+            if status[name] != "Skipped":
+                return status[name] == "Succeeded"
+            return all(evaluated(p) for p in parents[name])
+
+        leaves = [n for n in order if not any(n in parents[m] for m in order)]
+        return status, all(evaluated(n) for n in leaves)
+
+    def test_agent365_fallback_scenarios_follow_try_catch_semantics(self):
+        cases = {
+            "disabled": ({}, False, "Skipped", "Succeeded", True),
+            "api succeeds": ({}, True, "Skipped", "Succeeded", True),
+            "api fails, csv lands": ({"Run_Agent365_Registry_Ingester": "Failed"}, True, "Succeeded", "Succeeded", True),
+            "api and csv fail": (
+                {"Run_Agent365_Registry_Ingester": "Failed", FALLBACK: "Failed"}, True, "Failed", "Skipped", False,
+            ),
+        }
+        for label, (outcomes, enabled, fallback, processor, pipeline_ok) in cases.items():
+            with self.subTest(label):
+                status, ok = self.simulate(outcomes, enabled)
+                self.assertEqual(status[FALLBACK], fallback)
+                self.assertEqual(status[PROCESSOR], processor)
+                self.assertIs(ok, pipeline_ok)
 
     def test_graph_is_acyclic_and_all_dependencies_resolve_at_top_level(self):
         self.assertEqual(len(self.activities), len(self.properties["activities"]))
@@ -74,7 +124,7 @@ class PipelineTests(unittest.TestCase):
 
     def test_ingestion_branches_remain_parallel_and_optional_defaults_unchanged(self):
         for name, activity in self.activities.items():
-            if name != PROCESSOR:
+            if name not in {PROCESSOR, FALLBACK}:
                 self.assertEqual(activity["dependsOn"], [], name)
         self.assertEqual(
             {name: p["defaultValue"] for name, p in self.properties["parameters"].items()},

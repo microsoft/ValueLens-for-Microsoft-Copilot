@@ -60,8 +60,9 @@ scheduled PowerShell job.
 **In your tenant:**
 - An Entra app registration with these admin-consented **Microsoft Graph Application** permissions:
   `AuditLogsQuery.Read.All`, `Reports.Read.All`, `User.Read.All`, `Organization.Read.All`, `Sites.Selected`.
-  - *Only if you use `-IncludeAgent365Info`* (optional Agent 365 catalogue): also add
+  - *Only if you use `-IncludeAgent365Info`* (optional Agent 365 registry): also add
     `CopilotPackages.Read.All` + `Application.Read.All`, and an **Agent 365 licence** in the tenant.
+    (`User.Read.All`, already listed, resolves agent creators.)
 - A SharePoint document library to hold the two CSVs.
 - A Power BI Pro (or Premium / PPU) workspace to publish into.
 
@@ -146,10 +147,17 @@ and Agent 365 outputs are snapshots (overwritten each run).**
 > Nothing is lost: your source data is still queryable, so re-running rebuilds the complete picture.
 
 Produces `.\processed\*_Interactions_*.csv`, `.\processed\*_Users_*.csv`, and `rollup-manifest.json`
-(5–15 min for 30 days). Add `-IncludeAgent365Info` for the optional Agents 365 output — this runs
-**app-only/unattended** under your `-Auth` mode (needs
-`CopilotPackages.Read.All` + `Application.Read.All` and an Agent 365 licence; a missing licence
-returns `403`). To supply your own user directory instead of pulling it live from Entra, add
+(5–15 min for 30 days). Add `-IncludeAgent365Info` for the optional Agent 365 registry: after PAX,
+[`Get-Agents365Registry.ps1`](scripts/Get-Agents365Registry.ps1) writes
+`.\processed\Agents365Registry.csv` in the same 48-column shape as the Fabric notebook (Entra
+Agent ID, publisher, blocked flag and resolved creator included) and records it in the manifest.
+With `-Auth AppRegistration` it runs **unattended** on the same app (needs `CopilotPackages.Read.All`
++ `Application.Read.All` + `User.Read.All` and an Agent 365 licence; a missing licence returns
+`403`). A registry failure is a warning only; the rollups still upload. Add
+`-Agents365Csv <admin-centre Agents export>` as the **CSV fallback** when the API step fails, or use
+it on its own (without `-IncludeAgent365Info`) if the tenant has no Agent 365 licence.
+`-Agent365Source PAX`
+uses PAX's own 28-column catalogue export instead. To supply your own user directory instead of pulling it live from Entra, add
 `-UserInfoFile <path|SharePoint-URL|OneLake-path>` (BYOD; `UserPrincipalName` required, other columns
 optional/alias-aware). For privacy-restricted tenants, pair it with `-Deidentify` to anonymise user
 identities. See [`scripts/README.md`](scripts/README.md) for all parameters.
@@ -163,7 +171,8 @@ identities. See [`scripts/README.md`](scripts/README.md) for all parameters.
     -SiteId '<host>,<siteguid>,<webguid>' -DriveId 'b!...' -FolderPath '/AIBV'
 ```
 
-Lands as fixed names `copilot_interactions_rollup.csv` + `copilot_users_rollup.csv` (overwrites the previous run).
+Lands as fixed names `copilot_interactions_rollup.csv` + `copilot_users_rollup.csv` (overwrites the previous run),
+plus `agents_365.csv` when the manifest lists an Agent 365 registry (or you pass `-Agents365Csv`).
 
 ### 5. Schedule — [`Register-TaskScheduler.ps1`](scripts/Register-TaskScheduler.ps1)
 
@@ -177,7 +186,9 @@ Seed the interactions file once manually (the back-fill run above), then registe
     -FolderPath '/AIBV' -Days 2 -AppendFile Purview_CopilotInteraction_Rollup.csv -RunAt '02:00'
 ```
 
-Add `-RunAsUser DOMAIN\svc_aibv` for a service account. Runs under the app registration; the secret
+Add `-IncludeAgent365Info` to refresh the Agent 365 registry on each run (plus `-Agents365Csv <file>`
+for the CSV fallback, or on its own without an Agent 365 licence), and
+`-RunAsUser DOMAIN\svc_aibv` for a service account. Runs under the app registration; the secret
 is **not** stored in the task. (Secretless managed-identity scheduling is WIP — see [`azure-container/`](azure-container/).)
 
 ### 6. Connect the template
@@ -189,7 +200,8 @@ is **not** stored in the task. (Secretless managed-identity scheduling is WIP �
    |---|---|
    | Copilot Interactions File | `https://<tenant>.sharepoint.com/.../copilot_interactions_rollup.csv` |
    | Org Data File | `https://<tenant>.sharepoint.com/.../copilot_users_rollup.csv` |
-   | Agent 365 *(optional)* | blank, or a SharePoint URL to your Agents 365 export |
+   | Agent 365 *(optional)* | blank, or `https://<tenant>.sharepoint.com/.../agents_365.csv` |
+   | Feedback File *(optional)* | blank, or a SharePoint URL to the admin centre feedback export |
 
 3. **Load** → **Publish** to a Power BI workspace.
 4. In Power BI Service: dataset **Settings → Data source credentials** → sign in to SharePoint, **Privacy: None**.
@@ -204,23 +216,30 @@ is **not** stored in the task. (Secretless managed-identity scheduling is WIP �
 ## 📚 Dashboard pages
 
 <details>
-<summary>13 report pages — activation, adoption, value, maturity, governance &amp; appendices</summary>
+<summary>15 report pages — activation, adoption, habits, agents, tasks, value, model and Cowork fit, readiness &amp; appendices</summary>
 
 | Page | Purpose |
 |---|---|
-| **◆ Activation** | Activation across teams — licensed vs unlicensed, active vs inactive |
-| **🎯 Readiness** | Ranks unlicensed / low-adoption users by upgrade‑priority score |
-| **📡 Adoption** | User counts, coverage %, licensed vs unlicensed reach |
-| **🪙 Consumption** | Copilot &amp; agent consumption — credits / messages over time |
-| **🔮 Activity** | Copilot and agent usage, tasks and behaviour mix |
-| **🚀 Value** | Hours saved, dollar‑equivalent assisted value, and the business case |
-| **🌱 Maturity** | Progression: Asking → Finding → Consuming → Producing → Delegating |
-| **🛡 Agent Health** | Agent resolution, abandonment, escalation and response time |
-| **📈 Heatmap** | Activity heatmap across the reporting period |
-| **🏅 Leaderboard** | Top users, agents, and functions |
-| **📘 Appendix: Glossary** | Metric definitions and research sources |
-| **🧬 Appendix: Signal Table** | Trace raw signals through to value (audit trail) |
-| **📘 Appendix: Key Concepts** | Methodology and key‑concept explainers |
+| **◆ Activation** | Licensed vs unlicensed, active vs inactive users, across teams |
+| **📡 Adoption** | Adoption and reach, and usage trends by tool |
+| **🌱 Habit Formation** | How usage matures into habits over time |
+| **🛡 Agent Registry** | Agent catalogue, tenant builds and observed use; registry detail needs the optional **Agent 365** source |
+| **🔮 Task Breakdown** | What Copilot, agents and Cowork are used for, by task category |
+| **🚀 Estimated Value** | Hours saved and assisted value, by task and function |
+| **🧠 Model Fit** | Which AI models handle which tasks, and how well each session's model fits the task (High / Medium / Low) |
+| **🧭 Cowork Fit** | How well each Cowork task suits Cowork (High / Medium / Low fit), and why |
+| **🎯 Cowork Readiness** | Where to roll out Cowork next, from observed signals, ranked by organization, then user |
+| **🎯 License Readiness** | Where to roll out Copilot licences next, from observed unlicensed use |
+| **💬 User Feedback** | User satisfaction and sentiment; needs the optional feedback export |
+| **🏅 Leaderboard** | Usage rankings for users, agents and functions |
+| **📈 Trend Heatmap** | Weekly trend of a selected metric |
+| **📘 Appendix: Glossary** | Definitions, evidence limits and guidance |
+| **🧬 Appendix: Signal - Impact Table** | AI tasks performed → human-time estimate → value, with editable assumptions |
+
+A hidden **⚖ License Allocation** page (expansion candidates and dormancy review) is kept for
+drill-through. Every template ships this same report; only the data connection differs.
+The Tool pills at the top of each page filter on `Agent Filter` (Copilot, Agents, Cowork);
+`Environment` is licensing only (Licensed / Unlicensed).
 
 </details>
 
@@ -238,7 +257,8 @@ is **not** stored in the task. (Secretless managed-identity scheduling is WIP �
 | Masked UPNs (32-char hex) | M365 Admin → Org settings → Reports → untick "Display concealed names". |
 | `403 Forbidden` on upload | App lacks per-site write — re-run [`ProvisionSiteAccess-SP-AppReg.ps1`](scripts/ProvisionSiteAccess-SP-AppReg.ps1). |
 | `404 Not Found` on upload | `-FolderPath` doesn't exist in SharePoint — create it, or use `/` for the library root. |
-| **Agent Health visuals blank** (`Users shared`, `Active Users`, `Total sessions`, `Exception rate`, `Last Activity Date`) | Expected on the PAX / registry path. `-IncludeAgent365Info` exports the **28-column registry catalogue**, which does not carry usage telemetry — those come from the Admin Center → **Agents** observability export. The template adds the missing columns as typed nulls so refresh still succeeds; land the Admin Center export to populate them. See [`../docs/DATA-DICTIONARY.md`](../docs/DATA-DICTIONARY.md#4-agents_365). |
+| **Agent Registry usage fields blank** (`Active Users`, `Total sessions`, `Exception rate`, `Last Activity Date`) | Expected on the registry path. The catalogue rarely returns usage telemetry; that comes from the Admin Center → **Agents** observability export. The template adds missing columns as typed nulls so refresh still succeeds, and observed use comes from the audit log. See [`../docs/DATA-DICTIONARY.md`](../docs/DATA-DICTIONARY.md#4-agents_365). |
+| Agent Registry shows no creator, Entra ID or blocked flag | You are on `-Agent365Source PAX` (28 columns). Use the default canonical export. |
 | Refresh hits 1 GB / 2-hour cap | Move to [`../3. Fabric/`](../3.%20Fabric/) for high-volume tenants. |
 
 </details>
