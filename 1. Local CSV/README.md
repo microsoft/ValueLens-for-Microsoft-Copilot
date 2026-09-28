@@ -67,6 +67,7 @@ lands — *before* you spend any effort on exports or automation.
    | Copilot Interactions File | `sample-data/copilot_interactions_sample.csv` |
    | Org Data File | `sample-data/copilot_users_sample.csv` |
    | Agent 365 *(optional)* | `sample-data/agents_365_sample.csv` |
+   | Feedback File *(optional)* | `sample-data/product_feedback_sample.csv` |
 
 3. **Load**.
 
@@ -141,7 +142,7 @@ Open **`ValueLens - Local CSV.pbit`** and point the parameters at the rollup CSV
 | Copilot Interactions File | local path to `*_Interactions_*.csv` |
 | Org Data File | local path to `*_Users_*.csv` |
 | Agent 365 *(optional)* | blank, or a local path to the `Get-Agents365Registry.ps1` output ([how](../2.%20SharePoint/scripts/README.md#get-agents365registryps1-on-its-own)); without an Agent 365 licence, the Microsoft 365 admin centre **Agents** export works too |
-| Feedback File *(optional)* | blank, or a local path to the admin centre feedback export |
+| Feedback File *(optional)* | blank, or a local path to the Microsoft 365 admin centre product feedback export (**Health → Product feedback → Export**) |
 
 **Load** — done. To refresh: re-export, re-run the processor, **Refresh** in Desktop.
 
@@ -184,7 +185,8 @@ Agent 365 data. With your own data, export the registry with
 telemetry, so those agent fields stay blank. See the
 [Agent 365 source contract](../docs/DATA-DICTIONARY.md#4-agents_365).
 
-User Feedback loads empty unless you set the optional `Feedback File` parameter. There is no
+User Feedback loads empty unless you set the optional `Feedback File` parameter; the sample data
+includes one (`product_feedback_sample.csv`). There is no
 Credit Meter / cost-consumption input. Do not infer billing credits or transcript health from
 the audit rollups.
 

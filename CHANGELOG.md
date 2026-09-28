@@ -15,6 +15,18 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-09-28 — sample product feedback
+
+- New `1. Local CSV/sample-data/product_feedback_sample.csv` (172 rows): a fabricated
+  Microsoft 365 admin centre product-feedback export, so the User Feedback page fills in from
+  the sample data like every other page. `Build-SampleData.py` generates it from its own
+  random stream, so the other three sample files are unchanged. It uses the same 21-column
+  export shape the Fabric `Copilot_ProductFeedback_Ingester` reads.
+- `.gitignore`: the sample-data exception now matches `1. Local CSV/sample-data/`. It was
+  anchored to a root `sample-data/` folder that doesn't exist, so new sample files were ignored.
+
+---
+
 ## 2026-09-28 — one lean report across all five templates
 
 The Local CSV, SharePoint, Fabric, Fabric OneLake and Power Automate + Dataverse templates had

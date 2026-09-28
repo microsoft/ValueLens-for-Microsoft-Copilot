@@ -43,7 +43,7 @@ https://github.com/user-attachments/assets/bc0712c0-e50b-4c8d-91f4-e9aa61e999a1
 > ### 👉 New here? Start with **[1. Local CSV](1.%20Local%20CSV/)**
 >
 > It ships with a **fabricated sample dataset** that fills the whole dashboard. Open the
-> template, point it at three CSVs, done — **no tenant, no exports, no setup**. Roughly two
+> template, point it at the sample CSVs, done — **no tenant, no exports, no setup**. Roughly two
 > minutes, and it tells you whether the numbers are worth wiring up before you wire anything up.
 
 <details>
@@ -73,7 +73,7 @@ Dataverse-centric → **4**.
 
 | Path | Licence needed | Refresh | Setup | Scale | Best for |
 |---|---|---|---|---|---|
-| **[1. Local CSV](1.%20Local%20CSV/)** · *start here* 🧪 | Power BI Desktop only | Manual — re-export, re-run, refresh | **Sample data included.** Open the template, point it at three CSVs. ~2 min | One-off; a local file path, so high volumes get slow | Seeing it working now, or a one-off look at your own numbers |
+| **[1. Local CSV](1.%20Local%20CSV/)** · *start here* 🧪 | Power BI Desktop only | Manual — re-export, re-run, refresh | **Sample data included.** Open the template, point it at the sample CSVs. ~2 min | One-off; a local file path, so high volumes get slow | Seeing it working now, or a one-off look at your own numbers |
 | **[2. SharePoint](2.%20SharePoint/)** | Power BI **Pro** | Scheduled, hands-off | App registration + a SharePoint library + a scheduled extract task | Up to Pro's 1 GB model / 2-hour refresh cap | Automatic refresh without Fabric or Premium |
 | **[3. Fabric](3.%20Fabric/)** · *recommended* | **Fabric capacity** (F2+ or trial), Premium or PPU | Pipeline-orchestrated, plus a success-gated model refresh | Lakehouse + app registration + notebooks + pipeline | Tenant scale — Lakehouse ingestion, no file caps | High volume, plus the optional feedback and Agent 365 sources |
 | **[4. Power Automate + Dataverse](4.%20Power%20Automate%20+%20Dataverse/)** · *preview* | Power Automate premium + Dataverse capacity, plus Power BI | Scheduled collector + runner; you advance the snapshot parameter by hand | Collector solution + Dataverse tables + a Python refresh runner | Preview — validated on a bounded demo interval; benchmark before a production cadence | Tenants already collecting Copilot interactions into Dataverse |

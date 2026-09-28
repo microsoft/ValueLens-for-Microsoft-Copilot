@@ -1,6 +1,6 @@
 # Sample data — try ValueLens with no tenant setup
 
-Three CSVs that populate the dashboard end to end, so you can see how the numbers
+Four CSVs that populate the dashboard end to end, so you can see how the numbers
 land before wiring anything up to your own tenant.
 
 | File | Feeds the template parameter | Rows |
@@ -8,6 +8,7 @@ land before wiring anything up to your own tenant.
 | `copilot_interactions_sample.csv` | **Copilot Interactions File** | 3,271 |
 | `copilot_users_sample.csv` | **Org Data File** | 260 |
 | `agents_365_sample.csv` | **Agent 365** *(optional)* | 50 |
+| `product_feedback_sample.csv` | **Feedback File** *(optional)* | 172 |
 
 ## Quick start
 
@@ -28,7 +29,7 @@ export — the data is synthetic **by construction rather than by redaction**, w
 can confirm by reading the generator rather than by trusting a scrub.
 
 - All users are `userNNNN@contoso-demo.com`
-- Departments, job titles, agent names and offices are invented
+- Departments, job titles, agent names, offices, prompts and feedback comments are invented
 - No real UPNs, tenant IDs, workspace endpoints, URLs or prompt text
 
 It models a ~260-person company over roughly two months: ~62% licensed, uneven
@@ -64,6 +65,15 @@ Agent Registry page populates the same way it does from `Get-Agents365Registry.p
 
 Cowork and Scout adoption ramps up across the window and is gated per user, rather than
 appearing fully formed on day one.
+
+`product_feedback_sample.csv` has the shape of the Microsoft 365 admin centre **Product
+feedback** export (21 columns, verbatim headers), so the User Feedback page populates. About 5%
+of prompts carry a thumbs up or down, each tied to a real sample prompt (same user, same app or
+agent, submitted minutes later). Satisfaction is about 69% overall and varies from 50% to 91%
+across apps, so the per-surface breakdown has something to show. Agent ratings are thin (one
+to four per agent), as in real exports. Autonomous agents get none, because nobody is
+there to rate them. The same file also works on the Fabric path: drop it in
+`Files/product_feedback/` and run `Copilot_ProductFeedback_Ingester`.
 
 ## Regenerating
 
@@ -105,7 +115,7 @@ auditable rather than asserted.
 ## Also useful as a test fixture
 
 Because the files satisfy the template's full column contract — 55 interaction columns,
-84 org columns, 38 agent columns — they double as a regression fixture for template
+84 org columns, 38 agent columns, 21 feedback columns — they double as a regression fixture for template
 changes. If a model edit breaks the load path, loading this dataset surfaces it without
 needing tenant access.
 
