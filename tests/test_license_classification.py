@@ -4,6 +4,7 @@ import contextlib
 import functools
 import io
 import json
+import re
 import unittest
 import zipfile
 from pathlib import Path
@@ -152,8 +153,10 @@ class LicenseClassificationTests(unittest.TestCase):
                 table = next(t for t in model["tables"] if t["name"] == "Copilot Licensed")
                 expression = table["partitions"][0]["source"]["expression"]
                 expression = "\n".join(expression) if isinstance(expression, list) else expression
-                self.assertNotIn("Assigned Products", expression)
-                self.assertNotIn("Assigned_Products", expression)
+                # The lean pass drops unused export columns by name; dropping is not classifying.
+                read = re.sub(r"Table\.RemoveColumns\([^{]*\{[^}]*\}", "", expression)
+                self.assertNotIn("Assigned Products", read)
+                self.assertNotIn("Assigned_Products", read)
                 self.assertIn('"Has license"', expression)
                 if "3. Fabric" in path.parts:
                     self.assertIn('FabricTable("copilot_licensed_users")', expression)

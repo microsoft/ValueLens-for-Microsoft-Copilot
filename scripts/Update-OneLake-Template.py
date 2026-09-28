@@ -1,4 +1,8 @@
-"""Repack only the authoritative OneLake PBIT's two FabricTable query copies."""
+"""Repack only the authoritative OneLake PBIT's FabricTable query copies.
+
+DataModelSchema always holds one; UnappliedChanges holds the second only when the
+template was saved with pending Power Query edits (current templates have none).
+"""
 import argparse
 import copy
 import hashlib
@@ -56,8 +60,8 @@ def read_archive(data):
         names = [info.filename for info in infos]
         if len(names) != len(set(names)):
             raise ValueError("Duplicate ZIP members are not safe to update")
-        if not set(PARTS).issubset(names):
-            raise ValueError("Missing DataModelSchema or UnappliedChanges")
+        if "DataModelSchema" not in names:
+            raise ValueError("Missing DataModelSchema")
         payloads = {info.filename: archive.read(info) for info in infos}
         return infos, payloads, archive.comment
 
@@ -89,7 +93,7 @@ def build_template(original, canonical):
         raise ValueError("The canonical FabricTable helper is empty")
     infos, payloads, comment = read_archive(original)
     changed = []
-    for member in PARTS:
+    for member in (m for m in PARTS if m in payloads):
         document = json.loads(payloads[member].decode("utf-16-le"))
         record, field = helper_record(document, member)
         if record[field] == lines:
@@ -111,7 +115,7 @@ def build_template(original, canonical):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="Check both query copies without writing")
+    parser.add_argument("--check", action="store_true", help="Check the query copies without writing")
     args = parser.parse_args(argv)
     original = TEMPLATE.read_bytes()
     rebuilt, changed = build_template(original, SOURCE.read_bytes())
@@ -125,10 +129,11 @@ def main(argv=None):
         if TEMPLATE.read_bytes() != rebuilt:
             raise ValueError("Written template does not match the validated in-memory ZIP")
     _, payloads, _ = read_archive(rebuilt)
+    members = [m for m in PARTS if m in payloads]
     print("OneLake template: " + ("updated " + ", ".join(changed) if changed else "current"))
-    print(f"Preserved {len(payloads) - len(PARTS)} unrelated ZIP member payloads and ZIP metadata")
+    print(f"Preserved {len(payloads) - len(members)} unrelated ZIP member payloads and ZIP metadata")
     print("PBIT SHA256: " + hashlib.sha256(rebuilt).hexdigest())
-    for member in PARTS:
+    for member in members:
         document = json.loads(payloads[member].decode("utf-16-le"))
         print(f"{member} SHA256: {hashlib.sha256(payloads[member]).hexdigest()}")
         print(f"{member} unrelated-fields SHA256: {unrelated_hash(document, member)}")

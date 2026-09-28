@@ -1,9 +1,10 @@
 # ARCHIVED — Cost Consumption (M365 Admin Center) setup reference
 
 > **ARCHIVED / reference only — these landing flows are not recommended for new deployments.**
-> Historical instructions are retained below. The [core ingester](../../notebooks/Copilot_Cost_Consumption_Ingester.ipynb)
-> and [base Fabric build](../../README.md) remain active, as does the
-> [ProductFeedback flow](../../flows/Copilot_ProductFeedback_Email_to_OneLake.json).
+> Historical instructions are retained below. The [ingester](../notebooks/Copilot_Cost_Consumption_Ingester.ipynb)
+> is archived too: no template reads its table since the Credit Meter page was retired. The
+> [base Fabric build](../../README.md) and the
+> [ProductFeedback flow](../../flows/Copilot_ProductFeedback_Email_to_OneLake.json) remain active.
 
 **Who this is for:** anyone lighting up the **first Consumption page** on the dashboard — the one
 that shows per-user **Cowork / WorkIQ / Other** credit split and monthly credit usage against the
@@ -105,7 +106,7 @@ permissions as the credit-consumption flows — see the
 
 This turns the CSV into one tidy table the dashboard can read.
 
-1. In your Fabric workspace, import **`../../notebooks/Copilot_Cost_Consumption_Ingester.ipynb`**
+1. In your Fabric workspace, import **`../notebooks/Copilot_Cost_Consumption_Ingester.ipynb`**
    (**+ New → Import notebook**) — *or* open it if it's already there.
 2. Attach it to the **`<your-lakehouse>`** lakehouse and **pin it as default** (📌).
 3. Click **Run all**. It finishes in well under a minute.

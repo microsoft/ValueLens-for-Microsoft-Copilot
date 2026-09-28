@@ -34,12 +34,11 @@ The optional Spark check in `test_snapshot_safety.py` skips when local PySpark /
 Spark is unavailable; the default CI job does not install Spark. Local tests do
 not certify Fabric execution, tenant permissions or Desktop / Service refresh.
 
-The full command above also runs known pre-existing Dataverse template-contract
-failures and a registry test with stale notebook-cell indexes. CI temporarily
-deselects only those exact cases, with reasons in
-[the tests workflow](.github/workflows/tests.yml). Use that workflow's pytest
-command to reproduce its gated subset; do not treat exclusions as passing tests.
-Remove an exclusion when a separate, validated template fix resolves it.
+CI runs the full suite with no exclusions. The archive-sync and Dataverse
+directory-refresh checks launch PowerShell 7 (`pwsh`); on a machine with only
+Windows PowerShell 5.1 or a restrictive execution policy they fail at setup
+rather than on template content. Don't bypass the execution policy to run them;
+rely on CI or install PowerShell 7.
 
 ## Repository conventions
 

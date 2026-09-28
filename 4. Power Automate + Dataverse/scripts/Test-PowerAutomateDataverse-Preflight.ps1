@@ -3,7 +3,7 @@
     Preflight checks for the Power Automate + Dataverse pathway.
 
 .DESCRIPTION
-    Verifies that the required local build assets exist and that any supplied URLs
+    Verifies that the required local assets exist and that any supplied URLs
     are well formed (strict HTTPS). On any failure of a REQUIRED check the script
     throws an aggregate error (non-zero exit) rather than silently succeeding.
 
@@ -53,9 +53,7 @@ function Test-StrictHttpsUrl {
     return $true
 }
 
-$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $pathwayRoot = Split-Path -Parent $PSScriptRoot
-$buildScript = Join-Path $PSScriptRoot 'Build-PowerAutomateDataverse-Template.py'
 $bridgeScript = Join-Path $PSScriptRoot 'Build-DataverseCoreFeeds.py'
 $rawCaptureScript = Join-Path $PSScriptRoot 'Invoke-CopilotAuditRawCapture.ps1'
 $prepareScript = Join-Path $PSScriptRoot 'Prepare-CollectorRawCapture.py'
@@ -71,8 +69,6 @@ function Add-Check {
     $checks.Add([pscustomobject]@{ Check = $Check; Required = $Required; Result = $Result; Detail = $Detail })
 }
 
-Add-Check 'Source template' (Test-Path (Join-Path $repoRoot '2. SharePoint\ValueLens - SharePoint.pbit')) 'Base template for the additive pathway'
-Add-Check 'Build script' (Test-Path $buildScript) $buildScript
 Add-Check 'Core bridge script' (Test-Path $bridgeScript) 'Requires full raw AuditData; rejects summary-only collector rows'
 Add-Check 'Raw capture/backfill script' (Test-Path $rawCaptureScript) 'Captures full Graph audit payloads; Dataverse write is opt-in'
 Add-Check 'Raw reuse patch tool' (Test-Path $prepareScript) 'Adapts a private CopilotInteractionLogging zip to add raw retention'
@@ -81,7 +77,7 @@ foreach ($script in @('Deploy-DataverseCoreSchema.py', 'Export-EntraCoreSnapshot
     $scriptPath = Join-Path $PSScriptRoot $script
     Add-Check $script (Test-Path $scriptPath) $scriptPath
 }
-Add-Check 'Built template' (Test-Path $templatePath) $templatePath
+Add-Check 'Template' (Test-Path $templatePath) $templatePath
 
 if ($DataverseUrl) {
     Add-Check 'Dataverse URL (strict https)' (Test-StrictHttpsUrl $DataverseUrl) $DataverseUrl

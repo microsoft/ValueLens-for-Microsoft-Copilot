@@ -4,8 +4,8 @@ Guidance for the current Fabric notebook set — especially the reviewed snapsho
 and merge-key changes.
 
 This is the base **No-Studio** build: three core sources — **audit logs**, **licensed users**, and
-**org data**. Optional add-ons (Cowork / Work IQ consumption, product feedback, Agents 365) follow the
-same rules; Copilot Studio agent-transcript analytics and PPAC message-credit tables live in the
+**org data**. Optional add-ons (product feedback, Agents 365) follow the
+same rules; Cowork / Work IQ credit consumption is [archived](../archive/notebooks/). Copilot Studio agent-transcript analytics and PPAC message-credit tables live in the
 archived [Fabric + Copilot Studio](../archive/extended/Fabric%20+%20Copilot%20Studio/) build,
 kept as reference rather than a recommended active deployment.
 
@@ -22,7 +22,7 @@ The current core path is **not** "append everything forever". It now mixes
 | **Licensed users** → `copilot_licensed_users` (`Copilot_Licensed_Users_Direct_Ingester`) | **overwrite** | Snapshot source. Rejects empty, malformed and conflicting duplicate rows before replacement. |
 | **Org / people** → `copilot_org_data` (`Copilot_Org_Data_Direct_Ingester`) | **overwrite** | Snapshot source. Rejects malformed pages, conflicting duplicates and manager cycles before replacement. |
 | **Agent 365 registry** → `agents_365` (`Copilot_Agent365_Registry_Ingester`) | **overwrite** | Snapshot source. Rejects rows with missing `Title ID` and conflicting duplicates. |
-| **Agent 365 CSV lander** → `agents_365` (`Copilot_Agent365_Lander`) | **overwrite** | Snapshot fallback. Use only as an alternative source for the same table. |
+| **Agent 365 CSV lander** → `agents_365` (`Copilot_Agent365_Lander`) | **overwrite** | Snapshot fallback. The shipped pipeline runs it only when the registry ingester fails (`Run_Agent365_CSV_Fallback`). |
 | **Product feedback** → `user_feedback` (`Copilot_ProductFeedback_Ingester`) | **overwrite only** | `append` is explicitly rejected; missing exports preserve the existing snapshot unless you allow an empty first placeholder. |
 
 ### Parsed audit keys and deliberate upgrade path

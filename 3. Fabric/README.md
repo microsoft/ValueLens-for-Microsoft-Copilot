@@ -83,10 +83,11 @@ just want to see the thing working first, start at [1. Local CSV](../1.%20Local%
 | SQL | **Fabric SQL Endpoint** (copy the Lakehouse SQL connection server) and **Lakehouse Name** |
 | OneLake | **Fabric Workspace ID** and **Lakehouse ID** (lowercase GUIDs from the Lakehouse URL, without surrounding spaces) |
 
-Set **RangeStart** (inclusive) and **RangeEnd** (exclusive) to cover the required history.
-Keep **Enable_ProductFeedback** and **Enable_Agent365** set to `Exclude` until their
-tables are ready; use `Include` when enabling them. Sign in with an Organizational
-Account that can read the source, then load in Desktop.
+Set **RangeStart** (inclusive) and **RangeEnd** (exclusive) to cover the required history
+(the templates default to 1 Jan 2025 – 1 Jan 2027). **Enable_ProductFeedback** and
+**Enable_Agent365** default to `Include`: a table that has not been landed yet loads empty, so
+the report still refreshes. Set either to `Exclude` to skip that fetch. Sign in with an
+Organizational Account that can read the source, then load in Desktop.
 
 After publishing, configure the corresponding data-source credentials in Power BI
 Service. For OneLake use Organizational Account/OAuth2 at the **Tables-root URL**.
@@ -116,14 +117,14 @@ Power BI semantic model refresh (add native pipeline activity; not included in s
 
 ```text
 Graph Agent 365 registry ---------> Copilot_Agent365_Registry_Ingester ----> agents_365 -----------+
-Files/agent365/agents.csv -------> Copilot_Agent365_Lander --------------- > agents_365 -----------+--> processor + model
+Files/agent365/agents.csv -------> Copilot_Agent365_Lander (if API fails) -> agents_365 -----------+--> processor + model
 Files/product_feedback/*.csv ----> Copilot_ProductFeedback_Ingester -------> user_feedback --------> model
 ```
 
 - **Licence data feeds both the processor and the model.**
 - **Org data feeds the model only.**
-- **`agents_365` can come from either the registry ingester or the CSV lander, never both.**
-- The **shipped pipeline JSON currently wires `EnableAgent365` to the CSV lander**, not the registry ingester.
+- **`agents_365` comes from the registry ingester (API) first; the CSV lander runs only if the API step fails.**
+- The **shipped pipeline JSON runs `EnableAgent365` as API primary with a CSV fallback**, so tenants without an Agent 365 licence still land the admin-centre export.
 - **Add Power BI refresh after all model-source branches succeed** using the [native activity](pipelines/README.md#refresh-power-bi-from-the-pipeline); this repo does **not** ship it inside the pipeline JSON.
 
 ### Backfill vs incremental
@@ -152,10 +153,10 @@ recorded in [`CHANGELOG.md`](../CHANGELOG.md).
 
 | Source | Notebook | Notes |
 |---|---|---|
-| Agents 365 registry | `notebooks/Copilot_Agent365_Registry_Ingester.ipynb` | Preferred unattended path when Graph permissions are available. |
-| Agents 365 CSV fallback | `notebooks/Copilot_Agent365_Lander.ipynb` | Manual/export fallback. The shipped pipeline invokes this branch. |
+| Agents 365 registry | `notebooks/Copilot_Agent365_Registry_Ingester.ipynb` | **Primary.** Unattended Graph API pull; needs an Agent 365 licence and the Graph permissions. |
+| Agents 365 CSV fallback | `notebooks/Copilot_Agent365_Lander.ipynb` | **Fallback.** The shipped pipeline runs it only if the API step fails (e.g. no Agent 365 licence); lands `Files/agent365/agents.csv`. |
 | Product feedback | `notebooks/Copilot_ProductFeedback_Ingester.ipynb` | Reads landed files from `Files/product_feedback/`; safe overwrite snapshot only. |
-| Cowork / Work IQ consumption | `notebooks/Copilot_Cost_Consumption_Ingester.ipynb` | Optional export-only source; landing flows and guides are [archived reference](archive/flows/COST-CONSUMPTION.md), not active setup. |
+| Cowork / Work IQ consumption | [`archive/notebooks/Copilot_Cost_Consumption_Ingester.ipynb`](archive/notebooks/) | **Archived.** No template reads it since the Credit Meter page was retired; kept with its [landing flows and guides](archive/flows/COST-CONSUMPTION.md) for your own analysis only. |
 | Workday / HRIS org attributes | [`notebooks/optional/workday-org-data/`](notebooks/optional/workday-org-data/README.md) | Optional. Adds only missing columns to an existing org snapshot, joining on work email; existing Entra values remain authoritative. Can also land a standalone user-level org table without Entra. For enrichment, run after a fresh Graph org ingestion; for recurring HRIS-only refreshes, use explicit standalone mode. |
 
 The former [Copilot Studio add-on](archive/extended/Fabric%20+%20Copilot%20Studio/README.md)
@@ -188,38 +189,42 @@ The four queries intentionally use:
 ## 📚 Dashboard pages
 
 <details>
-<summary>13 report pages — shared by the SQL and OneLake templates, with optional Agent 365 and feedback signals</summary>
+<summary>15 report pages — activation, adoption, habits, agents, tasks, value, model and Cowork fit, readiness &amp; appendices</summary>
 
-Both shipped Import templates contain the same pages:
-
-| Page | Purpose / source |
+| Page | Purpose |
 |---|---|
-| **📘 Key Concepts** | Methodology and key-concept explainers |
-| **◆ Activation** | Licensed vs unlicensed, active vs inactive users |
-| **🎯 Readiness** | Upgrade-priority signals |
-| **📡 Adoption** | User counts, coverage and reach |
-| **🌱 Power Users** | Usage maturity and behaviour-stage progression |
-| **🔮 Activity** | Copilot and agent usage, tasks and behaviour mix |
-| **🚀 Value** | Hours saved, assisted value and business case; feedback-bound visuals need the optional feedback source |
-| **🛡 Agent Health** | Agent inventory / telemetry; Agent 365 enrichment is **optional**, gated by `Enable_Agent365` |
-| **💬 Feedback** | Product-feedback analysis — **optional**, requires `user_feedback` and `Enable_ProductFeedback = Include` |
-| **📈 Heatmap** | Activity across the reporting period |
-| **🏅 Leaderboard** | Top users, agents and functions |
-| **📘 Appendix: Glossary** | Metric definitions and research sources |
-| **🧬 Appendix: Signal - Impact Table** | Trace signals through to their value impact |
+| **◆ Activation** | Licensed vs unlicensed, active vs inactive users, across teams |
+| **📡 Adoption** | Adoption and reach, and usage trends by tool |
+| **🌱 Habit Formation** | How usage matures into habits over time |
+| **🛡 Agent Registry** | Agent catalogue, tenant builds and observed use; registry detail needs the optional **Agent 365** source |
+| **🔮 Task Breakdown** | What Copilot, agents and Cowork are used for, by task category |
+| **🚀 Estimated Value** | Hours saved and assisted value, by task and function |
+| **🧠 Model Fit** | Which AI models handle which tasks, and how well each session's model fits the task (High / Medium / Low) |
+| **🧭 Cowork Fit** | How well each Cowork task suits Cowork (High / Medium / Low fit), and why |
+| **🎯 Cowork Readiness** | Where to roll out Cowork next, from observed signals, ranked by organization, then user |
+| **🎯 License Readiness** | Where to roll out Copilot licences next, from observed unlicensed use |
+| **💬 User Feedback** | User satisfaction and sentiment; needs the optional feedback export |
+| **🏅 Leaderboard** | Usage rankings for users, agents and functions |
+| **📈 Trend Heatmap** | Weekly trend of a selected metric |
+| **📘 Appendix: Glossary** | Definitions, evidence limits and guidance |
+| **🧬 Appendix: Signal - Impact Table** | AI tasks performed → human-time estimate → value, with editable assumptions |
+
+A hidden **⚖ License Allocation** page (expansion candidates and dormancy review) is kept for
+drill-through. Every template ships this same report; only the data connection differs.
+The Tool pills at the top of each page filter on `Agent Filter` (Copilot, Agents, Cowork);
+`Environment` is licensing only (Licensed / Unlicensed).
 
 Core pages use audit interactions, licences and org data. Leave optional toggles at
 `Exclude` until their tables are ready. A registry-only `agents_365` export supplies
 inventory, **not** observability telemetry; unavailable health fields remain blank.
 See the [source contract](../docs/DATA-DICTIONARY.md#optional-tables).
 
-**Consumption boundary:** the optional Cowork / Work IQ ingester and the
-[documented consumption contract](../docs/DATA-DICTIONARY.md#6-copilot_cost_consumption--copilot-credit-usage-mac-cost-management-export)
-exist, but the shipped Fabric templates currently contain **no Consumption page,
-cost-consumption model table or `Enable_CostConsumption` parameter**. Ingesting that
-source alone does not add a report page. The dictionary's broader cross-template
-claim is not a guarantee of packaged report support. PPAC credit detail and Studio
-transcript pages remain archived, not part of this active build.
+**Consumption boundary:** no template reads cost consumption any more (the Credit Meter
+page was retired from every variant). `Copilot_Cost_Consumption_Ingester` is
+[archived](archive/notebooks/) with its
+[contract](../docs/DATA-DICTIONARY.md#6-copilot_cost_consumption--copilot-credit-usage-mac-cost-management-export),
+for your own analysis only. PPAC credit detail and Studio transcript pages remain
+archived, not part of this active build.
 
 </details>
 

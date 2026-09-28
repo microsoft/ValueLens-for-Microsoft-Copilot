@@ -15,6 +15,87 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-09-28 — one lean report across all five templates
+
+The Local CSV, SharePoint, Fabric, Fabric OneLake and Power Automate + Dataverse templates had
+drifted apart (different page sets and models). They now ship the same report and the same 198
+measures; only the data-source layer differs. Each `.pbit`
+is about 1.2 MB (previously 4.7–10.5 MB) because it no longer carries pending query edits
+(`UnappliedChanges`). Setup steps are unchanged except where noted in the path READMEs.
+
+### Report
+
+- 15 visible pages: Activation, Adoption, Habit Formation, Agent Registry, Task Breakdown,
+  Estimated Value, Model Fit, Cowork Fit, Cowork Readiness, License Readiness, User Feedback,
+  Leaderboard, Trend Heatmap, and the Glossary and Signal – Impact appendices. License Allocation
+  ships hidden.
+- **Model Fit** (new) grades every session High, Medium or Low fit for the model it used, across
+  every tool, with ranked model usage and fit by tool.
+- **Cowork Fit** (new) shows what share of each Cowork task is High, Medium or Low fit, why, and
+  which people drive it.
+- **Cowork Readiness** ranks where to roll out Cowork next by organization, then user, the
+  same way License Readiness does.
+- **User Feedback** reads the optional product-feedback export, now on every template.
+- Removed: the Key Concepts introduction page (the Glossary covers it) and, from the SharePoint
+  template, the Credit Meter page.
+- Money values share one display symbol, the `Currency Symbol Value` measure in `Assumptions`
+  (default `£`). It changes the symbol only; there is no FX conversion.
+
+### Model
+
+- Lean pass: tables, measures, relationships and source columns that nothing reads were removed,
+  and duplicate measures were folded into one survivor each.
+- `Environment` is now the licensing dimension only (Licensed / Unlicensed). Cowork is flagged in
+  `Agent Filter`, as the Fabric notebook already did, so a Licensed filter no longer drops licensed
+  Cowork work. The Local CSV processor (`Purview_CopilotInteraction_Processor_v4.0.0.py`) and the
+  sample data follow the same rule.
+- `Top Value Outcome` ranks Cowork task categories when the filter context is Cowork only, so the
+  Adoption page's Cowork card no longer shows the generic chat outcome.
+
+### Agents 365: API first, CSV fallback
+
+- **Fabric:** the pipeline runs `Copilot_Agent365_Registry_Ingester` (Graph API) and, only if it
+  fails, `Copilot_Agent365_Lander` (admin-centre CSV). See the
+  [pipelines README](3.%20Fabric/pipelines/README.md) for the migration steps.
+- **Other paths:** [`Get-Agents365Registry.ps1`](2.%20SharePoint/scripts/Get-Agents365Registry.ps1)
+  writes the same 48-column registry as the Fabric notebook. `Run-PAX-AIBV.ps1
+  -IncludeAgent365Info` runs it after PAX; add `-Agents365Csv` to fall back to the admin-centre
+  export, or use `-Agents365Csv` alone in tenants without an Agent 365 licence.
+- **Fabric templates:** `Enable_Agent365` and `Enable_ProductFeedback` default to `Include`, and a
+  table that hasn't been landed yet loads empty instead of failing the refresh.
+
+### Retired and archived
+
+- No template reads cost consumption any more: the `copilot_cost_consumption`, `Credit Budget` and
+  `Credit Unit Cost` tables and the `Cost Consumption File` parameter left the SharePoint and
+  Dataverse templates.
+  `Copilot_Cost_Consumption_Ingester` moved to
+  [`3. Fabric/archive/notebooks/`](3.%20Fabric/archive/notebooks/); seven shared notebooks remain.
+- Power Automate + Dataverse: the `SharePoint Agents` table and the `Include SharePoint agent
+  inventory` parameter were dropped (no page used them), and `Use SharePoint CSV fallback` now
+  defaults to `false`. The template is built from the same project as the other four, so its old
+  builder moved to [`archive/scripts/`](4.%20Power%20Automate%20+%20Dataverse/archive/README.md).
+
+### Tests
+
+- `tests/test_core_templates.py` now checks all five templates: identical report and measures,
+  every report field reference resolves, neutral parameter defaults, no machine-bound parts or
+  local paths, page inventory, bookmark targets and the optional Fabric tables' empty-load guard.
+- The Dataverse, glossary and schema-hash tests were updated for the new templates, and CI now
+  runs the full suite with no deselected tests.
+
+### What was and wasn't validated
+
+Every template was built from one project and passed structural, PBIR-schema and field-reference
+checks. The report was refreshed in Power BI Desktop against a Fabric Lakehouse, and against
+synthetic data for the Local CSV, SharePoint and Dataverse builds. The Agent 365 fallback logic
+was exercised with a test harness and fixture data, not a live tenant.
+
+This does **not** validate Power BI Service refresh, tenant Graph permissions or a production
+Agent 365 run. Validate those in your own deployment before switching production over.
+
+---
+
 ## 2026-09-15 — reviewed Fabric notebook set
 
 These notes describe what changed in the notebooks under

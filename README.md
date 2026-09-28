@@ -133,14 +133,16 @@ Availability varies by deployment path. Use the path README for the maintained s
 | Copilot interactions (audit logs) | ✅ Core | Microsoft Purview; path 4 retains full raw payloads in Dataverse before processing |
 | Licensed users | ✅ Core | Microsoft 365 Admin Center / Graph; path 4 publishes curated users to Dataverse |
 | Org data (department / function) | ✅ Core | Microsoft Entra / BYOD equivalent |
-| Agents 365 | ⬜ Optional | Agent 365 export (Fabric path) |
-| Cowork / Work IQ consumption | ⬜ Optional | Microsoft 365 Admin Center export → see the path README; [archived landing-flow reference](3.%20Fabric/archive/flows/COST-CONSUMPTION.md), not active setup |
+| Agents 365 | ⬜ Optional | Graph Agent 365 registry — Fabric notebook, or [`Get-Agents365Registry.ps1`](2.%20SharePoint/scripts/Get-Agents365Registry.ps1) on every other path (same 48 columns) |
+| Cowork / Work IQ consumption | Not read by the templates | Microsoft 365 Admin Center export; the Credit Meter page was retired. [Archived landing-flow reference](3.%20Fabric/archive/flows/COST-CONSUMPTION.md) only |
 | Credit consumption (billing) | Archived reference only | Power Platform Admin Center export → [archived Fabric + Copilot Studio add-on](3.%20Fabric/archive/extended/) |
-| Product feedback | ⬜ Optional | M365 Admin Center → Health → Product Feedback export (Fabric path optional source) |
+| Product feedback | ⬜ Optional | M365 Admin Center → Health → Product Feedback export (Fabric table, or the `Feedback File` parameter on the other paths) |
 | Copilot Studio agent transcripts | ⬜ Optional | Dataverse `ConversationTranscript` table — use the [Dataverse companion repo ↗](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio) |
 
-Optional sources are gated by `Enable_*` toggles — the dashboard works fine without them. The exact
-export + connect steps live in the path README you choose above.
+Optional sources can be left out — the dashboard works fine without them. On Fabric, the `Enable_*`
+toggles default to `Include` and a table that hasn't been landed loads empty; on the other paths,
+leave the `Agent 365` or `Feedback File` parameter blank. The exact export + connect steps live in
+the path README you choose above.
 
 ---
 
@@ -156,9 +158,10 @@ Maintained page lists live in the path READMEs:
 Archived Studio page reference (not an active deployment):
 [`3. Fabric/archive/extended/Fabric + Copilot Studio/README.md`](3.%20Fabric/archive/extended/Fabric%20+%20Copilot%20Studio/README.md).
 
-Across the maintained paths, the common core centres on activation, readiness, adoption,
-activity, value, leaderboard, heatmap and appendices. Fabric-specific optional additions
-such as feedback are documented in the active Fabric README above; Studio detail is archived.
+Every path ships the same 15-page report (activation, adoption, habit formation, agent registry,
+task breakdown, estimated value, model fit, Cowork fit, Cowork and licence readiness, user
+feedback, leaderboard, trend heatmap and two appendices); only the data connection differs.
+Studio detail is archived.
 
 ---
 

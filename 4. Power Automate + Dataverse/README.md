@@ -1,8 +1,8 @@
 # 4. Power Automate + Dataverse — preview: the same dashboard, Dataverse as the core transport
 
-**Additional preview pathway, same ValueLens dashboard.** The original Local CSV,
-SharePoint and Fabric templates are unchanged. This template reads its required
-interaction and user/licence feeds from Dataverse instead of SharePoint CSVs.
+**Additional preview pathway, same ValueLens dashboard.** Every template ships the same
+report; this one reads its required interaction and user/licence feeds from Dataverse
+instead of SharePoint CSVs.
 A representative bounded interval has been exercised through live solution import,
 manual collection, scoped snapshot publication and a full Power BI Desktop model
 refresh. This remains a preview, not a production-scale or unattended-refresh certification.
@@ -19,7 +19,7 @@ Compatible CopilotInteractionLogging collector package, with local raw-retention
   -> Dataverse: immutable interactions/users snapshot + completed run manifest
   -> ValueLens - Power Automate + Dataverse.pbit
 
-Optional: compatible SharePointAgentLogging -> Dataverse SharePoint-agent inventory
+Optional: compatible SharePointAgentLogging -> Dataverse SharePoint-agent inventory (not read by the current report)
 ```
 
 **Jump to:** [Who it's for](#-who-its-for) · [Prerequisites](#-prerequisites) ·
@@ -52,7 +52,8 @@ written outside the repository.
 The optional SharePoint inventory uses a compatible
 `SharePointAgentLogging` solution and `poc_sharepointagents` contract. Its
 observed file IDs can be joined to decoded `SPO_*` interaction IDs, **never
-agent display names**. Unmatched agents remain unmatched.
+agent display names**. Unmatched agents remain unmatched. The current report
+does not read it (see [the optional inventory step](#optional-add-compatible-sharepoint-agent-inventory)).
 
 Existing `poc_copilotinteractions` summaries do not retain the original message
 IDs and all resource detail required by ValueLens. The extension keeps the
@@ -96,8 +97,8 @@ outside the repository.
   -DataverseUrl 'https://contoso.crm.dynamics.com' -RequirePac
 ```
 
-`pac` is needed for solution import, not for template generation or local
-processor use. Omitting `-RequirePac` permits core build checks without the CLI.
+`pac` is needed for solution import, not for local processor use. Omitting
+`-RequirePac` permits the local checks without the CLI.
 
 ### 2. Provision the four companion tables
 
@@ -226,9 +227,9 @@ it writes Dataverse only with `-ExecuteDataverseWrite`.
 | `Dataverse URL` | The environment origin containing the core tables. |
 | `Core Snapshot ID` | The successful run ID emitted in step 4. |
 | `Use SharePoint CSV fallback` | Leave `false` for the new pathway. |
-| `Include SharePoint agent inventory` | Leave `false` unless you enable the optional lane below. |
 | `Copilot Interactions File` / `Org Data File` | Not required in Dataverse mode; used only with explicit CSV fallback. |
-| `Agent 365` / `Cost Consumption File` | Existing optional SharePoint sources; not invented from audit data. |
+| `Agent 365` *(optional)* | SharePoint URL of `agents_365.csv`, the [`Get-Agents365Registry.ps1`](../2.%20SharePoint/scripts/Get-Agents365Registry.ps1) output (same 48 columns as the Fabric table). Without an Agent 365 licence, upload the Microsoft 365 admin centre **Agents** export instead (`Upload-Rollups-SharePoint.ps1 -Agents365Csv`). Not invented from audit data. |
+| `Feedback File` *(optional)* | SharePoint URL of the admin centre feedback export. |
 
 All three core queries use the **same immutable run ID** and refuse missing,
 incomplete or count-inconsistent snapshots. This prevents combining one run's
@@ -239,6 +240,10 @@ Publish the configured report and set organizational credentials for Dataverse
 
 ### Optional: add compatible SharePoint-agent inventory
 
+> **The current report does not read this inventory.** No page used it, so the lean model
+> dropped the `SharePoint Agents` table and the `Include SharePoint agent inventory` parameter.
+> The import below still lands the Dataverse tables for your own analysis.
+
 ```powershell
 # Dry run, validates the explicit managed package.
 .\Invoke-SharePointAgentLogging-Import.ps1 `
@@ -248,9 +253,7 @@ Publish the configured report and set organizational credentials for Dataverse
 
 For an approved import add `-Execute`; optionally pass a package-generated PAC
 deployment file with `-SettingsFile`. Configure the existing `poc_SP_*`
-environment variables and connections, then run its backfill. Enable
-`Include SharePoint agent inventory` in the PBIT afterward. If explicitly enabled
-but absent or invalid, the inventory query fails rather than hiding the problem.
+environment variables and connections, then run its backfill.
 
 ### Scheduling, security and limits
 
@@ -284,38 +287,42 @@ but absent or invalid, the inventory query fails rather than hiding the problem.
 ## 📚 Dashboard pages
 
 <details>
-<summary>12 report pages — Dataverse core signals, with separate optional agent enrichment</summary>
+<summary>15 report pages — activation, adoption, habits, agents, tasks, value, model and Cowork fit, readiness &amp; appendices</summary>
 
-These are the pages in the shipped preview template, not a promise that every optional
-signal is collected by Power Automate:
-
-| Page | Purpose / source |
+| Page | Purpose |
 |---|---|
-| **📘 Introduction: Key Concepts** | Methodology and key-concept explainers |
-| **◆ Activation** | Licensed vs unlicensed, active vs inactive users |
-| **🎯 Readiness** | Upgrade-priority signals |
-| **📡 Adoption** | User counts, coverage and reach |
-| **🌱 Power Users** | Usage maturity and behaviour-stage progression |
-| **🔮 Activity** | Copilot and agent usage, tasks and behaviour mix |
-| **🚀 Value** | Hours saved, assisted value and business case |
-| **🛡 Agent Health (A365)** | Agent inventory / health signals; Agent 365 enrichment needs the **optional, separate SharePoint CSV** |
-| **📈 Heatmap** | Activity across the reporting period |
-| **🏅 Leaderboard** | Top users, agents and functions |
-| **📘 Appendix: Glossary** | Metric definitions and research sources |
-| **🧬 Appendix: Signal Table** | Trace raw signals through to value |
+| **◆ Activation** | Licensed vs unlicensed, active vs inactive users, across teams |
+| **📡 Adoption** | Adoption and reach, and usage trends by tool |
+| **🌱 Habit Formation** | How usage matures into habits over time |
+| **🛡 Agent Registry** | Agent catalogue, tenant builds and observed use; registry detail needs the optional **Agent 365** source |
+| **🔮 Task Breakdown** | What Copilot, agents and Cowork are used for, by task category |
+| **🚀 Estimated Value** | Hours saved and assisted value, by task and function |
+| **🧠 Model Fit** | Which AI models handle which tasks, and how well each session's model fits the task (High / Medium / Low) |
+| **🧭 Cowork Fit** | How well each Cowork task suits Cowork (High / Medium / Low fit), and why |
+| **🎯 Cowork Readiness** | Where to roll out Cowork next, from observed signals, ranked by organization, then user |
+| **🎯 License Readiness** | Where to roll out Copilot licences next, from observed unlicensed use |
+| **💬 User Feedback** | User satisfaction and sentiment; needs the optional feedback export |
+| **🏅 Leaderboard** | Usage rankings for users, agents and functions |
+| **📈 Trend Heatmap** | Weekly trend of a selected metric |
+| **📘 Appendix: Glossary** | Definitions, evidence limits and guidance |
+| **🧬 Appendix: Signal - Impact Table** | AI tasks performed → human-time estimate → value, with editable assumptions |
+
+A hidden **⚖ License Allocation** page (expansion candidates and dormancy review) is kept for
+drill-through. Every template ships this same report; only the data connection differs.
+The Tool pills at the top of each page filter on `Agent Filter` (Copilot, Agents, Cowork);
+`Environment` is licensing only (Licensed / Unlicensed).
 
 The curated Dataverse snapshot supplies core interactions and users/licences; it does
 **not** manufacture Agent 365 telemetry, transcript outcomes or billing credits.
-Optional SharePoint-agent inventory enriches observed agent identity, not agent health.
-Registry-only Agent 365 data is not an observability export — see the
+Agent 365 registry detail comes from the optional `Agent 365` CSV
+([`Get-Agents365Registry.ps1`](../2.%20SharePoint/scripts/Get-Agents365Registry.ps1)), which is
+an inventory, not an observability export — see the
 [source contract](../docs/DATA-DICTIONARY.md#4-agents_365) and this path's
 [source map](source-map.json).
 
-The model retains optional cost-consumption and feedback inputs, but this packaged
-report has **no Credit Meter / Consumption or Feedback page**. Its page list therefore
-differs from the current SharePoint template; supplying those inputs does not create
-the missing pages. The wider layout-parity claim in Development below should not be
-read as an exact page-count guarantee.
+The report is the same one every template ships. User Feedback loads empty unless the
+optional `Feedback File` parameter points at a feedback export. There is no Credit Meter /
+cost-consumption input.
 
 </details>
 
@@ -332,7 +339,7 @@ read as an exact page-count guarantee.
 | Dashboard doesn't move after a scheduled runner run | Expected. The runner does **not** update Power BI parameters or trigger a refresh. Set `Core Snapshot ID` to the newly completed run, then refresh. |
 | A Dataverse write fails on a large record | Payloads above the 1,048,576-character Dataverse memo limit fail rather than truncate. |
 | Snapshot contains partial or duplicated windows | Pin the bridge with `-SourceRunId` / `-RawStartUtc` / `-RawEndUtc` to a **completed** collector run, and check the collector's terminal status and page/write results first. |
-| Agent inventory query fails | `Include SharePoint agent inventory` is enabled but the optional solution is absent or invalid. It fails rather than hiding the problem — either import the inventory solution or set the parameter back to `false`. |
+| Agent Registry shows observed use but no catalogue detail | `Agent 365` is blank or its URL is wrong. Upload the registry CSV with `Upload-Rollups-SharePoint.ps1 -Agents365Csv` and point the parameter at `agents_365.csv`. |
 | Graph or Dataverse calls rejected | Consent to Graph does **not** grant Dataverse access. Check the runner's application user and its privileges separately — see [`/docs/PERMISSIONS.md`](../docs/PERMISSIONS.md). |
 | Sovereign-cloud endpoint rejected | Not supported by the current runner. Use a commercial-cloud `https://<org>.crm[region].dynamics.com` origin. |
 
@@ -357,18 +364,15 @@ Reference:
 
 ### Development
 
-Rebuild from the current SharePoint template:
-
-```powershell
-python .\Build-PowerAutomateDataverse-Template.py
-python .\Build-PowerAutomateDataverse-Template.py --check
-```
-
-The generator preserves the original report layout and existing measures. It
-updates both model and pending Power Query definitions. Repository tests cover
-source contracts, snapshot safety, collector adaptation, directory classification
-and dry-run helpers. Those local checks do not replace a real solution import,
-authenticated Power Query refresh or demo-tenant metric reconciliation.
+The template is built from the same Power BI project (PBIP) as every other
+ValueLens template, so the report and measures stay identical across pathways
+(`tests/test_core_templates.py` enforces this). The earlier generator that derived
+this template from the SharePoint one is retired to
+[`archive/scripts/`](archive/scripts/); it targets the pre-lean model and must not be
+run against the current templates. Repository tests cover source contracts, snapshot
+safety, collector adaptation, directory classification and dry-run helpers. Those
+local checks do not replace a real solution import, authenticated Power Query
+refresh or demo-tenant metric reconciliation.
 
 The representative live validation reconciled original distinct prompt-message IDs,
 curated message IDs and Desktop DAX counts for the same completed interval. Fact
@@ -376,8 +380,7 @@ row count can exceed distinct-message count because of the dashboard's grain.
 Likewise, `Copilot Licensed` contains the directory's licence flags: its total row
 count is **not** the licensed-seat count; filter `Has license = "TRUE"` for that.
 
-Live fixes are retained in the reusable package adapter and template generator:
-raw writes use the audit GUID as the Dataverse connector row ID, failed writes
-stop paging and fail the run, and model/pending-query metadata remains aligned.
-Deployment-scale throughput, full 90-day collection, non-empty SharePoint-agent
-inventory and automatic Power BI parameter advancement require separate validation.
+Live fixes are retained in the reusable package adapter and the template:
+raw writes use the audit GUID as the Dataverse connector row ID, and failed writes
+stop paging and fail the run. Deployment-scale throughput, full 90-day collection
+and automatic Power BI parameter advancement require separate validation.

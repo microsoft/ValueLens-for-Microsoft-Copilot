@@ -17,6 +17,7 @@ transformation runs* changed (Power Query → Spark).
 |---|---|
 | [`extended/`](extended/README.md) | Copilot Studio extension, credit-consumption landing flows, notebooks and samples. Historical setup only; not a recommended active add-on. |
 | [`flows/`](flows/COST-CONSUMPTION.md) | Cost-consumption email and SharePoint landing flows, plus their [setup guide](flows/COST-CONSUMPTION-SETUP.md) and schema reference. Not recommended for new deployments. |
+| [`notebooks/`](notebooks/) | `Copilot_Cost_Consumption_Ingester.ipynb`, which landed the admin-centre credit export into `copilot_cost_consumption`. Archived when the Credit Meter page was retired; no template reads that table. |
 
 The [core notebooks](../notebooks/) and [ProductFeedback flow](../flows/Copilot_ProductFeedback_Email_to_OneLake.json)
 remain active. The archived extension's `notebooks/_core/` mirror remains

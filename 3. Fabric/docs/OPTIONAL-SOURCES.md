@@ -21,7 +21,9 @@ and the measures simply return `0`/blank.
 | --- | --- | --- |
 | `Enable_ProductFeedback` | `"Include"` | `user_feedback` (ProductFeedback — OCV export) |
 | `Enable_Agent365` | `"Include"` | `agents_365` (Agents 365 registry) |
-| `Enable_CostConsumption` | `"Include"` | `copilot_cost_consumption` (Cowork / Work IQ / Other credits — MAC Cost management export) |
+
+The Local CSV, SharePoint and Dataverse templates have no toggles: a blank `Agent 365` or
+`Feedback File` parameter loads that table empty.
 
 Set a toggle to `"Exclude"` to skip that source entirely (no fetch attempt) — useful when a customer
 hasn't licensed/exported it, or to speed up refresh.
@@ -34,10 +36,11 @@ hasn't licensed/exported it, or to speed up refresh.
 > [Fabric + Copilot Studio](../archive/extended/Fabric%20+%20Copilot%20Studio/) build, not this one.
 > It is reference material, not a recommended active deployment.
 
-> **Cost consumption remains active.** `Enable_CostConsumption` and the core
-> `Copilot_Cost_Consumption_Ingester` are unchanged. Only the four `COST-CONSUMPTION` guides and
-> cost flow JSON moved to [archived flow references](../archive/flows/); they are not recommended
-> active deployment instructions.
+> **Cost consumption is no longer read.** The Credit Meter page was retired from every template,
+> so there is no `Enable_CostConsumption` parameter or cost table in the model. The
+> `Copilot_Cost_Consumption_Ingester` notebook is [archived](../archive/notebooks/) for your own
+> analysis only, and the two `COST-CONSUMPTION` guides and cost flow JSON are
+> [archived flow references](../archive/flows/).
 
 ## 3. The per-table wrapper
 
@@ -76,12 +79,12 @@ Promoted =
 
 Before release, confirm a green refresh for each combination (at minimum):
 
-| Product Feedback | Agent 365 | Cost Consumption | Expected |
-| --- | --- | --- | --- |
-| on (data) | on (data) | on (data) | full dashboard |
-| off | off | off | core-only, no errors |
-| on (missing) | on (missing) | on (missing) | empty optional tables, no errors |
-| on (data) | on (data) | off | cost page blank, rest populated |
+| Product Feedback | Agent 365 | Expected |
+| --- | --- | --- |
+| on (data) | on (data) | full dashboard |
+| off | off | core-only, no errors |
+| on (missing) | on (missing) | empty optional tables, no errors |
+| on (data) | off | Agent Registry detail blank, rest populated |
 
 > ⚠️ These M changes must be opened & refreshed once in **Power BI Desktop** to validate (the edits
 > were made directly in TMDL). Desktop will also assign proper lineage on first save.

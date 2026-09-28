@@ -24,7 +24,6 @@ Fabric + Copilot Studio/
 │   │   ├── Copilot_Licensed_Users_Direct_Ingester.ipynb
 │   │   ├── Copilot_Org_Data_Direct_Ingester.ipynb
 │   │   ├── Copilot_ProductFeedback_Ingester.ipynb
-│   │   ├── Copilot_Cost_Consumption_Ingester.ipynb
 │   │   ├── Copilot_Agent365_Registry_Ingester.ipynb
 │   │   ├── Copilot_Agent365_Lander.ipynb
 │   │   └── ValueLens_Data_Check.ipynb
@@ -36,7 +35,7 @@ Fabric + Copilot Studio/
 
 | Notebook | Purpose |
 |---|---|
-| **`_core/*`** | Eight canonical notebooks: seven M365 Copilot ingesters/landers plus `ValueLens_Data_Check.ipynb`. Byte-identical to those in `3. Fabric/notebooks/` (kept in sync by [`scripts/sync-shared.ps1`](../../../../scripts/sync-shared.ps1), not frozen). |
+| **`_core/*`** | Seven canonical notebooks: six M365 Copilot ingesters/landers plus `ValueLens_Data_Check.ipynb`. Byte-identical to those in `3. Fabric/notebooks/` (kept in sync by [`scripts/sync-shared.ps1`](../../../../scripts/sync-shared.ps1), not frozen). |
 | `Copilot_Agent_Transcript_Parser.ipynb` | Parses **Copilot Studio agent transcripts** (Dataverse `ConversationTranscript`) into a Lakehouse Delta table for the agent pages. |
 | `Copilot_Credit_Consumption_Ingester.ipynb` | Ingests the **Power Platform Admin Center (PPAC) per-agent Copilot Studio message credit** export into the `credit_consumption_*` Lakehouse tables (gated by `Enable_Consumption`). |
 | `flows/` | Power Automate flows that auto-land the PPAC credit export into OneLake (email or SharePoint trigger). See [`flows/README.md`](flows/README.md). |
@@ -59,10 +58,10 @@ agents** that wanted:
    permissions the core ingesters need. (You only need to *read* that guide; you'll run the notebooks
    from this folder.)
 2. Run the notebooks in **`notebooks/_core/`** in order — audit logs → licensed users → org data →
-   product feedback → cost consumption → **Agent 365 registry**. For Agent 365 use
+   product feedback → **Agent 365 registry**. For Agent 365 use
    **`Copilot_Agent365_Registry_Ingester.ipynb`** by default (Graph API app-only). Fall back to
-   `Copilot_Agent365_Lander.ipynb` (CSV drop) only if you can't grant the Ingester's app-reg
-   permissions. Both target the same `dbo.agents_365` table — pick one, don't run both.
+   `Copilot_Agent365_Lander.ipynb` (CSV drop) only if the Ingester fails (for example, no Agent 365
+   licence or app-reg permissions). Both target the same `dbo.agents_365` table, so don't run both.
 3. Run **`notebooks/Copilot_Agent_Transcript_Parser.ipynb`** to land the Copilot Studio transcript
    tables. Needs Dataverse read on `ConversationTranscript`.
 4. *(Optional)* Light up **agent credit consumption** — follow

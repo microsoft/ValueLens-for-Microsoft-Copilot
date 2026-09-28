@@ -8,6 +8,9 @@
 
     copilot_interactions_rollup.csv
     copilot_users_rollup.csv
+    agents_365.csv                   (optional: the Agent 365 registry, when the
+                                      manifest has agents365_csv or -Agents365Csv
+                                      is given)
 
   Fixed names are intentional: the AIBV PBIT points at single URLs, so each
   upload OVERWRITES the previous file. No folder iteration, no privacy-firewall
@@ -26,6 +29,11 @@
 
 .PARAMETER UsersCsv
   Explicit path to the *_Users_*.csv. Required if -Manifest not given.
+
+.PARAMETER Agents365Csv
+  Optional. Agent 365 registry CSV (Get-Agents365Registry.ps1 output or the admin
+  centre export). Defaults to the manifest's agents365_csv, written by
+  Run-PAX-AIBV.ps1 -IncludeAgent365Info and/or its -Agents365Csv fallback.
 
 .PARAMETER TenantId
 .PARAMETER ClientId
@@ -64,6 +72,7 @@ param(
   [Parameter(ParameterSetName='Manifest', Mandatory=$true)] [string]$Manifest,
   [Parameter(ParameterSetName='Files',    Mandatory=$true)] [string]$InteractionsCsv,
   [Parameter(ParameterSetName='Files',    Mandatory=$true)] [string]$UsersCsv,
+                                 [string]$Agents365Csv,
   [Parameter(Mandatory=$true)] [string]$TenantId,
   [Parameter(Mandatory=$true)] [string]$ClientId,
                                  [string]$ClientSecret,
@@ -177,8 +186,11 @@ if ($PSCmdlet.ParameterSetName -eq 'Manifest') {
   $m = Get-Content -LiteralPath $Manifest -Raw | ConvertFrom-Json
   $InteractionsCsv = $m.interactions_csv
   $UsersCsv        = $m.users_csv
+  if (-not $Agents365Csv -and $m.PSObject.Properties['agents365_csv'] -and $m.agents365_csv) {
+    $Agents365Csv = $m.agents365_csv
+  }
 }
-foreach ($p in @($InteractionsCsv, $UsersCsv)) {
+foreach ($p in @($InteractionsCsv, $UsersCsv) + @($Agents365Csv | Where-Object { $_ })) {
   if (-not (Test-Path -LiteralPath $p)) { throw "CSV not found: $p" }
 }
 
@@ -190,6 +202,7 @@ Write-Host ("Drive        : {0}" -f $DriveId)
 Write-Host ("Folder       : {0}" -f $FolderPath)
 Write-Host ("Interactions : {0}" -f $InteractionsCsv)
 Write-Host ("Users        : {0}" -f $UsersCsv)
+if ($Agents365Csv) { Write-Host ("Agent 365    : {0}" -f $Agents365Csv) }
 Write-Host ""
 
 $token = Get-GraphToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $secret
@@ -197,6 +210,10 @@ Invoke-GraphPutCsv -Token $token -DriveId $DriveId -FolderPath $FolderPath `
   -RemoteName 'copilot_interactions_rollup.csv' -LocalPath $InteractionsCsv
 Invoke-GraphPutCsv -Token $token -DriveId $DriveId -FolderPath $FolderPath `
   -RemoteName 'copilot_users_rollup.csv'        -LocalPath $UsersCsv
+if ($Agents365Csv) {
+  Invoke-GraphPutCsv -Token $token -DriveId $DriveId -FolderPath $FolderPath `
+    -RemoteName 'agents_365.csv'                -LocalPath $Agents365Csv
+}
 
 Write-Host ""
 Write-Host "==> Upload complete." -ForegroundColor Green
@@ -205,3 +222,6 @@ $folderForUrl = $FolderPath.Trim('/')
 $base = if ($folderForUrl) { "<sharepoint-site-url>/<library>/$folderForUrl" } else { "<sharepoint-site-url>/<library>" }
 Write-Host ("  Copilot Interactions File = {0}/copilot_interactions_rollup.csv" -f $base)
 Write-Host ("  Org Data File             = {0}/copilot_users_rollup.csv"        -f $base)
+if ($Agents365Csv) {
+  Write-Host ("  Agent 365                 = {0}/agents_365.csv"                  -f $base)
+}

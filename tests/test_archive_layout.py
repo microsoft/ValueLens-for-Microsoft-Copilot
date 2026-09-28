@@ -17,13 +17,13 @@ SHARED_NAMES = {
     "Copilot_Agent365_Lander.ipynb",
     "Copilot_Agent365_Registry_Ingester.ipynb",
     "Copilot_Audit_Log_Direct_Ingester.ipynb",
-    "Copilot_Cost_Consumption_Ingester.ipynb",
     "Copilot_Licensed_Users_Direct_Ingester.ipynb",
     "Copilot_Org_Data_Direct_Ingester.ipynb",
     "Copilot_ProductFeedback_Ingester.ipynb",
     "ValueLens_Data_Check.ipynb",
 }
 PROCESSOR = "Copilot_Audit_Log_Processor.ipynb"
+COST_NOTEBOOK = "Copilot_Cost_Consumption_Ingester.ipynb"
 COST_FILES = (
     "Copilot_CostConsumption_Email_to_OneLake.json",
     "Copilot_CostConsumption_SharePoint_to_OneLake.json",
@@ -55,6 +55,12 @@ class ArchiveLayoutTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertTrue((FABRIC / "archive" / "flows" / name).is_file())
                 self.assertFalse((FABRIC / "flows" / name).exists())
+
+    def test_cost_ingester_is_archived_not_active_or_mirrored(self):
+        self.assertTrue((FABRIC / "archive" / "notebooks" / COST_NOTEBOOK).is_file())
+        self.assertFalse((FABRIC / "notebooks" / COST_NOTEBOOK).exists())
+        for folder in MIRRORS:
+            self.assertFalse((ROOT / folder / COST_NOTEBOOK).exists())
 
     def test_product_feedback_flow_remains_active(self):
         self.assertTrue((FABRIC / "flows" / "Copilot_ProductFeedback_Email_to_OneLake.json").is_file())
@@ -147,7 +153,7 @@ class ArchiveSyncTests(unittest.TestCase):
         self.assert_synced()
         result = self.run_sync(check=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("8 notebook(s) x 1 destination(s)", result.stdout)
+        self.assertIn("7 notebook(s) x 1 destination(s)", result.stdout)
 
     def test_drift_in_archive_is_detected_without_writes_and_repaired(self):
         result = self.run_sync()
