@@ -2,12 +2,13 @@
 """
 Generate the ValueLens sample dataset.
 
-Produces three CSVs that satisfy the exact column contract of
+Produces four CSVs that satisfy the exact column contract of
 `1. Local CSV/ValueLens - Local CSV.pbit`:
 
     copilot_interactions_sample.csv   -> "Copilot Interactions File"
     copilot_users_sample.csv          -> "Org Data File"
-    agents_365_sample.csv             -> "Agent 365"  (optional parameter)
+    agents_365_sample.csv             -> "Agent 365"      (optional parameter)
+    product_feedback_sample.csv       -> "Feedback File"  (optional parameter)
 
 Every value is fabricated here from a fixed seed. Nothing is copied, sampled or
 derived from any tenant, export or audit log, so the output is synthetic by
@@ -58,9 +59,11 @@ from __future__ import annotations
 import argparse
 import csv
 import importlib.util
+import json
 import os
 import random
 import sys
+import uuid
 from datetime import date, datetime, timedelta
 
 SEED = 20260807          # fixed: regenerating gives byte-identical output
@@ -303,6 +306,135 @@ AGENT_COLS = [
     "Instructions", "Groups shared", "Users shared", "Entra Agent ID",
     # Canonical registry extras (Get-Agents365Registry.ps1 / Fabric ingester).
     "Is Blocked", "Agent creator UPN", "Agent creator source",
+]
+
+# Microsoft 365 admin centre > Health > Product feedback export, verbatim headers.
+# The template derives FeedbackDate from "Date Submitted UTC" (MM/dd/yyyy HH:mm:ss)
+# and agent identity from "Additional Metadata"; the rest pass through unread.
+FEEDBACK_COLS = [
+    "Feedback Id", "Comment", "Translated Comment", "Comment Language",
+    "Date Submitted UTC", "Feedback Type", "Microsoft Response Status", "App",
+    "App Language", "Platform", "Source Type", "Logs, Attachments", "User Id",
+    "User Email", "Browser", "Browser Version", "AI Context Prompt",
+    "AI Context Response Message", "Survey Question", "Survey Response Option",
+    "Additional Metadata",
+]
+FEEDBACK_SHARE = 0.05        # share of prompts that get a thumbs up / down
+FEEDBACK_APP = {
+    "Microsoft Teams": "Teams", "Microsoft365Chat": "Microsoft 365 Copilot",
+    "Microsoft Edge": "Edge", "Copilot Studio": "Microsoft 365 Copilot",
+    "Cowork": "Microsoft 365 Copilot", "Microsoft Scout": "Microsoft 365 Copilot",
+}
+FEEDBACK_AGENT_TYPE = {
+    "declarative": "DeclarativeAgent", "studio": "CustomEngineAgent",
+    "cowork": "Cowork", "scout": "Scout",
+}
+# Agents that answer less well, so per-agent satisfaction has a spread to show.
+WEAK_AGENTS = {"T_1004", "T_2003", "T_2008", "T_4005"}
+
+# Fabricated prompts. The template's FeedbackCategory buckets feedback by
+# keywords in prompt + comment, so these are worded to land in a realistic
+# spread of categories rather than all in "General".
+BEHAVIOUR_PROMPTS = {
+    "Email Drafting": ["Draft a reply to this email confirming Thursday's delivery",
+                       "Write a polite follow-up email chasing the signed contract"],
+    "Email Summarising": ["Summarise my unread emails from this morning"],
+    "Email Triage": ["Which emails in my inbox need a reply today?"],
+    "Email Thread Summary": ["Summarise this email thread and list the open questions"],
+    "General Chat": ["Rewrite this paragraph so it is shorter and clearer",
+                     "Give me three ideas for a team offsite agenda",
+                     "Help me write a better prompt for summarising contracts"],
+    "Document Drafting": ["Draft a one-page project brief for the new supplier portal",
+                          "Draft an introduction for the quarterly business review"],
+    "Document Summarising": ["Summarise this document in five bullet points",
+                             "Summarise this project plan in five bullet points"],
+    "Teams Messaging": ["Post a summary of this chat to the project channel in Teams"],
+    "Meeting Prep": ["Prepare me for my Teams meeting with the account team"],
+    "Enterprise Searching": ["Find the travel policy on SharePoint"],
+    "Web Searching": ["What changed in the new EU AI Act guidance?",
+                      "Search the web for security guidance on passkeys"],
+    "Excel Assistance": ["Write an Excel formula to total sales by region"],
+    "Spreadsheet Analysis": ["Find the trends in this spreadsheet and chart them"],
+    "Presentation Creation": ["Generate five slides from this proposal"],
+    "Data Querying": ["Show last quarter's pipeline data by region"],
+    "Code Writing": ["Write a Python function that validates postcodes"],
+    "Code Analysis": ["Explain what this SQL query does",
+                      "Why does this script throw an error on line 12?"],
+    "PDF Analysis": ["Pull the key terms out of this PDF contract"],
+    "Note Taking": ["Take notes from this Teams call and list the actions"],
+    "Task Management": ["Create tasks in Planner from these meeting actions"],
+    "File Retrieval": ["Find the most recent version of the pricing deck on OneDrive"],
+    "Meeting Scheduling": ["Find a slot next week for a Teams call with Finance"],
+    "People Lookup": ["Who owns supplier onboarding in Procurement?"],
+    "SharePoint Access": ["Open the HR policies SharePoint site"],
+    "Image Generation": ["Generate an image for the newsletter header"],
+    "Form / Survey Work": ["Build a sign-up form for the training day"],
+    "Video Summarising": ["Summarise the Teams recording of yesterday's town hall"],
+}
+AGENT_PROMPTS = {
+    "T_1001": ["How do I set up my payroll details?"],
+    "T_1002": ["My laptop won't turn on after the update",
+               "Outlook keeps freezing when I open attachments",
+               "I'm locked out of my account after the password change"],
+    "T_1003": ["Which accounts in my territory are at risk this quarter?"],
+    "T_1004": ["What is the expense policy for client dinners?",
+               "Can I work remotely from abroad for two weeks?"],
+    "T_1005": ["Summarise competitor pricing moves this month"],
+    "T_1006": ["Suggest a learning path to get better at data storytelling"],
+    "T_1007": ["Build the month-end variance report for cost centre 204"],
+    "T_1008": ["What are the warranty terms for the X200 range?"],
+    "T_1009": ["Write a LinkedIn post announcing the new office"],
+    "T_1010": ["Generate campaign ideas for the spring launch"],
+    "T_1011": ["What health benefits am I eligible for?",
+               "How does the wellbeing allowance work?"],
+    "T_1012": ["Highlight risky clauses in this NDA"],
+    "T_1013": ["How do I request a new laptop?"],
+    "T_1014": ["Brief me on the Northwind account before tomorrow's meeting"],
+    "T_1015": ["Draft a proposal for the Fabrikam renewal"],
+    "T_1016": ["Write up the notes from the Teams call"],
+    "T_2001": ["Open an incident for the VPN outage in Madrid",
+               "What's the status of my ticket?"],
+    "T_2002": ["Move the Contoso opportunity to stage 3"],
+    "T_2003": ["Why is invoice 4471 on hold?"],
+    "T_2004": ["Book two days of annual leave next week",
+               "How much time off do I have left?"],
+    "T_2005": ["Show open cases for the Tailspin account"],
+    "T_2006": ["Show weekly case volumes as a chart"],
+    "T_2007": ["What documents does a new supplier need to provide?"],
+    "T_2008": ["Triage this claim and suggest next steps"],
+    "T_2009": ["Which policy covers home visits?"],
+    "T_2010": ["Which stores are below target on stock checks?"],
+    "T_2011": ["Reschedule tomorrow's engineer visits in the north region"],
+    "T_2012": ["How do I register a new partner deal?"],
+    "T_2013": ["Draft an escalation summary for the Litware complaint"],
+    "T_2014": ["Do I need three quotes for a 20k purchase?"],
+    "T_2015": ["Summarise failed inspections on line 4 this week"],
+    "T_2016": ["Where is shipment 88213?"],
+    "T_2017": ["Find the design standard for pump housings"],
+    "T_2018": ["Draft answers for section 3 of this tender"],
+    "T_4001": ["Plan the Q4 kickoff: agenda, invites and a briefing pack"],
+    "T_4002": ["Research three competitors and write a comparison"],
+    "T_4003": ["Build a board paper from these notes and the budget workbook"],
+    "T_4004": ["Send follow-ups and create tasks from today's meetings"],
+    "T_4005": ["Review this sales workbook and highlight anomalies"],
+    "T_4006": ["Put together an onboarding pack for three new starters"],
+    "T_5001": ["What should I prioritise today?"],
+    "T_5002": ["Brief me on today's meetings and unread email"],
+    "T_5003": ["Prepare me for my next customer meeting"],
+    "T_5004": ["Which emails need my attention?"],
+    "T_5005": ["Any movement on my open deals?"],
+}
+FALLBACK_PROMPT = "Help me finish this piece of work"
+POSITIVE_COMMENTS = [
+    "Exactly what I needed.", "Saved me twenty minutes.", "Clear and well structured.",
+    "Accurate, with the right sources.", "Much quicker than doing it by hand.",
+    "Good starting point, needed only light edits.", "Great summary.",
+]
+NEGATIVE_COMMENTS = [
+    "The answer was incorrect.", "It quoted a figure that isn't in the source.",
+    "Too slow to respond.", "Missed the attachment I referenced.",
+    "Too generic to be useful.", "It ignored half of my request.",
+    "Cited an out-of-date policy.", "Kept asking me to rephrase.",
 ]
 
 FIRST = ["Alex", "Sam", "Jordan", "Riley", "Casey", "Morgan", "Taylor", "Jamie",
@@ -627,6 +759,66 @@ def agent_rows(users, rng):
     return out
 
 
+def feedback_rows(users, inter):
+    """Admin centre product-feedback export: thumbs up / down on sampled prompts.
+
+    Drawn from its own RNG, so adding it leaves the other three files unchanged.
+    Each row is tied to a real sample prompt: same user, same app or agent,
+    submitted a few minutes after the prompt, so feedback dates sit inside the
+    interaction window and join to the template's Calendar.
+    """
+    fb_rng = random.Random(SEED + 2)
+    by_upn = {u["upn"]: u for u in users}
+    agents = {a[0]: a for a in AGENTS}
+    out = []
+    for r in inter:
+        # Autonomous agents run unattended, so nobody is there to rate them.
+        if r["_kind"] == "autonomous" or fb_rng.random() >= FEEDBACK_SHARE:
+            continue
+        u = by_upn[r["Audit_UserId"]]
+        tid, kind, host = r["Agent_TitleID"], r["_kind"], r["AppHost"]
+        down_p = 0.55 if tid in WEAK_AGENTS else 0.32 if not u["licensed"] else 0.24
+        thumbs_up = fb_rng.random() >= down_p
+        comment = ""
+        if fb_rng.random() < (0.40 if thumbs_up else 0.65):
+            comment = fb_rng.choice(POSITIVE_COMMENTS if thumbs_up else NEGATIVE_COMMENTS)
+        prompt = fb_rng.choice(AGENT_PROMPTS.get(tid)
+                               or BEHAVIOUR_PROMPTS.get(r["Behavior_Category"])
+                               or [FALLBACK_PROMPT])
+        if tid:
+            meta = {"UiHost": host}
+            if kind == "studio":
+                meta.update({"copilotType": "custom", "essAgentId": tid})
+            meta["aiAgents"] = [{"Name": agents[tid][1], "Type": FEEDBACK_AGENT_TYPE[kind]}]
+        else:
+            meta = {"UiHost": host}
+        app = FEEDBACK_APP.get(host, host)
+        platform = "Web" if app in {"Microsoft 365 Copilot", "Edge"} else fb_rng.choice(
+            ["Windows", "Windows", "Windows", "Mac", "Web"] if app != "Teams"
+            else ["Windows", "Windows", "Web", "iOS", "Android"])
+        web = platform == "Web"
+        ts = datetime.strptime(r["CreationDate"], "%Y-%m-%dT%H:%M:%SZ") \
+            + timedelta(minutes=fb_rng.randint(1, 15), seconds=fb_rng.randint(0, 59))
+        out.append({
+            "Feedback Id": str(uuid.UUID(int=fb_rng.getrandbits(128), version=4)),
+            "Comment": comment,
+            "Comment Language": "en" if comment else "",
+            "Date Submitted UTC": ts.strftime("%m/%d/%Y %H:%M:%S"),
+            "Feedback Type": "Thumbs Up" if thumbs_up else "Thumbs Down",
+            "App": app,
+            "App Language": "en-GB" if u["country"] in {"GB", "IE"} else "en-US",
+            "Platform": platform,
+            "User Id": f"00000000-0000-0000-0000-{u['idx']:012d}",
+            "User Email": u["upn"],
+            "Browser": fb_rng.choice(["Edge", "Edge", "Chrome"]) if web else "",
+            "Browser Version": "140.0" if web else "",
+            "AI Context Prompt": prompt,
+            "Additional Metadata": json.dumps(meta, separators=(",", ":")),
+        })
+    out.sort(key=lambda x: datetime.strptime(x["Date Submitted UTC"], "%m/%d/%Y %H:%M:%S"))
+    return out
+
+
 def write_csv(path, cols, rows):
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
@@ -661,6 +853,8 @@ def main():
     f1 = write_csv(os.path.join(a.out, "copilot_interactions_sample.csv"), INTERACTION_COLS, inter)
     f2 = write_csv(os.path.join(a.out, "copilot_users_sample.csv"), USER_COLS, user_rows(users))
     f3 = write_csv(os.path.join(a.out, "agents_365_sample.csv"), AGENT_COLS, agent_rows(users, rng))
+    feedback = feedback_rows(users, inter)
+    f4 = write_csv(os.path.join(a.out, "product_feedback_sample.csv"), FEEDBACK_COLS, feedback)
 
     hours = sum(int(r["Human_Baseline_Min"]) for r in inter if r["Human_Baseline_Min"]) / 60
     lic = sum(1 for u in users if u["licensed"])
@@ -668,6 +862,7 @@ def main():
     print(f"  copilot_interactions_sample.csv  {len(inter):>6,} rows  {f1/1024:>7,.0f} KB")
     print(f"  copilot_users_sample.csv         {len(users):>6,} rows  {f2/1024:>7,.0f} KB")
     print(f"  agents_365_sample.csv            {len(AGENTS):>6,} rows  {f3/1024:>7,.0f} KB")
+    print(f"  product_feedback_sample.csv      {len(feedback):>6,} rows  {f4/1024:>7,.0f} KB")
     print()
     lic_actives = len({r["Audit_UserId"] for r in inter if r["License Status"] == "M365 Copilot Licensed"})
     unlic_actives = len({r["Audit_UserId"] for r in inter if r["License Status"] == "Unlicensed"})
@@ -699,6 +894,8 @@ def main():
     print()
     agents_seen = len({r["AgentName"] for r in inter if r["AgentName"]})
     print(f"  agents used         : {agents_seen} of {len(AGENTS)} registered")
+    ups = sum(1 for r in feedback if r["Feedback Type"] == "Thumbs Up")
+    print(f"  feedback            : {len(feedback)} ratings, {ups / max(len(feedback), 1):.0%} thumbs up")
 
 
 if __name__ == "__main__":

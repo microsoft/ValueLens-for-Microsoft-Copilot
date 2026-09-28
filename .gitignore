@@ -1,6 +1,6 @@
 # Customer data — never commit
 *.csv
-!sample-data/*.csv
+!**/sample-data/*.csv
 !docs/*.csv
 !1. SharePoint/scripts/OrgData-Template.csv
 !3. Fabric/notebooks/optional/**/*.csv
