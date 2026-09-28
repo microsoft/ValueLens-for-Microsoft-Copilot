@@ -1,0 +1,56 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [
+    {
+      "fold": ["Licensed", "Unlicensed", "Agents"],
+      "as": ["Surface", "Sessions per user"]
+    }
+  ],
+  "encoding": {
+    "x": {
+      "field": "Chat + Agent Interactions (Audit Logs)WeekStart",
+      "type": "temporal",
+      "title": null,
+      "axis": { "format": "%d %b", "tickCount": 6 }
+    },
+    "y": {
+      "field": "Sessions per user",
+      "type": "quantitative",
+      "title": "Sessions per user"
+    },
+    "color": {
+      "field": "Surface",
+      "type": "nominal",
+      "title": null,
+      "sort": ["Licensed", "Unlicensed", "Agents"],
+      "legend": { "orient": "top", "direction": "horizontal" }
+    }
+  },
+  "layer": [
+    {
+      "mark": { "type": "line", "interpolate": "monotone", "strokeWidth": 2 }
+    },
+    {
+      "mark": { "type": "point", "filled": true, "size": 40 },
+      "encoding": {
+        "tooltip": [
+          {
+            "field": "Chat + Agent Interactions (Audit Logs)WeekStart",
+            "type": "temporal",
+            "title": "Week starting",
+            "format": "%d %b %Y"
+          },
+          { "field": "Surface", "type": "nominal", "title": "Surface" },
+          {
+            "field": "Sessions per user",
+            "type": "quantitative",
+            "title": "Sessions per user",
+            "format": ".2f"
+          }
+        ]
+      }
+    }
+  ]
+}

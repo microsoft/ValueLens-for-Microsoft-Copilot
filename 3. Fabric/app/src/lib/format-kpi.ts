@@ -1,0 +1,26 @@
+//-----------------------------------------------------------------------
+// <copyright company="Microsoft Corporation">
+//        Copyright (c) Microsoft Corporation.  All rights reserved.
+//        Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// </copyright>
+//-----------------------------------------------------------------------
+
+/** How a figure should be rendered when it is present. */
+export type KpiFormat = "whole" | "percent" | "rate" | "hours";
+
+const formatters: Record<KpiFormat, Intl.NumberFormat> = {
+    whole: new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }),
+    percent: new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 }),
+    rate: new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    hours: new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }),
+};
+
+/**
+ * Formats a figure for display, or returns an em dash when the model returned
+ * BLANK. A missing figure must never be shown as a zero — the two mean very
+ * different things in this report.
+ */
+export function formatKpi(value: number | undefined, format: KpiFormat): string {
+    if (value === undefined) return "—";
+    return formatters[format].format(value);
+}

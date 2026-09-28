@@ -1,0 +1,20 @@
+﻿EVALUATE
+TOPN(
+    50,
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Org Data'[Organization],
+            "Licensed Active", [Active Licensed Users (Verified Inventory)],
+            "Licensed Inactive", [Inactive Licensed Users (Filter-Aware)],
+            "Unlicensed Active", [Active Unlicensed Users (Verified Inventory)],
+            "Unlicensed Inactive", [Inactive Unlicensed Users (Filter-Aware)],
+            "All Active", [All Active Users],
+            "All Inactive", [Inactive Users (Filter-Aware)],
+            "Agent Active", [Active Agent Users],
+            "Agent NotUsing", [Using Copilot / Not Using Agents]
+        ),
+        NOT ISBLANK('Chat + Agent Org Data'[Organization])
+    ),
+    [All Active], DESC
+)
+ORDER BY [All Active] DESC

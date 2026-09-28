@@ -1,0 +1,10 @@
+﻿EVALUATE
+SUMMARIZECOLUMNS(
+    'Chat + Agent Interactions (Audit Logs)'[WeekStart],
+    "Licensed", [Observed Licensed Sessions per User],
+    "Unlicensed", [Observed Unlicensed Sessions per User],
+    "Agents", [Observed Agent Sessions per User],
+    "All Sessions", [Observed Sessions],
+    "Hours", [Expert Equivalent Hours]
+)
+ORDER BY 'Chat + Agent Interactions (Audit Logs)'[WeekStart]

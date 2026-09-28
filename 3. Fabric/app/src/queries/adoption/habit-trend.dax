@@ -1,0 +1,7 @@
+﻿EVALUATE
+SUMMARIZECOLUMNS(
+    'Chat + Agent Interactions (Audit Logs)'[MonthStart],
+    'Stage Legend'[Stage],
+    "Users", [Stage Users (Monthly)]
+)
+ORDER BY 'Chat + Agent Interactions (Audit Logs)'[MonthStart], 'Stage Legend'[Stage]

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "area", "interpolate": "monotone", "line": false },
+  "encoding": {
+    "x": {
+      "field": "Chat + Agent Interactions (Audit Logs)MonthStart",
+      "type": "temporal",
+      "title": null,
+      "axis": { "format": "%b %y", "tickCount": 6 }
+    },
+    "y": {
+      "aggregate": "sum",
+      "field": "Users",
+      "type": "quantitative",
+      "title": "Users",
+      "stack": "normalize",
+      "axis": { "format": ".0%" }
+    },
+    "color": {
+      "field": "Stage LegendStage",
+      "type": "nominal",
+      "title": null,
+      "sort": "descending",
+      "legend": { "orient": "top", "direction": "horizontal", "columns": 3 }
+    },
+    "order": {
+      "field": "Stage LegendStage",
+      "type": "nominal",
+      "sort": "descending"
+    },
+    "tooltip": [
+      {
+        "field": "Chat + Agent Interactions (Audit Logs)MonthStart",
+        "type": "temporal",
+        "title": "Month",
+        "format": "%b %Y"
+      },
+      { "field": "Stage LegendStage", "type": "nominal", "title": "Stage" },
+      { "field": "Users", "type": "quantitative", "title": "Users", "format": ",.0f" }
+    ]
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "palettes": [
+    {
+      "id": "signal-flare",
+      "name": "Signal Flare",
+      "colors": {
+        "light": [
+          "#e4572e",
+          "#17509b",
+          "#f0a202",
+          "#2d8a5f",
+          "#8f3b8f",
+          "#0e7c9c",
+          "#b5342f",
+          "#6b7a1f",
+          "#c25e8a",
+          "#5c6470"
+        ],
+        "dark": [
+          "#ff8a63",
+          "#6ba3e8",
+          "#ffc24d",
+          "#57c894",
+          "#c47cc4",
+          "#4fb8d6",
+          "#f4736e",
+          "#a9bb4f",
+          "#e896b8",
+          "#96a0ad"
+        ]
+      }
+    },
+    {
+      "id": "deep-harbour",
+      "name": "Deep Harbour",
+      "colors": {
+        "light": [
+          "#0b4f6c",
+          "#2f9c95",
+          "#7a4fa3",
+          "#c76a3e",
+          "#3d6b3a",
+          "#1c74b8",
+          "#a03d5f",
+          "#8a7a2e",
+          "#5a8fb0",
+          "#63707d"
+        ],
+        "dark": [
+          "#4fa9d1",
+          "#5fd4cb",
+          "#b48ce0",
+          "#f09a68",
+          "#7ec178",
+          "#6bb2f0",
+          "#e8809f",
+          "#d0bd5c",
+          "#93c4dd",
+          "#9aa5b1"
+        ]
+      }
+    },
+    {
+      "id": "graphite-ember",
+      "name": "Graphite Ember",
+      "colors": {
+        "light": [
+          "#2b2b2b",
+          "#c1440e",
+          "#5f7470",
+          "#9a6a3c",
+          "#3f5d75",
+          "#7d3c52",
+          "#6e7f38",
+          "#b0813b",
+          "#4a4458",
+          "#8c8781"
+        ],
+        "dark": [
+          "#d6d2cb",
+          "#f2784b",
+          "#93aba6",
+          "#d1a172",
+          "#7d9cb8",
+          "#c47a92",
+          "#a8bd6c",
+          "#e0b26e",
+          "#9d95b5",
+          "#7f7a74"
+        ]
+      }
+    }
+  ]
+}

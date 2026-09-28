@@ -1,0 +1,19 @@
+﻿EVALUATE
+ROW(
+    "Overall Users", [All Active Users],
+    "Overall Sessions", [Observed Sessions],
+    "Overall SPUW", [Observed Sessions per User per Week],
+    "Overall Hours Wk", [Expert Equivalent Hours Per Week],
+    "Overall Top Outcome", [Top Value Outcome],
+    "Licensed Users", [Active Licensed Users],
+    "Licensed SPUW", [Observed Licensed Sessions per User per Week],
+    "Unlicensed Users", [Active Unlicensed Users],
+    "Unlicensed SPUW", [Observed Unlicensed Sessions per User per Week],
+    "Agent Users", [Active Agent Users],
+    "Agent SPUW", [Observed Agent Sessions per User per Week],
+    "Agent Return Rate", [Agent Return Rate],
+    "Cowork Users", [Cowork Users],
+    "Cowork SPUW", [Observed Cowork Sessions per User per Week],
+    "Cowork Hours Wk", [Cowork Expert Equivalent Hours Per Week],
+    "Cowork Top Outcome", [Cowork Top Value Outcome]
+)
