@@ -14,6 +14,7 @@ import { QueryLoading } from "./components/query-states";
 const AdoptionScreen = lazy(() =>
     import("./screens/adoption").then((module) => ({ default: module.AdoptionScreen })),
 );
+const WorkScreen = lazy(() => import("./screens/work").then((module) => ({ default: module.WorkScreen })));
 
 function App() {
     const [destination, setDestination] = useState<DestinationId>("adoption");
@@ -22,6 +23,7 @@ function App() {
         <AppShell active={destination} onNavigate={setDestination}>
             <Suspense fallback={<QueryLoading />}>
                 {destination === "adoption" && <AdoptionScreen />}
+                {destination === "work" && <WorkScreen />}
             </Suspense>
         </AppShell>
     );

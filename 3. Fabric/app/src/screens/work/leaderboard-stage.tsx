@@ -1,0 +1,108 @@
+//-----------------------------------------------------------------------
+// <copyright company="Microsoft Corporation">
+//        Copyright (c) Microsoft Corporation.  All rights reserved.
+//        Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// </copyright>
+//-----------------------------------------------------------------------
+
+import { useMemo, useState } from "react";
+import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
+import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
+import { Section } from "@/components/section";
+import { SegmentedControl } from "@/components/segmented-control";
+import { useThemeContext } from "@/hooks/theme.context";
+import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
+import { toRollupDataTables } from "@/lib/to-data-table";
+import {
+    cohortTaskField,
+    ORGANIZATION_COLUMN,
+    USER_COLUMN,
+    userLeaderboard,
+    workCohorts,
+    type WorkCohort,
+} from "@/queries/work";
+
+/** The task columns the grid carries, one per cohort. */
+const taskColumns = workCohorts.map((entry) => ({
+    id: cohortTaskField(entry.id),
+    header: `${entry.label} tasks`,
+}));
+
+/**
+ * Stage three of the Work destination: who is doing the work.
+ *
+ * The report repeats the same table four times, once per cohort, on four
+ * bookmarks. Here one grid holds every cohort's column and the toggle simply
+ * hides the ones you are not asking about — sorting and filtering survive the
+ * switch because the rows never change.
+ */
+export function LeaderboardStage() {
+    const [cohort, setCohort] = useState<WorkCohort>("all");
+    const { theme } = useThemeContext();
+
+    const leaderboard = userLeaderboard();
+    const result = useSemanticModelQuery({
+        connection: leaderboard.connection,
+        query: leaderboard.query,
+    });
+
+    const tables = useMemo(() => {
+        if (result.data?.status !== "success") return undefined;
+        return toRollupDataTables(result.data.table, leaderboard.columnMetadata, {
+            rollupFlagColumns: leaderboard.rollupFlagColumns,
+        });
+    }, [result.data, leaderboard.columnMetadata, leaderboard.rollupFlagColumns]);
+
+    const activeField = cohortTaskField(cohort);
+
+    const columns: GridColumnDef[] = useMemo(
+        () => [
+            { id: ORGANIZATION_COLUMN, header: "Organization" },
+            { id: USER_COLUMN, header: "User", minWidth: 220 },
+            ...taskColumns.map((column) => ({
+                ...column,
+                numericStyling: true,
+                hidden: column.id !== activeField,
+            })),
+            { id: "Active Days", header: "Active days", numericStyling: true },
+        ],
+        [activeField],
+    );
+
+    return (
+        <Section
+            eyebrow="Stage 3"
+            title="Leaderboard"
+            description="Every person who used Copilot, ranked. Sort or filter any column; the total row stays pinned to the bottom."
+            actions={
+                <SegmentedControl label="Cohort" options={workCohorts} value={cohort} onChange={setCohort} />
+            }
+        >
+            <div className="flex h-[560px] flex-col">
+                {result.data?.status === "error" ? (
+                    <QueryError className="h-full" message={result.data.error.message} onRetry={result.refetch} />
+                ) : result.isLoading || !tables ? (
+                    <QueryLoading className="h-full" />
+                ) : tables.bodyTable.rows.length === 0 ? (
+                    <QueryEmpty
+                        className="h-full"
+                        title="Nobody to rank"
+                        description="The semantic model returned no users for this period."
+                    />
+                ) : (
+                    <DataGrid
+                        columns={columns}
+                        data={tables.bodyTable}
+                        grandTotals={{ position: "bottom", data: tables.grandTotalTable }}
+                        defaultSort={[{ columnId: activeField, direction: "desc" }]}
+                        theme={theme}
+                        header={{
+                            title: "Tasks by person",
+                            subtitle: `${tables.bodyTable.rows.length} people with recorded activity`,
+                        }}
+                    />
+                )}
+            </div>
+        </Section>
+    );
+}

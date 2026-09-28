@@ -2,7 +2,8 @@
   "browser": {
     "browserName": "chromium",
     "launchOptions": {
-      "channel": "msedge"
+      "channel": "msedge",
+      "headless": false
     }
   }
 }

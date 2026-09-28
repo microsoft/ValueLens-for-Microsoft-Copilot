@@ -1,0 +1,122 @@
+[
+  {
+    "Chat + Agent Org Data[Organization]": null,
+    "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": null,
+    "[IsTotal]": true,
+    "[All Tasks]": 6300,
+    "[Licensed Tasks]": 6163,
+    "[Unlicensed Tasks]": 137,
+    "[Agent Tasks]": 4500,
+    "[Active Days]": 16.977777777777778
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Sales",
+    "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user1@contoso-demo.com",
+    "[IsTotal]": false,
+    "[All Tasks]": 931,
+    "[Licensed Tasks]": 931,
+    "[Unlicensed Tasks]": null,
+    "[Agent Tasks]": 931,
+    "[Active Days]": 60
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "IT",
+    "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user2@contoso-demo.com",
+    "[IsTotal]": false,
+    "[All Tasks]": 457,
+    "[Licensed Tasks]": 457,
+    "[Unlicensed Tasks]": null,
+    "[Agent Tasks]": 457,
+    "[Active Days]": 60
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Marketing",
+    "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user3@contoso-demo.com",
+    "[IsTotal]": false,
+    "[All Tasks]": 335,
+    "[Licensed Tasks]": 335,
+    "[Unlicensed Tasks]": null,
+    "[Agent Tasks]": 335,
+    "[Active Days]": 60
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Legal",
+    "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user66@contoso-demo.com",
+    "[IsTotal]": false,
+    "[All Tasks]": 297,
+    "[Licensed Tasks]": 297,
+    "[Unlicensed Tasks]": null,
+    "[Agent Tasks]": null,
+    "[Active Days]": 60
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Finance",
+    "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user4@contoso-demo.com",
+    "[IsTotal]": false,
+    "[All Tasks]": 252,
+    "[Licensed Tasks]": 252,
+    "[Unlicensed Tasks]": null,
+    "[Agent Tasks]": 252,
+    "[Active Days]": 60
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "HR",
+    "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user5@contoso-demo.com",
+    "[IsTotal]": false,
+    "[All Tasks]": 196,
+    "[Licensed Tasks]": 196,
+    "[Unlicensed Tasks]": null,
+    "[Agent Tasks]": 196,
+    "[Active Days]": 59
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Sales",
+    "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user67@contoso-demo.com",
+    "[IsTotal]": false,
+    "[All Tasks]": 152,
+    "[Licensed Tasks]": 152,
+    "[Unlicensed Tasks]": null,
+    "[Agent Tasks]": null,
+    "[Active Days]": 56
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Legal",
+    "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user6@contoso-demo.com",
+    "[IsTotal]": false,
+    "[All Tasks]": 150,
+    "[Licensed Tasks]": 150,
+    "[Unlicensed Tasks]": null,
+    "[Agent Tasks]": 150,
+    "[Active Days]": 58
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Marketing",
+    "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user9@contoso-demo.com",
+    "[IsTotal]": false,
+    "[All Tasks]": 124,
+    "[Licensed Tasks]": 124,
+    "[Unlicensed Tasks]": null,
+    "[Agent Tasks]": 124,
+    "[Active Days]": 54
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Sales",
+    "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user7@contoso-demo.com",
+    "[IsTotal]": false,
+    "[All Tasks]": 121,
+    "[Licensed Tasks]": 121,
+    "[Unlicensed Tasks]": null,
+    "[Agent Tasks]": 121,
+    "[Active Days]": 54
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "IT",
+    "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user8@contoso-demo.com",
+    "[IsTotal]": false,
+    "[All Tasks]": 121,
+    "[Licensed Tasks]": 121,
+    "[Unlicensed Tasks]": null,
+    "[Agent Tasks]": 121,
+    "[Active Days]": 53
+  }
+]

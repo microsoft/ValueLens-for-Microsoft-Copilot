@@ -36,7 +36,7 @@ export const destinations = [
         label: "Work",
         blurb: "What people actually do with it",
         icon: Workflow as LucideIcon,
-        ready: false,
+        ready: true,
     },
     {
         id: "agents",
