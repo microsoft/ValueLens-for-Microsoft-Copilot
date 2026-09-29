@@ -10,11 +10,11 @@ import { VegaVisual } from "@microsoft/fabric-visuals";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
+import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
-import { cn } from "@/lib/utils";
 import { adoptionSummary, adoptionTrend, type AdoptionTrendMeasure } from "@/queries/adoption";
 
 /** The four surfaces usage is reported across. */
@@ -67,25 +67,12 @@ export function AdoptionStage() {
             title="Adoption"
             description="How often the activated population comes back, measured the same way across every surface."
             actions={
-                <div role="group" aria-label="Trend measure" className="flex rounded-md border border-border bg-card p-100-nudge">
-                    {trendMeasures.map((entry) => (
-                        <button
-                            key={entry.id}
-                            type="button"
-                            onClick={() => setMeasure(entry.id)}
-                            aria-pressed={entry.id === measure}
-                            className={cn(
-                                "rounded-sm px-300 py-100 text-[length:var(--text-200)] transition-colors",
-                                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                                entry.id === measure
-                                    ? "bg-accent font-semibold text-accent-foreground"
-                                    : "text-muted-foreground hover:text-foreground",
-                            )}
-                        >
-                            {entry.label}
-                        </button>
-                    ))}
-                </div>
+                <SegmentedControl
+                    label="Trend measure"
+                    options={trendMeasures}
+                    value={measure}
+                    onChange={setMeasure}
+                />
             }
         >
             {summary.data?.status === "error" ? (

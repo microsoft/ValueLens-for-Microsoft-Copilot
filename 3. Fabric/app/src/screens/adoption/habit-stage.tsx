@@ -9,12 +9,12 @@ import { useMemo, useState } from "react";
 import { VegaVisual } from "@microsoft/fabric-visuals";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
+import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
 import { formatKpi } from "@/lib/format-kpi";
 import { readNumber, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
-import { cn } from "@/lib/utils";
 import { habitStages, habitSummary, habitTrend } from "@/queries/adoption";
 
 const stageDescriptions: Record<string, string> = {
@@ -24,6 +24,12 @@ const stageDescriptions: Record<string, string> = {
     Beginner: "Occasional use",
     Inactive: "No recorded use",
 };
+
+/** Whether the monthly mix is plotted as a share of users or as a headcount. */
+const habitScales = [
+    { id: "share", label: "Share" },
+    { id: "count", label: "Count" },
+] as const;
 
 /**
  * Stage three of the funnel: whether use has become a habit.
@@ -130,25 +136,13 @@ export function HabitStage() {
                 )}
             </div>
 
-            <div role="group" aria-label="Scale" className="flex self-end rounded-md border border-border bg-card p-100-nudge">
-                {(["share", "count"] as const).map((option) => (
-                    <button
-                        key={option}
-                        type="button"
-                        onClick={() => setScale(option)}
-                        aria-pressed={option === scale}
-                        className={cn(
-                            "rounded-sm px-300 py-100 text-[length:var(--text-200)] capitalize transition-colors",
-                            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                            option === scale
-                                ? "bg-accent font-semibold text-accent-foreground"
-                                : "text-muted-foreground hover:text-foreground",
-                        )}
-                    >
-                        {option}
-                    </button>
-                ))}
-            </div>
+            <SegmentedControl
+                label="Scale"
+                options={habitScales}
+                value={scale}
+                onChange={setScale}
+                className="self-end"
+            />
         </Section>
     );
 }

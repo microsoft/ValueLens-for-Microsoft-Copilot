@@ -10,11 +10,11 @@ import { VegaVisual } from "@microsoft/fabric-visuals";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
+import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
-import { cn } from "@/lib/utils";
 import { activationByOrg, activationSummary, type ActivationCohort } from "@/queries/adoption";
 
 /** The four cohorts the Activation page reports on, in reading order. */
@@ -111,25 +111,7 @@ export function ActivationStage() {
             title="Activation"
             description="How much of the population has picked Copilot up at all — before asking how often or how deeply."
             actions={
-                <div role="group" aria-label="Cohort" className="flex rounded-md border border-border bg-card p-100-nudge">
-                    {cohorts.map((entry) => (
-                        <button
-                            key={entry.id}
-                            type="button"
-                            onClick={() => setCohort(entry.id)}
-                            aria-pressed={entry.id === cohort}
-                            className={cn(
-                                "rounded-sm px-300 py-100 text-[length:var(--text-200)] transition-colors",
-                                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                                entry.id === cohort
-                                    ? "bg-accent font-semibold text-accent-foreground"
-                                    : "text-muted-foreground hover:text-foreground",
-                            )}
-                        >
-                            {entry.label}
-                        </button>
-                    ))}
-                </div>
+                <SegmentedControl label="Cohort" options={cohorts} value={cohort} onChange={setCohort} />
             }
         >
             {summary.data?.status === "error" ? (
