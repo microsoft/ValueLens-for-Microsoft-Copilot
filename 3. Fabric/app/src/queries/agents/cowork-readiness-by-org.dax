@@ -1,0 +1,21 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Org Data'[Organization],
+            "@Eligible", [Cowork Fit: Eligible Users],
+            "@Surfaces", [Cowork Readiness: Surfaces Per Day],
+            "@Depth", [Cowork Readiness: Prompts Per Session],
+            "@AgentShare", [Cowork Fit: Agent User Share]
+        ),
+        NOT ISBLANK('Chat + Agent Org Data'[Organization])
+            && NOT ISBLANK([@Eligible])
+            && NOT ISBLANK([@Surfaces])
+    ),
+    "Organization", 'Chat + Agent Org Data'[Organization],
+    "Eligible Users", [@Eligible],
+    "Surfaces Per Day", [@Surfaces],
+    "Prompts Per Session", [@Depth],
+    "Agent User Share", [@AgentShare]
+)
+ORDER BY [Surfaces Per Day] DESC

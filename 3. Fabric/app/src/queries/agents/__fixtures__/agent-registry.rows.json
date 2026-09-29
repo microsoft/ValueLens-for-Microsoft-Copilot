@@ -1,0 +1,302 @@
+[
+  {
+    "[Agent]": "Employee Self-Service (P)",
+    "[Type]": "Maker: Copilot Studio",
+    "[Creator]": "Maker Four",
+    "[Lifecycle Order]": 1,
+    "[Lifecycle]": "Blocked by admin",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Employee Self-Service IT",
+    "[Type]": "Maker: Copilot Studio",
+    "[Creator]": "Maker Four",
+    "[Lifecycle Order]": 1,
+    "[Lifecycle]": "Blocked by admin",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "ESS IT Preview",
+    "[Type]": "Maker: Copilot Studio",
+    "[Creator]": "Maker Four",
+    "[Lifecycle Order]": 1,
+    "[Lifecycle]": "Blocked by admin",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Frontline IT Support",
+    "[Type]": "Maker: Copilot Studio",
+    "[Creator]": "Maker Five",
+    "[Lifecycle Order]": 1,
+    "[Lifecycle]": "Blocked by admin",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Contoso Helpdesk Agent",
+    "[Type]": "Maker: Copilot Studio",
+    "[Creator]": null,
+    "[Lifecycle Order]": 1,
+    "[Lifecycle]": "Blocked by admin",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "PHONE APPLI PEOPLE bot",
+    "[Type]": "Marketplace",
+    "[Creator]": "PHONE APPLI",
+    "[Lifecycle Order]": 1,
+    "[Lifecycle]": "Blocked by admin",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Project Tracker",
+    "[Type]": "Maker: Copilot Studio",
+    "[Creator]": "Custom Developer",
+    "[Lifecycle Order]": 1,
+    "[Lifecycle]": "Blocked by admin",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "S&P Global Energy",
+    "[Type]": "Marketplace",
+    "[Creator]": "SPGlobal",
+    "[Lifecycle Order]": 1,
+    "[Lifecycle]": "Blocked by admin",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Analyst",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "App Builder (Frontier)",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Car Spec",
+    "[Type]": "Line of business",
+    "[Creator]": "Maker One",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Career Coach",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Coda Agent",
+    "[Type]": "Line of business",
+    "[Creator]": "Maker One",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Cowork",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Customer Insights Assistant",
+    "[Type]": "Line of business",
+    "[Creator]": "Maker Two",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "ESS Hub",
+    "[Type]": "Line of business",
+    "[Creator]": "Maker Four",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "ESS Hub",
+    "[Type]": "Line of business",
+    "[Creator]": "Maker Four",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "ESSHR",
+    "[Type]": "Line of business",
+    "[Creator]": "Maker Five",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Excel (Agent)",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Frontline Agent (Preview)",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "HR Agent",
+    "[Type]": "Line of business",
+    "[Creator]": "Maker Five",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Idea Coach",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Language Guy",
+    "[Type]": "Line of business",
+    "[Creator]": "Maker Three",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Learning",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Learning Coach",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Microsoft 365 Admin",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Planner Agent",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "PowerPoint (Agent)",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Prompt Coach",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  },
+  {
+    "[Agent]": "Researcher",
+    "[Type]": "Microsoft",
+    "[Creator]": "Microsoft Corporation",
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Usage Review]": "No usage recorded",
+    "[Users]": null,
+    "[Sessions]": null
+  }
+]

@@ -1,0 +1,25 @@
+DEFINE
+    MEASURE 'Agents 365'[Registry Agents Seen In Use] =
+        IF(
+            [Agent Registry Records] > 0,
+            COALESCE(
+                COUNTROWS(
+                    FILTER(
+                        VALUES('Agents 365'[Title ID]),
+                        NOT ISBLANK('Agents 365'[Title ID])
+                            && NOT ISBLANK([Observed Agent Sessions])
+                    )
+                ),
+                0
+            )
+        )
+    MEASURE 'Agents 365'[Sessions Outside Registry] =
+        CALCULATE([Observed Agent Sessions], ISBLANK('Agents 365'[Title ID]))
+EVALUATE
+ROW(
+    "Registry Agents", [Agent Registry Records],
+    "Tenant Built", [Agents Built In Tenant],
+    "Seen In Use", [Registry Agents Seen In Use],
+    "Unmatched Sessions", [Sessions Outside Registry],
+    "Registry Updated", [Agent Registry Freshness]
+)

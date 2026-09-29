@@ -1,0 +1,28 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Organization",
+      "type": "nominal",
+      "title": null,
+      "sort": "-x",
+      "axis": { "labelLimit": 200 }
+    },
+    "x": {
+      "field": "Surfaces Per Day",
+      "type": "quantitative",
+      "title": "Apps used per active day",
+      "axis": { "labelExpr": "format(datum.value, ',.1f')" }
+    },
+    "tooltip": [
+      { "field": "Organization", "type": "nominal", "title": "Organization" },
+      { "field": "Surfaces Per Day", "type": "quantitative", "title": "Apps per active day", "format": ",.2f" },
+      { "field": "Prompts Per Session", "type": "quantitative", "title": "Prompts per session", "format": ",.2f" },
+      { "field": "Agent User Share", "type": "quantitative", "title": "Already using agents", "format": ".0%" },
+      { "field": "Eligible Users", "type": "quantitative", "title": "Eligible users", "format": ",.0f" }
+    ]
+  }
+}
