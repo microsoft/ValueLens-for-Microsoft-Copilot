@@ -28,6 +28,17 @@ export function toSummaryRow(table: QueryTable): SummaryRow | undefined {
     return summary;
 }
 
+/** Every row of a query result as a plain object keyed by the original DAX column name. */
+export function toRecords(table: QueryTable): SummaryRow[] {
+    return table.rows.map((row) => {
+        const record: SummaryRow = {};
+        table.columns.forEach((column, index) => {
+            record[column.name] = row[index];
+        });
+        return record;
+    });
+}
+
 /** Reads a numeric cell, mapping BLANK and non-numeric values to `undefined`. */
 export function readNumber(row: SummaryRow | undefined, column: string): number | undefined {
     const value = row?.[column];

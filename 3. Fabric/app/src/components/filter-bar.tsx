@@ -24,8 +24,8 @@ import {
     type Licence,
 } from "@/lib/filters";
 import { describeOrgAttribute } from "@/lib/org-attribute";
+import { menuOptionClass as optionClass } from "@/lib/menu-option";
 import { useIsRefreshing } from "@/lib/refresh-tracker";
-import { cn } from "@/lib/utils";
 import { FilterMenu } from "./filter-menu";
 import { SegmentedControl } from "./segmented-control";
 
@@ -41,13 +41,6 @@ const AUDIENCE_LABELS: Record<Audience, string> = {
     agents: "Agents",
     cowork: "Cowork",
 };
-
-const optionClass = (selected: boolean) =>
-    cn(
-        "flex w-full items-center justify-between gap-300 rounded-md px-300 py-200 text-left text-[length:var(--text-300)] leading-300 transition-colors",
-        "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
-        selected ? "bg-accent font-semibold text-accent-foreground" : "text-foreground hover:bg-secondary",
-    );
 
 function DateFilter() {
     const { filters, setFilters, options } = useFilterContext();

@@ -241,7 +241,7 @@
     --vl-teal-strong: #0a9c88;
     --vl-lavender: #8783ff;    --vl-lavender-text: #5650d9;  --vl-lavender-tint: #efeeff;
     --vl-coral: #f06549;       --vl-coral-text: #b23e25;     --vl-coral-tint: #fdeeea;
-    --vl-navy: #0b2c57;
+    --vl-navy: #0b2c57;        --vl-navy-text: #0b2c57;      --vl-navy-tint: #e9eef5;
     --vl-periwinkle: #95a9ce;
     --vl-slate: #8793a3;
     --vl-ink: #1c2632;
@@ -263,7 +263,7 @@
     --vl-teal-strong: #3cc9b4;
     --vl-lavender: #a3a0ff;    --vl-lavender-text: #bcbaff;  --vl-lavender-tint: #27264a;
     --vl-coral: #f4836c;       --vl-coral-text: #f7a392;     --vl-coral-tint: #3d1f19;
-    --vl-navy: #5b7bb0;
+    --vl-navy: #5b7bb0;        --vl-navy-text: #a9bde0;      --vl-navy-tint: #1b2536;
     --vl-periwinkle: #b3c2de;
     --vl-slate: #a3aebd;
     --vl-ink: #dbdfe4;
@@ -388,6 +388,27 @@
     --color-data-5: var(--vl-plum);
     --color-data-6: var(--vl-lavender);
     --color-data-7: var(--vl-navy);
+    --color-data-8: var(--vl-periwinkle);
+    --color-data-9: var(--vl-slate);
+    --color-data-10: var(--vl-ink);
+  }
+
+  /* The appendix is reference, not a place with its own story, so it takes
+     the report's navy: the quietest hue in the family. */
+  .palette-appendix {
+    --color-brand: var(--vl-navy);
+    --color-brand-foreground: var(--vl-navy-text);
+    --color-primary: var(--vl-navy-text);
+    --color-ring: var(--vl-navy-text);
+    --color-accent: var(--vl-navy-tint);
+    --color-accent-foreground: var(--vl-navy-text);
+    --color-data-1: var(--vl-navy);
+    --color-data-2: var(--vl-blue);
+    --color-data-3: var(--vl-teal);
+    --color-data-4: var(--vl-amber);
+    --color-data-5: var(--vl-plum);
+    --color-data-6: var(--vl-lavender);
+    --color-data-7: var(--vl-coral);
     --color-data-8: var(--vl-periwinkle);
     --color-data-9: var(--vl-slate);
     --color-data-10: var(--vl-ink);

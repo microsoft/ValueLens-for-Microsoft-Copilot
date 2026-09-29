@@ -11,7 +11,7 @@ import { paletteClass, usePaletteTheme } from "@/hooks/use-palette-theme";
 import { ThemeContext, useThemeContext } from "@/hooks/theme.context";
 import { useIsRefreshing } from "@/lib/refresh-tracker";
 import { cn } from "@/lib/utils";
-import { destinations, isDestinationReady, stageAnchor, type DestinationId, type StageId } from "./destinations";
+import { destinations, isDestinationReady, isReference, stageAnchor, type Destination, type DestinationId, type StageId } from "./destinations";
 import { FilterBar } from "./filter-bar";
 
 interface AppShellProps {
@@ -30,7 +30,8 @@ function prefersReducedMotion(): boolean {
 /**
  * Sidebar-and-canvas frame. The sidebar is the whole navigation model — six
  * destinations replacing the report's pages and bookmark bars, with the
- * active destination's stages listed beneath it and tracked as you scroll.
+ * active destination's stages listed beneath it and tracked as you scroll,
+ * and the report's appendix set apart below them as reference.
  *
  * Each destination carries its own palette: the sidebar shows every hue at
  * once so the six read as distinct places, and the canvas — chrome and charts
@@ -89,11 +90,83 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
         element.focus({ preventScroll: true });
     };
 
+    const renderDestination = (destination: Destination) => {
+        const Icon = destination.icon;
+        const isActive = destination.id === active;
+        const ready = isDestinationReady(destination);
+        return (
+            <li key={destination.id} className={paletteClass(destination.id)}>
+                <button
+                    type="button"
+                    onClick={() => onNavigate(destination.id)}
+                    aria-current={isActive ? "page" : undefined}
+                    disabled={!ready}
+                    className={cn(
+                        "flex w-full items-center gap-300 rounded-md px-300 py-200 text-left transition-colors",
+                        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                        isActive
+                            ? "bg-accent text-accent-foreground"
+                            : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                        !ready && "cursor-not-allowed opacity-50 hover:bg-transparent",
+                    )}
+                >
+                    <Icon className="icon-size-200 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="flex flex-col">
+                        <span className={cn("text-[length:var(--text-300)] leading-300", isActive && "font-semibold")}>
+                            {destination.label}
+                        </span>
+                        <span className="text-[length:var(--text-100)] leading-100 opacity-70">
+                            {ready ? destination.blurb : "Coming next"}
+                        </span>
+                    </span>
+                </button>
+
+                {isActive && destination.stages.length > 1 && (
+                    <ul
+                        aria-label={`${destination.label} stages`}
+                        className="mt-100 mb-200 ml-500 flex flex-col border-l border-border"
+                    >
+                        {destination.stages.map((stage) => {
+                            const isReading = stage.id === readingStage;
+                            return (
+                                <li key={stage.id}>
+                                    {stage.ready ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => goToStage(stage.id)}
+                                            aria-current={isReading ? "location" : undefined}
+                                            className={cn(
+                                                "-ml-px flex w-full border-l-2 py-100 pr-200 pl-[18px] text-left text-[length:var(--text-200)] leading-200 transition-colors",
+                                                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                                                isReading
+                                                    ? "border-primary font-semibold text-foreground"
+                                                    : "border-transparent text-muted-foreground hover:text-foreground",
+                                            )}
+                                        >
+                                            {stage.label}
+                                        </button>
+                                    ) : (
+                                        <span className="-ml-px flex items-baseline justify-between gap-200 border-l-2 border-transparent py-100 pr-200 pl-[18px] text-[length:var(--text-200)] leading-200 text-muted-foreground opacity-60">
+                                            {stage.label}
+                                            <span className="text-[length:var(--text-100)] leading-100">Soon</span>
+                                        </span>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+            </li>
+        );
+    };
+
+    const reference = destinations.filter(isReference);
+
     return (
         <div className={cn("flex h-screen w-full overflow-hidden bg-background text-foreground", paletteClass(active))}>
             <nav
                 aria-label="Sections"
-                className="flex w-[248px] shrink-0 flex-col gap-500 border-r border-border bg-card px-400 py-500"
+                className="flex w-[248px] shrink-0 flex-col gap-500 overflow-y-auto border-r border-border bg-card px-400 py-500"
             >
                 <div className="flex flex-col gap-100 px-200">
                     <span className="text-[length:var(--text-500)] leading-500 font-semibold">ValueLens</span>
@@ -103,76 +176,22 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                 </div>
 
                 <ul className="flex flex-1 flex-col gap-100-nudge">
-                    {destinations.map((destination) => {
-                        const Icon = destination.icon;
-                        const isActive = destination.id === active;
-                        const ready = isDestinationReady(destination);
-                        return (
-                            <li key={destination.id} className={paletteClass(destination.id)}>
-                                <button
-                                    type="button"
-                                    onClick={() => onNavigate(destination.id)}
-                                    aria-current={isActive ? "page" : undefined}
-                                    disabled={!ready}
-                                    className={cn(
-                                        "flex w-full items-center gap-300 rounded-md px-300 py-200 text-left transition-colors",
-                                        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                                        isActive
-                                            ? "bg-accent text-accent-foreground"
-                                            : "text-muted-foreground hover:bg-secondary hover:text-foreground",
-                                        !ready && "cursor-not-allowed opacity-50 hover:bg-transparent",
-                                    )}
-                                >
-                                    <Icon className="icon-size-200 shrink-0 text-primary" aria-hidden="true" />
-                                    <span className="flex flex-col">
-                                        <span className={cn("text-[length:var(--text-300)] leading-300", isActive && "font-semibold")}>
-                                            {destination.label}
-                                        </span>
-                                        <span className="text-[length:var(--text-100)] leading-100 opacity-70">
-                                            {ready ? destination.blurb : "Coming next"}
-                                        </span>
-                                    </span>
-                                </button>
-
-                                {isActive && destination.stages.length > 1 && (
-                                    <ul
-                                        aria-label={`${destination.label} stages`}
-                                        className="mt-100 mb-200 ml-500 flex flex-col border-l border-border"
-                                    >
-                                        {destination.stages.map((stage) => {
-                                            const isReading = stage.id === readingStage;
-                                            return (
-                                                <li key={stage.id}>
-                                                    {stage.ready ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => goToStage(stage.id)}
-                                                            aria-current={isReading ? "location" : undefined}
-                                                            className={cn(
-                                                                "-ml-px flex w-full border-l-2 py-100 pr-200 pl-[18px] text-left text-[length:var(--text-200)] leading-200 transition-colors",
-                                                                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                                                                isReading
-                                                                    ? "border-primary font-semibold text-foreground"
-                                                                    : "border-transparent text-muted-foreground hover:text-foreground",
-                                                            )}
-                                                        >
-                                                            {stage.label}
-                                                        </button>
-                                                    ) : (
-                                                        <span className="-ml-px flex items-baseline justify-between gap-200 border-l-2 border-transparent py-100 pr-200 pl-[18px] text-[length:var(--text-200)] leading-200 text-muted-foreground opacity-60">
-                                                            {stage.label}
-                                                            <span className="text-[length:var(--text-100)] leading-100">Soon</span>
-                                                        </span>
-                                                    )}
-                                                </li>
-                                            );
-                                        })}
-                                    </ul>
-                                )}
-                            </li>
-                        );
-                    })}
+                    {destinations.filter((destination) => !isReference(destination)).map(renderDestination)}
                 </ul>
+
+                {reference.length > 0 && (
+                    <div className="flex flex-col gap-100 border-t border-border pt-400">
+                        <span
+                            id="nav-reference"
+                            className="px-300 text-[length:var(--text-200)] leading-200 font-semibold text-muted-foreground"
+                        >
+                            Reference
+                        </span>
+                        <ul aria-labelledby="nav-reference" className="flex flex-col gap-100-nudge">
+                            {reference.map(renderDestination)}
+                        </ul>
+                    </div>
+                )}
 
                 <button
                     type="button"
@@ -206,7 +225,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                             </span>
                         </header>
                     )}
-                    {current && <FilterBar destinationLabel={current.label} />}
+                    {current && current.filters.length > 0 && <FilterBar destinationLabel={current.label} />}
                     <ThemeContext.Provider value={{ ...themeContext, theme: paletteTheme }}>
                         <div
                             aria-busy={refreshing || undefined}

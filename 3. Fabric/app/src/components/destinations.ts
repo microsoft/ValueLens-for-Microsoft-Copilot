@@ -11,12 +11,15 @@ import type { FilterKey } from "@/lib/filters";
 
 /**
  * The six top-level destinations the report pages were folded into, each
- * holding its pages as stages read top to bottom.
+ * holding its pages as stages read top to bottom, plus the report's appendix
+ * as a reference destination below them.
  *
  * A stage that is not built yet stays listed so the shape of the destination
  * is visible; a destination is reachable once any of its stages is built.
  * `filters` are the slicers the destination responds to, taken from the ones
  * the report placed on its pages; the destination id doubles as its palette.
+ * A `reference` destination holds definitions rather than activity, so it has
+ * no filters and sits apart in the sidebar.
  */
 export const destinations = [
     {
@@ -84,6 +87,18 @@ export const destinations = [
         filters: ["dateRange"] as FilterKey[],
         stages: [{ id: "feedback", label: "Feedback", ready: true }],
     },
+    {
+        id: "appendix",
+        label: "Appendix",
+        blurb: "What each metric means, and the value assumptions",
+        icon: BookOpen as LucideIcon,
+        filters: [] as FilterKey[],
+        reference: true,
+        stages: [
+            { id: "glossary", label: "Glossary", ready: true },
+            { id: "signal-impact", label: "Signal → Impact", ready: true },
+        ],
+    },
 ] as const;
 
 export type Destination = (typeof destinations)[number];
@@ -95,10 +110,12 @@ export function isDestinationReady(destination: Destination): boolean {
     return destination.stages.some((stage) => stage.ready);
 }
 
+/** Reference destinations hold definitions rather than activity. */
+export function isReference(destination: Destination): boolean {
+    return "reference" in destination && destination.reference;
+}
+
 /** The DOM id a stage's section carries, so the sidebar can scroll to it. */
 export function stageAnchor(id: StageId): string {
     return `stage-${id}`;
 }
-
-/** The reference material that lives in the slide-over drawer, not in the nav. */
-export const referenceIcon = BookOpen as LucideIcon;
