@@ -1,5 +1,6 @@
 EVALUATE
 ROW(
+    "Month", [Last Full Month Start],
     "Power", [Power Users, Last Month], "Power Pct", [Power Users %, Last Month],
     "Habitual", [Habitual Users, Last Month], "Habitual Pct", [Habitual Users %, Last Month],
     "Developing", [Developing Users, Last Month], "Developing Pct", [Developing Users %, Last Month],

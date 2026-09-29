@@ -14,15 +14,20 @@ import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states"
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
+import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import type { FilterKey } from "@/lib/filters";
 import { rowChartHeight } from "@/lib/chart-height";
+import { withOrgAttribute } from "@/lib/org-attribute";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import { activationByOrg, activationSummary, type ActivationCohort } from "@/queries/adoption";
 
 /** The cohort cards already split licensed, unlicensed and agent use, so those filters would only blank cards out. */
 const COHORT_FILTERS: FilterKey[] = ["licence", "audience"];
+/** Activation counts people who haven't used anything yet, so narrowing to an agent would call everyone else inactive. */
+const AGENT_FILTERS: FilterKey[] = ["agentTypes", "agentNames"];
+const IGNORED: FilterKey[] = [...COHORT_FILTERS, ...AGENT_FILTERS];
 
 /** The four cohorts the Activation page reports on, in reading order. */
 const cohorts: {
@@ -91,10 +96,11 @@ const cohorts: {
 export function ActivationStage() {
     const [cohort, setCohort] = useState<ActivationCohort>("all");
     const { theme } = useThemeContext();
+    const org = useOrgAttribute();
 
-    const summary = useFilteredQuery(activationSummary(), { ignore: COHORT_FILTERS });
-    const byOrg = useMemo(() => activationByOrg({ cohort }), [cohort]);
-    const orgResult = useFilteredQuery({ connection: byOrg.connection, query: byOrg.query }, { ignore: COHORT_FILTERS });
+    const summary = useFilteredQuery(activationSummary(), { ignore: IGNORED });
+    const byOrg = useMemo(() => withOrgAttribute(activationByOrg({ cohort }), org), [cohort, org]);
+    const orgResult = useFilteredQuery({ connection: byOrg.connection, query: byOrg.query }, { ignore: IGNORED });
 
     const summaryRow = useMemo(
         () => (summary.data?.status === "success" ? toSummaryRow(summary.data.table) : undefined),
@@ -124,6 +130,10 @@ export function ActivationStage() {
             <FilterNote
                 ignored={COHORT_FILTERS}
                 reason="activation is shown for each cohort side by side — pick one with the cohort switch."
+            />
+            <FilterNote
+                ignored={AGENT_FILTERS}
+                reason="activation counts everyone, including people who haven't used an agent yet."
             />
             {summary.data?.status === "error" ? (
                 <QueryError message={summary.data.error.message} onRetry={summary.refetch} />
@@ -188,8 +198,8 @@ export function ActivationStage() {
                 ) : orgTable.rows.length === 0 ? (
                     <QueryEmpty
                         className="h-full"
-                        title="No organizations to compare"
-                        description="No rows carry an organization value. Populate the organization mapping in the lakehouse to break activation down by team."
+                        title={`No ${org.plural} to compare`}
+                        description={`No rows carry a ${org.noun} value. Populate that column in the org data in the lakehouse to break activation down by team.`}
                     />
                 ) : (
                     <VegaVisual
@@ -197,7 +207,7 @@ export function ActivationStage() {
                         data={orgTable}
                         theme={theme}
                         header={{
-                            title: `${selected.label} activation by organization`,
+                            title: `${selected.label} activation by ${org.noun}`,
                             subtitle: "Active and inactive users, sharing a baseline",
                         }}
                     />

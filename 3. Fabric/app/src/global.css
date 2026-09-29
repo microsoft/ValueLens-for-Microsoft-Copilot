@@ -245,6 +245,13 @@
     --vl-periwinkle: #95a9ce;
     --vl-slate: #8793a3;
     --vl-ink: #1c2632;
+    /* The habit ladder, Power (4) down to Inactive (0): one blue ramp, with
+       Inactive stepping out of it into grey because it is an absence. */
+    --vl-ladder-4: #0b2c57;
+    --vl-ladder-3: #3a5c9e;
+    --vl-ladder-2: #7e9cdb;
+    --vl-ladder-1: #b7c8ea;
+    --vl-ladder-0: #dcdfe3;
   }
 
   .dark {
@@ -260,6 +267,12 @@
     --vl-periwinkle: #b3c2de;
     --vl-slate: #a3aebd;
     --vl-ink: #dbdfe4;
+    /* On a dark ground engagement reads as brightness. */
+    --vl-ladder-4: #c7d6f5;
+    --vl-ladder-3: #8fa9e0;
+    --vl-ladder-2: #5b7bb0;
+    --vl-ladder-1: #36507d;
+    --vl-ladder-0: #4a5058;
   }
 
   /* Destination palettes. Each destination leads with its own hue — in the

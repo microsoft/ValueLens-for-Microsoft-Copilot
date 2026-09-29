@@ -189,7 +189,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                 </button>
             </nav>
 
-            <main ref={mainRef} className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+            <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
                 <div className="mx-auto flex max-w-[1400px] flex-col gap-600 px-700 pt-600 pb-800">
                     {current && (
                         <header className="flex items-center gap-400">

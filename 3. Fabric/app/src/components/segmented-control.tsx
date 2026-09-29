@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 interface SegmentedControlProps<T extends string> {
     /** Names the group for assistive technology, e.g. "Cohort". */
     label: string;
-    options: readonly { id: T; label: string }[];
+    options: readonly { id: T; label: string; disabled?: boolean; hint?: string }[];
     value: T;
     onChange: (value: T) => void;
     className?: string;
@@ -36,9 +36,12 @@ export function SegmentedControl<T extends string>({
                     type="button"
                     onClick={() => onChange(option.id)}
                     aria-pressed={option.id === value}
+                    disabled={option.disabled}
+                    title={option.hint}
                     className={cn(
                         "rounded-sm px-300 py-100 text-[length:var(--text-200)] transition-colors",
                         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                        "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted-foreground",
                         option.id === value
                             ? "bg-accent font-semibold text-accent-foreground"
                             : "text-muted-foreground hover:text-foreground",

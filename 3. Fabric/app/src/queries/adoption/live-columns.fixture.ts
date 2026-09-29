@@ -76,6 +76,7 @@ export const liveColumns = {
         "[Hours]",
     ],
     habitSummary: [
+        "[Month]",
         "[Power]",
         "[Power Pct]",
         "[Habitual]",

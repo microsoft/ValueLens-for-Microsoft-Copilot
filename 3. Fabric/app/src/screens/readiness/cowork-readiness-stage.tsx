@@ -13,9 +13,11 @@ import { KpiCard } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";
+import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { rowChartHeight } from "@/lib/chart-height";
 import { formatKpi } from "@/lib/format-kpi";
+import { withOrgAttribute } from "@/lib/org-attribute";
 import { readNumber, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import {
@@ -25,14 +27,16 @@ import {
     isDepthUniform,
 } from "@/queries/agents";
 
-const candidateColumns: GridColumnDef[] = [
-    { id: "Rank", header: "Rank", width: 88, numericStyling: true },
-    { id: "User", header: "User", minWidth: 240 },
-    { id: "Organization", header: "Organization", minWidth: 160 },
-    { id: "Surfaces Per Day", header: "Apps per active day", numericStyling: true },
-    { id: "Prompts Per Session", header: "Prompts per session", numericStyling: true },
-    { id: "Uses Agents", header: "Uses agents" },
-];
+function candidateColumns(orgLabel: string): GridColumnDef[] {
+    return [
+        { id: "Rank", header: "Rank", width: 88, numericStyling: true },
+        { id: "User", header: "User", minWidth: 240 },
+        { id: "Organization", header: orgLabel, minWidth: 160 },
+        { id: "Surfaces Per Day", header: "Apps per active day", numericStyling: true },
+        { id: "Prompts Per Session", header: "Prompts per session", numericStyling: true },
+        { id: "Uses Agents", header: "Uses agents" },
+    ];
+}
 
 /**
  * The Cowork half of the Readiness destination: who could be offered Cowork
@@ -45,12 +49,14 @@ const candidateColumns: GridColumnDef[] = [
  */
 export function CoworkReadinessStage() {
     const { theme } = useThemeContext();
+    const org = useOrgAttribute();
 
     const summary = useFilteredQuery(coworkReadinessSummary());
-    const byOrg = coworkReadinessByOrg();
+    const byOrg = useMemo(() => withOrgAttribute(coworkReadinessByOrg(), org), [org]);
     const byOrgResult = useFilteredQuery({ connection: byOrg.connection, query: byOrg.query });
-    const candidates = coworkCandidates();
+    const candidates = useMemo(() => withOrgAttribute(coworkCandidates(), org), [org]);
     const candidatesResult = useFilteredQuery({ connection: candidates.connection, query: candidates.query });
+    const columns = useMemo(() => candidateColumns(org.label), [org.label]);
 
     const summaryRow = useMemo(
         () => (summary.data?.status === "success" ? toSummaryRow(summary.data.table) : undefined),
@@ -133,7 +139,7 @@ export function CoworkReadinessStage() {
                 ) : byOrgTable.rows.length === 0 ? (
                     <QueryEmpty
                         className="h-full"
-                        title="No organizations to compare"
+                        title={`No ${org.plural} to compare`}
                         description="Nobody without Cowork has recorded Copilot use in this period."
                     />
                 ) : (
@@ -142,7 +148,7 @@ export function CoworkReadinessStage() {
                         data={byOrgTable}
                         theme={theme}
                         header={{
-                            title: "Breadth of use by organization",
+                            title: `Breadth of use by ${org.noun}`,
                             subtitle: "Apps used per active day, among people who have not tried Cowork",
                         }}
                     />
@@ -166,7 +172,7 @@ export function CoworkReadinessStage() {
                     />
                 ) : (
                     <DataGrid
-                        columns={candidateColumns}
+                        columns={columns}
                         data={candidatesTable}
                         defaultSort={[{ columnId: "Rank", direction: "asc" }]}
                         theme={theme}

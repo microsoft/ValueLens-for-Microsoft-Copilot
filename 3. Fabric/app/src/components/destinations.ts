@@ -24,7 +24,7 @@ export const destinations = [
         label: "Adoption",
         blurb: "Who started, who stayed, who stuck",
         icon: TrendingUp as LucideIcon,
-        filters: ["dateRange", "organizations", "licence", "audience"] as FilterKey[],
+        filters: ["dateRange", "organizations", "licence", "audience", "agentTypes", "agentNames"] as FilterKey[],
         stages: [
             { id: "activation", label: "Activation", ready: true },
             { id: "adoption", label: "Adoption", ready: true },
@@ -37,7 +37,7 @@ export const destinations = [
         label: "Leaderboards",
         blurb: "The people and the agents doing the most",
         icon: Trophy as LucideIcon,
-        filters: ["dateRange", "organizations", "licence", "agentTypes"] as FilterKey[],
+        filters: ["dateRange", "organizations", "licence", "audience", "agentTypes", "agentNames"] as FilterKey[],
         stages: [
             { id: "leaderboard", label: "Leaderboard", ready: true },
             { id: "agent-registry", label: "Agent registry", ready: true },
@@ -59,7 +59,7 @@ export const destinations = [
         label: "Value",
         blurb: "What the work was, and what it was worth",
         icon: PoundSterling as LucideIcon,
-        filters: ["dateRange", "organizations", "licence", "audience", "agentTypes"] as FilterKey[],
+        filters: ["dateRange", "organizations", "licence", "audience", "agentTypes", "agentNames"] as FilterKey[],
         stages: [
             { id: "task-breakdown", label: "Task breakdown", ready: true },
             { id: "estimated-value", label: "Estimated value", ready: true },
@@ -70,7 +70,7 @@ export const destinations = [
         label: "Efficiency",
         blurb: "Whether the right tool is doing the job",
         icon: Gauge as LucideIcon,
-        filters: ["dateRange", "organizations", "licence", "audience"] as FilterKey[],
+        filters: ["dateRange", "organizations", "licence", "audience", "agentTypes", "agentNames"] as FilterKey[],
         stages: [
             { id: "cowork-fit", label: "Cowork fit", ready: true },
             { id: "model-fit", label: "Model fit", ready: true },

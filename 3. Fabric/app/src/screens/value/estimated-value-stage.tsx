@@ -14,10 +14,12 @@ import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states"
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
+import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { gridHeight, rowChartHeight } from "@/lib/chart-height";
 import { treatAs } from "@/lib/dax-filters";
 import { formatKpi } from "@/lib/format-kpi";
+import { withOrgAttribute } from "@/lib/org-attribute";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import {
@@ -67,6 +69,7 @@ export function EstimatedValueStage() {
     const [draftRate, setDraftRate] = useState("50");
     const [scenario, setScenario] = useState<Scenario>("Typical");
     const { theme } = useThemeContext();
+    const org = useOrgAttribute();
 
     const extra = useMemo(
         () => [
@@ -85,7 +88,7 @@ export function EstimatedValueStage() {
     );
     const agents = agentValue();
     const agentResult = useFilteredQuery({ connection: agents.connection, query: agents.query }, { extra });
-    const organizations = organizationValue();
+    const organizations = useMemo(() => withOrgAttribute(organizationValue(), org), [org]);
     const organizationResult = useFilteredQuery(
         { connection: organizations.connection, query: organizations.query },
         { extra },
@@ -179,7 +182,7 @@ export function EstimatedValueStage() {
 
     const organizationColumns: GridColumnDef[] = useMemo(
         () => [
-            { id: ORGANIZATION_COLUMN, header: "Organization", minWidth: 180 },
+            { id: ORGANIZATION_COLUMN, header: org.label, minWidth: 180 },
             {
                 id: "Active Users",
                 header: "Active users",
@@ -202,7 +205,7 @@ export function EstimatedValueStage() {
                 cellRenderer: (value) => formatCurrencyCell(value, currencySymbol),
             },
         ],
-        [currencySymbol],
+        [currencySymbol, org.label],
     );
 
     return (
@@ -357,8 +360,8 @@ export function EstimatedValueStage() {
                     ) : organizationTable.rows.length === 0 ? (
                         <QueryEmpty
                             className="h-full"
-                            title="No organizations to compare"
-                            description="No rows carry both an organization and an estimated value for this slice."
+                            title={`No ${org.plural} to compare`}
+                            description={`No rows carry both a ${org.noun} and an estimated value for this slice.`}
                         />
                     ) : (
                         <DataGrid
@@ -367,7 +370,7 @@ export function EstimatedValueStage() {
                             defaultSort={[{ columnId: "AI Assisted Value", direction: "desc" }]}
                             theme={theme}
                             header={{
-                                title: "Organizations",
+                                title: org.plural.charAt(0).toUpperCase() + org.plural.slice(1),
                                 subtitle: "Users, weekly hours and value in one view",
                             }}
                         />

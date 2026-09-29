@@ -159,6 +159,37 @@ describe("adoption spec field references", () => {
         ).toBe(true);
     });
 
+    it("stacks the habit trend with Power on top, matching the legend and ladder", () => {
+        const spec = habitTrend().vegaLiteSpec as {
+            transform: { calculate?: string; as?: string }[];
+            encoding: {
+                color: { field: string; sort: unknown; scale: { domain: string[]; range: string[] }; legend: { symbolLimit?: number } };
+                order: { field: string; sort: string };
+            };
+        };
+        const { color, order } = spec.encoding;
+
+        expect(color.scale.domain).toEqual(["Power", "Habitual", "Developing", "Beginner", "Inactive"]);
+        expect(color.sort).toBeNull();
+        // The first stacked series sits on the baseline, so Inactive must rank lowest and Power highest.
+        const rank = spec.transform.find((step) => step.as === order.field)?.calculate ?? "";
+        expect(rank).toContain("['Inactive', 'Beginner', 'Developing', 'Habitual', 'Power']");
+        expect(order.sort).toBe("ascending");
+        // Without an explicit limit the library truncates a narrow legend to "…4 entries".
+        expect(color.legend.symbolLimit).toBeGreaterThanOrEqual(color.scale.domain.length);
+        // The theme fades areas to 60%, which would stop the fills matching the ladder's swatches.
+        expect((spec as { config?: { area?: { fillOpacity?: number } } }).config?.area?.fillOpacity).toBe(1);
+    });
+
+    it("takes the ladder colours from the theme, Power first", () => {
+        const colors = ["#111111", "#222222", "#333333", "#444444", "#555555"];
+        const themed = habitTrend({ colors }).vegaLiteSpec as { encoding: { color: { scale: { range: string[] } } } };
+        expect(themed.encoding.color.scale.range).toEqual(colors);
+
+        const partial = habitTrend({ colors: colors.slice(0, 2) }).vegaLiteSpec as typeof themed;
+        expect(partial.encoding.color.scale.range).not.toEqual(colors.slice(0, 2));
+    });
+
     it("drops the colour legend when a single series is plotted", () => {
         const single = adoptionTrend({ measure: "sessions" }).vegaLiteSpec as { encoding: { color?: unknown } };
         expect(single.encoding.color).toBeUndefined();

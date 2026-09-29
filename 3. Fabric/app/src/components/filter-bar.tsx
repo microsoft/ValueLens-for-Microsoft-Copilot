@@ -10,9 +10,11 @@ import { Check, Info, LoaderCircle, X } from "lucide-react";
 import { useFilterContext } from "@/hooks/filter.context";
 import {
     availablePresets,
+    AUDIENCE_VALUES,
     DATE_PRESET_LABELS,
     defaultFilters,
-    FILTER_LABELS,
+    FILTER_KEYS,
+    filterLabel,
     formatDateRange,
     isFilterActive,
     presetRange,
@@ -21,6 +23,7 @@ import {
     type FilterKey,
     type Licence,
 } from "@/lib/filters";
+import { describeOrgAttribute } from "@/lib/org-attribute";
 import { useIsRefreshing } from "@/lib/refresh-tracker";
 import { cn } from "@/lib/utils";
 import { FilterMenu } from "./filter-menu";
@@ -32,11 +35,12 @@ const LICENCE_OPTIONS: { id: Licence; label: string }[] = [
     { id: "unlicensed", label: "Unlicensed" },
 ];
 
-const AUDIENCE_OPTIONS: { id: Audience; label: string }[] = [
-    { id: "all", label: "All" },
-    { id: "copilot", label: "Copilot chat" },
-    { id: "agents", label: "Agents" },
-];
+const AUDIENCE_LABELS: Record<Audience, string> = {
+    all: "All",
+    copilot: "Copilot chat",
+    agents: "Agents",
+    cowork: "Cowork",
+};
 
 const optionClass = (selected: boolean) =>
     cn(
@@ -64,7 +68,7 @@ function DateFilter() {
     const customValid = Boolean(from && to && from <= to);
 
     return (
-        <FilterMenu label={FILTER_LABELS.dateRange} summary={summary} active={Boolean(range)}>
+        <FilterMenu label={filterLabel("dateRange", "")} summary={summary} active={Boolean(range)}>
             {(close) => (
                 <div className="flex flex-col gap-300">
                     <div className="flex flex-col gap-100">
@@ -158,13 +162,14 @@ function DateFilter() {
 }
 
 interface MultiSelectFilterProps {
-    filterKey: "organizations" | "agentTypes";
+    filterKey: "organizations" | "agentTypes" | "agentNames";
+    label: string;
     allLabel: string;
     noun: string;
     choices: readonly string[] | undefined;
 }
 
-function MultiSelectFilter({ filterKey, allLabel, noun, choices }: MultiSelectFilterProps) {
+function MultiSelectFilter({ filterKey, label, allLabel, noun, choices }: MultiSelectFilterProps) {
     const { filters, setFilters } = useFilterContext();
     const [search, setSearch] = useState("");
     const selected = filters[filterKey];
@@ -186,7 +191,7 @@ function MultiSelectFilter({ filterKey, allLabel, noun, choices }: MultiSelectFi
 
     return (
         <FilterMenu
-            label={FILTER_LABELS[filterKey]}
+            label={label}
             summary={summariseSelection(selected, allLabel, noun)}
             active={selected.length > 0}
         >
@@ -213,7 +218,7 @@ function MultiSelectFilter({ filterKey, allLabel, noun, choices }: MultiSelectFi
                     ) : visible.length === 0 ? (
                         <p className="px-200 py-200 text-[length:var(--text-300)] text-muted-foreground">No {noun} match.</p>
                     ) : (
-                        <ul className="flex flex-col" aria-label={FILTER_LABELS[filterKey]}>
+                        <ul className="flex flex-col" aria-label={label}>
                             {visible.map((choice) => (
                                 <li key={choice}>
                                     <label className="flex cursor-pointer items-center gap-300 rounded-md px-200 py-200 text-[length:var(--text-300)] leading-300 text-foreground hover:bg-secondary">
@@ -244,9 +249,54 @@ function MultiSelectFilter({ filterKey, allLabel, noun, choices }: MultiSelectFi
     );
 }
 
+/**
+ * Picks which column of the customer's org data the breakdowns group by —
+ * department, function, location, whatever their export carried — and so
+ * which values the filter beside it offers.
+ */
+function GroupByFilter() {
+    const { filters, setFilters, orgAttributes, orgAttribute } = useFilterContext();
+
+    return (
+        <FilterMenu label="Group by" summary={orgAttribute.label} active={false}>
+            {(close) => (
+                <div className="flex flex-col gap-200">
+                    <p className="px-200 text-[length:var(--text-200)] leading-200 text-muted-foreground">
+                        Charts and tables that break down by team use this column from your org data.
+                    </p>
+                    <ul className="flex flex-col gap-100" aria-label="Group by">
+                        {orgAttributes.map((column) => {
+                            const selected = column === filters.orgAttribute;
+                            return (
+                                <li key={column}>
+                                    <button
+                                        type="button"
+                                        aria-pressed={selected}
+                                        className={optionClass(selected)}
+                                        onClick={() => {
+                                            if (!selected) {
+                                                // The old values belong to the old column.
+                                                setFilters((current) => ({ ...current, orgAttribute: column, organizations: [] }));
+                                            }
+                                            close();
+                                        }}
+                                    >
+                                        {describeOrgAttribute(column).label}
+                                        {selected && <Check className="icon-size-200" aria-hidden="true" />}
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+            )}
+        </FilterMenu>
+    );
+}
+
 interface LabelledSegmentProps<T extends string> {
     label: string;
-    options: readonly { id: T; label: string }[];
+    options: readonly { id: T; label: string; disabled?: boolean; hint?: string }[];
     value: T;
     onChange: (value: T) => void;
 }
@@ -268,14 +318,29 @@ function LabelledSegment<T extends string>({ label, options, value, onChange }: 
  * apply here is called out rather than silently dropped.
  */
 export function FilterBar({ destinationLabel }: { destinationLabel: string }) {
-    const { filters, setFilters, options, optionsError, applicable } = useFilterContext();
+    const { filters, setFilters, options, optionsError, applicable, orgAttribute, orgAttributes, orgValues } =
+        useFilterContext();
     const refreshing = useIsRefreshing();
 
     const has = (key: FilterKey) => applicable.includes(key);
-    const anyActive = (Object.keys(FILTER_LABELS) as FilterKey[]).some((key) => isFilterActive(filters, key));
-    const notApplied = (Object.keys(FILTER_LABELS) as FilterKey[]).filter(
-        (key) => isFilterActive(filters, key) && !has(key),
-    );
+    const anyActive = FILTER_KEYS.some((key) => isFilterActive(filters, key));
+    const notApplied = FILTER_KEYS.filter((key) => isFilterActive(filters, key) && !has(key));
+
+    // Offer Cowork even before the tenant has any, so the option is visible,
+    // but only make it selectable once the data holds Cowork activity.
+    const audienceOptions = (Object.keys(AUDIENCE_LABELS) as Audience[]).map((id) => {
+        const missing =
+            id !== "all" &&
+            options !== undefined &&
+            !options.activities.includes(AUDIENCE_VALUES[id]) &&
+            filters.audience !== id;
+        return {
+            id,
+            label: AUDIENCE_LABELS[id],
+            disabled: missing,
+            hint: missing ? `No ${AUDIENCE_LABELS[id]} activity in this data yet` : undefined,
+        };
+    });
 
     return (
         <div
@@ -284,17 +349,20 @@ export function FilterBar({ destinationLabel }: { destinationLabel: string }) {
             className="sticky top-0 z-10 -mx-700 flex flex-wrap items-center gap-x-400 gap-y-200 border-b border-border bg-background px-700 py-300"
         >
             {has("dateRange") && <DateFilter />}
+            {has("organizations") && orgAttributes.length > 1 && <GroupByFilter />}
             {has("organizations") && (
                 <MultiSelectFilter
+                    key={orgAttribute.column}
                     filterKey="organizations"
-                    allLabel="All organizations"
-                    noun="organizations"
-                    choices={options?.organizations}
+                    label={orgAttribute.label}
+                    allLabel={`All ${orgAttribute.plural}`}
+                    noun={orgAttribute.plural}
+                    choices={orgValues}
                 />
             )}
             {has("licence") && (
                 <LabelledSegment
-                    label={FILTER_LABELS.licence}
+                    label={filterLabel("licence", "")}
                     options={LICENCE_OPTIONS}
                     value={filters.licence}
                     onChange={(licence) => setFilters((current) => ({ ...current, licence }))}
@@ -302,8 +370,8 @@ export function FilterBar({ destinationLabel }: { destinationLabel: string }) {
             )}
             {has("audience") && (
                 <LabelledSegment
-                    label={FILTER_LABELS.audience}
-                    options={AUDIENCE_OPTIONS}
+                    label={filterLabel("audience", "")}
+                    options={audienceOptions}
                     value={filters.audience}
                     onChange={(audience) => setFilters((current) => ({ ...current, audience }))}
                 />
@@ -311,9 +379,19 @@ export function FilterBar({ destinationLabel }: { destinationLabel: string }) {
             {has("agentTypes") && (
                 <MultiSelectFilter
                     filterKey="agentTypes"
+                    label={filterLabel("agentTypes", "")}
                     allLabel="All agent types"
                     noun="agent types"
                     choices={options?.agentTypes}
+                />
+            )}
+            {has("agentNames") && (
+                <MultiSelectFilter
+                    filterKey="agentNames"
+                    label={filterLabel("agentNames", "")}
+                    allLabel="All agents"
+                    noun="agents"
+                    choices={options?.agentNames}
                 />
             )}
 
@@ -341,7 +419,7 @@ export function FilterBar({ destinationLabel }: { destinationLabel: string }) {
                     <Info className="icon-size-200 shrink-0" aria-hidden="true" />
                     {optionsError
                         ? "Filter choices didn't load, so only the date presets are available."
-                        : `${notApplied.map((key) => FILTER_LABELS[key]).join(" and ")} ${notApplied.length > 1 ? "filters are set but don't" : "filter is set but doesn't"} apply to ${destinationLabel}.`}
+                        : `${notApplied.map((key) => filterLabel(key, orgAttribute.label)).join(" and ")} ${notApplied.length > 1 ? "filters are set but don't" : "filter is set but doesn't"} apply to ${destinationLabel}.`}
                 </p>
             )}
         </div>

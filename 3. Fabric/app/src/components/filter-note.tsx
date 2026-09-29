@@ -7,10 +7,10 @@
 
 import { Info } from "lucide-react";
 import { useFilterContext } from "@/hooks/filter.context";
-import { FILTER_LABELS, isFilterActive, type FilterKey } from "@/lib/filters";
+import { filterLabel, isFilterActive, type FilterKey } from "@/lib/filters";
 
-function joinLabels(keys: readonly FilterKey[]): string {
-    const labels = keys.map((key) => FILTER_LABELS[key]);
+function joinLabels(keys: readonly FilterKey[], orgLabel: string): string {
+    const labels = keys.map((key) => filterLabel(key, orgLabel));
     if (labels.length <= 1) return labels.join("");
     return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
@@ -21,7 +21,7 @@ function joinLabels(keys: readonly FilterKey[]): string {
  * Renders nothing when none of `ignored` is active on this destination.
  */
 export function FilterNote({ ignored, reason }: { ignored: readonly FilterKey[]; reason: string }) {
-    const { filters, applicable } = useFilterContext();
+    const { filters, applicable, orgAttribute } = useFilterContext();
     const skipped = ignored.filter((key) => applicable.includes(key) && isFilterActive(filters, key));
     if (skipped.length === 0) return null;
 
@@ -29,7 +29,7 @@ export function FilterNote({ ignored, reason }: { ignored: readonly FilterKey[];
         <p className="flex items-start gap-200 text-[length:var(--text-200)] leading-200 text-muted-foreground">
             <Info className="icon-size-200 mt-[2px] shrink-0" aria-hidden="true" />
             <span>
-                {joinLabels(skipped)} {skipped.length > 1 ? "filters don't" : "filter doesn't"} apply here: {reason}
+                {joinLabels(skipped, orgAttribute.label)} {skipped.length > 1 ? "filters don't" : "filter doesn't"} apply here: {reason}
             </span>
         </p>
     );

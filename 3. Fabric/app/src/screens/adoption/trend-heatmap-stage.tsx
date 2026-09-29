@@ -13,7 +13,9 @@ import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states"
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
+import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import { DEFAULT_ORG_ATTRIBUTE, withOrgAttribute } from "@/lib/org-attribute";
 import { readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import {
@@ -42,8 +44,9 @@ function distinctValueCount(table: DataTable | undefined, columnName: string): n
 export function TrendHeatmapStage() {
     const [metric, setMetric] = useState<TrendHeatmapMetric>("activeUsers");
     const { theme } = useThemeContext();
+    const org = useOrgAttribute();
 
-    const heatmap = useMemo(() => trendHeatmap({ metric }), [metric]);
+    const heatmap = useMemo(() => withOrgAttribute(trendHeatmap({ metric }), org), [metric, org]);
     const heatmapResult = useFilteredQuery({ connection: heatmap.connection, query: heatmap.query });
     const headline = useMemo(() => trendHeatmapHeadline(), []);
     const headlineResult = useFilteredQuery({ connection: headline.connection, query: headline.query });
@@ -73,7 +76,8 @@ export function TrendHeatmapStage() {
             }),
         [heatmap.vegaLiteSpec, theme],
     );
-    const headlineText = readText(headlineRow, selected.headlineColumn);
+    // The model writes this headline about organizations, whatever the Group by says.
+    const headlineText = org.column === DEFAULT_ORG_ATTRIBUTE ? readText(headlineRow, selected.headlineColumn) : undefined;
 
     const error =
         heatmapResult.data?.status === "error"
@@ -127,7 +131,7 @@ export function TrendHeatmapStage() {
                                 data={heatmapTable}
                                 theme={theme}
                                 header={{
-                                    title: `${selected.label} by organization and week`,
+                                    title: `${selected.label} by ${org.noun} and week`,
                                     subtitle: "Darker cells mark the strongest concentration in the current selection",
                                 }}
                             />

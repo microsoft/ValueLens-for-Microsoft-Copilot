@@ -1,0 +1,9 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        VALUES('Chat + Agent Org Data'[Organization]),
+        LEN(TRIM('Chat + Agent Org Data'[Organization])) > 0
+    ),
+    "Value", 'Chat + Agent Org Data'[Organization]
+)
+ORDER BY [Value]

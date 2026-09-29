@@ -18,7 +18,7 @@ import {
     type FilterState,
 } from "./filters";
 
-const ALL_KEYS: FilterKey[] = ["dateRange", "organizations", "licence", "audience", "agentTypes"];
+const ALL_KEYS: FilterKey[] = ["dateRange", "organizations", "licence", "audience", "agentTypes", "agentNames"];
 
 describe("filterExpressions", () => {
     it("emits nothing for the default state", () => {
@@ -29,10 +29,12 @@ describe("filterExpressions", () => {
     it("emits one argument per active filter, in key order", () => {
         const state: FilterState = {
             dateRange: { preset: "4w", from: "2026-06-09", to: "2026-07-06" },
+            orgAttribute: "Organization",
             organizations: ["HR", "IT"],
             licence: "unlicensed",
             audience: "agents",
             agentTypes: ["Microsoft"],
+            agentNames: ["Sales Agent 365"],
         };
         expect(filterExpressions(state, ALL_KEYS)).toEqual([
             "FILTER(ALL('Calendar'[Date]), 'Calendar'[Date] >= DATE(2026, 6, 9) && 'Calendar'[Date] <= DATE(2026, 7, 6))",
@@ -40,6 +42,21 @@ describe("filterExpressions", () => {
             `TREATAS({"Unlicensed"}, 'Chat + Agent Interactions (Audit Logs)'[Environment])`,
             `TREATAS({"Agents"}, 'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)])`,
             `TREATAS({"Microsoft"}, 'Agents 365'[Agent Type Label])`,
+            `TREATAS({"Sales Agent 365"}, 'Chat + Agent Interactions (Audit Logs)'[AgentName])`,
+        ]);
+    });
+
+    it("filters Cowork through the same Activity column the report uses", () => {
+        const state: FilterState = { ...defaultFilters, audience: "cowork" };
+        expect(filterExpressions(state, ["audience"])).toEqual([
+            `TREATAS({"Cowork"}, 'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)])`,
+        ]);
+    });
+
+    it("filters the org column chosen in Group by", () => {
+        const state: FilterState = { ...defaultFilters, orgAttribute: "officeLocation", organizations: ["Dublin"] };
+        expect(filterExpressions(state, ["organizations"])).toEqual([
+            `TREATAS({"Dublin"}, 'Chat + Agent Org Data'[officeLocation])`,
         ]);
     });
 

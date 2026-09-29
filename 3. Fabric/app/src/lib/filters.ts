@@ -6,16 +6,17 @@
 //-----------------------------------------------------------------------
 
 import { dateBetween, treatAs } from "./dax-filters";
+import { DEFAULT_ORG_ATTRIBUTE, orgColumnRef } from "./org-attribute";
 
 /**
  * The report's slicers, reduced to the handful that recur across its pages.
  * Each destination declares which of them apply to it; a stage can opt out of
  * one when it already splits by that dimension itself.
  */
-export type FilterKey = "dateRange" | "organizations" | "licence" | "audience" | "agentTypes";
+export type FilterKey = "dateRange" | "organizations" | "licence" | "audience" | "agentTypes" | "agentNames";
 
 export type DatePreset = "all" | "4w" | "8w" | "12w" | "custom";
-export type Audience = "all" | "copilot" | "agents";
+export type Audience = "all" | "copilot" | "agents" | "cowork";
 export type Licence = "all" | "licensed" | "unlicensed";
 
 export interface DateRange {
@@ -29,21 +30,39 @@ export interface DateRange {
 export interface FilterState {
     /** `undefined` means the whole loaded window. */
     dateRange: DateRange | undefined;
-    /** Empty means every organization. */
+    /**
+     * The org column to group and filter by. The provider resolves it against
+     * the columns the model actually has before anything reads it.
+     */
+    orgAttribute: string;
+    /** Values of `orgAttribute`; empty means all of them. */
     organizations: string[];
     licence: Licence;
     audience: Audience;
     /** Empty means every agent type. */
     agentTypes: string[];
+    /** Empty means every agent. */
+    agentNames: string[];
 }
 
 export const defaultFilters: FilterState = {
     dateRange: undefined,
+    orgAttribute: DEFAULT_ORG_ATTRIBUTE,
     organizations: [],
     licence: "all",
     audience: "all",
     agentTypes: [],
+    agentNames: [],
 };
+
+export const FILTER_KEYS: readonly FilterKey[] = [
+    "dateRange",
+    "organizations",
+    "licence",
+    "audience",
+    "agentTypes",
+    "agentNames",
+];
 
 export const FILTER_LABELS: Record<FilterKey, string> = {
     dateRange: "Date",
@@ -51,18 +70,31 @@ export const FILTER_LABELS: Record<FilterKey, string> = {
     licence: "License",
     audience: "Activity",
     agentTypes: "Agent type",
+    agentNames: "Agent",
 };
+
+/** A filter's name, with the org filter named after the attribute in use. */
+export function filterLabel(key: FilterKey, orgLabel: string): string {
+    return key === "organizations" ? orgLabel : FILTER_LABELS[key];
+}
 
 const AUDIT = "'Chat + Agent Interactions (Audit Logs)'";
 
 /** The model columns each slicer filters, as the report's own slicers do. */
 export const FILTER_COLUMNS = {
     date: "'Calendar'[Date]",
-    organization: "'Chat + Agent Org Data'[Organization]",
     licence: `${AUDIT}[Environment]`,
     audience: `${AUDIT}[Agent Filter (Normalized)]`,
     agentType: "'Agents 365'[Agent Type Label]",
+    agentName: `${AUDIT}[AgentName]`,
 } as const;
+
+/** The values of the report's Activity column behind each audience. */
+export const AUDIENCE_VALUES: Record<Exclude<Audience, "all">, string> = {
+    copilot: "Copilot",
+    agents: "Agents",
+    cowork: "Cowork",
+};
 
 /** Whether a filter narrows the data at all. */
 export function isFilterActive(state: FilterState, key: FilterKey): boolean {
@@ -77,6 +109,8 @@ export function isFilterActive(state: FilterState, key: FilterKey): boolean {
             return state.audience !== "all";
         case "agentTypes":
             return state.agentTypes.length > 0;
+        case "agentNames":
+            return state.agentNames.length > 0;
     }
 }
 
@@ -90,16 +124,19 @@ export function filterExpressions(state: FilterState, keys: readonly FilterKey[]
                 expressions.push(dateBetween(FILTER_COLUMNS.date, state.dateRange!.from, state.dateRange!.to));
                 break;
             case "organizations":
-                expressions.push(treatAs(FILTER_COLUMNS.organization, state.organizations));
+                expressions.push(treatAs(orgColumnRef(state.orgAttribute), state.organizations));
                 break;
             case "licence":
                 expressions.push(treatAs(FILTER_COLUMNS.licence, [state.licence === "licensed" ? "Licensed" : "Unlicensed"]));
                 break;
             case "audience":
-                expressions.push(treatAs(FILTER_COLUMNS.audience, [state.audience === "agents" ? "Agents" : "Copilot"]));
+                expressions.push(treatAs(FILTER_COLUMNS.audience, [AUDIENCE_VALUES[state.audience as Exclude<Audience, "all">]]));
                 break;
             case "agentTypes":
                 expressions.push(treatAs(FILTER_COLUMNS.agentType, state.agentTypes));
+                break;
+            case "agentNames":
+                expressions.push(treatAs(FILTER_COLUMNS.agentName, state.agentNames));
                 break;
         }
     }

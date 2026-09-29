@@ -8,29 +8,36 @@
 import { useMemo, useState } from "react";
 import { VegaVisual } from "@microsoft/fabric-visuals";
 import { stageAnchor } from "@/components/destinations";
+import { FilterNote } from "@/components/filter-note";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
+import { useFilterContext } from "@/hooks/filter.context";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import { LADDER_VARS, useLadderColors } from "@/hooks/use-palette-theme";
+import type { FilterKey } from "@/lib/filters";
 import { formatKpi } from "@/lib/format-kpi";
-import { readNumber, toSummaryRow } from "@/lib/summary-row";
+import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
-import { habitStages, habitSummary, habitTrend } from "@/queries/adoption";
+import { habitStages, habitSummary, habitThresholds, habitTrend } from "@/queries/adoption";
 
-const stageDescriptions: Record<string, string> = {
-    Power: "Daily reliance",
-    Habitual: "Most working days",
-    Developing: "A few times a week",
-    Beginner: "Occasional use",
-    Inactive: "No recorded use",
-};
+/** Stages place every licensed person, so narrowing to one agent would call everyone else inactive. */
+const AGENT_FILTERS: FilterKey[] = ["agentTypes", "agentNames"];
 
 /** Whether the monthly mix is plotted as a share of users or as a headcount. */
 const habitScales = [
     { id: "share", label: "Share" },
     { id: "count", label: "Count" },
 ] as const;
+
+const monthFormat = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+
+/** "June 2026" from the model's `2026-06-01T00:00:00`. */
+function formatMonth(value: string | undefined): string | undefined {
+    if (!value || !/^\d{4}-\d{2}-\d{2}/.test(value)) return undefined;
+    return monthFormat.format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
+}
 
 /**
  * Stage three of the funnel: whether use has become a habit.
@@ -41,10 +48,12 @@ const habitScales = [
 export function HabitStage() {
     const [scale, setScale] = useState<"share" | "count">("share");
     const { theme } = useThemeContext();
+    const { filters } = useFilterContext();
+    const ladderColors = useLadderColors();
 
-    const summary = useFilteredQuery(habitSummary());
-    const trend = useMemo(() => habitTrend({ scale }), [scale]);
-    const trendResult = useFilteredQuery({ connection: trend.connection, query: trend.query });
+    const summary = useFilteredQuery(habitSummary(), { ignore: AGENT_FILTERS });
+    const trend = useMemo(() => habitTrend({ scale, colors: ladderColors }), [scale, ladderColors]);
+    const trendResult = useFilteredQuery({ connection: trend.connection, query: trend.query }, { ignore: AGENT_FILTERS });
 
     const summaryRow = useMemo(
         () => (summary.data?.status === "success" ? toSummaryRow(summary.data.table) : undefined),
@@ -59,12 +68,21 @@ export function HabitStage() {
         [trendResult.data, trend.columnMetadata],
     );
 
+    const month = formatMonth(readText(summaryRow, "[Month]"));
+    // The model only knows who is licensed and idle for Copilot, not for Cowork.
+    const inactiveUnmeasured = filters.audience === "cowork";
+
     return (
         <Section
             id={stageAnchor("habit-formation")}
             title="Habit formation"
-            description="Where the population sits on the ladder from never using Copilot to relying on it daily."
+            description="Where people sit on the ladder from licensed but idle to relying on Copilot nearly every day, judged by how many days they used it in a month."
+            actions={<SegmentedControl label="Trend scale" options={habitScales} value={scale} onChange={setScale} />}
         >
+            <FilterNote
+                ignored={AGENT_FILTERS}
+                reason="habit stages place every licensed person, so narrowing to one agent would count everyone else as inactive."
+            />
             {summary.data?.status === "error" ? (
                 <QueryError message={summary.data.error.message} onRetry={summary.refetch} />
             ) : summary.isLoading || !summary.data ? (
@@ -75,35 +93,53 @@ export function HabitStage() {
                     description="Habit stages are derived from the most recent complete month. None was found in the current selection."
                 />
             ) : (
-                <ol className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
-                    {habitStages.map((stage) => {
-                        const share = readNumber(summaryRow, `[${stage} Pct]`);
-                        const count = readNumber(summaryRow, `[${stage}]`);
-                        return (
-                            <li key={stage} className="relative flex items-center gap-400 px-400 py-300">
-                                <span
-                                    aria-hidden="true"
-                                    className="absolute inset-y-0 left-0 bg-accent"
-                                    style={{ width: `${(share ?? 0) * 100}%` }}
-                                />
-                                <span className="relative flex flex-1 flex-col">
-                                    <span className="text-[length:var(--text-300)] leading-300 font-semibold text-card-foreground">
-                                        {stage}
+                <div className="flex flex-col gap-200">
+                    <p className="max-w-[80ch] text-[length:var(--text-200)] leading-200 text-muted-foreground">
+                        {month ? `Placed on ${month}, the last complete month. ` : "Placed on the last complete month. "}
+                        An active day is any day with at least one Copilot or agent interaction.
+                    </p>
+                    <ol className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+                        {habitStages.map((stage, index) => {
+                            const share = readNumber(summaryRow, `[${stage} Pct]`);
+                            const count = readNumber(summaryRow, `[${stage}]`);
+                            const threshold = habitThresholds[stage];
+                            const unmeasured = stage === "Inactive" && inactiveUnmeasured;
+                            return (
+                                <li key={stage} className="relative flex items-center gap-400 px-400 py-300">
+                                    <span
+                                        aria-hidden="true"
+                                        className="absolute inset-y-0 left-0 bg-accent"
+                                        style={{ width: `${(share ?? 0) * 100}%` }}
+                                    />
+                                    <span
+                                        aria-hidden="true"
+                                        className="relative size-300 shrink-0 rounded-sm"
+                                        style={{ backgroundColor: `var(${LADDER_VARS[index]})` }}
+                                    />
+                                    <span className="relative flex min-w-0 flex-1 flex-col">
+                                        <span className="flex flex-wrap items-baseline gap-x-200">
+                                            <span className="text-[length:var(--text-300)] leading-300 font-semibold text-card-foreground">
+                                                {stage}
+                                            </span>
+                                            <span className="font-numeric text-[length:var(--text-200)] leading-200 text-card-foreground">
+                                                {threshold.rule}
+                                            </span>
+                                        </span>
+                                        <span className="text-[length:var(--text-200)] leading-200 text-muted-foreground">
+                                            {unmeasured ? "Not measured for Cowork" : threshold.meaning}
+                                        </span>
                                     </span>
-                                    <span className="text-[length:var(--text-200)] leading-200 text-muted-foreground">
-                                        {stageDescriptions[stage]}
+                                    <span className="relative font-numeric tabular-nums text-[length:var(--text-300)] text-muted-foreground">
+                                        {formatKpi(count, "whole")} users
                                     </span>
-                                </span>
-                                <span className="relative font-numeric tabular-nums text-[length:var(--text-300)] text-muted-foreground">
-                                    {formatKpi(count, "whole")} users
-                                </span>
-                                <span className="relative w-[5ch] text-right font-numeric font-semibold tabular-nums text-[length:var(--text-500)] leading-500 text-card-foreground">
-                                    {formatKpi(share, "percent")}
-                                </span>
-                            </li>
-                        );
-                    })}
-                </ol>
+                                    <span className="relative w-[5ch] text-right font-numeric font-semibold tabular-nums text-[length:var(--text-500)] leading-500 text-card-foreground">
+                                        {formatKpi(share, "percent")}
+                                    </span>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                </div>
             )}
 
             <div className="h-[380px]">
@@ -130,20 +166,12 @@ export function HabitStage() {
                             title: "How the mix is moving",
                             subtitle:
                                 scale === "share"
-                                    ? "Share of users in each stage, by month"
-                                    : "Users in each stage, by month",
+                                    ? "Share of users in each stage by complete month, Power on top"
+                                    : "Users in each stage by complete month, Power on top",
                         }}
                     />
                 )}
             </div>
-
-            <SegmentedControl
-                label="Scale"
-                options={habitScales}
-                value={scale}
-                onChange={setScale}
-                className="self-end"
-            />
         </Section>
     );
 }

@@ -7,6 +7,14 @@
     {
       "calculate": "toDate(datum['Chat + Agent Interactions (Audit Logs)MonthStart'])",
       "as": "Month"
+    },
+    {
+      "calculate": "replace(datum['Stage LegendStage'], regexp('^[0-9]+ *- *'), '')",
+      "as": "Stage"
+    },
+    {
+      "calculate": "indexof(['Inactive', 'Beginner', 'Developing', 'Habitual', 'Power'], datum.Stage)",
+      "as": "Rank"
     }
   ],
   "encoding": {
@@ -29,16 +37,25 @@
       "axis": { "labelExpr": "format(datum.value, '.0%')" }
     },
     "color": {
-      "field": "Stage LegendStage",
+      "field": "Stage",
       "type": "nominal",
       "title": null,
-      "sort": "descending",
-      "legend": { "orient": "top", "direction": "horizontal", "columns": 3 }
+      "sort": null,
+      "scale": {
+        "domain": ["Power", "Habitual", "Developing", "Beginner", "Inactive"],
+        "range": ["#0b2c57", "#3a5c9e", "#7e9cdb", "#b7c8ea", "#dcdfe3"]
+      },
+      "legend": {
+        "orient": "right",
+        "direction": "vertical",
+        "symbolType": "square",
+        "symbolLimit": 10
+      }
     },
     "order": {
-      "field": "Stage LegendStage",
-      "type": "nominal",
-      "sort": "descending"
+      "field": "Rank",
+      "type": "quantitative",
+      "sort": "ascending"
     },
     "tooltip": [
       {
@@ -47,8 +64,11 @@
         "title": "Month",
         "format": "%b %Y"
       },
-      { "field": "Stage LegendStage", "type": "nominal", "title": "Stage" },
+      { "field": "Stage", "type": "nominal", "title": "Stage" },
       { "field": "Users", "type": "quantitative", "title": "Users", "format": ",.0f" }
     ]
+  },
+  "config": {
+    "area": { "fillOpacity": 1 }
   }
 }

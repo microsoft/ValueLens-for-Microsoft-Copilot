@@ -27,13 +27,17 @@ interface HabitTrendParams {
      * `count` keeps absolute user counts. Defaults to `share`.
      */
     scale?: "share" | "count";
+    /** Fills from Power down to Inactive; the spec's light-theme ramp when omitted. */
+    colors?: readonly string[];
 }
 
 /**
  * How the habit mix moves month over month, as a stacked area.
  *
- * Stage labels arrive numbered (`0 - Inactive` … `4 - Power`) so a descending
- * sort puts the most engaged stage on top without a lookup.
+ * Stage labels arrive numbered (`0 - Inactive` … `4 - Power`). The spec strips
+ * the number for display and stacks by it, so Inactive sits on the baseline
+ * and Power on top — the same top-to-bottom order as the legend and the
+ * ladder above the chart.
  */
 export function habitTrend(params?: HabitTrendParams) {
     const vegaLiteSpec = structuredClone(spec) as unknown as MutableSpec;
@@ -43,6 +47,9 @@ export function habitTrend(params?: HabitTrendParams) {
         vegaLiteSpec.encoding.y.title = "Users";
         vegaLiteSpec.encoding.y.axis = { labelExpr: "format(datum.value, ',.0f')" };
     }
+    if (params?.colors?.length === vegaLiteSpec.encoding.color.scale.domain.length) {
+        vegaLiteSpec.encoding.color.scale.range = [...params.colors];
+    }
 
     return { connection, query, columnMetadata, vegaLiteSpec: vegaLiteSpec as unknown as VisualizationSpec };
 }
@@ -51,5 +58,6 @@ export function habitTrend(params?: HabitTrendParams) {
 interface MutableSpec {
     encoding: {
         y: { stack: string; title: string; axis: { labelExpr: string } };
+        color: { scale: { domain: string[]; range: string[] } };
     };
 }

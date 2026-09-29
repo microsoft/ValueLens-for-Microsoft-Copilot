@@ -16,10 +16,12 @@ import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states"
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
+import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { useOutcomeColors, type OutcomeColors } from "@/hooks/use-palette-theme";
 import { gridHeight, rowChartHeight } from "@/lib/chart-height";
 import type { FilterKey } from "@/lib/filters";
+import type { OrgAttribute } from "@/lib/org-attribute";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import {
@@ -35,17 +37,13 @@ import {
 
 type ModelFitView = "task" | "organization" | "person";
 
-const viewOptions: readonly { id: ModelFitView; label: string }[] = [
-    { id: "task", label: "Task" },
-    { id: "organization", label: "Organization" },
-    { id: "person", label: "Person" },
-];
-
-const viewLabels: Record<ModelFitView, string> = {
-    task: "task",
-    organization: "organization",
-    person: "person",
-};
+function viewOptions(orgLabel: string): readonly { id: ModelFitView; label: string }[] {
+    return [
+        { id: "task", label: "Task" },
+        { id: "organization", label: orgLabel },
+        { id: "person", label: "Person" },
+    ];
+}
 
 const ACTIVITY_FILTER: FilterKey[] = ["audience"];
 
@@ -157,10 +155,10 @@ function verdictCell(value: ReactNode, palette: VerdictPalette) {
     );
 }
 
-function verdictQuery(view: ModelFitView) {
+function verdictQuery(view: ModelFitView, org: OrgAttribute) {
     switch (view) {
         case "organization":
-            return modelFitByOrganization();
+            return modelFitByOrganization(org);
         case "person":
             return modelFitByPerson();
         case "task":
@@ -175,6 +173,7 @@ function verdictQuery(view: ModelFitView) {
 export function ModelFitStage() {
     const [view, setView] = useState<ModelFitView>("task");
     const { theme } = useThemeContext();
+    const org = useOrgAttribute();
     const outcomeColors = useOutcomeColors();
     const palette = useMemo(() => verdictPalette(outcomeColors, theme), [outcomeColors, theme]);
 
@@ -183,7 +182,7 @@ export function ModelFitStage() {
     const usageResult = useFilteredQuery({ connection: usage.connection, query: usage.query });
     const match = modelMatchByTool();
     const matchResult = useFilteredQuery({ connection: match.connection, query: match.query }, { ignore: ACTIVITY_FILTER });
-    const verdicts = useMemo(() => verdictQuery(view), [view]);
+    const verdicts = useMemo(() => verdictQuery(view, org), [view, org]);
     const verdictResult = useFilteredQuery({ connection: verdicts.connection, query: verdicts.query });
 
     const summaryRow = useMemo(
@@ -209,16 +208,18 @@ export function ModelFitStage() {
     const matchSpec = useMemo(() => injectOutcomeColors(match.vegaLiteSpec, palette), [match.vegaLiteSpec, palette]);
     // The model leaves the reason blank when nothing is over- or under-specified.
     const showReason = hasAnyText(verdictTable, "Main Reason");
+    const views = useMemo(() => viewOptions(org.label), [org.label]);
+    const segmentLabel = view === "person" ? "Person" : view === "organization" ? org.label : "Task";
     const verdictColumns: GridColumnDef[] = useMemo(
         () => [
             { id: "Verdict", header: "Verdict", minWidth: 176, cellRenderer: (value) => verdictCell(value, palette) },
-            { id: "Segment", header: view === "person" ? "Person" : view === "organization" ? "Organization" : "Task", minWidth: 240 },
+            { id: "Segment", header: segmentLabel, minWidth: 240 },
             { id: "Main Model", header: "Main model", minWidth: 180 },
             ...(showReason ? [{ id: "Main Reason", header: "Main reason", minWidth: 180 }] : []),
             { id: "Sessions", header: "Sessions", width: 112, numericStyling: true },
             { id: "Judged Share", header: "Judged share", width: 132, numericStyling: true },
         ],
-        [palette, view, showReason],
+        [palette, segmentLabel, showReason],
     );
 
     const notice = readText(summaryRow, "[Coverage Notice]");
@@ -228,7 +229,7 @@ export function ModelFitStage() {
             id={stageAnchor("model-fit")}
             title="Model fit"
             description="Whether the model doing the work is well matched, too expensive for the task, or not strong enough for the job."
-            actions={<SegmentedControl label="Model fit view" options={viewOptions} value={view} onChange={setView} />}
+            actions={<SegmentedControl label="Model fit view" options={views} value={view} onChange={setView} />}
         >
             {summary.data?.status === "error" ? (
                 <QueryError message={summary.data.error.message} onRetry={summary.refetch} />
@@ -345,7 +346,7 @@ export function ModelFitStage() {
                         defaultSort={[{ columnId: "Sessions", direction: "desc" }]}
                         theme={theme}
                         header={{
-                            title: `Verdicts by ${viewLabels[view]}`,
+                            title: `Verdicts by ${view === "organization" ? org.noun : segmentLabel.toLowerCase()}`,
                             subtitle: "Top segments by sessions, with a verdict only after five judged sessions",
                         }}
                     />

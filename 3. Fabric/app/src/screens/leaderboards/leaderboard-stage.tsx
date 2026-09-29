@@ -12,7 +12,9 @@ import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states"
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
+import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import { withOrgAttribute } from "@/lib/org-attribute";
 import { toRollupDataTables } from "@/lib/to-data-table";
 import {
     cohortTaskField,
@@ -23,11 +25,11 @@ import {
     type WorkCohort,
 } from "@/queries/work";
 
-/** The task columns the grid carries, one per cohort. */
-const taskColumns = workCohorts.map((entry) => ({
-    id: cohortTaskField(entry.id),
-    header: `${entry.label} tasks`,
-}));
+/** The task columns the grid carries, one per cohort: "All tasks", "Licensed tasks" and so on. */
+const taskColumns = workCohorts.map((entry) => {
+    const field = cohortTaskField(entry.id);
+    return { id: field, header: field.charAt(0) + field.slice(1).toLowerCase() };
+});
 
 /**
  * The people half of the Leaderboards destination: who is doing the work.
@@ -40,8 +42,9 @@ const taskColumns = workCohorts.map((entry) => ({
 export function LeaderboardStage() {
     const [cohort, setCohort] = useState<WorkCohort>("all");
     const { theme } = useThemeContext();
+    const org = useOrgAttribute();
 
-    const leaderboard = userLeaderboard();
+    const leaderboard = useMemo(() => withOrgAttribute(userLeaderboard(), org), [org]);
     const result = useFilteredQuery({
         connection: leaderboard.connection,
         query: leaderboard.query,
@@ -58,7 +61,7 @@ export function LeaderboardStage() {
 
     const columns: GridColumnDef[] = useMemo(
         () => [
-            { id: ORGANIZATION_COLUMN, header: "Organization" },
+            { id: ORGANIZATION_COLUMN, header: org.label },
             { id: USER_COLUMN, header: "User", minWidth: 220 },
             ...taskColumns.map((column) => ({
                 ...column,
@@ -67,7 +70,7 @@ export function LeaderboardStage() {
             })),
             { id: "Active Days", header: "Active days", numericStyling: true },
         ],
-        [activeField],
+        [activeField, org.label],
     );
 
     return (

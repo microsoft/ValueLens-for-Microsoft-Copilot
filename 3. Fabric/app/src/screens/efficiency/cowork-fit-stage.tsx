@@ -7,12 +7,17 @@
 
 import { useMemo } from "react";
 import { stageAnchor } from "@/components/destinations";
+import { FilterNote } from "@/components/filter-note";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import type { FilterKey } from "@/lib/filters";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { coworkFitSummary } from "@/queries/agents";
+
+/** Cowork fit reads Cowork sessions by definition, so activity and agent filters would only blank it. */
+const COWORK_ONLY: FilterKey[] = ["audience", "agentTypes", "agentNames"];
 
 /**
  * The Cowork half of the Efficiency destination: whether the work people hand
@@ -24,7 +29,7 @@ import { coworkFitSummary } from "@/queries/agents";
  * empty figures.
  */
 export function CoworkFitStage() {
-    const summary = useFilteredQuery(coworkFitSummary());
+    const summary = useFilteredQuery(coworkFitSummary(), { ignore: COWORK_ONLY });
 
     const row = useMemo(
         () => (summary.data?.status === "success" ? toSummaryRow(summary.data.table) : undefined),
@@ -40,6 +45,7 @@ export function CoworkFitStage() {
             title="Cowork fit"
             description="How well the work people hand to Cowork suits it, graded by the weight of each task. Sessions the classifier could not place are left out of both shares."
         >
+            <FilterNote ignored={COWORK_ONLY} reason="Cowork fit always reads every Cowork session." />
             {summary.data?.status === "error" ? (
                 <QueryError message={summary.data.error.message} onRetry={summary.refetch} />
             ) : summary.isLoading || !summary.data ? (

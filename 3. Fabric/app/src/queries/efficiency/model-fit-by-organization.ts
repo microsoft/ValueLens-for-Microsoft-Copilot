@@ -5,12 +5,14 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { describeOrgAttribute, DEFAULT_ORG_ATTRIBUTE, orgColumnRef, type OrgAttribute } from "@/lib/org-attribute";
 import { modelFitVerdictsFor } from "./model-fit-verdicts";
 
 /**
  * The organization table from Model Fit, bound straight to the org mapping
- * table so destination filters keep behaving like slicers.
+ * table so destination filters keep behaving like slicers. Pass another org
+ * attribute to group by that column instead.
  */
-export function modelFitByOrganization() {
-    return modelFitVerdictsFor("'Chat + Agent Org Data'[Organization]", "Unassigned organization");
+export function modelFitByOrganization(attribute: OrgAttribute = describeOrgAttribute(DEFAULT_ORG_ATTRIBUTE)) {
+    return modelFitVerdictsFor(orgColumnRef(attribute.column), `Unassigned ${attribute.noun}`);
 }

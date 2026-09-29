@@ -14,10 +14,12 @@ import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";
+import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { rowChartHeight } from "@/lib/chart-height";
 import type { FilterKey } from "@/lib/filters";
 import { formatKpi } from "@/lib/format-kpi";
+import { withOrgAttribute } from "@/lib/org-attribute";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import {
@@ -30,14 +32,16 @@ import {
 
 const LICENSE_ESTATE_IGNORES: FilterKey[] = ["dateRange", "organizations"];
 
-const candidateColumns: GridColumnDef[] = [
-    { id: "Rank", header: "Rank", width: 88, numericStyling: true },
-    { id: "User", header: "User", minWidth: 240 },
-    { id: "Organization", header: "Organization", minWidth: 160 },
-    { id: "Priority Score", header: "Priority score", numericStyling: true },
-    { id: "Sessions Per Week", header: "Sessions per week", numericStyling: true },
-    { id: "Active Days Per Week", header: "Active days per week", numericStyling: true },
-];
+function candidateColumns(orgLabel: string): GridColumnDef[] {
+    return [
+        { id: "Rank", header: "Rank", width: 88, numericStyling: true },
+        { id: "User", header: "User", minWidth: 240 },
+        { id: "Organization", header: orgLabel, minWidth: 160 },
+        { id: "Priority Score", header: "Priority score", numericStyling: true },
+        { id: "Sessions Per Week", header: "Sessions per week", numericStyling: true },
+        { id: "Active Days Per Week", header: "Active days per week", numericStyling: true },
+    ];
+}
 
 /**
  * The license half of the Readiness destination: demand from people already
@@ -46,13 +50,15 @@ const candidateColumns: GridColumnDef[] = [
  */
 export function LicenseReadinessStage() {
     const { theme } = useThemeContext();
+    const org = useOrgAttribute();
 
     const demand = useFilteredQuery(licenseDemandSummary());
     const estate = useFilteredQuery(licenseEstateSummary(), { ignore: LICENSE_ESTATE_IGNORES });
-    const byOrg = licensePriorityByOrg();
+    const byOrg = useMemo(() => withOrgAttribute(licensePriorityByOrg(), org), [org]);
     const byOrgResult = useFilteredQuery({ connection: byOrg.connection, query: byOrg.query });
-    const candidates = licenseCandidates();
+    const candidates = useMemo(() => withOrgAttribute(licenseCandidates(), org), [org]);
     const candidatesResult = useFilteredQuery({ connection: candidates.connection, query: candidates.query });
+    const columns = useMemo(() => candidateColumns(org.label), [org.label]);
     const dormancy = licenseDormancy();
     const dormancyResult = useFilteredQuery(
         { connection: dormancy.connection, query: dormancy.query },
@@ -179,8 +185,8 @@ export function LicenseReadinessStage() {
                 ) : byOrgTable.rows.length === 0 ? (
                     <QueryEmpty
                         className="h-full"
-                        title="No unlicensed demand by organization"
-                        description="No organization has active unlicensed Copilot use in the current selection."
+                        title={`No unlicensed demand by ${org.noun}`}
+                        description={`No ${org.noun} has active unlicensed Copilot use in the current selection.`}
                     />
                 ) : (
                     <VegaVisual
@@ -188,7 +194,7 @@ export function LicenseReadinessStage() {
                         data={byOrgTable}
                         theme={theme}
                         header={{
-                            title: "Priority by organization",
+                            title: `Priority by ${org.noun}`,
                             subtitle: "Sessions per user per week among active unlicensed users",
                         }}
                     />
@@ -212,7 +218,7 @@ export function LicenseReadinessStage() {
                     />
                 ) : (
                     <DataGrid
-                        columns={candidateColumns}
+                        columns={columns}
                         data={candidatesTable}
                         defaultSort={[{ columnId: "Rank", direction: "asc" }]}
                         theme={theme}

@@ -77,3 +77,22 @@ export function useOutcomeColors(): OutcomeColors | undefined {
         });
     }, [theme]);
 }
+
+/** The habit ladder's CSS variables, Power first. */
+export const LADDER_VARS = ["--vl-ladder-4", "--vl-ladder-3", "--vl-ladder-2", "--vl-ladder-1", "--vl-ladder-0"] as const;
+
+/**
+ * The habit ladder's fills, Power down to Inactive, resolved for the current
+ * light or dark theme so the chart matches the swatches beside the ladder.
+ */
+export function useLadderColors(): readonly string[] | undefined {
+    const { theme } = useThemeContext();
+    return useMemo(() => {
+        void theme;
+        return readInPalette("ladder", (element) => {
+            const style = getComputedStyle(element);
+            const colors = LADDER_VARS.map((name) => style.getPropertyValue(name).trim());
+            return colors.every(Boolean) ? colors : undefined;
+        });
+    }, [theme]);
+}
