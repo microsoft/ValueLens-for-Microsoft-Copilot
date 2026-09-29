@@ -1,0 +1,122 @@
+[
+  {
+    "[Task]": "Document & content creation",
+    "[Grade]": "Strong fit",
+    "[Grade Order]": 0,
+    "[Share]": 0.5194174757281553,
+    "[Sessions]": 214,
+    "[Task Sessions]": 412
+  },
+  {
+    "[Task]": "Document & content creation",
+    "[Grade]": "Fair fit",
+    "[Grade Order]": 1,
+    "[Share]": 0.3300970873786408,
+    "[Sessions]": 136,
+    "[Task Sessions]": 412
+  },
+  {
+    "[Task]": "Document & content creation",
+    "[Grade]": "Worth a look",
+    "[Grade Order]": 2,
+    "[Share]": 0.15048543689320387,
+    "[Sessions]": 62,
+    "[Task Sessions]": 412
+  },
+  {
+    "[Task]": "Analysis & Research",
+    "[Grade]": "Strong fit",
+    "[Grade Order]": 0,
+    "[Share]": 0.5786516853932584,
+    "[Sessions]": 206,
+    "[Task Sessions]": 356
+  },
+  {
+    "[Task]": "Analysis & Research",
+    "[Grade]": "Fair fit",
+    "[Grade Order]": 1,
+    "[Share]": 0.300561797752809,
+    "[Sessions]": 107,
+    "[Task Sessions]": 356
+  },
+  {
+    "[Task]": "Analysis & Research",
+    "[Grade]": "Worth a look",
+    "[Grade Order]": 2,
+    "[Share]": 0.12078651685393259,
+    "[Sessions]": 43,
+    "[Task Sessions]": 356
+  },
+  {
+    "[Task]": "Email workflows",
+    "[Grade]": "Strong fit",
+    "[Grade Order]": 0,
+    "[Share]": 0.2102803738317757,
+    "[Sessions]": 45,
+    "[Task Sessions]": 214
+  },
+  {
+    "[Task]": "Email workflows",
+    "[Grade]": "Fair fit",
+    "[Grade Order]": 1,
+    "[Share]": 0.45794392523364486,
+    "[Sessions]": 98,
+    "[Task Sessions]": 214
+  },
+  {
+    "[Task]": "Email workflows",
+    "[Grade]": "Worth a look",
+    "[Grade Order]": 2,
+    "[Share]": 0.3317757009345794,
+    "[Sessions]": 71,
+    "[Task Sessions]": 214
+  },
+  {
+    "[Task]": "Communication workflows",
+    "[Grade]": "Strong fit",
+    "[Grade Order]": 0,
+    "[Share]": 0.1440677966101695,
+    "[Sessions]": 17,
+    "[Task Sessions]": 118
+  },
+  {
+    "[Task]": "Communication workflows",
+    "[Grade]": "Fair fit",
+    "[Grade Order]": 1,
+    "[Share]": 0.4067796610169492,
+    "[Sessions]": 48,
+    "[Task Sessions]": 118
+  },
+  {
+    "[Task]": "Communication workflows",
+    "[Grade]": "Worth a look",
+    "[Grade Order]": 2,
+    "[Share]": 0.4491525423728814,
+    "[Sessions]": 53,
+    "[Task Sessions]": 118
+  },
+  {
+    "[Task]": "General assistance / Other",
+    "[Grade]": "Strong fit",
+    "[Grade Order]": 0,
+    "[Share]": 0.07894736842105263,
+    "[Sessions]": 6,
+    "[Task Sessions]": 76
+  },
+  {
+    "[Task]": "General assistance / Other",
+    "[Grade]": "Fair fit",
+    "[Grade Order]": 1,
+    "[Share]": 0.3026315789473684,
+    "[Sessions]": 23,
+    "[Task Sessions]": 76
+  },
+  {
+    "[Task]": "General assistance / Other",
+    "[Grade]": "Worth a look",
+    "[Grade Order]": 2,
+    "[Share]": 0.618421052631579,
+    "[Sessions]": 47,
+    "[Task Sessions]": 76
+  }
+]

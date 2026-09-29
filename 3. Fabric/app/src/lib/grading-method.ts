@@ -52,6 +52,32 @@ export const WORK_WEIGHT_GRADES: readonly GradeRule[] = [
     },
 ];
 
+// Models built before the grades were renamed carry High, Medium and Low fit.
+const GRADE_ALIASES: Record<string, string> = {
+    "strong fit": "Strong fit",
+    "high fit": "Strong fit",
+    "fair fit": "Fair fit",
+    "medium fit": "Fair fit",
+    "worth a look": "Worth a look",
+    "low fit": "Worth a look",
+    unclassified: "Too light to grade",
+    "too light to grade": "Too light to grade",
+};
+
+// Work Weight Grade Sort has run 0 (strongest) to 3 (unclassified) in every model version.
+const GRADE_BY_SORT = ["Strong fit", "Fair fit", "Worth a look", "Too light to grade"] as const;
+
+/**
+ * The grade rule for a model `Work Weight Grade` value, under either naming,
+ * falling back to its sort position for a name this app has not seen.
+ */
+export function workWeightGrade(value: unknown, sort?: unknown): GradeRule | undefined {
+    const alias = typeof value === "string" ? GRADE_ALIASES[value.trim().toLowerCase()] : undefined;
+    const bySort = typeof sort === "number" && Number.isInteger(sort) ? GRADE_BY_SORT[sort] : undefined;
+    const name = alias ?? bySort;
+    return name ? WORK_WEIGHT_GRADES.find((grade) => grade.name === name) : undefined;
+}
+
 export const GRADING_SETTING_NOTE =
     "Shown at the Balanced setting. Strict moves message-reading and one-app work down to Worth a look; Lenient lifts longer chats to Fair fit. The setting lives in the semantic model's Assumptions table.";
 

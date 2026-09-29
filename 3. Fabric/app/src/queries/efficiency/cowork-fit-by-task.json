@@ -1,0 +1,36 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar" },
+  "encoding": {
+    "y": {
+      "field": "Task",
+      "type": "nominal",
+      "title": null,
+      "sort": { "field": "Task Sessions", "op": "max", "order": "descending" },
+      "axis": { "labelLimit": 200 }
+    },
+    "x": {
+      "field": "Share",
+      "type": "quantitative",
+      "stack": "zero",
+      "title": "Share of the task",
+      "scale": { "domain": [0, 1] },
+      "axis": { "labelExpr": "format(datum.value, '.0%')" }
+    },
+    "color": {
+      "field": "Grade",
+      "type": "nominal",
+      "title": "Fit",
+      "scale": { "domain": ["Strong fit", "Fair fit", "Worth a look"] }
+    },
+    "order": { "field": "Grade Order", "type": "quantitative", "sort": "ascending" },
+    "tooltip": [
+      { "field": "Task", "type": "nominal", "title": "Task" },
+      { "field": "Grade", "type": "nominal", "title": "Fit" },
+      { "field": "Share", "type": "quantitative", "title": "Share of the task", "format": ".0%" },
+      { "field": "Sessions", "type": "quantitative", "title": "Graded sessions", "format": ",.0f" }
+    ]
+  }
+}

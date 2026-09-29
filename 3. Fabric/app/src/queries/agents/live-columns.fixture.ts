@@ -11,9 +11,9 @@
  *
  * Every Cowork fit measure returns BLANK in a tenant with no Cowork activity,
  * so the column names below are the only live evidence those queries parse
- * and resolve. The per-grade breakdown the report draws beneath them is
- * deliberately not built until a tenant with Cowork rows can confirm its
- * shape.
+ * and resolve. The per-grade breakdowns beneath the summary live with the
+ * Efficiency queries; their row shape was confirmed by running the same
+ * rollups over non-Cowork measures.
  */
 export const liveColumns = {
     agentActivitySummary: [
@@ -64,12 +64,12 @@ export const liveColumns = {
         "[Uses Agents]",
     ],
     coworkFitSummary: [
-        "[Cowork Users]",
         "[Cowork Sessions]",
-        "[Graded Sessions]",
+        "[Tasks Completed]",
+        "[Active Days Per User]",
+        "[Expert Hours]",
         "[Strong Fit Share]",
-        "[Low Fit Share]",
-        "[Cowork Hours]",
+        "[Worth A Look Share]",
         "[Fit Notice]",
     ],
 } as const;

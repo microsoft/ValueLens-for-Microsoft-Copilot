@@ -12,3 +12,6 @@ export * from "./model-fit-by-task";
 export * from "./model-fit-by-organization";
 export * from "./model-fit-by-person";
 export * from "./model-fit-verdicts";
+export * from "./cowork-fit-by-task";
+export * from "./cowork-work-shape";
+export * from "./cowork-fit-people";

@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { describe, expect, it } from "vitest";
-import { MODEL_VERDICTS, RESEARCH_GROUPS, WORK_WEIGHT_GRADES } from "./grading-method";
+import { MODEL_VERDICTS, RESEARCH_GROUPS, WORK_WEIGHT_GRADES, workWeightGrade } from "./grading-method";
 
 const sources = RESEARCH_GROUPS.flatMap((group) => group.sources);
 
@@ -45,5 +45,21 @@ describe("grading method", () => {
     it("keeps every group populated with a unique id", () => {
         expect(new Set(RESEARCH_GROUPS.map((group) => group.id)).size).toBe(RESEARCH_GROUPS.length);
         for (const group of RESEARCH_GROUPS) expect(group.sources.length).toBeGreaterThan(0);
+    });
+
+    it("reads a work weight grade under either naming", () => {
+        expect(workWeightGrade("Strong fit")?.name).toBe("Strong fit");
+        expect(workWeightGrade("High fit")?.name).toBe("Strong fit");
+        expect(workWeightGrade("Medium fit")?.tone).toBe("neutral");
+        expect(workWeightGrade("Low fit")?.name).toBe("Worth a look");
+        expect(workWeightGrade(" worth a look ")?.tone).toBe("caution");
+        expect(workWeightGrade("Unclassified")?.tone).toBe("none");
+    });
+
+    it("falls back to the grade's sort position for an unknown name", () => {
+        expect(workWeightGrade("Great fit", 0)?.name).toBe("Strong fit");
+        expect(workWeightGrade("Needs coaching", 2)?.name).toBe("Worth a look");
+        expect(workWeightGrade("Something else")).toBeUndefined();
+        expect(workWeightGrade(null, 9)).toBeUndefined();
     });
 });

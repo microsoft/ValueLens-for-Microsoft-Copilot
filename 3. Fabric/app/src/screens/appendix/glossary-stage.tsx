@@ -13,13 +13,10 @@ import { Section } from "@/components/section";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { formatKpi } from "@/lib/format-kpi";
 import { GLOSSARY_PAGE_HOME, highlightParts, searchGlossary, toGlossaryPages, type GlossaryPage } from "@/lib/glossary";
+import { scrollToAnchor } from "@/lib/scroll-to-anchor";
 import { toRecords } from "@/lib/summary-row";
 import { cn } from "@/lib/utils";
 import { glossary } from "@/queries/appendix";
-
-function prefersReducedMotion(): boolean {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
 
 function pageAnchor(page: string): string {
     return `glossary-${page.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
@@ -122,12 +119,7 @@ export function GlossaryStage() {
     const metricCount = visible.reduce((total, page) => total + page.entries.length, 0);
     const searching = deferredTerm.trim().length > 0;
 
-    const goToPage = (page: string) => {
-        const element = document.getElementById(pageAnchor(page));
-        if (!element) return;
-        element.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
-        element.focus({ preventScroll: true });
-    };
+    const goToPage = (page: string) => scrollToAnchor(pageAnchor(page));
 
     return (
         <Section

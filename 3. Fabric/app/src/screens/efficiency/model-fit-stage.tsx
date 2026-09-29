@@ -7,8 +7,8 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { DataGrid, type GridColumnDef, type Row } from "@microsoft/fabric-datagrid";
-import { VegaVisual, type VisualizationSpec } from "@microsoft/fabric-visuals";
-import type { DataTable, VisualTheme } from "@microsoft/fabric-visuals-core";
+import { VegaVisual } from "@microsoft/fabric-visuals";
+import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { stageAnchor } from "@/components/destinations";
 import { FilterNote } from "@/components/filter-note";
 import { GradeMark } from "@/components/grade-mark";
@@ -19,8 +19,9 @@ import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
-import { useOutcomeColors, type OutcomeColors } from "@/hooks/use-palette-theme";
+import { useOutcomeColors } from "@/hooks/use-palette-theme";
 import { gridHeight, rowChartHeight } from "@/lib/chart-height";
+import { outcomePalette, withColorScale } from "@/lib/color-scale";
 import type { FilterKey } from "@/lib/filters";
 import { formatKpi } from "@/lib/format-kpi";
 import { MODEL_VERDICTS } from "@/lib/grading-method";
@@ -55,49 +56,6 @@ const OUTCOME_DOMAIN = ["Good match", "Lighter model may do", "Try stronger", "N
 
 /** Shares of judged sessions, so every view shades on the same absolute scale. */
 const SHARE_HEAT: HeatDomain = { min: 0, max: 1 };
-
-interface VerdictPalette {
-    positive: string;
-    negative: string;
-    caution: string;
-    neutral: string;
-}
-
-function fallbackOutcomePalette(theme: VisualTheme): VerdictPalette {
-    const palette = theme.categoricalPalette ?? [];
-    return {
-        positive: palette[0] ?? theme.brandBackground,
-        negative: palette[1] ?? theme.foregroundSecondary,
-        caution: palette[2] ?? theme.brandForeground,
-        neutral: palette[3] ?? theme.stroke,
-    };
-}
-
-function verdictPalette(outcomeColors: OutcomeColors | undefined, theme: VisualTheme): VerdictPalette {
-    return outcomeColors ?? fallbackOutcomePalette(theme);
-}
-
-function injectOutcomeColors(spec: VisualizationSpec, palette: VerdictPalette): VisualizationSpec {
-    const base = spec as Record<string, unknown>;
-    const encoding = (base.encoding ?? {}) as Record<string, unknown>;
-    const color = (encoding.color ?? {}) as Record<string, unknown>;
-    const scale = (color.scale ?? {}) as Record<string, unknown>;
-
-    return {
-        ...base,
-        encoding: {
-            ...encoding,
-            color: {
-                ...color,
-                scale: {
-                    ...scale,
-                    domain: OUTCOME_DOMAIN,
-                    range: [palette.positive, palette.negative, palette.caution, palette.neutral],
-                },
-            },
-        },
-    } as unknown as VisualizationSpec;
-}
 
 function numericCell(row: readonly unknown[], table: DataTable, columnName: string): number | undefined {
     const index = table.columns.findIndex((column) => column.name === columnName);
@@ -201,7 +159,7 @@ export function ModelFitStage() {
     const { theme } = useThemeContext();
     const org = useOrgAttribute();
     const outcomeColors = useOutcomeColors();
-    const palette = useMemo(() => verdictPalette(outcomeColors, theme), [outcomeColors, theme]);
+    const palette = useMemo(() => outcomePalette(outcomeColors, theme), [outcomeColors, theme]);
 
     const summary = useFilteredQuery(modelFitSummary());
     const usage = modelUsage();
@@ -231,7 +189,16 @@ export function ModelFitStage() {
         [verdictResult.data, verdicts.columnMetadata],
     );
 
-    const matchSpec = useMemo(() => injectOutcomeColors(match.vegaLiteSpec, palette), [match.vegaLiteSpec, palette]);
+    const matchSpec = useMemo(
+        () =>
+            withColorScale(match.vegaLiteSpec, OUTCOME_DOMAIN, [
+                palette.positive,
+                palette.negative,
+                palette.caution,
+                palette.neutral,
+            ]),
+        [match.vegaLiteSpec, palette],
+    );
     // The model leaves the reason blank when nothing is over- or under-specified.
     const showReason = hasAnyText(verdictTable, "Main Reason");
     const views = useMemo(() => viewOptions(org.label), [org.label]);
@@ -308,7 +275,7 @@ export function ModelFitStage() {
                 </div>
             )}
 
-            <div className="grid gap-500 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-500 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <div
                     className="h-[340px]"
                     style={usageTable ? { height: rowChartHeight(usageTable.rows.length, LEGEND_CHART) } : undefined}

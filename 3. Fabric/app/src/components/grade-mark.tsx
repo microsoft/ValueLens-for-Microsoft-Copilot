@@ -51,3 +51,45 @@ export function GradeMark({ tone, icon: Icon, className }: GradeMarkProps) {
         </span>
     );
 }
+
+interface GradeMixProps {
+    /** Shares of graded sessions at each grade; blanks count as none. */
+    strong: unknown;
+    fair: unknown;
+    worth: unknown;
+    className?: string;
+}
+
+function share(value: unknown): number {
+    return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/**
+ * A small bar splitting graded sessions into Strong, Fair and Worth a look,
+ * the report's Mix column. Decorative: the shares sit beside it as numbers.
+ */
+export function GradeMix({ strong, fair, worth, className }: GradeMixProps) {
+    const parts = [
+        { tone: "positive", value: share(strong) },
+        { tone: "neutral", value: share(fair) },
+        { tone: "caution", value: share(worth) },
+    ] as const;
+    const total = parts.reduce((sum, part) => sum + part.value, 0);
+    if (total <= 0) return null;
+    return (
+        <span
+            aria-hidden="true"
+            className={cn("flex h-[8px] w-[72px] shrink-0 gap-px overflow-hidden rounded-full", className)}
+        >
+            {parts.map((part) =>
+                part.value > 0 ? (
+                    <span
+                        key={part.tone}
+                        className="h-full"
+                        style={{ width: `${(part.value / total) * 100}%`, backgroundColor: TONE_FILL[part.tone] }}
+                    />
+                ) : null,
+            )}
+        </span>
+    );
+}

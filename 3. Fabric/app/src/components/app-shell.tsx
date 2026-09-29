@@ -10,6 +10,7 @@ import { Moon, Sun } from "lucide-react";
 import { paletteClass, usePaletteTheme } from "@/hooks/use-palette-theme";
 import { ThemeContext, useThemeContext } from "@/hooks/theme.context";
 import { useIsRefreshing } from "@/lib/refresh-tracker";
+import { scrollToAnchor } from "@/lib/scroll-to-anchor";
 import { cn } from "@/lib/utils";
 import { destinations, isDestinationReady, isReference, stageAnchor, type Destination, type DestinationId, type StageId } from "./destinations";
 import { FilterBar } from "./filter-bar";
@@ -22,10 +23,6 @@ interface AppShellProps {
 
 /** How far down the canvas a stage's heading has to pass before it counts as the one being read. */
 const READING_LINE = 0.3;
-
-function prefersReducedMotion(): boolean {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
 
 /**
  * Sidebar-and-canvas frame. The sidebar is the whole navigation model — six
@@ -83,12 +80,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
         };
     }, [active]);
 
-    const goToStage = (id: StageId) => {
-        const element = document.getElementById(stageAnchor(id));
-        if (!element) return;
-        element.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
-        element.focus({ preventScroll: true });
-    };
+    const goToStage = (id: StageId) => scrollToAnchor(stageAnchor(id));
 
     const renderDestination = (destination: Destination) => {
         const Icon = destination.icon;

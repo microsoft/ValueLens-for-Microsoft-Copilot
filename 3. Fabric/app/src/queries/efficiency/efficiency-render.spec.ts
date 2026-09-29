@@ -12,7 +12,8 @@ import { parse, View, type Scene, type SceneItem } from "vega";
 import { compile } from "vega-lite";
 import type { TopLevelSpec } from "vega-lite";
 import type { ColumnMetadataMap } from "@/lib/to-data-table";
-import { modelMatchByTool, modelUsage } from "./index";
+import { coworkFitByTask, modelMatchByTool, modelUsage } from "./index";
+import byTaskRows from "./__fixtures__/cowork-fit-by-task.rows.json";
 import matchRows from "./__fixtures__/model-match-by-tool.rows.json";
 import usageRows from "./__fixtures__/model-usage.rows.json";
 
@@ -111,5 +112,45 @@ describe("model match by tool renders", () => {
         for (const width of widths.slice(1)) {
             expect(width / widths[0]).toBeCloseTo(1, 6);
         }
+    });
+});
+
+describe("cowork fit by task renders", () => {
+    const rows = byTaskRows as Row[];
+
+    it("draws one segment per task and grade", async () => {
+        const { vegaLiteSpec, columnMetadata } = coworkFitByTask();
+        const bars = await renderBars(vegaLiteSpec, rows, columnMetadata);
+
+        expectDrawable(bars, rows.length);
+    });
+
+    it("fills every task's row, since its grades share out all of its graded sessions", async () => {
+        const { vegaLiteSpec, columnMetadata } = coworkFitByTask();
+        const bars = await renderBars(vegaLiteSpec, rows, columnMetadata);
+        const totals = new Map<string, number>();
+        for (const bar of bars) {
+            const key = String(bar.datum.Task);
+            totals.set(key, (totals.get(key) ?? 0) + bar.width);
+        }
+
+        expect(totals.size).toBe(new Set(rows.map((row) => row["[Task]"])).size);
+        for (const width of totals.values()) {
+            expect(width).toBeCloseTo(600, 3);
+        }
+    });
+
+    it("puts the task with the most graded sessions at the top, Strong fit first", async () => {
+        const { vegaLiteSpec, columnMetadata } = coworkFitByTask();
+        const bars = await renderBars(vegaLiteSpec, rows, columnMetadata);
+        const top = Math.min(...bars.map((bar) => bar.bounds.y1));
+        const busiest = rows.reduce((best, row) =>
+            (row["[Task Sessions]"] as number) > (best["[Task Sessions]"] as number) ? row : best,
+        );
+        const topRow = bars.filter((bar) => bar.bounds.y1 === top);
+
+        expect(new Set(topRow.map((bar) => bar.datum.Task))).toEqual(new Set([busiest["[Task]"]]));
+        const leftmost = topRow.reduce((first, bar) => (bar.bounds.x1 < first.bounds.x1 ? bar : first));
+        expect(leftmost.datum.Grade).toBe("Strong fit");
     });
 });

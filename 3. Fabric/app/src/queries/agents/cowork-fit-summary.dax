@@ -1,10 +1,10 @@
 EVALUATE
 ROW(
-    "Cowork Users", [Cowork Users],
-    "Cowork Sessions", [Observed Cowork Sessions],
-    "Graded Sessions", [Usage Efficiency: Graded Tasks],
+    "Cowork Sessions", [Usage Efficiency: Consumption Sessions],
+    "Tasks Completed", [Usage Efficiency: Consumption Tasks],
+    "Active Days Per User", [Usage Efficiency: Active Days Per User],
+    "Expert Hours", [Cowork Hours (Task Category Basis)],
     "Strong Fit Share", [Usage Efficiency: High Fit Share],
-    "Low Fit Share", [Usage Efficiency: Low Fit Share],
-    "Cowork Hours", [Cowork Hours (Task Category Basis)],
+    "Worth A Look Share", [Usage Efficiency: Low Fit Share],
     "Fit Notice", [Usage Efficiency: Fit Rule Notice]
 )

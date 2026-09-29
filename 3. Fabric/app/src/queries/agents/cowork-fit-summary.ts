@@ -10,22 +10,27 @@ import { connection, FORMAT_HOURS, FORMAT_PERCENT, FORMAT_WHOLE } from "../share
 import query from "./cowork-fit-summary.dax?raw";
 
 const columnMetadata: ColumnMetadataMap = {
-    "[Cowork Users]": { name: "Cowork Users", displayName: "Cowork users", format: FORMAT_WHOLE },
     "[Cowork Sessions]": { name: "Cowork Sessions", displayName: "Cowork sessions", format: FORMAT_WHOLE },
-    "[Graded Sessions]": { name: "Graded Sessions", displayName: "Graded sessions", format: FORMAT_WHOLE },
+    "[Tasks Completed]": { name: "Tasks Completed", displayName: "Tasks completed", format: FORMAT_WHOLE },
+    "[Active Days Per User]": {
+        name: "Active Days Per User",
+        displayName: "Active days per user",
+        format: FORMAT_HOURS,
+    },
+    "[Expert Hours]": { name: "Expert Hours", displayName: "Expert equivalent hours", format: FORMAT_HOURS },
     "[Strong Fit Share]": { name: "Strong Fit Share", displayName: "Strong fit", format: FORMAT_PERCENT },
-    "[Low Fit Share]": { name: "Low Fit Share", displayName: "Low fit", format: FORMAT_PERCENT },
-    "[Cowork Hours]": { name: "Cowork Hours", displayName: "Hours of work", format: FORMAT_HOURS },
+    "[Worth A Look Share]": { name: "Worth A Look Share", displayName: "Worth a look", format: FORMAT_PERCENT },
     "[Fit Notice]": { name: "Fit Notice", displayName: "Fit notice" },
 };
 
 /**
- * How well the work people hand to Cowork suits it.
+ * The six headline cards of the report's Cowork fit page, plus its rule notice.
  *
  * Each Cowork session is graded by the model's `Work Weight Grade`; sessions
- * the classifier could not place are left out of both shares rather than
- * counted as poor fits. `Fit Notice` is the model's own explanation when
- * there is too little detail to grade, and is shown verbatim.
+ * too light to grade are left out of both shares rather than counted as poor
+ * fits. `Fit Notice` is the model's own statement of the grading rules and how
+ * many sessions it graded, shown verbatim. `Active Days Per User` and
+ * `Expert Hours` carry one decimal place, as the report shows them.
  */
 export function coworkFitSummary() {
     return { connection, query, columnMetadata };
