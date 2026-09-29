@@ -1,0 +1,41 @@
+Agent Name,Agent Id,Product,AI Feature/Billable Feature,Billed credit,Non-billed credit,Channel,Knowledge Sources,Tool Used,LLM Model,Scenario Name,Environment Id,Environment Name
+Policy Document Analyser,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Copilot Studio,Classic answer,193,63,Teams,,Power Automate,,,632f5262-ff7c-664f-b383-4a8f0b395fde,AI Centre of Excellence
+Policy Document Analyser,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Copilot Studio,Classic answer,523,379,Teams,SharePoint,Power Automate,GPT-5.4,,13a55d62-a7f3-b2e7-6d8f-5b05a74e8821,Member Services Live
+Policy Document Analyser,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Copilot Studio,Classic answer,118,42,M365 Copilot,SharePoint,HTTP,,,f148bf2c-e3b1-9c7e-ad62-fb4831aeb13f,Claims Automation
+Policy Document Analyser,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Copilot Studio,Classic answer,103,93,Teams,Dataverse,HTTP,GPT-5.6 Sol,,59a0f3c4-0dbc-05fa-3114-e0e4a9ed627b,Clinical Assistant
+Policy Document Analyser,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Copilot Studio,Classic answer,80,79,Web,Dataverse,HTTP,GPT-5.4,,7eb9044d-c52b-a2dc-fc18-2b3c39fbb388,Care Plan Test
+Care Plan Orchestrator,85db9a46-1787-f55a-509e-d1decc984cde,Copilot Studio,Generative answer,842,476,M365 Copilot,Dataverse,HTTP,GPT-5.4,,632f5262-ff7c-664f-b383-4a8f0b395fde,AI Centre of Excellence
+Care Plan Orchestrator,85db9a46-1787-f55a-509e-d1decc984cde,Copilot Studio,Generative answer,601,274,Web,Dataverse,HTTP,GPT-5.6 Sol,,13a55d62-a7f3-b2e7-6d8f-5b05a74e8821,Member Services Live
+Care Plan Orchestrator,85db9a46-1787-f55a-509e-d1decc984cde,Copilot Studio,Generative answer,555,585,M365 Copilot,SharePoint,HTTP,,,f148bf2c-e3b1-9c7e-ad62-fb4831aeb13f,Claims Automation
+Care Plan Orchestrator,85db9a46-1787-f55a-509e-d1decc984cde,Copilot Studio,Generative answer,374,155,Web,Dataverse,,,,59a0f3c4-0dbc-05fa-3114-e0e4a9ed627b,Clinical Assistant
+Care Plan Orchestrator,85db9a46-1787-f55a-509e-d1decc984cde,Copilot Studio,Generative answer,160,152,M365 Copilot,SharePoint,HTTP,,,7eb9044d-c52b-a2dc-fc18-2b3c39fbb388,Care Plan Test
+Formulary Lookup,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Copilot Studio,Classic answer,861,715,M365 Copilot,SharePoint,HTTP,GPT-5.6 Sol,,632f5262-ff7c-664f-b383-4a8f0b395fde,AI Centre of Excellence
+Formulary Lookup,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Copilot Studio,Classic answer,677,658,Web,,Power Automate,,,13a55d62-a7f3-b2e7-6d8f-5b05a74e8821,Member Services Live
+Formulary Lookup,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Copilot Studio,Classic answer,46,32,Web,SharePoint,HTTP,GPT-5.6 Sol,,f148bf2c-e3b1-9c7e-ad62-fb4831aeb13f,Claims Automation
+Formulary Lookup,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Copilot Studio,Classic answer,395,342,M365 Copilot,Dataverse,,,,59a0f3c4-0dbc-05fa-3114-e0e4a9ed627b,Clinical Assistant
+Formulary Lookup,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Copilot Studio,Classic answer,126,135,Web,,HTTP,,,7eb9044d-c52b-a2dc-fc18-2b3c39fbb388,Care Plan Test
+Claims Triage Assistant,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Copilot Studio,Generative answer,75,67,M365 Copilot,SharePoint,HTTP,GPT-5.6 Sol,,632f5262-ff7c-664f-b383-4a8f0b395fde,AI Centre of Excellence
+Claims Triage Assistant,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Copilot Studio,Generative answer,113,90,Web,SharePoint,Power Automate,,,13a55d62-a7f3-b2e7-6d8f-5b05a74e8821,Member Services Live
+Claims Triage Assistant,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Copilot Studio,Generative answer,349,358,Teams,SharePoint,,,,f148bf2c-e3b1-9c7e-ad62-fb4831aeb13f,Claims Automation
+Claims Triage Assistant,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Copilot Studio,Generative answer,241,256,Teams,,HTTP,GPT-5.4,,59a0f3c4-0dbc-05fa-3114-e0e4a9ed627b,Clinical Assistant
+Claims Triage Assistant,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Copilot Studio,Generative answer,96,53,Teams,SharePoint,,,,7eb9044d-c52b-a2dc-fc18-2b3c39fbb388,Care Plan Test
+Prior Authorisation Helper,733b4c39-5730-a59c-0f4b-7570687e67b4,Copilot Studio,Agent action,819,217,Teams,SharePoint,,GPT-5.6 Sol,,632f5262-ff7c-664f-b383-4a8f0b395fde,AI Centre of Excellence
+Prior Authorisation Helper,733b4c39-5730-a59c-0f4b-7570687e67b4,Copilot Studio,Agent action,269,285,Web,,,GPT-5.6 Sol,,13a55d62-a7f3-b2e7-6d8f-5b05a74e8821,Member Services Live
+Prior Authorisation Helper,733b4c39-5730-a59c-0f4b-7570687e67b4,Copilot Studio,Agent action,416,307,M365 Copilot,SharePoint,,GPT-5.4,,f148bf2c-e3b1-9c7e-ad62-fb4831aeb13f,Claims Automation
+Prior Authorisation Helper,733b4c39-5730-a59c-0f4b-7570687e67b4,Copilot Studio,Agent action,404,235,Web,,,GPT-5.6 Sol,,59a0f3c4-0dbc-05fa-3114-e0e4a9ed627b,Clinical Assistant
+Prior Authorisation Helper,733b4c39-5730-a59c-0f4b-7570687e67b4,Copilot Studio,Agent action,123,59,Web,SharePoint,,GPT-5.6 Sol,,7eb9044d-c52b-a2dc-fc18-2b3c39fbb388,Care Plan Test
+Provider Directory Bot,b1b8249c-efd3-47a3-5137-cd6e461c3733,Copilot Studio,Classic answer,613,340,Teams,SharePoint,,GPT-5.6 Sol,,632f5262-ff7c-664f-b383-4a8f0b395fde,AI Centre of Excellence
+Provider Directory Bot,b1b8249c-efd3-47a3-5137-cd6e461c3733,Copilot Studio,Classic answer,622,368,Web,SharePoint,Power Automate,GPT-5.4,,13a55d62-a7f3-b2e7-6d8f-5b05a74e8821,Member Services Live
+Provider Directory Bot,b1b8249c-efd3-47a3-5137-cd6e461c3733,Copilot Studio,Classic answer,134,33,Web,Dataverse,,GPT-5.4,,f148bf2c-e3b1-9c7e-ad62-fb4831aeb13f,Claims Automation
+Provider Directory Bot,b1b8249c-efd3-47a3-5137-cd6e461c3733,Copilot Studio,Classic answer,215,171,Teams,SharePoint,Power Automate,GPT-5.4,,59a0f3c4-0dbc-05fa-3114-e0e4a9ed627b,Clinical Assistant
+Provider Directory Bot,b1b8249c-efd3-47a3-5137-cd6e461c3733,Copilot Studio,Classic answer,71,37,M365 Copilot,Dataverse,,,,7eb9044d-c52b-a2dc-fc18-2b3c39fbb388,Care Plan Test
+Benefits Explainer,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Copilot Studio,Generative answer,504,531,M365 Copilot,Dataverse,Power Automate,GPT-5.6 Sol,,632f5262-ff7c-664f-b383-4a8f0b395fde,AI Centre of Excellence
+Benefits Explainer,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Copilot Studio,Generative answer,708,458,Web,Dataverse,Power Automate,,,13a55d62-a7f3-b2e7-6d8f-5b05a74e8821,Member Services Live
+Benefits Explainer,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Copilot Studio,Generative answer,112,30,M365 Copilot,Dataverse,,GPT-5.6 Sol,,f148bf2c-e3b1-9c7e-ad62-fb4831aeb13f,Claims Automation
+Benefits Explainer,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Copilot Studio,Generative answer,95,41,M365 Copilot,,Power Automate,,,59a0f3c4-0dbc-05fa-3114-e0e4a9ed627b,Clinical Assistant
+Benefits Explainer,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Copilot Studio,Generative answer,105,47,M365 Copilot,Dataverse,Power Automate,GPT-5.4,,7eb9044d-c52b-a2dc-fc18-2b3c39fbb388,Care Plan Test
+Onboarding Buddy,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Copilot Studio,Classic answer,761,761,M365 Copilot,,Power Automate,,,632f5262-ff7c-664f-b383-4a8f0b395fde,AI Centre of Excellence
+Onboarding Buddy,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Copilot Studio,Classic answer,528,413,Teams,SharePoint,Power Automate,GPT-5.4,,13a55d62-a7f3-b2e7-6d8f-5b05a74e8821,Member Services Live
+Onboarding Buddy,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Copilot Studio,Classic answer,411,191,M365 Copilot,Dataverse,,GPT-5.6 Sol,,f148bf2c-e3b1-9c7e-ad62-fb4831aeb13f,Claims Automation
+Onboarding Buddy,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Copilot Studio,Classic answer,40,37,Web,Dataverse,,GPT-5.4,,59a0f3c4-0dbc-05fa-3114-e0e4a9ed627b,Clinical Assistant
+Onboarding Buddy,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Copilot Studio,Classic answer,176,189,Teams,SharePoint,Power Automate,GPT-5.4,,7eb9044d-c52b-a2dc-fc18-2b3c39fbb388,Care Plan Test

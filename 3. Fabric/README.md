@@ -43,6 +43,7 @@ just want to see the thing working first, start at [1. Local CSV](../1.%20Local%
 | `docs/` | Fabric-specific reference notes, including the read-only SQL checker pack. Cross-path references (data dictionary, permissions) live in [`/docs`](../docs/). |
 | `archive/extended/` | Archived Fabric + Copilot Studio reference, not a recommended active deployment; core notebook mirrors remain synchronized. |
 | `archive/flows/` | Archived cost-consumption landing flows and guides, not active setup. |
+| [`Add Credit Consumption/`](Add%20Credit%20Consumption/) | *Optional.* The separate Consumption Central report for Copilot credit consumption and cost. |
 
 ---
 
@@ -156,7 +157,7 @@ recorded in [`CHANGELOG.md`](../CHANGELOG.md).
 | Agents 365 registry | `notebooks/Copilot_Agent365_Registry_Ingester.ipynb` | **Primary.** Unattended Graph API pull; needs an Agent 365 licence and the Graph permissions. |
 | Agents 365 CSV fallback | `notebooks/Copilot_Agent365_Lander.ipynb` | **Fallback.** The shipped pipeline runs it only if the API step fails (e.g. no Agent 365 licence); lands `Files/agent365/agents.csv`. |
 | Product feedback | `notebooks/Copilot_ProductFeedback_Ingester.ipynb` | Reads landed files from `Files/product_feedback/`; safe overwrite snapshot only. |
-| Cowork / Work IQ consumption | [`archive/notebooks/Copilot_Cost_Consumption_Ingester.ipynb`](archive/notebooks/) | **Archived.** No template reads it since the Credit Meter page was retired; kept with its [landing flows and guides](archive/flows/COST-CONSUMPTION.md) for your own analysis only. |
+| Cowork / Work IQ consumption | [`archive/notebooks/Copilot_Cost_Consumption_Ingester.ipynb`](archive/notebooks/) | **Archived.** No template reads it since the Credit Meter page was retired; kept with its [landing flows and guides](archive/flows/COST-CONSUMPTION.md) for your own analysis only. For credit consumption and cost reporting, use [`Add Credit Consumption/`](Add%20Credit%20Consumption/). |
 | Workday / HRIS org attributes | [`notebooks/optional/workday-org-data/`](notebooks/optional/workday-org-data/README.md) | Optional. Adds only missing columns to an existing org snapshot, joining on work email; existing Entra values remain authoritative. Can also land a standalone user-level org table without Entra. For enrichment, run after a fresh Graph org ingestion; for recurring HRIS-only refreshes, use explicit standalone mode. |
 
 The former [Copilot Studio add-on](archive/extended/Fabric%20+%20Copilot%20Studio/README.md)
