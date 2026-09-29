@@ -77,6 +77,7 @@ export const destinations = [
         stages: [
             { id: "cowork-fit", label: "Cowork fit", ready: true },
             { id: "model-fit", label: "Model fit", ready: true },
+            { id: "grading-method", label: "How grading works", ready: true },
         ],
     },
     {

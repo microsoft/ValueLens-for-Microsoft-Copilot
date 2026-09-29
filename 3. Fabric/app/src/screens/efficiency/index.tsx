@@ -6,17 +6,20 @@
 //-----------------------------------------------------------------------
 
 import { CoworkFitStage } from "./cowork-fit-stage";
+import { GradingMethodStage } from "./grading-method-stage";
 import { ModelFitStage } from "./model-fit-stage";
 
 /**
  * Whether the right tool and model are doing the job: Cowork fit first, then
- * the Model Fit page rebuilt as model-choice coverage and verdicts.
+ * the Model Fit page rebuilt as model-choice coverage and verdicts, then the
+ * rules and research both stages grade by.
  */
 export function EfficiencyScreen() {
     return (
         <div className="flex flex-col gap-800">
             <CoworkFitStage />
             <ModelFitStage />
+            <GradingMethodStage />
         </div>
     );
 }
