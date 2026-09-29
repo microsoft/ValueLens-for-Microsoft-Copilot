@@ -12,7 +12,7 @@ import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states"
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
-import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
+import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { formatKpi } from "@/lib/format-kpi";
 import { readNumber, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
@@ -42,9 +42,9 @@ export function HabitStage() {
     const [scale, setScale] = useState<"share" | "count">("share");
     const { theme } = useThemeContext();
 
-    const summary = useSemanticModelQuery(habitSummary());
+    const summary = useFilteredQuery(habitSummary());
     const trend = useMemo(() => habitTrend({ scale }), [scale]);
-    const trendResult = useSemanticModelQuery({ connection: trend.connection, query: trend.query });
+    const trendResult = useFilteredQuery({ connection: trend.connection, query: trend.query });
 
     const summaryRow = useMemo(
         () => (summary.data?.status === "success" ? toSummaryRow(summary.data.table) : undefined),

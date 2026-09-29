@@ -8,12 +8,14 @@
 import { useMemo, useState } from "react";
 import { VegaVisual } from "@microsoft/fabric-visuals";
 import { stageAnchor } from "@/components/destinations";
+import { FilterNote } from "@/components/filter-note";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
-import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
+import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import type { FilterKey } from "@/lib/filters";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import { adoptionSummary, adoptionTrend, type AdoptionTrendMeasure } from "@/queries/adoption";
@@ -25,6 +27,9 @@ const surfaces = [
     { id: "unlicensed", label: "Unlicensed chat", usersColumn: "[Unlicensed Users]", rateColumn: "[Unlicensed SPUW]" },
     { id: "agents", label: "Agents", usersColumn: "[Agent Users]", rateColumn: "[Agent SPUW]" },
 ] as const;
+
+/** Every card and trend line here is already one surface, so these filters would only blank some out. */
+const SURFACE_FILTERS: FilterKey[] = ["licence", "audience"];
 
 const trendMeasures: { id: AdoptionTrendMeasure; label: string }[] = [
     { id: "sessionsPerUser", label: "Per user" },
@@ -42,9 +47,9 @@ export function AdoptionStage() {
     const [measure, setMeasure] = useState<AdoptionTrendMeasure>("sessionsPerUser");
     const { theme } = useThemeContext();
 
-    const summary = useSemanticModelQuery(adoptionSummary());
+    const summary = useFilteredQuery(adoptionSummary(), { ignore: SURFACE_FILTERS });
     const trend = useMemo(() => adoptionTrend({ measure }), [measure]);
-    const trendResult = useSemanticModelQuery({ connection: trend.connection, query: trend.query });
+    const trendResult = useFilteredQuery({ connection: trend.connection, query: trend.query }, { ignore: SURFACE_FILTERS });
 
     const summaryRow = useMemo(
         () => (summary.data?.status === "success" ? toSummaryRow(summary.data.table) : undefined),
@@ -76,6 +81,10 @@ export function AdoptionStage() {
                 />
             }
         >
+            <FilterNote
+                ignored={SURFACE_FILTERS}
+                reason="licensed chat, unlicensed chat and agents are each shown in their own card and line."
+            />
             {summary.data?.status === "error" ? (
                 <QueryError message={summary.data.error.message} onRetry={summary.refetch} />
             ) : summary.isLoading || !summary.data ? (

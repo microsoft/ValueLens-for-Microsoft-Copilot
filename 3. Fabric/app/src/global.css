@@ -64,6 +64,13 @@
   --color-input: #e0e0e0;                                            /* input field borders */
   --color-ring: #0f6cbd;                                             /* focus rings */
 
+  /* Outcome colours, shared by every destination so good and bad never
+     change meaning between sections. Text-safe shades; the chart fills are
+     `--vl-teal`, `--vl-coral` and `--vl-amber`, read by `useOutcomeColors`. */
+  --color-positive: var(--vl-teal-text);                             /* thumbs up, well matched */
+  --color-negative: var(--vl-coral-text);                            /* thumbs down, over-specified */
+  --color-caution: var(--vl-amber-text);                             /* worth a look, under-specified */
+
   /* Elevation shadows — Fluent UI v9 ramp, keyed by resting elevation in px.
      Usage: shadow-* (e.g. shadow-8, shadow-64) */
   --shadow-2:  0 0 2px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.14);
@@ -211,6 +218,166 @@
     --color-data-8:  #e0a3d0;
     --color-data-9:  #9ba7b4;
     --color-data-10: #adadad;
+  }
+}
+
+/* ValueLens palette — the report theme's own colours (ValueLens_Panel_Mockup),
+   so the app reads as the same product as the dashboard.
+
+   Each hue has three roles:
+     base  — chart marks; the report's exact hex in light mode
+     text  — a deeper (light) or paler (dark) shade that clears 4.5:1 on cards,
+             for text, controls and focus rings
+     tint  — a quiet surface for selection and the active destination
+   `-strong` variants deepen the two hues that fall under 3:1 on white when
+   they have to lead a chart on their own. */
+@layer base {
+  :root {
+    --vl-blue: #4f73b8;        --vl-blue-text: #3a5c9e;      --vl-blue-tint: #edf2fa;
+    --vl-amber: #f1963a;       --vl-amber-text: #8f5207;     --vl-amber-tint: #fdf1e3;
+    --vl-amber-strong: #d97b1f;
+    --vl-plum: #7f215d;        --vl-plum-text: #7f215d;      --vl-plum-tint: #f8ecf3;
+    --vl-teal: #09b39d;        --vl-teal-text: #07766a;      --vl-teal-tint: #e4f6f2;
+    --vl-teal-strong: #0a9c88;
+    --vl-lavender: #8783ff;    --vl-lavender-text: #5650d9;  --vl-lavender-tint: #efeeff;
+    --vl-coral: #f06549;       --vl-coral-text: #b23e25;     --vl-coral-tint: #fdeeea;
+    --vl-navy: #0b2c57;
+    --vl-periwinkle: #95a9ce;
+    --vl-slate: #8793a3;
+    --vl-ink: #1c2632;
+  }
+
+  .dark {
+    --vl-blue: #7e9cdb;        --vl-blue-text: #a3b9e6;      --vl-blue-tint: #1e2b42;
+    --vl-amber: #f4a85e;       --vl-amber-text: #f6bc82;     --vl-amber-tint: #3a2a17;
+    --vl-amber-strong: #f4a85e;
+    --vl-plum: #c8619f;        --vl-plum-text: #e3a1ca;      --vl-plum-tint: #3b1a2f;
+    --vl-teal: #3cc9b4;        --vl-teal-text: #6fd9c8;      --vl-teal-tint: #15332e;
+    --vl-teal-strong: #3cc9b4;
+    --vl-lavender: #a3a0ff;    --vl-lavender-text: #bcbaff;  --vl-lavender-tint: #27264a;
+    --vl-coral: #f4836c;       --vl-coral-text: #f7a392;     --vl-coral-tint: #3d1f19;
+    --vl-navy: #5b7bb0;
+    --vl-periwinkle: #b3c2de;
+    --vl-slate: #a3aebd;
+    --vl-ink: #dbdfe4;
+  }
+
+  /* Destination palettes. Each destination leads with its own hue — in the
+     sidebar, on its controls and as the first series of every chart — and
+     draws its supporting series from the same theme, so the six read as one
+     family. Charts pick these up through `usePaletteTheme`. */
+  .palette-adoption {
+    --color-brand: var(--vl-blue);
+    --color-brand-foreground: var(--vl-blue-text);
+    --color-primary: var(--vl-blue-text);
+    --color-ring: var(--vl-blue-text);
+    --color-accent: var(--vl-blue-tint);
+    --color-accent-foreground: var(--vl-blue-text);
+    --color-data-1: var(--vl-blue);
+    --color-data-2: var(--vl-teal);
+    --color-data-3: var(--vl-amber);
+    --color-data-4: var(--vl-plum);
+    --color-data-5: var(--vl-lavender);
+    --color-data-6: var(--vl-coral);
+    --color-data-7: var(--vl-navy);
+    --color-data-8: var(--vl-periwinkle);
+    --color-data-9: var(--vl-slate);
+    --color-data-10: var(--vl-ink);
+  }
+
+  .palette-leaderboards {
+    --color-brand: var(--vl-amber-strong);
+    --color-brand-foreground: var(--vl-amber-text);
+    --color-primary: var(--vl-amber-text);
+    --color-ring: var(--vl-amber-text);
+    --color-accent: var(--vl-amber-tint);
+    --color-accent-foreground: var(--vl-amber-text);
+    --color-data-1: var(--vl-amber-strong);
+    --color-data-2: var(--vl-blue);
+    --color-data-3: var(--vl-teal);
+    --color-data-4: var(--vl-plum);
+    --color-data-5: var(--vl-lavender);
+    --color-data-6: var(--vl-coral);
+    --color-data-7: var(--vl-navy);
+    --color-data-8: var(--vl-periwinkle);
+    --color-data-9: var(--vl-slate);
+    --color-data-10: var(--vl-ink);
+  }
+
+  .palette-readiness {
+    --color-brand: var(--vl-plum);
+    --color-brand-foreground: var(--vl-plum-text);
+    --color-primary: var(--vl-plum-text);
+    --color-ring: var(--vl-plum-text);
+    --color-accent: var(--vl-plum-tint);
+    --color-accent-foreground: var(--vl-plum-text);
+    --color-data-1: var(--vl-plum);
+    --color-data-2: var(--vl-teal);
+    --color-data-3: var(--vl-amber);
+    --color-data-4: var(--vl-blue);
+    --color-data-5: var(--vl-lavender);
+    --color-data-6: var(--vl-coral);
+    --color-data-7: var(--vl-navy);
+    --color-data-8: var(--vl-periwinkle);
+    --color-data-9: var(--vl-slate);
+    --color-data-10: var(--vl-ink);
+  }
+
+  .palette-value {
+    --color-brand: var(--vl-teal-strong);
+    --color-brand-foreground: var(--vl-teal-text);
+    --color-primary: var(--vl-teal-text);
+    --color-ring: var(--vl-teal-text);
+    --color-accent: var(--vl-teal-tint);
+    --color-accent-foreground: var(--vl-teal-text);
+    --color-data-1: var(--vl-teal-strong);
+    --color-data-2: var(--vl-plum);
+    --color-data-3: var(--vl-amber);
+    --color-data-4: var(--vl-blue);
+    --color-data-5: var(--vl-lavender);
+    --color-data-6: var(--vl-coral);
+    --color-data-7: var(--vl-navy);
+    --color-data-8: var(--vl-periwinkle);
+    --color-data-9: var(--vl-slate);
+    --color-data-10: var(--vl-ink);
+  }
+
+  .palette-efficiency {
+    --color-brand: var(--vl-lavender);
+    --color-brand-foreground: var(--vl-lavender-text);
+    --color-primary: var(--vl-lavender-text);
+    --color-ring: var(--vl-lavender-text);
+    --color-accent: var(--vl-lavender-tint);
+    --color-accent-foreground: var(--vl-lavender-text);
+    --color-data-1: var(--vl-lavender);
+    --color-data-2: var(--vl-teal);
+    --color-data-3: var(--vl-amber);
+    --color-data-4: var(--vl-plum);
+    --color-data-5: var(--vl-blue);
+    --color-data-6: var(--vl-coral);
+    --color-data-7: var(--vl-navy);
+    --color-data-8: var(--vl-periwinkle);
+    --color-data-9: var(--vl-slate);
+    --color-data-10: var(--vl-ink);
+  }
+
+  .palette-feedback {
+    --color-brand: var(--vl-coral);
+    --color-brand-foreground: var(--vl-coral-text);
+    --color-primary: var(--vl-coral-text);
+    --color-ring: var(--vl-coral-text);
+    --color-accent: var(--vl-coral-tint);
+    --color-accent-foreground: var(--vl-coral-text);
+    --color-data-1: var(--vl-coral);
+    --color-data-2: var(--vl-teal);
+    --color-data-3: var(--vl-blue);
+    --color-data-4: var(--vl-amber);
+    --color-data-5: var(--vl-plum);
+    --color-data-6: var(--vl-lavender);
+    --color-data-7: var(--vl-navy);
+    --color-data-8: var(--vl-periwinkle);
+    --color-data-9: var(--vl-slate);
+    --color-data-10: var(--vl-ink);
   }
 }
 

@@ -7,7 +7,8 @@
 
 import { lazy, Suspense, useState } from "react";
 import { AppShell } from "./components/app-shell";
-import type { DestinationId } from "./components/destinations";
+import { destinations, type DestinationId } from "./components/destinations";
+import { FilterProvider } from "./components/filter-provider";
 import { QueryLoading } from "./components/query-states";
 
 // Screens load on demand so only the visible destination queries the model.
@@ -27,17 +28,20 @@ const EfficiencyScreen = lazy(() =>
 
 function App() {
     const [destination, setDestination] = useState<DestinationId>("adoption");
+    const applicable = destinations.find((candidate) => candidate.id === destination)?.filters ?? [];
 
     return (
-        <AppShell active={destination} onNavigate={setDestination}>
-            <Suspense fallback={<QueryLoading />}>
-                {destination === "adoption" && <AdoptionScreen />}
-                {destination === "leaderboards" && <LeaderboardsScreen />}
-                {destination === "readiness" && <ReadinessScreen />}
-                {destination === "value" && <ValueScreen />}
-                {destination === "efficiency" && <EfficiencyScreen />}
-            </Suspense>
-        </AppShell>
+        <FilterProvider applicable={applicable}>
+            <AppShell active={destination} onNavigate={setDestination}>
+                <Suspense fallback={<QueryLoading />}>
+                    {destination === "adoption" && <AdoptionScreen />}
+                    {destination === "leaderboards" && <LeaderboardsScreen />}
+                    {destination === "readiness" && <ReadinessScreen />}
+                    {destination === "value" && <ValueScreen />}
+                    {destination === "efficiency" && <EfficiencyScreen />}
+                </Suspense>
+            </AppShell>
+        </FilterProvider>
     );
 }
 

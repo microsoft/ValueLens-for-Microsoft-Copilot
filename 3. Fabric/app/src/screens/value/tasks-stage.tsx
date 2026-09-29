@@ -13,7 +13,7 @@ import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states"
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
-import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
+import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import { taskBreakdown, taskDimensions, workSummary, type TaskDimension } from "@/queries/work";
@@ -44,9 +44,9 @@ export function TasksStage() {
     const [dimension, setDimension] = useState<TaskDimension>("behaviour");
     const { theme } = useThemeContext();
 
-    const summary = useSemanticModelQuery(workSummary());
+    const summary = useFilteredQuery(workSummary());
     const breakdown = useMemo(() => taskBreakdown({ dimension }), [dimension]);
-    const breakdownResult = useSemanticModelQuery({
+    const breakdownResult = useFilteredQuery({
         connection: breakdown.connection,
         query: breakdown.query,
     });

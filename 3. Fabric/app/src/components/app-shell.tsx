@@ -7,9 +7,12 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Moon, Sun } from "lucide-react";
-import { useThemeContext } from "@/hooks/theme.context";
+import { paletteClass, usePaletteTheme } from "@/hooks/use-palette-theme";
+import { ThemeContext, useThemeContext } from "@/hooks/theme.context";
+import { useIsRefreshing } from "@/lib/refresh-tracker";
 import { cn } from "@/lib/utils";
 import { destinations, isDestinationReady, stageAnchor, type DestinationId, type StageId } from "./destinations";
+import { FilterBar } from "./filter-bar";
 
 interface AppShellProps {
     active: DestinationId;
@@ -28,9 +31,16 @@ function prefersReducedMotion(): boolean {
  * Sidebar-and-canvas frame. The sidebar is the whole navigation model — six
  * destinations replacing the report's pages and bookmark bars, with the
  * active destination's stages listed beneath it and tracked as you scroll.
+ *
+ * Each destination carries its own palette: the sidebar shows every hue at
+ * once so the six read as distinct places, and the canvas — chrome and charts
+ * alike — takes on the hue of the one that is open.
  */
 export function AppShell({ active, onNavigate, children }: AppShellProps) {
-    const { isDark, toggleTheme } = useThemeContext();
+    const themeContext = useThemeContext();
+    const { isDark, toggleTheme } = themeContext;
+    const paletteTheme = usePaletteTheme(active);
+    const refreshing = useIsRefreshing();
     const current = destinations.find((destination) => destination.id === active);
     const mainRef = useRef<HTMLElement>(null);
     const [readingStage, setReadingStage] = useState<StageId>();
@@ -80,7 +90,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
     };
 
     return (
-        <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+        <div className={cn("flex h-screen w-full overflow-hidden bg-background text-foreground", paletteClass(active))}>
             <nav
                 aria-label="Sections"
                 className="flex w-[248px] shrink-0 flex-col gap-500 border-r border-border bg-card px-400 py-500"
@@ -98,7 +108,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                         const isActive = destination.id === active;
                         const ready = isDestinationReady(destination);
                         return (
-                            <li key={destination.id}>
+                            <li key={destination.id} className={paletteClass(destination.id)}>
                                 <button
                                     type="button"
                                     onClick={() => onNavigate(destination.id)}
@@ -113,7 +123,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                                         !ready && "cursor-not-allowed opacity-50 hover:bg-transparent",
                                     )}
                                 >
-                                    <Icon className="icon-size-200 shrink-0" aria-hidden="true" />
+                                    <Icon className="icon-size-200 shrink-0 text-primary" aria-hidden="true" />
                                     <span className="flex flex-col">
                                         <span className={cn("text-[length:var(--text-300)] leading-300", isActive && "font-semibold")}>
                                             {destination.label}
@@ -180,18 +190,32 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
             </nav>
 
             <main ref={mainRef} className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
-                <div className="mx-auto flex max-w-[1400px] flex-col gap-700 px-700 py-600">
+                <div className="mx-auto flex max-w-[1400px] flex-col gap-600 px-700 pt-600 pb-800">
                     {current && (
-                        <header className="flex flex-col gap-100">
-                            <h1 className="text-[length:var(--text-hero-700)] leading-hero-700 font-semibold">
-                                {current.label}
-                            </h1>
-                            <p className="text-[length:var(--text-300)] leading-300 text-muted-foreground">
-                                {current.blurb}
-                            </p>
+                        <header className="flex items-center gap-400">
+                            <span className="flex size-[48px] shrink-0 items-center justify-center rounded-lg bg-accent text-primary">
+                                <current.icon className="icon-size-400" aria-hidden="true" />
+                            </span>
+                            <span className="flex flex-col gap-100">
+                                <h1 className="text-[length:var(--text-hero-700)] leading-hero-700 font-semibold">
+                                    {current.label}
+                                </h1>
+                                <span className="text-[length:var(--text-300)] leading-300 text-muted-foreground">
+                                    {current.blurb}
+                                </span>
+                            </span>
                         </header>
                     )}
-                    {children}
+                    {current && <FilterBar destinationLabel={current.label} />}
+                    <ThemeContext.Provider value={{ ...themeContext, theme: paletteTheme }}>
+                        <div
+                            aria-busy={refreshing || undefined}
+                            data-refreshing={refreshing || undefined}
+                            className="flex flex-col gap-700 transition-opacity duration-200 data-[refreshing]:opacity-55 data-[refreshing]:delay-150"
+                        >
+                            {children}
+                        </div>
+                    </ThemeContext.Provider>
                 </div>
             </main>
         </div>

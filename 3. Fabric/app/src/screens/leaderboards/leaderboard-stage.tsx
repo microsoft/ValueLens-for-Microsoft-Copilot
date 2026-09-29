@@ -12,7 +12,7 @@ import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states"
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
-import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
+import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { toRollupDataTables } from "@/lib/to-data-table";
 import {
     cohortTaskField,
@@ -42,7 +42,7 @@ export function LeaderboardStage() {
     const { theme } = useThemeContext();
 
     const leaderboard = userLeaderboard();
-    const result = useSemanticModelQuery({
+    const result = useFilteredQuery({
         connection: leaderboard.connection,
         query: leaderboard.query,
     });

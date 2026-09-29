@@ -1,0 +1,28 @@
+EVALUATE
+UNION(
+    SELECTCOLUMNS(
+        FILTER(
+            VALUES('Chat + Agent Org Data'[Organization]),
+            LEN(TRIM('Chat + Agent Org Data'[Organization])) > 0
+        ),
+        "Kind", "organization",
+        "Value", 'Chat + Agent Org Data'[Organization]
+    ),
+    SELECTCOLUMNS(
+        FILTER(
+            VALUES('Agents 365'[Agent Type Label]),
+            LEN(TRIM('Agents 365'[Agent Type Label])) > 0
+        ),
+        "Kind", "agentType",
+        "Value", 'Agents 365'[Agent Type Label]
+    ),
+    ROW(
+        "Kind", "firstDate",
+        "Value", FORMAT(MIN('Chat + Agent Interactions (Audit Logs)'[ActivityDate]), "yyyy-MM-dd")
+    ),
+    ROW(
+        "Kind", "lastDate",
+        "Value", FORMAT(MAX('Chat + Agent Interactions (Audit Logs)'[ActivityDate]), "yyyy-MM-dd")
+    )
+)
+ORDER BY [Kind], [Value]

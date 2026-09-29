@@ -8,15 +8,20 @@
 import { useMemo, useState } from "react";
 import { VegaVisual } from "@microsoft/fabric-visuals";
 import { stageAnchor } from "@/components/destinations";
+import { FilterNote } from "@/components/filter-note";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
-import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
+import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import type { FilterKey } from "@/lib/filters";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import { activationByOrg, activationSummary, type ActivationCohort } from "@/queries/adoption";
+
+/** The cohort cards already split licensed, unlicensed and agent use, so those filters would only blank cards out. */
+const COHORT_FILTERS: FilterKey[] = ["licence", "audience"];
 
 /** The four cohorts the Activation page reports on, in reading order. */
 const cohorts: {
@@ -86,9 +91,9 @@ export function ActivationStage() {
     const [cohort, setCohort] = useState<ActivationCohort>("all");
     const { theme } = useThemeContext();
 
-    const summary = useSemanticModelQuery(activationSummary());
+    const summary = useFilteredQuery(activationSummary(), { ignore: COHORT_FILTERS });
     const byOrg = useMemo(() => activationByOrg({ cohort }), [cohort]);
-    const orgResult = useSemanticModelQuery({ connection: byOrg.connection, query: byOrg.query });
+    const orgResult = useFilteredQuery({ connection: byOrg.connection, query: byOrg.query }, { ignore: COHORT_FILTERS });
 
     const summaryRow = useMemo(
         () => (summary.data?.status === "success" ? toSummaryRow(summary.data.table) : undefined),
@@ -115,6 +120,10 @@ export function ActivationStage() {
                 <SegmentedControl label="Cohort" options={cohorts} value={cohort} onChange={setCohort} />
             }
         >
+            <FilterNote
+                ignored={COHORT_FILTERS}
+                reason="activation is shown for each cohort side by side — pick one with the cohort switch."
+            />
             {summary.data?.status === "error" ? (
                 <QueryError message={summary.data.error.message} onRetry={summary.refetch} />
             ) : summary.isLoading || !summary.data ? (

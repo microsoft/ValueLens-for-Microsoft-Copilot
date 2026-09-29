@@ -13,7 +13,7 @@ import { KpiCard } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";
-import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
+import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { formatKpi } from "@/lib/format-kpi";
 import { readNumber, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
@@ -45,11 +45,11 @@ const candidateColumns: GridColumnDef[] = [
 export function CoworkReadinessStage() {
     const { theme } = useThemeContext();
 
-    const summary = useSemanticModelQuery(coworkReadinessSummary());
+    const summary = useFilteredQuery(coworkReadinessSummary());
     const byOrg = coworkReadinessByOrg();
-    const byOrgResult = useSemanticModelQuery({ connection: byOrg.connection, query: byOrg.query });
+    const byOrgResult = useFilteredQuery({ connection: byOrg.connection, query: byOrg.query });
     const candidates = coworkCandidates();
-    const candidatesResult = useSemanticModelQuery({ connection: candidates.connection, query: candidates.query });
+    const candidatesResult = useFilteredQuery({ connection: candidates.connection, query: candidates.query });
 
     const summaryRow = useMemo(
         () => (summary.data?.status === "success" ? toSummaryRow(summary.data.table) : undefined),

@@ -10,7 +10,7 @@ import { stageAnchor } from "@/components/destinations";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
-import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
+import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { coworkFitSummary } from "@/queries/agents";
 
@@ -24,7 +24,7 @@ import { coworkFitSummary } from "@/queries/agents";
  * empty figures.
  */
 export function CoworkFitStage() {
-    const summary = useSemanticModelQuery(coworkFitSummary());
+    const summary = useFilteredQuery(coworkFitSummary());
 
     const row = useMemo(
         () => (summary.data?.status === "success" ? toSummaryRow(summary.data.table) : undefined),

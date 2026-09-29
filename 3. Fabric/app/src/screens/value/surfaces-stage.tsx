@@ -11,7 +11,7 @@ import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states"
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
-import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
+import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { toDataTable } from "@/lib/to-data-table";
 import { surfaceUsage, workCohorts, type WorkCohort } from "@/queries/work";
 
@@ -30,7 +30,7 @@ export function SurfacesStage() {
     const surface = useMemo(() => surfaceUsage({ lens: "surface", cohort }), [cohort]);
     const model = useMemo(() => surfaceUsage({ lens: "model", cohort }), [cohort]);
 
-    const result = useSemanticModelQuery({ connection: surface.connection, query: surface.query });
+    const result = useFilteredQuery({ connection: surface.connection, query: surface.query });
 
     const table = useMemo(
         () =>

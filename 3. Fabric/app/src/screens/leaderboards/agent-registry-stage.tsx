@@ -10,11 +10,13 @@ import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
 import { VegaVisual } from "@microsoft/fabric-visuals";
 import { Unlink } from "lucide-react";
 import { stageAnchor } from "@/components/destinations";
+import { FilterNote } from "@/components/filter-note";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";
-import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
+import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import type { FilterKey } from "@/lib/filters";
 import { formatKpi } from "@/lib/format-kpi";
 import { readNumber, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
@@ -27,6 +29,13 @@ import {
     describeRegistryLinkage,
     type RegistryLinkage,
 } from "@/queries/agents";
+
+/**
+ * The registry is a catalogue, not activity: narrowing it to a window or an
+ * organization would drop every agent nobody used there, which is exactly the
+ * part of the estate this stage exists to show. Agent type still applies.
+ */
+const CATALOGUE_IGNORES: FilterKey[] = ["dateRange", "organizations", "licence", "audience"];
 
 /** The one sentence explaining how far usage could be tied back to the registry, if any is needed. */
 function linkageMessage(linkage: RegistryLinkage): string | undefined {
@@ -60,15 +69,21 @@ function linkageMessage(linkage: RegistryLinkage): string | undefined {
 export function AgentRegistryStage() {
     const { theme } = useThemeContext();
 
-    const activity = useSemanticModelQuery(agentActivitySummary());
-    const estate = useSemanticModelQuery(agentEstateSummary());
+    const activity = useFilteredQuery(agentActivitySummary());
+    const estate = useFilteredQuery(agentEstateSummary(), { ignore: CATALOGUE_IGNORES });
 
     const usage = agentUsage();
-    const usageResult = useSemanticModelQuery({ connection: usage.connection, query: usage.query });
+    const usageResult = useFilteredQuery({ connection: usage.connection, query: usage.query });
     const lifecycle = agentLifecycle();
-    const lifecycleResult = useSemanticModelQuery({ connection: lifecycle.connection, query: lifecycle.query });
+    const lifecycleResult = useFilteredQuery(
+        { connection: lifecycle.connection, query: lifecycle.query },
+        { ignore: CATALOGUE_IGNORES },
+    );
     const registry = agentRegistry();
-    const registryResult = useSemanticModelQuery({ connection: registry.connection, query: registry.query });
+    const registryResult = useFilteredQuery(
+        { connection: registry.connection, query: registry.query },
+        { ignore: CATALOGUE_IGNORES },
+    );
 
     const activityRow = useMemo(
         () => (activity.data?.status === "success" ? toSummaryRow(activity.data.table) : undefined),
@@ -192,6 +207,11 @@ export function AgentRegistryStage() {
                     {message}
                 </p>
             )}
+
+            <FilterNote
+                ignored={CATALOGUE_IGNORES}
+                reason="the registry, its lifecycle chart and the registered-agent count always cover every agent, used or not."
+            />
 
             <div className="grid gap-400 xl:grid-cols-2">
                 <div className="h-[420px]">
