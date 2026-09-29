@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
+import { stageAnchor } from "@/components/destinations";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
@@ -29,7 +30,7 @@ const taskColumns = workCohorts.map((entry) => ({
 }));
 
 /**
- * Stage three of the Work destination: who is doing the work.
+ * The people half of the Leaderboards destination: who is doing the work.
  *
  * The report repeats the same table four times, once per cohort, on four
  * bookmarks. Here one grid holds every cohort's column and the toggle simply
@@ -71,7 +72,7 @@ export function LeaderboardStage() {
 
     return (
         <Section
-            eyebrow="Stage 3"
+            id={stageAnchor("leaderboard")}
             title="Leaderboard"
             description="Every person who used Copilot, ranked. Sort or filter any column; the total row stays pinned to the bottom."
             actions={

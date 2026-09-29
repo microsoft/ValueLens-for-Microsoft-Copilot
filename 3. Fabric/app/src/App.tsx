@@ -14,7 +14,16 @@ import { QueryLoading } from "./components/query-states";
 const AdoptionScreen = lazy(() =>
     import("./screens/adoption").then((module) => ({ default: module.AdoptionScreen })),
 );
-const WorkScreen = lazy(() => import("./screens/work").then((module) => ({ default: module.WorkScreen })));
+const LeaderboardsScreen = lazy(() =>
+    import("./screens/leaderboards").then((module) => ({ default: module.LeaderboardsScreen })),
+);
+const ReadinessScreen = lazy(() =>
+    import("./screens/readiness").then((module) => ({ default: module.ReadinessScreen })),
+);
+const ValueScreen = lazy(() => import("./screens/value").then((module) => ({ default: module.ValueScreen })));
+const EfficiencyScreen = lazy(() =>
+    import("./screens/efficiency").then((module) => ({ default: module.EfficiencyScreen })),
+);
 
 function App() {
     const [destination, setDestination] = useState<DestinationId>("adoption");
@@ -23,7 +32,10 @@ function App() {
         <AppShell active={destination} onNavigate={setDestination}>
             <Suspense fallback={<QueryLoading />}>
                 {destination === "adoption" && <AdoptionScreen />}
-                {destination === "work" && <WorkScreen />}
+                {destination === "leaderboards" && <LeaderboardsScreen />}
+                {destination === "readiness" && <ReadinessScreen />}
+                {destination === "value" && <ValueScreen />}
+                {destination === "efficiency" && <EfficiencyScreen />}
             </Suspense>
         </AppShell>
     );

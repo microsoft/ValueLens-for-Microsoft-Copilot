@@ -5,11 +5,11 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Moon, Sun } from "lucide-react";
 import { useThemeContext } from "@/hooks/theme.context";
 import { cn } from "@/lib/utils";
-import { destinations, type DestinationId } from "./destinations";
+import { destinations, isDestinationReady, stageAnchor, type DestinationId, type StageId } from "./destinations";
 
 interface AppShellProps {
     active: DestinationId;
@@ -17,13 +17,67 @@ interface AppShellProps {
     children: ReactNode;
 }
 
+/** How far down the canvas a stage's heading has to pass before it counts as the one being read. */
+const READING_LINE = 0.3;
+
+function prefersReducedMotion(): boolean {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 /**
  * Sidebar-and-canvas frame. The sidebar is the whole navigation model — six
- * destinations replacing sixteen report pages and their bookmark bars.
+ * destinations replacing the report's pages and bookmark bars, with the
+ * active destination's stages listed beneath it and tracked as you scroll.
  */
 export function AppShell({ active, onNavigate, children }: AppShellProps) {
     const { isDark, toggleTheme } = useThemeContext();
     const current = destinations.find((destination) => destination.id === active);
+    const mainRef = useRef<HTMLElement>(null);
+    const [readingStage, setReadingStage] = useState<StageId>();
+
+    useEffect(() => {
+        const main = mainRef.current;
+        if (!main) return;
+        main.scrollTop = 0;
+
+        const built = (destinations.find((destination) => destination.id === active)?.stages ?? []).filter(
+            (stage) => stage.ready,
+        );
+        let frame = 0;
+
+        // Screens load their data after mounting and grow as they do, so stage
+        // positions are read on every scroll rather than cached.
+        const update = () => {
+            frame = 0;
+            const line = main.getBoundingClientRect().top + main.clientHeight * READING_LINE;
+            let reading: StageId | undefined = built[0]?.id;
+            for (const stage of built) {
+                const element = document.getElementById(stageAnchor(stage.id));
+                if (element && element.getBoundingClientRect().top <= line) reading = stage.id;
+            }
+            // A short last stage can never reach the reading line, so hitting the end selects it.
+            const atEnd = main.scrollTop > 0 && main.scrollTop + main.clientHeight >= main.scrollHeight - 1;
+            if (atEnd && built.length > 0) reading = built[built.length - 1].id;
+            setReadingStage(reading);
+        };
+        const onScroll = () => {
+            if (!frame) frame = requestAnimationFrame(update);
+        };
+
+        frame = requestAnimationFrame(update);
+        main.addEventListener("scroll", onScroll, { passive: true });
+        return () => {
+            main.removeEventListener("scroll", onScroll);
+            cancelAnimationFrame(frame);
+        };
+    }, [active]);
+
+    const goToStage = (id: StageId) => {
+        const element = document.getElementById(stageAnchor(id));
+        if (!element) return;
+        element.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+        element.focus({ preventScroll: true });
+    };
 
     return (
         <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
@@ -42,20 +96,21 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                     {destinations.map((destination) => {
                         const Icon = destination.icon;
                         const isActive = destination.id === active;
+                        const ready = isDestinationReady(destination);
                         return (
                             <li key={destination.id}>
                                 <button
                                     type="button"
                                     onClick={() => onNavigate(destination.id)}
                                     aria-current={isActive ? "page" : undefined}
-                                    disabled={!destination.ready}
+                                    disabled={!ready}
                                     className={cn(
                                         "flex w-full items-center gap-300 rounded-md px-300 py-200 text-left transition-colors",
                                         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                                         isActive
                                             ? "bg-accent text-accent-foreground"
                                             : "text-muted-foreground hover:bg-secondary hover:text-foreground",
-                                        !destination.ready && "cursor-not-allowed opacity-50 hover:bg-transparent",
+                                        !ready && "cursor-not-allowed opacity-50 hover:bg-transparent",
                                     )}
                                 >
                                     <Icon className="icon-size-200 shrink-0" aria-hidden="true" />
@@ -64,10 +119,46 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                                             {destination.label}
                                         </span>
                                         <span className="text-[length:var(--text-100)] leading-100 opacity-70">
-                                            {destination.ready ? destination.blurb : "Coming next"}
+                                            {ready ? destination.blurb : "Coming next"}
                                         </span>
                                     </span>
                                 </button>
+
+                                {isActive && destination.stages.length > 1 && (
+                                    <ul
+                                        aria-label={`${destination.label} stages`}
+                                        className="mt-100 mb-200 ml-500 flex flex-col border-l border-border"
+                                    >
+                                        {destination.stages.map((stage) => {
+                                            const isReading = stage.id === readingStage;
+                                            return (
+                                                <li key={stage.id}>
+                                                    {stage.ready ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => goToStage(stage.id)}
+                                                            aria-current={isReading ? "location" : undefined}
+                                                            className={cn(
+                                                                "-ml-px flex w-full border-l-2 py-100 pr-200 pl-[18px] text-left text-[length:var(--text-200)] leading-200 transition-colors",
+                                                                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                                                                isReading
+                                                                    ? "border-primary font-semibold text-foreground"
+                                                                    : "border-transparent text-muted-foreground hover:text-foreground",
+                                                            )}
+                                                        >
+                                                            {stage.label}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="-ml-px flex items-baseline justify-between gap-200 border-l-2 border-transparent py-100 pr-200 pl-[18px] text-[length:var(--text-200)] leading-200 text-muted-foreground opacity-60">
+                                                            {stage.label}
+                                                            <span className="text-[length:var(--text-100)] leading-100">Soon</span>
+                                                        </span>
+                                                    )}
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                )}
                             </li>
                         );
                     })}
@@ -88,7 +179,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                 </button>
             </nav>
 
-            <main className="flex-1 overflow-y-auto">
+            <main ref={mainRef} className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
                 <div className="mx-auto flex max-w-[1400px] flex-col gap-700 px-700 py-600">
                     {current && (
                         <header className="flex flex-col gap-100">

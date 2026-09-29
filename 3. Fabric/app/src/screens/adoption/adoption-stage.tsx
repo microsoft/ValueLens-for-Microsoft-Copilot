@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { VegaVisual } from "@microsoft/fabric-visuals";
+import { stageAnchor } from "@/components/destinations";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
@@ -63,7 +64,7 @@ export function AdoptionStage() {
 
     return (
         <Section
-            eyebrow="Stage 2"
+            id={stageAnchor("adoption")}
             title="Adoption"
             description="How often the activated population comes back, measured the same way across every surface."
             actions={

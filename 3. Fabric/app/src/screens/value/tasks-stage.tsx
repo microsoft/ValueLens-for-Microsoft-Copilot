@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { VegaVisual } from "@microsoft/fabric-visuals";
+import { stageAnchor } from "@/components/destinations";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
@@ -32,8 +33,8 @@ const cards = [
 ] as const;
 
 /**
- * Stage one of the Work destination: how much got done, and what kind of work
- * it was.
+ * The Value destination's task breakdown: how much got done, and what kind of
+ * work it was.
  *
  * Power BI spends thirty-nine visuals across the Activity page on this. Here
  * it is two queries — one row of headline figures covering all four cohorts,
@@ -67,8 +68,8 @@ export function TasksStage() {
 
     return (
         <Section
-            eyebrow="Stage 1"
-            title="Tasks"
+            id={stageAnchor("task-breakdown")}
+            title="Task breakdown"
             description="How much work Copilot was asked to do, by whom, and what kind of work it was."
         >
             {summary.data?.status === "error" ? (

@@ -9,8 +9,8 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 interface SectionProps {
-    /** Short label set above the title, e.g. the funnel stage number. */
-    eyebrow?: string;
+    /** Anchor the sidebar scrolls to; see `stageAnchor`. */
+    id?: string;
     title: string;
     /** One sentence explaining what the reader is looking at. */
     description?: string;
@@ -24,16 +24,16 @@ interface SectionProps {
  * A titled band of content. The hairline rule under the heading is the
  * repeating structural motif that ties the screens together.
  */
-export function Section({ eyebrow, title, description, actions, children, className }: SectionProps) {
+export function Section({ id, title, description, actions, children, className }: SectionProps) {
     return (
-        <section className={cn("flex flex-col gap-400", className)}>
+        <section
+            id={id}
+            // Focusable only by script, so a sidebar jump moves keyboard focus with the scroll.
+            tabIndex={id ? -1 : undefined}
+            className={cn("flex scroll-mt-600 flex-col gap-400 outline-none", className)}
+        >
             <div className="flex flex-wrap items-end justify-between gap-300 border-b border-border pb-300">
                 <div className="flex flex-col gap-100">
-                    {eyebrow && (
-                        <span className="text-[length:var(--text-200)] leading-200 text-muted-foreground">
-                            {eyebrow}
-                        </span>
-                    )}
                     <h2 className="text-[length:var(--text-400)] leading-400 font-semibold text-foreground">
                         {title}
                     </h2>

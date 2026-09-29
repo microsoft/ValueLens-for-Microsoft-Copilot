@@ -16,8 +16,8 @@ import { toDataTable } from "@/lib/to-data-table";
 import { surfaceUsage, workCohorts, type WorkCohort } from "@/queries/work";
 
 /**
- * Stage two of the Work destination: where the work happens and which model
- * answers it.
+ * The second half of the Value destination's task breakdown: where the work
+ * happens and which model answers it.
  *
  * The report draws eight bar charts here — two lenses times four cohorts, each
  * on its own bookmark. One query carries all eight, so both the lens split and
@@ -57,7 +57,6 @@ export function SurfacesStage() {
 
     return (
         <Section
-            eyebrow="Stage 2"
             title="Surfaces & models"
             description="Where Copilot is being used from, and what is answering. Together these say whether adoption is concentrated in one app or spread across the suite."
             actions={

@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { VegaVisual } from "@microsoft/fabric-visuals";
+import { stageAnchor } from "@/components/destinations";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
@@ -107,7 +108,7 @@ export function ActivationStage() {
 
     return (
         <Section
-            eyebrow="Stage 1"
+            id={stageAnchor("activation")}
             title="Activation"
             description="How much of the population has picked Copilot up at all — before asking how often or how deeply."
             actions={

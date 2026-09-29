@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { VegaVisual } from "@microsoft/fabric-visuals";
+import { stageAnchor } from "@/components/destinations";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
@@ -60,7 +61,7 @@ export function HabitStage() {
 
     return (
         <Section
-            eyebrow="Stage 3"
+            id={stageAnchor("habit-formation")}
             title="Habit formation"
             description="Where the population sits on the ladder from never using Copilot to relying on it daily."
         >

@@ -5,21 +5,16 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { LeaderboardStage } from "./leaderboard-stage";
-import { SurfacesStage } from "./surfaces-stage";
-import { TasksStage } from "./tasks-stage";
+import { CoworkFitStage } from "./cowork-fit-stage";
 
 /**
- * What people actually do with Copilot, read top to bottom: how much work got
- * done, where it happened, and who did it. Two report pages, sixty-six visuals
- * and four queries.
+ * Whether the right tool is doing the job: the report's Cowork Fit and Model
+ * Fit pages. Cowork fit is built; model fit follows.
  */
-export function WorkScreen() {
+export function EfficiencyScreen() {
     return (
         <div className="flex flex-col gap-800">
-            <TasksStage />
-            <SurfacesStage />
-            <LeaderboardStage />
+            <CoworkFitStage />
         </div>
     );
 }
