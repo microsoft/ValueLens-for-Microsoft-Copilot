@@ -8,6 +8,7 @@
 import { useMemo } from "react";
 import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
 import { VegaVisual } from "@microsoft/fabric-visuals";
+import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { stageAnchor } from "@/components/destinations";
 import { KpiCard } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
@@ -17,6 +18,7 @@ import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { rowChartHeight } from "@/lib/chart-height";
 import { formatKpi } from "@/lib/format-kpi";
+import { columnFormat, columnHeat, heatRenderer } from "@/lib/heat";
 import { withOrgAttribute } from "@/lib/org-attribute";
 import { readNumber, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
@@ -27,9 +29,19 @@ import {
     isDepthUniform,
 } from "@/queries/agents";
 
-function candidateColumns(orgLabel: string): GridColumnDef[] {
+function candidateColumns(orgLabel: string, table: DataTable | undefined): GridColumnDef[] {
     return [
-        { id: "Rank", header: "Rank", width: 88, numericStyling: true },
+        {
+            id: "Rank",
+            header: "Rank",
+            width: 88,
+            numericStyling: true,
+            // Rank 1 is the readiest, so the heat runs the other way.
+            cellRenderer: heatRenderer({
+                domain: columnHeat(table, "Rank", { reverse: true }),
+                format: columnFormat(table, "Rank"),
+            }),
+        },
         { id: "User", header: "User", minWidth: 240 },
         { id: "Organization", header: orgLabel, minWidth: 160 },
         { id: "Surfaces Per Day", header: "Apps per active day", numericStyling: true },
@@ -56,7 +68,6 @@ export function CoworkReadinessStage() {
     const byOrgResult = useFilteredQuery({ connection: byOrg.connection, query: byOrg.query });
     const candidates = useMemo(() => withOrgAttribute(coworkCandidates(), org), [org]);
     const candidatesResult = useFilteredQuery({ connection: candidates.connection, query: candidates.query });
-    const columns = useMemo(() => candidateColumns(org.label), [org.label]);
 
     const summaryRow = useMemo(
         () => (summary.data?.status === "success" ? toSummaryRow(summary.data.table) : undefined),
@@ -76,6 +87,7 @@ export function CoworkReadinessStage() {
                 : undefined,
         [candidatesResult.data, candidates.columnMetadata],
     );
+    const columns = useMemo(() => candidateColumns(org.label, candidatesTable), [org.label, candidatesTable]);
 
     const depthUniform = candidatesTable ? isDepthUniform(candidatesTable) : false;
 

@@ -8,6 +8,7 @@
 import { useMemo } from "react";
 import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
 import { VegaVisual } from "@microsoft/fabric-visuals";
+import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { stageAnchor } from "@/components/destinations";
 import { FilterNote } from "@/components/filter-note";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
@@ -19,6 +20,7 @@ import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { rowChartHeight } from "@/lib/chart-height";
 import type { FilterKey } from "@/lib/filters";
 import { formatKpi } from "@/lib/format-kpi";
+import { columnFormat, columnHeat, heatRenderer } from "@/lib/heat";
 import { withOrgAttribute } from "@/lib/org-attribute";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
@@ -32,12 +34,20 @@ import {
 
 const LICENSE_ESTATE_IGNORES: FilterKey[] = ["dateRange", "organizations"];
 
-function candidateColumns(orgLabel: string): GridColumnDef[] {
+function candidateColumns(orgLabel: string, table: DataTable | undefined): GridColumnDef[] {
     return [
         { id: "Rank", header: "Rank", width: 88, numericStyling: true },
         { id: "User", header: "User", minWidth: 240 },
         { id: "Organization", header: orgLabel, minWidth: 160 },
-        { id: "Priority Score", header: "Priority score", numericStyling: true },
+        {
+            id: "Priority Score",
+            header: "Priority score",
+            numericStyling: true,
+            cellRenderer: heatRenderer({
+                domain: columnHeat(table, "Priority Score"),
+                format: columnFormat(table, "Priority Score"),
+            }),
+        },
         { id: "Sessions Per Week", header: "Sessions per week", numericStyling: true },
         { id: "Active Days Per Week", header: "Active days per week", numericStyling: true },
     ];
@@ -58,7 +68,6 @@ export function LicenseReadinessStage() {
     const byOrgResult = useFilteredQuery({ connection: byOrg.connection, query: byOrg.query });
     const candidates = useMemo(() => withOrgAttribute(licenseCandidates(), org), [org]);
     const candidatesResult = useFilteredQuery({ connection: candidates.connection, query: candidates.query });
-    const columns = useMemo(() => candidateColumns(org.label), [org.label]);
     const dormancy = licenseDormancy();
     const dormancyResult = useFilteredQuery(
         { connection: dormancy.connection, query: dormancy.query },
@@ -87,6 +96,7 @@ export function LicenseReadinessStage() {
                 : undefined,
         [candidatesResult.data, candidates.columnMetadata],
     );
+    const columns = useMemo(() => candidateColumns(org.label, candidatesTable), [org.label, candidatesTable]);
     const dormancyTable = useMemo(
         () =>
             dormancyResult.data?.status === "success"

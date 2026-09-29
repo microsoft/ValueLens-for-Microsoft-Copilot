@@ -18,6 +18,7 @@ import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import type { FilterKey } from "@/lib/filters";
 import { formatKpi } from "@/lib/format-kpi";
+import { columnFormat, columnHeat, heatRenderer } from "@/lib/heat";
 import { readNumber, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import {
@@ -129,9 +130,18 @@ export function AgentRegistryStage() {
             { id: "Lifecycle", header: "Lifecycle", minWidth: 200 },
             { id: "Usage Review", header: "Usage review", minWidth: 180 },
             { id: "Users", header: "Users", numericStyling: true, hidden: hideUsage },
-            { id: "Sessions", header: "Sessions", numericStyling: true, hidden: hideUsage },
+            {
+                id: "Sessions",
+                header: "Sessions",
+                numericStyling: true,
+                hidden: hideUsage,
+                cellRenderer: heatRenderer({
+                    domain: columnHeat(registryTable, "Sessions"),
+                    format: columnFormat(registryTable, "Sessions"),
+                }),
+            },
         ],
-        [hideUsage],
+        [hideUsage, registryTable],
     );
 
     const summaryError =

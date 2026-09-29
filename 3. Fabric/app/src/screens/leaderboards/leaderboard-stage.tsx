@@ -14,6 +14,7 @@ import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import { columnFormat, columnHeat, heatRenderer } from "@/lib/heat";
 import { withOrgAttribute } from "@/lib/org-attribute";
 import { toRollupDataTables } from "@/lib/to-data-table";
 import {
@@ -58,6 +59,7 @@ export function LeaderboardStage() {
     }, [result.data, leaderboard.columnMetadata, leaderboard.rollupFlagColumns]);
 
     const activeField = cohortTaskField(cohort);
+    const body = tables?.bodyTable;
 
     const columns: GridColumnDef[] = useMemo(
         () => [
@@ -67,10 +69,14 @@ export function LeaderboardStage() {
                 ...column,
                 numericStyling: true,
                 hidden: column.id !== activeField,
+                cellRenderer: heatRenderer({
+                    domain: columnHeat(body, column.id),
+                    format: columnFormat(body, column.id),
+                }),
             })),
             { id: "Active Days", header: "Active days", numericStyling: true },
         ],
-        [activeField, org.label],
+        [activeField, org.label, body],
     );
 
     return (

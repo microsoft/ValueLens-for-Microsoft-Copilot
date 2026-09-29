@@ -18,6 +18,7 @@ import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { gridHeight } from "@/lib/chart-height";
 import { treatAs } from "@/lib/dax-filters";
 import { formatKpi } from "@/lib/format-kpi";
+import { columnHeat, heatRenderer } from "@/lib/heat";
 import { withOrgAttribute } from "@/lib/org-attribute";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
@@ -161,10 +162,13 @@ export function EstimatedValueStage() {
                 header: `Value (${currencySymbol || "currency"})`,
                 width: 140,
                 numericStyling: true,
-                cellRenderer: (value) => formatCurrencyCell(value, currencySymbol),
+                cellRenderer: heatRenderer({
+                    domain: columnHeat(agentTable, "AI Assisted Value"),
+                    format: (value) => formatCurrencyCell(value, currencySymbol),
+                }),
             },
         ],
-        [currencySymbol],
+        [currencySymbol, agentTable],
     );
 
     const organizationColumns: GridColumnDef[] = useMemo(
@@ -189,10 +193,13 @@ export function EstimatedValueStage() {
                 header: `Value (${currencySymbol || "currency"})`,
                 width: 140,
                 numericStyling: true,
-                cellRenderer: (value) => formatCurrencyCell(value, currencySymbol),
+                cellRenderer: heatRenderer({
+                    domain: columnHeat(organizationTable, "AI Assisted Value"),
+                    format: (value) => formatCurrencyCell(value, currencySymbol),
+                }),
             },
         ],
-        [currencySymbol, org.label],
+        [currencySymbol, org.label, organizationTable],
     );
 
     return (
