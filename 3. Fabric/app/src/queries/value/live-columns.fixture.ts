@@ -18,11 +18,14 @@ export const liveColumns = {
         "[AI Assisted Value Per Week]",
         "[Currency Symbol]",
     ],
-    valueByTaskGroup: [
+    valueByTask: [
         "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]",
-        "[Expert Equivalent Hours]",
-        "[AI Assisted Value]",
-        "[Share of Value]",
+        "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]",
+        "[Is Grand Total]",
+        "[Is Group Total]",
+        "[Activity Share]",
+        "[Expert Equivalent Hours Per Week]",
+        "[AI Assisted Value Per Week]",
     ],
     agentValue: [
         "Chat + Agent Interactions (Audit Logs)[AgentName]",

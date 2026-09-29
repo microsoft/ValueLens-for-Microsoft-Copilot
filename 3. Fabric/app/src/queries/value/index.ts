@@ -6,6 +6,6 @@
 //-----------------------------------------------------------------------
 
 export * from "./value-summary";
-export * from "./value-by-task-group";
+export * from "./value-by-task";
 export * from "./agent-value";
 export * from "./organization-value";

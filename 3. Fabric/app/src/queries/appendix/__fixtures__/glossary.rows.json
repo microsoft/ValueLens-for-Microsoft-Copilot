@@ -1,0 +1,786 @@
+[
+  {
+    "[Page]": "Activation",
+    "[Metric]": "Active users",
+    "[Description]": "Nonblank users with prompt-flagged activity in the selected cohort and period.",
+    "[Page Order]": 0,
+    "[Metric Order]": 0,
+    "[Page Description]": "Compare observed activity with reconciled license inventory; do not interpret missing inventory as zero adoption."
+  },
+  {
+    "[Page]": "Activation",
+    "[Metric]": "Licensed utilisation",
+    "[Description]": "Active licensed users divided by matched licensed inventory. Unavailable when inventory is missing or does not reconcile; never a fabricated 0%.",
+    "[Page Order]": 0,
+    "[Metric Order]": 1,
+    "[Page Description]": "Compare observed activity with reconciled license inventory; do not interpret missing inventory as zero adoption."
+  },
+  {
+    "[Page]": "Activation",
+    "[Metric]": "Inactive licensed users",
+    "[Description]": "Matched licensed inventory less active licensed users, only when the denominator is valid.",
+    "[Page Order]": 0,
+    "[Metric Order]": 2,
+    "[Page Description]": "Compare observed activity with reconciled license inventory; do not interpret missing inventory as zero adoption."
+  },
+  {
+    "[Page]": "Activation",
+    "[Metric]": "Cowork observed population",
+    "[Description]": "Users observed with Cowork-tagged activity in loaded history, not a purchased or entitled Cowork-license population.",
+    "[Page Order]": 0,
+    "[Metric Order]": 3,
+    "[Page Description]": "Compare observed activity with reconciled license inventory; do not interpret missing inventory as zero adoption."
+  },
+  {
+    "[Page]": "License & Cowork Readiness",
+    "[Metric]": "License readiness",
+    "[Description]": "Review unlicensed usage depth and frequency before discussing a license. No universal buying threshold is asserted.",
+    "[Page Order]": 1,
+    "[Metric Order]": 100,
+    "[Page Description]": "License demand and Cowork fit are separate observed-usage signals, not purchase recommendations."
+  },
+  {
+    "[Page]": "License & Cowork Readiness",
+    "[Metric]": "Cowork readiness",
+    "[Description]": "Review session depth, daily app spread and agent usage separately. Current Cowork users are excluded from the fit population.",
+    "[Page Order]": 1,
+    "[Metric Order]": 101,
+    "[Page Description]": "License demand and Cowork fit are separate observed-usage signals, not purchase recommendations."
+  },
+  {
+    "[Page]": "License & Cowork Readiness",
+    "[Metric]": "Maturity mapping",
+    "[Description]": "Existing stage calculations remain unchanged pending confirmation of the stage mapping.",
+    "[Page Order]": 1,
+    "[Metric Order]": 102,
+    "[Page Description]": "License demand and Cowork fit are separate observed-usage signals, not purchase recommendations."
+  },
+  {
+    "[Page]": "License & Cowork Readiness",
+    "[Metric]": "Why an organisation shows no rank",
+    "[Description]": "Only users with no Cowork history can be ranked. Where every observed user already uses Cowork there is no one left to recommend, so the organisation carries no rank and is left out of the ranked candidate list rather than shown as a blank row.",
+    "[Page Order]": 1,
+    "[Metric Order]": 103,
+    "[Page Description]": "License demand and Cowork fit are separate observed-usage signals, not purchase recommendations."
+  },
+  {
+    "[Page]": "Adoption",
+    "[Metric]": "Tasks and sessions",
+    "[Description]": "Tasks count prompt-flagged activity rows; sessions group identifiable prompt activity by user, app and thread. They are different units.",
+    "[Page Order]": 2,
+    "[Metric Order]": 200,
+    "[Page Description]": "View observed activity volume and frequency over the selected dates and cohort."
+  },
+  {
+    "[Page]": "Adoption",
+    "[Metric]": "Sessions / active user",
+    "[Description]": "Observed sessions divided by the same prompt-active user population used for cohort task metrics.",
+    "[Page Order]": 2,
+    "[Metric Order]": 201,
+    "[Page Description]": "View observed activity volume and frequency over the selected dates and cohort."
+  },
+  {
+    "[Page]": "Adoption",
+    "[Metric]": "Sessions / user / week",
+    "[Description]": "Sessions per active user normalized to the selected calendar period in weeks; not a measure of completed weekly outcomes.",
+    "[Page Order]": 2,
+    "[Metric Order]": 202,
+    "[Page Description]": "View observed activity volume and frequency over the selected dates and cohort."
+  },
+  {
+    "[Page]": "Adoption",
+    "[Metric]": "Conversation depth",
+    "[Description]": "Sessions grouped by how many turns were observed. Depth shows the work was refined rather than taken from a first answer; it is not a quality score.",
+    "[Page Order]": 2,
+    "[Metric Order]": 203,
+    "[Page Description]": "View observed activity volume and frequency over the selected dates and cohort."
+  },
+  {
+    "[Page]": "Adoption",
+    "[Metric]": "More than one turn",
+    "[Description]": "Share of sessions with at least two observed turns. Single-turn sessions stay in the denominator rather than being excluded.",
+    "[Page Order]": 2,
+    "[Metric Order]": 204,
+    "[Page Description]": "View observed activity volume and frequency over the selected dates and cohort."
+  },
+  {
+    "[Page]": "Adoption",
+    "[Metric]": "Median session span",
+    "[Description]": "Median wall-clock time between a session's first and last timestamp. It measures how long activity was logged, not how long the work took, so no speed figure is derived from it.",
+    "[Page Order]": 2,
+    "[Metric Order]": 205,
+    "[Page Description]": "View observed activity volume and frequency over the selected dates and cohort."
+  },
+  {
+    "[Page]": "Power Users",
+    "[Metric]": "Usage stages",
+    "[Description]": "Existing activity-based maturity buckets; no new mapping or externally validated benchmark was introduced.",
+    "[Page Order]": 3,
+    "[Metric Order]": 300,
+    "[Page Description]": "Explore established usage patterns. Stage boundaries remain the inherited, unconfirmed mapping."
+  },
+  {
+    "[Page]": "Power Users",
+    "[Metric]": "Usage frequency",
+    "[Description]": "Read activity and days in the selected date context. High usage alone does not establish business impact.",
+    "[Page Order]": 3,
+    "[Metric Order]": 301,
+    "[Page Description]": "Explore established usage patterns. Stage boundaries remain the inherited, unconfirmed mapping."
+  },
+  {
+    "[Page]": "Power Users",
+    "[Metric]": "Usage stages under Cowork",
+    "[Description]": "Inactive reads N/A when the cohort is Cowork. Inactive means holds a seat but did not use it, and only Copilot has a seat inventory in this model - the Cowork cohort filters the audit feed, not the licence list, so the figure would subtract 183 Cowork-active users from 11,442 Copilot seats and report 11,316 against an observed Cowork population of 186. With Inactive blank the stage base falls back to users active last month, so Beginner and Developing are shares of the people actually observed on Cowork.",
+    "[Page Order]": 3,
+    "[Metric Order]": 302,
+    "[Page Description]": "Explore established usage patterns. Stage boundaries remain the inherited, unconfirmed mapping."
+  },
+  {
+    "[Page]": "Activity",
+    "[Metric]": "Behavior classification",
+    "[Description]": "Activity categories inferred by the ingestion/model logic, not independent verification of completed business tasks.",
+    "[Page Order]": 4,
+    "[Metric Order]": 400,
+    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred behavior as delivered outcomes."
+  },
+  {
+    "[Page]": "Activity",
+    "[Metric]": "Task volume",
+    "[Description]": "Prompt-flagged audit activity rows under the current filters.",
+    "[Page Order]": 4,
+    "[Metric Order]": 401,
+    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred behavior as delivered outcomes."
+  },
+  {
+    "[Page]": "Activity",
+    "[Metric]": "Session context",
+    "[Description]": "Observed sessions are available beside task totals or in relevant chart tooltips.",
+    "[Page Order]": 4,
+    "[Metric Order]": 402,
+    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred behavior as delivered outcomes."
+  },
+  {
+    "[Page]": "Activity",
+    "[Metric]": "Which breakdown dimension is used",
+    "[Description]": "The breakdown dimension. Behaviour for every cohort that reports one; the Cowork task category for Cowork, which does not - the feed tags all Cowork 'General Chat', so grouping on behaviour drew a single 100% block. Roughly half of Cowork still reads 'General assistance / Other' because those prompts attach no typed material.",
+    "[Page Order]": 4,
+    "[Metric Order]": 403,
+    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred behavior as delivered outcomes."
+  },
+  {
+    "[Page]": "Activity",
+    "[Metric]": "How deeply AI engaged",
+    "[Description]": "The estate's four-rung ladder - Asking, Finding, Consuming, Producing. Taken verbatim from the feed for every cohort that reports one. Cowork does not report one, so it is derived from the material each prompt touched: markdown artefact = Producing, document or mail item = Consuming, chat messages only = Finding, nothing attached = Asking.",
+    "[Page Order]": 4,
+    "[Metric Order]": 404,
+    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred behavior as delivered outcomes."
+  },
+  {
+    "[Page]": "Activity",
+    "[Metric]": "Share of activity",
+    "[Description]": "Each engagement rung as a percentage of all prompt activity in the current selection, so the four rungs add to 100%. The denominator is every prompt in scope, not just those on the same rung - if all four bars read 100% the denominator is being filtered by the rung as well as the numerator.",
+    "[Page Order]": 4,
+    "[Metric Order]": 405,
+    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred behavior as delivered outcomes."
+  },
+  {
+    "[Page]": "License Prioritisation",
+    "[Metric]": "Unlicensed sessions",
+    "[Description]": "Observed sessions from activity classified as unlicensed under the current source and date filters.",
+    "[Page Order]": 5,
+    "[Metric Order]": 500,
+    "[Page Description]": "Use unlicensed adoption evidence to build a review shortlist, not an automatic procurement decision."
+  },
+  {
+    "[Page]": "License Prioritisation",
+    "[Metric]": "Active days",
+    "[Description]": "Distinct dates with observed qualifying activity, not elapsed calendar days.",
+    "[Page Order]": 5,
+    "[Metric Order]": 501,
+    "[Page Description]": "Use unlicensed adoption evidence to build a review shortlist, not an automatic procurement decision."
+  },
+  {
+    "[Page]": "License Prioritisation",
+    "[Metric]": "Review priority",
+    "[Description]": "A conversation starter based on observed usage; missing or stale identity/license data must be resolved first.",
+    "[Page Order]": 5,
+    "[Metric Order]": 502,
+    "[Page Description]": "Use unlicensed adoption evidence to build a review shortlist, not an automatic procurement decision."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Consumption tasks",
+    "[Description]": "AI tasks billed through the Cowork consumption surface in the current selection.",
+    "[Page Order]": 6,
+    "[Metric Order]": 600,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Grounding ratio",
+    "[Description]": "How much heavier a Cowork task is than a Copilot Chat task, measured by the number of distinct resources the task touched. Above 1 means the premium tool is carrying heavier work. This is the signal that actually separates the tools in this data.",
+    "[Page Order]": 6,
+    "[Metric Order]": 601,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Over-specified tasks",
+    "[Description]": "Cowork tasks that show neither conversation depth nor any grounding - one turn and no resource touched. This is deliberately strict. It is the only population this feed can fairly describe as work a cheaper tool could have done.",
+    "[Page Order]": 6,
+    "[Metric Order]": 602,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Why turn count is not used on its own",
+    "[Description]": "Conversation length does not separate the tools here: 87% of Copilot Chat, 79% of agent traffic and 93% of Cowork all sit in the 7+ turn band. An earlier version flagged single-turn Cowork as substitutable, which inspected well under one percent of one percent of activity and could not support the conclusion. Turn count is now only used alongside grounding, never alone.",
+    "[Page Order]": 6,
+    "[Metric Order]": 603,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Wrong-app tasks",
+    "[Description]": "Tasks done in an app that does not normally carry that behaviour. Best fit is decided on volume, so a small surface such as Cowork can only ever appear as poor fit.",
+    "[Page Order]": 6,
+    "[Metric Order]": 603,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Best-fit app",
+    "[Description]": "The app carrying 40% or more of a behaviour's tasks in your own data. Behaviours with no dominant app are not judged rather than guessed.",
+    "[Page Order]": 6,
+    "[Metric Order]": 604,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "No cost is attributed",
+    "[Description]": "This model carries licence cost, not per-task or per-model consumption cost. No saving is estimated for any task flagged here, because the data cannot price the alternative.",
+    "[Page Order]": 6,
+    "[Metric Order]": 604,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Model efficiency",
+    "[Description]": "Partly judged now. Models are graded into cost tiers from published list prices, and frontier-tier tasks are compared with workhorse tasks on grounding depth. What is still missing is a per-call cost in the source, so no saving or spend figure is attached to any model.",
+    "[Page Order]": 6,
+    "[Metric Order]": 605,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Work weight",
+    "[Description]": "A four-band grade - High, Medium, Low, Unclassified - ported from the published Cowork classification methodology's Layer 1 rules. High needs three or more pieces of material across two or more types, or more than five pieces. Medium needs two or more types, or three or more pieces. One or two pieces of a single type grades Low, as does attaching nothing at all. Unclassified means the prompt attached references the feed gave no type to, so it cannot be graded either way - it is an abstention, not a low score.",
+    "[Page Order]": 6,
+    "[Metric Order]": 606,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "What counts as material",
+    "[Description]": "Only typed, non-conversational references count. Chat messages and references the feed left untyped are excluded, because counting them treats talking about work as doing it. In Cowork only 43.5% of the recorded references survive that test. The feed also records a resource type, not an identifier, so five pieces may be five files or one file touched five times - read the grade as work weight, not as a verified count of distinct sources.",
+    "[Page Order]": 6,
+    "[Metric Order]": 607,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Why work weight is a floor, not a verdict",
+    "[Description]": "The published method also grades cross-app work, code, automation and multi-format outputs as High, and an audit log sees none of them - only 0.23% of threads here touch more than one app, and just 188 rows record a write. The published method's Layer 2 LLM review is absent too. Every one of those gaps can only push a prompt up a band, never down, so the High share shown is the lowest defensible figure rather than the true one.",
+    "[Page Order]": 6,
+    "[Metric Order]": 608,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Counted per prompt, not per audit row",
+    "[Description]": "A prompt emits one audit row for every reference it attaches, so counting rows lets a heavy prompt vote once per attachment. This page counts distinct prompts instead. The difference is not cosmetic - in Cowork it is 5.4x, and it moved the High share from 75.2% to 21.4% before the material test was applied at all. Pages outside Usage Efficiency and Model Mix still count rows, so task counts there will read higher.",
+    "[Page Order]": 6,
+    "[Metric Order]": 609,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Producing a file is not a strong signal",
+    "[Description]": "In-app Copilots save files too, so producing an artefact never grades a task High on its own. It counts only alongside grounding or synthesis evidence.",
+    "[Page Order]": 6,
+    "[Metric Order]": 610,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Light work, decomposed",
+    "[Description]": "The first chart breaks the graded whole into its three bands, so the parts always add back to the total at the left. All graded is every Cowork prompt the rule could grade; High, Medium and Low are mutually exclusive slices of it. Unclassified prompts sit outside the bands and outside the share column, which is why the three bands sum to 100% of graded work rather than to 100% of prompts.",
+    "[Page Order]": 6,
+    "[Metric Order]": 611,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Habitual light use",
+    "[Description]": "Counts people, not prompts. A person is habitual if at least 80% of their own graded Cowork prompts graded Low, measured only across people with at least five graded prompts. Volume alone cannot show this - a single enthusiast can produce thousands of light prompts - so each person is banded by their own share instead. Below five graded prompts a share is noise, so those people are excluded from both the numerator and the denominator rather than counted as well-targeted.",
+    "[Page Order]": 6,
+    "[Metric Order]": 612,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Why the fit test is scoped to Cowork",
+    "[Description]": "Light work is only a cost signal on a surface that is paid for separately. On an included Copilot Chat seat a short, ungrounded prompt costs nothing extra and is entirely expected. The same grade therefore means different things on different surfaces, which is why it is applied to Cowork here and to premium models on Model Mix, and why any estate-wide figure is shown as context rather than as a target.",
+    "[Page Order]": 6,
+    "[Metric Order]": 613,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Which tool carries the heavier work",
+    "[Description]": "Read from the grounding ratio - material attached per Cowork prompt divided by material attached per in-app Copilot Chat prompt. Above 1.0 the paid surface is carrying the heavier work; below 1.0 it is carrying the lighter work. The page states whichever direction the data shows rather than assuming the paid surface is the heavier one, because in this tenant it is not.",
+    "[Page Order]": 6,
+    "[Metric Order]": 614,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Simple asks",
+    "[Description]": "A prompt that carried little material - few or no files, links or pasted text - and few turns. It describes the shape of the request, not its worth: a simple ask can still be valuable work. Replaces the older internal term \"light work\".",
+    "[Page Order]": 6,
+    "[Metric Order]": 615,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Prompts we could assess",
+    "[Description]": "Prompts with enough recorded detail to judge fit. Prompts whose attachments carry no recorded type are left out rather than assumed simple, so every share on this page is a floor, not a verdict. Replaces the older internal term \"graded on work weight\".",
+    "[Page Order]": 6,
+    "[Metric Order]": 616,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "What the work was",
+    "[Description]": "Each Cowork prompt is mapped to a Cowork Methodology v4 task category - Analysis & Research, Document & content creation, Email, Communication and so on - read from the material it attached. The source feed tags every Cowork prompt General Chat, a bucket defined as no signals matched, so this is derived here instead.",
+    "[Page Order]": 6,
+    "[Metric Order]": 617,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Why Cowork is categorised here and not upstream",
+    "[Description]": "49% of Cowork prompts attach a typed resource such as a spreadsheet, deck or PDF, yet all of them arrive tagged General Chat. Left uncorrected the whole surface is valued at the General assistance band, the lowest in the methodology. Three v4 categories - Meetings, Specialized workflows and Code - are not observable in an audit log and are never assigned.",
+    "[Page Order]": 6,
+    "[Metric Order]": 618,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Sessions we could assess",
+    "[Description]": "Cowork sessions carrying enough attached material to grade. Fit is judged per session, not per prompt: a person picks a surface once for a piece of work, and the files are attached at the start, so grading each follow-up turn alone convicted the whole session as light work.",
+    "[Page Order]": 6,
+    "[Metric Order]": 619,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Why sessions and not prompts",
+    "[Description]": "Grading each prompt alone put 74.5% of assessed work in Low fit, 58% of which had attached nothing at all - they were follow-up turns in a session whose material arrived earlier. Same thresholds, moved to session grain: 42.0% High, 10.9% Medium, 47.2% Low.",
+    "[Page Order]": 6,
+    "[Metric Order]": 620,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Cowork Hours (Task Category Basis)",
+    "[Description]": "Cowork human-equivalent hours priced from the task category its attached material shows, at that category's researched per-turn rate from Human Time Estimates. Replaces the General Chat fallback rate (8 min/turn) the feed forces on every Cowork prompt.",
+    "[Page Order]": 6,
+    "[Metric Order]": 621,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Could have used",
+    "[Description]": "The cheaper surface for work already judged a simple ask, with evidence: how many comparable Copilot Chat prompts the estate already runs in the same task category. Blank on High and Medium fit, and blank when no comparable Copilot volume exists, so the table never invents an alternative.",
+    "[Page Order]": 6,
+    "[Metric Order]": 622,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Source items and Source types",
+    "[Description]": "The only two inputs to the fit grade, shown so the grade can be checked rather than trusted. Source items is the average pieces of material a session worked across - files, links and pasted text, not just file attachments - so it measures depth. Source types is how many different types those were, so it measures breadth. Fit rises with both: high fit needs 3+ items across 2+ types, or more than 5 items on depth alone. Simple asks carry 1-2 items of one type, or none. Expert Equivalent Hours was removed from these tables: it is an outcome of the work, not evidence of how it graded.",
+    "[Page Order]": 6,
+    "[Metric Order]": 623,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Usage Efficiency",
+    "[Metric]": "Decided by",
+    "[Description]": "The test inside the fit grade that decided most sessions in the row, with the share it covers. Reads 3+ items, 2+ types or 6+ items on high fit; 2+ types or 3+ items, 1 type on medium; 1-2 items, 1 type or No sources on simple asks. It is counted from the graded sessions, not inferred, and it is why the same task category can be high fit in one row and a simple ask in another - the difference is always the material the session worked across.",
+    "[Page Order]": 6,
+    "[Metric Order]": 624,
+    "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
+  },
+  {
+    "[Page]": "Model Mix",
+    "[Metric]": "Model cost tier",
+    "[Description]": "Models grouped into Frontier, Workhorse and Not attributed using published per-million-token list prices. Frontier covers GPT-6 Astra, GPT-5.6 Sol, Claude Opus 5 and Opus 5.5. A model name the rule does not recognise is left Unclassified rather than guessed into a band.",
+    "[Page Order]": 7,
+    "[Metric Order]": 700,
+    "[Page Description]": "Show whether premium model capacity is going to heavy work or to trivia. Tiers come from published list prices; this feed carries no per-call cost."
+  },
+  {
+    "[Page]": "Model Mix",
+    "[Metric]": "Attribution coverage",
+    "[Description]": "Share of AI tasks that carry a model name at all. Every frontier figure on this page is stated against that attributed base, never against total tasks, because unattributed rows cannot be assumed to belong to either tier.",
+    "[Page Order]": 7,
+    "[Metric Order]": 701,
+    "[Page Description]": "Show whether premium model capacity is going to heavy work or to trivia. Tiers come from published list prices; this feed carries no per-call cost."
+  },
+  {
+    "[Page]": "Model Mix",
+    "[Metric]": "Frontier share",
+    "[Description]": "Frontier-tier tasks divided by tasks with a model logged. Read it with attribution coverage beside it; a low share means little when coverage is partial.",
+    "[Page Order]": 7,
+    "[Metric Order]": 702,
+    "[Page Description]": "Show whether premium model capacity is going to heavy work or to trivia. Tiers come from published list prices; this feed carries no per-call cost."
+  },
+  {
+    "[Page]": "Model Mix",
+    "[Metric]": "Depth signal",
+    "[Description]": "Mean resource references attached per task, compared between tiers. It is the only evidence here that separates heavy work from casual work. It is not a measure of answer quality, it is not a count of verified distinct sources, and it is not a cost.",
+    "[Page Order]": 7,
+    "[Metric Order]": 703,
+    "[Page Description]": "Show whether premium model capacity is going to heavy work or to trivia. Tiers come from published list prices; this feed carries no per-call cost."
+  },
+  {
+    "[Page]": "Model Mix",
+    "[Metric]": "No per-model cost",
+    "[Description]": "The audit feed carries no token counts and no per-call price, so no currency figure is shown against any model or tier. Tier is a relative statement about published list price only.",
+    "[Page Order]": 7,
+    "[Metric Order]": 704,
+    "[Page Description]": "Show whether premium model capacity is going to heavy work or to trivia. Tiers come from published list prices; this feed carries no per-call cost."
+  },
+  {
+    "[Page]": "Model Mix",
+    "[Metric]": "Why tiers are not compared",
+    "[Description]": "Premium-tier work in this estate is 100% Cowork and mid-cost work is 100% other tools, so cost tier and tool are the same split. A premium-versus-mid comparison would mostly compare Cowork with Copilot, not one model with another. Model fit is therefore judged inside Cowork only, where the model choice is actually made.",
+    "[Page Order]": 7,
+    "[Metric Order]": 705,
+    "[Page Description]": "Show whether premium model capacity is going to heavy work or to trivia. Tiers come from published list prices; this feed carries no per-call cost."
+  },
+  {
+    "[Page]": "Model Mix",
+    "[Metric]": "Overspecified",
+    "[Description]": "Cowork sessions on a premium-tier model whose attached material shows a simple ask - one file of one type. The premium model was billed for work the evidence does not show needed it. 559 sessions and 984 prompts sit here.",
+    "[Page Order]": 7,
+    "[Metric Order]": 706,
+    "[Page Description]": "Show whether premium model capacity is going to heavy work or to trivia. Tiers come from published list prices; this feed carries no per-call cost."
+  },
+  {
+    "[Page]": "Model Mix",
+    "[Metric]": "Well matched",
+    "[Description]": "Cowork sessions on a premium-tier model whose attached material shows heavy work - 3 or more files across 2 or more kinds, or more than 5 files. Premium capacity going where the evidence supports it.",
+    "[Page Order]": 7,
+    "[Metric Order]": 707,
+    "[Page Description]": "Show whether premium model capacity is going to heavy work or to trivia. Tiers come from published list prices; this feed carries no per-call cost."
+  },
+  {
+    "[Page]": "Model Mix",
+    "[Metric]": "Could have used (model)",
+    "[Description]": "The mid-cost model this estate already runs for the same kind of Cowork task, with the volume that proves it. Mid-cost models carry only 254 Cowork prompts in total, so read this as 'a cheaper model has handled this work', not as a benchmark. Blank on well-matched rows and blank where no mid-cost volume exists.",
+    "[Page Order]": 7,
+    "[Metric Order]": 708,
+    "[Page Description]": "Show whether premium model capacity is going to heavy work or to trivia. Tiers come from published list prices; this feed carries no per-call cost."
+  },
+  {
+    "[Page]": "Model Mix",
+    "[Metric]": "Headline verdict and depth signal (retired)",
+    "[Description]": "Both compared premium against mid-cost tiers, which in this estate is a Cowork-versus-Copilot comparison wearing a model label. The two visuals were removed rather than left to read as a model finding. The measures remain in the model, unused by any page.",
+    "[Page Order]": 7,
+    "[Metric Order]": 709,
+    "[Page Description]": "Show whether premium model capacity is going to heavy work or to trivia. Tiers come from published list prices; this feed carries no per-call cost."
+  },
+  {
+    "[Page]": "Value",
+    "[Metric]": "Estimated time saved",
+    "[Description]": "Modeled activity volume multiplied by configured task/time assumptions, not directly measured time savings.",
+    "[Page Order]": 8,
+    "[Metric Order]": 700,
+    "[Page Description]": "Treat time and financial value as modeled scenarios based on explicit assumptions."
+  },
+  {
+    "[Page]": "Value",
+    "[Metric]": "Estimated value / ROI",
+    "[Description]": "Scenario estimates using configured time, labor-cost and license-cost assumptions. Results depend on coverage and valid denominators.",
+    "[Page Order]": 8,
+    "[Metric Order]": 701,
+    "[Page Description]": "Treat time and financial value as modeled scenarios based on explicit assumptions."
+  },
+  {
+    "[Page]": "Value",
+    "[Metric]": "Value context: tasks and sessions",
+    "[Description]": "Usage context for value estimates. Sessions are not multiplied into task-based value a second time.",
+    "[Page Order]": 8,
+    "[Metric Order]": 702,
+    "[Page Description]": "Treat time and financial value as modeled scenarios based on explicit assumptions."
+  },
+  {
+    "[Page]": "Value",
+    "[Metric]": "Hours: one consistent basis",
+    "[Description]": "Every hours measure reports the same quantity - the full human-equivalent time the delivered work would have taken a person. Per-week measures divide by the weeks in the selected period, not by the weeks a given category happened to appear in, so a breakdown always adds back to the page total.",
+    "[Page Order]": 8,
+    "[Metric Order]": 703,
+    "[Page Description]": "Treat time and financial value as modeled scenarios based on explicit assumptions."
+  },
+  {
+    "[Page]": "Value",
+    "[Metric]": "No discount factors",
+    "[Description]": "Earlier versions applied a 70% realisation factor to hours and a fixed 50% reinvestment factor to capacity. Both have been removed because neither was traceable to a cited source. Hours and value now report the full estimated human-equivalent effort, and any haircut you want to apply should be an explicit, stated assumption.",
+    "[Page Order]": 8,
+    "[Metric Order]": 704,
+    "[Page Description]": "Treat time and financial value as modeled scenarios based on explicit assumptions."
+  },
+  {
+    "[Page]": "Value",
+    "[Metric]": "AI Assisted Value basis",
+    "[Description]": "Full human-equivalent hours multiplied by the hourly value and penalty factor you set. No realisation or reinvestment haircut is applied, so the figure reflects what the delivered work would have cost at the rate supplied.",
+    "[Page Order]": 8,
+    "[Metric Order]": 705,
+    "[Page Description]": "Treat time and financial value as modeled scenarios based on explicit assumptions."
+  },
+  {
+    "[Page]": "Value",
+    "[Metric]": "Effort scenario",
+    "[Description]": "Hours are estimated from a researched band, not a single number. Conservative uses the low end of the band, Typical the midpoint and Optimistic the high end. The Effort scenario slicer on the Estimated Value page switches between them, and every hours and value measure moves with it. Typical is the default. The bands come from the Cowork time-savings methodology, whose primary source is a Microsoft Research difference-in-differences study of 72,186 users.",
+    "[Page Order]": 8,
+    "[Metric Order]": 706,
+    "[Page Description]": "Treat time and financial value as modeled scenarios based on explicit assumptions."
+  },
+  {
+    "[Page]": "Value",
+    "[Metric]": "Why some activities count more than once",
+    "[Description]": "A single prompt can appear as several rows in the audit log, one per file, page or record it touched. For activities where those rows were verified to be genuinely distinct material - web and enterprise search, file retrieval, document and data analysis, meeting prep, people lookup - effort scales with how much material was handled. For everything else, including general chat, the extra rows are grounding context rather than separate work, so effort is counted once per prompt. Scaling is calibrated to each activity's own average, so the organisation-wide total stays inside the researched band while heavier users are credited more than lighter ones.",
+    "[Page Order]": 8,
+    "[Metric Order]": 707,
+    "[Page Description]": "Treat time and financial value as modeled scenarios based on explicit assumptions."
+  },
+  {
+    "[Page]": "Value",
+    "[Metric]": "Work-pattern category",
+    "[Description]": "The parent grouping in the Value Table. The estate's 12-bucket, tool-agnostic taxonomy - Email, Data & Analysis, Document Creation, Collaboration & Workflows and so on. It is reached through the behaviour each row was classified as, which Cowork does not report: every Cowork row carries the feed's single fallback behaviour, so all of it previously grouped under General Chat & Q&A regardless of what the work actually was. Cowork is now placed by its own task category instead, using the material the prompt touched - mail items to Email, spreadsheets and data files to Data & Analysis, documents and decks to Document Creation, chat messages to Collaboration & Workflows. No new buckets were added. Cowork prompts that attach no typed material remain under General Chat & Q&A, because that is an absence of evidence rather than a category.",
+    "[Page Order]": 8,
+    "[Metric Order]": 708,
+    "[Page Description]": "Treat time and financial value as modeled scenarios based on explicit assumptions."
+  },
+  {
+    "[Page]": "Agent Health",
+    "[Metric]": "Registry records",
+    "[Description]": "Imported A365 registry rows after existing blank-Title-ID filtering and Title-ID deduplication, not an asserted tenant-wide total.",
+    "[Page Order]": 9,
+    "[Metric Order]": 800,
+    "[Page Description]": "Separate registry review evidence from audit adoption. Missing A365 telemetry cannot establish a healthy verdict."
+  },
+  {
+    "[Page]": "Agent Health",
+    "[Metric]": "Review queue",
+    "[Description]": "Explicit inventory review flags such as block/status, missing owner evidence or known broad sharing. A review flag is not a danger verdict.",
+    "[Page Order]": 9,
+    "[Metric Order]": 801,
+    "[Page Description]": "Separate registry review evidence from audit adoption. Missing A365 telemetry cannot establish a healthy verdict."
+  },
+  {
+    "[Page]": "Agent Health",
+    "[Metric]": "Unknown evidence",
+    "[Description]": "Insufficient available registry evidence; not zero risk or healthy.",
+    "[Page Order]": 9,
+    "[Metric Order]": 802,
+    "[Page Description]": "Separate registry review evidence from audit adoption. Missing A365 telemetry cannot establish a healthy verdict."
+  },
+  {
+    "[Page]": "Agent Health",
+    "[Metric]": "Owner coverage",
+    "[Description]": "Registry rows with creator identity or non-publisher-only owner evidence divided by registry rows in scope.",
+    "[Page Order]": 9,
+    "[Metric Order]": 803,
+    "[Page Description]": "Separate registry review evidence from audit adoption. Missing A365 telemetry cannot establish a healthy verdict."
+  },
+  {
+    "[Page]": "Agent Health",
+    "[Metric]": "Audit linkage",
+    "[Description]": "Audit sessions matched to nonblank registry Title IDs. Unmatched sessions remain in overall audit totals but are not assigned to a blank registry agent.",
+    "[Page Order]": 9,
+    "[Metric Order]": 804,
+    "[Page Description]": "Separate registry review evidence from audit adoption. Missing A365 telemetry cannot establish a healthy verdict."
+  },
+  {
+    "[Page]": "Agent Health",
+    "[Metric]": "Return rate",
+    "[Description]": "Observed agent users with at least two sessions divided by users with at least one session in the current context.",
+    "[Page Order]": 9,
+    "[Metric Order]": 805,
+    "[Page Description]": "Separate registry review evidence from audit adoption. Missing A365 telemetry cannot establish a healthy verdict."
+  },
+  {
+    "[Page]": "Agent Health",
+    "[Metric]": "Last observed activity",
+    "[Description]": "Latest qualifying audit activity, not the registry's Last updated date.",
+    "[Page Order]": 9,
+    "[Metric Order]": 806,
+    "[Page Description]": "Separate registry review evidence from audit adoption. Missing A365 telemetry cannot establish a healthy verdict."
+  },
+  {
+    "[Page]": "Agent Health",
+    "[Metric]": "Registry snapshot",
+    "[Description]": "Explicit snapshot evidence when supplied. Registry creation/update dates do not establish ingestion freshness.",
+    "[Page Order]": 9,
+    "[Metric Order]": 807,
+    "[Page Description]": "Separate registry review evidence from audit adoption. Missing A365 telemetry cannot establish a healthy verdict."
+  },
+  {
+    "[Page]": "Agent Health",
+    "[Metric]": "A365 telemetry coverage",
+    "[Description]": "Population varies by field. Blank capability flags, sessions, exception rate or risk fields remain unavailable, not false/zero.",
+    "[Page Order]": 9,
+    "[Metric Order]": 808,
+    "[Page Description]": "Separate registry review evidence from audit adoption. Missing A365 telemetry cannot establish a healthy verdict."
+  },
+  {
+    "[Page]": "Agent Health",
+    "[Metric]": "Observed in audit",
+    "[Description]": "Distinct registry agent names with at least one audit session matched on Title ID. Distinct from A365-supplied usage telemetry, which the ingestor populates for far fewer agents; a low count is a coverage statement, not proof agents are unused.",
+    "[Page Order]": 9,
+    "[Metric Order]": 809,
+    "[Page Description]": "Separate registry review evidence from audit adoption. Missing A365 telemetry cannot establish a healthy verdict."
+  },
+  {
+    "[Page]": "Agent Health",
+    "[Metric]": "Orgs reached",
+    "[Description]": "Distinct organisations whose users generated a matched session for the agent in the selected dates. Observed reach through the user-to-organisation link, not licensed or intended scope. Users with no organisation record are excluded rather than counted as an unknown organisation, so reach understates where organisation data is incomplete. Blank means no matched session, not zero reach.",
+    "[Page Order]": 9,
+    "[Metric Order]": 810,
+    "[Page Description]": "Separate registry review evidence from audit adoption. Missing A365 telemetry cannot establish a healthy verdict."
+  },
+  {
+    "[Page]": "Feedback",
+    "[Metric]": "Feedback coverage",
+    "[Description]": "Reported feedback is a selected response population, not every active user or session.",
+    "[Page Order]": 10,
+    "[Metric Order]": 900,
+    "[Page Description]": "Interpret feedback only for the responses and source coverage represented here."
+  },
+  {
+    "[Page]": "Feedback",
+    "[Metric]": "Sentiment",
+    "[Description]": "A reported or classified feedback signal; not proof of measured productivity or financial return.",
+    "[Page Order]": 10,
+    "[Metric Order]": 901,
+    "[Page Description]": "Interpret feedback only for the responses and source coverage represented here."
+  },
+  {
+    "[Page]": "Heatmap",
+    "[Metric]": "Selected metric",
+    "[Description]": "The same field parameter controls the matrix and headline, including the Sessions option.",
+    "[Page Order]": 11,
+    "[Metric Order]": 1000,
+    "[Page Description]": "Compare the selected metric across the existing date and organizational dimensions."
+  },
+  {
+    "[Page]": "Heatmap",
+    "[Metric]": "Heatmap shading",
+    "[Description]": "Relative intensity of the selected metric, not a universal good/bad threshold.",
+    "[Page Order]": 11,
+    "[Metric Order]": 1001,
+    "[Page Description]": "Compare the selected metric across the existing date and organizational dimensions."
+  },
+  {
+    "[Page]": "Heatmap",
+    "[Metric]": "Kinds of work per user",
+    "[Description]": "Average number of distinct task categories each person uses AI for. Counts Task Breakdown Category, not the raw feed behaviour - the feed gives every Cowork row one behaviour, which pinned this at exactly 1.0 for the Cowork cohort. Copilot and Agents are unaffected.",
+    "[Page Order]": 11,
+    "[Metric Order]": 1002,
+    "[Page Description]": "Compare the selected metric across the existing date and organizational dimensions."
+  },
+  {
+    "[Page]": "Leaderboard",
+    "[Metric]": "Absolute activity",
+    "[Description]": "Active users, prompt-row task proxy and observed sessions under the selected cohort.",
+    "[Page Order]": 12,
+    "[Metric Order]": 1100,
+    "[Page Description]": "Compare absolute adoption and per-user intensity without equating volume with performance."
+  },
+  {
+    "[Page]": "Leaderboard",
+    "[Metric]": "Per-user intensity",
+    "[Description]": "Sessions divided by the cohort's prompt-active users. Small populations can produce high averages.",
+    "[Page Order]": 12,
+    "[Metric Order]": 1101,
+    "[Page Description]": "Compare absolute adoption and per-user intensity without equating volume with performance."
+  },
+  {
+    "[Page]": "Leaderboard",
+    "[Metric]": "Cohort bookmarks",
+    "[Description]": "Overall, Licensed, Unlicensed, Agents and Cowork views; date and organization selections are retained when switching.",
+    "[Page Order]": 12,
+    "[Metric Order]": 1102,
+    "[Page Description]": "Compare absolute adoption and per-user intensity without equating volume with performance."
+  },
+  {
+    "[Page]": "Appendix: Glossary",
+    "[Metric]": "Source scope",
+    "[Description]": "This preview uses existing audit, organizational/license and A365 registry inputs. No ARG or Copilot Studio session/turn source was added.",
+    "[Page Order]": 13,
+    "[Metric Order]": 1200,
+    "[Page Description]": "Definitions for the pages actually present in this preview. Use the page and metric filters at the right."
+  },
+  {
+    "[Page]": "Appendix: Glossary",
+    "[Metric]": "Blank / unavailable",
+    "[Description]": "Insufficient qualifying data or an invalid denominator; never silently reinterpret as zero.",
+    "[Page Order]": 13,
+    "[Metric Order]": 1201,
+    "[Page Description]": "Definitions for the pages actually present in this preview. Use the page and metric filters at the right."
+  },
+  {
+    "[Page]": "Appendix: Signal - Impact Table",
+    "[Metric]": "Signal",
+    "[Description]": "Observed source activity with its original grain and coverage limitations.",
+    "[Page Order]": 14,
+    "[Metric Order]": 1300,
+    "[Page Description]": "Trace how observed signals become inferred behavior and modeled value."
+  },
+  {
+    "[Page]": "Appendix: Signal - Impact Table",
+    "[Metric]": "Behavior",
+    "[Description]": "An inferred classification of the signal, not independently verified task completion.",
+    "[Page Order]": 14,
+    "[Metric Order]": 1301,
+    "[Page Description]": "Trace how observed signals become inferred behavior and modeled value."
+  },
+  {
+    "[Page]": "Appendix: Signal - Impact Table",
+    "[Metric]": "Impact",
+    "[Description]": "A modeled interpretation based on assumptions; validate against business evidence before treating it as realized benefit.",
+    "[Page Order]": 14,
+    "[Metric Order]": 1302,
+    "[Page Description]": "Trace how observed signals become inferred behavior and modeled value."
+  },
+  {
+    "[Page]": "Appendix: Signal - Impact Table",
+    "[Metric]": "Which behavior field prices the work",
+    "[Description]": "Only Behavior_Enriched_Full is joined to the Behavior Value Map and Human Time Estimates, so it alone determines the minutes behind every hours and value figure. Behavior_Category and Behavior_Enriched are display groupings; they slice the same rows but do not set the baseline.",
+    "[Page Order]": 14,
+    "[Metric Order]": 1303,
+    "[Page Description]": "Trace how observed signals become inferred behavior and modeled value."
+  },
+  {
+    "[Page]": "Appendix: Signal - Impact Table",
+    "[Metric]": "Classification basis",
+    "[Description]": "Behavior is inferred largely from the host application rather than the action performed, so creation-heavy work is under-represented relative to summarising and review. Treat behavior mix as indicative, not as a measured task census.",
+    "[Page Order]": 14,
+    "[Metric Order]": 1304,
+    "[Page Description]": "Trace how observed signals become inferred behavior and modeled value."
+  }
+]
