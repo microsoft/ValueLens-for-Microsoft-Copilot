@@ -357,6 +357,7 @@ cost-consumption input.
 
 Reference:
 
+- [`Add Credit Consumption/`](Add%20Credit%20Consumption/) — *optional*, the separate Consumption Central report for Copilot credit consumption and cost
 - [`NOTICE.md`](NOTICE.md) — component-boundary guidance
 - [`source-map.json`](source-map.json) — required sources, optional sources, unsupported signals
 - [`/docs/DATA-DICTIONARY.md`](../docs/DATA-DICTIONARY.md) — the shared source contract

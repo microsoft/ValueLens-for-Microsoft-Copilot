@@ -138,7 +138,8 @@ class LicenseClassificationTests(unittest.TestCase):
                         exec(compile(code, "report-fetch", "exec"), namespace)
 
     def test_active_pbits_consume_flags_not_assigned_product_classifiers(self):
-        paths = [p for p in ROOT.rglob("*.pbit") if "archive" not in p.parts]
+        paths = [p for p in ROOT.rglob("*.pbit")
+                 if "archive" not in p.parts and "Add Credit Consumption" not in p.parts]
         self.assertEqual(len(paths), 5)
         # Keep the moved Studio template in the existing classifier checks.
         paths.append(

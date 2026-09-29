@@ -1,0 +1,43 @@
+Period,PeriodStart,PeriodEnd,Product,PoolName,Representation,Amount,Currency,Status,EvidenceType,Notes
+2026-05,2026-05-01,2026-05-31,Foundry Models,Foundry PAYG Pool,UsageEstimate,2004.16,USD,Variance within tolerance,Modelled from usage feed,Difference attributable to rounding and meter lag.
+2026-05,2026-05-01,2026-05-31,Foundry Models,Foundry PAYG Pool,AzureActual,2081.62,USD,Variance within tolerance,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-05,2026-05-01,2026-05-31,Foundry Models,Foundry PAYG Pool,FictionalEvidence,98.92,USD,Variance within tolerance,Credit memo,Azure consumption credit applied outside the usage feed.
+2026-05,2026-05-01,2026-05-31,Azure AI Speech,Foundry PAYG Pool,UsageEstimate,307.44,USD,Variance within tolerance,Modelled from usage feed,Difference attributable to rounding and meter lag.
+2026-05,2026-05-01,2026-05-31,Azure AI Speech,Foundry PAYG Pool,AzureActual,314.6,USD,Variance within tolerance,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-05,2026-05-01,2026-05-31,Azure AI Document Intelligence,Foundry PAYG Pool,UsageEstimate,366.74,USD,Unexplained variance,Modelled from usage feed,Investigate: usage feed may be missing meters for this pool.
+2026-05,2026-05-01,2026-05-31,Azure AI Document Intelligence,Foundry PAYG Pool,AzureActual,396.95,USD,Unexplained variance,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-05,2026-05-01,2026-05-31,Azure AI Vision,Foundry PAYG Pool,UsageEstimate,148.22,USD,Unexplained variance,Modelled from usage feed,Investigate: usage feed may be missing meters for this pool.
+2026-05,2026-05-01,2026-05-31,Azure AI Vision,Foundry PAYG Pool,AzureActual,158.47,USD,Unexplained variance,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-05,2026-05-01,2026-05-31,Foundry Models,Foundry Provisioned Pool,UsageEstimate,1048.44,USD,Reconciled,Modelled from usage feed,Usage estimate matches invoiced amount within 2%.
+2026-05,2026-05-01,2026-05-31,Foundry Models,Foundry Provisioned Pool,AzureActual,1060.77,USD,Reconciled,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-05,2026-05-01,2026-05-31,Foundry Models,Foundry Provisioned Pool,FictionalEvidence,56.65,USD,Reconciled,Credit memo,Azure consumption credit applied outside the usage feed.
+2026-05,2026-05-01,2026-05-31,Azure AI Search,Foundry Provisioned Pool,UsageEstimate,189.85,USD,Variance within tolerance,Modelled from usage feed,Difference attributable to rounding and meter lag.
+2026-05,2026-05-01,2026-05-31,Azure AI Search,Foundry Provisioned Pool,AzureActual,183.28,USD,Variance within tolerance,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-06,2026-06-01,2026-06-30,Foundry Models,Foundry PAYG Pool,UsageEstimate,2833.8,USD,Reconciled,Modelled from usage feed,Usage estimate matches invoiced amount within 2%.
+2026-06,2026-06-01,2026-06-30,Foundry Models,Foundry PAYG Pool,AzureActual,2887.8,USD,Reconciled,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-06,2026-06-01,2026-06-30,Foundry Models,Foundry PAYG Pool,FictionalEvidence,160.54,USD,Reconciled,Credit memo,Azure consumption credit applied outside the usage feed.
+2026-06,2026-06-01,2026-06-30,Azure AI Speech,Foundry PAYG Pool,UsageEstimate,326.99,USD,Unexplained variance,Modelled from usage feed,Investigate: usage feed may be missing meters for this pool.
+2026-06,2026-06-01,2026-06-30,Azure AI Speech,Foundry PAYG Pool,AzureActual,353.5,USD,Unexplained variance,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-06,2026-06-01,2026-06-30,Azure AI Document Intelligence,Foundry PAYG Pool,UsageEstimate,496.88,USD,Reconciled,Modelled from usage feed,Usage estimate matches invoiced amount within 2%.
+2026-06,2026-06-01,2026-06-30,Azure AI Document Intelligence,Foundry PAYG Pool,AzureActual,503.67,USD,Reconciled,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-06,2026-06-01,2026-06-30,Azure AI Vision,Foundry PAYG Pool,UsageEstimate,249.61,USD,Variance within tolerance,Modelled from usage feed,Difference attributable to rounding and meter lag.
+2026-06,2026-06-01,2026-06-30,Azure AI Vision,Foundry PAYG Pool,AzureActual,240.54,USD,Variance within tolerance,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-06,2026-06-01,2026-06-30,Foundry Models,Foundry Provisioned Pool,UsageEstimate,1343.2,USD,Variance within tolerance,Modelled from usage feed,Difference attributable to rounding and meter lag.
+2026-06,2026-06-01,2026-06-30,Foundry Models,Foundry Provisioned Pool,AzureActual,1392.82,USD,Variance within tolerance,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-06,2026-06-01,2026-06-30,Foundry Models,Foundry Provisioned Pool,FictionalEvidence,80.64,USD,Variance within tolerance,Credit memo,Azure consumption credit applied outside the usage feed.
+2026-06,2026-06-01,2026-06-30,Azure AI Search,Foundry Provisioned Pool,UsageEstimate,203.48,USD,Variance within tolerance,Modelled from usage feed,Difference attributable to rounding and meter lag.
+2026-06,2026-06-01,2026-06-30,Azure AI Search,Foundry Provisioned Pool,AzureActual,209.11,USD,Variance within tolerance,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-07,2026-07-01,2026-07-31,Foundry Models,Foundry PAYG Pool,UsageEstimate,3485.22,USD,Reconciled,Modelled from usage feed,Usage estimate matches invoiced amount within 2%.
+2026-07,2026-07-01,2026-07-31,Foundry Models,Foundry PAYG Pool,AzureActual,3454.96,USD,Reconciled,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-07,2026-07-01,2026-07-31,Foundry Models,Foundry PAYG Pool,FictionalEvidence,204.31,USD,Reconciled,Credit memo,Azure consumption credit applied outside the usage feed.
+2026-07,2026-07-01,2026-07-31,Azure AI Speech,Foundry PAYG Pool,UsageEstimate,553.98,USD,Reconciled,Modelled from usage feed,Usage estimate matches invoiced amount within 2%.
+2026-07,2026-07-01,2026-07-31,Azure AI Speech,Foundry PAYG Pool,AzureActual,552.15,USD,Reconciled,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-07,2026-07-01,2026-07-31,Azure AI Document Intelligence,Foundry PAYG Pool,UsageEstimate,578.35,USD,Variance within tolerance,Modelled from usage feed,Difference attributable to rounding and meter lag.
+2026-07,2026-07-01,2026-07-31,Azure AI Document Intelligence,Foundry PAYG Pool,AzureActual,592.37,USD,Variance within tolerance,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-07,2026-07-01,2026-07-31,Azure AI Vision,Foundry PAYG Pool,UsageEstimate,288.4,USD,Variance within tolerance,Modelled from usage feed,Difference attributable to rounding and meter lag.
+2026-07,2026-07-01,2026-07-31,Azure AI Vision,Foundry PAYG Pool,AzureActual,306.29,USD,Variance within tolerance,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-07,2026-07-01,2026-07-31,Foundry Models,Foundry Provisioned Pool,UsageEstimate,2004.38,USD,Reconciled,Modelled from usage feed,Usage estimate matches invoiced amount within 2%.
+2026-07,2026-07-01,2026-07-31,Foundry Models,Foundry Provisioned Pool,AzureActual,2035.06,USD,Reconciled,Cost Management export,Invoiced amount from Azure Cost Management.
+2026-07,2026-07-01,2026-07-31,Foundry Models,Foundry Provisioned Pool,FictionalEvidence,102.49,USD,Reconciled,Credit memo,Azure consumption credit applied outside the usage feed.
+2026-07,2026-07-01,2026-07-31,Azure AI Search,Foundry Provisioned Pool,UsageEstimate,264.39,USD,Variance within tolerance,Modelled from usage feed,Difference attributable to rounding and meter lag.
+2026-07,2026-07-01,2026-07-31,Azure AI Search,Foundry Provisioned Pool,AzureActual,274.08,USD,Variance within tolerance,Cost Management export,Invoiced amount from Azure Cost Management.

@@ -29,6 +29,7 @@ lands — *before* you spend any effort on exports or automation.
 | `ValueLens - Local CSV.pbit` | The dashboard template. Parameters take **local file paths**. |
 | [`sample-data/`](sample-data/) | Fabricated dataset + the generator that produced it. |
 | [`scripts/`](scripts/) | The processor that turns a raw Purview export into what the template reads, plus org-data helpers. |
+| [`Add Credit Consumption/`](Add%20Credit%20Consumption/) | *Optional.* The separate Consumption Central report for Copilot credit consumption and cost. |
 
 > **The template reads *processed* CSVs, not a raw Purview export.** 55 of the 56 columns it needs
 > don't exist in the raw audit log — they're produced by the processor in

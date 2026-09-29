@@ -15,6 +15,28 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-09-29 — optional Add Credit Consumption add-on
+
+Each path folder now has an optional `Add Credit Consumption/` folder holding
+**Consumption Central**, a separate Power BI report for Copilot credit consumption and cost
+across Cowork / Work IQ, Copilot Studio, GitHub Copilot and Azure AI Foundry. The ValueLens
+templates are unchanged and don't read it.
+
+- **1. Local CSV** — the Local CSV template, `pull_azure_ai.py` and the shared synthetic sample
+  data.
+- **2. SharePoint** — the Viva Direct template, which reads Cowork data straight from Viva
+  Insights. Consumption Central has no SharePoint template.
+- **3. Fabric** — the Fabric template, seven ingestion notebooks, `seed_sample_data.py` and the
+  data dictionary. It can share the ValueLens Lakehouse; no table names overlap.
+- **4. Power Automate + Dataverse** — the Dataverse template, flow package, schema deploy script
+  and permissions. Tables use the `cc_` prefix, so they sit beside ValueLens's `poc_` tables.
+
+Copied from `microsoft/ConsumptionCentral-for-Microsoft-Copilot` at commit `24b0ca8`. The only
+change to the templates is the example addresses in the `SecurityFilter` table, which now use the
+fictional `contoso-health.com` domain. Links to the full documentation point at that repository.
+
+---
+
 ## 2026-09-29 — fuller sample data
 
 The Local CSV sample now fills every page, so a first look shows what each page does on a

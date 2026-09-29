@@ -87,6 +87,11 @@ automating — *before* you set up any automation. Move to 2 or 3 when you want 
 > [Dataverse companion repo ↗](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio), which
 > reads them natively — no Fabric or SharePoint needed.
 
+> 💳 **Want credit consumption and cost too?** Every path folder has an optional
+> **`Add Credit Consumption/`** add-on: the separate **Consumption Central** report for Cowork /
+> Work IQ, Copilot Studio, GitHub Copilot and Azure AI Foundry spend. Start with the
+> [Local CSV add-on](1.%20Local%20CSV/Add%20Credit%20Consumption/) and its sample data.
+
 > Each path folder has its **own README** with the exact, step‑by‑step setup. This page is just the
 > map.
 
@@ -104,6 +109,7 @@ docs/              DATA-DICTIONARY.md  ·  PERMISSIONS.md   ← cross-path refer
      archive/extended/  archived Copilot Studio add-on reference (core notebook mirrors still synchronized)
      archive/flows/     archived cost-consumption flows and guides, not active setup
 4. Power Automate + Dataverse/  Power Automate + Dataverse.pbit  ·  scripts/  ·  source-map.json
+*/Add Credit Consumption/  optional Consumption Central cost report, one per path
 archive/           superseded versions — kept for reference, not maintained
 tests/             offline pytest regressions, run in CI by .github/workflows/tests.yml
 
@@ -134,8 +140,7 @@ Availability varies by deployment path. Use the path README for the maintained s
 | Licensed users | ✅ Core | Microsoft 365 Admin Center / Graph; path 4 publishes curated users to Dataverse |
 | Org data (department / function) | ✅ Core | Microsoft Entra / BYOD equivalent |
 | Agents 365 | ⬜ Optional | Graph Agent 365 registry — Fabric notebook, or [`Get-Agents365Registry.ps1`](2.%20SharePoint/scripts/Get-Agents365Registry.ps1) on every other path (same 48 columns) |
-| Cowork / Work IQ consumption | Not read by the templates | Microsoft 365 Admin Center export; the Credit Meter page was retired. [Archived landing-flow reference](3.%20Fabric/archive/flows/COST-CONSUMPTION.md) only |
-| Credit consumption (billing) | Archived reference only | Power Platform Admin Center export → [archived Fabric + Copilot Studio add-on](3.%20Fabric/archive/extended/) |
+| Copilot credit consumption & cost | ⬜ Optional, separate report | Cowork / Work IQ, Copilot Studio, GitHub Copilot and Azure AI Foundry → the **Consumption Central** report in each path's `Add Credit Consumption/` folder. Not read by the ValueLens templates |
 | Product feedback | ⬜ Optional | M365 Admin Center → Health → Product Feedback export (Fabric table, or the `Feedback File` parameter on the other paths) |
 | Copilot Studio agent transcripts | ⬜ Optional | Dataverse `ConversationTranscript` table — use the [Dataverse companion repo ↗](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio) |
 
