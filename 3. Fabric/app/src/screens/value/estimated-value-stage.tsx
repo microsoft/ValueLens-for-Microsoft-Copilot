@@ -7,7 +7,6 @@
 
 import { useMemo, useState, type KeyboardEvent } from "react";
 import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
-import { VegaVisual } from "@microsoft/fabric-visuals";
 import { stageAnchor } from "@/components/destinations";
 import { KpiCard } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
@@ -16,7 +15,7 @@ import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
-import { gridHeight, rowChartHeight } from "@/lib/chart-height";
+import { gridHeight } from "@/lib/chart-height";
 import { treatAs } from "@/lib/dax-filters";
 import { formatKpi } from "@/lib/format-kpi";
 import { withOrgAttribute } from "@/lib/org-attribute";
@@ -27,9 +26,9 @@ import {
     AGENT_NAME_COLUMN,
     organizationValue,
     ORGANIZATION_COLUMN,
-    valueByTaskGroup,
     valueSummary,
 } from "@/queries/value";
+import { TaskValueBreakdown } from "./task-value-breakdown";
 
 type Scenario = "Conservative" | "Typical" | "Optimistic";
 
@@ -81,11 +80,6 @@ export function EstimatedValueStage() {
 
     const summary = valueSummary();
     const summaryResult = useFilteredQuery({ connection: summary.connection, query: summary.query }, { extra });
-    const taskGroups = valueByTaskGroup();
-    const taskGroupResult = useFilteredQuery(
-        { connection: taskGroups.connection, query: taskGroups.query },
-        { extra },
-    );
     const agents = agentValue();
     const agentResult = useFilteredQuery({ connection: agents.connection, query: agents.query }, { extra });
     const organizations = useMemo(() => withOrgAttribute(organizationValue(), org), [org]);
@@ -97,13 +91,6 @@ export function EstimatedValueStage() {
     const summaryRow = useMemo(
         () => (summaryResult.data?.status === "success" ? toSummaryRow(summaryResult.data.table) : undefined),
         [summaryResult.data],
-    );
-    const taskGroupTable = useMemo(
-        () =>
-            taskGroupResult.data?.status === "success"
-                ? toDataTable(taskGroupResult.data.table, taskGroups.columnMetadata)
-                : undefined,
-        [taskGroupResult.data, taskGroups.columnMetadata],
     );
     const agentTable = useMemo(
         () =>
@@ -287,36 +274,7 @@ export function EstimatedValueStage() {
                 {assumption}
             </p>
 
-            <div
-                className="h-[380px]"
-                style={taskGroupTable ? { height: rowChartHeight(taskGroupTable.rows.length, { perRow: 40, chrome: 100 }) } : undefined}
-            >
-                {taskGroupResult.data?.status === "error" ? (
-                    <QueryError
-                        className="h-full"
-                        message={taskGroupResult.data.error.message}
-                        onRetry={taskGroupResult.refetch}
-                    />
-                ) : taskGroupResult.isLoading || !taskGroupTable ? (
-                    <QueryLoading className="h-full" />
-                ) : taskGroupTable.rows.length === 0 ? (
-                    <QueryEmpty
-                        className="h-full"
-                        title="No value to break down"
-                        description="No recorded work carries both a task group and an estimated value for this slice."
-                    />
-                ) : (
-                    <VegaVisual
-                        spec={taskGroups.vegaLiteSpec}
-                        data={taskGroupTable}
-                        theme={theme}
-                        header={{
-                            title: "Where the value comes from",
-                            subtitle: `Estimated value by task group, ${assumption.toLowerCase()}`,
-                        }}
-                    />
-                )}
-            </div>
+            <TaskValueBreakdown extra={extra} currencySymbol={currencySymbol} assumption={assumption} />
 
             <div className="grid gap-300 xl:grid-cols-2">
                 <div className="flex h-[520px] flex-col" style={tablesHeight ? { height: tablesHeight } : undefined}>

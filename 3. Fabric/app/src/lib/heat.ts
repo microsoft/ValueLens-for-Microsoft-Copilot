@@ -5,9 +5,10 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import type { CSSProperties, ReactNode } from "react";
+import { createElement, type ReactNode } from "react";
 import type { CellValue, Row } from "@microsoft/fabric-datagrid";
 import { formatValue, type DataTable } from "@microsoft/fabric-visuals-core";
+import { HeatCell } from "@/components/heat-cell";
 
 /**
  * Quiet heat shading for the one or two grid columns that carry what a table
@@ -76,24 +77,6 @@ export function heatMix(value: unknown, domain: HeatDomain | undefined): number 
     return Math.round(HEAT_MIX_MIN + t * (HEAT_MIX_MAX - HEAT_MIX_MIN));
 }
 
-export interface HeatCellProps {
-    mix: number | undefined;
-    /** Any CSS colour; defaults to the destination brand colour. */
-    color?: string;
-    children: ReactNode;
-}
-
-/** A cell body whose tint fills the grid cell (see `.vl-heat` in global.css). */
-export function HeatCell({ mix, color, children }: HeatCellProps) {
-    if (mix === undefined) return <>{children}</>;
-    const style = { "--heat-mix": `${mix}%`, ...(color ? { "--heat-color": color } : {}) } as CSSProperties;
-    return (
-        <span className="vl-heat" data-heat={mix} style={style}>
-            {children}
-        </span>
-    );
-}
-
 type HeatFormat = string | ((value: unknown, row: Row) => ReactNode);
 
 export interface HeatRendererOptions {
@@ -115,11 +98,7 @@ function render(format: HeatFormat | undefined, value: unknown, row: Row): React
 export function heatRenderer(options: HeatRendererOptions): (value: CellValue, row: Row) => ReactNode {
     return (value, row) => {
         const domain = typeof options.domain === "function" ? options.domain(row) : options.domain;
-        return (
-            <HeatCell mix={heatMix(value, domain)} color={options.color}>
-                {render(options.format, value, row)}
-            </HeatCell>
-        );
+        return createElement(HeatCell, { mix: heatMix(value, domain), color: options.color }, render(options.format, value, row));
     };
 }
 

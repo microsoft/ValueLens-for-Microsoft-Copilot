@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import type { Row } from "@microsoft/fabric-datagrid";
-import type { VisualizationSpec } from "@microsoft/fabric-visuals";
+import type { VegaVisualCapabilities, VisualizationSpec } from "@microsoft/fabric-visuals";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import type { ColumnMetadataMap } from "@/lib/to-data-table";
 import { connection, FORMAT_HOURS, FORMAT_PERCENT, FORMAT_WHOLE } from "../shared";
@@ -23,6 +23,13 @@ const GROUP_TOTAL_FLAG = "Is Group Total";
 
 /** The grid's first column: the category on group rows, the task on leaf rows. */
 export const TASK_LABEL_COLUMN = "Task";
+
+// Every task stays on screen (16 on the demo model, past the default scroll
+// threshold of 15) and every category name stays whole in the legend.
+const capabilities: VegaVisualCapabilities = {
+    disableCategoricalScroll: true,
+    disableLegendTruncation: true,
+};
 
 const columnMetadata: ColumnMetadataMap = {
     "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": {
@@ -58,7 +65,7 @@ const columnMetadata: ColumnMetadataMap = {
  * disagree with the report.
  */
 export function valueByTask() {
-    return { connection, query, columnMetadata, vegaLiteSpec: spec as VisualizationSpec };
+    return { connection, query, columnMetadata, capabilities, vegaLiteSpec: spec as VisualizationSpec };
 }
 
 export interface ValueTaskTree {

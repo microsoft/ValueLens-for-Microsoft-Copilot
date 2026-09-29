@@ -14,6 +14,7 @@
     "x": {
       "field": "Expert Equivalent Hours Per Week",
       "type": "quantitative",
+      "stack": null,
       "title": "Expert-equivalent hours per week",
       "axis": { "labelExpr": "format(datum.value, ',.0f')" }
     },
@@ -21,7 +22,7 @@
       "field": "Chat + Agent Interactions (Audit Logs)Task Breakdown Group",
       "type": "nominal",
       "title": "Category",
-      "legend": { "orient": "top", "direction": "horizontal", "symbolLimit": 20, "columns": 4 }
+      "legend": { "orient": "top", "direction": "horizontal", "symbolLimit": 20, "columns": 3, "labelLimit": 260 }
     },
     "tooltip": [
       { "field": "Chat + Agent Interactions (Audit Logs)Task Breakdown Category", "type": "nominal", "title": "Task" },

@@ -410,13 +410,14 @@ body,
   height: 100%;
 }
 
-/* Heat shading for grid cells (lib/heat.tsx). The tint has to fill the whole
-   cell, but a cell renderer only owns the content, so the span paints its own
-   box and an outer shadow the grid cell's `overflow: hidden` clips to the
-   cell edge. The two never overlap: an outer shadow is not drawn under its
-   own box. */
+/* Heat shading for grid cells (lib/heat.ts, components/heat-cell.tsx). The
+   tint has to fill the whole cell, but a cell renderer only owns the content,
+   so the span paints its own box and an outer shadow the grid cell's
+   `overflow: hidden` clips to the cell edge. The tint is mixed into the card
+   colour rather than into transparent: two translucent layers meeting on a
+   sub-pixel edge leave a visible seam, two opaque ones do not. */
 .vl-heat {
-  --heat-tint: color-mix(in srgb, var(--heat-color, var(--color-brand)) var(--heat-mix, 0%), transparent);
+  --heat-tint: color-mix(in srgb, var(--heat-color, var(--color-brand)) var(--heat-mix, 0%), var(--color-card));
   display: block;
   background-color: var(--heat-tint);
   box-shadow: 0 0 0 100vmax var(--heat-tint);
