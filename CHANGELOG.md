@@ -37,6 +37,26 @@ fictional `contoso-health.com` domain. Links to the full documentation point at 
 
 ---
 
+## 2026-09-29 — fuller sample data
+
+The Local CSV sample now fills every page, so a first look shows what each page does on a
+real estate rather than a thin version of it. Before this, about a third of the report's
+visuals came up empty or thin on the sample.
+
+- **Bigger, longer, deeper.** 13,337 interaction rows (3,716 sessions) across three full months,
+  170 people in 14 organisations with a management hierarchy, a 104-agent registry and 1,215
+  feedback rows over 15 months.
+- **Every page populated.** All four habit bands, dormant and never-used licences, all eight
+  Cowork work shapes, Model Fit's Over-specified and Under-specified sessions, every Agent
+  Registry lifecycle state, and 11 feedback types.
+- **Still synthetic by construction.** `Build-SampleData.py` generates every value from a fixed
+  seed. Its proportions were tuned against aggregate counts from real deployments; no rows or
+  values were copied. People are invented `first.last@contoso-demo.com` names.
+- **New generator options.** `--end`, `--months`, `--users` and `--unlicensed-agent-share`, and
+  a coverage report after each run. `--days` is gone; use `--months`.
+
+---
+
 ## 2026-09-29 — gentler, adjustable fit grading
 
 Feedback on Cowork Fit was that it read as too critical (about half of graded Cowork sessions
