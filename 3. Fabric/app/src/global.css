@@ -10,59 +10,59 @@
    `useCssTheme()` and project them into a JS theme object (Vega's SVG output
    cannot resolve `var()` references). */
 @theme static {
-  --color-brand:            #5333ed;  /* bar/area fills, button-like brand surfaces */
-  --color-brand-foreground: #4526d4;  /* line/point marks, branded text & emphasis */
-  --color-hover:            #f2efec;  /* row/cell hover surface in DataGrid + visuals */
+  --color-brand:            #0f6cbd;  /* bar/area fills, button-like brand surfaces */
+  --color-brand-foreground: #115ea3;  /* line/point marks, branded text & emphasis */
+  --color-hover:            #f5f5f5;  /* row/cell hover surface in DataGrid + visuals */
 
-  /* Categorical data palette — "ink & signal".
-     Violet lead with warm and cool counterweights so donuts, treemaps and
-     stacked bars stay separable at small sizes. */
-  --color-data-1:  #5333ed;
-  --color-data-2:  #0d8f86;
-  --color-data-3:  #d4791c;
-  --color-data-4:  #c2415a;
-  --color-data-5:  #3b6fd4;
-  --color-data-6:  #7a9434;
-  --color-data-7:  #9b6cf7;
-  --color-data-8:  #a4510b;
-  --color-data-9:  #21867a;
-  --color-data-10: #6b7280;
+  /* Categorical data palette — Fluent 2.
+     Microsoft blue leads; the rest are muted enough to sit together in a
+     stacked bar without any one of them shouting. */
+  --color-data-1:  #0f6cbd;
+  --color-data-2:  #0e7c7b;
+  --color-data-3:  #8f7200;
+  --color-data-4:  #a4262c;
+  --color-data-5:  #8764b8;
+  --color-data-6:  #107c10;
+  --color-data-7:  #4f6bed;
+  --color-data-8:  #c36bb1;
+  --color-data-9:  #6e7a89;
+  --color-data-10: #616161;
 }
 
 @theme {
   /* Color tokens — light theme
      Usage: bg-*, text-*, border-* (e.g. bg-primary text-primary-foreground)
      Each token has a -foreground pair for text on that surface. */
-  --color-background: #fbfaf9;                                       /* page background */
-  --color-foreground: #1a1917;                                       /* default text */
+  --color-background: #fafafa;                                       /* page background */
+  --color-foreground: #242424;                                       /* default text */
 
   --color-card: #ffffff;                                             /* card surfaces */
-  --color-card-foreground: #1a1917;
+  --color-card-foreground: #242424;
 
   --color-popover: #ffffff;                                          /* popover/dropdown surfaces */
-  --color-popover-foreground: #1a1917;
+  --color-popover-foreground: #242424;
 
-  --color-primary: #5333ed;                                          /* primary actions & buttons */
+  --color-primary: #0f6cbd;                                          /* primary actions & buttons */
   --color-primary-foreground: #ffffff;
 
-  --color-secondary: #f2efec;                                        /* secondary actions */
-  --color-secondary-foreground: #1a1917;
+  --color-secondary: #f5f5f5;                                        /* secondary actions */
+  --color-secondary-foreground: #242424;
 
-  --color-muted: #f2efec;                                            /* subtle backgrounds */
-  --color-muted-foreground: #6b665f;                                 /* subdued text */
+  --color-muted: #f5f5f5;                                            /* subtle backgrounds */
+  --color-muted-foreground: #616161;                                 /* subdued text */
 
-  --color-accent: #ece7f9;                                           /* accent highlights */
-  --color-accent-foreground: #3a20b5;
+  --color-accent: #ebf3fc;                                           /* accent highlights */
+  --color-accent-foreground: #115ea3;
 
-  --color-destructive: #b3261e;                                      /* errors & destructive actions */
+  --color-destructive: #c50f1f;                                      /* errors & destructive actions */
   --color-destructive-foreground: #ffffff;
 
-  --color-success: #1d6f42;                                          /* success surfaces */
+  --color-success: #0e700e;                                          /* success surfaces */
   --color-success-foreground: #ffffff;
 
-  --color-border: #e4e0da;                                           /* default border */
-  --color-input: #e4e0da;                                            /* input field borders */
-  --color-ring: #5333ed;                                             /* focus rings */
+  --color-border: #e0e0e0;                                           /* default border */
+  --color-input: #e0e0e0;                                            /* input field borders */
+  --color-ring: #0f6cbd;                                             /* focus rings */
 
   /* Elevation shadows — Fluent UI v9 ramp, keyed by resting elevation in px.
      Usage: shadow-* (e.g. shadow-8, shadow-64) */
@@ -134,15 +134,16 @@
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
-  /* Font Families
+  /* Font Families — the Windows/M365 system stack, so the app matches its host
+     and needs no webfont download.
      Usage: font-* (e.g. font-heading, font-base) */
-  --font-heading: 'Instrument Serif', 'Iowan Old Style', Georgia,    /* headings, titles, display text */
-    'Times New Roman', serif;
-  --font-base: 'Instrument Sans', 'Segoe UI',                        /* body text, labels, UI controls */
-    -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-  --font-monospace: 'IBM Plex Mono', Consolas, 'Courier New', monospace; /* code, pre-formatted text */
-  --font-numeric: 'IBM Plex Mono', Consolas,                         /* KPI values, numeric displays */
-    'Courier New', monospace;
+  --font-heading: 'Segoe UI Variable', 'Segoe UI',                   /* headings and titles */
+    -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+  --font-base: 'Segoe UI Variable', 'Segoe UI',                      /* body text, labels, UI controls */
+    -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+  --font-monospace: Consolas, 'Cascadia Mono', 'Courier New', monospace; /* code, pre-formatted text */
+  --font-numeric: 'Segoe UI Variable', 'Segoe UI',                   /* KPI values, numeric displays */
+    -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
 
   /* Icon Sizes — 100-based scale
      Usage: icon-size-* custom utility (e.g. icon-size-200) */
@@ -163,53 +164,53 @@
 @layer base {
   .dark {
     /* Color tokens — dark theme */
-    --color-background: #16151a;
-    --color-foreground: #f5f3ef;
+    --color-background: #1f1f1f;
+    --color-foreground: #ffffff;
 
-    --color-card: #1d1c23;
-    --color-card-foreground: #f5f3ef;
+    --color-card: #292929;
+    --color-card-foreground: #ffffff;
 
-    --color-popover: #1d1c23;
-    --color-popover-foreground: #f5f3ef;
+    --color-popover: #292929;
+    --color-popover-foreground: #ffffff;
 
-    --color-primary: #9b8afb;
-    --color-primary-foreground: #17142b;
+    --color-primary: #479ef5;
+    --color-primary-foreground: #1f1f1f;
 
-    --color-secondary: #26242e;
-    --color-secondary-foreground: #f5f3ef;
+    --color-secondary: #333333;
+    --color-secondary-foreground: #ffffff;
 
-    --color-muted: #26242e;
-    --color-muted-foreground: #a09aad;
+    --color-muted: #333333;
+    --color-muted-foreground: #adadad;
 
-    --color-accent: #2e2843;
-    --color-accent-foreground: #c9bdff;
+    --color-accent: #10375c;
+    --color-accent-foreground: #9bcaff;
 
-    --color-destructive: #f2777f;
-    --color-destructive-foreground: #2a1214;
+    --color-destructive: #f1707b;
+    --color-destructive-foreground: #1f1f1f;
 
-    --color-success: #5cc98d;
-    --color-success-foreground: #0d2418;
+    --color-success: #54b054;
+    --color-success-foreground: #1f1f1f;
 
-    --color-border: #322f3b;
-    --color-input: #322f3b;
-    --color-ring: #9b8afb;
+    --color-border: #3d3d3d;
+    --color-input: #3d3d3d;
+    --color-ring: #479ef5;
 
-    --color-brand:            #7d63f7;
-    --color-brand-foreground: #9b8afb;
-    --color-hover:            #26242e;
+    --color-brand:            #479ef5;
+    --color-brand-foreground: #62abf5;
+    --color-hover:            #333333;
 
     /* Categorical data palette — dark. Lifted value and lowered chroma so
-       marks read against #16151a without vibrating. */
-    --color-data-1:  #9b8afb;
-    --color-data-2:  #3fbfb0;
-    --color-data-3:  #e8a65a;
-    --color-data-4:  #ee7f92;
-    --color-data-5:  #6fa3f2;
-    --color-data-6:  #a8c063;
-    --color-data-7:  #c3aefd;
-    --color-data-8:  #d98b4e;
-    --color-data-9:  #5fd0c0;
-    --color-data-10: #9a95a5;
+       marks read against #1f1f1f without vibrating. */
+    --color-data-1:  #479ef5;
+    --color-data-2:  #4bc0b8;
+    --color-data-3:  #d9b400;
+    --color-data-4:  #f1707b;
+    --color-data-5:  #b4a0e3;
+    --color-data-6:  #54b054;
+    --color-data-7:  #7a8cf2;
+    --color-data-8:  #e0a3d0;
+    --color-data-9:  #9ba7b4;
+    --color-data-10: #adadad;
   }
 }
 

@@ -32,7 +32,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                 className="flex w-[248px] shrink-0 flex-col gap-500 border-r border-border bg-card px-400 py-500"
             >
                 <div className="flex flex-col gap-100 px-200">
-                    <span className="font-heading text-[length:var(--text-600)] leading-600">ValueLens</span>
+                    <span className="text-[length:var(--text-500)] leading-500 font-semibold">ValueLens</span>
                     <span className="text-[length:var(--text-200)] leading-200 text-muted-foreground">
                         for Microsoft Copilot
                     </span>
@@ -60,7 +60,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                                 >
                                     <Icon className="icon-size-200 shrink-0" aria-hidden="true" />
                                     <span className="flex flex-col">
-                                        <span className="text-[length:var(--text-300)] leading-300 font-medium">
+                                        <span className={cn("text-[length:var(--text-300)] leading-300", isActive && "font-semibold")}>
                                             {destination.label}
                                         </span>
                                         <span className="text-[length:var(--text-100)] leading-100 opacity-70">
@@ -92,10 +92,10 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                 <div className="mx-auto flex max-w-[1400px] flex-col gap-700 px-700 py-600">
                     {current && (
                         <header className="flex flex-col gap-100">
-                            <h1 className="font-heading text-[length:var(--text-hero-800)] leading-hero-800">
+                            <h1 className="text-[length:var(--text-hero-700)] leading-hero-700 font-semibold">
                                 {current.label}
                             </h1>
-                            <p className="text-[length:var(--text-400)] leading-400 text-muted-foreground">
+                            <p className="text-[length:var(--text-300)] leading-300 text-muted-foreground">
                                 {current.blurb}
                             </p>
                         </header>

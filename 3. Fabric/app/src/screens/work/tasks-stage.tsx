@@ -108,7 +108,7 @@ export function TasksStage() {
             )}
 
             {topOutcome && (
-                <p className="border-l-2 border-primary pl-400 font-heading text-[length:var(--text-500)] leading-500 text-foreground">
+                <p className="border-l-2 border-primary pl-400 text-[length:var(--text-400)] leading-400 text-foreground">
                     The benefit people report most often is {topOutcome.toLowerCase()}.
                 </p>
             )}

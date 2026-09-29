@@ -17,7 +17,7 @@ export function QueryLoading({ className }: QueryStateProps) {
         <div
             role="status"
             aria-live="polite"
-            className={cn("flex min-h-[160px] flex-col justify-end gap-300 rounded-md border border-border bg-card p-400", className)}
+            className={cn("flex min-h-[160px] flex-col justify-end gap-300 rounded-xl border border-border bg-card p-500", className)}
         >
             <span className="sr-only">Loading</span>
             <div className="h-200 w-1/3 animate-pulse rounded-sm bg-muted" aria-hidden="true" />
@@ -38,11 +38,11 @@ export function QueryEmpty({ title, description, className }: QueryEmptyProps) {
     return (
         <div
             className={cn(
-                "flex min-h-[160px] flex-col justify-center gap-200 rounded-md border border-dashed border-border bg-card p-500",
+                "flex min-h-[160px] flex-col justify-center gap-200 rounded-xl border border-dashed border-border bg-card p-500",
                 className,
             )}
         >
-            <span className="font-heading text-[length:var(--text-500)] leading-500 text-foreground">{title}</span>
+            <span className="text-[length:var(--text-400)] leading-400 font-semibold text-foreground">{title}</span>
             <p className="max-w-[60ch] text-[length:var(--text-300)] leading-300 text-muted-foreground">
                 {description}
             </p>
@@ -62,11 +62,11 @@ export function QueryError({ message, onRetry, className }: QueryErrorProps) {
         <div
             role="alert"
             className={cn(
-                "flex min-h-[160px] flex-col justify-center gap-300 rounded-md border border-destructive/40 bg-card p-500",
+                "flex min-h-[160px] flex-col justify-center gap-300 rounded-xl border border-destructive/40 bg-card p-500",
                 className,
             )}
         >
-            <span className="font-heading text-[length:var(--text-500)] leading-500 text-destructive">
+            <span className="text-[length:var(--text-400)] leading-400 font-semibold text-destructive">
                 This didn't load
             </span>
             <p className="max-w-[60ch] font-monospace text-[length:var(--text-200)] leading-300 text-muted-foreground">
@@ -76,7 +76,7 @@ export function QueryError({ message, onRetry, className }: QueryErrorProps) {
                 <button
                     type="button"
                     onClick={onRetry}
-                    className="self-start rounded-md border border-border px-300 py-200-nudge text-[length:var(--text-300)] font-medium text-foreground transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    className="self-start rounded-md border border-border px-300 py-200-nudge text-[length:var(--text-300)] font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                     Try again
                 </button>

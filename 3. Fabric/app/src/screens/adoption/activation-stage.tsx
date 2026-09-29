@@ -111,7 +111,7 @@ export function ActivationStage() {
             title="Activation"
             description="How much of the population has picked Copilot up at all — before asking how often or how deeply."
             actions={
-                <div role="group" aria-label="Cohort" className="flex rounded-md border border-border p-100-nudge">
+                <div role="group" aria-label="Cohort" className="flex rounded-md border border-border bg-card p-100-nudge">
                     {cohorts.map((entry) => (
                         <button
                             key={entry.id}
@@ -119,10 +119,10 @@ export function ActivationStage() {
                             onClick={() => setCohort(entry.id)}
                             aria-pressed={entry.id === cohort}
                             className={cn(
-                                "rounded-sm px-300 py-100 text-[length:var(--text-200)] font-medium transition-colors",
+                                "rounded-sm px-300 py-100 text-[length:var(--text-200)] transition-colors",
                                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                                 entry.id === cohort
-                                    ? "bg-accent text-accent-foreground"
+                                    ? "bg-accent font-semibold text-accent-foreground"
                                     : "text-muted-foreground hover:text-foreground",
                             )}
                         >
@@ -178,7 +178,7 @@ export function ActivationStage() {
             )}
 
             {headline && (
-                <p className="border-l-2 border-primary pl-400 font-heading text-[length:var(--text-500)] leading-500 text-foreground">
+                <p className="border-l-2 border-primary pl-400 text-[length:var(--text-400)] leading-400 text-foreground">
                     {headline}
                 </p>
             )}

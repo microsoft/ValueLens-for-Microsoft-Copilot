@@ -30,17 +30,17 @@ export function KpiCard({ label, value, format = "whole", detail, emphasis, clas
     return (
         <div
             className={cn(
-                "flex flex-col gap-200 rounded-md border border-border bg-card p-400",
+                "flex flex-col gap-200 rounded-xl border border-border bg-card p-500",
                 emphasis && "border-primary/40 bg-accent/40",
                 className,
             )}
         >
-            <span className="text-[length:var(--text-200)] leading-200 font-medium uppercase tracking-[0.1em] text-muted-foreground">
+            <span className="text-[length:var(--text-200)] leading-200 text-muted-foreground">
                 {label}
             </span>
             <span
                 className={cn(
-                    "font-numeric tabular-nums leading-hero-800 text-card-foreground",
+                    "font-numeric font-semibold tabular-nums leading-hero-800 text-card-foreground",
                     emphasis
                         ? "text-[length:var(--text-hero-900)] leading-hero-900"
                         : "text-[length:var(--text-hero-800)]",
@@ -69,7 +69,7 @@ export function KpiStat({ label, value, format = "whole" }: KpiStatProps) {
     return (
         <div className="flex items-baseline justify-between gap-200">
             <span>{label}</span>
-            <span className="font-numeric tabular-nums text-[length:var(--text-300)] text-foreground">
+            <span className="font-numeric font-semibold tabular-nums text-[length:var(--text-300)] text-foreground">
                 {formatKpi(value, format)}
             </span>
         </div>

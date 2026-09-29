@@ -67,7 +67,7 @@ export function AdoptionStage() {
             title="Adoption"
             description="How often the activated population comes back, measured the same way across every surface."
             actions={
-                <div role="group" aria-label="Trend measure" className="flex rounded-md border border-border p-100-nudge">
+                <div role="group" aria-label="Trend measure" className="flex rounded-md border border-border bg-card p-100-nudge">
                     {trendMeasures.map((entry) => (
                         <button
                             key={entry.id}
@@ -75,10 +75,10 @@ export function AdoptionStage() {
                             onClick={() => setMeasure(entry.id)}
                             aria-pressed={entry.id === measure}
                             className={cn(
-                                "rounded-sm px-300 py-100 text-[length:var(--text-200)] font-medium transition-colors",
+                                "rounded-sm px-300 py-100 text-[length:var(--text-200)] transition-colors",
                                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                                 entry.id === measure
-                                    ? "bg-accent text-accent-foreground"
+                                    ? "bg-accent font-semibold text-accent-foreground"
                                     : "text-muted-foreground hover:text-foreground",
                             )}
                         >
@@ -144,11 +144,11 @@ export function AdoptionStage() {
                             format="hours"
                             detail="Expert-equivalent time returned across the whole population"
                         />
-                        <div className="flex flex-col gap-200 rounded-md border border-border bg-card p-400 md:col-span-2">
-                            <span className="text-[length:var(--text-200)] leading-200 font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                        <div className="flex flex-col gap-200 rounded-xl border border-border bg-card p-500 md:col-span-2">
+                            <span className="text-[length:var(--text-200)] leading-200 text-muted-foreground">
                                 Top value outcome
                             </span>
-                            <span className="font-heading text-[length:var(--text-600)] leading-600 text-card-foreground">
+                            <span className="text-[length:var(--text-500)] leading-500 font-semibold text-card-foreground">
                                 {topOutcome ?? "Not yet established"}
                             </span>
                             <p className="border-t border-border pt-200 text-[length:var(--text-200)] leading-300 text-muted-foreground">

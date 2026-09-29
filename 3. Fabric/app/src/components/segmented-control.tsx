@@ -29,7 +29,7 @@ export function SegmentedControl<T extends string>({
     className,
 }: SegmentedControlProps<T>) {
     return (
-        <div role="group" aria-label={label} className={cn("flex rounded-md border border-border p-100-nudge", className)}>
+        <div role="group" aria-label={label} className={cn("flex rounded-md border border-border bg-card p-100-nudge", className)}>
             {options.map((option) => (
                 <button
                     key={option.id}
@@ -37,10 +37,10 @@ export function SegmentedControl<T extends string>({
                     onClick={() => onChange(option.id)}
                     aria-pressed={option.id === value}
                     className={cn(
-                        "rounded-sm px-300 py-100 text-[length:var(--text-200)] font-medium transition-colors",
+                        "rounded-sm px-300 py-100 text-[length:var(--text-200)] transition-colors",
                         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                         option.id === value
-                            ? "bg-accent text-accent-foreground"
+                            ? "bg-accent font-semibold text-accent-foreground"
                             : "text-muted-foreground hover:text-foreground",
                     )}
                 >

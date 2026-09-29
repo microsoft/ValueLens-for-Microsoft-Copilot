@@ -30,11 +30,11 @@ export function Section({ eyebrow, title, description, actions, children, classN
             <div className="flex flex-wrap items-end justify-between gap-300 border-b border-border pb-300">
                 <div className="flex flex-col gap-100">
                     {eyebrow && (
-                        <span className="font-numeric text-[length:var(--text-100)] leading-100 uppercase tracking-[0.18em] text-muted-foreground">
+                        <span className="text-[length:var(--text-200)] leading-200 text-muted-foreground">
                             {eyebrow}
                         </span>
                     )}
-                    <h2 className="font-heading text-[length:var(--text-hero-700)] leading-hero-700 text-foreground">
+                    <h2 className="text-[length:var(--text-400)] leading-400 font-semibold text-foreground">
                         {title}
                     </h2>
                     {description && (

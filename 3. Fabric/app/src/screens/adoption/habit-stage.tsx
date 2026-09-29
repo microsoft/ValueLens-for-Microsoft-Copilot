@@ -68,7 +68,7 @@ export function HabitStage() {
                     description="Habit stages are derived from the most recent complete month. None was found in the current selection."
                 />
             ) : (
-                <ol className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border bg-card">
+                <ol className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
                     {habitStages.map((stage) => {
                         const share = readNumber(summaryRow, `[${stage} Pct]`);
                         const count = readNumber(summaryRow, `[${stage}]`);
@@ -80,7 +80,7 @@ export function HabitStage() {
                                     style={{ width: `${(share ?? 0) * 100}%` }}
                                 />
                                 <span className="relative flex flex-1 flex-col">
-                                    <span className="text-[length:var(--text-400)] leading-400 font-medium text-card-foreground">
+                                    <span className="text-[length:var(--text-300)] leading-300 font-semibold text-card-foreground">
                                         {stage}
                                     </span>
                                     <span className="text-[length:var(--text-200)] leading-200 text-muted-foreground">
@@ -90,7 +90,7 @@ export function HabitStage() {
                                 <span className="relative font-numeric tabular-nums text-[length:var(--text-300)] text-muted-foreground">
                                     {formatKpi(count, "whole")} users
                                 </span>
-                                <span className="relative w-[5ch] text-right font-numeric tabular-nums text-[length:var(--text-600)] leading-600 text-card-foreground">
+                                <span className="relative w-[5ch] text-right font-numeric font-semibold tabular-nums text-[length:var(--text-500)] leading-500 text-card-foreground">
                                     {formatKpi(share, "percent")}
                                 </span>
                             </li>
@@ -130,7 +130,7 @@ export function HabitStage() {
                 )}
             </div>
 
-            <div role="group" aria-label="Scale" className="flex self-end rounded-md border border-border p-100-nudge">
+            <div role="group" aria-label="Scale" className="flex self-end rounded-md border border-border bg-card p-100-nudge">
                 {(["share", "count"] as const).map((option) => (
                     <button
                         key={option}
@@ -138,10 +138,10 @@ export function HabitStage() {
                         onClick={() => setScale(option)}
                         aria-pressed={option === scale}
                         className={cn(
-                            "rounded-sm px-300 py-100 text-[length:var(--text-200)] font-medium capitalize transition-colors",
+                            "rounded-sm px-300 py-100 text-[length:var(--text-200)] capitalize transition-colors",
                             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                             option === scale
-                                ? "bg-accent text-accent-foreground"
+                                ? "bg-accent font-semibold text-accent-foreground"
                                 : "text-muted-foreground hover:text-foreground",
                         )}
                     >
