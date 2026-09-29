@@ -11,10 +11,10 @@ import query from "./model-fit-summary.dax?raw";
 
 const columnMetadata: ColumnMetadataMap = {
     "[Sessions]": { name: "Sessions", displayName: "Sessions", format: FORMAT_WHOLE },
-    "[Logged Share]": { name: "Logged Share", displayName: "Logged share", format: FORMAT_PERCENT },
-    "[Well-matched Share]": { name: "Well-matched Share", displayName: "Well-matched", format: FORMAT_PERCENT },
-    "[Over-specified Share]": { name: "Over-specified Share", displayName: "Over-specified", format: FORMAT_PERCENT },
-    "[Under-specified Share]": { name: "Under-specified Share", displayName: "Under-specified", format: FORMAT_PERCENT },
+    "[Logged Share]": { name: "Logged Share", displayName: "Model logged", format: FORMAT_PERCENT },
+    "[Well-matched Share]": { name: "Well-matched Share", displayName: "Good match", format: FORMAT_PERCENT },
+    "[Over-specified Share]": { name: "Over-specified Share", displayName: "Lighter model may do", format: FORMAT_PERCENT },
+    "[Under-specified Share]": { name: "Under-specified Share", displayName: "Try stronger", format: FORMAT_PERCENT },
     "[Coverage Notice]": { name: "Coverage Notice", displayName: "Coverage notice" },
 };
 

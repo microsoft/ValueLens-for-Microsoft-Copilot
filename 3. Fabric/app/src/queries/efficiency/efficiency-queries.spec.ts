@@ -101,28 +101,28 @@ describe("efficiency spec field references", () => {
 });
 
 describe("model fit verdicts", () => {
-    it("returns not enough data below five judged sessions", () => {
+    it("returns not judged below five judged sessions", () => {
         expect(deriveModelFitVerdict({ judgedSessions: 4, overSpecifiedSessions: 4, underSpecifiedSessions: 0 })).toBe(
-            "Not enough data",
+            "Not judged",
         );
     });
 
-    it("treats blank over and under counts as a well-matched segment", () => {
+    it("treats blank over and under counts as a good match", () => {
         expect(
             deriveModelFitVerdict({
                 judgedSessions: 12,
                 overSpecifiedSessions: null,
                 underSpecifiedSessions: undefined,
             }),
-        ).toBe("Well matched");
+        ).toBe("Good match");
     });
 
-    it("uses the largest exception bucket when the segment is not well matched", () => {
+    it("uses the largest exception bucket when the segment is not a good match", () => {
         expect(deriveModelFitVerdict({ judgedSessions: 12, overSpecifiedSessions: 7, underSpecifiedSessions: 1 })).toBe(
-            "Over-specified",
+            "Lighter model may do",
         );
         expect(deriveModelFitVerdict({ judgedSessions: 12, overSpecifiedSessions: 2, underSpecifiedSessions: 6 })).toBe(
-            "Under-specified",
+            "Try stronger",
         );
     });
 });

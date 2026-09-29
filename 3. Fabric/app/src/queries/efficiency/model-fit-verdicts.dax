@@ -11,6 +11,9 @@ TOPN(
                 "@Over", [Model: Over-specified Sessions],
                 "@Under", [Model: Under-specified Sessions],
                 "@JudgedShare", [Model: Judged Share],
+                "@WellShare", [Model: Well-matched Share],
+                "@OverShare", [Model: Over-specified Share],
+                "@UnderShare", [Model: Under-specified Share],
                 "@MainModel", [Model: Main Model],
                 "@MainReason", [Model: Main Reason]
             ),
@@ -24,7 +27,10 @@ TOPN(
         "Well-matched Sessions", [@Well],
         "Over-specified Sessions", [@Over],
         "Under-specified Sessions", [@Under],
-        "Judged Share", [@JudgedShare]
+        "Judged Share", [@JudgedShare],
+        "Well-matched Share", [@WellShare],
+        "Over-specified Share", [@OverShare],
+        "Under-specified Share", [@UnderShare]
     ),
     [Sessions], DESC,
     [Segment], ASC

@@ -27,6 +27,9 @@ export const liveColumns = {
         "[Over-specified Sessions]",
         "[Under-specified Sessions]",
         "[Judged Share]",
+        "[Well-matched Share]",
+        "[Over-specified Share]",
+        "[Under-specified Share]",
     ],
     modelFitByOrganization: [
         "[Segment]",
@@ -38,6 +41,9 @@ export const liveColumns = {
         "[Over-specified Sessions]",
         "[Under-specified Sessions]",
         "[Judged Share]",
+        "[Well-matched Share]",
+        "[Over-specified Share]",
+        "[Under-specified Share]",
     ],
     modelFitByPerson: [
         "[Segment]",
@@ -49,5 +55,8 @@ export const liveColumns = {
         "[Over-specified Sessions]",
         "[Under-specified Sessions]",
         "[Judged Share]",
+        "[Well-matched Share]",
+        "[Over-specified Share]",
+        "[Under-specified Share]",
     ],
 } as const;

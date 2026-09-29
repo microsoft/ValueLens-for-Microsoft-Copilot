@@ -24,7 +24,7 @@
       "type": "nominal",
       "title": "Outcome",
       "scale": {
-        "domain": ["Well matched", "Over-specified", "Under-specified", "Not judged"]
+        "domain": ["Good match", "Lighter model may do", "Try stronger", "Not judged"]
       }
     },
     "order": { "field": "Outcome Order", "type": "quantitative", "sort": "ascending" },

@@ -1,7 +1,7 @@
 [
   {
     "[Activity]": "Agents",
-    "[Outcome]": "Well matched",
+    "[Outcome]": "Good match",
     "[Outcome Order]": 1,
     "[Sessions]": 2956,
     "[Share]": 0.6568888888888889
@@ -15,7 +15,7 @@
   },
   {
     "[Activity]": "Copilot",
-    "[Outcome]": "Well matched",
+    "[Outcome]": "Good match",
     "[Outcome Order]": 1,
     "[Sessions]": 1187,
     "[Share]": 0.6594444444444445

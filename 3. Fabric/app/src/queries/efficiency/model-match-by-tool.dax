@@ -10,7 +10,7 @@ VAR _well =
             [@Sessions] > 0
         ),
         "Activity", 'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)],
-        "Outcome", "Well matched",
+        "Outcome", "Good match",
         "Outcome Order", 1,
         "Sessions", [@Sessions],
         "Share", DIVIDE([@Sessions], [@Total])
@@ -26,7 +26,7 @@ VAR _over =
             [@Sessions] > 0
         ),
         "Activity", 'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)],
-        "Outcome", "Over-specified",
+        "Outcome", "Lighter model may do",
         "Outcome Order", 2,
         "Sessions", [@Sessions],
         "Share", DIVIDE([@Sessions], [@Total])
@@ -42,7 +42,7 @@ VAR _under =
             [@Sessions] > 0
         ),
         "Activity", 'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)],
-        "Outcome", "Under-specified",
+        "Outcome", "Try stronger",
         "Outcome Order", 3,
         "Sessions", [@Sessions],
         "Share", DIVIDE([@Sessions], [@Total])

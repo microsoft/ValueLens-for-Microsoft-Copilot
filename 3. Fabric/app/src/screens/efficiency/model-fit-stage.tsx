@@ -6,11 +6,12 @@
 //-----------------------------------------------------------------------
 
 import { useMemo, useState, type ReactNode } from "react";
-import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
+import { DataGrid, type GridColumnDef, type Row } from "@microsoft/fabric-datagrid";
 import { VegaVisual, type VisualizationSpec } from "@microsoft/fabric-visuals";
 import type { DataTable, VisualTheme } from "@microsoft/fabric-visuals-core";
 import { stageAnchor } from "@/components/destinations";
 import { FilterNote } from "@/components/filter-note";
+import { GradeMark } from "@/components/grade-mark";
 import { KpiCard } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
@@ -21,8 +22,11 @@ import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { useOutcomeColors, type OutcomeColors } from "@/hooks/use-palette-theme";
 import { gridHeight, rowChartHeight } from "@/lib/chart-height";
 import type { FilterKey } from "@/lib/filters";
+import { formatKpi } from "@/lib/format-kpi";
+import { MODEL_VERDICTS } from "@/lib/grading-method";
+import { heatRenderer, type HeatDomain } from "@/lib/heat";
 import type { OrgAttribute } from "@/lib/org-attribute";
-import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
+import { readNumber, readText, toSummaryRow, type SummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import {
     deriveModelFitVerdict,
@@ -32,22 +36,25 @@ import {
     modelFitSummary,
     modelMatchByTool,
     modelUsage,
-    type ModelFitVerdict,
 } from "@/queries/efficiency";
 
 type ModelFitView = "task" | "organization" | "person";
 
+/** The report's Model Fit View buttons, with the middle one following the Group by choice. */
 function viewOptions(orgLabel: string): readonly { id: ModelFitView; label: string }[] {
     return [
         { id: "task", label: "Task" },
         { id: "organization", label: orgLabel },
-        { id: "person", label: "Person" },
+        { id: "person", label: "User" },
     ];
 }
 
 const ACTIVITY_FILTER: FilterKey[] = ["audience"];
 
-const OUTCOME_DOMAIN = ["Well matched", "Over-specified", "Under-specified", "Not judged"] as const;
+const OUTCOME_DOMAIN = ["Good match", "Lighter model may do", "Try stronger", "Not judged"] as const;
+
+/** Shares of judged sessions, so every view shades on the same absolute scale. */
+const SHARE_HEAT: HeatDomain = { min: 0, max: 1 };
 
 interface VerdictPalette {
     positive: string;
@@ -68,19 +75,6 @@ function fallbackOutcomePalette(theme: VisualTheme): VerdictPalette {
 
 function verdictPalette(outcomeColors: OutcomeColors | undefined, theme: VisualTheme): VerdictPalette {
     return outcomeColors ?? fallbackOutcomePalette(theme);
-}
-
-function colorForVerdict(verdict: ModelFitVerdict, palette: VerdictPalette): string {
-    switch (verdict) {
-        case "Well matched":
-            return palette.positive;
-        case "Over-specified":
-            return palette.negative;
-        case "Under-specified":
-            return palette.caution;
-        case "Not enough data":
-            return palette.neutral;
-    }
 }
 
 function injectOutcomeColors(spec: VisualizationSpec, palette: VerdictPalette): VisualizationSpec {
@@ -145,14 +139,46 @@ const LEGEND_CHART = { perRow: 44, chrome: 190 };
 /** Automatic segment labels misplace shares once segments are reordered; the tooltip carries them. */
 const NO_STACK_LABELS = { disableStackedDataLabels: true };
 
-function verdictCell(value: ReactNode, palette: VerdictPalette) {
-    const verdict = typeof value === "string" ? (value as ModelFitVerdict) : "Not enough data";
+function verdictCell(value: ReactNode) {
+    const verdict = MODEL_VERDICTS.find((rule) => rule.name === value) ?? MODEL_VERDICTS[MODEL_VERDICTS.length - 1];
     return (
         <span className="inline-flex items-center gap-200">
-            <span className="size-200 rounded-full" style={{ backgroundColor: colorForVerdict(verdict, palette) }} />
-            <span>{verdict}</span>
+            <GradeMark tone={verdict.tone} icon={verdict.icon} />
+            <span>{verdict.name}</span>
         </span>
     );
+}
+
+/** A blank exception share on a judged segment is a true 0%, as the report's blank cell means. */
+function shareOfJudged(value: unknown, row: Row): string | null {
+    if (typeof value === "number") return formatKpi(value, "percent");
+    const judged = row["Judged Sessions"];
+    return typeof judged === "number" && judged > 0 ? formatKpi(0, "percent") : null;
+}
+
+/**
+ * The three verdict shares divide by judged sessions, so once any of them has a
+ * value the others are zero rather than unknown.
+ */
+function judgedShares(row: SummaryRow | undefined) {
+    const well = readNumber(row, "[Well-matched Share]");
+    const over = readNumber(row, "[Over-specified Share]");
+    const under = readNumber(row, "[Under-specified Share]");
+    const judged = well !== undefined || over !== undefined || under !== undefined;
+    const orZero = (value: number | undefined) => value ?? (judged ? 0 : undefined);
+    return { well: orZero(well), over: orZero(over), under: orZero(under) };
+}
+
+function shareColumn(id: string, header: string, width: number, color?: string): GridColumnDef {
+    return {
+        id,
+        header,
+        width,
+        numericStyling: true,
+        cellRenderer: color
+            ? heatRenderer({ domain: SHARE_HEAT, format: shareOfJudged, color })
+            : (value, row) => shareOfJudged(value, row),
+    };
 }
 
 function verdictQuery(view: ModelFitView, org: OrgAttribute) {
@@ -209,27 +235,33 @@ export function ModelFitStage() {
     // The model leaves the reason blank when nothing is over- or under-specified.
     const showReason = hasAnyText(verdictTable, "Main Reason");
     const views = useMemo(() => viewOptions(org.label), [org.label]);
-    const segmentLabel = view === "person" ? "Person" : view === "organization" ? org.label : "Task";
+    const segmentLabel = view === "person" ? "User" : view === "organization" ? org.label : "Task";
+    // Mirrors the report's mm_table: verdict, main model and reason, then judged coverage and the three shares.
     const verdictColumns: GridColumnDef[] = useMemo(
         () => [
-            { id: "Verdict", header: "Verdict", minWidth: 176, cellRenderer: (value) => verdictCell(value, palette) },
-            { id: "Segment", header: segmentLabel, minWidth: 240 },
-            { id: "Main Model", header: "Main model", minWidth: 180 },
-            ...(showReason ? [{ id: "Main Reason", header: "Main reason", minWidth: 180 }] : []),
-            { id: "Sessions", header: "Sessions", width: 112, numericStyling: true },
-            { id: "Judged Share", header: "Judged share", width: 132, numericStyling: true },
+            { id: "Verdict", header: "Verdict", width: 196, cellRenderer: (value) => verdictCell(value) },
+            // A fixed width keeps the name visible; the grid scrolls sideways on narrow screens.
+            { id: "Segment", header: segmentLabel, width: 232 },
+            { id: "Main Model", header: "Main model", width: 176 },
+            ...(showReason ? [{ id: "Main Reason", header: "Main reason", width: 184 }] : []),
+            { id: "Sessions", header: "Sessions", width: 100, numericStyling: true },
+            shareColumn("Judged Share", "Judged", 92),
+            shareColumn("Well-matched Share", "Good match", 116),
+            shareColumn("Over-specified Share", "Lighter model may do", 168, palette.negative),
+            shareColumn("Under-specified Share", "Try stronger", 124, palette.caution),
+            { id: "Judged Sessions", header: "Judged sessions", hidden: true },
         ],
         [palette, segmentLabel, showReason],
     );
 
     const notice = readText(summaryRow, "[Coverage Notice]");
+    const shares = judgedShares(summaryRow);
 
     return (
         <Section
             id={stageAnchor("model-fit")}
             title="Model fit"
-            description="Whether the model doing the work is well matched, too expensive for the task, or not strong enough for the job."
-            actions={<SegmentedControl label="Model fit view" options={views} value={view} onChange={setView} />}
+            description="Whether the model doing the work suits it: a good match, a premium model on light work, or a mid-cost model on heavy work."
         >
             {summary.data?.status === "error" ? (
                 <QueryError message={summary.data.error.message} onRetry={summary.refetch} />
@@ -249,10 +281,30 @@ export function ModelFitStage() {
             ) : (
                 <div className="grid gap-300 md:grid-cols-2 xl:grid-cols-5">
                     <KpiCard label="Sessions" value={readNumber(summaryRow, "[Sessions]")} emphasis />
-                    <KpiCard label="Logged share" value={readNumber(summaryRow, "[Logged Share]")} format="percent" />
-                    <KpiCard label="Well-matched share" value={readNumber(summaryRow, "[Well-matched Share]")} format="percent" />
-                    <KpiCard label="Over-specified share" value={readNumber(summaryRow, "[Over-specified Share]")} format="percent" />
-                    <KpiCard label="Under-specified share" value={readNumber(summaryRow, "[Under-specified Share]")} format="percent" />
+                    <KpiCard
+                        label="Model logged"
+                        value={readNumber(summaryRow, "[Logged Share]")}
+                        format="percent"
+                        detail="Share of sessions"
+                    />
+                    <KpiCard
+                        label="Good match"
+                        value={shares.well}
+                        format="percent"
+                        detail="Model cost suits the work"
+                    />
+                    <KpiCard
+                        label="Lighter model may do"
+                        value={shares.over}
+                        format="percent"
+                        detail="Premium model on light work"
+                    />
+                    <KpiCard
+                        label="Try stronger"
+                        value={shares.under}
+                        format="percent"
+                        detail="Mid-cost model on Strong-fit work"
+                    />
                 </div>
             )}
 
@@ -314,43 +366,55 @@ export function ModelFitStage() {
                                 data={matchTable}
                                 theme={theme}
                                 capabilities={NO_STACK_LABELS}
-                                header={{ title: "Match by tool", subtitle: "Well matched, exceptions and unjudged sessions" }}
+                                header={{ title: "Match by tool", subtitle: "Good matches, the two exceptions, and unjudged sessions" }}
                             />
                         )}
                     </div>
                 </div>
             </div>
 
-            <div
-                className="flex h-[560px] flex-col"
-                style={verdictTable && verdictTable.rows.length > 0 ? { height: gridHeight(verdictTable.rows.length) } : undefined}
-            >
-                {verdictResult.data?.status === "error" ? (
-                    <QueryError
-                        className="h-full"
-                        message={verdictResult.data.error.message}
-                        onRetry={verdictResult.refetch}
-                    />
-                ) : verdictResult.isLoading || !verdictTable ? (
-                    <QueryLoading className="h-full" />
-                ) : verdictTable.rows.length === 0 ? (
-                    <QueryEmpty
-                        className="h-full"
-                        title="No segments to judge"
-                        description="No sessions in this selection have enough model and task detail to build the table."
-                    />
-                ) : (
-                    <DataGrid
-                        columns={verdictColumns}
-                        data={verdictTable}
-                        defaultSort={[{ columnId: "Sessions", direction: "desc" }]}
-                        theme={theme}
-                        header={{
-                            title: `Verdicts by ${view === "organization" ? org.noun : segmentLabel.toLowerCase()}`,
-                            subtitle: "Top segments by sessions, with a verdict only after five judged sessions",
-                        }}
-                    />
-                )}
+            <div className="flex flex-col gap-300">
+                <div className="flex flex-wrap items-center gap-300">
+                    <span
+                        aria-hidden="true"
+                        className="text-[length:var(--text-300)] leading-300 font-semibold text-foreground"
+                    >
+                        View verdicts by
+                    </span>
+                    <SegmentedControl label="View verdicts by" options={views} value={view} onChange={setView} />
+                </div>
+                <div
+                    className="flex h-[560px] flex-col"
+                    style={verdictTable && verdictTable.rows.length > 0 ? { height: gridHeight(verdictTable.rows.length) } : undefined}
+                >
+                    {verdictResult.data?.status === "error" ? (
+                        <QueryError
+                            className="h-full"
+                            message={verdictResult.data.error.message}
+                            onRetry={verdictResult.refetch}
+                        />
+                    ) : verdictResult.isLoading || !verdictTable ? (
+                        <QueryLoading className="h-full" />
+                    ) : verdictTable.rows.length === 0 ? (
+                        <QueryEmpty
+                            className="h-full"
+                            title="No segments to judge"
+                            description="No sessions in this selection have enough model and task detail to build the table."
+                        />
+                    ) : (
+                        <DataGrid
+                            key={view}
+                            columns={verdictColumns}
+                            data={verdictTable}
+                            defaultSort={[{ columnId: "Sessions", direction: "desc" }]}
+                            theme={theme}
+                            header={{
+                                title: `Verdicts by ${view === "organization" ? org.noun : segmentLabel.toLowerCase()}`,
+                                subtitle: "Top 25 by sessions. Shares are of judged sessions; a verdict needs five judged sessions.",
+                            }}
+                        />
+                    )}
+                </div>
             </div>
 
             {notice && <p className="max-w-[80ch] text-[length:var(--text-300)] leading-300 text-muted-foreground">{notice}</p>}
