@@ -994,6 +994,118 @@
       ]
     },
     {
+      "sourceTable": "viva_credits_weekly",
+      "modelTable": "VivaCreditMetrics",
+      "logicalName": "cc_vivacreditsweekly",
+      "displayName": "VivaCreditMetrics",
+      "keyColumns": [
+        "PersonId",
+        "MetricDate",
+        "ServiceId",
+        "SpendingPolicyId"
+      ],
+      "columns": [
+        {
+          "canonical": "PersonId",
+          "logicalName": "cc_personid",
+          "displayName": "PersonId",
+          "type": "String",
+          "loadedToModel": true
+        },
+        {
+          "canonical": "UserPrincipalName",
+          "logicalName": "cc_userprincipalname",
+          "displayName": "UserPrincipalName",
+          "type": "String",
+          "loadedToModel": true
+        },
+        {
+          "canonical": "PeopleHistoricalId",
+          "logicalName": "cc_peoplehistoricalid",
+          "displayName": "PeopleHistoricalId",
+          "type": "String",
+          "loadedToModel": true
+        },
+        {
+          "canonical": "EntraId",
+          "logicalName": "cc_entraid",
+          "displayName": "EntraId",
+          "type": "String",
+          "loadedToModel": true
+        },
+        {
+          "canonical": "ServiceId",
+          "logicalName": "cc_serviceid",
+          "displayName": "ServiceId",
+          "type": "String",
+          "loadedToModel": true
+        },
+        {
+          "canonical": "ServiceName",
+          "logicalName": "cc_servicename",
+          "displayName": "ServiceName",
+          "type": "String",
+          "loadedToModel": true
+        },
+        {
+          "canonical": "SpendingPolicyId",
+          "logicalName": "cc_spendingpolicyid",
+          "displayName": "SpendingPolicyId",
+          "type": "String",
+          "loadedToModel": true
+        },
+        {
+          "canonical": "MetricDate",
+          "logicalName": "cc_metricdate",
+          "displayName": "MetricDate",
+          "type": "DateTime",
+          "loadedToModel": true
+        },
+        {
+          "canonical": "SessionCount",
+          "logicalName": "cc_sessioncount",
+          "displayName": "SessionCount",
+          "type": "Integer",
+          "loadedToModel": true
+        },
+        {
+          "canonical": "SpendingPolicyLimit",
+          "logicalName": "cc_spendingpolicylimit",
+          "displayName": "SpendingPolicyLimit",
+          "type": "Integer",
+          "loadedToModel": true
+        },
+        {
+          "canonical": "CreditsUsed",
+          "logicalName": "cc_creditsused",
+          "displayName": "CreditsUsed",
+          "type": "Decimal",
+          "loadedToModel": true
+        },
+        {
+          "canonical": "UserLimit",
+          "logicalName": "cc_userlimit",
+          "displayName": "UserLimit",
+          "type": "Integer",
+          "loadedToModel": true
+        },
+        {
+          "canonical": "PolicyName",
+          "logicalName": "cc_policyname",
+          "displayName": "PolicyName",
+          "type": "String",
+          "loadedToModel": true
+        },
+        {
+          "canonical": "IncludedServices",
+          "logicalName": "cc_includedservices",
+          "displayName": "IncludedServices",
+          "type": "String",
+          "loadedToModel": true
+        }
+      ]
+    },
+    {
       "sourceTable": "viva_spending_policy",
       "modelTable": "SpendingPolicy",
       "logicalName": "cc_vivaspendingpolicy",

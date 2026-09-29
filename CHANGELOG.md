@@ -31,9 +31,10 @@ templates are unchanged and don't read it.
 - **4. Power Automate + Dataverse** — the Dataverse template, flow package, schema deploy script
   and permissions. Tables use the `cc_` prefix, so they sit beside ValueLens's `poc_` tables.
 
-Copied from `microsoft/ConsumptionCentral-for-Microsoft-Copilot` at commit `24b0ca8`. The only
-change to the templates is the example addresses in the `SecurityFilter` table, which now use the
-fictional `contoso-health.com` domain. Links to the full documentation point at that repository.
+Copied from `microsoft/ConsumptionCentral-for-Microsoft-Copilot` at commit `24b0ca8`, with the
+fixes from microsoft/ConsumptionCentral-for-Microsoft-Copilot#39: the example addresses in the
+`SecurityFilter` table now use the fictional `contoso-health.com` domain, and the Dataverse path
+gets a table for Cowork / Work IQ. Links to the full documentation point at that repository.
 
 ---
 
