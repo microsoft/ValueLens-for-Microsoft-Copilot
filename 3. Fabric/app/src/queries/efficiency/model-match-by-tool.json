@@ -1,0 +1,38 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar" },
+  "encoding": {
+    "y": {
+      "field": "Activity",
+      "type": "nominal",
+      "title": null,
+      "sort": "ascending",
+      "axis": { "labelLimit": 200 }
+    },
+    "x": {
+      "field": "Share",
+      "type": "quantitative",
+      "stack": "zero",
+      "title": "Share of sessions",
+      "scale": { "domain": [0, 1] },
+      "axis": { "labelExpr": "format(datum.value, '.0%')" }
+    },
+    "color": {
+      "field": "Outcome",
+      "type": "nominal",
+      "title": "Outcome",
+      "scale": {
+        "domain": ["Well matched", "Over-specified", "Under-specified", "Not judged"]
+      }
+    },
+    "order": { "field": "Outcome Order", "type": "quantitative", "sort": "ascending" },
+    "tooltip": [
+      { "field": "Activity", "type": "nominal", "title": "Activity" },
+      { "field": "Outcome", "type": "nominal", "title": "Outcome" },
+      { "field": "Sessions", "type": "quantitative", "title": "Sessions", "format": ",.0f" },
+      { "field": "Share", "type": "quantitative", "title": "Share", "format": ".1%" }
+    ]
+  }
+}

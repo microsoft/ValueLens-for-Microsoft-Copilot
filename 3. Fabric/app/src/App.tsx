@@ -25,6 +25,9 @@ const ValueScreen = lazy(() => import("./screens/value").then((module) => ({ def
 const EfficiencyScreen = lazy(() =>
     import("./screens/efficiency").then((module) => ({ default: module.EfficiencyScreen })),
 );
+const FeedbackScreen = lazy(() =>
+    import("./screens/feedback").then((module) => ({ default: module.FeedbackScreen })),
+);
 
 function App() {
     const [destination, setDestination] = useState<DestinationId>("adoption");
@@ -39,6 +42,7 @@ function App() {
                     {destination === "readiness" && <ReadinessScreen />}
                     {destination === "value" && <ValueScreen />}
                     {destination === "efficiency" && <EfficiencyScreen />}
+                    {destination === "feedback" && <FeedbackScreen />}
                 </Suspense>
             </AppShell>
         </FilterProvider>

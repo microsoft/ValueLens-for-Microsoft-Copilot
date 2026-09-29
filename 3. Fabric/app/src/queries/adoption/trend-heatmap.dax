@@ -1,0 +1,16 @@
+EVALUATE
+VAR _Weeks = VALUES('Chat + Agent Interactions (Audit Logs)'[WeekStart])
+VAR _Organizations =
+    FILTER(
+        VALUES('Chat + Agent Org Data'[Organization]),
+        NOT ISBLANK('Chat + Agent Org Data'[Organization])
+    )
+RETURN
+ADDCOLUMNS(
+    CROSSJOIN(_Organizations, _Weeks),
+    "Active Users", [All Active Users],
+    "Active Days Per User", [Average Active Days Per User (Chat + Agents)],
+    "Expert Hours Per User", [Expert Equivalent Hours Per Active User],
+    "Sessions Per User", [Observed Sessions per User]
+)
+ORDER BY 'Chat + Agent Org Data'[Organization], 'Chat + Agent Interactions (Audit Logs)'[WeekStart]

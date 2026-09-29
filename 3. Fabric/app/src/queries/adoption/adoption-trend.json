@@ -4,16 +4,24 @@
   "height": "container",
   "transform": [
     {
+      "calculate": "toDate(datum['Chat + Agent Interactions (Audit Logs)WeekStart'])",
+      "as": "Week"
+    },
+    {
       "fold": ["Licensed", "Unlicensed", "Agents"],
       "as": ["Surface", "Sessions per user"]
     }
   ],
   "encoding": {
     "x": {
-      "field": "Chat + Agent Interactions (Audit Logs)WeekStart",
+      "field": "Week",
       "type": "temporal",
       "title": null,
-      "axis": { "format": "%d %b", "tickCount": 6 }
+      "axis": {
+        "tickCount": { "interval": "week", "step": 1 },
+        "labelExpr": "timeFormat(datum.value, '%-d %b')",
+        "labelAngle": 0
+      }
     },
     "y": {
       "field": "Sessions per user",
@@ -37,7 +45,7 @@
       "encoding": {
         "tooltip": [
           {
-            "field": "Chat + Agent Interactions (Audit Logs)WeekStart",
+            "field": "Week",
             "type": "temporal",
             "title": "Week starting",
             "format": "%d %b %Y"

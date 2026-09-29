@@ -1,0 +1,27 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Organization",
+      "type": "nominal",
+      "title": null,
+      "sort": "-x",
+      "axis": { "labelLimit": 200 }
+    },
+    "x": {
+      "field": "Sessions Per User Per Week",
+      "type": "quantitative",
+      "title": "Sessions per user per week",
+      "axis": { "labelExpr": "format(datum.value, ',.1f')" }
+    },
+    "tooltip": [
+      { "field": "Organization", "type": "nominal", "title": "Organization" },
+      { "field": "Sessions Per User Per Week", "type": "quantitative", "title": "Sessions per user per week", "format": ",.2f" },
+      { "field": "Active Days Per Week", "type": "quantitative", "title": "Active days per week", "format": ",.2f" },
+      { "field": "Active Unlicensed Users", "type": "quantitative", "title": "Active unlicensed users", "format": ",.0f" }
+    ]
+  }
+}

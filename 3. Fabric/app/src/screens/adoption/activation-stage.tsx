@@ -16,6 +16,7 @@ import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import type { FilterKey } from "@/lib/filters";
+import { rowChartHeight } from "@/lib/chart-height";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import { activationByOrg, activationSummary, type ActivationCohort } from "@/queries/adoption";
@@ -175,7 +176,7 @@ export function ActivationStage() {
                 </p>
             )}
 
-            <div className="h-[420px]">
+            <div className="h-[420px]" style={orgTable ? { height: rowChartHeight(orgTable.rows.length, { chrome: 156 }) } : undefined}>
                 {orgResult.data?.status === "error" ? (
                     <QueryError
                         className="h-full"

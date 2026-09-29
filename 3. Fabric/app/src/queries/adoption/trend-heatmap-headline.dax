@@ -1,0 +1,7 @@
+EVALUATE
+ROW(
+    "Active Users Headline", CALCULATE([Heatmap Headline], TREATAS({0}, 'Heatmap Toggle'[Heatmap Toggle Order])),
+    "Active Days Headline", CALCULATE([Heatmap Headline], TREATAS({1}, 'Heatmap Toggle'[Heatmap Toggle Order])),
+    "Expert Hours Headline", CALCULATE([Heatmap Headline], TREATAS({3}, 'Heatmap Toggle'[Heatmap Toggle Order])),
+    "Sessions Headline", CALCULATE([Heatmap Headline], TREATAS({4}, 'Heatmap Toggle'[Heatmap Toggle Order]))
+)

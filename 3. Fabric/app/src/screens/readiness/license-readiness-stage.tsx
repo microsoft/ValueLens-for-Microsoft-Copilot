@@ -1,0 +1,274 @@
+//-----------------------------------------------------------------------
+// <copyright company="Microsoft Corporation">
+//        Copyright (c) Microsoft Corporation.  All rights reserved.
+//        Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// </copyright>
+//-----------------------------------------------------------------------
+
+import { useMemo } from "react";
+import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
+import { VegaVisual } from "@microsoft/fabric-visuals";
+import { stageAnchor } from "@/components/destinations";
+import { FilterNote } from "@/components/filter-note";
+import { KpiCard, KpiStat } from "@/components/kpi-card";
+import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
+import { Section } from "@/components/section";
+import { useThemeContext } from "@/hooks/theme.context";
+import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import { rowChartHeight } from "@/lib/chart-height";
+import type { FilterKey } from "@/lib/filters";
+import { formatKpi } from "@/lib/format-kpi";
+import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
+import { toDataTable } from "@/lib/to-data-table";
+import {
+    licenseCandidates,
+    licenseDemandSummary,
+    licenseDormancy,
+    licenseEstateSummary,
+    licensePriorityByOrg,
+} from "@/queries/licensing";
+
+const LICENSE_ESTATE_IGNORES: FilterKey[] = ["dateRange", "organizations"];
+
+const candidateColumns: GridColumnDef[] = [
+    { id: "Rank", header: "Rank", width: 88, numericStyling: true },
+    { id: "User", header: "User", minWidth: 240 },
+    { id: "Organization", header: "Organization", minWidth: 160 },
+    { id: "Priority Score", header: "Priority score", numericStyling: true },
+    { id: "Sessions Per Week", header: "Sessions per week", numericStyling: true },
+    { id: "Active Days Per Week", header: "Active days per week", numericStyling: true },
+];
+
+/**
+ * The license half of the Readiness destination: demand from people already
+ * using Copilot without a license, folded together with the idle licensed
+ * estate the report kept on License Allocation.
+ */
+export function LicenseReadinessStage() {
+    const { theme } = useThemeContext();
+
+    const demand = useFilteredQuery(licenseDemandSummary());
+    const estate = useFilteredQuery(licenseEstateSummary(), { ignore: LICENSE_ESTATE_IGNORES });
+    const byOrg = licensePriorityByOrg();
+    const byOrgResult = useFilteredQuery({ connection: byOrg.connection, query: byOrg.query });
+    const candidates = licenseCandidates();
+    const candidatesResult = useFilteredQuery({ connection: candidates.connection, query: candidates.query });
+    const dormancy = licenseDormancy();
+    const dormancyResult = useFilteredQuery(
+        { connection: dormancy.connection, query: dormancy.query },
+        { ignore: LICENSE_ESTATE_IGNORES },
+    );
+
+    const demandRow = useMemo(
+        () => (demand.data?.status === "success" ? toSummaryRow(demand.data.table) : undefined),
+        [demand.data],
+    );
+    const estateRow = useMemo(
+        () => (estate.data?.status === "success" ? toSummaryRow(estate.data.table) : undefined),
+        [estate.data],
+    );
+    const byOrgTable = useMemo(
+        () =>
+            byOrgResult.data?.status === "success"
+                ? toDataTable(byOrgResult.data.table, byOrg.columnMetadata)
+                : undefined,
+        [byOrgResult.data, byOrg.columnMetadata],
+    );
+    const candidatesTable = useMemo(
+        () =>
+            candidatesResult.data?.status === "success"
+                ? toDataTable(candidatesResult.data.table, candidates.columnMetadata)
+                : undefined,
+        [candidatesResult.data, candidates.columnMetadata],
+    );
+    const dormancyTable = useMemo(
+        () =>
+            dormancyResult.data?.status === "success"
+                ? toDataTable(dormancyResult.data.table, dormancy.columnMetadata)
+                : undefined,
+        [dormancyResult.data, dormancy.columnMetadata],
+    );
+
+    const summaryError =
+        demand.data?.status === "error"
+            ? { message: demand.data.error.message, retry: demand.refetch }
+            : estate.data?.status === "error"
+              ? { message: estate.data.error.message, retry: estate.refetch }
+              : undefined;
+    const summaryLoading = demand.isLoading || !demand.data || estate.isLoading || !estate.data;
+    const evidenceNotice = readText(estateRow, "[License Evidence Notice]");
+    const reclaimNotice = readText(estateRow, "[Reclaim Cost Notice]");
+
+    return (
+        <Section
+            id={stageAnchor("license-readiness")}
+            title="License readiness"
+            description="Who is already reaching for Copilot without a license, and which licenses are sitting idle."
+        >
+            {summaryError ? (
+                <QueryError message={summaryError.message} onRetry={summaryError.retry} />
+            ) : summaryLoading ? (
+                <div className="grid gap-300 md:grid-cols-2 xl:grid-cols-3">
+                    <QueryLoading />
+                    <QueryLoading />
+                    <QueryLoading />
+                </div>
+            ) : !demandRow && !estateRow ? (
+                <QueryEmpty
+                    title="No license readiness data"
+                    description="The semantic model returned no rows for the current selection."
+                />
+            ) : (
+                <div className="grid gap-300 md:grid-cols-2 xl:grid-cols-3">
+                    <KpiCard
+                        label="Active unlicensed users"
+                        value={readNumber(demandRow, "[Active Unlicensed Users]")}
+                        emphasis
+                        detail={
+                            <div className="flex flex-col gap-100">
+                                <KpiStat
+                                    label="Share of active users"
+                                    value={readNumber(demandRow, "[Unlicensed Share]")}
+                                    format="percent"
+                                />
+                                <KpiStat
+                                    label="Median sessions/user/week"
+                                    value={readNumber(demandRow, "[Median Sessions Per User Per Week]")}
+                                    format="rate"
+                                />
+                            </div>
+                        }
+                    />
+                    <KpiCard
+                        label="Observed unlicensed use"
+                        value={readNumber(demandRow, "[Observed Sessions Per User Per Week]")}
+                        format="rate"
+                        detail="sessions per user per week, averaged across the active unlicensed population"
+                    />
+                    <KpiCard
+                        label="License estate"
+                        value={readNumber(estateRow, "[Total Licensed Users]")}
+                        detail={
+                            <KpiStat
+                                label="Avg days since last active"
+                                value={readNumber(estateRow, "[Avg Days Since Last Active]")}
+                                format="hours"
+                            />
+                        }
+                    />
+                </div>
+            )}
+
+            <FilterNote
+                ignored={LICENSE_ESTATE_IGNORES}
+                reason="the estate card, dormancy chart and notices read the license roster, which is not dated and has no independent organization dimension."
+            />
+
+            <div
+                className="h-[340px]"
+                style={byOrgTable ? { height: rowChartHeight(byOrgTable.rows.length, { perRow: 40, chrome: 100 }) } : undefined}
+            >
+                {byOrgResult.data?.status === "error" ? (
+                    <QueryError
+                        className="h-full"
+                        message={byOrgResult.data.error.message}
+                        onRetry={byOrgResult.refetch}
+                    />
+                ) : byOrgResult.isLoading || !byOrgTable ? (
+                    <QueryLoading className="h-full" />
+                ) : byOrgTable.rows.length === 0 ? (
+                    <QueryEmpty
+                        className="h-full"
+                        title="No unlicensed demand by organization"
+                        description="No organization has active unlicensed Copilot use in the current selection."
+                    />
+                ) : (
+                    <VegaVisual
+                        spec={byOrg.vegaLiteSpec}
+                        data={byOrgTable}
+                        theme={theme}
+                        header={{
+                            title: "Priority by organization",
+                            subtitle: "Sessions per user per week among active unlicensed users",
+                        }}
+                    />
+                )}
+            </div>
+
+            <div className="flex h-[560px] flex-col">
+                {candidatesResult.data?.status === "error" ? (
+                    <QueryError
+                        className="h-full"
+                        message={candidatesResult.data.error.message}
+                        onRetry={candidatesResult.refetch}
+                    />
+                ) : candidatesResult.isLoading || !candidatesTable ? (
+                    <QueryLoading className="h-full" />
+                ) : candidatesTable.rows.length === 0 ? (
+                    <QueryEmpty
+                        className="h-full"
+                        title="Nobody to license next"
+                        description="No active unlicensed users have enough observed activity to rank in the current selection."
+                    />
+                ) : (
+                    <DataGrid
+                        columns={candidateColumns}
+                        data={candidatesTable}
+                        defaultSort={[{ columnId: "Rank", direction: "asc" }]}
+                        theme={theme}
+                        header={{
+                            title: "Who to license next",
+                            subtitle: `${formatKpi(candidatesTable.rows.length, "whole")} unlicensed users, ranked by priority score`,
+                        }}
+                    />
+                )}
+            </div>
+
+            <div
+                className="h-[340px]"
+                style={dormancyTable ? { height: rowChartHeight(dormancyTable.rows.length, { perRow: 40, chrome: 100 }) } : undefined}
+            >
+                {dormancyResult.data?.status === "error" ? (
+                    <QueryError
+                        className="h-full"
+                        message={dormancyResult.data.error.message}
+                        onRetry={dormancyResult.refetch}
+                    />
+                ) : dormancyResult.isLoading || !dormancyTable ? (
+                    <QueryLoading className="h-full" />
+                ) : dormancyTable.rows.length === 0 ? (
+                    <QueryEmpty
+                        className="h-full"
+                        title="No license roster"
+                        description="The license inventory returned no dormancy buckets to show."
+                    />
+                ) : (
+                    <VegaVisual
+                        spec={dormancy.vegaLiteSpec}
+                        data={dormancyTable}
+                        theme={theme}
+                        header={{
+                            title: "Dormancy of the license estate",
+                            subtitle: "Licensed users by last activity bucket",
+                        }}
+                    />
+                )}
+            </div>
+
+            {(evidenceNotice || reclaimNotice) && (
+                <div className="flex flex-col gap-200">
+                    {evidenceNotice && (
+                        <p className="max-w-[90ch] text-[length:var(--text-300)] leading-300 text-muted-foreground">
+                            {evidenceNotice}
+                        </p>
+                    )}
+                    {reclaimNotice && (
+                        <p className="max-w-[90ch] text-[length:var(--text-300)] leading-300 text-muted-foreground">
+                            {reclaimNotice}
+                        </p>
+                    )}
+                </div>
+            )}
+        </Section>
+    );
+}

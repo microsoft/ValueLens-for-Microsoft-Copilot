@@ -1,0 +1,68 @@
+EVALUATE
+VAR _well =
+    SELECTCOLUMNS(
+        FILTER(
+            SUMMARIZECOLUMNS(
+                'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)],
+                "@Sessions", [Model: Well-matched Sessions],
+                "@Total", [Model: Sessions]
+            ),
+            [@Sessions] > 0
+        ),
+        "Activity", 'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)],
+        "Outcome", "Well matched",
+        "Outcome Order", 1,
+        "Sessions", [@Sessions],
+        "Share", DIVIDE([@Sessions], [@Total])
+    )
+VAR _over =
+    SELECTCOLUMNS(
+        FILTER(
+            SUMMARIZECOLUMNS(
+                'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)],
+                "@Sessions", [Model: Over-specified Sessions],
+                "@Total", [Model: Sessions]
+            ),
+            [@Sessions] > 0
+        ),
+        "Activity", 'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)],
+        "Outcome", "Over-specified",
+        "Outcome Order", 2,
+        "Sessions", [@Sessions],
+        "Share", DIVIDE([@Sessions], [@Total])
+    )
+VAR _under =
+    SELECTCOLUMNS(
+        FILTER(
+            SUMMARIZECOLUMNS(
+                'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)],
+                "@Sessions", [Model: Under-specified Sessions],
+                "@Total", [Model: Sessions]
+            ),
+            [@Sessions] > 0
+        ),
+        "Activity", 'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)],
+        "Outcome", "Under-specified",
+        "Outcome Order", 3,
+        "Sessions", [@Sessions],
+        "Share", DIVIDE([@Sessions], [@Total])
+    )
+VAR _notJudged =
+    SELECTCOLUMNS(
+        FILTER(
+            SUMMARIZECOLUMNS(
+                'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)],
+                "@Sessions", [Model: Not Judged Sessions],
+                "@Total", [Model: Sessions]
+            ),
+            [@Sessions] > 0
+        ),
+        "Activity", 'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)],
+        "Outcome", "Not judged",
+        "Outcome Order", 4,
+        "Sessions", [@Sessions],
+        "Share", DIVIDE([@Sessions], [@Total])
+    )
+RETURN
+    UNION(_well, _over, _under, _notJudged)
+ORDER BY [Activity], [Outcome Order]

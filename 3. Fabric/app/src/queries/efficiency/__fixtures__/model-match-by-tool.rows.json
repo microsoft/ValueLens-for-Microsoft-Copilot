@@ -1,0 +1,30 @@
+[
+  {
+    "[Activity]": "Agents",
+    "[Outcome]": "Well matched",
+    "[Outcome Order]": 1,
+    "[Sessions]": 2956,
+    "[Share]": 0.6568888888888889
+  },
+  {
+    "[Activity]": "Agents",
+    "[Outcome]": "Not judged",
+    "[Outcome Order]": 4,
+    "[Sessions]": 1544,
+    "[Share]": 0.3431111111111111
+  },
+  {
+    "[Activity]": "Copilot",
+    "[Outcome]": "Well matched",
+    "[Outcome Order]": 1,
+    "[Sessions]": 1187,
+    "[Share]": 0.6594444444444445
+  },
+  {
+    "[Activity]": "Copilot",
+    "[Outcome]": "Not judged",
+    "[Outcome Order]": 4,
+    "[Sessions]": 613,
+    "[Share]": 0.34055555555555556
+  }
+]

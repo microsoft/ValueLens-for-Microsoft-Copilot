@@ -1,0 +1,29 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Surface / Agent",
+      "type": "nominal",
+      "title": null,
+      "sort": "-x",
+      "axis": { "labelLimit": 220 }
+    },
+    "x": {
+      "field": "Satisfaction",
+      "type": "quantitative",
+      "title": "Satisfaction",
+      "scale": { "domain": [0, 1] },
+      "axis": { "format": ".0%" }
+    },
+    "tooltip": [
+      { "field": "Surface / Agent", "type": "nominal", "title": "Surface or agent" },
+      { "field": "Satisfaction", "type": "quantitative", "title": "Satisfaction", "format": ".0%" },
+      { "field": "Total Feedback", "type": "quantitative", "title": "Feedback items", "format": ",.0f" },
+      { "field": "Thumbs Up", "type": "quantitative", "title": "Thumbs up", "format": ",.0f" },
+      { "field": "Thumbs Down", "type": "quantitative", "title": "Thumbs down", "format": ",.0f" }
+    ]
+  }
+}

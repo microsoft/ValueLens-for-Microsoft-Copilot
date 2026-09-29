@@ -6,15 +6,16 @@
 //-----------------------------------------------------------------------
 
 import { CoworkReadinessStage } from "./cowork-readiness-stage";
+import { LicenseReadinessStage } from "./license-readiness-stage";
 
 /**
  * Who is ready for more: the report's License Readiness page (with License
- * Allocation folded in) and its Cowork Readiness page. Cowork readiness is
- * built; license readiness follows.
+ * Allocation folded in) and its Cowork Readiness page, in report order.
  */
 export function ReadinessScreen() {
     return (
         <div className="flex flex-col gap-800">
+            <LicenseReadinessStage />
             <CoworkReadinessStage />
         </div>
     );

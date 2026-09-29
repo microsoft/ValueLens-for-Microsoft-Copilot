@@ -13,6 +13,7 @@ interface KpiCardProps {
     label: string;
     value: number | undefined;
     format?: KpiFormat;
+    prefix?: string;
     /** Smaller supporting figure shown beneath the rule. */
     detail?: ReactNode;
     /** Emphasises the card as the lead figure of its group. */
@@ -24,7 +25,7 @@ interface KpiCardProps {
  * A single figure presented as the focus of its card — oversized tabular
  * numerals over a hairline rule, with the label subordinated above it.
  */
-export function KpiCard({ label, value, format = "whole", detail, emphasis, className }: KpiCardProps) {
+export function KpiCard({ label, value, format = "whole", prefix, detail, emphasis, className }: KpiCardProps) {
     const isBlank = value === undefined;
 
     return (
@@ -47,7 +48,7 @@ export function KpiCard({ label, value, format = "whole", detail, emphasis, clas
                     isBlank && "text-muted-foreground",
                 )}
             >
-                {formatKpi(value, format)}
+                {formatKpi(value, format, { prefix })}
             </span>
             {detail && (
                 <div className="border-t border-border pt-200 text-[length:var(--text-200)] leading-300 text-muted-foreground">
@@ -62,15 +63,16 @@ interface KpiStatProps {
     label: string;
     value: number | undefined;
     format?: KpiFormat;
+    prefix?: string;
 }
 
 /** A compact label/figure pair for use inside a card's detail area. */
-export function KpiStat({ label, value, format = "whole" }: KpiStatProps) {
+export function KpiStat({ label, value, format = "whole", prefix }: KpiStatProps) {
     return (
         <div className="flex items-baseline justify-between gap-200">
             <span>{label}</span>
             <span className="font-numeric font-semibold tabular-nums text-[length:var(--text-300)] text-foreground">
-                {formatKpi(value, format)}
+                {formatKpi(value, format, { prefix })}
             </span>
         </div>
     );

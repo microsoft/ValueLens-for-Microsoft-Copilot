@@ -6,15 +6,17 @@
 //-----------------------------------------------------------------------
 
 import { CoworkFitStage } from "./cowork-fit-stage";
+import { ModelFitStage } from "./model-fit-stage";
 
 /**
- * Whether the right tool is doing the job: the report's Cowork Fit and Model
- * Fit pages. Cowork fit is built; model fit follows.
+ * Whether the right tool and model are doing the job: Cowork fit first, then
+ * the Model Fit page rebuilt as model-choice coverage and verdicts.
  */
 export function EfficiencyScreen() {
     return (
         <div className="flex flex-col gap-800">
             <CoworkFitStage />
+            <ModelFitStage />
         </div>
     );
 }

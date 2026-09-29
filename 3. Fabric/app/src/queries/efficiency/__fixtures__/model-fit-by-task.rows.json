@@ -1,0 +1,35 @@
+[
+  {
+    "[Segment]": "Document Summarization",
+    "[Main Model]": "COPILOT-PRO · 36%",
+    "[Main Reason]": null,
+    "[Sessions]": 1721,
+    "[Judged Sessions]": 1106,
+    "[Well-matched Sessions]": 1106,
+    "[Over-specified Sessions]": null,
+    "[Under-specified Sessions]": null,
+    "[Judged Share]": 0.6426496223126089
+  },
+  {
+    "[Segment]": "Collaboration & Workflows",
+    "[Main Model]": "COPILOT-PRO · 35%",
+    "[Main Reason]": null,
+    "[Sessions]": 1300,
+    "[Judged Sessions]": 841,
+    "[Well-matched Sessions]": 841,
+    "[Over-specified Sessions]": null,
+    "[Under-specified Sessions]": null,
+    "[Judged Share]": 0.6469230769230769
+  },
+  {
+    "[Segment]": "General Chat & Q&A",
+    "[Main Model]": "GPT-4-TURBO · 35%",
+    "[Main Reason]": null,
+    "[Sessions]": 1223,
+    "[Judged Sessions]": 841,
+    "[Well-matched Sessions]": 841,
+    "[Over-specified Sessions]": null,
+    "[Under-specified Sessions]": null,
+    "[Judged Share]": 0.687653311529027
+  }
+]

@@ -1,0 +1,7 @@
+EVALUATE
+ROW(
+    "Active Unlicensed Users", [Active Unlicensed Users],
+    "Unlicensed Share", [Unlicensed Share of Active Users],
+    "Median Sessions Per User Per Week", [Median Unlicensed Sessions Per User Per Week],
+    "Observed Sessions Per User Per Week", [Observed Unlicensed Sessions per User per Week]
+)

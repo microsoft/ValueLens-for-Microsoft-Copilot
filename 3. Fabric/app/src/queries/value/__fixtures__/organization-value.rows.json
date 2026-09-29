@@ -1,0 +1,38 @@
+[
+  {
+    "Chat + Agent Org Data[Organization]": "Sales",
+    "[Active Users]": 30,
+    "[Expert Equivalent Hours Per Week]": 40.99166666666666,
+    "[AI Assisted Value]": 20495.83333333333
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "IT",
+    "[Active Users]": 30,
+    "[Expert Equivalent Hours Per Week]": 28.368333333333332,
+    "[AI Assisted Value]": 14184.166666666666
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Marketing",
+    "[Active Users]": 30,
+    "[Expert Equivalent Hours Per Week]": 23.241666666666667,
+    "[AI Assisted Value]": 11620.833333333334
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Legal",
+    "[Active Users]": 30,
+    "[Expert Equivalent Hours Per Week]": 23.165,
+    "[AI Assisted Value]": 11582.499999999998
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Finance",
+    "[Active Users]": 30,
+    "[Expert Equivalent Hours Per Week]": 21.368333333333336,
+    "[AI Assisted Value]": 10684.166666666668
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "HR",
+    "[Active Users]": 30,
+    "[Expert Equivalent Hours Per Week]": 17.01833333333333,
+    "[AI Assisted Value]": 8509.166666666666
+  }
+]

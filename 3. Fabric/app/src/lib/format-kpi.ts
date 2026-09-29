@@ -6,13 +6,19 @@
 //-----------------------------------------------------------------------
 
 /** How a figure should be rendered when it is present. */
-export type KpiFormat = "whole" | "percent" | "rate" | "hours";
+export type KpiFormat = "whole" | "percent" | "rate" | "hours" | "currency";
+
+interface FormatKpiOptions {
+    /** Symbol or short unit printed directly before a present value. */
+    prefix?: string;
+}
 
 const formatters: Record<KpiFormat, Intl.NumberFormat> = {
     whole: new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }),
     percent: new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 }),
     rate: new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     hours: new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }),
+    currency: new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }),
 };
 
 /**
@@ -20,7 +26,7 @@ const formatters: Record<KpiFormat, Intl.NumberFormat> = {
  * BLANK. A missing figure must never be shown as a zero — the two mean very
  * different things in this report.
  */
-export function formatKpi(value: number | undefined, format: KpiFormat): string {
+export function formatKpi(value: number | undefined, format: KpiFormat, options: FormatKpiOptions = {}): string {
     if (value === undefined) return "—";
-    return formatters[format].format(value);
+    return `${options.prefix ?? ""}${formatters[format].format(value)}`;
 }

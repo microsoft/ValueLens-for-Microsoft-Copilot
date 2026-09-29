@@ -1,0 +1,29 @@
+EVALUATE
+VAR RankedGroups =
+    TOPN(
+        20,
+        FILTER(
+            SUMMARIZECOLUMNS(
+                'Chat + Agent Interactions (Audit Logs)'[Task Breakdown Group],
+                "Expert Equivalent Hours", [Expert Equivalent Hours],
+                "AI Assisted Value", [AI Assisted Value],
+                "Share of Value",
+                    DIVIDE(
+                        [AI Assisted Value],
+                        CALCULATE(
+                            [AI Assisted Value],
+                            ALLSELECTED('Chat + Agent Interactions (Audit Logs)'[Task Breakdown Group])
+                        ),
+                        0
+                    )
+            ),
+            NOT ISBLANK('Chat + Agent Interactions (Audit Logs)'[Task Breakdown Group])
+                && NOT ISBLANK([AI Assisted Value])
+                && [AI Assisted Value] > 0
+        ),
+        [AI Assisted Value], DESC,
+        'Chat + Agent Interactions (Audit Logs)'[Task Breakdown Group], ASC
+    )
+RETURN
+RankedGroups
+ORDER BY [AI Assisted Value] DESC, 'Chat + Agent Interactions (Audit Logs)'[Task Breakdown Group] ASC

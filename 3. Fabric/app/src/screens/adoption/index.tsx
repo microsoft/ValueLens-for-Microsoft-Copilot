@@ -8,11 +8,12 @@
 import { ActivationStage } from "./activation-stage";
 import { AdoptionStage } from "./adoption-stage";
 import { HabitStage } from "./habit-stage";
+import { TrendHeatmapStage } from "./trend-heatmap-stage";
 
 /**
  * The adoption funnel, read top to bottom: did people start, do they come
- * back, and has it become a habit. Three report pages, ninety-three visuals
- * and six queries.
+ * back, has it become a habit, and where is that momentum concentrating.
+ * Four report pages, more than one hundred visuals and eight queries.
  */
 export function AdoptionScreen() {
     return (
@@ -20,6 +21,7 @@ export function AdoptionScreen() {
             <ActivationStage />
             <AdoptionStage />
             <HabitStage />
+            <TrendHeatmapStage />
         </div>
     );
 }

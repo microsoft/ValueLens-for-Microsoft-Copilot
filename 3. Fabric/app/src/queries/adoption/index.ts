@@ -11,3 +11,5 @@ export * from "./adoption-summary";
 export * from "./adoption-trend";
 export * from "./habit-summary";
 export * from "./habit-trend";
+export * from "./trend-heatmap";
+export * from "./trend-heatmap-headline";

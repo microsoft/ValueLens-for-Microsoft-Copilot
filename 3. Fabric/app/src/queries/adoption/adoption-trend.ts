@@ -53,7 +53,9 @@ export function adoptionTrend(params?: AdoptionTrendParams) {
     const { fields, axisTitle, format } = seriesByMeasure[params?.measure ?? "sessionsPerUser"];
     const vegaLiteSpec = structuredClone(spec) as unknown as MutableSpec;
 
-    vegaLiteSpec.transform[0].fold = fields;
+    const fold = vegaLiteSpec.transform.find((step): step is FoldStep => "fold" in step);
+    if (!fold) throw new Error("adoption-trend.json must fold the series into one column.");
+    fold.fold = fields;
     vegaLiteSpec.encoding.y.title = axisTitle;
 
     const tooltip = vegaLiteSpec.layer[1].encoding.tooltip;
@@ -72,8 +74,13 @@ export function adoptionTrend(params?: AdoptionTrendParams) {
 }
 
 /** Narrow view of the spec covering only the parts this factory rewrites. */
+interface FoldStep {
+    fold: string[];
+    as: string[];
+}
+
 interface MutableSpec {
-    transform: { fold: string[]; as: string[] }[];
+    transform: (FoldStep | { calculate: string; as: string })[];
     encoding: {
         y: { title: string };
         color?: unknown;

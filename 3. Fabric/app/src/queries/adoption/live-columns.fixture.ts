@@ -92,4 +92,18 @@ export const liveColumns = {
         "Stage Legend[Stage]",
         "[Users]",
     ],
+    trendHeatmap: [
+        "Chat + Agent Org Data[Organization]",
+        "Chat + Agent Interactions (Audit Logs)[WeekStart]",
+        "[Active Users]",
+        "[Active Days Per User]",
+        "[Expert Hours Per User]",
+        "[Sessions Per User]",
+    ],
+    trendHeatmapHeadline: [
+        "[Active Users Headline]",
+        "[Active Days Headline]",
+        "[Expert Hours Headline]",
+        "[Sessions Headline]",
+    ],
 } as const;

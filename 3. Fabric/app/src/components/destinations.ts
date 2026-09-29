@@ -29,7 +29,7 @@ export const destinations = [
             { id: "activation", label: "Activation", ready: true },
             { id: "adoption", label: "Adoption", ready: true },
             { id: "habit-formation", label: "Habit formation", ready: true },
-            { id: "trend-heatmap", label: "Trend heatmap", ready: false },
+            { id: "trend-heatmap", label: "Trend heatmap", ready: true },
         ],
     },
     {
@@ -50,7 +50,7 @@ export const destinations = [
         icon: KeyRound as LucideIcon,
         filters: ["dateRange", "organizations"] as FilterKey[],
         stages: [
-            { id: "license-readiness", label: "License readiness", ready: false },
+            { id: "license-readiness", label: "License readiness", ready: true },
             { id: "cowork-readiness", label: "Cowork readiness", ready: true },
         ],
     },
@@ -62,7 +62,7 @@ export const destinations = [
         filters: ["dateRange", "organizations", "licence", "audience", "agentTypes"] as FilterKey[],
         stages: [
             { id: "task-breakdown", label: "Task breakdown", ready: true },
-            { id: "estimated-value", label: "Estimated value", ready: false },
+            { id: "estimated-value", label: "Estimated value", ready: true },
         ],
     },
     {
@@ -73,7 +73,7 @@ export const destinations = [
         filters: ["dateRange", "organizations", "licence", "audience"] as FilterKey[],
         stages: [
             { id: "cowork-fit", label: "Cowork fit", ready: true },
-            { id: "model-fit", label: "Model fit", ready: false },
+            { id: "model-fit", label: "Model fit", ready: true },
         ],
     },
     {
@@ -82,7 +82,7 @@ export const destinations = [
         blurb: "What people say about it",
         icon: MessageSquareQuote as LucideIcon,
         filters: ["dateRange"] as FilterKey[],
-        stages: [{ id: "feedback", label: "Feedback", ready: false }],
+        stages: [{ id: "feedback", label: "Feedback", ready: true }],
     },
 ] as const;
 

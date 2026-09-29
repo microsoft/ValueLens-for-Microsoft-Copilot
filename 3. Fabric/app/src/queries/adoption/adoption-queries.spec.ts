@@ -13,6 +13,8 @@ import {
     adoptionTrend,
     habitSummary,
     habitTrend,
+    trendHeatmap,
+    trendHeatmapHeadline,
 } from "./index";
 import { liveColumns } from "./live-columns.fixture";
 
@@ -23,6 +25,8 @@ const modules = [
     { name: "adoptionTrend", factory: adoptionTrend, columns: liveColumns.adoptionTrend },
     { name: "habitSummary", factory: habitSummary, columns: liveColumns.habitSummary },
     { name: "habitTrend", factory: habitTrend, columns: liveColumns.habitTrend },
+    { name: "trendHeatmap", factory: trendHeatmap, columns: liveColumns.trendHeatmap },
+    { name: "trendHeatmapHeadline", factory: trendHeatmapHeadline, columns: liveColumns.trendHeatmapHeadline },
 ];
 
 /** Characters `ColumnDef.name` strips from the original DAX column name. */
@@ -103,6 +107,10 @@ describe("adoption spec field references", () => {
         { name: "adoptionTrend (hours)", factory: () => adoptionTrend({ measure: "hours" }) },
         { name: "habitTrend", factory: () => habitTrend() },
         { name: "habitTrend (count)", factory: () => habitTrend({ scale: "count" }) },
+        { name: "trendHeatmap", factory: () => trendHeatmap() },
+        { name: "trendHeatmap (active days)", factory: () => trendHeatmap({ metric: "activeDays" }) },
+        { name: "trendHeatmap (hours)", factory: () => trendHeatmap({ metric: "expertHours" }) },
+        { name: "trendHeatmap (sessions)", factory: () => trendHeatmap({ metric: "sessions" }) },
     ];
 
     it.each(specModules)("$name only references columns the query returns", ({ factory }) => {
@@ -118,6 +126,11 @@ describe("adoption spec field references", () => {
 
     it("leaves no unsubstituted placeholders in the org spec", () => {
         const serialized = JSON.stringify(activationByOrg().vegaLiteSpec);
+        expect(serialized).not.toMatch(/__[A-Z]+__/);
+    });
+
+    it("leaves no unsubstituted placeholders in the heatmap spec", () => {
+        const serialized = JSON.stringify(trendHeatmap({ metric: "sessions" }).vegaLiteSpec);
         expect(serialized).not.toMatch(/__[A-Z]+__/);
     });
 
@@ -157,10 +170,19 @@ describe("adoption spec field references", () => {
     it("does not let one variant's spec changes leak into the next", () => {
         adoptionTrend({ measure: "hours" });
         const followUp = adoptionTrend().vegaLiteSpec as {
-            transform: { fold: string[] }[];
+            transform: { fold?: string[] }[];
             encoding: { color?: unknown };
         };
-        expect(followUp.transform[0].fold).toEqual(["Licensed", "Unlicensed", "Agents"]);
+        expect(followUp.transform.find((step) => step.fold)?.fold).toEqual(["Licensed", "Unlicensed", "Agents"]);
         expect(followUp.encoding.color).toBeDefined();
+    });
+
+    it("does not let one heatmap metric's spec changes leak into the next", () => {
+        trendHeatmap({ metric: "sessions" });
+        const followUp = trendHeatmap().vegaLiteSpec as unknown as {
+            layer: [{ encoding: { color: { field: string } } }];
+        };
+
+        expect(followUp.layer[0].encoding.color.field).toBe("Active Users");
     });
 });

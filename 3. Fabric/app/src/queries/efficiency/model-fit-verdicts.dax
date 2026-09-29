@@ -1,0 +1,32 @@
+EVALUATE
+TOPN(
+    25,
+    SELECTCOLUMNS(
+        FILTER(
+            SUMMARIZECOLUMNS(
+                __GROUPING_COLUMN__,
+                "@Sessions", [Model: Sessions],
+                "@Judged", [Model: Judged Sessions],
+                "@Well", [Model: Well-matched Sessions],
+                "@Over", [Model: Over-specified Sessions],
+                "@Under", [Model: Under-specified Sessions],
+                "@JudgedShare", [Model: Judged Share],
+                "@MainModel", [Model: Main Model],
+                "@MainReason", [Model: Main Reason]
+            ),
+            NOT ISBLANK([@Sessions])
+        ),
+        "Segment", COALESCE(__GROUPING_COLUMN__, "__BLANK_LABEL__"),
+        "Main Model", [@MainModel],
+        "Main Reason", [@MainReason],
+        "Sessions", [@Sessions],
+        "Judged Sessions", [@Judged],
+        "Well-matched Sessions", [@Well],
+        "Over-specified Sessions", [@Over],
+        "Under-specified Sessions", [@Under],
+        "Judged Share", [@JudgedShare]
+    ),
+    [Sessions], DESC,
+    [Segment], ASC
+)
+ORDER BY [Sessions] DESC, [Segment] ASC

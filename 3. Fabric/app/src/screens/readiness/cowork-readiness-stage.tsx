@@ -14,6 +14,7 @@ import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states"
 import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import { rowChartHeight } from "@/lib/chart-height";
 import { formatKpi } from "@/lib/format-kpi";
 import { readNumber, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
@@ -120,7 +121,7 @@ export function CoworkReadinessStage() {
                 </p>
             )}
 
-            <div className="h-[340px]">
+            <div className="h-[340px]" style={byOrgTable ? { height: rowChartHeight(byOrgTable.rows.length, { perRow: 40, chrome: 100 }) } : undefined}>
                 {byOrgResult.data?.status === "error" ? (
                     <QueryError
                         className="h-full"
