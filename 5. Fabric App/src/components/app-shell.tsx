@@ -25,13 +25,13 @@ interface AppShellProps {
 const READING_LINE = 0.3;
 
 /**
- * Sidebar-and-canvas frame. The sidebar is the whole navigation model — six
+ * Sidebar-and-canvas frame. The sidebar is the whole navigation model — the
  * destinations replacing the report's pages and bookmark bars, with the
  * active destination's stages listed beneath it and tracked as you scroll,
  * and the report's appendix set apart below them as reference.
  *
  * Each destination carries its own palette: the sidebar shows every hue at
- * once so the six read as distinct places, and the canvas — chrome and charts
+ * once so they read as distinct places, and the canvas — chrome and charts
  * alike — takes on the hue of the one that is open.
  */
 export function AppShell({ active, onNavigate, children }: AppShellProps) {

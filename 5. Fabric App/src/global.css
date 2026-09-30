@@ -245,6 +245,9 @@
     --vl-lavender: #8783ff;    --vl-lavender-text: #5650d9;  --vl-lavender-tint: #efeeff;
     --vl-coral: #f06549;       --vl-coral-text: #b23e25;     --vl-coral-tint: #fdeeea;
     --vl-navy: #0b2c57;        --vl-navy-text: #0b2c57;      --vl-navy-tint: #e9eef5;
+    /* Green comes from Consumption Central's theme rather than the ValueLens
+       one, so the page built on that report still looks like it. */
+    --vl-green: #3d8b4f;       --vl-green-text: #2e6b3c;     --vl-green-tint: #e8f3ea;
     --vl-periwinkle: #95a9ce;
     --vl-slate: #8793a3;
     --vl-ink: #1c2632;
@@ -267,6 +270,7 @@
     --vl-lavender: #a3a0ff;    --vl-lavender-text: #bcbaff;  --vl-lavender-tint: #27264a;
     --vl-coral: #f4836c;       --vl-coral-text: #f7a392;     --vl-coral-tint: #3d1f19;
     --vl-navy: #5b7bb0;        --vl-navy-text: #a9bde0;      --vl-navy-tint: #1b2536;
+    --vl-green: #6cc07f;       --vl-green-text: #93d3a1;     --vl-green-tint: #1a3020;
     --vl-periwinkle: #b3c2de;
     --vl-slate: #a3aebd;
     --vl-ink: #dbdfe4;
@@ -280,7 +284,7 @@
 
   /* Destination palettes. Each destination leads with its own hue — in the
      sidebar, on its controls and as the first series of every chart — and
-     draws its supporting series from the same theme, so the six read as one
+     draws its supporting series from the same theme, so they read as one
      family. Charts pick these up through `usePaletteTheme`. */
   .palette-adoption {
     --color-brand: var(--vl-blue);
@@ -390,6 +394,27 @@
     --color-data-4: var(--vl-amber);
     --color-data-5: var(--vl-plum);
     --color-data-6: var(--vl-lavender);
+    --color-data-7: var(--vl-navy);
+    --color-data-8: var(--vl-periwinkle);
+    --color-data-9: var(--vl-slate);
+    --color-data-10: var(--vl-ink);
+  }
+
+  /* Consumption leads with green for prepaid capacity and puts amber second,
+     so pay-as-you-go always reads as the overflow on top of it. */
+  .palette-consumption {
+    --color-brand: var(--vl-green);
+    --color-brand-foreground: var(--vl-green-text);
+    --color-primary: var(--vl-green-text);
+    --color-ring: var(--vl-green-text);
+    --color-accent: var(--vl-green-tint);
+    --color-accent-foreground: var(--vl-green-text);
+    --color-data-1: var(--vl-green);
+    --color-data-2: var(--vl-amber);
+    --color-data-3: var(--vl-blue);
+    --color-data-4: var(--vl-plum);
+    --color-data-5: var(--vl-lavender);
+    --color-data-6: var(--vl-coral);
     --color-data-7: var(--vl-navy);
     --color-data-8: var(--vl-periwinkle);
     --color-data-9: var(--vl-slate);

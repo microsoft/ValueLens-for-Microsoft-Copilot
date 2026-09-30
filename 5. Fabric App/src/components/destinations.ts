@@ -6,13 +6,15 @@
 //-----------------------------------------------------------------------
 
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, Gauge, KeyRound, MessageSquareQuote, PoundSterling, TrendingUp, Trophy } from "lucide-react";
+import { BookOpen, Coins, Gauge, KeyRound, MessageSquareQuote, PoundSterling, TrendingUp, Trophy } from "lucide-react";
 import type { FilterKey } from "@/lib/filters";
 
 /**
- * The six top-level destinations the report pages were folded into, each
+ * The top-level destinations the report pages were folded into, each
  * holding its pages as stages read top to bottom, plus the report's appendix
- * as a reference destination below them.
+ * as a reference destination below them. Consumption comes from a second
+ * report, Consumption Central, and brings its own slicers, so it takes none
+ * of the filter bar's.
  *
  * A stage that is not built yet stays listed so the shape of the destination
  * is visible; a destination is reachable once any of its stages is built.
@@ -87,6 +89,19 @@ export const destinations = [
         icon: MessageSquareQuote as LucideIcon,
         filters: ["dateRange"] as FilterKey[],
         stages: [{ id: "feedback", label: "Feedback", ready: true }],
+    },
+    {
+        id: "consumption",
+        label: "Consumption",
+        blurb: "Credits used, and what they cost",
+        icon: Coins as LucideIcon,
+        filters: [] as FilterKey[],
+        stages: [
+            { id: "consumption-overview", label: "All products", ready: true },
+            { id: "cowork-credits", label: "Cowork / Work IQ", ready: true },
+            { id: "studio-credits", label: "Copilot Studio", ready: true },
+            { id: "azure-spend", label: "Azure", ready: true },
+        ],
     },
     {
         id: "appendix",

@@ -18,16 +18,20 @@ security applies.
 | **Value** | What the work was, and what it was worth: task breakdown and estimated value |
 | **Efficiency** | Whether the right tool is doing the job: Cowork fit, Model fit, and how grading works |
 | **Feedback** | What people say about Copilot |
+| **Consumption** | Credits used and what they cost across Cowork / Work IQ, Copilot Studio and Azure, from Consumption Central |
 | **Appendix** | Glossary, plus Signal → Impact value assumptions |
 
-Filters (date, organisation, licence, activity, agent) apply across pages. The app opens in light
-mode, and a toggle switches it to dark.
+Filters (date, organisation, licence, activity, agent) apply across the ValueLens pages. The
+Consumption page has its own period, service, group and cost-basis choices, taken from the
+Consumption Central report. The app opens in light mode, and a toggle switches it to dark.
 
 ## Prerequisites
 
 - A workspace on **Fabric capacity** (F2 or above, or a trial) to host the app. *My workspace*
   can't host it.
 - A **published ValueLens semantic model**, with **Build** permission on it for everyone who'll use the app.
+- *Optional, for the Consumption page:* a **published Consumption Central semantic model**, with
+  the same Build permission.
 - The Power BI tenant setting **Dataset Execute Queries REST API** turned on (Admin portal →
   Integration settings).
 - [Node.js 22](https://nodejs.org/) on the machine you deploy from.
@@ -40,9 +44,11 @@ Run these commands from this folder (`5. Fabric App`).
    ```powershell
    npm install
    ```
-2. **Point it at your model.** In [`fabric.yaml`](fabric.yaml), set `workspaceId` and `itemId` to
-   your semantic model. Both IDs are in the model's URL:
-   `app.powerbi.com/groups/<workspaceId>/datasets/<itemId>/…`
+2. **Point it at your models.** In [`fabric.yaml`](fabric.yaml), set `workspaceId` and `itemId`
+   under `vl` to your ValueLens semantic model, and under `cc` to your Consumption Central model.
+   Both IDs are in each model's URL: `app.powerbi.com/groups/<workspaceId>/datasets/<itemId>/…`
+   Without Consumption Central, delete the `cc` block; the Consumption page then explains what
+   it needs.
 3. **Deploy.** Sign in when prompted. If your account spans tenants, add `--tenant <tenant-id>`.
    ```powershell
    npx rayfin up --workspace-uri "https://app.fabric.microsoft.com/groups/<workspace-id>"

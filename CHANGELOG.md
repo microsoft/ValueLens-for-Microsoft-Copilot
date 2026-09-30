@@ -16,6 +16,19 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-09-30 — Fabric App: a Consumption page from Consumption Central
+
+The [Fabric App](5.%20Fabric%20App/) has an eighth page, **Consumption**. It reads a published
+Consumption Central model, bound as a second connection (`cc`), and rebuilds that report's
+consumption and cost pages. There are four sections: all products side by side, Cowork / Work IQ,
+Copilot Studio and Azure. The Cowork and Studio sections each switch between a Consumption view
+and a Cost view, and keep the report's period, service and group-by choices. Azure shows the
+whole-solution cost export when one is loaded, and Azure AI Foundry model spend otherwise. The
+Consumption Central model is optional: without it, the page says what to connect. The app also
+opens in light mode by default again.
+
+---
+
 ## 2026-09-30 — path 5: the ValueLens Fabric App (preview)
 
 A new top-level folder, [`5. Fabric App`](5.%20Fabric%20App/), holds ValueLens rebuilt as a web
