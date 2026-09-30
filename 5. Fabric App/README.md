@@ -32,6 +32,7 @@ Consumption Central report. The app opens in light mode, and a toggle switches i
 - A **published ValueLens semantic model**, with **Build** permission on it for everyone who'll use the app.
 - *Optional, for the Consumption page:* a **published Consumption Central semantic model**, with
   the same Build permission.
+- The Fabric tenant setting **Fabric Apps (preview)** turned on (Admin portal → Tenant settings).
 - The Power BI tenant setting **Dataset Execute Queries REST API** turned on (Admin portal →
   Integration settings).
 - [Node.js 22](https://nodejs.org/) on the machine you deploy from.
@@ -54,7 +55,14 @@ Run these commands from this folder (`5. Fabric App`).
    npx rayfin up --workspace-uri "https://app.fabric.microsoft.com/groups/<workspace-id>"
    ```
    It builds the app, creates a **ValueLens** item in the workspace, and prints the link.
-4. **Share.** Anyone with access to the workspace and Build permission on the model can open the app.
+4. **Share.** Each viewer needs two things:
+   - **The app:** add them to the workspace (Viewer is enough), or share the **ValueLens** item
+     with *Run and interact* permission. Then send them the link `rayfin up` printed.
+   - **The data:** Build permission on the ValueLens model, and on Consumption Central if you use
+     it. Without it the app opens, but its pages can't load.
+
+   People from another tenant must first be invited as guests in yours, and guest access to
+   Fabric must be allowed in your tenant settings.
 
 To ship changes, run `npx rayfin up` again. It updates the same item.
 
