@@ -20,8 +20,8 @@ security applies.
 | **Feedback** | What people say about Copilot |
 | **Appendix** | Glossary, plus Signal → Impact value assumptions |
 
-Filters (date, organisation, licence, activity, agent) apply across pages. The app opens in dark
-mode, and a toggle switches it to light.
+Filters (date, organisation, licence, activity, agent) apply across pages. The app opens in light
+mode, and a toggle switches it to dark.
 
 ## Prerequisites
 

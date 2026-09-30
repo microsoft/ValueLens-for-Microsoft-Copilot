@@ -28,12 +28,12 @@ function save(value: "dark" | "light") {
 }
 
 /**
- * Dark by default. Anyone who switches to light mode keeps it on their next
+ * Light by default. Anyone who switches to dark mode keeps it on their next
  * visit, because the choice is saved in this browser. The OS and host themes
  * are deliberately not followed, so the app always opens the same way.
  */
 export function useAppTheme() {
-    const [isDark, setIsDark] = useState(() => readSaved() !== "light");
+    const [isDark, setIsDark] = useState(() => readSaved() === "dark");
 
     useEffect(() => {
         // Sync the .dark class on <html> for Tailwind dark mode

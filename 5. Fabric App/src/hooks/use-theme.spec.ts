@@ -16,29 +16,29 @@ afterEach(() => {
 });
 
 describe("useAppTheme", () => {
-    it("opens in dark mode when nothing is saved", () => {
+    it("opens in light mode when nothing is saved", () => {
         const { result } = renderHook(() => useAppTheme());
-        expect(result.current.isDark).toBe(true);
-        expect(document.documentElement.classList.contains("dark")).toBe(true);
+        expect(result.current.isDark).toBe(false);
+        expect(document.documentElement.classList.contains("dark")).toBe(false);
     });
 
-    it("remembers a switch to light mode", () => {
+    it("remembers a switch to dark mode", () => {
         const first = renderHook(() => useAppTheme());
         act(() => first.result.current.toggleTheme());
-        expect(first.result.current.isDark).toBe(false);
-        expect(document.documentElement.classList.contains("dark")).toBe(false);
-        expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
+        expect(first.result.current.isDark).toBe(true);
+        expect(document.documentElement.classList.contains("dark")).toBe(true);
+        expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
         first.unmount();
 
         const next = renderHook(() => useAppTheme());
-        expect(next.result.current.isDark).toBe(false);
+        expect(next.result.current.isDark).toBe(true);
     });
 
-    it("remembers switching back to dark mode", () => {
-        window.localStorage.setItem(THEME_STORAGE_KEY, "light");
+    it("remembers switching back to light mode", () => {
+        window.localStorage.setItem(THEME_STORAGE_KEY, "dark");
         const { result } = renderHook(() => useAppTheme());
         act(() => result.current.toggleTheme());
-        expect(result.current.isDark).toBe(true);
-        expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
+        expect(result.current.isDark).toBe(false);
+        expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
     });
 });
