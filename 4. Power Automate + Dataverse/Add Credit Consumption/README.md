@@ -32,7 +32,7 @@ cd "4. Power Automate + Dataverse/Add Credit Consumption/scripts"
 python Deploy-DataverseSchema.py --environment https://your-org.crm.dynamics.com
 ```
 
-That's a dry run: it lists the 11 tables and 123 columns and changes nothing. Set a token in
+That's a dry run: it lists the 12 tables and 173 columns and changes nothing. Set a token in
 `DATAVERSE_TOKEN` and add `--execute` to create them. Re-running skips anything that already exists.
 
 ### 2. Import the flows
@@ -73,15 +73,18 @@ admin centre → **Settings** → **Features**).
 ## What the flows don't fill
 
 Flows fill `studio_tenant_daily`, `studio_agent`, `azure_ai_spend` and `github_ai_usage`. The other
-seven tables the script creates (Studio per-user, GitHub seat map, spending policies and four Azure
-detail tables) have no API. Import them by hand with **Data → Import** in
+eight tables the script creates (Cowork credits, Studio per-user, GitHub seat map, spending policies
+and four Azure detail tables) have no API. Import them by hand with **Data → Import** in
 [make.powerapps.com](https://make.powerapps.com); the files in the
 [Local CSV sample data](../../1.%20Local%20CSV/Add%20Credit%20Consumption/sample-data/) show the
 columns.
 
-**Cowork / Work IQ consumption isn't loaded on this path.** The schema has no table for it, so those
-pages stay empty. For Cowork, add the [Viva Direct report](../../2.%20SharePoint/Add%20Credit%20Consumption/)
-alongside, or use the [Fabric add-on](../../3.%20Fabric/Add%20Credit%20Consumption/).
+**Cowork / Work IQ** goes into `viva_credits_weekly`: import `PersonServiceCreditsMetrics.csv` from
+the [Viva Insights export ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot/blob/main/docs/DATA-SOURCES.md#files-and-columns)
+and map `Session count`, `Spending policy limit`, `Total Copilot Credits used` and `User limit` by
+hand. An import adds rows rather than replacing them, so delete the old rows before loading a newer
+export. Org columns aren't carried on this path; for Cowork by org, add the
+[Viva Direct report](../../2.%20SharePoint/Add%20Credit%20Consumption/) alongside.
 
 ---
 
@@ -92,4 +95,5 @@ alongside, or use the [Fabric add-on](../../3.%20Fabric/Add%20Credit%20Consumpti
 - [Flow sources and build scripts ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot/tree/main/4.%20Power%20Automate%20%2B%20Dataverse)
 
 Copied from [microsoft/ConsumptionCentral-for-Microsoft-Copilot ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot)
-(MIT) at commit `24b0ca8`. Full documentation and issues live there.
+(MIT) at commit `24b0ca8`, plus the [Dataverse Cowork table ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot/pull/39). Full documentation and
+issues live there.
