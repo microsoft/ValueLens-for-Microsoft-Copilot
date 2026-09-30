@@ -650,7 +650,7 @@ def _resource_behavior(
                 return "Code Analysis"
         for token in ("learning.cloud.microsoft", "coursera.org", "udemy.com"):
             if token in site_url:
-                return "Agent: Coaching"
+                return "Coaching"
         if "sharepoint.com" in site_url:
             return "Enterprise Searching"
         return "Web Searching"
@@ -669,9 +669,9 @@ def _resource_behavior(
             return "File Retrieval"
         return "Presentation Summarising"
     if "service-now.com" in site_url or "servicenow.com" in site_url:
-        return "Agent: IT & Service Desk"
+        return "IT & Service Desk"
     if "dynamics.com" in site_url:
-        return "Agent: Sales & Customer"
+        return "Sales & Customer"
     return ""
 
 
@@ -758,16 +758,16 @@ def compute_behavior_category(
 
 _GENERIC_QA_BEHAVIORS = {"General Q&A", "M365 Chat Q&A", "Teams Q&A", "Browser Q&A", "General Chat"}
 _AGENT_NAME_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("coach", "mentor", "learning", "career"), "Agent: Coaching"),
-    (("research", "analyst", "analy"), "Agent: Research & Analysis"),
-    (("sales", "commercial", "customer", "crm", "revenue"), "Agent: Sales & Customer"),
-    (("hr", "recruit", "talent", "onboard", "people"), "Agent: HR & People"),
-    (("policy", "compliance", "legal", "audit", "risk"), "Agent: Compliance & Policy"),
-    (("service", "support", "help", "ticket", "incident"), "Agent: IT & Service Desk"),
-    (("summar", "draft", "translat", "editor"), "Agent: Content Generation"),
-    (("data", "report", "dashboard", "metric"), "Agent: Data & Reporting"),
-    (("knowledge", "faq", "wiki", "buddy", "guide"), "Agent: Knowledge Base"),
-    (("idea", "brainstorm", "creative", "design"), "Agent: Ideation & Creative"),
+    (("coach", "mentor", "learning", "career"), "Coaching"),
+    (("research", "analyst", "analy"), "Research & Analysis"),
+    (("sales", "commercial", "customer", "crm", "revenue"), "Sales & Customer"),
+    (("hr", "recruit", "talent", "onboard", "people"), "HR & People"),
+    (("policy", "compliance", "legal", "audit", "risk"), "Compliance & Policy"),
+    (("service", "support", "help", "ticket", "incident"), "IT & Service Desk"),
+    (("summar", "draft", "translat", "editor"), "Content Generation"),
+    (("data", "report", "dashboard", "metric"), "Data & Reporting"),
+    (("knowledge", "faq", "wiki", "buddy", "guide"), "Knowledge Base"),
+    (("idea", "brainstorm", "creative", "design"), "Ideation & Creative"),
 )
 
 
@@ -785,7 +785,7 @@ def compute_behavior_enriched(profile: str, behavior_category: str, agent_name: 
     for tokens, label in _AGENT_NAME_RULES:
         if any(t in name_l for t in tokens):
             return label
-    return "Agent: General Purpose"
+    return "General Assistance"
 
 
 # Autonomy_Pattern — profile-aware.
@@ -844,19 +844,19 @@ _VO_TIME_MEET = frozenset({"Meeting Prep", "Video Summarising"})
 _VO_TIME_DOC = frozenset({"Document Summarising", "Presentation Summarising", "Note Taking"})
 _VO_SEARCH = frozenset({
     "Web Searching", "Enterprise Searching", "File Retrieval", "PDF Analysis",
-    "SharePoint Access", "People Lookup", "Agent: Knowledge Base",
+    "SharePoint Access", "People Lookup", "Knowledge Base",
 })
 _VO_COMM = frozenset({"Teams Messaging", "Meeting Scheduling"})
 _VO_SHEET = frozenset({"Spreadsheet Review", "Spreadsheet Analysis", "Excel Assistance"})
 _VO_CONTENT = frozenset({
     "Email Drafting", "Document Drafting", "Presentation Creation",
     "Image Generation", "Image / Media Analysis", "Image/Media Analysis",
-    "Agent: Content Generation", "Agent: Ideation & Creative",
+    "Content Generation", "Ideation & Creative",
 })
 _VO_TEAMCOLLAB = frozenset({"Real-time Collaboration", "Form / Survey Work"})
-_VO_DATA = frozenset({"Data Querying", "Agent: Data & Reporting", "Agent: Research & Analysis"})
+_VO_DATA = frozenset({"Data Querying", "Data & Reporting", "Research & Analysis"})
 _VO_CODE = frozenset({"Code Writing", "Code Analysis", "Code Analysis (URL)"})
-_VO_COACH = frozenset({"Agent: Coaching", "Agent: Coaching (URL)"})
+_VO_COACH = frozenset({"Coaching", "Coaching (URL)"})
 _VO_DOMAIN = frozenset({"Domain-Specific Agent", "Cross-Org Agent"})
 
 
@@ -901,13 +901,13 @@ def compute_value_outcome(
         return "Coding Capability"
     if b in _VO_COACH:
         return "Skills Development"
-    if b == "Agent: Sales & Customer":
+    if b == "Sales & Customer":
         return "Revenue Enablement"
-    if b == "Agent: IT & Service Desk":
+    if b == "IT & Service Desk":
         return "Service Desk Deflection"
-    if b == "Agent: Compliance & Policy":
+    if b == "Compliance & Policy":
         return "Compliance & Risk"
-    if b == "Agent: HR & People":
+    if b == "HR & People":
         return "HR Expertise"
     if b in _VO_DOMAIN:
         return "Specialist Expertise"
@@ -919,7 +919,7 @@ def compute_value_outcome(
 #
 # Per F2 (see offload plan): in the current AIBV model `Environment` never
 # returns "Agents", so `Behavior_Enriched_Full`'s NeedsEnhancement guard
-# (Env = "Agents" && BaseEnriched = "Agent: General Purpose") is always FALSE
+# (Env = "Agents" && BaseEnriched = "General Assistance") is always FALSE
 # and the RELATED('Agents 365'...) lookups never execute. Therefore
 # Behavior_Enriched_Full == Behavior_Enriched and the whole chain
 # (Usage_Mode / Expertise_Role / Efficiency_Breakdown) is fully computable
@@ -936,10 +936,10 @@ def compute_behavior_enriched_full(behavior_enriched: str) -> str:
 _UM_PRODUCING = frozenset({
     "Email Drafting", "Document Drafting", "Presentation Creation", "Image Generation",
     "Code Writing", "Code Analysis", "Code Analysis (URL)", "Data Querying",
-    "Spreadsheet Analysis", "Excel Assistance", "Agent: Content Generation",
-    "Agent: Ideation & Creative", "Agent: Research & Analysis", "Agent: Data & Reporting",
-    "Agent: Sales & Customer", "Agent: HR & People", "Agent: IT & Service Desk",
-    "Agent: Compliance & Policy", "Agent: Coaching", "Agent: Coaching (URL)",
+    "Spreadsheet Analysis", "Excel Assistance", "Content Generation",
+    "Ideation & Creative", "Research & Analysis", "Data & Reporting",
+    "Sales & Customer", "HR & People", "IT & Service Desk",
+    "Compliance & Policy", "Coaching", "Coaching (URL)",
     "Domain-Specific Agent", "Cross-Org Agent", "Form / Survey Work",
     "Real-time Collaboration", "Note Taking", "Teams Messaging", "Meeting Scheduling",
     "Task Management",
@@ -951,7 +951,7 @@ _UM_CONSUMING = frozenset({
 })
 _UM_FINDING = frozenset({
     "Web Searching", "Enterprise Searching", "PDF Analysis", "SharePoint Access",
-    "File Retrieval", "People Lookup", "Agent: Knowledge Base", "Spreadsheet Review",
+    "File Retrieval", "People Lookup", "Knowledge Base", "Spreadsheet Review",
 })
 
 
@@ -980,23 +980,23 @@ def compute_usage_mode(behavior_enriched_full: str, environment: str, app_host: 
 
 # Verbatim port of AIBV `Expertise_Role` (ordered IF cascade on Behavior_Enriched_Full).
 _EXPERTISE_RULES: tuple[tuple[frozenset[str], str], ...] = (
-    (frozenset({"Data Querying", "Agent: Data & Reporting", "Spreadsheet Analysis"}), "Data Analyst"),
+    (frozenset({"Data Querying", "Data & Reporting", "Spreadsheet Analysis"}), "Data Analyst"),
     (frozenset({"Code Writing", "Code Analysis", "Code Analysis (URL)"}), "Software Engineer"),
-    (frozenset({"Agent: Research & Analysis"}), "Business Analyst"),
-    (frozenset({"Agent: Compliance & Policy", "Sensitive Content Interaction"}), "Compliance Specialist"),
-    (frozenset({"Agent: Sales & Customer"}), "Sales Consultant"),
-    (frozenset({"Agent: IT & Service Desk"}), "IT Specialist"),
-    (frozenset({"Agent: HR & People"}), "HR Specialist"),
-    (frozenset({"Agent: Coaching", "Agent: Coaching (URL)"}), "Coach"),
+    (frozenset({"Research & Analysis"}), "Business Analyst"),
+    (frozenset({"Compliance & Policy", "Sensitive Content Interaction"}), "Compliance Specialist"),
+    (frozenset({"Sales & Customer"}), "Sales Consultant"),
+    (frozenset({"IT & Service Desk"}), "IT Specialist"),
+    (frozenset({"HR & People"}), "HR Specialist"),
+    (frozenset({"Coaching", "Coaching (URL)"}), "Coach"),
     (frozenset({"Running a Workflow", "Task Management"}), "Automation Engineer"),
     (frozenset({"Domain-Specific Agent", "Cross-Org Agent"}), "Domain Expert"),
     (frozenset({"Email Drafting"}), "Communications Specialist"),
     (frozenset({"Email Triage", "Meeting Scheduling", "Email Summarising", "Email Thread Summary"}), "Executive Assistant"),
-    (frozenset({"Document Drafting", "Agent: Content Generation", "Note Taking", "Document Summarising"}), "Content Writer"),
+    (frozenset({"Document Drafting", "Content Generation", "Note Taking", "Document Summarising"}), "Content Writer"),
     (frozenset({"Presentation Creation", "Presentation Summarising"}), "Presentation Designer"),
-    (frozenset({"Image Generation", "Image/Media Analysis", "Image / Media Analysis", "Agent: Ideation & Creative"}), "Visual Designer"),
+    (frozenset({"Image Generation", "Image/Media Analysis", "Image / Media Analysis", "Ideation & Creative"}), "Visual Designer"),
     (frozenset({"Meeting Prep", "Video Summarising"}), "Meeting Coordinator"),
-    (frozenset({"Web Searching", "PDF Analysis", "Agent: Knowledge Base"}), "Researcher"),
+    (frozenset({"Web Searching", "PDF Analysis", "Knowledge Base"}), "Researcher"),
     (frozenset({"Enterprise Searching", "SharePoint Access", "File Retrieval", "People Lookup"}), "Knowledge Navigator"),
     (frozenset({"Spreadsheet Review", "Excel Assistance"}), "Spreadsheet Specialist"),
     (frozenset({"Real-time Collaboration", "Form / Survey Work", "Form/Survey Work", "Teams Messaging"}), "Collaboration Lead"),
@@ -1014,14 +1014,14 @@ def compute_expertise_role(behavior_enriched_full: str) -> str:
 # Verbatim port of AIBV `Efficiency_Breakdown` (behavior cascade, then Behavior_Category fallback).
 _EFF_RULES: tuple[tuple[frozenset[str], str], ...] = (
     (frozenset({"Email Summarising", "Email Triage", "Email Thread Summary", "Email Drafting"}), "Email"),
-    (frozenset({"Document Summarising", "Note Taking", "Document Drafting", "Agent: Content Generation"}), "Document Assistance"),
+    (frozenset({"Document Summarising", "Note Taking", "Document Drafting", "Content Generation"}), "Document Assistance"),
     (frozenset({"Presentation Summarising", "Presentation Creation"}), "Presentations"),
     (frozenset({"Meeting Prep", "Video Summarising", "Meeting Scheduling"}), "Meetings"),
-    (frozenset({"Web Searching", "Enterprise Searching", "PDF Analysis", "SharePoint Access", "File Retrieval", "People Lookup", "Agent: Knowledge Base", "Agent: Research & Analysis"}), "Search & Research"),
-    (frozenset({"Spreadsheet Review", "Excel Assistance", "Spreadsheet Analysis", "Data Querying", "Agent: Data & Reporting"}), "Data & Spreadsheets"),
-    (frozenset({"Image Generation", "Image / Media Analysis", "Image/Media Analysis", "Agent: Ideation & Creative", "Code Writing", "Code Analysis", "Code Analysis (URL)"}), "Creative & Technical"),
+    (frozenset({"Web Searching", "Enterprise Searching", "PDF Analysis", "SharePoint Access", "File Retrieval", "People Lookup", "Knowledge Base", "Research & Analysis"}), "Search & Research"),
+    (frozenset({"Spreadsheet Review", "Excel Assistance", "Spreadsheet Analysis", "Data Querying", "Data & Reporting"}), "Data & Spreadsheets"),
+    (frozenset({"Image Generation", "Image / Media Analysis", "Image/Media Analysis", "Ideation & Creative", "Code Writing", "Code Analysis", "Code Analysis (URL)"}), "Creative & Technical"),
     (frozenset({"Teams Messaging", "Real-time Collaboration", "Form / Survey Work", "Task Management", "Running a Workflow"}), "Collaboration & Workflows"),
-    (frozenset({"Agent: Sales & Customer", "Agent: IT & Service Desk", "Agent: HR & People", "Agent: Compliance & Policy", "Agent: Coaching", "Agent: Coaching (URL)", "Domain-Specific Agent", "Cross-Org Agent"}), "Specialist Agents"),
+    (frozenset({"Sales & Customer", "IT & Service Desk", "HR & People", "Compliance & Policy", "Coaching", "Coaching (URL)", "Domain-Specific Agent", "Cross-Org Agent"}), "Specialist Support"),
 )
 
 
@@ -1058,18 +1058,18 @@ def compute_efficiency_breakdown(behavior_enriched_full: str, behavior_category:
 # ---------------------------------------------------------------------------
 
 _HUMAN_BASELINE_MIN: dict[str, int] = {
-    "Agent: Coaching": 45,
-    "Agent: Coaching (URL)": 25,
-    "Agent: Compliance & Policy": 25,
-    "Agent: Content Generation": 25,
-    "Agent: Data & Reporting": 35,
-    "Agent: General Purpose": 15,
-    "Agent: HR & People": 35,
-    "Agent: IT & Service Desk": 20,
-    "Agent: Ideation & Creative": 40,
-    "Agent: Knowledge Base": 12,
-    "Agent: Research & Analysis": 45,
-    "Agent: Sales & Customer": 35,
+    "Coaching": 45,
+    "Coaching (URL)": 25,
+    "Compliance & Policy": 25,
+    "Content Generation": 25,
+    "Data & Reporting": 35,
+    "General Assistance": 15,
+    "HR & People": 35,
+    "IT & Service Desk": 20,
+    "Ideation & Creative": 40,
+    "Knowledge Base": 12,
+    "Research & Analysis": 45,
+    "Sales & Customer": 35,
     "Browser Q&A": 10,
     "Code Analysis": 30,
     "Code Analysis (URL)": 15,
@@ -1116,17 +1116,17 @@ _HUMAN_BASELINE_MIN: dict[str, int] = {
 
 # Behaviors present in the Behavior Value Map bridge (gates HTE reachability).
 _BVM_BEHAVIORS: frozenset = frozenset({
-    "Agent: Coaching",
-    "Agent: Compliance & Policy",
-    "Agent: Content Generation",
-    "Agent: Data & Reporting",
-    "Agent: General Purpose",
-    "Agent: HR & People",
-    "Agent: IT & Service Desk",
-    "Agent: Ideation & Creative",
-    "Agent: Knowledge Base",
-    "Agent: Research & Analysis",
-    "Agent: Sales & Customer",
+    "Coaching",
+    "Compliance & Policy",
+    "Content Generation",
+    "Data & Reporting",
+    "General Assistance",
+    "HR & People",
+    "IT & Service Desk",
+    "Ideation & Creative",
+    "Knowledge Base",
+    "Research & Analysis",
+    "Sales & Customer",
     "Code Analysis",
     "Code Writing",
     "Data Querying",

@@ -1,7 +1,7 @@
 [
   {
     "[Signal]": "Agent name: coach/mentor/learning/career OR learning URLs",
-    "[AI Tasks]": "Agent: Coaching",
+    "[AI Tasks]": "Coaching",
     "[Use Case]": "Writing coaching, prompt improvement, career guidance, training",
     "[Value Outcome]": "Skills Development",
     "[Human Equivalent (Minutes)]": 45,
@@ -12,7 +12,7 @@
   },
   {
     "[Signal]": "Agent name: policy/compliance/legal/audit/risk",
-    "[AI Tasks]": "Agent: Compliance & Policy",
+    "[AI Tasks]": "Compliance & Policy",
     "[Use Case]": "Policy lookup, compliance checking, risk assessment, audit support",
     "[Value Outcome]": "Compliance & Risk",
     "[Human Equivalent (Minutes)]": 25,
@@ -23,7 +23,7 @@
   },
   {
     "[Signal]": "Agent name: summar/draft/translat/editor",
-    "[AI Tasks]": "Agent: Content Generation",
+    "[AI Tasks]": "Content Generation",
     "[Use Case]": "Drafting communications, summarising documents, translation",
     "[Value Outcome]": "Content Output",
     "[Human Equivalent (Minutes)]": 25,
@@ -34,7 +34,7 @@
   },
   {
     "[Signal]": "Agent name: data/report/dashboard/metric OR has code interpreter",
-    "[AI Tasks]": "Agent: Data & Reporting",
+    "[AI Tasks]": "Data & Reporting",
     "[Use Case]": "Building reports, querying data, KPI tracking, dashboard creation",
     "[Value Outcome]": "Data-Driven Decisions",
     "[Human Equivalent (Minutes)]": 35,
@@ -45,7 +45,7 @@
   },
   {
     "[Signal]": "Agent — no keyword/capability match",
-    "[AI Tasks]": "Agent: General Purpose",
+    "[AI Tasks]": "General Assistance",
     "[Use Case]": "Unclassified agent interactions — review agent metadata for better categorisation",
     "[Value Outcome]": "General AI Productivity",
     "[Human Equivalent (Minutes)]": 15,
@@ -56,7 +56,7 @@
   },
   {
     "[Signal]": "Agent name: hr/recruit/talent/onboard/people OR description matches",
-    "[AI Tasks]": "Agent: HR & People",
+    "[AI Tasks]": "HR & People",
     "[Use Case]": "Job descriptions, candidate screening, onboarding guidance, policy Q&A",
     "[Value Outcome]": "HR Process Automation",
     "[Human Equivalent (Minutes)]": 35,
@@ -67,7 +67,7 @@
   },
   {
     "[Signal]": "Agent name: idea/brainstorm/creative/design OR has image generation",
-    "[AI Tasks]": "Agent: Ideation & Creative",
+    "[AI Tasks]": "Ideation & Creative",
     "[Use Case]": "Brainstorming, design concepts, creative briefs, innovation workshops",
     "[Value Outcome]": "Content Output",
     "[Human Equivalent (Minutes)]": 40,
@@ -78,7 +78,7 @@
   },
   {
     "[Signal]": "Agent name: service/support/help/ticket/incident OR servicenow.com URLs",
-    "[AI Tasks]": "Agent: IT & Service Desk",
+    "[AI Tasks]": "IT & Service Desk",
     "[Use Case]": "IT troubleshooting, ticket creation, knowledge base queries",
     "[Value Outcome]": "Service Desk Deflection",
     "[Human Equivalent (Minutes)]": 20,
@@ -89,7 +89,7 @@
   },
   {
     "[Signal]": "Agent name: knowledge/faq/wiki/buddy/guide OR has SharePoint access",
-    "[AI Tasks]": "Agent: Knowledge Base",
+    "[AI Tasks]": "Knowledge Base",
     "[Use Case]": "Policy lookup, process guidance, FAQ resolution, documentation search",
     "[Value Outcome]": "Search Time Saved",
     "[Human Equivalent (Minutes)]": 12,
@@ -100,7 +100,7 @@
   },
   {
     "[Signal]": "Agent name: research/analyst/analy/insight/intelligence",
-    "[AI Tasks]": "Agent: Research & Analysis",
+    "[AI Tasks]": "Research & Analysis",
     "[Use Case]": "Market research, competitive analysis, data interpretation, trend spotting",
     "[Value Outcome]": "Data-Driven Decisions",
     "[Human Equivalent (Minutes)]": 45,
@@ -111,7 +111,7 @@
   },
   {
     "[Signal]": "Agent name: sales/commercial/customer/crm/revenue OR dynamics.com URLs",
-    "[AI Tasks]": "Agent: Sales & Customer",
+    "[AI Tasks]": "Sales & Customer",
     "[Use Case]": "Sales intelligence, customer insights, deal support, CRM assistance",
     "[Value Outcome]": "Revenue Enablement",
     "[Human Equivalent (Minutes)]": 35,

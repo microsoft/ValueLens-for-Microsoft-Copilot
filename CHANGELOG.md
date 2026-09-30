@@ -15,6 +15,25 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-09-30 — task names without the "Agent:" prefix
+
+Eleven task names started with "Agent:". Cowork and agent sessions that don't match a more
+specific task are given these names, so filtering to Cowork showed a list of "Agent:" tasks.
+The prefix is gone: for example, "Agent: Knowledge Base" is now **Knowledge Base**. Two names change more:
+"Agent: General Purpose" is now **General Assistance**, and the "Specialist Agents" efficiency
+group is now **Specialist Support**. The baselines, value outcomes and colours are unchanged.
+All five templates, both processors (the Fabric notebook and the Local CSV / SharePoint /
+Power Automate script), and the sample data carry the change.
+
+- **Reprocess existing data once.** The templates look up the new names, so rows processed
+  before this change have no time baseline until they're reprocessed. In Fabric, run
+  `Copilot_Audit_Log_Processor` with `WRITE_MODE = "overwrite"`, which is the default. For the other
+  paths, rerun `Purview_CopilotInteraction_Processor_v4.0.0.py` over your export.
+- **Saved filters.** If you built your own visuals or bookmarks that filter on an old name, re-pick
+  the new name.
+
+---
+
 ## 2026-09-29 — gentler, adjustable fit grading
 
 Feedback on Cowork Fit was that it read as too critical (about half of graded Cowork sessions
