@@ -12,8 +12,9 @@ import { toSummaryRow } from "@/lib/summary-row";
 import {
     agentActivitySummary,
     agentEstateSummary,
+    agentLeaderboard,
     agentLifecycle,
-    agentRegistry,
+    agentSurfaces,
     agentUsage,
     coworkCandidates,
     coworkFitSummary,
@@ -21,9 +22,11 @@ import {
     coworkReadinessSummary,
     describeRegistryLinkage,
     isDepthUniform,
+    toAgentEntries,
 } from "./index";
 import { liveColumns } from "./live-columns.fixture";
 import estateRows from "./__fixtures__/agent-estate-summary.rows.json";
+import leaderboardRows from "./__fixtures__/agent-leaderboard.rows.json";
 import candidateRows from "./__fixtures__/cowork-candidates.rows.json";
 
 type Row = Record<string, string | number | boolean | null>;
@@ -33,7 +36,7 @@ const modules = [
     { name: "agentUsage", factory: () => agentUsage(), columns: liveColumns.agentUsage },
     { name: "agentEstateSummary", factory: () => agentEstateSummary(), columns: liveColumns.agentEstateSummary },
     { name: "agentLifecycle", factory: () => agentLifecycle(), columns: liveColumns.agentLifecycle },
-    { name: "agentRegistry", factory: () => agentRegistry(), columns: liveColumns.agentRegistry },
+    { name: "agentLeaderboard", factory: () => agentLeaderboard(), columns: liveColumns.agentLeaderboard },
     {
         name: "coworkReadinessSummary",
         factory: () => coworkReadinessSummary(),
@@ -165,6 +168,94 @@ describe("registry linkage", () => {
     it("stays unknown when there is no audit activity to match", () => {
         expect(describeRegistryLinkage({ "[Registry Agents]": 469 })).toEqual({ kind: "unknown" });
         expect(describeRegistryLinkage(undefined)).toEqual({ kind: "unknown" });
+    });
+});
+
+describe("agent leaderboard", () => {
+    const { query, columnMetadata } = agentLeaderboard();
+    const rows = leaderboardRows as Row[];
+    const entries = toAgentEntries(toDataTable(asQueryTable(rows), columnMetadata));
+
+    // The model relates the audit log and the registry both ways, so without
+    // a one-way join a date filter would drop every agent nobody used; and
+    // clearing the audit table's filters would clear the agent type too.
+    it("keeps the registry whole by joining it to the audit log one way", () => {
+        expect(query).toMatch(
+            /CROSSFILTER\(\s*'Chat \+ Agent Interactions \(Audit Logs\)'\[Agent_LinkID\],\s*'Agents 365'\[Title ID\],\s*OneWay\s*\)/,
+        );
+        expect(query).not.toMatch(/(REMOVEFILTERS|ALL)\(\s*'Chat \+ Agent Interactions \(Audit Logs\)'\s*\)/);
+    });
+
+    it("ranks by users, then sessions", () => {
+        expect(query.trim()).toMatch(/ORDER BY \[Users\] DESC, \[Sessions\] DESC, \[Agent\] ASC$/);
+    });
+
+    it("leaves out the draft placeholder agent, as the report's Leaderboard page does", () => {
+        expect(query).toContain('<> "Draft as 1P Agent"');
+    });
+
+    it("gives every row its own key, even agents that share a name", () => {
+        const keys = entries.map((entry) => entry.key);
+        expect(new Set(keys).size).toBe(keys.length);
+        expect(entries.filter((entry) => entry.name === "Agent").length).toBeGreaterThan(1);
+    });
+
+    it("reads usage and the last active day for an agent the registry lacks", () => {
+        expect(entries[0]).toMatchObject({
+            name: "Finance Analyst Bot",
+            inRegistry: false,
+            type: "Not in registry",
+            users: 62,
+            sessions: 529,
+            orgsReached: 6,
+            lastActivity: "2026-07-06",
+        });
+        expect(entries[0].registryId).toBeUndefined();
+        expect(entries[0].description).toBeUndefined();
+    });
+
+    it("counts an unused registered agent's users, sessions and orgs as zero", () => {
+        const unused = entries.find((entry) => entry.inRegistry);
+        expect(unused).toMatchObject({ users: 0, sessions: 0, orgsReached: 0 });
+        expect(unused?.sessionsPerUser).toBeUndefined();
+        expect(unused?.returnRate).toBeUndefined();
+        expect(unused?.lastActivity).toBeUndefined();
+        expect(unused?.registryId).toMatch(/^[A-Z]_/);
+    });
+
+    it("treats a blank description as missing", () => {
+        const described = entries.filter((entry) => entry.name === "Agent").map((entry) => entry.description);
+        expect(described).toContain("Built using Microsoft Copilot Studio.");
+        expect(described).toContain(undefined);
+        expect(described).not.toContain("");
+    });
+
+    it("reads every features text the registry uses as surfaces, or leaves it as written", () => {
+        for (const entry of entries.filter((item) => item.features)) {
+            if (entry.surfaces === undefined) {
+                expect(entry.features).toBe("Unknown / insufficient capability evidence");
+            } else {
+                expect(entry.surfaces.length).toBeGreaterThan(0);
+            }
+        }
+    });
+});
+
+describe("agent surfaces", () => {
+    it.each([
+        ["🤖 in Copilot", ["Copilot"]],
+        ["💬 in Teams", ["Teams"]],
+        ["🤖 in Copilot 💬 in Teams", ["Copilot", "Teams"]],
+        ["🤖 in Copilot 💬 in Teams 📧 in Outlook 📄 in Office", ["Copilot", "Teams", "Outlook", "Office"]],
+    ])("reads %s", (features, expected) => {
+        expect(agentSurfaces(features)).toEqual(expected);
+    });
+
+    it("leaves text it can't read to be shown as written", () => {
+        expect(agentSurfaces("Unknown / insufficient capability evidence")).toBeUndefined();
+        expect(agentSurfaces("🤖 Copilot")).toBeUndefined();
+        expect(agentSurfaces("")).toBeUndefined();
+        expect(agentSurfaces(null)).toBeUndefined();
     });
 });
 

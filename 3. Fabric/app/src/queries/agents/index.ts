@@ -9,7 +9,7 @@ export * from "./agent-activity-summary";
 export * from "./agent-usage";
 export * from "./agent-estate-summary";
 export * from "./agent-lifecycle";
-export * from "./agent-registry";
+export * from "./agent-leaderboard";
 export * from "./cowork-readiness-summary";
 export * from "./cowork-readiness-by-org";
 export * from "./cowork-candidates";
