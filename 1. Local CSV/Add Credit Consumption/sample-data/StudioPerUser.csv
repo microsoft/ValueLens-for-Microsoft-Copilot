@@ -1,0 +1,241 @@
+User Id,User Email,Agent Id,Agent Name,Billable credit used,Credits used,M365 Copilot Licensed
+aa1651fb-586f-3b5b-a9cd-9643fcc98833,percival.ingoldsby0067@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,278,718,TRUE
+b8706b7c-6a55-f4da-0849-64246118fdfb,vivienne.quested0830@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,124,319,TRUE
+98cad5ac-8bb1-1c24-55c2-71c85a3c5983,bridget.westbrook0486@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,128,330,TRUE
+9bb16c2c-4c3e-0365-0289-91a613a57a2e,horatio.leverton0606@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,73,188,FALSE
+99b9887f-9f5e-3770-27bc-3af211df8438,arthur.montrose0421@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,85,218,TRUE
+61d78d03-84cf-5efd-8a57-293af919b354,ulric.quarrington0331@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,91,236,TRUE
+3a9131d7-625e-0b3a-72a2-cd0036cc03c2,tobias.northcote0706@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,73,187,FALSE
+acfbeedf-9aba-b218-e4e9-751fec13a1e4,thaddeus.crowhurst0684@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,72,185,TRUE
+af4398e8-6691-d51d-b905-3052f79981ca,quentin.hetherington0931@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,84,218,TRUE
+d58e6dba-b220-1b46-ab81-2ee454b687f3,isolde.thistlewood0375@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,116,298,TRUE
+04266a43-00a1-1c7a-9806-e01f4edbaaa0,lavinia.dunstable0173@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,97,250,FALSE
+be19b56f-9536-c998-412e-36b1d1829c92,bridget.wetherby0859@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,80,207,TRUE
+8d6d8696-609c-c6b9-616b-0437a2831d39,cordelia.brocklehurst0828@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,610,1573,FALSE
+90dbff4b-5d54-9d6b-e978-92e675ff34e6,ignatius.pennington0849@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,173,446,FALSE
+640ab2a4-66ec-a1db-63d0-1023d4f9b7e2,tabitha.holbrook0815@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,89,229,FALSE
+10cde0f2-2205-5479-b5aa-8d55fd1fe45b,everard.garrowby0080@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,126,326,FALSE
+a99dc703-f417-d7db-e580-4e9cf78cf246,ulric.hepplewhite0505@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,79,203,TRUE
+fda8a69c-885a-7246-c255-3527b5bb828a,theodora.wainwright0010@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,133,342,TRUE
+a1f405d1-a8dd-2e30-1ae8-a743fc7bfb23,nathaniel.abernathy0852@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,105,271,FALSE
+8c62df6a-e71a-c737-fb1a-cc149836b08c,odette.entwistle0999@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,112,290,TRUE
+f15dd1d0-d5f0-a514-68a8-6e87f73c0c02,marianne.redmayne0593@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,86,223,FALSE
+d29fb06d-8935-d688-4909-a6756834e8ee,xavier.crowhurst0019@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,191,492,TRUE
+6f170639-43ef-30f8-8781-281b7a0d7d62,verity.cattermole0953@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,188,486,FALSE
+2e6e2ad6-1697-845a-2c22-99b6e6defdd9,millicent.hollingsworth0605@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,96,247,FALSE
+796654fc-c549-5d0e-5107-331dc38fe73f,helena.verinder0362@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,185,476,FALSE
+7cf12b39-cfb8-a007-c661-f32dab895520,lysander.somerville0022@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,158,407,FALSE
+1e60b280-2281-76df-43d8-612a3136f2e2,juliet.osbaldeston0794@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,198,512,FALSE
+418d840f-54ad-fc5d-6794-ca55ea2c59f1,jarvis.littlewood0601@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,1017,2622,FALSE
+51b30d6b-3c2c-ec5b-7bf1-c5162db18664,tobias.calloway0425@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,86,221,FALSE
+ea0802aa-c3bc-ff64-e558-e4efb9893028,seraphina.cranbrook0529@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,188,484,TRUE
+ce19963f-f7e1-fd8e-3118-3f5cea809132,montgomery.bickerstaff0523@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,112,289,TRUE
+276372ad-b87b-283a-099c-3a793efa81d6,winifred.mordaunt0877@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,100,258,TRUE
+cec33cad-71d3-187b-10bc-c3ae740ef806,ulric.bramley0163@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,78,201,FALSE
+681fd3ec-c553-275b-ab13-5843abd585dd,winifred.uppingham0128@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,105,270,FALSE
+446f5166-65ea-f455-24ee-d3fa4bd6b787,lysander.shackleton0176@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,152,391,TRUE
+7628a68e-518a-2223-7217-03f02e65b6c7,humphrey.dinsdale0388@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,133,342,TRUE
+043c1a1a-d933-ae9d-1ed2-8cca454dce70,zephyrine.lattimore0844@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,94,242,TRUE
+bcb09966-768c-df82-1e06-9bfeb260871a,zelda.hepplewhite0607@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,301,775,TRUE
+7afb2313-17c7-b455-3360-d4577d17862f,amelia.galbraith0848@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,186,479,FALSE
+32899a42-dd69-4b28-fd6f-c040942ad099,cyprian.osbaldeston0988@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,102,263,FALSE
+acf343e7-9c9b-2f04-6127-a93d737248e8,phineas.inglewood0271@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,97,251,TRUE
+d5c64899-1ad2-15ef-68db-b15f131536f2,evangeline.waverley0307@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,86,222,FALSE
+7ef9d39c-a3e7-788f-c3dc-f2c042897979,winifred.ottershaw0909@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,90,232,FALSE
+9630a540-1684-d6f8-8e25-12a89722671b,susannah.galbraith0906@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,85,219,FALSE
+c7dd92bc-3257-f61d-088d-6a5dc364649d,wilhelmina.vansittart0676@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,85,220,TRUE
+3ecb9fd9-a781-ab2d-9e5b-044454cbcec3,desmond.higginbotham0712@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,1277,3294,TRUE
+55944f23-e510-a8fe-abef-4f9409915bcf,percival.vale0189@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,430,1109,FALSE
+4ad331aa-97d4-80aa-31df-658969169e0b,nicola.granville0031@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,187,482,TRUE
+7ef73bf1-777d-a401-dcb0-c2d84bfee186,dominic.whitcombe0832@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,316,814,TRUE
+60a09ec3-d7dc-c9e3-05e1-15da0206071f,montgomery.oglethorpe0453@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,74,190,TRUE
+c31a9617-2006-7efe-a14a-e359ddaeaf47,standish.illsley0799@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,81,209,FALSE
+2f319f73-3d66-2522-48f1-04f7e0550e61,ysabel.northcote0854@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,268,690,TRUE
+19cfe017-48fc-0d48-d55c-16bec090672c,ulrica.ramsbottom0869@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,77,198,TRUE
+5d1e3754-db13-df1a-0910-8d437758ef58,ophelia.hepplewhite0672@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,95,245,TRUE
+f0b6d466-ab08-2c79-4cfc-bc0e30c7f142,phineas.kinsella0654@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,98,254,TRUE
+f18f0006-5276-d7b2-fb8c-59770a01bd22,juliet.beauchamp0306@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,90,232,TRUE
+419ab115-6d3d-065a-3dfe-88ceab241169,helena.attenborough0472@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,73,189,TRUE
+fbf995ab-d0ce-f7bd-e911-8908c1ac9acc,peregrine.yealand0959@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,540,1393,TRUE
+d42ab259-4a10-7ab1-2e6c-9a939d1de0ba,jerome.fairbrother0478@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,77,200,TRUE
+b1da10b0-cd0a-c8ee-a0e0-50e53e5d5fd7,fenella.lymington0332@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,175,451,TRUE
+89d82428-d05a-534b-a2b9-abc1d8f5f748,humphrey.vale0759@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,100,259,TRUE
+09ef9971-bd96-f566-c349-5e0833c1713a,tabitha.yaxley0750@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,214,552,TRUE
+07061710-e76d-fecf-8668-7088777b6a56,bexley.hollingsworth0068@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,78,201,TRUE
+f9fd6df3-7481-b72f-b8dd-0707f38b8032,verity.winstanley0951@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,75,194,FALSE
+da86467e-3f03-7f5a-46e5-605c20fad9a0,ulric.ramsbottom0512@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,119,307,TRUE
+8d3d348a-c4a7-cd4d-6df7-708a6576bde0,temperance.lymington0947@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,118,305,TRUE
+4addb74b-f5c6-7b89-aaf9-fb6eaa526c4d,jonquil.quibell0126@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,368,949,TRUE
+5424dd41-ca93-398b-0946-7025de025875,zelda.willoughby0015@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,109,281,FALSE
+8b58a4a6-6afa-78fa-1e5b-2e96730a03a4,amelia.standish0393@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,107,275,TRUE
+1cb99dd0-7f39-34cc-c943-95cb733e18d2,jasper.netherby0297@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,86,221,FALSE
+01beab03-df5b-0c72-3047-a78b58b3fef8,cyprian.grantham0993@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,1326,3420,FALSE
+ae23032f-c385-9a3e-6702-3a76d57c84c4,yusuf.whitcombe0485@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,81,208,FALSE
+8dd63df0-66bf-9f2b-53cd-ca54116ba03a,delphine.quested0941@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,92,236,TRUE
+f973e7b0-98f6-a9e5-f16d-5731767b017c,ignatius.willoughby0726@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,372,960,FALSE
+a55792a3-9d46-7f4f-5189-faa52c45dd00,wilhelmina.dewhurst0069@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,83,214,FALSE
+a7a54ee8-ae39-8708-539f-33f65fc6f3c2,ernest.ivorson0111@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,160,412,TRUE
+8d5c7f9d-2dc9-6707-8ac3-ad9a0c2e8e2b,vanessa.merriweather0272@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,327,842,TRUE
+ee55db1e-2108-702d-2153-371be5c61b83,barnaby.eastgate0346@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,83,214,TRUE
+c285235d-ba96-4008-5ca1-8b3180357060,rafferty.darlington0945@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,110,283,FALSE
+47776a82-3db6-4dda-1b76-06af36d4533c,silas.waverley0804@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,175,450,TRUE
+708f6b3e-abae-a487-d996-534cd7263e40,bexley.kettering0001@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,111,287,FALSE
+d80322df-ddba-c2af-3873-9b8367484610,ernest.wetherby0614@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,117,302,TRUE
+e0eb8c36-ce8b-ebc3-e90d-2ef5b89776d4,nigel.ulverston0149@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,75,193,FALSE
+a60cb9ce-5026-3a6e-fc22-0ab54d9335e2,percival.osgoode0819@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,470,1213,FALSE
+86d410fd-cd8e-c48c-c849-27f76037db5b,konstantin.langdale0433@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,92,238,TRUE
+e85296a1-e452-3d5c-c189-4286af61b30c,delilah.netherby0648@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,75,192,FALSE
+13bfee1c-8e4b-cf5d-5174-d6cad9900651,temperance.inglewood0866@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,99,254,TRUE
+4f8dc4a1-f43e-48d3-1eb5-e2b0c689a65c,callista.fairweather0075@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,92,238,FALSE
+eea907d6-3ab4-1dea-76f4-463610040ed8,rosalind.whitworth0233@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,77,200,FALSE
+81bdd7b3-6269-46bc-410f-f731ffd6055c,kenelm.braithwaite0937@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,199,513,FALSE
+148f6f91-ed07-ae5a-e057-83cd0f8e95f9,nathaniel.selwyn0996@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,746,1923,TRUE
+988f823e-c22b-dc52-e9c0-5b06759bfe7a,amelia.ashcombe0249@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,242,624,FALSE
+3b904bf0-307a-985c-20bf-668171f5da5d,jerome.duckworth0197@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,89,230,TRUE
+02b9032c-99ac-2a10-ede7-8d68fc36ee3d,wilfred.jephson0134@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,218,562,FALSE
+1df90ecf-6282-6be5-2c79-2265b7996280,millicent.whitcombe0168@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,311,803,FALSE
+e31ad4f1-01c4-b545-d1cf-60abb47e3c50,temperance.yoxall0821@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,1672,4312,FALSE
+55c64e75-6984-4621-13cd-088e14a7eb07,beatrice.beauchamp0198@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,131,337,TRUE
+3ffb6d7b-09dd-c519-eac4-861e3af30e97,yusuf.winterbottom0494@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,85,220,FALSE
+11ec3341-3475-b2b2-0757-a9ead1d7bc23,helena.braithwaite0049@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,251,647,TRUE
+81697cbb-af0c-ca7e-bec7-0fb533779502,alastair.carmichael0259@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,80,205,TRUE
+a38f6e73-f747-6748-0ca7-59a16de45884,barnaby.tremayne0400@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,80,206,FALSE
+30887af1-b9d8-9aae-1e52-52cca2850db8,cassian.hetherington0217@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,88,227,TRUE
+36a3ee0c-52a8-3aca-5e83-07c41cca3291,verity.quennell0401@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,76,195,TRUE
+08727c65-67f0-5b3a-442d-f73967d1fd8e,torquil.kettlewell0919@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,83,214,FALSE
+de0d2af4-daa7-b9d7-c996-66d5ac842a8d,ottoline.satterthwaite0308@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,104,269,TRUE
+a464cfe9-9bd1-89fe-ea83-dd8f2dff389a,prudence.jerningham0664@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,179,462,FALSE
+8a5f54dc-ebb2-e5f7-9da8-196e7f5a3ed4,percival.middleton0994@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,128,329,FALSE
+75c8ecb9-b57b-766a-2c32-12aaa4105518,desmond.brocklehurst0344@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,82,211,TRUE
+3a74ace8-7131-e092-3adc-8f770e9a4a6d,rhiannon.yealand0255@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,77,199,TRUE
+91ac7ed3-fab4-aa89-91b1-de88b77657a1,meredith.ormsby0893@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,528,1362,TRUE
+4974ff55-beed-7be7-f371-133d07db2bbd,vernon.bexworth0624@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,133,344,FALSE
+59ebe458-aba5-4545-5a26-1ee53ae3f88e,sybilla.kembleford0108@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,109,280,TRUE
+f68e25eb-dd4a-74a7-3846-b36694acc329,gideon.fairweather0444@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,85,218,FALSE
+182b1a45-3160-6868-6532-18cbc5b715cf,norbert.ellingham0147@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,508,1310,FALSE
+daff0455-e713-d1a1-072a-b49c0f4a98c0,hugo.rushworth0371@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,123,317,TRUE
+ee3f0c81-0edf-cd9d-746e-629828bf5d8a,seraphina.jessamine0647@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,115,296,TRUE
+295131ae-3dbd-75b5-e568-9d1ecaf0643b,xanthe.marchetti0896@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,76,195,TRUE
+760a7e6b-677f-8322-7a33-14a79a2ce365,rafferty.stanhope0547@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,84,216,TRUE
+3473172c-b92f-1429-a86f-3bef56a35dee,ysabel.wentworth0470@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,116,300,FALSE
+91412380-bc8a-c738-5c03-81ec234702a8,josephine.uppingham0167@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,332,856,TRUE
+c0f3f3ba-3127-155f-34f7-72f54ae6a51a,sybilla.urquhart0325@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,524,1351,TRUE
+2ff07e67-3fcb-136f-1760-8c62877af3c9,rowena.lindquist0655@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,889,2292,FALSE
+6a78ee6e-0aef-7c91-744f-00e7e1099d2f,odette.quennell0791@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,284,733,FALSE
+36865f7f-b40c-3af2-16ca-ac7e8b9a3ddf,prudence.brentwood0997@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,82,213,FALSE
+371e5ed6-7aed-ef31-79a4-58cbab2ea1ea,bridget.vale0123@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,308,794,FALSE
+6be53d90-d5db-647d-15a3-b7e61a3c41cb,xavier.elphinstone0330@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,324,836,TRUE
+1f5232fc-0ef7-e1fc-3210-eb7111d9ea73,katya.braithwaite0867@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,201,518,TRUE
+e830b4c9-3204-ed1f-bb10-d56f44eaf77f,nolan.ashdown0855@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,221,569,FALSE
+520a8cf1-e883-c148-157b-80c68cf890b2,faustine.fotheringay0666@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,90,231,FALSE
+5afb087a-b026-4537-1154-390215f67a98,tobias.ecclestone0063@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,166,429,TRUE
+febd680c-9069-be27-97c3-81c7e0b75229,tabitha.fitzgerald0180@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,224,577,TRUE
+dbd9d1dd-22a2-12fd-efd9-502d3fb2eb8a,sybilla.garforth0682@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,324,837,FALSE
+1a44d718-e0a4-33c5-1764-58b4a499ae63,marianne.bickerstaff0963@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,113,291,FALSE
+566efbd9-442b-4ebd-6e7b-22b90dabc5ab,kingsley.balfour0153@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,76,197,TRUE
+5c649874-3b2a-03c1-ab87-7e72369a9527,wistan.overton0698@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,79,203,FALSE
+a1e63114-3724-ffc7-6922-1a5a9ee96979,sebastian.applewhite0121@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,93,241,TRUE
+706512ae-61fd-69c1-459d-00c2df884534,vivienne.pennington0265@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,82,211,FALSE
+5821509b-9e91-d804-ba9e-f6750b13bd61,ignatius.stanhope0060@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,71,184,FALSE
+099c4c72-73d5-0ad4-16d1-e07deb228c60,ulysses.northcote0840@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,111,285,FALSE
+1948c447-06bc-81c6-5c15-4f6a1ba63652,silas.ingoldsby0615@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,1624,4188,FALSE
+4b237179-4364-51e0-536e-ad7217936681,juliet.dewhurst0424@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,180,464,FALSE
+78cbd48b-b5da-225d-d6b2-fe78121462ab,nolan.braithwaite0338@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,178,460,FALSE
+b5dd8284-464b-f019-1d30-c6e0ce1ff978,josephine.holbrook0736@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,114,295,TRUE
+3815096b-ec8b-b864-3e24-976ccb130f02,ivo.petrie0164@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,149,383,FALSE
+3e196f57-fcd2-285c-f4ad-4eb132b68bc1,una.haddonfield0074@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,96,247,FALSE
+a4857e4a-22e7-fcac-7146-a5194bd6e7c3,ernest.macallister0246@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,83,215,FALSE
+bc4b854f-3bd6-0af8-8a4a-e37911229c48,nigel.pickersgill0394@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,221,570,TRUE
+5af44e54-dcc6-e59c-5196-a520e678bd66,ottoline.halloway0757@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,73,188,TRUE
+f4f71d5b-28d2-3828-3dd3-6cb9fd086982,roderick.thistlewood0659@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,94,241,FALSE
+957902f7-2f81-c97c-eef4-13263eac18a2,callista.underhill0580@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,78,200,TRUE
+c1b75563-5084-10f3-ea61-d423c587c989,eloise.warrender1007@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,206,532,FALSE
+16044c49-2a4d-6c80-8b76-848fe916452a,konstantin.lockhart0258@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,87,225,FALSE
+a71d44d3-dc5f-199b-34e2-e1853fae7c56,verity.wentworth0841@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,89,229,FALSE
+4d89bdfe-f11d-cf71-7929-90a4ae118285,odette.wentworth1012@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,82,211,TRUE
+12e95348-5cdb-c8a8-cf85-f9308f857541,lavinia.vale0603@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,133,342,TRUE
+ad39d58a-eb3a-03d5-bf33-8bd7e55c159b,fitzwilliam.whitcombe0559@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,137,352,FALSE
+719dfe53-bd61-74fa-2c7f-d8a3b529f078,quentin.granville0449@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,150,387,TRUE
+891b5d3a-7b77-5e4e-32e5-aa450fd52550,petra.sandringham0260@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,77,199,TRUE
+b1216d14-c3e2-5579-8c8b-4d814f2ef83d,barnaby.quibell0496@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,75,194,TRUE
+0120e5f1-f69d-eea8-26b7-4b74391ab334,rafferty.goldsworthy0563@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,112,290,TRUE
+3ead527c-82af-2c51-787e-a2f6601991c1,sebastian.cadwallader0418@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,312,804,FALSE
+e6b96cdb-8d48-6453-fa02-10949c1d5571,cordelia.petrie0626@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,86,221,TRUE
+f56e03e3-248d-ec49-2ef9-c345ca160be1,rupert.harkness0458@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,79,203,TRUE
+5ad699f2-e4e9-decb-a45d-e0ae1481c2a7,wilfred.wrexham0318@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,85,218,TRUE
+105c3fcb-5286-31c2-1865-6d439bbe9a84,xanthe.westbrook0372@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,97,250,TRUE
+e0e228dc-50a8-ec9f-0832-d37337697b17,faustine.barrowman0353@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,75,194,FALSE
+381c59ca-8e7b-9be5-d10e-978db0b02e18,lettice.cranbrook0510@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,83,214,FALSE
+c6d121fd-0d63-a6c0-17f0-5c72c9c8bf1b,orsola.thackeray0378@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,84,216,FALSE
+b8095cad-eb9a-5983-45db-b964ea6e912e,isadora.jellicoe0252@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,97,249,TRUE
+50cfce1e-8ebf-35bc-461c-49647f9d4f06,leopold.naseby0596@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,154,397,TRUE
+65089b8f-4b08-a0c3-4fe3-96bd1420e108,temperance.hargreaves0735@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,126,326,FALSE
+5aff15b7-596d-79a0-fcc9-412a4cd6ea27,tabitha.leverton0004@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,217,559,TRUE
+fe3a057d-6d5c-6a0f-2b51-9e963d0c0a14,meredith.ramsbottom0824@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,157,405,FALSE
+6247d3ef-9fb4-6a9b-3fd7-d759366095cc,amelia.hetherington0428@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,338,871,FALSE
+7a57b136-1faf-a75f-e981-580e0c6f8d53,ursula.ufford0379@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,94,241,FALSE
+c4272a0a-56ab-d8bc-afae-8fbfab69b119,kingsley.higginbotham0845@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,268,691,FALSE
+4771acf2-0312-2e23-f6fe-d2c06017ae75,wallace.skelmersdale0270@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,76,196,FALSE
+c5df7c08-aedb-e3c6-a0de-85eea69232bb,zelda.illingworth0447@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,75,194,TRUE
+1e7bec63-9051-164b-bc4e-195d84e21a50,winifred.applewhite0579@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,77,197,FALSE
+2b63821f-6187-1cda-3dd6-6aa7adb0c23d,ferdinand.inglewood0310@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,74,190,TRUE
+91a5ec55-6300-d163-ad8a-3419c6943983,camilla.attenborough0092@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,129,333,TRUE
+5bbdfdb6-d7e6-70a4-029b-8b08e8fb5619,zephyrine.marchetti0091@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,107,277,FALSE
+b54cfbcc-201d-86fb-28c5-88418264b5c1,montgomery.macallister0907@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,186,481,FALSE
+c4984dd0-e066-0e15-94b5-d5a9adade995,alastair.thistlewood0359@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,89,229,FALSE
+cfbd50bc-79c1-e0a0-e695-1a913d1cc5d6,odette.braithwaite0136@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,83,213,FALSE
+cfb42999-c6ae-a98a-8339-49640e4f8659,lettice.lymington0742@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,112,289,TRUE
+76c6dca9-d35e-a372-58c4-0075e80fd1a3,everard.featherstone0084@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,116,298,TRUE
+a4f2975b-07c1-a5ad-e6a5-7d5f002fe637,lachlan.hetherington0578@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,97,250,FALSE
+00b862ea-b189-e39f-214b-5789beafa1a7,yusuf.kingsmill0144@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,88,227,TRUE
+c45b7790-bac2-fbd0-a567-fab479fb51ad,valentine.wainwright0652@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,640,1650,TRUE
+65c41883-0205-029f-05b5-ede6af634e58,lucinda.higginbotham0465@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,117,301,TRUE
+bf110654-bfa0-adae-4d7d-e8cc27cbd7b4,peregrine.pargeter0891@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,82,212,TRUE
+3a43e6af-5add-f6fc-9738-6cd00e5a9457,edmund.trelawney0592@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,103,267,TRUE
+3c3ce4ed-3f5c-c6e8-17b3-3768c2b7cef2,ulysses.warrender0788@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,118,303,FALSE
+a7169c32-5295-1077-3d5c-34b15bf02901,sebastian.goldsworthy0304@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,79,203,FALSE
+9f881b93-c515-46cf-9566-caebd8d07911,ulysses.rothwell1013@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,74,191,FALSE
+e0256385-a77e-4a3b-05bf-70ab307cdbbc,bridget.dewhurst0613@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,75,193,TRUE
+63122154-53d8-bc93-b07f-80be510b33e3,callista.somerville0521@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,109,281,FALSE
+ac0597da-47b7-103c-2ad4-6d8a9b08aaf4,anastasia.barrowman0669@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,85,220,FALSE
+f0e198f5-9b69-a854-fc5f-f560d7450a0b,clementine.mallinson0043@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,76,196,FALSE
+50689709-8424-b4ff-7176-21d6ef5fae26,camilla.hollingsworth0186@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,173,446,FALSE
+398bdcc9-f018-3599-e710-121b27d476ae,delphine.ecclestone0562@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,250,645,FALSE
+4c08d9e4-77df-d46d-7c99-0b3958dda5b8,kingsley.shackleton0531@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,1496,3858,TRUE
+2c065092-5988-dc1a-9833-ad601b63d24a,ulysses.wadsworth0527@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,99,255,TRUE
+740fbd60-088c-30e2-38d7-60ee9dbb8f6e,kenelm.leverton0749@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,75,193,FALSE
+362c662f-f7c5-7717-176e-fd4099f1698a,rhiannon.thackeray0509@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,158,408,TRUE
+bbb1cd1b-3ac2-3108-725e-4e65f9adf04a,ingrid.fenwick0451@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,189,487,FALSE
+d6b6b05f-258e-3964-6672-0bea119f8ae6,torquil.zetland0028@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,1757,4531,TRUE
+2aefd1f7-f8ea-007c-74e7-3212ed0f354b,cyprian.danesfield0130@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,101,261,FALSE
+1144cc76-c63b-c038-1850-4c2bab8c524b,rupert.langdale0058@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,168,432,FALSE
+db897ad1-ddef-24cb-e30b-f02da6e92f3c,rhiannon.eversleigh0469@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,76,196,FALSE
+c3ce82ad-5ed9-a4f8-9cfb-c77a5b43b904,octavia.abernathy0403@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,71,184,FALSE
+738a44dc-0c3a-feda-1f58-959403bc38ef,nathaniel.fenwick0675@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,82,211,FALSE
+08121205-6af8-1a03-75e6-65b5b6f43c45,evangeline.lymington0430@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,234,603,TRUE
+686549ea-58f4-a835-b1e5-7b66207af85c,helena.higginbotham0381@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,157,405,FALSE
+783e41cd-a7be-18d6-18af-4bae876b029e,sebastian.jolliffe0753@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,77,199,TRUE
+c789d1be-774d-1066-6ee5-ccdcc2b2bcbd,orsola.darlington0898@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,123,317,TRUE
+ce69ba88-1322-ea7f-b136-b77fb65468dc,roderick.goodenough0013@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,271,698,TRUE
+b2cb54f6-0aab-bf3c-3a8e-57283aa45689,rowena.tarrington0182@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,72,186,TRUE
+3b01f1eb-f3dd-2c35-f08c-ca18c03a0a29,vernon.lymington0532@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,145,373,TRUE
+3dd57700-49d0-cd78-5bb0-310d5e44d5e5,drusilla.hepplewhite0098@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,583,1504,FALSE
+55104d26-586c-b002-94b7-28f074839050,kester.elphinstone0913@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,74,190,FALSE
+aafe7b9c-b54a-436e-fb44-7bac83acdd5f,winifred.dunmore0662@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,122,313,FALSE
+2fd6505a-6f97-faae-4f32-4d20daae3b41,kingsley.garforth0066@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,73,187,TRUE
+66567786-2e3b-506d-cc6c-f89d06c62be6,torquil.ainsworth0629@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,431,1110,FALSE
+6c0572dc-e755-012e-cf36-476cfc21cc15,meredith.yeovil0463@contoso-health.com,c93c10b9-68b2-0c70-16b4-8839f59bb1c2,Onboarding Buddy,74,190,TRUE
+ba983720-5a19-de9f-b4d2-57ed120667bf,lucinda.fitzgerald0618@contoso-health.com,739bd5c9-e26c-79ba-e0ef-86a0668dcd04,Benefits Explainer,165,425,TRUE
+95817dbb-3938-860a-7c61-8c8502b2fda5,thaddeus.cadwallader0317@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,143,368,TRUE
+dd910702-cc29-6fbf-adb1-913f2d390e3f,nigel.tattersall0889@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,89,230,FALSE
+6ce58e82-3f50-744a-a252-67cb6a00d2cd,nadia.quennell0822@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,97,249,FALSE
+57475ff2-7c72-0f7a-e667-51cc5ee6cd28,hyacinth.fairweather0847@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,127,327,FALSE
+4d327e19-d5dc-bbd8-3a31-e7ec13f4bae3,orlando.jolliffe0902@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,151,390,FALSE
+baa5a78c-c273-03dd-27d2-264640cf6543,lachlan.mainwaring0097@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,127,326,FALSE
+a48075a4-2ce4-aa1e-583d-3f7f8ea7a68d,wistan.lymington0748@contoso-health.com,b1b8249c-efd3-47a3-5137-cd6e461c3733,Provider Directory Bot,180,463,TRUE
+10bcca8b-5cca-98a5-6205-8d2d16f7354f,jarvis.micklethwait0354@contoso-health.com,b27804a9-5ad4-0dc7-db59-19e4535a2dad,Claims Triage Assistant,77,198,TRUE
+c2d69b5d-f72a-436e-53e9-0b106a17dd13,cuthbert.lindquist0276@contoso-health.com,85db9a46-1787-f55a-509e-d1decc984cde,Care Plan Orchestrator,85,219,FALSE
+9291bed3-765e-be88-696e-908c083560da,percival.osgoode0942@contoso-health.com,f4e3144b-b35d-f4e6-f760-51473fbd7e3f,Policy Document Analyser,116,300,FALSE
+b263ab53-25b3-1807-25cb-3f922144a9de,tabitha.willoughby0564@contoso-health.com,be6fc1e7-0b1e-e1cd-f474-5fd59c8417a3,Formulary Lookup,102,264,FALSE
+036800a1-f415-b9dd-de7c-06d1f19e1b63,tabitha.norrington0650@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,79,204,FALSE
+3135debd-df99-87dc-963e-487dcc9f0242,nathaniel.ottershaw0865@contoso-health.com,733b4c39-5730-a59c-0f4b-7570687e67b4,Prior Authorisation Helper,72,186,TRUE

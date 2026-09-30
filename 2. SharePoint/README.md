@@ -43,6 +43,7 @@ scheduled PowerShell job.
 | `ValueLens - SharePoint.pbit` | The dashboard template (refreshes from SharePoint URLs). |
 | [`scripts/`](scripts/) | Extract / upload / schedule helpers + the processor. See [`scripts/README.md`](scripts/README.md). |
 | [`azure-container/`](azure-container/) | Planned ACA Job for secretless managed-identity scheduling (WIP). |
+| [`Add Credit Consumption/`](Add%20Credit%20Consumption/) | *Optional.* The separate Consumption Central report for Copilot credit consumption and cost. |
 
 > Looking for the **local file path** template? It moved to
 > [`../1. Local CSV/ValueLens - Local CSV.pbit`](../1.%20Local%20CSV/) along with the sample data.

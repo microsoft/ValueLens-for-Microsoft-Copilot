@@ -17,6 +17,8 @@ TEMPLATES = (
     Path("4. Power Automate + Dataverse") / "ValueLens - Power Automate + Dataverse.pbit",
 )
 PAGE_COUNT = 16
+# Separate Consumption Central report shipped as an optional add-on in each path.
+ADDON = "Add Credit Consumption"
 HIDDEN_PAGES = {"licenseprioritisation"}
 VALUE_PAGE = "0a7ca92c179ad5909bba"
 VALUE_TOGGLES = ("Time Saved", "Value Table")
@@ -75,7 +77,8 @@ class CoreTemplateTests(unittest.TestCase):
             cls.templates.append((str(relative), members, model, docs))
 
     def test_exactly_five_active_templates(self):
-        active = {p.relative_to(ROOT) for p in ROOT.rglob("*.pbit") if "archive" not in p.parts}
+        active = {p.relative_to(ROOT) for p in ROOT.rglob("*.pbit")
+                  if "archive" not in p.parts and ADDON not in p.parts}
         self.assertEqual(active, set(TEMPLATES))
 
     def test_portable_parts_only(self):

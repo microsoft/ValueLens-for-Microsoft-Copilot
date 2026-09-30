@@ -59,6 +59,49 @@ Power Automate script), and the sample data carry the change.
 
 ---
 
+## 2026-09-29 — optional Add Credit Consumption add-on
+
+Each path folder now has an optional `Add Credit Consumption/` folder holding
+**Consumption Central**, a separate Power BI report for Copilot credit consumption and cost
+across Cowork / Work IQ, Copilot Studio, GitHub Copilot and Azure AI Foundry. The ValueLens
+templates are unchanged and don't read it.
+
+- **1. Local CSV** — the Local CSV template, `pull_azure_ai.py` and the shared synthetic sample
+  data.
+- **2. SharePoint** — the Viva Direct template, which reads Cowork data straight from Viva
+  Insights. Consumption Central has no SharePoint template.
+- **3. Fabric** — the Fabric template, seven ingestion notebooks, `seed_sample_data.py` and the
+  data dictionary. It can share the ValueLens Lakehouse; no table names overlap.
+- **4. Power Automate + Dataverse** — the Dataverse template, flow package, schema deploy script
+  and permissions. Tables use the `cc_` prefix, so they sit beside ValueLens's `poc_` tables.
+
+Copied from `microsoft/ConsumptionCentral-for-Microsoft-Copilot` at commit `24b0ca8`, with the
+fixes from microsoft/ConsumptionCentral-for-Microsoft-Copilot#39: the example addresses in the
+`SecurityFilter` table now use the fictional `contoso-health.com` domain, and the Dataverse path
+gets a table for Cowork / Work IQ. Links to the full documentation point at that repository.
+
+---
+
+## 2026-09-29 — fuller sample data
+
+The Local CSV sample now fills every page, so a first look shows what each page does on a
+real estate rather than a thin version of it. Before this, about a third of the report's
+visuals came up empty or thin on the sample.
+
+- **Bigger, longer, deeper.** 13,337 interaction rows (3,716 sessions) across three full months,
+  170 people in 14 organisations with a management hierarchy, a 104-agent registry and 1,215
+  feedback rows over 15 months.
+- **Every page populated.** All four habit bands, dormant and never-used licences, all eight
+  Cowork work shapes, Model Fit's Over-specified and Under-specified sessions, every Agent
+  Registry lifecycle state, and 11 feedback types.
+- **Still synthetic by construction.** `Build-SampleData.py` generates every value from a fixed
+  seed. Its proportions were tuned against aggregate counts from real deployments; no rows or
+  values were copied. People are invented `first.last@contoso-demo.com` names.
+- **New generator options.** `--end`, `--months`, `--users` and `--unlicensed-agent-share`, and
+  a coverage report after each run. `--days` is gone; use `--months`.
+
+---
+
 ## 2026-09-29 — gentler, adjustable fit grading
 
 Feedback on Cowork Fit was that it read as too critical (about half of graded Cowork sessions
