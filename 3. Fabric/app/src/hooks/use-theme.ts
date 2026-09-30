@@ -7,54 +7,43 @@
 
 import { useState, useEffect } from "react";
 
+export const THEME_STORAGE_KEY = "valuelens.theme";
+
+// Storage can be unavailable in a sandboxed embed; the theme then just isn't remembered.
+function readSaved(): "dark" | "light" | undefined {
+    try {
+        const value = window.localStorage.getItem(THEME_STORAGE_KEY);
+        return value === "dark" || value === "light" ? value : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+function save(value: "dark" | "light") {
+    try {
+        window.localStorage.setItem(THEME_STORAGE_KEY, value);
+    } catch {
+        // Not remembered; the toggle still works for this visit.
+    }
+}
+
 /**
- * Detects the current color scheme preference and toggles the `dark`
- * class on `<html>`. Listens for changes to `prefers-color-scheme` and
- * the `data-appearance` attribute on `<html>`.
+ * Dark by default. Anyone who switches to light mode keeps it on their next
+ * visit, because the choice is saved in this browser. The OS and host themes
+ * are deliberately not followed, so the app always opens the same way.
  */
 export function useAppTheme() {
-    const [isDark, setIsDark] = useState(() => {
-        // Check data-appearance attribute first (set by host environment)
-        const appearance = document.documentElement.getAttribute("data-appearance");
-        if (appearance === "dark") return true;
-        if (appearance === "light") return false;
-
-        // Check for .dark class
-        if (document.documentElement.classList.contains("dark")) return true;
-
-        // Fall back to OS preference
-        return window.matchMedia("(prefers-color-scheme: dark)").matches;
-    });
+    const [isDark, setIsDark] = useState(() => readSaved() !== "light");
 
     useEffect(() => {
         // Sync the .dark class on <html> for Tailwind dark mode
         document.documentElement.classList.toggle("dark", isDark);
     }, [isDark]);
 
-    useEffect(() => {
-        // Watch OS-level preference
-        const mql = window.matchMedia("(prefers-color-scheme: dark)");
-        const onMediaChange = (e: MediaQueryListEvent) => setIsDark(e.matches);
-        mql.addEventListener("change", onMediaChange);
-
-        // Watch data-appearance attribute on <html>
-        const observer = new MutationObserver(() => {
-            const appearance = document.documentElement.getAttribute("data-appearance");
-            if (appearance === "dark") setIsDark(true);
-            else if (appearance === "light") setIsDark(false);
-        });
-        observer.observe(document.documentElement, {
-            attributes: true,
-            attributeFilter: ["data-appearance", "class"],
-        });
-
-        return () => {
-            mql.removeEventListener("change", onMediaChange);
-            observer.disconnect();
-        };
-    }, []);
-
-    const toggleTheme = () => setIsDark((prev: boolean) => !prev);
+    const toggleTheme = () => {
+        save(isDark ? "light" : "dark");
+        setIsDark(!isDark);
+    };
 
     return { isDark, toggleTheme };
 }
