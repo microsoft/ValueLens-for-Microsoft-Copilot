@@ -45,8 +45,9 @@ Run these commands from this folder (`5. Fabric App`).
    ```powershell
    npm install
    ```
-2. **Point it at your models.** In [`fabric.yaml`](fabric.yaml), set `workspaceId` and `itemId`
-   under `vl` to your ValueLens semantic model, and under `cc` to your Consumption Central model.
+2. **Point it at your models.** [`fabric.yaml`](fabric.yaml) ships with placeholders. Replace
+   `workspaceId` and `itemId` under `vl` with your ValueLens semantic model's, and under `cc`
+   with your Consumption Central model's.
    Both IDs are in each model's URL: `app.powerbi.com/groups/<workspaceId>/datasets/<itemId>/…`
    Without Consumption Central, delete the `cc` block; the Consumption page then explains what
    it needs.
@@ -76,7 +77,9 @@ To ship changes, run `npx rayfin up` again. It updates the same item.
 | Edit a page | `src/screens/<page>/` |
 
 `rayfin up` writes local deploy state to `.env.local`, `rayfin/.env` and `rayfin/.deployments.json`.
-All three are gitignored, because every customer deploys their own copy.
+All three are gitignored, because every customer deploys their own copy. It also adds your app's
+URL to `allowedRedirectUris` in `rayfin/rayfin.yml`. Keep that edit, and your IDs in
+`fabric.yaml`, out of any pull request to this repo.
 
 Built on the [Fabric apps analytics template](https://learn.microsoft.com/fabric/apps/data-apps-template)
 (React, TypeScript, Vite). [`AGENTS.md`](AGENTS.md) has the build conventions for coding agents.
