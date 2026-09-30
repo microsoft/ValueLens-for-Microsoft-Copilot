@@ -15,6 +15,17 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-09-30 — Task Breakdown Users column blank on Cowork / Copilot
+
+On **Task Breakdown**, the Users column in the Organization and Agent tables was bound to
+`[Active Agent Users]`, which hard-codes `[Agent Filter (Normalized)] = "Agents"`. Selecting
+the Cowork or Copilot button intersected that with a different segment, so every Users cell
+went blank while Sessions still populated. Both tables (and the Value Outcome table's sort)
+now use `[All Active Users]`, which follows the selected Licensed / Agents / Copilot / Cowork
+button. Applied to all five ValueLens templates with
+`scripts/Fix-TaskBreakdown-UsersMeasure.py`. Other pages that deliberately report agent users
+are unchanged.
+
 ## 2026-09-29 — optional Add Credit Consumption add-on
 
 Each path folder now has an optional `Add Credit Consumption/` folder holding
