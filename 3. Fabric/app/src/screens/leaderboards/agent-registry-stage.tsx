@@ -467,7 +467,7 @@ function AgentLeaderboard() {
     const registered = entries.filter((entry) => entry.inRegistry).length;
 
     return (
-        <div className="grid items-start gap-400 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid grid-cols-1 items-start gap-400 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div
                 ref={gridRef}
                 className="flex h-[600px] min-w-0 flex-col [&_tbody_tr]:cursor-pointer"
@@ -484,7 +484,7 @@ function AgentLeaderboard() {
                     header={{
                         title: "Agent leaderboard",
                         subtitle:
-                            `${formatKpi(inUse, "whole")} in use in this selection, ${formatKpi(registered, "whole")} ` +
+                            `${formatKpi(inUse, "whole")} in use, ${formatKpi(registered, "whole")} ` +
                             `registered. Select an agent to see its description.`,
                     }}
                 />
@@ -623,7 +623,9 @@ export function AgentRegistryStage() {
                 reason="the lifecycle chart and the registered-agent count always cover every registered agent, used or not. The agent leaderboard follows every filter for usage and still lists the agents nobody used."
             />
 
-            <div className="grid gap-400 xl:grid-cols-2">
+            {/* grid-cols-1 caps the stacked track at the column width, so a chart
+                drawn wider (before the window narrowed) can shrink back. */}
+            <div className="grid grid-cols-1 gap-400 xl:grid-cols-2">
                 <div className="h-[420px]">
                     {usageResult.data?.status === "error" ? (
                         <QueryError

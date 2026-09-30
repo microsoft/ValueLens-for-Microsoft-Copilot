@@ -170,6 +170,9 @@
 
 @layer base {
   .dark {
+    /* Native controls (scrollbars, the <select> list) follow the theme too. */
+    color-scheme: dark;
+
     /* Color tokens — dark theme */
     --color-background: #1f1f1f;
     --color-foreground: #ffffff;
