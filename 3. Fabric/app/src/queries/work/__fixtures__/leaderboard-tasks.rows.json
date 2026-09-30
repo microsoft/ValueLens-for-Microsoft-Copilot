@@ -1,0 +1,119 @@
+[
+    {
+        "Chat + Agent Interactions (Audit Logs)[AppHost]": null,
+        "Chat + Agent Interactions (Audit Logs)[Behavior_Enriched_Full]": null,
+        "[Is Grand Total]": true,
+        "[Is Group Total]": true,
+        "[Active Users]": 180,
+        "[Sessions]": 6300,
+        "[Sessions Per User Per Week]": 5.006057463651787
+    },
+    {
+        "Chat + Agent Interactions (Audit Logs)[AppHost]": "autonomous",
+        "Chat + Agent Interactions (Audit Logs)[Behavior_Enriched_Full]": null,
+        "[Is Grand Total]": false,
+        "[Is Group Total]": true,
+        "[Active Users]": 65,
+        "[Sessions]": 1300,
+        "[Sessions Per User Per Week]": 5.96260042994399
+    },
+    {
+        "Chat + Agent Interactions (Audit Logs)[AppHost]": "Excel",
+        "Chat + Agent Interactions (Audit Logs)[Behavior_Enriched_Full]": null,
+        "[Is Grand Total]": false,
+        "[Is Group Total]": true,
+        "[Active Users]": 146,
+        "[Sessions]": 953,
+        "[Sessions Per User Per Week]": 1.9859200344317542
+    },
+    {
+        "Chat + Agent Interactions (Audit Logs)[AppHost]": "PowerPoint",
+        "Chat + Agent Interactions (Audit Logs)[Behavior_Enriched_Full]": null,
+        "[Is Grand Total]": false,
+        "[Is Group Total]": true,
+        "[Active Users]": 154,
+        "[Sessions]": 917,
+        "[Sessions Per User Per Week]": 1.9133084491715326
+    },
+    {
+        "Chat + Agent Interactions (Audit Logs)[AppHost]": "Excel",
+        "Chat + Agent Interactions (Audit Logs)[Behavior_Enriched_Full]": "Excel Assistance",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 144,
+        "[Sessions]": 877,
+        "[Sessions Per User Per Week]": 1.8993363397525769
+    },
+    {
+        "Chat + Agent Interactions (Audit Logs)[AppHost]": "PowerPoint",
+        "Chat + Agent Interactions (Audit Logs)[Behavior_Enriched_Full]": "Presentation Summarising",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 154,
+        "[Sessions]": 846,
+        "[Sessions Per User Per Week]": 1.8376016509616595
+    },
+    {
+        "Chat + Agent Interactions (Audit Logs)[AppHost]": "autonomous",
+        "Chat + Agent Interactions (Audit Logs)[Behavior_Enriched_Full]": "Specialist / Line-of-Business Workflow",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 53,
+        "[Sessions]": 230,
+        "[Sessions Per User Per Week]": 2.39289248762933
+    },
+    {
+        "Chat + Agent Interactions (Audit Logs)[AppHost]": "autonomous",
+        "Chat + Agent Interactions (Audit Logs)[Behavior_Enriched_Full]": "Document Workflow",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 47,
+        "[Sessions]": 220,
+        "[Sessions Per User Per Week]": 2.5674603174603177
+    },
+    {
+        "Chat + Agent Interactions (Audit Logs)[AppHost]": "autonomous",
+        "Chat + Agent Interactions (Audit Logs)[Behavior_Enriched_Full]": "Coordination Workflow",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 48,
+        "[Sessions]": 180,
+        "[Sessions Per User Per Week]": 2.1582480818414322
+    },
+    {
+        "Chat + Agent Interactions (Audit Logs)[AppHost]": "Excel",
+        "Chat + Agent Interactions (Audit Logs)[Behavior_Enriched_Full]": "People Lookup",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 15,
+        "[Sessions]": 23,
+        "[Sessions Per User Per Week]": 1.125
+    },
+    {
+        "Chat + Agent Interactions (Audit Logs)[AppHost]": "Excel",
+        "Chat + Agent Interactions (Audit Logs)[Behavior_Enriched_Full]": "Enterprise Searching",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 14,
+        "[Sessions]": 22,
+        "[Sessions Per User Per Week]": 1.2814814814814814
+    },
+    {
+        "Chat + Agent Interactions (Audit Logs)[AppHost]": "PowerPoint",
+        "Chat + Agent Interactions (Audit Logs)[Behavior_Enriched_Full]": "Web Searching",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 13,
+        "[Sessions]": 19,
+        "[Sessions Per User Per Week]": 1.2666666666666666
+    },
+    {
+        "Chat + Agent Interactions (Audit Logs)[AppHost]": "PowerPoint",
+        "Chat + Agent Interactions (Audit Logs)[Behavior_Enriched_Full]": "People Lookup",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 15,
+        "[Sessions]": 18,
+        "[Sessions Per User Per Week]": 1.0227272727272727
+    }
+]

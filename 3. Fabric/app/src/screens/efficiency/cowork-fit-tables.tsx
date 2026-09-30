@@ -5,23 +5,24 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Flag } from "lucide-react";
 import { DataGrid, type CellValue, type GridColumnDef, type Row } from "@microsoft/fabric-datagrid";
-import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { GradeMark, GradeMix } from "@/components/grade-mark";
-import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
+import { TreeFrame } from "@/components/tree-frame";
 import { useOrgAttribute } from "@/hooks/filter.context";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { useOutcomeColors } from "@/hooks/use-palette-theme";
+import { useRowToggles } from "@/hooks/use-row-toggles";
 import { gridHeight } from "@/lib/chart-height";
-import { formatKpi, type KpiFormat } from "@/lib/format-kpi";
+import { formatKpi } from "@/lib/format-kpi";
 import type { FilterKey } from "@/lib/filters";
 import { workWeightGrade } from "@/lib/grading-method";
 import { heatDomain, heatRenderer, type HeatDomain } from "@/lib/heat";
-import { isGroupRow, visibleRowCount, type RollupTree } from "@/lib/rollup-tree";
+import { isGroupRow, visibleRowCount } from "@/lib/rollup-tree";
 import { toDataTable } from "@/lib/to-data-table";
+import { asNumber, formatCell, textCell, totalsRow, TREE_GRID, withExpansion } from "@/lib/tree-grid";
 import {
     coworkFitPeople,
     coworkWorkShape,
@@ -31,97 +32,8 @@ import {
     WORK_LABEL_COLUMN,
 } from "@/queries/efficiency";
 
-const NO_IDS: ReadonlySet<string> = new Set();
-
 /** Shares of graded sessions shade on one absolute scale, so 50% reads the same on every row. */
 const SHARE_HEAT: HeatDomain = { min: 0, max: 1 };
-
-const ONE_DECIMAL = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-
-/** Grid sizing with room for the sideways scrollbar these wide tables need on narrow screens. */
-const TREE_GRID = { chrome: 148, max: 640 };
-
-function asNumber(value: unknown): number | undefined {
-    return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-/** A blank stays blank in a tree grid; the em dash of a KPI card would be noise on every other row. */
-function formatCell(format: KpiFormat | "decimal"): (value: unknown) => string | null {
-    return (value) => {
-        const n = asNumber(value);
-        if (n === undefined) return null;
-        return format === "decimal" ? ONE_DECIMAL.format(n) : formatKpi(n, format);
-    };
-}
-
-function textCell(value: unknown): string {
-    return typeof value === "string" ? value : "";
-}
-
-/**
- * Tracks which rows the reader has opened or closed against the default, to
- * size the grid. The grid owns its expansion and only reads `_expanded` on
- * mount, so a change of `gridKey` (a new result) starts afresh.
- */
-function useRowToggles(gridKey: string) {
-    const [toggled, setToggled] = useState<{ key: string; ids: ReadonlySet<string> }>({ key: "", ids: NO_IDS });
-    const ids = toggled.key === gridKey ? toggled.ids : NO_IDS;
-    const onRowToggle = useCallback(
-        (rowId: string) =>
-            setToggled((previous) => {
-                const next = new Set(previous.key === gridKey ? previous.ids : NO_IDS);
-                if (next.has(rowId)) next.delete(rowId);
-                else next.add(rowId);
-                return { key: gridKey, ids: next };
-            }),
-        [gridKey],
-    );
-    return { ids, onRowToggle };
-}
-
-/** Expands (or collapses) every group row on first render. */
-function withExpansion(tree: RollupTree | undefined, expanded: boolean): Row[] | undefined {
-    return tree?.rows.map((row) => (row._children ? { ...row, _expanded: expanded } : row));
-}
-
-/** A supplied totals row is rendered as given, so each value arrives already formatted. */
-function totalsRow(
-    total: Row | undefined,
-    columns: readonly { id: string; format?: (value: unknown) => string | null }[],
-): DataTable | undefined {
-    if (!total) return undefined;
-    return {
-        columns: columns.map((column) => ({ name: column.id })),
-        rows: [columns.map((column) => (column.format ? column.format(total[column.id]) ?? "" : textCell(total[column.id])))],
-    };
-}
-
-interface TreeFrameProps {
-    tree: RollupTree | undefined;
-    error?: string;
-    onRetry: () => void;
-    isLoading: boolean;
-    height: number | undefined;
-    emptyTitle: string;
-    emptyDescription: string;
-    children: ReactNode;
-}
-
-function TreeFrame({ tree, error, onRetry, isLoading, height, emptyTitle, emptyDescription, children }: TreeFrameProps) {
-    return (
-        <div className="flex h-[420px] flex-col" style={height ? { height } : undefined}>
-            {error !== undefined ? (
-                <QueryError className="h-full" message={error} onRetry={onRetry} />
-            ) : isLoading || !tree ? (
-                <QueryLoading className="h-full" />
-            ) : tree.rows.length === 0 ? (
-                <QueryEmpty className="h-full" title={emptyTitle} description={emptyDescription} />
-            ) : (
-                children
-            )}
-        </div>
-    );
-}
 
 interface CoworkTableProps {
     /** Filters Cowork fit never applies. */

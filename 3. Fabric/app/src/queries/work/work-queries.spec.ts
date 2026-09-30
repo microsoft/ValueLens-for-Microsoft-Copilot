@@ -6,14 +6,18 @@
 //-----------------------------------------------------------------------
 
 import { describe, expect, it } from "vitest";
+import { describeOrgAttribute } from "@/lib/org-attribute";
 import {
     cohortTaskField,
-    ORGANIZATION_COLUMN,
+    leaderboardCohorts,
+    leaderboardMeasures,
+    leaderboardPeople,
+    leaderboardSummary,
+    leaderboardSummaryColumns,
+    leaderboardTasks,
     surfaceUsage,
     taskBreakdown,
     taskDimensions,
-    USER_COLUMN,
-    userLeaderboard,
     workCohorts,
     workSummary,
     type WorkCohort,
@@ -28,7 +32,17 @@ const modules = [
         factory: () => surfaceUsage({ lens: "surface" }),
         columns: liveColumns.surfaceUsage,
     },
-    { name: "userLeaderboard", factory: () => userLeaderboard(), columns: liveColumns.userLeaderboard },
+    { name: "leaderboardSummary", factory: () => leaderboardSummary(), columns: liveColumns.leaderboardSummary },
+    ...leaderboardCohorts.map(({ id }) => ({
+        name: `leaderboardPeople (${id})`,
+        factory: () => leaderboardPeople(id),
+        columns: liveColumns.leaderboardPeople,
+    })),
+    ...leaderboardCohorts.map(({ id }) => ({
+        name: `leaderboardTasks (${id})`,
+        factory: () => leaderboardTasks(id),
+        columns: id === "cowork" ? liveColumns.leaderboardCoworkTasks : liveColumns.leaderboardTasks,
+    })),
 ];
 
 /** Characters `ColumnDef.name` strips from the original DAX column name. */
@@ -117,21 +131,6 @@ describe("work cohorts", () => {
             expect(serialized).toContain(`"field":"${cohortTaskField(id)}"`);
         }
     });
-
-    it("keeps the leaderboard's grid column ids in step with the query", () => {
-        const { columnMetadata } = userLeaderboard();
-        const available = new Set(Object.values(columnMetadata).map((def) => def.name));
-        expect(available).toContain(ORGANIZATION_COLUMN);
-        expect(available).toContain(USER_COLUMN);
-    });
-
-    it("keeps the leaderboard's task columns aligned with the cohorts", () => {
-        const { columnMetadata } = userLeaderboard();
-        const available = new Set(Object.values(columnMetadata).map((def) => def.name));
-        for (const { id } of workCohorts) {
-            expect(available, `cohort "${id}"`).toContain(cohortTaskField(id));
-        }
-    });
 });
 
 describe("work spec field references", () => {
@@ -198,21 +197,60 @@ describe("work spec field references", () => {
     });
 });
 
-describe("leaderboard rollup", () => {
-    it("declares the rollup flag the query emits and keeps it out of the grid", () => {
-        const { query, columnMetadata, rollupFlagColumns } = userLeaderboard();
-        expect(rollupFlagColumns).toEqual(["[IsTotal]"]);
-        expect(query).toContain(`"IsTotal"`);
-        for (const flag of rollupFlagColumns) {
-            expect(Object.keys(columnMetadata)).not.toContain(flag);
+describe("leaderboard queries", () => {
+    const cohortQueries = leaderboardCohorts.flatMap(({ id }) => [
+        { name: `people (${id})`, cohort: id, query: leaderboardPeople(id).query },
+        { name: `tasks (${id})`, cohort: id, query: leaderboardTasks(id).query },
+    ]);
+    const everyQuery = [{ name: "summary", query: leaderboardSummary().query }, ...cohortQueries];
+
+    it.each(cohortQueries)("$name leaves no unsubstituted placeholders", ({ query }) => {
+        expect(query).not.toMatch(/__[A-Z_]+__/);
+    });
+
+    // The report's bookmarks each bind their own cohort's measures, so a
+    // template filled with the wrong ones would rank the wrong sessions.
+    it.each(cohortQueries)("$name binds its own cohort's measures", ({ cohort, query }) => {
+        const measures = leaderboardMeasures(cohort);
+        expect(query).toContain(`[${measures.users}]`);
+        expect(query).toContain(`[${measures.sessions}]`);
+        expect(query).toContain(`[${measures.perWeek}]`);
+    });
+
+    it.each(everyQuery)("$name leaves Security Copilot out, as the report's page filter does", ({ query }) => {
+        expect(query).toContain(
+            `NOT CONTAINSSTRING('Chat + Agent Interactions (Audit Logs)'[AppHost], "SecurityCopilot")`,
+        );
+    });
+
+    it("breaks Cowork down by what the work was, and every other cohort by app and activity", () => {
+        for (const { id } of leaderboardCohorts) {
+            const levels =
+                id === "cowork" ? ["Task Breakdown Group", "Task Breakdown Category"] : ["AppHost", "Behavior_Enriched_Full"];
+            const rollup = new RegExp(
+                `ROLLUPADDISSUBTOTAL\\(\\s*'Chat \\+ Agent Interactions \\(Audit Logs\\)'\\[${levels[0]}\\], "Is Grand Total",\\s*` +
+                    `'Chat \\+ Agent Interactions \\(Audit Logs\\)'\\[${levels[1]}\\], "Is Group Total"`,
+            );
+            expect(leaderboardTasks(id).query, `cohort "${id}"`).toMatch(rollup);
         }
     });
 
-    // `toRollupDataTables` rejects rows where the flags disagree, which is what
-    // a per-organization subtotal would produce. ROLLUPGROUP collapses both
-    // grouping columns into one level so only detail rows and a single grand
-    // total come back.
-    it("groups both key columns into one rollup level", () => {
-        expect(userLeaderboard().query).toMatch(/ROLLUPADDISSUBTOTAL\(\s*ROLLUPGROUP\(/);
+    it("names every cohort's cards in the summary", () => {
+        const available = new Set<string>(liveColumns.leaderboardSummary);
+        for (const { id } of leaderboardCohorts) {
+            for (const column of Object.values(leaderboardSummaryColumns(id))) {
+                expect(available, `cohort "${id}"`).toContain(column);
+            }
+        }
+    });
+
+    it("groups people by whichever org column is chosen", () => {
+        const { query, columnMetadata } = leaderboardPeople("licensed", describeOrgAttribute("Department"));
+        expect(query).toContain("'Chat + Agent Org Data'[Department]");
+        expect(query).not.toContain("[Organization]");
+        expect(columnMetadata["Chat + Agent Org Data[Department]"]).toMatchObject({
+            name: "Chat + Agent Org DataOrganization",
+            displayName: "Department",
+        });
     });
 });

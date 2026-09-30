@@ -14,19 +14,19 @@ import { compile } from "vega-lite";
 import { parse, View, type Scene, type SceneItem } from "vega";
 import type { TopLevelSpec } from "vega-lite";
 import type { QueryTable } from "@microsoft/fabric-app-data";
+import type { Row as GridRow } from "@microsoft/fabric-datagrid";
+import { isGroupRow } from "@/lib/rollup-tree";
 import type { ColumnMetadataMap } from "@/lib/to-data-table";
-import { toRollupDataTables } from "@/lib/to-data-table";
+import { toDataTable } from "@/lib/to-data-table";
 import { surfaceUsage, type UsageLens } from "./surface-usage";
 import { taskBreakdown, taskDimensions, type TaskDimension } from "./task-breakdown";
-import {
-    userLeaderboard,
-    ORGANIZATION_COLUMN,
-    USER_COLUMN,
-} from "./user-leaderboard";
+import { LEADERBOARD_LABEL_COLUMN, leaderboardPeople, toLeaderboardPeopleTree } from "./leaderboard-people";
+import { leaderboardTasks, toLeaderboardTaskTree } from "./leaderboard-tasks";
 import { workCohorts, cohortTaskField } from "./cohorts";
 import taskBreakdownRows from "./__fixtures__/task-breakdown.rows.json";
 import surfaceUsageRows from "./__fixtures__/surface-usage.rows.json";
-import userLeaderboardRows from "./__fixtures__/user-leaderboard.rows.json";
+import leaderboardPeopleRows from "./__fixtures__/leaderboard-people.rows.json";
+import leaderboardTaskRows from "./__fixtures__/leaderboard-tasks.rows.json";
 
 type Row = Record<string, string | number | boolean | null>;
 
@@ -173,9 +173,7 @@ describe("surface usage renders", () => {
     });
 });
 
-describe("user leaderboard grid", () => {
-    const leaderboardRows = userLeaderboardRows as Row[];
-
+describe("leaderboard trees", () => {
     /** Rebuilds the positional `QueryTable` the SDK hands the app. */
     function asQueryTable(rows: Row[]): QueryTable {
         const names = Object.keys(rows[0]);
@@ -185,50 +183,65 @@ describe("user leaderboard grid", () => {
         } as QueryTable;
     }
 
-    it("splits the grand total out of the body", () => {
-        const { columnMetadata, rollupFlagColumns } = userLeaderboard();
-        const { bodyTable, grandTotalTable } = toRollupDataTables(
-            asQueryTable(leaderboardRows),
-            columnMetadata,
-            { rollupFlagColumns: [...rollupFlagColumns] },
+    const ORG = "Chat + Agent Org Data[Organization]";
+    const peopleRows = leaderboardPeopleRows as Row[];
+
+    function peopleTree(rows: Row[] = peopleRows) {
+        return toLeaderboardPeopleTree(
+            toDataTable(asQueryTable(rows), leaderboardPeople().columnMetadata),
+            "Unassigned organization",
         );
+    }
 
-        expect(grandTotalTable.rows).toHaveLength(1);
-        expect(bodyTable.rows).toHaveLength(leaderboardRows.length - 1);
-        // The flag column is internal plumbing and must not reach the grid.
-        expect(bodyTable.columns.map((column) => column.name)).not.toContain("[IsTotal]");
-    });
+    const children = (row: GridRow) => (row._children as GridRow[] | undefined) ?? [];
 
-    it("gives the grid the column ids the cohort toggle hides by", () => {
-        const { columnMetadata, rollupFlagColumns } = userLeaderboard();
-        const { bodyTable } = toRollupDataTables(asQueryTable(leaderboardRows), columnMetadata, {
-            rollupFlagColumns: [...rollupFlagColumns],
-        });
-        const names = bodyTable.columns.map((column) => column.name);
+    it("folds each organization over its people, busiest first", () => {
+        const { rows } = peopleTree();
 
-        expect(names).toContain(ORGANIZATION_COLUMN);
-        expect(names).toContain(USER_COLUMN);
-        for (const cohort of workCohorts) {
-            expect(names).toContain(cohortTaskField(cohort.id));
+        expect(rows.map((row) => row[LEADERBOARD_LABEL_COLUMN])).toEqual(["Sales", "IT"]);
+        for (const group of rows) {
+            expect(isGroupRow(group)).toBe(true);
+            const people = children(group);
+            expect(people.length).toBeGreaterThan(0);
+            const sessions = people.map((person) => person.Sessions as number);
+            expect(sessions).toEqual([...sessions].sort((a, b) => b - a));
+            for (const person of people) expect(String(person[LEADERBOARD_LABEL_COLUMN])).toMatch(/@/);
         }
     });
 
-    it("carries the grand total the model reports, not a client-side sum", () => {
-        const { columnMetadata, rollupFlagColumns } = userLeaderboard();
-        const { grandTotalTable } = toRollupDataTables(
-            asQueryTable(leaderboardRows),
-            columnMetadata,
-            { rollupFlagColumns: [...rollupFlagColumns] },
-        );
-        const total = grandTotalTable.rows[0] as unknown[];
-        const allTasks = grandTotalTable.columns.findIndex((c) => c.name === "All Tasks");
+    // The fixture holds a slice of the ranking, so the model's total is
+    // necessarily larger than anything summed from the rows it ships with.
+    it("carries the grand total and subtotals the model reports, not client-side sums", () => {
+        const { rows, total } = peopleTree();
 
-        // The fixture holds a slice of the leaderboard, so the total is
-        // necessarily larger than the detail rows it ships with.
-        const sliceSum = leaderboardRows
-            .filter((row) => row["[IsTotal]"] === false)
-            .reduce((sum, row) => sum + (row["[All Tasks]"] as number), 0);
-        expect(total[allTasks]).toBe(6300);
-        expect(total[allTasks]).toBeGreaterThan(sliceSum);
+        expect(total?.Sessions).toBe(6300);
+        expect(total?.["Active Users"]).toBe(180);
+        const sales = rows[0];
+        expect(sales.Sessions).toBe(1655);
+        const sliceSum = children(sales).reduce((sum, person) => sum + (person.Sessions as number), 0);
+        expect(sales.Sessions).toBeGreaterThan(sliceSum);
+    });
+
+    it("names people missing from the org data instead of leaving a blank row", () => {
+        const unassigned = peopleRows.map((row) => (row[ORG] === "IT" ? { ...row, [ORG]: null } : row));
+        const { rows } = peopleTree(unassigned);
+
+        expect(rows.map((row) => row[LEADERBOARD_LABEL_COLUMN])).toEqual(["Sales", "Unassigned organization"]);
+        expect(children(rows[1]).length).toBeGreaterThan(0);
+    });
+
+    it("folds each app over the activities done there", () => {
+        const source = leaderboardTasks("all");
+        const { rows, total } = toLeaderboardTaskTree(
+            toDataTable(asQueryTable(leaderboardTaskRows as Row[]), source.columnMetadata),
+            source.levels,
+        );
+
+        expect(rows.map((row) => row[LEADERBOARD_LABEL_COLUMN])).toEqual(["autonomous", "Excel", "PowerPoint"]);
+        expect(total?.Sessions).toBe(6300);
+        for (const group of rows) {
+            expect(children(group).length).toBeGreaterThan(0);
+            for (const activity of children(group)) expect(isGroupRow(activity)).toBe(false);
+        }
     });
 });

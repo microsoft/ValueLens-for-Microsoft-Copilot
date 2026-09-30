@@ -9,4 +9,7 @@ export * from "./cohorts";
 export * from "./work-summary";
 export * from "./task-breakdown";
 export * from "./surface-usage";
-export * from "./user-leaderboard";
+export * from "./leaderboard-cohorts";
+export * from "./leaderboard-summary";
+export * from "./leaderboard-people";
+export * from "./leaderboard-tasks";
