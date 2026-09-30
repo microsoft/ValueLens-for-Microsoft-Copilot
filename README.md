@@ -67,9 +67,11 @@ open an issue in this repo.
 
 **Same dashboard, a choice of data pathways.** Paths 1–3 remain unchanged. Path 4 is an
 additional preview for Power Automate and Dataverse, exercised end-to-end on a bounded demo interval.
+Path 5 is a preview that runs the dashboard as a web app in your Fabric workspace, on top of the
+model you publish from any of paths 1–4.
 
 **Quick decision:** no tenant access → **1** · Power BI Pro only → **2** · Fabric capacity → **3** ·
-Dataverse-centric → **4**.
+Dataverse-centric → **4** · want a web app on top of any of them → **5**.
 
 | Path | Licence needed | Refresh | Setup | Scale | Best for |
 |---|---|---|---|---|---|
@@ -77,6 +79,7 @@ Dataverse-centric → **4**.
 | **[2. SharePoint](2.%20SharePoint/)** | Power BI **Pro** | Scheduled, hands-off | App registration + a SharePoint library + a scheduled extract task | Up to Pro's 1 GB model / 2-hour refresh cap | Automatic refresh without Fabric or Premium |
 | **[3. Fabric](3.%20Fabric/)** · *recommended* | **Fabric capacity** (F2+ or trial), Premium or PPU | Pipeline-orchestrated, plus a success-gated model refresh | Lakehouse + app registration + notebooks + pipeline | Tenant scale — Lakehouse ingestion, no file caps | High volume, plus the optional feedback and Agent 365 sources |
 | **[4. Power Automate + Dataverse](4.%20Power%20Automate%20+%20Dataverse/)** · *preview* | Power Automate premium + Dataverse capacity, plus Power BI | Scheduled collector + runner; you advance the snapshot parameter by hand | Collector solution + Dataverse tables + a Python refresh runner | Preview — validated on a bounded demo interval; benchmark before a production cadence | Tenants already collecting Copilot interactions into Dataverse |
+| **[5. Fabric App](5.%20Fabric%20App/)** · *preview* | **Fabric capacity** to host the app, plus a published model from paths 1–4 | Live: each page queries the published model as the viewer | `npm install`, point `fabric.yaml` at the model, `npx rayfin up` | As the model beneath it | A fast, shareable app in Fabric instead of a report |
 
 **Not sure?** **Start with path 1.** It takes minutes and tells you whether the numbers are worth
 automating — *before* you set up any automation. Move to 2 or 3 when you want it hands-off.
@@ -104,6 +107,7 @@ docs/              DATA-DICTIONARY.md  ·  PERMISSIONS.md   ← cross-path refer
      archive/extended/  archived Copilot Studio add-on reference (core notebook mirrors still synchronized)
      archive/flows/     archived cost-consumption flows and guides, not active setup
 4. Power Automate + Dataverse/  Power Automate + Dataverse.pbit  ·  scripts/  ·  source-map.json
+5. Fabric App/     web app (React + Vite) over a published model  ·  deployed with `npx rayfin up`
 archive/           superseded versions — kept for reference, not maintained
 tests/             offline pytest regressions, run in CI by .github/workflows/tests.yml
 
@@ -154,6 +158,7 @@ Maintained page lists live in the path READMEs:
 - [`2. SharePoint/README.md`](2.%20SharePoint/README.md)
 - [`3. Fabric/README.md`](3.%20Fabric/README.md)
 - [`4. Power Automate + Dataverse/README.md`](4.%20Power%20Automate%20+%20Dataverse/README.md)
+- [`5. Fabric App/README.md`](5.%20Fabric%20App/README.md)
 
 Archived Studio page reference (not an active deployment):
 [`3. Fabric/archive/extended/Fabric + Copilot Studio/README.md`](3.%20Fabric/archive/extended/Fabric%20+%20Copilot%20Studio/README.md).

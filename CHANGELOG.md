@@ -11,7 +11,19 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 [1. Local CSV](1.%20Local%20CSV/README.md) ·
 [2. SharePoint](2.%20SharePoint/README.md) ·
 [3. Fabric](3.%20Fabric/README.md) ·
-[4. Power Automate + Dataverse](4.%20Power%20Automate%20+%20Dataverse/README.md).
+[4. Power Automate + Dataverse](4.%20Power%20Automate%20+%20Dataverse/README.md) ·
+[5. Fabric App](5.%20Fabric%20App/README.md).
+
+---
+
+## 2026-09-30 — path 5: the ValueLens Fabric App (preview)
+
+A new top-level folder, [`5. Fabric App`](5.%20Fabric%20App/), holds ValueLens rebuilt as a web
+app. It's hosted as an item in a Fabric workspace and queries the published ValueLens model live,
+as the viewer. It runs on the model from any of paths 1–4, because all five templates carry the
+fields it uses. It has seven pages: Adoption, Leaderboards, Readiness, Value, Efficiency,
+Feedback and Appendix. Deploy it with `npx rayfin up`; see the folder README. The app was
+developed under `3. Fabric/app` and has moved here unchanged.
 
 ---
 
