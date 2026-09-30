@@ -1,0 +1,26 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [{ "filter": "isValid(datum['Cost'])" }],
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Item",
+      "type": "nominal",
+      "title": null,
+      "sort": "-x",
+      "axis": { "labelLimit": 200 }
+    },
+    "x": {
+      "field": "Cost",
+      "type": "quantitative",
+      "title": "Cost",
+      "axis": { "labelExpr": "format(datum.value, ',.0f')" }
+    },
+    "tooltip": [
+      { "field": "Item", "type": "nominal", "title": "Item" },
+      { "field": "Cost", "type": "quantitative", "title": "Cost", "format": ",.2f" }
+    ]
+  }
+}

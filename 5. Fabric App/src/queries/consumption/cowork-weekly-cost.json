@@ -1,0 +1,44 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [
+    { "fold": ["Prepaid Cost", "PAYG Cost"], "as": ["Series", "Cost"] },
+    { "filter": "isValid(datum['Cost'])" },
+    { "calculate": "datum['Series'] === 'Prepaid Cost' ? 'Prepaid' : 'Pay-as-you-go'", "as": "Billing" },
+    { "calculate": "datum['Series'] === 'Prepaid Cost' ? 1 : 2", "as": "Billing Order" },
+    { "calculate": "toDate(datum['Week Start'])", "as": "Week" },
+    { "calculate": "timeFormat(datum['Week'], '%-d %b')", "as": "Week Label" }
+  ],
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "x": {
+      "field": "Week Label",
+      "type": "ordinal",
+      "title": null,
+      "sort": { "field": "Week Index", "op": "min", "order": "ascending" },
+      "axis": { "labelAngle": 0 }
+    },
+    "y": {
+      "field": "Cost",
+      "type": "quantitative",
+      "stack": "zero",
+      "title": "Cost ($)",
+      "axis": { "labelExpr": "format(datum.value, ',.0f')" }
+    },
+    "color": {
+      "field": "Billing",
+      "type": "nominal",
+      "title": null,
+      "sort": ["Prepaid", "Pay-as-you-go"],
+      "legend": { "orient": "top", "direction": "horizontal" }
+    },
+    "order": { "field": "Billing Order", "type": "quantitative" },
+    "tooltip": [
+      { "field": "Week", "type": "temporal", "title": "Week starting", "format": "%d %b %Y" },
+      { "field": "Billing", "type": "nominal", "title": "Billing" },
+      { "field": "Cost", "type": "quantitative", "title": "Cost", "format": "$,.2f" },
+      { "field": "Active Users", "type": "quantitative", "title": "Active users", "format": ",.0f" }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS('AzureAiSpend'[Model], "@Cost", [Foundry Cost], "@Tokens", [Foundry Tokens (M)]),
+        NOT ISBLANK([@Cost])
+    ),
+    "Item", COALESCE('AzureAiSpend'[Model], "Not recorded"),
+    "Cost", [@Cost],
+    "Tokens M", [@Tokens]
+)
+ORDER BY [Cost] DESC

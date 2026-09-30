@@ -1,0 +1,233 @@
+[
+  {
+    "Group By[Group]": null,
+    "Credit Consumption (User)[User Name]": null,
+    "[Is Grand Total]": true,
+    "[Is Group Total]": true,
+    "[Credits Used]": 1236,
+    "[Credit Share]": 1,
+    "[Billable Credits]": 197,
+    "[Estimated Cost]": 1.8124,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": null,
+    "[Is Grand Total]": false,
+    "[Is Group Total]": true,
+    "[Credits Used]": 1236,
+    "[Credit Share]": 1,
+    "[Billable Credits]": 197,
+    "[Estimated Cost]": 1.8124,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "adelaide.kettering0247",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 420,
+    "[Credit Share]": 0.33980582524271846,
+    "[Billable Credits]": 0,
+    "[Estimated Cost]": 0,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "aurelia.redmayne0179",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 193,
+    "[Credit Share]": 0.15614886731391586,
+    "[Billable Credits]": 75,
+    "[Estimated Cost]": 0.69,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "callista.knatchbull0445",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 153,
+    "[Credit Share]": 0.12378640776699029,
+    "[Billable Credits]": 0,
+    "[Estimated Cost]": 0,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "delilah.braithwaite0377",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 97,
+    "[Credit Share]": 0.0784789644012945,
+    "[Billable Credits]": 0,
+    "[Estimated Cost]": 0,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "ernest.chesterton0287",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 77,
+    "[Credit Share]": 0.06229773462783172,
+    "[Billable Credits]": 0,
+    "[Estimated Cost]": 0,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "florence.foxcroft0223",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 69,
+    "[Credit Share]": 0.055825242718446605,
+    "[Billable Credits]": 0,
+    "[Estimated Cost]": 0,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "helena.higginbotham0381",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 66,
+    "[Credit Share]": 0.05339805825242718,
+    "[Billable Credits]": 66,
+    "[Estimated Cost]": 0.6072,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "isadora.jellicoe0252",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 43,
+    "[Credit Share]": 0.03478964401294499,
+    "[Billable Credits]": 0,
+    "[Estimated Cost]": 0,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "juliet.shackleton0289",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 20,
+    "[Credit Share]": 0.016181229773462782,
+    "[Billable Credits]": 20,
+    "[Estimated Cost]": 0.184,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "lavinia.farquharson0392",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 19,
+    "[Credit Share]": 0.015372168284789644,
+    "[Billable Credits]": 0,
+    "[Estimated Cost]": 0,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "millicent.cholmondeley0691",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 14,
+    "[Credit Share]": 0.011326860841423949,
+    "[Billable Credits]": 14,
+    "[Estimated Cost]": 0.1288,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "nolan.ashdown0855",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 12,
+    "[Credit Share]": 0.009708737864077669,
+    "[Billable Credits]": 0,
+    "[Estimated Cost]": 0,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "orlando.quiller0409",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 11,
+    "[Credit Share]": 0.00889967637540453,
+    "[Billable Credits]": 11,
+    "[Estimated Cost]": 0.1012,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "prudence.beauchamp0535",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 10,
+    "[Credit Share]": 0.008090614886731391,
+    "[Billable Credits]": 0,
+    "[Estimated Cost]": 0,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "rosalind.bickerstaff0519",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 9,
+    "[Credit Share]": 0.007281553398058253,
+    "[Billable Credits]": 0,
+    "[Estimated Cost]": 0,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "susannah.hetherington0390",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 7,
+    "[Credit Share]": 0.0056634304207119745,
+    "[Billable Credits]": 0,
+    "[Estimated Cost]": 0,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "tobias.quibell0281",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 6,
+    "[Credit Share]": 0.0048543689320388345,
+    "[Billable Credits]": 6,
+    "[Estimated Cost]": 0.0552,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "valentine.wainwright0652",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 5,
+    "[Credit Share]": 0.0040453074433656954,
+    "[Billable Credits]": 0,
+    "[Estimated Cost]": 0,
+    "[Policy]": "(No billing policy)"
+  },
+  {
+    "Group By[Group]": "All users",
+    "Credit Consumption (User)[User Name]": "wilhelmina.underhill0550",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Credits Used]": 5,
+    "[Credit Share]": 0.0040453074433656954,
+    "[Billable Credits]": 5,
+    "[Estimated Cost]": 0.046,
+    "[Policy]": "(No billing policy)"
+  }
+]

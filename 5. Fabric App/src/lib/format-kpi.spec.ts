@@ -23,4 +23,10 @@ describe("formatKpi", () => {
         expect(formatKpi(0.1234, "percent")).toBe("12.3%");
         expect(formatKpi(1.2, "rate")).toBe("1.20");
     });
+
+    it("keeps cents on billed amounts and four decimals on unit prices", () => {
+        expect(formatKpi(0.736, "money", { prefix: "$" })).toBe("$0.74");
+        expect(formatKpi(6085.818, "money", { prefix: "$" })).toBe("$6,085.82");
+        expect(formatKpi(0.008566567, "price", { prefix: "$" })).toBe("$0.0086");
+    });
 });

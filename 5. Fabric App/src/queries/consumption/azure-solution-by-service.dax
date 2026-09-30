@@ -1,0 +1,10 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS('AzureSolutionSpend'[ServiceName], "@Cost", [Azure Selected Cost]),
+        NOT ISBLANK([@Cost])
+    ),
+    "Item", COALESCE('AzureSolutionSpend'[ServiceName], "Not recorded"),
+    "Cost", [@Cost]
+)
+ORDER BY [Cost] DESC

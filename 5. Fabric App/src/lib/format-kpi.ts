@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 /** How a figure should be rendered when it is present. */
-export type KpiFormat = "whole" | "percent" | "rate" | "hours" | "currency";
+export type KpiFormat = "whole" | "percent" | "rate" | "hours" | "currency" | "money" | "price";
 
 interface FormatKpiOptions {
     /** Symbol or short unit printed directly before a present value. */
@@ -19,6 +19,10 @@ const formatters: Record<KpiFormat, Intl.NumberFormat> = {
     rate: new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     hours: new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }),
     currency: new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }),
+    // Billed amounts, where cents matter: small agents cost well under a unit.
+    money: new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    // Unit prices such as cost per credit, which live in the fourth decimal.
+    price: new Intl.NumberFormat(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 }),
 };
 
 /**

@@ -5,3 +5,6 @@ profiles:
       vl:
         workspaceId: 290216ca-f6c6-445e-a640-8cd4d6929dde
         itemId: 034b5864-5c2b-4dcc-8ccb-6a09c84f172f
+      cc:
+        workspaceId: 290216ca-f6c6-445e-a640-8cd4d6929dde
+        itemId: 1b4012f4-ca4f-4ac3-b8cb-a77df04c50a5

@@ -1,0 +1,21 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Credit Consumption (Tenant)'[Usage_Date],
+            "@PrepaidCredits", [Studio Prepaid Consumed],
+            "@PAYGCredits", [Studio PAYG Consumed],
+            "@Credits", [Studio Consumed Credits (Tenant)],
+            "@PrepaidCost", [Studio Prepaid Cost],
+            "@PAYGCost", [Studio PAYG Cost]
+        ),
+        NOT ISBLANK([@Credits])
+    ),
+    "Usage Date", 'Credit Consumption (Tenant)'[Usage_Date],
+    "Prepaid Credits", [@PrepaidCredits],
+    "PAYG Credits", [@PAYGCredits],
+    "Credits", [@Credits],
+    "Prepaid Cost", [@PrepaidCost],
+    "PAYG Cost", [@PAYGCost]
+)
+ORDER BY [Usage Date] ASC

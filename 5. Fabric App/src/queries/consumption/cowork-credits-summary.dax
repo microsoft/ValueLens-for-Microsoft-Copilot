@@ -1,0 +1,18 @@
+EVALUATE
+ROW(
+    "Credits Used", [Cowork Total Credits Used],
+    "Consuming Users", [Consuming Users],
+    "Weekly Active Users", [Weekly Active Users],
+    "Avg Credits Per User", [Cowork Avg Credits per Consuming User],
+    "Allowance Used", [Person Allowance Used %],
+    "Users Over Limit", [% Users Over Limit],
+    "Policies", [Cowork Policies],
+    "Total Cost", [Cowork Total Cost],
+    "Prepaid Cost", [Cowork Prepaid Cost],
+    "PAYG Cost", [Cowork PAYG Cost],
+    "Blended Rate", [Blended Rate $],
+    "Avg Cost Per User", [Cowork Avg Cost per User],
+    "Policy Headroom", [Policy Headroom],
+    "Billing Basis", [Billing Basis],
+    "Period Label", [Cowork Period Label]
+)
