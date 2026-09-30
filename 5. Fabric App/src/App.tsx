@@ -21,15 +21,15 @@ const LeaderboardsScreen = lazy(() =>
 const ReadinessScreen = lazy(() =>
     import("./screens/readiness").then((module) => ({ default: module.ReadinessScreen })),
 );
+const ConsumptionScreen = lazy(() =>
+    import("./screens/consumption").then((module) => ({ default: module.ConsumptionScreen })),
+);
 const ValueScreen = lazy(() => import("./screens/value").then((module) => ({ default: module.ValueScreen })));
 const EfficiencyScreen = lazy(() =>
     import("./screens/efficiency").then((module) => ({ default: module.EfficiencyScreen })),
 );
 const FeedbackScreen = lazy(() =>
     import("./screens/feedback").then((module) => ({ default: module.FeedbackScreen })),
-);
-const ConsumptionScreen = lazy(() =>
-    import("./screens/consumption").then((module) => ({ default: module.ConsumptionScreen })),
 );
 const AppendixScreen = lazy(() =>
     import("./screens/appendix").then((module) => ({ default: module.AppendixScreen })),
@@ -46,10 +46,10 @@ function App() {
                     {destination === "adoption" && <AdoptionScreen />}
                     {destination === "leaderboards" && <LeaderboardsScreen />}
                     {destination === "readiness" && <ReadinessScreen />}
+                    {destination === "consumption" && <ConsumptionScreen />}
                     {destination === "value" && <ValueScreen />}
                     {destination === "efficiency" && <EfficiencyScreen />}
                     {destination === "feedback" && <FeedbackScreen />}
-                    {destination === "consumption" && <ConsumptionScreen />}
                     {destination === "appendix" && <AppendixScreen />}
                 </Suspense>
             </AppShell>

@@ -60,6 +60,19 @@ export const destinations = [
         ],
     },
     {
+        id: "consumption",
+        label: "Consumption",
+        blurb: "Credits used, and what they cost",
+        icon: Coins as LucideIcon,
+        filters: [] as FilterKey[],
+        stages: [
+            { id: "consumption-overview", label: "All products", ready: true },
+            { id: "cowork-credits", label: "Cowork / Work IQ", ready: true },
+            { id: "studio-credits", label: "Copilot Studio", ready: true },
+            { id: "azure-spend", label: "Azure", ready: true },
+        ],
+    },
+    {
         id: "value",
         label: "Value",
         blurb: "What the work was, and what it was worth",
@@ -89,19 +102,6 @@ export const destinations = [
         icon: MessageSquareQuote as LucideIcon,
         filters: ["dateRange"] as FilterKey[],
         stages: [{ id: "feedback", label: "Feedback", ready: true }],
-    },
-    {
-        id: "consumption",
-        label: "Consumption",
-        blurb: "Credits used, and what they cost",
-        icon: Coins as LucideIcon,
-        filters: [] as FilterKey[],
-        stages: [
-            { id: "consumption-overview", label: "All products", ready: true },
-            { id: "cowork-credits", label: "Cowork / Work IQ", ready: true },
-            { id: "studio-credits", label: "Copilot Studio", ready: true },
-            { id: "azure-spend", label: "Azure", ready: true },
-        ],
     },
     {
         id: "appendix",

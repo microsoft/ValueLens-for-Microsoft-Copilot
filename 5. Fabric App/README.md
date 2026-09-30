@@ -15,10 +15,10 @@ security applies.
 | **Adoption** | Who started, who stayed, who stuck: activation, adoption, habit formation, trend heatmap |
 | **Leaderboards** | The people and agents doing the most, plus the agent registry with descriptions |
 | **Readiness** | Who to license next, and who's ready for Cowork |
+| **Consumption** | Credits used and what they cost across Cowork / Work IQ, Copilot Studio and Azure, from Consumption Central |
 | **Value** | What the work was, and what it was worth: task breakdown and estimated value |
 | **Efficiency** | Whether the right tool is doing the job: Cowork fit, Model fit, and how grading works |
 | **Feedback** | What people say about Copilot |
-| **Consumption** | Credits used and what they cost across Cowork / Work IQ, Copilot Studio and Azure, from Consumption Central |
 | **Appendix** | Glossary, plus Signal → Impact value assumptions |
 
 Filters (date, organisation, licence, activity, agent) apply across the ValueLens pages. The
