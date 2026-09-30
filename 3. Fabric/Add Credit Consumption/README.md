@@ -79,6 +79,7 @@ python seed_sample_data.py --workspace <workspace-guid> --lakehouse <lakehouse-g
 
 Both GUIDs are in the Fabric portal URL when the Lakehouse is open. The script reads the CSVs from
 [`../../1. Local CSV/Add Credit Consumption/sample-data/`](../../1.%20Local%20CSV/Add%20Credit%20Consumption/sample-data/).
+It writes to the `dbo` schema; add `--schema=` if your Lakehouse was created without schemas.
 
 > **Per-person and department views** need Viva Insights **Identification** turned on
 > ([how ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot#viva-identification)).
