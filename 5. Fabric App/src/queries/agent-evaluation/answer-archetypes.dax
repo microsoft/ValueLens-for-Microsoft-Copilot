@@ -1,0 +1,14 @@
+// How each conversation was answered: the most advanced thing the agent did.
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Agent Sessions'[Conversation Archetype],
+            "@Conversations", COUNTROWS('Agent Sessions')
+        ),
+        [@Conversations] > 0
+    ),
+    "Archetype", 'Agent Sessions'[Conversation Archetype],
+    "Conversations", [@Conversations]
+)
+ORDER BY [Conversations] DESC

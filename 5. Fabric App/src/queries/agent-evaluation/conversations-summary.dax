@@ -1,0 +1,26 @@
+// The Conversations & topics stage's headline figures and the model's own
+// reads on topics, knowledge and feedback.
+EVALUATE
+ROW(
+    "Topics", [Distinct Topics],
+    "Grounded Rate", [Knowledge Grounded Rate],
+    "Answered From Knowledge", [Answered from Knowledge],
+    "Citations", [Knowledge Citation Count],
+    "Knowledge Gap Rate", [Knowledge Gap Rate],
+    "Knowledge Gap Conversations", [Knowledge Gap Conversations],
+    "Turns Per Conversation", [Avg Turns per Session],
+    "Single Turn Rate", [Single-Turn Rate],
+    "Turns To Resolve", [Avg Turns to Resolve],
+    "Friction", [Friction Score],
+    "Friction Read", [◆ Friction Read],
+    "Theme Verdict", [⭐ Theme Verdict],
+    "Theme Coverage", [◆ Theme Coverage],
+    "Top Fix", [⭐ Top Fix],
+    "Backlog Summary", [⭐ Backlog Summary],
+    "Topic Insight", [🧠 Topic Resolution Insight],
+    "Knowledge Story", [📚 Knowledge Story (Live)],
+    "Knowledge Gap Read", [◆ Knowledge Gap Read],
+    "Depth Read", [◆ Depth Read],
+    "Feedback Insight", [💬 Feedback Insight (Live)],
+    "CSAT Story", [😊 CSAT Story (Live)]
+)

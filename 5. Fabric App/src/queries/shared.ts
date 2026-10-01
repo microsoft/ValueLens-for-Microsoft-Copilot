@@ -15,6 +15,12 @@ export const connection = "vl";
  */
 export const consumptionConnection = "cc";
 
+/**
+ * The Agent Evaluator model, bound as a third connection so the Agent
+ * Evaluation page can read how Copilot Studio agents perform.
+ */
+export const evaluatorConnection = "ae";
+
 /** Count of people, sessions or items. */
 export const FORMAT_WHOLE = "#,0";
 /** Share of a population, returned by the model as a fraction. */

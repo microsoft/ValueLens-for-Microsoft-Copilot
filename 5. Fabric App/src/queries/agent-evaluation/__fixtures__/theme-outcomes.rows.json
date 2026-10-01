@@ -1,0 +1,158 @@
+[
+  {
+    "[Theme]": "General & Routing",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 122
+  },
+  {
+    "[Theme]": "General & Routing",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 17
+  },
+  {
+    "[Theme]": "General & Routing",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 2
+  },
+  {
+    "[Theme]": "General & Routing",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 22
+  },
+  {
+    "[Theme]": "HR & People",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 416
+  },
+  {
+    "[Theme]": "HR & People",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 53
+  },
+  {
+    "[Theme]": "HR & People",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 4
+  },
+  {
+    "[Theme]": "HR & People",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 89
+  },
+  {
+    "[Theme]": "IT & Access",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 372
+  },
+  {
+    "[Theme]": "IT & Access",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 94
+  },
+  {
+    "[Theme]": "IT & Access",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 7
+  },
+  {
+    "[Theme]": "IT & Access",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 96
+  },
+  {
+    "[Theme]": "Pay & Expenses",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 238
+  },
+  {
+    "[Theme]": "Pay & Expenses",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 86
+  },
+  {
+    "[Theme]": "Pay & Expenses",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 10
+  },
+  {
+    "[Theme]": "Pay & Expenses",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 108
+  },
+  {
+    "[Theme]": "Policy",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 196
+  },
+  {
+    "[Theme]": "Policy",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 37
+  },
+  {
+    "[Theme]": "Policy",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 57
+  },
+  {
+    "[Theme]": "Procurement",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 119
+  },
+  {
+    "[Theme]": "Procurement",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 15
+  },
+  {
+    "[Theme]": "Procurement",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 21
+  },
+  {
+    "[Theme]": "Workplace & Travel",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 117
+  },
+  {
+    "[Theme]": "Workplace & Travel",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 33
+  },
+  {
+    "[Theme]": "Workplace & Travel",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 1
+  },
+  {
+    "[Theme]": "Workplace & Travel",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 68
+  }
+]

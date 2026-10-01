@@ -1,0 +1,25 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "transform": [
+    { "joinaggregate": [{ "op": "sum", "field": "Conversations", "as": "All Conversations" }] },
+    { "calculate": "datum['Conversations'] / datum['All Conversations']", "as": "Share" }
+  ],
+  "encoding": {
+    "y": {
+      "field": "Archetype",
+      "type": "nominal",
+      "title": null,
+      "sort": { "field": "Conversations", "op": "sum", "order": "descending" },
+      "axis": { "labelLimit": 220 }
+    },
+    "x": { "field": "Conversations", "type": "quantitative", "title": "Conversations" },
+    "tooltip": [
+      { "field": "Archetype", "type": "nominal", "title": "Answered by" },
+      { "field": "Conversations", "type": "quantitative", "title": "Conversations", "format": ",.0f" },
+      { "field": "Share", "type": "quantitative", "title": "Share", "format": ".0%" }
+    ]
+  }
+}
