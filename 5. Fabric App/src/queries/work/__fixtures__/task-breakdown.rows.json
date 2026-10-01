@@ -1,0 +1,164 @@
+[
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "People Lookup",
+    "[Tasks]": 110,
+    "[Share]": 0.01746031746031746
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "PDF Analysis",
+    "[Tasks]": 110,
+    "[Share]": 0.01746031746031746
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "Web Searching",
+    "[Tasks]": 120,
+    "[Share]": 0.01904761904761905
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "Enterprise Searching",
+    "[Tasks]": 110,
+    "[Share]": 0.01746031746031746
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "Specialist / Line-of-Business Workflow",
+    "[Tasks]": 230,
+    "[Share]": 0.03650793650793651
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "General Workflow",
+    "[Tasks]": 140,
+    "[Share]": 0.022222222222222223
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "Data & Reporting Workflow",
+    "[Tasks]": 180,
+    "[Share]": 0.02857142857142857
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "Document Workflow",
+    "[Tasks]": 220,
+    "[Share]": 0.03492063492063492
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "Meeting Workflow",
+    "[Tasks]": 170,
+    "[Share]": 0.026984126984126985
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "Coordination Workflow",
+    "[Tasks]": 180,
+    "[Share]": 0.02857142857142857
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "Email Workflow",
+    "[Tasks]": 180,
+    "[Share]": 0.02857142857142857
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "Excel Assistance",
+    "[Tasks]": 877,
+    "[Share]": 0.1392063492063492
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "General Chat",
+    "[Tasks]": 1223,
+    "[Share]": 0.19412698412698412
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "Document Summarising",
+    "[Tasks]": 765,
+    "[Share]": 0.12142857142857143
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "Presentation Summarising",
+    "[Tasks]": 846,
+    "[Share]": 0.13428571428571429
+  },
+  {
+    "[Dimension]": "Behaviour",
+    "[Category]": "Email Summarising",
+    "[Tasks]": 839,
+    "[Share]": 0.13317460317460317
+  },
+  {
+    "[Dimension]": "Workflow action",
+    "[Category]": "",
+    "[Tasks]": 5000,
+    "[Share]": 0.7936507936507936
+  },
+  {
+    "[Dimension]": "Workflow action",
+    "[Category]": "Creating Content",
+    "[Tasks]": 120,
+    "[Share]": 0.01904761904761905
+  },
+  {
+    "[Dimension]": "Workflow action",
+    "[Category]": "Invoking / Triggering",
+    "[Tasks]": 140,
+    "[Share]": 0.022222222222222223
+  },
+  {
+    "[Dimension]": "Workflow action",
+    "[Category]": "Updating Records",
+    "[Tasks]": 510,
+    "[Share]": 0.08095238095238096
+  },
+  {
+    "[Dimension]": "Workflow action",
+    "[Category]": "Autonomous Run (no action logged)",
+    "[Tasks]": 530,
+    "[Share]": 0.08412698412698413
+  },
+  {
+    "[Dimension]": "Value outcome",
+    "[Category]": "Search Time Saved",
+    "[Tasks]": 450,
+    "[Share]": 0.07142857142857142
+  },
+  {
+    "[Dimension]": "Value outcome",
+    "[Category]": "Workflow Automation",
+    "[Tasks]": 1300,
+    "[Share]": 0.20634920634920634
+  },
+  {
+    "[Dimension]": "Value outcome",
+    "[Category]": "Spreadsheet Time Saved",
+    "[Tasks]": 877,
+    "[Share]": 0.1392063492063492
+  },
+  {
+    "[Dimension]": "Value outcome",
+    "[Category]": "General AI Productivity",
+    "[Tasks]": 1223,
+    "[Share]": 0.19412698412698412
+  },
+  {
+    "[Dimension]": "Value outcome",
+    "[Category]": "Time Saved (Documents)",
+    "[Tasks]": 1611,
+    "[Share]": 0.2557142857142857
+  },
+  {
+    "[Dimension]": "Value outcome",
+    "[Category]": "Time Saved (Email)",
+    "[Tasks]": 839,
+    "[Share]": 0.13317460317460317
+  }
+]

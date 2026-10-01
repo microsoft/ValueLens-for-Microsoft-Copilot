@@ -1,0 +1,11 @@
+// The report's slicer choices: each product's period, the Group By
+// attributes, the Cowork services and the Azure cost bases.
+EVALUATE
+UNION(
+    SELECTCOLUMNS('Cowork Period', "Kind", "Cowork period", "Value", 'Cowork Period'[Period], "Sort", 'Cowork Period'[Period Order]),
+    SELECTCOLUMNS('Studio Period', "Kind", "Studio period", "Value", 'Studio Period'[Period], "Sort", 'Studio Period'[Period Order]),
+    SELECTCOLUMNS(VALUES('Group By'[Attribute]), "Kind", "Group by", "Value", 'Group By'[Attribute], "Sort", 0),
+    SELECTCOLUMNS(VALUES(CreditsWeekly[ServiceName]), "Kind", "Service", "Value", CreditsWeekly[ServiceName], "Sort", 0),
+    SELECTCOLUMNS('Azure Cost Basis', "Kind", "Cost basis", "Value", 'Azure Cost Basis'[Cost Basis], "Sort", 0)
+)
+ORDER BY [Kind] ASC, [Sort] ASC, [Value] ASC

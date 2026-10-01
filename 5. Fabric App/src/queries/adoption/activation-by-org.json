@@ -1,0 +1,69 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [
+    {
+      "fold": ["__ACTIVE__", "__INACTIVE__"],
+      "as": ["Status", "Users"]
+    },
+    {
+      "calculate": "datum.Status === '__INACTIVE__' ? -datum.Users : datum.Users",
+      "as": "Signed"
+    },
+    {
+      "calculate": "datum.Status === '__INACTIVE__' ? 'Inactive' : 'Active'",
+      "as": "Segment"
+    }
+  ],
+  "encoding": {
+    "y": {
+      "field": "__ORG__",
+      "type": "nominal",
+      "title": null,
+      "sort": { "field": "__ACTIVE__", "order": "descending" },
+      "axis": { "labelLimit": 120 }
+    },
+    "x": {
+      "field": "Signed",
+      "type": "quantitative",
+      "title": "Inactive  ←     users     →  Active",
+      "axis": { "labelExpr": "abs(datum.value)" }
+    },
+    "color": {
+      "field": "Segment",
+      "type": "nominal",
+      "title": null,
+      "sort": ["Active", "Inactive"],
+      "legend": { "orient": "top", "direction": "horizontal" }
+    },
+    "tooltip": [
+      { "field": "__ORG__", "type": "nominal", "title": "Organization" },
+      { "field": "Segment", "type": "nominal", "title": "Status" },
+      { "field": "Users", "type": "quantitative", "title": "Users", "format": ",.0f" }
+    ]
+  },
+  "layer": [
+    {
+      "transform": [{ "filter": "datum.Signed >= 0" }],
+      "mark": {
+        "type": "bar",
+        "cornerRadiusEnd": 0,
+        "cornerRadiusTopRight": 2,
+        "cornerRadiusBottomRight": 2
+      }
+    },
+    {
+      "transform": [{ "filter": "datum.Signed < 0" }],
+      "mark": {
+        "type": "bar",
+        "cornerRadiusEnd": 0,
+        "cornerRadiusTopLeft": 2,
+        "cornerRadiusBottomLeft": 2
+      }
+    }
+  ],
+  "config": {
+    "bar": { "cornerRadiusEnd": 0 }
+  }
+}

@@ -1,0 +1,74 @@
+[
+  {
+    "[Usage Date]": "2026-04-14T00:00:00",
+    "[Prepaid Credits]": 7438.9,
+    "[PAYG Credits]": 261,
+    "[Credits]": 7699.9,
+    "[Prepaid Cost]": 55.04786,
+    "[PAYG Cost]": 2.4012
+  },
+  {
+    "[Usage Date]": "2026-04-15T00:00:00",
+    "[Prepaid Credits]": 6959.3,
+    "[PAYG Credits]": 0,
+    "[Credits]": 6959.3,
+    "[Prepaid Cost]": 51.49882,
+    "[PAYG Cost]": 0
+  },
+  {
+    "[Usage Date]": "2026-05-05T00:00:00",
+    "[Prepaid Credits]": 0,
+    "[PAYG Credits]": 521,
+    "[Credits]": 521,
+    "[Prepaid Cost]": 0,
+    "[PAYG Cost]": 4.7932
+  },
+  {
+    "[Usage Date]": "2026-05-06T00:00:00",
+    "[Prepaid Credits]": 370.77,
+    "[PAYG Credits]": 164,
+    "[Credits]": 534.77,
+    "[Prepaid Cost]": 2.743698,
+    "[PAYG Cost]": 1.5088
+  },
+  {
+    "[Usage Date]": "2026-05-07T00:00:00",
+    "[Prepaid Credits]": 490.13,
+    "[PAYG Credits]": 367,
+    "[Credits]": 857.13,
+    "[Prepaid Cost]": 3.6269620000000002,
+    "[PAYG Cost]": 3.3764
+  },
+  {
+    "[Usage Date]": "2026-05-08T00:00:00",
+    "[Prepaid Credits]": 569.39,
+    "[PAYG Credits]": 313,
+    "[Credits]": 882.39,
+    "[Prepaid Cost]": 4.2134860000000005,
+    "[PAYG Cost]": 2.8796
+  },
+  {
+    "[Usage Date]": "2026-05-09T00:00:00",
+    "[Prepaid Credits]": 646.4,
+    "[PAYG Credits]": 23,
+    "[Credits]": 669.4,
+    "[Prepaid Cost]": 4.78336,
+    "[PAYG Cost]": 0.2116
+  },
+  {
+    "[Usage Date]": "2026-05-10T00:00:00",
+    "[Prepaid Credits]": 1557.6,
+    "[PAYG Credits]": 34,
+    "[Credits]": 1591.6,
+    "[Prepaid Cost]": 11.52624,
+    "[PAYG Cost]": 0.31279999999999997
+  },
+  {
+    "[Usage Date]": "2026-05-11T00:00:00",
+    "[Prepaid Credits]": 3779.83,
+    "[PAYG Credits]": 99,
+    "[Credits]": 3878.83,
+    "[Prepaid Cost]": 27.970742,
+    "[PAYG Cost]": 0.9107999999999999
+  }
+]

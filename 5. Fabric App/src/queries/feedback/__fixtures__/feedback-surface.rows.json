@@ -1,0 +1,37 @@
+[
+  {
+    "[Surface / Agent]": "Agent A",
+    "[Total Feedback]": 45,
+    "[Thumbs Up]": 35,
+    "[Thumbs Down]": 10,
+    "[Satisfaction]": 0.7777777777777778
+  },
+  {
+    "[Surface / Agent]": "Copilot for Excel",
+    "[Total Feedback]": 45,
+    "[Thumbs Up]": 31,
+    "[Thumbs Down]": 14,
+    "[Satisfaction]": 0.6888888888888889
+  },
+  {
+    "[Surface / Agent]": "Agent B",
+    "[Total Feedback]": 43,
+    "[Thumbs Up]": 26,
+    "[Thumbs Down]": 17,
+    "[Satisfaction]": 0.6046511627906976
+  },
+  {
+    "[Surface / Agent]": "Copilot for Teams",
+    "[Total Feedback]": 39,
+    "[Thumbs Up]": 22,
+    "[Thumbs Down]": 17,
+    "[Satisfaction]": 0.5641025641025641
+  },
+  {
+    "[Surface / Agent]": "Agent C",
+    "[Total Feedback]": 39,
+    "[Thumbs Up]": 16,
+    "[Thumbs Down]": 23,
+    "[Satisfaction]": 0.41025641025641024
+  }
+]

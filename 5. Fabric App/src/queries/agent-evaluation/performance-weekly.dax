@@ -1,0 +1,42 @@
+// How conversations ended, week by week. Weeks start on Monday. The model's
+// outcome names are reworded here so every chart on the page uses the same.
+EVALUATE
+VAR _daily =
+    ADDCOLUMNS(
+        SUMMARIZECOLUMNS(
+            'Calendar'[Date],
+            'Agent Performance'[Outcome (Detailed)],
+            "@Conversations", [Total Conversations]
+        ),
+        "@WeekStart", 'Calendar'[Date] - WEEKDAY('Calendar'[Date], 2) + 1
+    )
+VAR _weeks =
+    GROUPBY(
+        _daily,
+        [@WeekStart],
+        'Agent Performance'[Outcome (Detailed)],
+        "@Conversations", SUMX(CURRENTGROUP(), [@Conversations])
+    )
+RETURN
+SELECTCOLUMNS(
+    FILTER(_weeks, [@Conversations] > 0),
+    "Week Start", [@WeekStart],
+    "Outcome",
+        SWITCH(
+            'Agent Performance'[Outcome (Detailed)],
+            "Escalated - Intended", "Escalated by design",
+            "Escalated - Unintended", "Escalated after an error",
+            'Agent Performance'[Outcome (Detailed)]
+        ),
+    "Outcome Order",
+        SWITCH(
+            'Agent Performance'[Outcome (Detailed)],
+            "Resolved", 1,
+            "Escalated - Intended", 2,
+            "Escalated - Unintended", 3,
+            "Abandoned", 4,
+            5
+        ),
+    "Conversations", [@Conversations]
+)
+ORDER BY [Week Start] ASC, [Outcome Order] ASC

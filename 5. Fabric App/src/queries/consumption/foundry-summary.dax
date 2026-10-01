@@ -1,0 +1,15 @@
+EVALUATE
+ROW(
+    "Cost", [Foundry Cost],
+    "Input Cost", [Foundry Input Cost],
+    "Output Cost", [Foundry Output Cost],
+    "Output Share", [Foundry Output Cost Share %],
+    "Tokens M", [Foundry Tokens (M)],
+    "Cost Per 1M Tokens", [Foundry Cost per 1M Tokens],
+    "AI Requests", [AI Requests],
+    "Tokens Per Request", [Tokens per Request],
+    "Daily Run Rate", [Foundry Daily Run Rate],
+    "Cost Per Month", [Foundry Cost /mo],
+    "Days Observed", [Foundry Days Observed],
+    "PTU Verdict", [PTU Verdict]
+)

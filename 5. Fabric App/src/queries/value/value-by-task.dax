@@ -1,0 +1,15 @@
+EVALUATE
+SUMMARIZECOLUMNS(
+    ROLLUPADDISSUBTOTAL(
+        'Chat + Agent Interactions (Audit Logs)'[Task Breakdown Group], "Is Grand Total",
+        'Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category], "Is Group Total"
+    ),
+    "Activity Share", [Activity Share],
+    "Expert Equivalent Hours Per Week", [Expert Equivalent Hours Per Week],
+    "AI Assisted Value Per Week", [AI Assisted Value Per Week]
+)
+ORDER BY
+    [Is Grand Total] DESC,
+    'Chat + Agent Interactions (Audit Logs)'[Task Breakdown Group] ASC,
+    [Is Group Total] DESC,
+    [AI Assisted Value Per Week] DESC

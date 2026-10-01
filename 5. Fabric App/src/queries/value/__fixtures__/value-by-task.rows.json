@@ -1,0 +1,209 @@
+[
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": null,
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": null,
+    "[Is Grand Total]": true,
+    "[Is Group Total]": true,
+    "[Activity Share]": 1,
+    "[Expert Equivalent Hours Per Week]": 154.15333333333334,
+    "[AI Assisted Value Per Week]": 7707.666666666667
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Collaboration & Workflows",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": null,
+    "[Is Grand Total]": false,
+    "[Is Group Total]": true,
+    "[Activity Share]": 0.20634920634920634,
+    "[Expert Equivalent Hours Per Week]": 30.4,
+    "[AI Assisted Value Per Week]": 3800
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Collaboration & Workflows",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "Specialist / Line-of-Business Workflow",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.03650793650793651,
+    "[Expert Equivalent Hours Per Week]": 5.75,
+    "[AI Assisted Value Per Week]": 958.3333333333334
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Collaboration & Workflows",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "Document Workflow",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.03492063492063492,
+    "[Expert Equivalent Hours Per Week]": 5.5,
+    "[AI Assisted Value Per Week]": 916.6666666666666
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Collaboration & Workflows",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "General Workflow",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.022222222222222223,
+    "[Expert Equivalent Hours Per Week]": 3.5,
+    "[AI Assisted Value Per Week]": 583.3333333333334
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Collaboration & Workflows",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "Data & Reporting Workflow",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.02857142857142857,
+    "[Expert Equivalent Hours Per Week]": 4.5,
+    "[AI Assisted Value Per Week]": 562.5
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Collaboration & Workflows",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "Meeting Workflow",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.026984126984126985,
+    "[Expert Equivalent Hours Per Week]": 4.25,
+    "[AI Assisted Value Per Week]": 531.25
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Collaboration & Workflows",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "Email Workflow",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.02857142857142857,
+    "[Expert Equivalent Hours Per Week]": 3.6,
+    "[AI Assisted Value Per Week]": 450
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Collaboration & Workflows",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "Coordination Workflow",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.02857142857142857,
+    "[Expert Equivalent Hours Per Week]": 3.3,
+    "[AI Assisted Value Per Week]": 412.5
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Data & Analysis",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": null,
+    "[Is Grand Total]": false,
+    "[Is Group Total]": true,
+    "[Activity Share]": 0.1392063492063492,
+    "[Expert Equivalent Hours Per Week]": 43.85,
+    "[AI Assisted Value Per Week]": 2192.5
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Data & Analysis",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "Excel Assistance",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.1392063492063492,
+    "[Expert Equivalent Hours Per Week]": 43.85,
+    "[AI Assisted Value Per Week]": 2192.5
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Document Summarisation",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": null,
+    "[Is Grand Total]": false,
+    "[Is Group Total]": true,
+    "[Activity Share]": 0.2731746031746032,
+    "[Expert Equivalent Hours Per Week]": 48.836666666666666,
+    "[AI Assisted Value Per Week]": 2441.833333333333
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Document Summarisation",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "PDF Analysis",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.01746031746031746,
+    "[Expert Equivalent Hours Per Week]": 6.416666666666667,
+    "[AI Assisted Value Per Week]": 1604.1666666666667
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Document Summarisation",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "Document Summarising",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.12142857142857143,
+    "[Expert Equivalent Hours Per Week]": 25.5,
+    "[AI Assisted Value Per Week]": 1275
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Document Summarisation",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "Presentation Summarising",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.13428571428571429,
+    "[Expert Equivalent Hours Per Week]": 16.919999999999998,
+    "[AI Assisted Value Per Week]": 846
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Email",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": null,
+    "[Is Grand Total]": false,
+    "[Is Group Total]": true,
+    "[Activity Share]": 0.13317460317460317,
+    "[Expert Equivalent Hours Per Week]": 5.593333333333333,
+    "[AI Assisted Value Per Week]": 279.66666666666663
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Email",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "Email Summarising",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.13317460317460317,
+    "[Expert Equivalent Hours Per Week]": 5.593333333333333,
+    "[AI Assisted Value Per Week]": 279.66666666666663
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "General Chat & Q&A",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": null,
+    "[Is Grand Total]": false,
+    "[Is Group Total]": true,
+    "[Activity Share]": 0.19412698412698412,
+    "[Expert Equivalent Hours Per Week]": 16.306666666666665,
+    "[AI Assisted Value Per Week]": 815.3333333333333
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "General Chat & Q&A",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "General Chat",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.19412698412698412,
+    "[Expert Equivalent Hours Per Week]": 16.306666666666665,
+    "[AI Assisted Value Per Week]": 815.3333333333333
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Search & Research",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": null,
+    "[Is Grand Total]": false,
+    "[Is Group Total]": true,
+    "[Activity Share]": 0.05396825396825397,
+    "[Expert Equivalent Hours Per Week]": 9.166666666666668,
+    "[AI Assisted Value Per Week]": 654.7619047619048
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Search & Research",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "Web Searching",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.01904761904761905,
+    "[Expert Equivalent Hours Per Week]": 4.4,
+    "[AI Assisted Value Per Week]": 733.3333333333334
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Search & Research",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "Enterprise Searching",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.01746031746031746,
+    "[Expert Equivalent Hours Per Week]": 3.3,
+    "[AI Assisted Value Per Week]": 550
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": "Search & Research",
+    "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": "People Lookup",
+    "[Is Grand Total]": false,
+    "[Is Group Total]": false,
+    "[Activity Share]": 0.01746031746031746,
+    "[Expert Equivalent Hours Per Week]": 1.4666666666666666,
+    "[AI Assisted Value Per Week]": 183.33333333333331
+  }
+]

@@ -11,9 +11,75 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 [1. Local CSV](1.%20Local%20CSV/README.md) ·
 [2. SharePoint](2.%20SharePoint/README.md) ·
 [3. Fabric](3.%20Fabric/README.md) ·
-[4. Power Automate + Dataverse](4.%20Power%20Automate%20+%20Dataverse/README.md).
+[4. Power Automate + Dataverse](4.%20Power%20Automate%20+%20Dataverse/README.md) ·
+[5. Fabric App](5.%20Fabric%20App/README.md).
 
 ---
+
+## 2026-09-30 — a methodology document
+
+[`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) explains how ValueLens turns audit records into each
+figure. It covers how records are flattened and counted, the classification rules, the value
+model for Copilot, agents and Cowork, the rules behind every page, the settings you can change, and
+the Fabric App's Consumption and Agent Evaluation pages. An appendix lists every time band with
+its source. The root README's maturity bullet now describes the Habit Formation stages the report
+actually uses.
+
+---
+
+## 2026-09-30 — Fabric App: a Consumption page from Consumption Central
+
+The [Fabric App](5.%20Fabric%20App/) has an eighth page, **Consumption**. It reads a published
+Consumption Central model, bound as a second connection (`cc`), and rebuilds that report's
+consumption and cost pages. There are four sections: all products side by side, Cowork / Work IQ,
+Copilot Studio and Azure. The Cowork and Studio sections each switch between a Consumption view
+and a Cost view, and keep the report's period, service and group-by choices. Azure shows the
+whole-solution cost export when one is loaded, and Azure AI Foundry model spend otherwise. The
+Consumption Central model is optional: without it, the page says what to connect. The app also
+opens in light mode by default again.
+
+---
+
+## 2026-09-30 — path 5: the ValueLens Fabric App (preview)
+
+A new top-level folder, [`5. Fabric App`](5.%20Fabric%20App/), holds ValueLens rebuilt as a web
+app. It's hosted as an item in a Fabric workspace and queries the published ValueLens model live,
+as the viewer. It runs on the model from any of paths 1–4, because all five templates carry the
+fields it uses. It has seven pages: Adoption, Leaderboards, Readiness, Value, Efficiency,
+Feedback and Appendix. Deploy it with `npx rayfin up`; see the folder README. The app was
+developed under `3. Fabric/app` and has moved here unchanged.
+
+---
+
+## 2026-09-30 — task names without the "Agent:" prefix
+
+Eleven task names started with "Agent:". Cowork and agent sessions that don't match a more
+specific task are given these names, so filtering to Cowork showed a list of "Agent:" tasks.
+The prefix is gone: for example, "Agent: Knowledge Base" is now **Knowledge Base**. Two names change more:
+"Agent: General Purpose" is now **General Assistance**, and the "Specialist Agents" efficiency
+group is now **Specialist Support**. The baselines, value outcomes and colours are unchanged.
+All five templates, both processors (the Fabric notebook and the Local CSV / SharePoint /
+Power Automate script), and the sample data carry the change.
+
+- **Reprocess existing data once.** The templates look up the new names, so rows processed
+  before this change have no time baseline until they're reprocessed. In Fabric, run
+  `Copilot_Audit_Log_Processor` with `WRITE_MODE = "overwrite"`, which is the default. For the other
+  paths, rerun `Purview_CopilotInteraction_Processor_v4.0.0.py` over your export.
+- **Saved filters.** If you built your own visuals or bookmarks that filter on an old name, re-pick
+  the new name.
+
+---
+
+## 2026-09-30 — Task Breakdown Users column blank on Cowork / Copilot
+
+On **Task Breakdown**, the Users column in the Organization and Agent tables was bound to
+`[Active Agent Users]`, which hard-codes `[Agent Filter (Normalized)] = "Agents"`. Selecting
+the Cowork or Copilot button intersected that with a different segment, so every Users cell
+went blank while Sessions still populated. Both tables (and the Value Outcome table's sort)
+now use `[All Active Users]`, which follows the selected Licensed / Agents / Copilot / Cowork
+button. Applied to all five ValueLens templates with
+`scripts/Fix-TaskBreakdown-UsersMeasure.py`. Other pages that deliberately report agent users
+are unchanged.
 
 ## 2026-09-29 — optional Add Credit Consumption add-on
 

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Error Code",
+      "type": "nominal",
+      "title": null,
+      "sort": { "field": "Errors", "op": "sum", "order": "descending" }
+    },
+    "x": { "field": "Errors", "type": "quantitative", "title": "Errors" },
+    "color": {
+      "field": "Source",
+      "type": "nominal",
+      "title": null,
+      "legend": { "orient": "top", "direction": "horizontal" }
+    },
+    "tooltip": [
+      { "field": "Error Code", "type": "nominal", "title": "Error" },
+      { "field": "Source", "type": "nominal", "title": "Cause" },
+      { "field": "Errors", "type": "quantitative", "title": "Errors", "format": ",.0f" }
+    ]
+  }
+}

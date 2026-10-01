@@ -1,0 +1,32 @@
+// The Performance stage's headline figures and the model's own verdicts.
+// Column names match the by-group query so this row doubles as its total.
+EVALUATE
+ROW(
+    "Conversations", [Total Conversations],
+    "People", [Unique Users],
+    "Conversations Per Person", [Conversations per User],
+    "Resolution Rate", [Resolution Rate],
+    "Implied Success", [Implied Success %],
+    "True Failure Rate", [True Failure Rate],
+    "Failing Conversations", [Failing Conversations],
+    "Hours Lost", [Est Hours Lost],
+    "Unintended Escalation Rate", [Unintended Escalation Rate],
+    "Intended Share", [Intended Share of Escalations],
+    "Abandonment Rate", [Abandonment Rate],
+    "CSAT", [Turn CSAT %],
+    "Thumbs Up", [Turn Thumbs Up],
+    "Thumbs Down", [Turn Thumbs Down],
+    "Error Rate", [Session Error Rate],
+    "Median Response", [Median Response Time (sec)],
+    "Slow Replies", [Replies Over 10s %],
+    "Reporting Window", [⭐ Reporting Window],
+    "Verdict Performance", [⭐ Verdict: Performance],
+    "Verdict Quality", [⭐ Verdict: Quality],
+    "Verdict Adoption", [⭐ Verdict: Adoption],
+    "Focus Agent", [⭐ Focus 1: Weakest Agent],
+    "Focus Knowledge", [⭐ Focus 2: Knowledge Gap],
+    "Focus Give Up", [⭐ Focus 3: Where Users Give Up],
+    "Escalation Verdict", [⭐ Escalation Verdict],
+    "Error Story", [Error Story (Live)],
+    "Response Read", [◆ Response Read]
+)

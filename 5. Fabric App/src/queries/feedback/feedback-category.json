@@ -1,0 +1,36 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Category",
+      "type": "nominal",
+      "title": null,
+      "sort": { "field": "Total Feedback", "op": "max", "order": "descending" },
+      "axis": { "labelLimit": 220 }
+    },
+    "x": {
+      "field": "Count",
+      "type": "quantitative",
+      "title": "Feedback items",
+      "stack": "zero",
+      "axis": { "labelExpr": "format(datum.value, ',.0f')" }
+    },
+    "color": {
+      "field": "Feedback Type",
+      "type": "nominal",
+      "title": null,
+      "sort": ["Thumbs Up", "Thumbs Down"],
+      "legend": { "orient": "top", "direction": "horizontal" }
+    },
+    "tooltip": [
+      { "field": "Category", "type": "nominal", "title": "Category" },
+      { "field": "Feedback Type", "type": "nominal", "title": "Feedback" },
+      { "field": "Count", "type": "quantitative", "title": "Items", "format": ",.0f" },
+      { "field": "Total Feedback", "type": "quantitative", "title": "Total in category", "format": ",.0f" },
+      { "field": "Satisfaction", "type": "quantitative", "title": "Satisfaction", "format": ".0%" }
+    ]
+  }
+}

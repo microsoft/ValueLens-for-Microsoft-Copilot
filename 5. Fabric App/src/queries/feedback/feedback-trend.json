@@ -1,0 +1,40 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "transform": [
+    { "calculate": "toDate(datum['Week Start'])", "as": "Week Date" },
+    { "calculate": "time(datum['Week Date'])", "as": "Week Order" },
+    { "calculate": "timeFormat(datum['Week Date'], '%-d %b')", "as": "Week" }
+  ],
+  "encoding": {
+    "x": {
+      "field": "Week",
+      "type": "ordinal",
+      "title": null,
+      "sort": { "field": "Week Order", "op": "min", "order": "ascending" },
+      "axis": { "labelAngle": 0 }
+    },
+    "y": {
+      "field": "Signed Count",
+      "type": "quantitative",
+      "title": "Feedback items",
+      "axis": { "labelExpr": "format(abs(datum.value), ',.0f')" }
+    },
+    "color": {
+      "field": "Feedback Type",
+      "type": "nominal",
+      "title": null,
+      "sort": ["Thumbs Up", "Thumbs Down"],
+      "legend": { "orient": "top", "direction": "horizontal" }
+    },
+    "tooltip": [
+      { "field": "Week Date", "type": "temporal", "title": "Week starting", "format": "%d %b %Y" },
+      { "field": "Feedback Type", "type": "nominal", "title": "Feedback" },
+      { "field": "Count", "type": "quantitative", "title": "Items", "format": ",.0f" },
+      { "field": "Total Feedback", "type": "quantitative", "title": "Total that week", "format": ",.0f" },
+      { "field": "Satisfaction", "type": "quantitative", "title": "Satisfaction", "format": ".0%" }
+    ]
+  }
+}

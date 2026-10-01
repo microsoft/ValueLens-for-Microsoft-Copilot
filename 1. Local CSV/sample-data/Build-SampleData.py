@@ -341,51 +341,51 @@ def _agent(tid, name, kind, behaviours, publisher, orgs=None, pop=1.0):
 
 AGENTS = [
     # Agent Builder
-    _agent("T_1001", "HR Onboarding Agent", "declarative", ("Agent: HR & People",), "Employee Services", pop=2),
-    _agent("T_1002", "IT Helpdesk Agent", "declarative", ("Agent: IT & Service Desk",), COMPANY, pop=5),
-    _agent("T_1003", "Sales Insights Agent", "declarative", ("Agent: Sales & Customer",), COMPANY, ["Sales"], 2),
-    _agent("T_1004", "Policy Lookup Agent", "declarative", ("Agent: Compliance & Policy",), COMPANY, pop=2),
-    _agent("T_1005", "Market Research Agent", "declarative", ("Agent: Research & Analysis",), COMPANY, ["Marketing", "Strategy"]),
-    _agent("T_1006", "Learning Coach Agent", "declarative", ("Agent: Coaching",), "Employee Services", pop=0.6),
-    _agent("T_1007", "Finance Reporting Agent", "declarative", ("Agent: Data & Reporting",), COMPANY, ["Finance"], 1.5),
-    _agent("T_1008", "Product Knowledge Agent", "declarative", ("Agent: Knowledge Base",), COMPANY, ["Sales", "Customer Service"], 1.5),
-    _agent("T_1009", "Brand Content Agent", "declarative", ("Agent: Content Generation",), "Marketing Ops", ["Marketing"]),
-    _agent("T_1010", "Campaign Ideation Agent", "declarative", ("Agent: Ideation & Creative",), "Marketing Ops", ["Marketing"], 0.6),
-    _agent("T_1011", "Benefits Buddy", "declarative", ("Agent: HR & People", "Agent: Knowledge Base"), "Employee Services", pop=2),
-    _agent("T_1012", "Contract Review Agent", "declarative", ("Agent: Compliance & Policy",), "Legal Ops", ["Legal", "Procurement"]),
-    _agent("T_1013", "Onboarding FAQ Agent", "declarative", ("Agent: Knowledge Base",), "Employee Services", pop=0.5),
-    _agent("T_1014", "Executive Briefing Agent", "declarative", ("Agent: Research & Analysis",), COMPANY, ["Executive Office", "Strategy", "Sales"]),
-    _agent("T_1015", "Sales Proposal Writer", "declarative", ("Agent: Content Generation", "Agent: Sales & Customer"), COMPANY, ["Sales"], 1.5),
+    _agent("T_1001", "HR Onboarding Agent", "declarative", ("HR & People",), "Employee Services", pop=2),
+    _agent("T_1002", "IT Helpdesk Agent", "declarative", ("IT & Service Desk",), COMPANY, pop=5),
+    _agent("T_1003", "Sales Insights Agent", "declarative", ("Sales & Customer",), COMPANY, ["Sales"], 2),
+    _agent("T_1004", "Policy Lookup Agent", "declarative", ("Compliance & Policy",), COMPANY, pop=2),
+    _agent("T_1005", "Market Research Agent", "declarative", ("Research & Analysis",), COMPANY, ["Marketing", "Strategy"]),
+    _agent("T_1006", "Learning Coach Agent", "declarative", ("Coaching",), "Employee Services", pop=0.6),
+    _agent("T_1007", "Finance Reporting Agent", "declarative", ("Data & Reporting",), COMPANY, ["Finance"], 1.5),
+    _agent("T_1008", "Product Knowledge Agent", "declarative", ("Knowledge Base",), COMPANY, ["Sales", "Customer Service"], 1.5),
+    _agent("T_1009", "Brand Content Agent", "declarative", ("Content Generation",), "Marketing Ops", ["Marketing"]),
+    _agent("T_1010", "Campaign Ideation Agent", "declarative", ("Ideation & Creative",), "Marketing Ops", ["Marketing"], 0.6),
+    _agent("T_1011", "Benefits Buddy", "declarative", ("HR & People", "Knowledge Base"), "Employee Services", pop=2),
+    _agent("T_1012", "Contract Review Agent", "declarative", ("Compliance & Policy",), "Legal Ops", ["Legal", "Procurement"]),
+    _agent("T_1013", "Onboarding FAQ Agent", "declarative", ("Knowledge Base",), "Employee Services", pop=0.5),
+    _agent("T_1014", "Executive Briefing Agent", "declarative", ("Research & Analysis",), COMPANY, ["Executive Office", "Strategy", "Sales"]),
+    _agent("T_1015", "Sales Proposal Writer", "declarative", ("Content Generation", "Sales & Customer"), COMPANY, ["Sales"], 1.5),
     _agent("T_1016", "Meeting Notes Agent", "declarative", ("Note Taking",), COMPANY, pop=2),
     # SharePoint site agents
-    _agent("T_1101", "HR Policies Site Agent", "sharepoint", ("Agent: HR & People",), "HR", pop=1.5),
-    _agent("T_1102", "IT Knowledge Site Agent", "sharepoint", ("Agent: Knowledge Base",), "IT", ["IT"]),
-    _agent("T_1103", "Sales Playbook Site Agent", "sharepoint", ("Agent: Sales & Customer",), "Sales", ["Sales"]),
-    _agent("T_1104", "Finance Handbook Site Agent", "sharepoint", ("Agent: Knowledge Base",), "Finance", ["Finance"], 0.6),
-    _agent("T_1105", "Engineering Standards Site Agent", "sharepoint", ("Agent: Knowledge Base",), "Engineering", ["Engineering"]),
+    _agent("T_1101", "HR Policies Site Agent", "sharepoint", ("HR & People",), "HR", pop=1.5),
+    _agent("T_1102", "IT Knowledge Site Agent", "sharepoint", ("Knowledge Base",), "IT", ["IT"]),
+    _agent("T_1103", "Sales Playbook Site Agent", "sharepoint", ("Sales & Customer",), "Sales", ["Sales"]),
+    _agent("T_1104", "Finance Handbook Site Agent", "sharepoint", ("Knowledge Base",), "Finance", ["Finance"], 0.6),
+    _agent("T_1105", "Engineering Standards Site Agent", "sharepoint", ("Knowledge Base",), "Engineering", ["Engineering"]),
     # Copilot Studio
-    _agent("T_2001", "ServiceNow Ticket Agent", "studio", ("Agent: IT & Service Desk", "Domain-Specific Agent"), "IT Service Management", pop=3),
-    _agent("T_2002", "Dynamics 365 Opportunity Agent", "studio", ("Agent: Sales & Customer", "Domain-Specific Agent"), "Revenue Operations", ["Sales"], 1.5),
-    _agent("T_2003", "SAP Invoice Agent", "studio", ("Domain-Specific Agent", "Agent: Data & Reporting"), "Finance Systems", ["Finance", "Procurement"]),
-    _agent("T_2004", "Workday Absence Agent", "studio", ("Agent: HR & People", "Domain-Specific Agent"), "People Systems", pop=3),
-    _agent("T_2005", "Salesforce Account Agent", "studio", ("Cross-Org Agent", "Agent: Sales & Customer"), "Revenue Operations", ["Sales", "Customer Service"]),
-    _agent("T_2006", "Dataverse Analytics Agent", "studio", ("Agent: Data & Reporting", "Domain-Specific Agent"), "Data & Analytics", ["IT", "Strategy", "Operations"]),
-    _agent("T_2007", "Supplier Onboarding Agent", "studio", ("Domain-Specific Agent", "Agent: Compliance & Policy"), "Procurement", ["Procurement", "Supply Chain"]),
+    _agent("T_2001", "ServiceNow Ticket Agent", "studio", ("IT & Service Desk", "Domain-Specific Agent"), "IT Service Management", pop=3),
+    _agent("T_2002", "Dynamics 365 Opportunity Agent", "studio", ("Sales & Customer", "Domain-Specific Agent"), "Revenue Operations", ["Sales"], 1.5),
+    _agent("T_2003", "SAP Invoice Agent", "studio", ("Domain-Specific Agent", "Data & Reporting"), "Finance Systems", ["Finance", "Procurement"]),
+    _agent("T_2004", "Workday Absence Agent", "studio", ("HR & People", "Domain-Specific Agent"), "People Systems", pop=3),
+    _agent("T_2005", "Salesforce Account Agent", "studio", ("Cross-Org Agent", "Sales & Customer"), "Revenue Operations", ["Sales", "Customer Service"]),
+    _agent("T_2006", "Dataverse Analytics Agent", "studio", ("Data & Reporting", "Domain-Specific Agent"), "Data & Analytics", ["IT", "Strategy", "Operations"]),
+    _agent("T_2007", "Supplier Onboarding Agent", "studio", ("Domain-Specific Agent", "Compliance & Policy"), "Procurement", ["Procurement", "Supply Chain"]),
     _agent("T_2008", "Claims Triage Agent", "studio", ("Domain-Specific Agent",), "Customer Operations", ["Customer Service"], 1.5),
-    _agent("T_2009", "Safety Policy Agent", "studio", ("Agent: Compliance & Policy", "Domain-Specific Agent"), "Risk & Compliance", ["Risk & Compliance", "Operations"]),
+    _agent("T_2009", "Safety Policy Agent", "studio", ("Compliance & Policy", "Domain-Specific Agent"), "Risk & Compliance", ["Risk & Compliance", "Operations"]),
     _agent("T_2010", "Store Operations Agent", "studio", ("Domain-Specific Agent",), "Retail Operations", ["Operations"]),
     _agent("T_2011", "Field Service Scheduler", "studio", ("Domain-Specific Agent", "Task Management"), "Field Operations", ["Operations", "Customer Service"]),
     _agent("T_2012", "Partner Portal Agent", "studio", ("Cross-Org Agent",), "Partner Ecosystem", ["Sales"], 0.5),
-    _agent("T_2013", "Customer Escalation Agent", "studio", ("Agent: Sales & Customer", "Domain-Specific Agent"), "Customer Operations", ["Customer Service"]),
-    _agent("T_2014", "Procurement Policy Agent", "studio", ("Agent: Compliance & Policy",), "Procurement", ["Procurement", "Finance"], 0.6),
+    _agent("T_2013", "Customer Escalation Agent", "studio", ("Sales & Customer", "Domain-Specific Agent"), "Customer Operations", ["Customer Service"]),
+    _agent("T_2014", "Procurement Policy Agent", "studio", ("Compliance & Policy",), "Procurement", ["Procurement", "Finance"], 0.6),
     _agent("T_2015", "Quality Inspection Agent", "studio", ("Domain-Specific Agent",), "Manufacturing", ["Operations", "Engineering"], 0.6),
-    _agent("T_2016", "Logistics Tracking Agent", "studio", ("Domain-Specific Agent", "Agent: Data & Reporting"), "Supply Chain", ["Supply Chain"]),
-    _agent("T_2017", "Engineering Knowledge Agent", "studio", ("Agent: Knowledge Base", "Domain-Specific Agent"), "Engineering", ["Engineering"]),
-    _agent("T_2018", "Tender Response Agent", "studio", ("Agent: Content Generation", "Cross-Org Agent"), "Bid Management", ["Sales", "Legal"], 0.6),
+    _agent("T_2016", "Logistics Tracking Agent", "studio", ("Domain-Specific Agent", "Data & Reporting"), "Supply Chain", ["Supply Chain"]),
+    _agent("T_2017", "Engineering Knowledge Agent", "studio", ("Knowledge Base", "Domain-Specific Agent"), "Engineering", ["Engineering"]),
+    _agent("T_2018", "Tender Response Agent", "studio", ("Content Generation", "Cross-Org Agent"), "Bid Management", ["Sales", "Legal"], 0.6),
     # Azure AI Foundry
-    _agent("T_2101", "Pricing Optimisation Agent", "foundry", ("Agent: Data & Reporting",), "Data & Analytics", ["Sales", "Finance"]),
-    _agent("T_2102", "Contract Intelligence Agent", "foundry", ("Agent: Compliance & Policy",), "Legal Ops", ["Legal"]),
-    _agent("T_2103", "Demand Forecasting Agent", "foundry", ("Agent: Research & Analysis",), "Supply Chain", ["Supply Chain", "Operations"]),
+    _agent("T_2101", "Pricing Optimisation Agent", "foundry", ("Data & Reporting",), "Data & Analytics", ["Sales", "Finance"]),
+    _agent("T_2102", "Contract Intelligence Agent", "foundry", ("Compliance & Policy",), "Legal Ops", ["Legal"]),
+    _agent("T_2103", "Demand Forecasting Agent", "foundry", ("Research & Analysis",), "Supply Chain", ["Supply Chain", "Operations"]),
     # Autonomous
     _agent("T_3001", "Invoice Matching Autonomous Agent", "autonomous", ("Running a Workflow",), "Finance Systems", ["Finance"], 0.8),
     _agent("T_3002", "Lead Qualification Autonomous Agent", "autonomous", ("Running a Workflow",), "Revenue Operations", ["Sales"], 0.8),
@@ -393,20 +393,20 @@ AGENTS = [
     _agent("T_3004", "Compliance Monitoring Autonomous Agent", "autonomous", ("Running a Workflow",), "Risk & Compliance", ["Risk & Compliance"], 0.8),
     _agent("T_3005", "Inventory Replenishment Autonomous Agent", "autonomous", ("Running a Workflow",), "Supply Chain", ["Supply Chain"], 0.8),
     # Marketplace (fictional publishers)
-    _agent("T_6001", "Fabrikam Travel Assistant", "marketplace", ("Agent: Knowledge Base",), "Fabrikam, Inc.", pop=1.5),
-    _agent("T_6002", "Northwind CRM Assistant", "marketplace", ("Agent: Sales & Customer",), "Northwind Traders", ["Sales"]),
-    _agent("T_6003", "Tailspin Legal Research", "marketplace", ("Agent: Compliance & Policy",), "Tailspin Toys", ["Legal"], 0.6),
-    _agent("T_6004", "Litware Market Intelligence", "marketplace", ("Agent: Research & Analysis",), "Litware, Inc.", ["Marketing", "Strategy"]),
+    _agent("T_6001", "Fabrikam Travel Assistant", "marketplace", ("Knowledge Base",), "Fabrikam, Inc.", pop=1.5),
+    _agent("T_6002", "Northwind CRM Assistant", "marketplace", ("Sales & Customer",), "Northwind Traders", ["Sales"]),
+    _agent("T_6003", "Tailspin Legal Research", "marketplace", ("Compliance & Policy",), "Tailspin Toys", ["Legal"], 0.6),
+    _agent("T_6004", "Litware Market Intelligence", "marketplace", ("Research & Analysis",), "Litware, Inc.", ["Marketing", "Strategy"]),
     # Line of business
-    _agent("T_6101", "Contoso Field Guide", "lob", ("Agent: Knowledge Base",), COMPANY, ["Operations"]),
-    _agent("T_6102", "Contoso Pricing Desk", "lob", ("Agent: Sales & Customer",), COMPANY, ["Sales"]),
-    _agent("T_6103", "Contoso Safety Reporter", "lob", ("Agent: Compliance & Policy",), COMPANY, ["Operations", "Risk & Compliance"], 0.6),
+    _agent("T_6101", "Contoso Field Guide", "lob", ("Knowledge Base",), COMPANY, ["Operations"]),
+    _agent("T_6102", "Contoso Pricing Desk", "lob", ("Sales & Customer",), COMPANY, ["Sales"]),
+    _agent("T_6103", "Contoso Safety Reporter", "lob", ("Compliance & Policy",), COMPANY, ["Operations", "Risk & Compliance"], 0.6),
     # Microsoft
-    _agent("T_7001", "Researcher", "microsoft", ("Agent: Research & Analysis",), "Microsoft", pop=4),
-    _agent("T_7002", "Analyst", "microsoft", ("Agent: Data & Reporting",), "Microsoft", pop=2),
+    _agent("T_7001", "Researcher", "microsoft", ("Research & Analysis",), "Microsoft", pop=4),
+    _agent("T_7002", "Analyst", "microsoft", ("Data & Reporting",), "Microsoft", pop=2),
     # Cowork and Scout are picked by their own share, not from favourites.
     _agent("T_4001", "Copilot Cowork", "cowork", ("General Chat",), "Microsoft"),
-    _agent("T_5001", "Microsoft Scout", "scout", ("Agent: Research & Analysis", "Meeting Prep", "Email Triage", "Email Thread Summary"), "Microsoft"),
+    _agent("T_5001", "Microsoft Scout", "scout", ("Research & Analysis", "Meeting Prep", "Email Triage", "Email Thread Summary"), "Microsoft"),
 ]
 AGENT_BY_ID = {a["tid"]: a for a in AGENTS}
 BLOCKED = {"T_2012"}                  # used early in the window, then blocked by an admin
@@ -469,11 +469,11 @@ COWORK_READS = [((1, 5), 49), ((6, 15), 17), ((16, 40), 30), ((41, 60), 4)]
 COWORK_BEHAVIOURS = {
     "chat": ["General Chat"],
     "read": ["Email Thread Summary", "Email Triage", "Teams Messaging"],
-    "thin": ["Document Drafting", "Agent: Research & Analysis", "Image Generation"],
+    "thin": ["Document Drafting", "Research & Analysis", "Image Generation"],
     "single": ["Spreadsheet Analysis", "Document Summarising", "Presentation Creation"],
-    "moderate": ["Agent: Research & Analysis", "Document Drafting"],
-    "multi": ["Agent: Research & Analysis", "Agent: Data & Reporting", "Document Drafting"],
-    "build": ["Code Writing", "Agent: Content Generation", "Running a Workflow"],
+    "moderate": ["Research & Analysis", "Document Drafting"],
+    "multi": ["Research & Analysis", "Data & Reporting", "Document Drafting"],
+    "build": ["Code Writing", "Content Generation", "Running a Workflow"],
     "cross": ["Presentation Creation", "Running a Workflow", "Task Management", "Document Drafting"],
 }
 COWORK_PROMPTS = {
@@ -1260,7 +1260,7 @@ def agent_rows(users, rng: random.Random):
     makers = [u for u in users if u["licensed"] and u["org"] in {"IT", "Engineering", "Operations", "Sales", "HR", "Finance"}]
     it = [u for u in users if u["org"] == "IT"]
     entries = [(a["tid"], a["name"], a["kind"], "used", a["beh"][0], a["publisher"]) for a in AGENTS]
-    entries += [(tid, name, kind, state, "Agent: General Purpose", COMPANY) for tid, name, kind, state in REGISTRY_ONLY]
+    entries += [(tid, name, kind, state, "General Assistance", COMPANY) for tid, name, kind, state in REGISTRY_ONLY]
     out = []
     for i, (tid, name, kind, state, beh, publisher) in enumerate(entries):
         _, a365, created_in, supported, status, _ = KINDS[kind]

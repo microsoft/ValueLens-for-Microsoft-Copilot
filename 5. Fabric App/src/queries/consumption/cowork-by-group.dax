@@ -1,0 +1,46 @@
+// Groups first, largest first, then the people inside them, so the tree
+// keeps both orders.
+DEFINE
+    // The released Consumption Central templates have no policy name yet, so
+    // the query brings its own. SUMMARIZE walks the relationship to
+    // SpendingPolicy, so a group row covers everyone in it. The all-zero GUID
+    // is usage outside any policy window, not a policy.
+    MEASURE 'CoworkBilling'[ValueLens Cowork Policy Name] =
+        VAR Assigned =
+            FILTER(
+                SUMMARIZE(
+                    'CoworkBilling',
+                    'CoworkBilling'[SpendingPolicyId],
+                    'SpendingPolicy'[Policy Name]
+                ),
+                'CoworkBilling'[SpendingPolicyId] <> ""
+                    && 'CoworkBilling'[SpendingPolicyId] <> "00000000-0000-0000-0000-000000000000"
+            )
+        VAR N = COUNTROWS(DISTINCT(SELECTCOLUMNS(Assigned, "PolicyId", 'CoworkBilling'[SpendingPolicyId])))
+        VAR PolicyName = MAXX(Assigned, 'SpendingPolicy'[Policy Name])
+        VAR PolicyId = MAXX(Assigned, 'CoworkBilling'[SpendingPolicyId])
+        RETURN
+            SWITCH(
+                TRUE(),
+                N = 1, IF(PolicyName <> "", PolicyName, "Policy " & LEFT(PolicyId, 8)),
+                N > 1, FORMAT(N, "#,0") & " policies",
+                NOT ISEMPTY('CoworkBilling'), "(Unassigned)"
+            )
+EVALUATE
+SUMMARIZECOLUMNS(
+    ROLLUPADDISSUBTOTAL(
+        'Group By'[Group], "Is Grand Total",
+        'Org'[DisplayName], "Is Group Total"
+    ),
+    "Users", [User Count],
+    "Credits Used", [Cowork Total Credits Used],
+    "Allowance Used", [Person Allowance Used %],
+    "Prepaid Cost", [Cowork Prepaid Cost],
+    "PAYG Cost", [Cowork PAYG Cost],
+    "Total Cost", [Cowork Total Cost],
+    "Policy", [ValueLens Cowork Policy Name]
+)
+ORDER BY
+    [Is Grand Total] DESC,
+    [Is Group Total] DESC,
+    [Credits Used] DESC

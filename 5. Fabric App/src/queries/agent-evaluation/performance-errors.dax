@@ -1,0 +1,16 @@
+// The ten error codes behind the most errors, and whose fault each one is.
+EVALUATE
+VAR _codes =
+    SUMMARIZECOLUMNS(
+        'Agent Errors'[error_code],
+        'Agent Errors'[Error Source],
+        "@Errors", [Total Errors]
+    )
+RETURN
+SELECTCOLUMNS(
+    TOPN(10, FILTER(_codes, [@Errors] > 0), [@Errors], DESC, 'Agent Errors'[error_code], ASC),
+    "Error Code", 'Agent Errors'[error_code],
+    "Source", 'Agent Errors'[Error Source],
+    "Errors", [@Errors]
+)
+ORDER BY [Errors] DESC, [Error Code] ASC

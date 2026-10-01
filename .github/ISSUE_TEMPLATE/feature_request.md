@@ -16,6 +16,7 @@ What decision or deployment task is difficult today? Do not include tenant data.
 - [ ] 2. SharePoint
 - [ ] 3. Fabric
 - [ ] 4. Power Automate + Dataverse (preview)
+- [ ] 5. Fabric App (preview)
 
 ### Proposed change
 

@@ -1,0 +1,17 @@
+EVALUATE
+ROW(
+    "All Tasks", [AI Tasks],
+    "Licensed Tasks", [Copilot AI Tasks],
+    "Unlicensed Tasks", [Unlicensed AI Tasks],
+    "Agent Tasks", [Agent AI Tasks],
+    "All Users", [All Active Users],
+    "Licensed Users", [Active Licensed Users],
+    "Unlicensed Users", [Active Unlicensed Users],
+    "Agent Users", [Active Agent Users],
+    "All Rate", DIVIDE([AI Tasks], [All Active Users]),
+    "Licensed Rate", DIVIDE([Copilot AI Tasks], [Active Licensed Users]),
+    "Unlicensed Rate", DIVIDE([Unlicensed AI Tasks], [Active Unlicensed Users]),
+    "Agent Rate", DIVIDE([Agent AI Tasks], [Active Agent Users]),
+    "Top Value Outcome", [Top Value Outcome],
+    "Licensed Utilisation", [% Active Licensed Users]
+)

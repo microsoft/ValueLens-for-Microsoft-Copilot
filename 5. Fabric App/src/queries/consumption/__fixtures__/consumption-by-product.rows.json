@@ -1,0 +1,26 @@
+[
+  {
+    "[Product]": "Cowork / Work IQ",
+    "[Product Sort]": 1,
+    "[Credits]": 2000928.5298,
+    "[Cost]": 18408.54247416,
+    "[Cost Basis]": "PAYG reference value; before prepaid capacity",
+    "[Coverage]": "Partial date coverage | source 2026-05-03 to 2026-07-26"
+  },
+  {
+    "[Product]": "Copilot Studio",
+    "[Product Sort]": 2,
+    "[Credits]": 23594.32,
+    "[Cost]": 177.805568,
+    "[Cost Basis]": "Tenant quantities x configured prepaid/PAYG rates",
+    "[Coverage]": "Partial date coverage | source 2026-04-14 to 2026-05-11"
+  },
+  {
+    "[Product]": "Azure AI Foundry",
+    "[Product Sort]": 3,
+    "[Credits]": null,
+    "[Cost]": 2535.80706566,
+    "[Cost Basis]": "Azure export cost in billing currency",
+    "[Coverage]": "Partial date coverage | source 2026-05-10 to 2026-08-07"
+  }
+]

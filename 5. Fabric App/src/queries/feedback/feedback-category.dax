@@ -1,0 +1,42 @@
+EVALUATE
+VAR _base =
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'ProductFeedback'[FeedbackCategory],
+            "@Total", 'ProductFeedback'[Total Feedback],
+            "@Up", 'ProductFeedback'[Thumbs Up Count],
+            "@Down", 'ProductFeedback'[Thumbs Down Count]
+        ),
+        NOT ISBLANK('ProductFeedback'[FeedbackCategory]) &&
+            'ProductFeedback'[FeedbackCategory] <> "🧪 Testing" &&
+            'ProductFeedback'[FeedbackCategory] <> "❓ Uncategorized" &&
+            [@Total] > 0
+    )
+VAR _long =
+    UNION(
+        SELECTCOLUMNS(
+            _base,
+            "Category",
+                VAR _category = 'ProductFeedback'[FeedbackCategory]
+                VAR _space = SEARCH(" ", _category, 1, 0)
+                RETURN IF(_space > 0, MID(_category, _space + 1, LEN(_category)), _category),
+            "Feedback Type", "Thumbs Up",
+            "Count", COALESCE([@Up], 0),
+            "Total Feedback", [@Total],
+            "Satisfaction", DIVIDE(COALESCE([@Up], 0), [@Total])
+        ),
+        SELECTCOLUMNS(
+            _base,
+            "Category",
+                VAR _category = 'ProductFeedback'[FeedbackCategory]
+                VAR _space = SEARCH(" ", _category, 1, 0)
+                RETURN IF(_space > 0, MID(_category, _space + 1, LEN(_category)), _category),
+            "Feedback Type", "Thumbs Down",
+            "Count", COALESCE([@Down], 0),
+            "Total Feedback", [@Total],
+            "Satisfaction", DIVIDE(COALESCE([@Up], 0), [@Total])
+        )
+    )
+RETURN
+FILTER(_long, [Count] > 0)
+ORDER BY [Total Feedback] DESC, [Feedback Type] DESC

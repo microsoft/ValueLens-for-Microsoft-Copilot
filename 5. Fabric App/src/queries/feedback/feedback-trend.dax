@@ -1,0 +1,43 @@
+EVALUATE
+VAR _daily =
+    ADDCOLUMNS(
+        SUMMARIZECOLUMNS(
+            'Calendar'[Date],
+            "@Total", 'ProductFeedback'[Total Feedback],
+            "@Up", 'ProductFeedback'[Thumbs Up Count],
+            "@Down", 'ProductFeedback'[Thumbs Down Count]
+        ),
+        "@WeekStart", 'Calendar'[Date] - WEEKDAY('Calendar'[Date], 2) + 1
+    )
+VAR _weeks =
+    GROUPBY(
+        FILTER(_daily, [@Total] > 0),
+        [@WeekStart],
+        "@Total", SUMX(CURRENTGROUP(), [@Total]),
+        "@Up", SUMX(CURRENTGROUP(), [@Up]),
+        "@Down", SUMX(CURRENTGROUP(), [@Down])
+    )
+VAR _long =
+    UNION(
+        SELECTCOLUMNS(
+            _weeks,
+            "Week Start", [@WeekStart],
+            "Feedback Type", "Thumbs Up",
+            "Count", COALESCE([@Up], 0),
+            "Signed Count", COALESCE([@Up], 0),
+            "Satisfaction", DIVIDE(COALESCE([@Up], 0), [@Total]),
+            "Total Feedback", [@Total]
+        ),
+        SELECTCOLUMNS(
+            _weeks,
+            "Week Start", [@WeekStart],
+            "Feedback Type", "Thumbs Down",
+            "Count", COALESCE([@Down], 0),
+            "Signed Count", -COALESCE([@Down], 0),
+            "Satisfaction", DIVIDE(COALESCE([@Up], 0), [@Total]),
+            "Total Feedback", [@Total]
+        )
+    )
+RETURN
+FILTER(_long, [Count] > 0)
+ORDER BY [Week Start], [Feedback Type] DESC

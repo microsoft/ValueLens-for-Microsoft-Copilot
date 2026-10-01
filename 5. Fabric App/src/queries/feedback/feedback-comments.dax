@@ -1,0 +1,21 @@
+EVALUATE
+TOPN(
+    50,
+    SELECTCOLUMNS(
+        FILTER(
+            'ProductFeedback',
+            NOT ISBLANK('ProductFeedback'[Comment]) && LEN(TRIM('ProductFeedback'[Comment])) > 0
+        ),
+        "Date Submitted", 'ProductFeedback'[Date Submitted Date],
+        "Feedback Type", 'ProductFeedback'[FeedbackType],
+        "Feedback Emoji", 'ProductFeedback'[FeedbackEmoji],
+        "Category",
+            VAR _category = 'ProductFeedback'[FeedbackCategory]
+            VAR _space = SEARCH(" ", _category, 1, 0)
+            RETURN IF(_space > 0, MID(_category, _space + 1, LEN(_category)), _category),
+        "Surface / Agent", 'ProductFeedback'[Surface / Agent],
+        "Comment", 'ProductFeedback'[Comment]
+    ),
+    [Date Submitted], DESC
+)
+ORDER BY [Date Submitted] DESC

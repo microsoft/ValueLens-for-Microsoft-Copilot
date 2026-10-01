@@ -1,7 +1,7 @@
 """
 Load the sample dataset straight into a Fabric Lakehouse.
 
-The quickest way to see the Fabric template working. It writes the nine
+The quickest way to see the Fabric template working. It writes the eleven
 Consumption Central tables from the synthetic CSVs in
 `1. Local CSV/Add Credit Consumption/sample-data/`, so you can point the
 template at a real Lakehouse without first standing up the ingester
@@ -42,7 +42,7 @@ SAMPLE = os.path.join(HERE, "..", "..", "1. Local CSV", "Add Credit Consumption"
 # Written in full every run. Nothing outside this set is created or removed.
 OURS = ["viva_credits_weekly", "viva_spending_policy", "studio_tenant_daily",
         "studio_agent", "studio_user", "github_ai_usage", "github_user_map",
-        "org_attributes", "commercial_terms"]
+        "org_attributes", "commercial_terms", "azure_ai_spend", "azure_ai_tokens"]
 
 
 def token():
@@ -62,7 +62,9 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--workspace", required=True, help="workspace GUID")
     ap.add_argument("--lakehouse", required=True, help="lakehouse GUID")
-    ap.add_argument("--schema", default="dbo")
+    ap.add_argument("--schema", default="dbo",
+                    help="dbo for a schema-enabled Lakehouse; pass --schema= "
+                         "(empty) for one created without schemas")
     ap.add_argument("--sample-dir", default=SAMPLE)
     ap.add_argument("--identified", action="store_true", default=True,
                     help="join PersonPolicyMap to give the Viva metrics real "
@@ -76,8 +78,8 @@ def main():
     if not os.path.isdir(a.sample_dir):
         sys.exit(f"sample data not found: {a.sample_dir}")
 
-    uri = (f"abfss://{a.workspace}@onelake.dfs.fabric.microsoft.com"
-           f"/{a.lakehouse}/Tables/{a.schema}")
+    tables = f"{a.lakehouse}/Tables" + (f"/{a.schema}" if a.schema else "")
+    uri = f"abfss://{a.workspace}@onelake.dfs.fabric.microsoft.com/{tables}"
     opts = {"bearer_token": token(), "use_fabric_endpoint": "true"}
     loaded_at = pd.Timestamp.now("UTC").tz_localize(None)
 
@@ -95,7 +97,7 @@ def main():
     def d(s):
         return pd.to_datetime(s, errors="coerce", format="mixed").dt.date
 
-    print(f"Writing to {a.workspace}/{a.lakehouse}/Tables/{a.schema}\n")
+    print(f"Writing to {a.workspace}/{tables}\n")
 
     # ---- Viva -------------------------------------------------------------
     met = read("PersonServiceCreditsMetrics.csv")
@@ -231,11 +233,7 @@ def main():
         spend["UsageDate"] = pd.to_datetime(spend["UsageDate"]).dt.date
         for c in ("Cost", "UsageQuantity"):
             spend[c] = pd.to_numeric(spend[c], errors="coerce").fillna(0.0)
-        out.append({
-            "table": "azure_ai_spend",
-            "df": spend,
-            "source_file": "AzureAiSpendDaily.csv",
-        })
+        put("azure_ai_spend", spend)
 
     try:
         tok = read("AzureAiTokensDaily.csv")
@@ -244,11 +242,7 @@ def main():
     if tok is not None and len(tok):
         tok["Date"] = pd.to_datetime(tok["Date"]).dt.date
         tok["Value"] = pd.to_numeric(tok["Value"], errors="coerce").fillna(0.0)
-        out.append({
-            "table": "azure_ai_tokens",
-            "df": tok,
-            "source_file": "AzureAiTokensDaily.csv",
-        })
+        put("azure_ai_tokens", tok)
 
     org = read("entra_org.csv")
     put("org_attributes", pd.DataFrame({

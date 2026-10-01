@@ -1,0 +1,74 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "area", "interpolate": "monotone", "line": false },
+  "transform": [
+    {
+      "calculate": "toDate(datum['Chat + Agent Interactions (Audit Logs)MonthStart'])",
+      "as": "Month"
+    },
+    {
+      "calculate": "replace(datum['Stage LegendStage'], regexp('^[0-9]+ *- *'), '')",
+      "as": "Stage"
+    },
+    {
+      "calculate": "indexof(['Inactive', 'Beginner', 'Developing', 'Habitual', 'Power'], datum.Stage)",
+      "as": "Rank"
+    }
+  ],
+  "encoding": {
+    "x": {
+      "field": "Month",
+      "type": "temporal",
+      "title": null,
+      "axis": {
+        "format": "%b %Y",
+        "tickCount": { "interval": "month", "step": 1 },
+        "labelAngle": 0
+      }
+    },
+    "y": {
+      "aggregate": "sum",
+      "field": "Users",
+      "type": "quantitative",
+      "title": "Share of users",
+      "stack": "normalize",
+      "axis": { "labelExpr": "format(datum.value, '.0%')" }
+    },
+    "color": {
+      "field": "Stage",
+      "type": "nominal",
+      "title": null,
+      "sort": null,
+      "scale": {
+        "domain": ["Power", "Habitual", "Developing", "Beginner", "Inactive"],
+        "range": ["#0b2c57", "#3a5c9e", "#7e9cdb", "#b7c8ea", "#dcdfe3"]
+      },
+      "legend": {
+        "orient": "right",
+        "direction": "vertical",
+        "symbolType": "square",
+        "symbolLimit": 10
+      }
+    },
+    "order": {
+      "field": "Rank",
+      "type": "quantitative",
+      "sort": "ascending"
+    },
+    "tooltip": [
+      {
+        "field": "Month",
+        "type": "temporal",
+        "title": "Month",
+        "format": "%b %Y"
+      },
+      { "field": "Stage", "type": "nominal", "title": "Stage" },
+      { "field": "Users", "type": "quantitative", "title": "Users", "format": ",.0f" }
+    ]
+  },
+  "config": {
+    "area": { "fillOpacity": 1 }
+  }
+}

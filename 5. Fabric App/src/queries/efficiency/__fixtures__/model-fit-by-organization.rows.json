@@ -1,0 +1,35 @@
+[
+  {
+    "[Segment]": "Sales",
+    "[Main Model]": "GPT-4-TURBO · 35%",
+    "[Main Reason]": null,
+    "[Sessions]": 1655,
+    "[Judged Sessions]": 1105,
+    "[Well-matched Sessions]": 1105,
+    "[Over-specified Sessions]": null,
+    "[Under-specified Sessions]": null,
+    "[Judged Share]": 0.6676737160120846
+  },
+  {
+    "[Segment]": "IT",
+    "[Main Model]": "COPILOT-PRO · 36%",
+    "[Main Reason]": null,
+    "[Sessions]": 1139,
+    "[Judged Sessions]": 727,
+    "[Well-matched Sessions]": 727,
+    "[Over-specified Sessions]": null,
+    "[Under-specified Sessions]": null,
+    "[Judged Share]": 0.6382791922739245
+  },
+  {
+    "[Segment]": "Marketing",
+    "[Main Model]": "GPT-4-TURBO · 34%",
+    "[Main Reason]": null,
+    "[Sessions]": 978,
+    "[Judged Sessions]": 651,
+    "[Well-matched Sessions]": 651,
+    "[Over-specified Sessions]": null,
+    "[Under-specified Sessions]": null,
+    "[Judged Share]": 0.6656441717791411
+  }
+]

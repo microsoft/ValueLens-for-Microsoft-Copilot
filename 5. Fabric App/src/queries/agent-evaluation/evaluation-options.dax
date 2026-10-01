@@ -1,0 +1,27 @@
+// The page's own slicer choices: the dates the model holds, the departments
+// and agents with conversations, and how many groups each Group by column
+// would show, so a column with one value is never offered.
+EVALUATE
+VAR _first = MIN('Agent Performance'[InteractionDate])
+VAR _last = MAX('Agent Performance'[InteractionDate])
+RETURN
+UNION(
+    ROW("Kind", "First date", "Value", FORMAT(_first, "yyyy-MM-dd"), "Sort", 0),
+    ROW("Kind", "Last date", "Value", FORMAT(_last, "yyyy-MM-dd"), "Sort", 0),
+    SELECTCOLUMNS(
+        FILTER(
+            SUMMARIZECOLUMNS('Chat + Agent Org Data'[Organization], "@Conversations", [Total Conversations]),
+            'Chat + Agent Org Data'[Organization] <> ""
+        ),
+        "Kind", "Department", "Value", 'Chat + Agent Org Data'[Organization], "Sort", [@Conversations]
+    ),
+    SELECTCOLUMNS(
+        FILTER(
+            SUMMARIZECOLUMNS('Agent Performance'[BotFriendlyName], "@Conversations", [Total Conversations]),
+            'Agent Performance'[BotFriendlyName] <> ""
+        ),
+        "Kind", "Agent", "Value", 'Agent Performance'[BotFriendlyName], "Sort", [@Conversations]
+    ),
+    __GROUP_COUNTS__
+)
+ORDER BY [Kind] ASC, [Sort] DESC, [Value] ASC

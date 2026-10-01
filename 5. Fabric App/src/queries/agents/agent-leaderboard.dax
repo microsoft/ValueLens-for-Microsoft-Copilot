@@ -1,0 +1,100 @@
+EVALUATE
+// Every registered agent, used or not. The model relates the audit log and
+// the registry in both directions, so a date or people filter on the log
+// would otherwise shrink the registry to the agents it matched. One-way keeps
+// the list whole; the usage measures below still see every filter. Removing
+// the audit table's filters would not do: its expanded table takes in the
+// registry, so the agent type filter would go too.
+VAR _catalogue =
+    CALCULATETABLE(
+        SUMMARIZE(
+            FILTER('Agents 365', NOT ISBLANK('Agents 365'[Title ID])),
+            'Agents 365'[Title ID],
+            'Agents 365'[Agent name],
+            'Agents 365'[Agent Type Label],
+            'Agents 365'[Creator],
+            'Agents 365'[Agent Features],
+            'Agents 365'[Agent Lifecycle],
+            'Agents 365'[Agent Usage Review],
+            'Agents 365'[Agent description]
+        ),
+        CROSSFILTER(
+            'Chat + Agent Interactions (Audit Logs)'[Agent_LinkID],
+            'Agents 365'[Title ID],
+            OneWay
+        )
+    )
+VAR _registered =
+    SELECTCOLUMNS(
+        FILTER(
+            ADDCOLUMNS(
+                _catalogue,
+                "@Users", [Active Agent Users],
+                "@Sessions", [Observed Agent Sessions],
+                "@PerUser", [Observed Agent Sessions per User],
+                "@ReturnRate", [Agent Return Rate],
+                "@Orgs", [Agent Orgs],
+                "@LastSeen", [Agent Last Observed Activity]
+            ),
+            // Picking agents by name filters the audit log, which the list no
+            // longer follows, so then a registered agent stays only if it was used.
+            NOT ISFILTERED('Chat + Agent Interactions (Audit Logs)'[AgentName])
+                || NOT ISBLANK([@Sessions])
+        ),
+        "Agent", 'Agents 365'[Agent name],
+        "Registry Id", 'Agents 365'[Title ID],
+        "In Registry", TRUE(),
+        "Type", 'Agents 365'[Agent Type Label],
+        "Creator", 'Agents 365'[Creator],
+        "Users", [@Users],
+        "Sessions", [@Sessions],
+        "Sessions Per User", [@PerUser],
+        "Return Rate", [@ReturnRate],
+        "Orgs Reached", [@Orgs],
+        "Last Activity", [@LastSeen],
+        "Features", 'Agents 365'[Agent Features],
+        "Lifecycle", 'Agents 365'[Agent Lifecycle],
+        "Adoption", 'Agents 365'[Agent Usage Review],
+        "Description", 'Agents 365'[Agent description]
+    )
+// Agents the audit log names but no registry entry matches. The report's
+// registry table leaves them out, yet in some tenants they carry all of the
+// agent use, so they are ranked with their usage and no registry details.
+// "Draft as 1P Agent" is left out, as on the report's Leaderboard page.
+VAR _unregistered =
+    SELECTCOLUMNS(
+        FILTER(
+            SUMMARIZECOLUMNS(
+                'Chat + Agent Interactions (Audit Logs)'[AgentName],
+                FILTER(ALL('Agents 365'[Title ID]), ISBLANK('Agents 365'[Title ID])),
+                "@Users", [Active Agent Users],
+                "@Sessions", [Observed Agent Sessions],
+                "@PerUser", [Observed Agent Sessions per User],
+                "@ReturnRate", [Agent Return Rate],
+                "@Orgs", [Agent Orgs],
+                "@LastSeen", [Agent Last Observed Activity]
+            ),
+            NOT ISBLANK([@Sessions])
+                && 'Chat + Agent Interactions (Audit Logs)'[AgentName] <> "Draft as 1P Agent"
+        ),
+        "Agent",
+            VAR _name = 'Chat + Agent Interactions (Audit Logs)'[AgentName]
+            RETURN IF(LEN(TRIM(_name)) = 0, "Unnamed agent", _name),
+        "Registry Id", BLANK(),
+        "In Registry", FALSE(),
+        "Type", "Not in registry",
+        "Creator", BLANK(),
+        "Users", [@Users],
+        "Sessions", [@Sessions],
+        "Sessions Per User", [@PerUser],
+        "Return Rate", [@ReturnRate],
+        "Orgs Reached", [@Orgs],
+        "Last Activity", [@LastSeen],
+        "Features", BLANK(),
+        "Lifecycle", BLANK(),
+        "Adoption", BLANK(),
+        "Description", BLANK()
+    )
+RETURN
+    UNION(_registered, _unregistered)
+ORDER BY [Users] DESC, [Sessions] DESC, [Agent] ASC
