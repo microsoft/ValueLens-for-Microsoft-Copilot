@@ -43,7 +43,7 @@ How each figure is worked out, page by page, is in the [methodology](../docs/MET
 - The Fabric tenant setting **Fabric Apps (preview)** turned on (Admin portal → Tenant settings).
 - The Power BI tenant setting **Dataset Execute Queries REST API** turned on (Admin portal →
   Integration settings).
-- [Node.js 22](https://nodejs.org/) on the machine you deploy from.
+- [Node.js 22.13 or later](https://nodejs.org/) on the machine you deploy from.
 
 ## Set up
 

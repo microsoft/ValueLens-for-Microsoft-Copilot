@@ -97,6 +97,8 @@ export function useSemanticModelQuery(
     }, [connection, query, bypassCache, canExecute]);
 
     useEffect(() => {
+        // Starts a fetch from the semantic model; the loading flag must flip as it starts.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         execute();
     }, [execute]);
 
