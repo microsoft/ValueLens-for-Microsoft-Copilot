@@ -99,7 +99,7 @@ describe("agent evaluation query contract", () => {
     it.each(modules)("$name ships a complete DAX query without a byte-order mark", ({ factory }) => {
         const raw = factory().query;
         expect(raw.charCodeAt(0)).not.toBe(0xfeff);
-        expect(raw.replace(/^(\s*\/\/.*\n)+/, "").trim()).toMatch(/^(EVALUATE|DEFINE)\b/);
+        expect(raw.replace(/^(\s*\/\/.*\r?\n)+/, "").trim()).toMatch(/^(EVALUATE|DEFINE)\b/);
         expect(raw).not.toMatch(/__[A-Z_]+__/);
     });
 

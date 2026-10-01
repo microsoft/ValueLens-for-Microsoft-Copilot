@@ -16,6 +16,15 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-01 — Fabric App: set-up checked from a fresh clone
+
+A clean Windows clone of `5. Fabric App` now passes every README step: `npm install`, build, test,
+lint and a `rayfin up` dry run. Two query tests failed when Git checked the `.dax` files out with
+Windows line endings, and `npm run lint` reported one error in the query hook; both are fixed. The
+README now asks for Node.js 22.13 or later, the oldest 22.x release the build tools support.
+
+---
+
 ## 2026-10-01 — methodology: from signal to task category
 
 [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md#32-from-signal-to-task-category) has a new section

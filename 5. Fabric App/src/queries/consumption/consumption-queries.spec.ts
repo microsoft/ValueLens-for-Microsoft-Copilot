@@ -134,7 +134,7 @@ describe("consumption query contract", () => {
     it.each(modules)("$name ships a DAX query without a byte-order mark", ({ factory }) => {
         const raw = factory().query;
         expect(raw.charCodeAt(0)).not.toBe(0xfeff);
-        expect(raw.replace(/^(\s*\/\/.*\n)+/, "").trim()).toMatch(/^(EVALUATE|DEFINE)\b/);
+        expect(raw.replace(/^(\s*\/\/.*\r?\n)+/, "").trim()).toMatch(/^(EVALUATE|DEFINE)\b/);
     });
 
     it.each(modules)("$name still parses once the page's slicers wrap it", ({ factory }) => {
