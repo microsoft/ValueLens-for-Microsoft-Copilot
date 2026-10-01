@@ -20,11 +20,13 @@ type in.
 | **Value** | What the work was, and what it was worth: task breakdown and estimated value |
 | **Efficiency** | Whether the right tool is doing the job: Cowork fit, Model fit, and how grading works |
 | **Feedback** | What people say about Copilot |
+| **Agent Evaluation** | How well Copilot Studio agents answer: how conversations ended, errors, topic health, knowledge sources and feedback comments, from Agent Evaluator. It never shows the conversations themselves |
 | **Appendix** | Glossary, plus Signal → Impact value assumptions |
 
 Filters (date, organisation, licence, activity, agent) apply across the ValueLens pages. The
 Consumption page has its own period, service, group and cost-basis choices, taken from the
-Consumption Central report. The app opens in light mode, and a toggle switches it to dark.
+Consumption Central report. The Agent Evaluation page has its own date, department and agent
+slicers, and a Group by choice. The app opens in light mode, and a toggle switches it to dark.
 
 ## Prerequisites
 
@@ -33,6 +35,8 @@ Consumption Central report. The app opens in light mode, and a toggle switches i
   uses that capacity too.
 - A **published ValueLens semantic model**, with **Build** permission on it for everyone who'll use the app.
 - *Optional, for the Consumption page:* a **published Consumption Central semantic model**, with
+  the same Build permission.
+- *Optional, for the Agent Evaluation page:* a **published Agent Evaluator semantic model**, with
   the same Build permission.
 - The Fabric tenant setting **Fabric Apps (preview)** turned on (Admin portal → Tenant settings).
 - The Power BI tenant setting **Dataset Execute Queries REST API** turned on (Admin portal →
@@ -48,11 +52,11 @@ Run these commands from this folder (`5. Fabric App`).
    npm install
    ```
 2. **Point it at your models.** [`fabric.yaml`](fabric.yaml) ships with placeholders. Replace
-   `workspaceId` and `itemId` under `vl` with your ValueLens semantic model's, and under `cc`
-   with your Consumption Central model's.
+   `workspaceId` and `itemId` under `vl` with your ValueLens semantic model's, under `cc` with
+   your Consumption Central model's, and under `ae` with your Agent Evaluator model's.
    Both IDs are in each model's URL: `app.powerbi.com/groups/<workspaceId>/datasets/<itemId>/…`
-   Without Consumption Central, delete the `cc` block; the Consumption page then explains what
-   it needs.
+   Without Consumption Central or Agent Evaluator, delete its block (`cc` or `ae`); its page then
+   explains what it needs.
 3. **Deploy.** Sign in when prompted. If your account spans tenants, add `--tenant <tenant-id>`.
    ```powershell
    npx rayfin up --workspace-uri "https://app.fabric.microsoft.com/groups/<workspace-id>"
@@ -64,8 +68,8 @@ Run these commands from this folder (`5. Fabric App`).
 4. **Share.** Each viewer needs two things:
    - **The app:** add them to the workspace (Viewer is enough), or share the **ValueLens** item
      with *Run and interact* permission. Then send them the Fabric portal link.
-   - **The data:** Build permission on the ValueLens model, and on Consumption Central if you use
-     it. Without it the app opens, but its pages can't load.
+   - **The data:** Build permission on the ValueLens model, and on Consumption Central and Agent
+     Evaluator if you use them. Without it the app opens, but its pages can't load.
 
    People from another tenant must first be invited as guests in yours, and guest access to
    Fabric must be allowed in your tenant settings.
