@@ -6,17 +6,20 @@
 //-----------------------------------------------------------------------
 
 import { useMemo } from "react";
-import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { useCommercialTerms } from "@/hooks/commercial-terms.context";
-import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import {
+    useSummaryQuery,
+    useTableQuery,
+    type SummaryResult,
+    type TableResult,
+    type TableSource,
+} from "@/hooks/use-table-query";
 import { formatKpi } from "@/lib/format-kpi";
-import { toSummaryRow, type SummaryRow } from "@/lib/summary-row";
-import { toDataTable, type ColumnMetadataMap } from "@/lib/to-data-table";
 import { asNumber } from "@/lib/tree-grid";
 import { readsCommercialTerms, withCommercialTerms, type ConsumptionLens } from "@/queries/consumption";
 
-export const SMALL = "text-[length:var(--text-200)] leading-200";
-export const BODY = "text-[length:var(--text-300)] leading-300";
+export { BODY, SMALL } from "@/lib/type-scale";
+export type { SummaryResult, TableResult } from "@/hooks/use-table-query";
 
 /** Copilot credits are priced in US dollars in the report's rate settings. */
 export const CREDIT_CURRENCY = "$";
@@ -26,19 +29,6 @@ export const LENSES: readonly { id: ConsumptionLens; label: string }[] = [
     { id: "consumption", label: "Consumption" },
     { id: "cost", label: "Cost" },
 ];
-
-interface Source {
-    connection: string;
-    query: string;
-    columnMetadata: ColumnMetadataMap;
-}
-
-export interface TableResult {
-    table: DataTable | undefined;
-    error: string | undefined;
-    isLoading: boolean;
-    refetch: () => void;
-}
 
 /**
  * The query priced at the terms saved in the app. A query that shows a cost
@@ -54,39 +44,15 @@ function usePricedQuery(query: string): string {
 }
 
 /** A Consumption Central query with the stage's own slicers applied, as a DataTable. */
-export function useConsumptionTable(source: Source, extra: readonly string[] = []): TableResult {
+export function useConsumptionTable(source: TableSource, extra: readonly string[] = []): TableResult {
     const query = usePricedQuery(source.query);
-    const result = useFilteredQuery({ connection: source.connection, query }, { extra });
-    const table = useMemo(
-        () => (result.data?.status === "success" ? toDataTable(result.data.table, source.columnMetadata) : undefined),
-        [result.data, source.columnMetadata],
-    );
-    const error = result.data?.status === "error" ? result.data.error.message : undefined;
-    return { table, error, isLoading: !table && !error, refetch: result.refetch };
-}
-
-export interface SummaryResult {
-    row: SummaryRow | undefined;
-    /** True once the query has answered, even with no rows. */
-    loaded: boolean;
-    error: string | undefined;
-    refetch: () => void;
+    return useTableQuery({ connection: source.connection, query, columnMetadata: source.columnMetadata }, extra);
 }
 
 /** A one-row Consumption Central query, keyed by DAX column name. */
-export function useConsumptionSummary(source: Source, extra: readonly string[] = []): SummaryResult {
+export function useConsumptionSummary(source: TableSource, extra: readonly string[] = []): SummaryResult {
     const query = usePricedQuery(source.query);
-    const result = useFilteredQuery({ connection: source.connection, query }, { extra });
-    const row = useMemo(
-        () => (result.data?.status === "success" ? toSummaryRow(result.data.table) : undefined),
-        [result.data],
-    );
-    return {
-        row,
-        loaded: result.data?.status === "success",
-        error: result.data?.status === "error" ? result.data.error.message : undefined,
-        refetch: result.refetch,
-    };
+    return useSummaryQuery({ connection: source.connection, query }, extra);
 }
 
 /** Money with its cents, blank when the model returned BLANK. */

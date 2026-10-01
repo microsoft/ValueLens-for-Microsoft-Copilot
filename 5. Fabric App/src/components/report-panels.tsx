@@ -5,7 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { useId, useMemo, type ReactNode } from "react";
+import { useId, useMemo, type ComponentProps, type ReactNode } from "react";
 import { DataGrid, type GridColumnDef, type Row } from "@microsoft/fabric-datagrid";
 import { VegaVisual, type VisualizationSpec } from "@microsoft/fabric-visuals";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
@@ -17,7 +17,8 @@ import { gridHeight } from "@/lib/chart-height";
 import { heatDomain, heatRenderer, type HeatDomain } from "@/lib/heat";
 import { isGroupRow, visibleRowCount, type RollupTree } from "@/lib/rollup-tree";
 import { textCell, totalsRow, TREE_GRID, withExpansion } from "@/lib/tree-grid";
-import { SMALL, type SummaryResult, type TableResult } from "./data";
+import type { SummaryResult, TableResult } from "@/hooks/use-table-query";
+import { SMALL } from "@/lib/type-scale";
 
 /** Stands in for a row of KPI cards while the summary loads or fails. */
 export function KpiRowState({
@@ -80,13 +81,16 @@ interface ChartPanelProps extends Omit<PanelProps, "children"> {
     spec: VisualizationSpec;
     title: string;
     subtitle: string;
+    capabilities?: ComponentProps<typeof VegaVisual>["capabilities"];
 }
 
-export function ChartPanel({ spec, title, subtitle, ...panel }: ChartPanelProps) {
+export function ChartPanel({ spec, title, subtitle, capabilities, ...panel }: ChartPanelProps) {
     const { theme } = useThemeContext();
     return (
         <Panel {...panel}>
-            {(table) => <VegaVisual spec={spec} data={table} theme={theme} header={{ title, subtitle }} />}
+            {(table) => (
+                <VegaVisual spec={spec} data={table} theme={theme} capabilities={capabilities} header={{ title, subtitle }} />
+            )}
         </Panel>
     );
 }
@@ -130,6 +134,8 @@ export interface TreeColumn {
     format?: (value: unknown) => string | null;
     /** Shades the cell, groups against groups and people against people. */
     heat?: boolean;
+    /** The heat colour, when the column measures something bad rather than volume. */
+    heatColor?: string;
     /** A person row would only repeat 1. */
     groupOnly?: boolean;
 }
@@ -211,6 +217,7 @@ export function RollupGrid({
                         ? heatRenderer({
                               domain: (row) => (isGroupRow(row) ? heat[column.id]?.group : heat[column.id]?.leaf),
                               format: levelFormat,
+                              color: column.heatColor,
                           })
                         : (value, row) => levelFormat(value, row),
                 };

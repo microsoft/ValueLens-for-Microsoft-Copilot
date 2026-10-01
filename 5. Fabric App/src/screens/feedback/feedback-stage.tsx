@@ -17,6 +17,7 @@ import { useOutcomeColors, type OutcomeColors } from "@/hooks/use-palette-theme"
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { rowChartHeight } from "@/lib/chart-height";
 import { formatKpi } from "@/lib/format-kpi";
+import { withoutEmoji } from "@/lib/model-text";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import {
@@ -37,14 +38,6 @@ function formatSubmitted(value: unknown): string {
     if (typeof value !== "string") return "";
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
-}
-
-/** The model decorates its narrative with emoji category icons; the app's type carries the meaning. */
-function withoutEmoji(text: string): string {
-    return text
-        .replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]+\s*/gu, "")
-        .replace(/\s{2,}/g, " ")
-        .trim();
 }
 
 function commentColumns(colors: FeedbackColorRange | undefined): GridColumnDef[] {

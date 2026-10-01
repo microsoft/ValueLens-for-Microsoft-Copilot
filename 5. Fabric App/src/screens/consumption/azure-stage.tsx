@@ -34,7 +34,7 @@ import {
     type ConsumptionOptions,
 } from "@/queries/consumption";
 import { moneyCell, SMALL, useConsumptionSummary, useConsumptionTable, type TableResult } from "./data";
-import { ChartPanel, KpiRowState, NoteCard, Panel } from "./shared";
+import { ChartPanel, KpiRowState, NoteCard, Panel } from "@/components/report-panels";
 
 const KPI_GRID = "grid gap-300 md:grid-cols-2 xl:grid-cols-5";
 const BY_ITEM_CHART = { perRow: 40, chrome: 130, min: 240 };

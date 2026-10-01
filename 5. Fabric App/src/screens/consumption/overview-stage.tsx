@@ -30,7 +30,7 @@ import {
     splitCoverage,
 } from "@/queries/consumption";
 import { CREDIT_CURRENCY, moneyCell, SMALL, useConsumptionSummary, useConsumptionTable, type TableResult } from "./data";
-import { ChartPanel, NoteCard, Panel } from "./shared";
+import { ChartPanel, NoteCard, Panel } from "@/components/report-panels";
 
 type OverviewPreset = Exclude<DatePreset, "custom">;
 

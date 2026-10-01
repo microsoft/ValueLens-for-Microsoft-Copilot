@@ -33,7 +33,7 @@ import {
     type ConsumptionOptions,
 } from "@/queries/consumption";
 import { CREDIT_CURRENCY, LENSES, moneyCell, standalone, useConsumptionSummary, useConsumptionTable } from "./data";
-import { ChartPanel, KpiRowState, NoteCard, Panel, RollupGrid, type TreeColumn } from "./shared";
+import { ChartPanel, KpiRowState, NoteCard, Panel, RollupGrid, type TreeColumn } from "@/components/report-panels";
 
 const KPI_GRID = "grid gap-300 md:grid-cols-2 xl:grid-cols-5";
 const money = moneyCell(CREDIT_CURRENCY);
