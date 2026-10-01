@@ -1,0 +1,20 @@
+EVALUATE
+ROW(
+    "Credits Consumed", [Studio Consumed Credits (Tenant)],
+    "Active Users", [Billing Active Users],
+    "Agents With Credits", [Billing Agents with Credits],
+    "Avg Credits Per User", [Studio Avg Credits per User],
+    "Avg Agents Per User", [Avg Agents per User],
+    "Total Cost", [Total Billable Cost],
+    "Prepaid Cost", [Studio Prepaid Cost],
+    "PAYG Cost", [Studio PAYG Cost],
+    "PAYG Share", [Studio PAYG Share %],
+    "Effective Rate", [Studio Effective Rate],
+    "Avg Cost Per User", [Studio Avg Cost per User],
+    "Billing Period", [Billing Period],
+    "Period Label", [Studio Period Label],
+    "Concentration", [Studio Concentration Summary],
+    "Snapshot Note", [Studio Snapshot Note],
+    "Org Match Rate", [Org Match Rate],
+    "Org Filter Status", [Org Filter Status]
+)

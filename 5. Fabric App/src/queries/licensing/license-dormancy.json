@@ -1,0 +1,25 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Dormancy Bucket",
+      "type": "nominal",
+      "title": null,
+      "sort": { "field": "Dormancy Bucket Order", "order": "ascending" },
+      "axis": { "labelLimit": 220 }
+    },
+    "x": {
+      "field": "Licensed Users",
+      "type": "quantitative",
+      "title": "Licensed users",
+      "axis": { "format": ",.0f" }
+    },
+    "tooltip": [
+      { "field": "Dormancy Bucket", "type": "nominal", "title": "Dormancy bucket" },
+      { "field": "Licensed Users", "type": "quantitative", "title": "Licensed users", "format": ",.0f" }
+    ]
+  }
+}

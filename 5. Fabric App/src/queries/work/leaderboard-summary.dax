@@ -1,0 +1,90 @@
+DEFINE
+    // The report's "Agent with most users" card binds Most Versatile Agent,
+    // which only counts prompts that carry an agent id and reads blank when
+    // the log has none. This names the agent (or agents, on a tie, one per
+    // line) with the most active agent users, as the card's label promises.
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Agent With Most Users] =
+        VAR _agents =
+            FILTER(
+                ADDCOLUMNS(
+                    VALUES('Chat + Agent Interactions (Audit Logs)'[AgentName]),
+                    "@Users", [Active Agent Users]
+                ),
+                LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[AgentName])) > 0 && [@Users] > 0
+            )
+        VAR _most = MAXX(_agents, [@Users])
+        RETURN
+            CONCATENATEX(
+                FILTER(_agents, [@Users] = _most),
+                'Chat + Agent Interactions (Audit Logs)'[AgentName], UNICHAR(10),
+                'Chat + Agent Interactions (Audit Logs)'[AgentName], ASC
+            )
+    // The report's "Top Agent Builder creator (by users)" card lists every
+    // Agent Builder creator when none of their agents has users. This names
+    // only the creator (or creators, on a tie, one per line) whose Agent
+    // Builder agents reach the most active users, and stays blank when none do.
+    MEASURE 'Agents 365'[ValueLens Top Agent Builder Creator] =
+        VAR _creators =
+            FILTER(
+                ADDCOLUMNS(
+                    CALCULATETABLE(
+                        VALUES('Agents 365'[Agent creator]),
+                        KEEPFILTERS('Agents 365'[Agent Type Combined] = "Agent Builder")
+                    ),
+                    "@Users",
+                        CALCULATE(
+                            [Active Agent Users],
+                            KEEPFILTERS('Agents 365'[Agent Type Combined] = "Agent Builder")
+                        )
+                ),
+                LEN(TRIM('Agents 365'[Agent creator])) > 0 && [@Users] > 0
+            )
+        VAR _most = MAXX(_creators, [@Users])
+        RETURN
+            CONCATENATEX(
+                FILTER(_creators, [@Users] = _most),
+                'Agents 365'[Agent creator], UNICHAR(10),
+                'Agents 365'[Agent creator], ASC
+            )
+
+EVALUATE
+// Every cohort's cards at once, so the toggle never waits on a query.
+CALCULATETABLE(
+    ROW(
+        "All Users", [All Active Users],
+        "All Sessions", [Observed Sessions],
+        "All Per User", [Observed Sessions per User],
+        "All Per Week", [Observed Sessions per User per Week],
+        "Licensed Users", [Active Licensed Users],
+        "Licensed Sessions", [Observed Licensed Sessions],
+        "Licensed Per User", [Observed Licensed Sessions per User],
+        "Licensed Per Week", [Observed Licensed Sessions per User per Week],
+        "Licence Utilisation", [% Active Licensed Users],
+        "Unlicensed Users", [Active Unlicensed Users],
+        "Unlicensed Sessions", [Observed Unlicensed Sessions],
+        "Unlicensed Per User", [Observed Unlicensed Sessions per User],
+        "Unlicensed Per Week", [Observed Unlicensed Sessions per User per Week],
+        "Unlicensed Tasks", [Unlicensed AI Tasks],
+        "Agent Users", [Active Agent Users],
+        "Agent Sessions", [Observed Agent Sessions],
+        "Agent Per User", [Observed Agent Sessions per User],
+        "Agent Per Week", [Observed Agent Sessions per User per Week],
+        "Agent Tasks", [Agent AI Tasks],
+        "Agent Return Rate", [Agent Return Rate],
+        "Agent With Most Users", [ValueLens Agent With Most Users],
+        "Top Agent Builder Creator", [ValueLens Top Agent Builder Creator],
+        "Cowork Users", [Cowork Users],
+        "Cowork Sessions", [Observed Cowork Sessions],
+        "Cowork Per User", [Observed Cowork Sessions per User],
+        "Cowork Per Week", [Observed Cowork Sessions per User per Week],
+        "Cowork Tasks", [Cowork AI Tasks]
+    ),
+    // As on the report's Leaderboard page: Security Copilot's automated
+    // sessions would otherwise top every ranking.
+    KEEPFILTERS(
+        FILTER(
+            ALL('Chat + Agent Interactions (Audit Logs)'[AppHost]),
+            NOT CONTAINSSTRING('Chat + Agent Interactions (Audit Logs)'[AppHost], "SecurityCopilot")
+        )
+    )
+)

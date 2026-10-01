@@ -16,6 +16,7 @@ Use fabricated examples and redact screenshots. -->
 - [ ] 2. SharePoint
 - [ ] 3. Fabric (SQL endpoint or OneLake? Specify below.)
 - [ ] 4. Power Automate + Dataverse (preview)
+- [ ] 5. Fabric App (preview)
 
 ### Environment
 

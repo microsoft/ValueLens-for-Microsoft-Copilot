@@ -1,0 +1,82 @@
+[
+  {
+    "[Rank]": 1,
+    "[User]": "user01@contoso.com",
+    "[Organization]": "IT",
+    "[Priority Score]": 26,
+    "[Sessions Per Week]": 3,
+    "[Active Days Per Week]": 2.5
+  },
+  {
+    "[Rank]": 2,
+    "[User]": "user02@contoso.com",
+    "[Organization]": "Sales",
+    "[Priority Score]": 20,
+    "[Sessions Per Week]": 2,
+    "[Active Days Per Week]": 2
+  },
+  {
+    "[Rank]": 3,
+    "[User]": "user03@contoso.com",
+    "[Organization]": "Marketing",
+    "[Priority Score]": 17,
+    "[Sessions Per Week]": 1.6666666666666667,
+    "[Active Days Per Week]": 1.6666666666666667
+  },
+  {
+    "[Rank]": 3,
+    "[User]": "user04@contoso.com",
+    "[Organization]": "Finance",
+    "[Priority Score]": 17,
+    "[Sessions Per Week]": 1.6666666666666667,
+    "[Active Days Per Week]": 1.6666666666666667
+  },
+  {
+    "[Rank]": 4,
+    "[User]": "user05@contoso.com",
+    "[Organization]": "Legal",
+    "[Priority Score]": 16,
+    "[Sessions Per Week]": 2,
+    "[Active Days Per Week]": 1.5
+  },
+  {
+    "[Rank]": 4,
+    "[User]": "user06@contoso.com",
+    "[Organization]": "Sales",
+    "[Priority Score]": 16,
+    "[Sessions Per Week]": 1.8,
+    "[Active Days Per Week]": 1.6
+  },
+  {
+    "[Rank]": 5,
+    "[User]": "user07@contoso.com",
+    "[Organization]": "Marketing",
+    "[Priority Score]": 15,
+    "[Sessions Per Week]": 1.5,
+    "[Active Days Per Week]": 1.5
+  },
+  {
+    "[Rank]": 5,
+    "[User]": "user08@contoso.com",
+    "[Organization]": "Legal",
+    "[Priority Score]": 15,
+    "[Sessions Per Week]": 1.5,
+    "[Active Days Per Week]": 1.5
+  },
+  {
+    "[Rank]": 5,
+    "[User]": "user09@contoso.com",
+    "[Organization]": "HR",
+    "[Priority Score]": 15,
+    "[Sessions Per Week]": 1.5,
+    "[Active Days Per Week]": 1.5
+  },
+  {
+    "[Rank]": 6,
+    "[User]": "user10@contoso.com",
+    "[Organization]": "IT",
+    "[Priority Score]": 13,
+    "[Sessions Per Week]": 1.6,
+    "[Active Days Per Week]": 1.2
+  }
+]

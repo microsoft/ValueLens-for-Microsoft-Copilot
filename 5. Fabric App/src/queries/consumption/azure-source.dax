@@ -1,0 +1,9 @@
+// Which Azure source the page can read: the whole-solution feed when it is
+// loaded, otherwise the Foundry model spend export.
+EVALUATE
+ROW(
+    "Solution Rows", COUNTROWS('AzureSolutionSpend'),
+    "Solution Currencies", CONCATENATEX(VALUES('AzureSolutionSpend'[Currency]), 'AzureSolutionSpend'[Currency], "|", 'AzureSolutionSpend'[Currency], ASC),
+    "Foundry Rows", COUNTROWS('AzureAiSpend'),
+    "Foundry Currency", CONCATENATEX(VALUES('AzureAiSpend'[Currency]), 'AzureAiSpend'[Currency], ", ")
+)

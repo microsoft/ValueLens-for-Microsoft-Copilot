@@ -1,0 +1,16 @@
+EVALUATE
+SUMMARIZECOLUMNS(
+    ROLLUPADDISSUBTOTAL(
+        'Group By'[Group], "Is Grand Total",
+        'Credit Consumption (User)'[User Name], "Is Group Total"
+    ),
+    "Credits Used", [Studio Total Credits Used],
+    "Credit Share", [Group Credit Share %],
+    "Billable Credits", [Total Billable Credits Used],
+    "Estimated Cost", [Billable Credit Cost (User)],
+    "Policy", [Studio Billing Policy]
+)
+ORDER BY
+    [Is Grand Total] DESC,
+    [Is Group Total] DESC,
+    [Credits Used] DESC

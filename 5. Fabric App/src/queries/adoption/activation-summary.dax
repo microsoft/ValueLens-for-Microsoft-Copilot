@@ -1,0 +1,22 @@
+EVALUATE
+ROW(
+    "Licensed Active", [Active Licensed Users (Verified Inventory)],
+    "Licensed Inactive", [Inactive Licensed Users (Filter-Aware)],
+    "Licensed Total", [Licensed Users (Filter-Aware)],
+    "Licensed Active Pct", [% Active Licensed Users],
+    "Unlicensed Active", [Active Unlicensed Users (Verified Inventory)],
+    "Unlicensed Inactive", [Inactive Unlicensed Users (Filter-Aware)],
+    "Unlicensed Total", [Unlicensed Users (Filter-Aware)],
+    "Unlicensed Active Pct", [% Active Unlicensed Users],
+    "All Active", [All Active Users],
+    "All Inactive", [Inactive Users (Filter-Aware)],
+    "All Total", [Total Users (Filter-Aware)],
+    "All Active Pct", [% Active Users (of Total)],
+    "Agent Active", [Active Agent Users],
+    "Agent NotUsing", [Using Copilot / Not Using Agents],
+    "Agent Active Pct", [% Active Users Using Agents],
+    "Headline Overall", [Activation Overall Headline],
+    "Headline Licensed", [Activation Licensed Headline],
+    "Headline Unlicensed", [Activation Unlicensed Headline],
+    "Headline Agents", [Activation Agents Headline]
+)

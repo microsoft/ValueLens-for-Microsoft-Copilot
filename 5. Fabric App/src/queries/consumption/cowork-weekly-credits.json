@@ -1,0 +1,42 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [
+    { "filter": "isValid(datum['Credits'])" },
+    { "calculate": "toDate(datum['Week Start'])", "as": "Week" }
+  ],
+  "encoding": {
+    "x": {
+      "field": "Week",
+      "type": "temporal",
+      "title": null,
+      "axis": {
+        "tickCount": { "interval": "week", "step": 1 },
+        "labelExpr": "timeFormat(datum.value, '%-d %b')",
+        "labelAngle": 0,
+        "labelOverlap": true
+      }
+    },
+    "y": {
+      "field": "Credits",
+      "type": "quantitative",
+      "title": "Credits",
+      "axis": { "labelExpr": "format(datum.value, '~s')" }
+    }
+  },
+  "layer": [
+    { "mark": { "type": "line", "interpolate": "monotone", "strokeWidth": 2 } },
+    {
+      "mark": { "type": "point", "filled": true, "size": 44 },
+      "encoding": {
+        "tooltip": [
+          { "field": "Week", "type": "temporal", "title": "Week starting", "format": "%d %b %Y" },
+          { "field": "Credits", "type": "quantitative", "title": "Credits", "format": ",.0f" },
+          { "field": "Active Users", "type": "quantitative", "title": "Active users", "format": ",.0f" },
+          { "field": "Credits WoW", "type": "quantitative", "title": "Week on week", "format": "+.1%" }
+        ]
+      }
+    }
+  ]
+}

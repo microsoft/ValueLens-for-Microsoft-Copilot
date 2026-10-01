@@ -1,0 +1,82 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [
+    {
+      "calculate": "toDate(datum['__WEEK__'])",
+      "as": "Week Date"
+    },
+    {
+      "calculate": "timeFormat(toDate(datum['__WEEK__']), '%-d %b')",
+      "as": "Week Label"
+    },
+    {
+      "joinaggregate": [
+        { "op": "min", "field": "__VALUE__", "as": "Heatmap Min" },
+        { "op": "max", "field": "__VALUE__", "as": "Heatmap Max" }
+      ]
+    },
+    {
+      "calculate": "isValid(datum['__VALUE__']) && datum['Heatmap Max'] > datum['Heatmap Min'] ? (datum['__VALUE__'] - datum['Heatmap Min']) / (datum['Heatmap Max'] - datum['Heatmap Min']) : isValid(datum['__VALUE__']) ? 1 : 0",
+      "as": "Heatmap Intensity"
+    },
+    {
+      "calculate": "isValid(datum['__VALUE__']) ? format(datum['__VALUE__'], '__FORMAT__') : ''",
+      "as": "Heatmap Label"
+    }
+  ],
+  "encoding": {
+    "x": {
+      "field": "Week Label",
+      "type": "ordinal",
+      "title": null,
+      "sort": { "field": "Week Date", "order": "ascending" },
+      "axis": { "labelAngle": 0, "labelPadding": 8 }
+    },
+    "y": {
+      "field": "__ORG__",
+      "type": "ordinal",
+      "title": null,
+      "sort": { "op": "sum", "field": "__VALUE__", "order": "descending" },
+      "axis": { "labelLimit": 160, "labelPadding": 8 }
+    },
+    "tooltip": [
+      { "field": "__ORG__", "type": "nominal", "title": "Organization" },
+      { "field": "Week Date", "type": "temporal", "title": "Week starting", "format": "%d %b %Y" },
+      { "field": "__VALUE__", "type": "quantitative", "title": "__TITLE__", "format": "__FORMAT__" }
+    ]
+  },
+  "layer": [
+    {
+      "mark": { "type": "rect" },
+      "encoding": {
+        "color": {
+          "field": "__VALUE__",
+          "type": "quantitative",
+          "title": null,
+          "scale": { "nice": true },
+          "legend": null
+        }
+      }
+    },
+    {
+      "mark": {
+        "type": "text",
+        "baseline": "middle",
+        "align": "center",
+        "fontWeight": 600,
+        "fontSize": 11,
+        "limit": 42,
+        "ellipsis": ""
+      },
+      "encoding": {
+        "text": { "field": "Heatmap Label", "type": "nominal" }
+      }
+    }
+  ],
+  "config": {
+    "view": { "stroke": null },
+    "axis": { "domain": false, "ticks": false }
+  }
+}

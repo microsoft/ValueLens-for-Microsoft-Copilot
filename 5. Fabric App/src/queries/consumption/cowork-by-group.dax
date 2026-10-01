@@ -1,0 +1,20 @@
+// Groups first, largest first, then the people inside them, so the tree
+// keeps both orders.
+EVALUATE
+SUMMARIZECOLUMNS(
+    ROLLUPADDISSUBTOTAL(
+        'Group By'[Group], "Is Grand Total",
+        'Org'[DisplayName], "Is Group Total"
+    ),
+    "Users", [User Count],
+    "Credits Used", [Cowork Total Credits Used],
+    "Allowance Used", [Person Allowance Used %],
+    "Prepaid Cost", [Cowork Prepaid Cost],
+    "PAYG Cost", [Cowork PAYG Cost],
+    "Total Cost", [Cowork Total Cost],
+    "Policy", [Cowork Policy Name]
+)
+ORDER BY
+    [Is Grand Total] DESC,
+    [Is Group Total] DESC,
+    [Credits Used] DESC

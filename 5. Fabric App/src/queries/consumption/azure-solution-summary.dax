@@ -1,0 +1,14 @@
+EVALUATE
+ROW(
+    "Selected Cost", [Azure Selected Cost],
+    "Model Share", [Azure Model Share %],
+    "Supporting Cost", [Azure Supporting Cost],
+    "AI Requests", [Azure AI Requests],
+    "Tagged Allocation", [Azure Tagged Allocation %],
+    "Tokens M", [Azure Total Tokens (M)],
+    "Speech Hours", [Azure Speech Hours],
+    "Document Pages", [Azure Document Pages],
+    "Generated Images", [Azure Generated Images],
+    "Cost Per 1M Tokens", [Azure Cost per 1M PAYG Tokens],
+    "Spend Context", [Azure Spend Context]
+)

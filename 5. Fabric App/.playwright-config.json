@@ -1,0 +1,12 @@
+{
+    "browser": {
+        "browserName": "chromium",
+        "launchOptions": {
+            "channel": "msedge",
+            "headless": false,
+            "args": [
+                "--disable-features=BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessRespectPreflightResults,LocalNetworkAccessChecks"
+            ]
+        }
+    }
+}

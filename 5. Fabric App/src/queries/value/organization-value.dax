@@ -1,0 +1,17 @@
+EVALUATE
+TOPN(
+    100,
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Org Data'[Organization],
+            "Active Users", [All Active Users],
+            "Expert Equivalent Hours Per Week", [Expert Equivalent Hours Per Week],
+            "AI Assisted Value", [AI Assisted Value]
+        ),
+        NOT ISBLANK('Chat + Agent Org Data'[Organization])
+            && NOT ISBLANK([AI Assisted Value])
+    ),
+    [AI Assisted Value], DESC,
+    'Chat + Agent Org Data'[Organization], ASC
+)
+ORDER BY [AI Assisted Value] DESC, 'Chat + Agent Org Data'[Organization] ASC

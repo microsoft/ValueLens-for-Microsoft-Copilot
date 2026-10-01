@@ -1,0 +1,16 @@
+EVALUATE
+VAR _days =
+    SUMMARIZECOLUMNS(
+        'AzureAiSpend'[UsageDate],
+        "@Input", [Foundry Input Cost],
+        "@Output", [Foundry Output Cost]
+    )
+RETURN
+    FILTER(
+        UNION(
+            SELECTCOLUMNS(_days, "Usage Date", 'AzureAiSpend'[UsageDate], "Component", "Input tokens", "Component Sort", 1, "Cost", [@Input]),
+            SELECTCOLUMNS(_days, "Usage Date", 'AzureAiSpend'[UsageDate], "Component", "Output tokens", "Component Sort", 2, "Cost", [@Output])
+        ),
+        NOT ISBLANK([Cost])
+    )
+ORDER BY [Usage Date] ASC, [Component Sort] ASC

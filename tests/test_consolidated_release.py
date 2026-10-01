@@ -17,10 +17,10 @@ MIRRORS = (
 # separately against its canonical source.
 SCHEMA_HASHES = {
     "ValueLens - Fabric.pbit": {
-        "DataModelSchema": "9df69db21b8c3b68052f9388c0ded9285dbdb835cf3891c68dbe8f118e09c670",
+        "DataModelSchema": "38b89fa9af8d991c512368f053c660d24c0038d0bbea5d5b0ccf6308dcb5219f",
     },
     "ValueLens - Fabric OneLake.pbit": {
-        "DataModelSchema": "8495e8b84dd1a28d0e4aef0c7a782d136444750c12c041b9b6a2a32cafee5d76",
+        "DataModelSchema": "10d01fc18ae8c66051b43ad5bacbf732bcbd22edfdba4f723c2ddc01fa496223",
     },
 }
 

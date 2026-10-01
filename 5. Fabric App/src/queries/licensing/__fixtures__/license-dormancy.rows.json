@@ -1,0 +1,17 @@
+[
+  {
+    "[Dormancy Bucket Order]": 1,
+    "[Dormancy Bucket]": "Active (<30 days)",
+    "[Licensed Users]": 176
+  },
+  {
+    "[Dormancy Bucket Order]": 2,
+    "[Dormancy Bucket]": "Inactive 30-89 days",
+    "[Licensed Users]": 4
+  },
+  {
+    "[Dormancy Bucket Order]": 5,
+    "[Dormancy Bucket]": "Never active",
+    "[Licensed Users]": 45
+  }
+]

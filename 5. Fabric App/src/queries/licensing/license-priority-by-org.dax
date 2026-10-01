@@ -1,0 +1,18 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Org Data'[Organization],
+            "@ActiveUnlicensed", [Active Unlicensed Users],
+            "@ActiveDays", [Average Active Days Per User Per Week (Unlicensed Chat)],
+            "@Sessions", [Observed Unlicensed Sessions per User per Week]
+        ),
+        NOT ISBLANK('Chat + Agent Org Data'[Organization])
+            && COALESCE([@ActiveUnlicensed], 0) > 0
+    ),
+    "Organization", 'Chat + Agent Org Data'[Organization],
+    "Active Unlicensed Users", [@ActiveUnlicensed],
+    "Active Days Per Week", [@ActiveDays],
+    "Sessions Per User Per Week", [@Sessions]
+)
+ORDER BY [Sessions Per User Per Week] DESC, [Active Unlicensed Users] DESC, [Organization]

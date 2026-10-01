@@ -1,0 +1,8 @@
+EVALUATE
+ROW(
+    "Expert Equivalent Hours Per Week", [Expert Equivalent Hours Per Week],
+    "AI Assisted Value", [AI Assisted Value],
+    "Projected Annualised Value", [Projected Annualised Value],
+    "AI Assisted Value Per Week", [AI Assisted Value Per Week],
+    "Currency Symbol", [Currency Symbol Value]
+)

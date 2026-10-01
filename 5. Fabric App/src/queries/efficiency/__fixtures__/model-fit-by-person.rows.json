@@ -1,0 +1,35 @@
+[
+  {
+    "[Segment]": "user01@contoso.com",
+    "[Main Model]": "GPT-4-TURBO · 37%",
+    "[Main Reason]": null,
+    "[Sessions]": 931,
+    "[Judged Sessions]": 631,
+    "[Well-matched Sessions]": 631,
+    "[Over-specified Sessions]": null,
+    "[Under-specified Sessions]": null,
+    "[Judged Share]": 0.677765843179377
+  },
+  {
+    "[Segment]": "user02@contoso.com",
+    "[Main Model]": "COPILOT-PRO · 34%",
+    "[Main Reason]": null,
+    "[Sessions]": 457,
+    "[Judged Sessions]": 300,
+    "[Well-matched Sessions]": 300,
+    "[Over-specified Sessions]": null,
+    "[Under-specified Sessions]": null,
+    "[Judged Share]": 0.6564551422319475
+  },
+  {
+    "[Segment]": "user03@contoso.com",
+    "[Main Model]": "GPT-4 · 34%",
+    "[Main Reason]": null,
+    "[Sessions]": 335,
+    "[Judged Sessions]": 227,
+    "[Well-matched Sessions]": 227,
+    "[Over-specified Sessions]": null,
+    "[Under-specified Sessions]": null,
+    "[Judged Share]": 0.6776119402985075
+  }
+]

@@ -1,0 +1,24 @@
+EVALUATE
+SUMMARIZECOLUMNS(
+    ROLLUPADDISSUBTOTAL(
+        ROLLUPGROUP(
+            'Chat + Agent Interactions (Audit Logs)'[Work Weight Grade],
+            'Chat + Agent Interactions (Audit Logs)'[Work Weight Grade Sort]
+        ), "Is Grand Total",
+        ROLLUPGROUP(
+            'Chat + Agent Interactions (Audit Logs)'[Work Shape],
+            'Chat + Agent Interactions (Audit Logs)'[Work Shape Sort]
+        ), "Is Group Total"
+    ),
+    "Sessions", [Usage Efficiency: Consumption Sessions],
+    "Decided By", [Usage Efficiency: Fit Basis],
+    "Could Have Used", [Usage Efficiency: Alternative Tool],
+    "Share Of Work", [Usage Efficiency: Share Of Work],
+    "Source Items", [Usage Efficiency: Evidence Files],
+    "Source Types", [Usage Efficiency: Evidence Kinds]
+)
+ORDER BY
+    [Is Grand Total] DESC,
+    'Chat + Agent Interactions (Audit Logs)'[Work Weight Grade Sort] ASC,
+    [Is Group Total] DESC,
+    'Chat + Agent Interactions (Audit Logs)'[Work Shape Sort] ASC

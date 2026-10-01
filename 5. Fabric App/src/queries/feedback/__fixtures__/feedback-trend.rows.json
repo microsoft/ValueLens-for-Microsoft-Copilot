@@ -1,0 +1,66 @@
+[
+  {
+    "[Week Start]": "2026-05-04T00:00:00",
+    "[Feedback Type]": "Thumbs Up",
+    "[Count]": 19,
+    "[Signed Count]": 19,
+    "[Satisfaction]": 0.6551724137931034,
+    "[Total Feedback]": 29
+  },
+  {
+    "[Week Start]": "2026-05-04T00:00:00",
+    "[Feedback Type]": "Thumbs Down",
+    "[Count]": 10,
+    "[Signed Count]": -10,
+    "[Satisfaction]": 0.6551724137931034,
+    "[Total Feedback]": 29
+  },
+  {
+    "[Week Start]": "2026-05-11T00:00:00",
+    "[Feedback Type]": "Thumbs Up",
+    "[Count]": 24,
+    "[Signed Count]": 24,
+    "[Satisfaction]": 0.6,
+    "[Total Feedback]": 40
+  },
+  {
+    "[Week Start]": "2026-05-11T00:00:00",
+    "[Feedback Type]": "Thumbs Down",
+    "[Count]": 16,
+    "[Signed Count]": -16,
+    "[Satisfaction]": 0.6,
+    "[Total Feedback]": 40
+  },
+  {
+    "[Week Start]": "2026-05-18T00:00:00",
+    "[Feedback Type]": "Thumbs Up",
+    "[Count]": 26,
+    "[Signed Count]": 26,
+    "[Satisfaction]": 0.7222222222222222,
+    "[Total Feedback]": 36
+  },
+  {
+    "[Week Start]": "2026-05-18T00:00:00",
+    "[Feedback Type]": "Thumbs Down",
+    "[Count]": 10,
+    "[Signed Count]": -10,
+    "[Satisfaction]": 0.7222222222222222,
+    "[Total Feedback]": 36
+  },
+  {
+    "[Week Start]": "2026-05-25T00:00:00",
+    "[Feedback Type]": "Thumbs Up",
+    "[Count]": 23,
+    "[Signed Count]": 23,
+    "[Satisfaction]": 0.5111111111111111,
+    "[Total Feedback]": 45
+  },
+  {
+    "[Week Start]": "2026-05-25T00:00:00",
+    "[Feedback Type]": "Thumbs Down",
+    "[Count]": 22,
+    "[Signed Count]": -22,
+    "[Satisfaction]": 0.5111111111111111,
+    "[Total Feedback]": 45
+  }
+]

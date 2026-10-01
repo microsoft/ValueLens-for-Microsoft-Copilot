@@ -1,0 +1,26 @@
+[
+  {
+    "[Date Submitted]": "2026-07-06T00:00:00",
+    "[Feedback Type]": "Thumbs Up",
+    "[Feedback Emoji]": "👍",
+    "[Category]": "General",
+    "[Surface / Agent]": "Copilot for Word",
+    "[Comment]": "The rewritten meeting summary was clear enough to send after one edit."
+  },
+  {
+    "[Date Submitted]": "2026-07-06T00:00:00",
+    "[Feedback Type]": "Thumbs Down",
+    "[Feedback Emoji]": "👎",
+    "[Category]": "Outlook & Email",
+    "[Surface / Agent]": "Copilot for Outlook",
+    "[Comment]": "The email draft missed the action requested in the original thread."
+  },
+  {
+    "[Date Submitted]": "2026-07-05T00:00:00",
+    "[Feedback Type]": "Thumbs Up",
+    "[Feedback Emoji]": "👍",
+    "[Category]": "Apps & Productivity",
+    "[Surface / Agent]": "Agent A",
+    "[Comment]": "The agent found the right policy page and saved several manual searches."
+  }
+]

@@ -1,0 +1,14 @@
+EVALUATE
+SELECTCOLUMNS(
+    SUMMARIZECOLUMNS(
+        'Agents 365'[Agent Lifecycle Order],
+        'Agents 365'[Agent Lifecycle],
+        'Agents 365'[Agent Type Label],
+        "@Agents", [Agent Registry Records]
+    ),
+    "Lifecycle Order", 'Agents 365'[Agent Lifecycle Order],
+    "Lifecycle", 'Agents 365'[Agent Lifecycle],
+    "Type", 'Agents 365'[Agent Type Label],
+    "Agents", [@Agents]
+)
+ORDER BY [Lifecycle Order], [Agents] DESC

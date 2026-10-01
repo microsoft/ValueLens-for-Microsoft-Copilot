@@ -1,0 +1,23 @@
+EVALUATE
+TOPN(
+    20,
+    SELECTCOLUMNS(
+        FILTER(
+            SUMMARIZECOLUMNS(
+                'ProductFeedback'[Surface / Agent],
+                "@Total", 'ProductFeedback'[Total Feedback],
+                "@Up", 'ProductFeedback'[Thumbs Up Count],
+                "@Down", 'ProductFeedback'[Thumbs Down Count],
+                "@Satisfaction", 'ProductFeedback'[Satisfaction Rate]
+            ),
+            [@Total] >= 5 && NOT ISBLANK('ProductFeedback'[Surface / Agent])
+        ),
+        "Surface / Agent", 'ProductFeedback'[Surface / Agent],
+        "Total Feedback", [@Total],
+        "Thumbs Up", COALESCE([@Up], 0),
+        "Thumbs Down", COALESCE([@Down], 0),
+        "Satisfaction", [@Satisfaction]
+    ),
+    [Total Feedback], DESC
+)
+ORDER BY [Satisfaction] DESC, [Total Feedback] DESC
