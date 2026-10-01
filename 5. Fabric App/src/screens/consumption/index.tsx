@@ -6,6 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { useMemo } from "react";
+import { CommercialTermsProvider } from "@/components/commercial-terms-provider";
 import { stageAnchor } from "@/components/destinations";
 import { QueryError } from "@/components/query-states";
 import { Section } from "@/components/section";
@@ -15,14 +16,24 @@ import { AzureStage } from "./azure-stage";
 import { CoworkStage } from "./cowork-stage";
 import { OverviewStage } from "./overview-stage";
 import { BODY, useConsumptionSummary, useConsumptionTable } from "./data";
+import { RatesBar } from "./rates-bar";
 import { StudioStage } from "./studio-stage";
 
 /**
  * Consumption Central's consumption and cost pages: every product side by
  * side, then Cowork / Work IQ, Copilot Studio and Azure in turn. The slicer
- * choices and credit rates are read once here and shared by every stage.
+ * choices and credit rates are read once here and shared by every stage, and
+ * every cost is priced at the rates and pack balance saved in the app.
  */
 export function ConsumptionScreen() {
+    return (
+        <CommercialTermsProvider>
+            <ConsumptionPage />
+        </CommercialTermsProvider>
+    );
+}
+
+function ConsumptionPage() {
     const optionsResult = useConsumptionTable(consumptionOptions());
     const options = useMemo(
         () => (optionsResult.table ? readConsumptionOptions(optionsResult.table) : undefined),
@@ -49,6 +60,7 @@ export function ConsumptionScreen() {
 
     return (
         <div className="flex flex-col gap-800">
+            <RatesBar />
             <OverviewStage />
             <CoworkStage options={options} rates={rates} />
             <StudioStage options={options} rates={rates} />

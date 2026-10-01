@@ -2,8 +2,9 @@
 
 **Preview.** The ValueLens dashboard rebuilt as a fast web app. It's hosted as an item in your
 Fabric workspace, and it reads the ValueLens semantic model you've already published. The app
-stores no data: every page queries the model live, as the person viewing it, so row-level
-security applies.
+keeps no copy of your data: every page queries the model live, as the person viewing it, so
+row-level security applies. The only thing it saves is the [rates and pack](#rates--packs) you
+type in.
 
 > **You need a published ValueLens model first.** Set up any path, 1 to 4, and publish its
 > template to a Power BI workspace. All five templates share the fields this app queries.
@@ -15,7 +16,7 @@ security applies.
 | **Adoption** | Who started, who stayed, who stuck: activation, adoption, habit formation, trend heatmap |
 | **Leaderboards** | The people and agents doing the most, plus the agent registry with descriptions |
 | **Readiness** | Who to license next, and who's ready for Cowork |
-| **Consumption** | Credits used and what they cost across Cowork / Work IQ, Copilot Studio and Azure, from Consumption Central |
+| **Consumption** | Credits used and what they cost across Cowork / Work IQ, Copilot Studio and Azure, from Consumption Central, at rates you can set in the app |
 | **Value** | What the work was, and what it was worth: task breakdown and estimated value |
 | **Efficiency** | Whether the right tool is doing the job: Cowork fit, Model fit, and how grading works |
 | **Feedback** | What people say about Copilot |
@@ -28,7 +29,8 @@ Consumption Central report. The app opens in light mode, and a toggle switches i
 ## Prerequisites
 
 - A workspace on **Fabric capacity** (F2 or above, or a trial) to host the app. *My workspace*
-  can't host it.
+  can't host it. The app adds a small **SQL database** under its item to hold the rates; it
+  uses that capacity too.
 - A **published ValueLens semantic model**, with **Build** permission on it for everyone who'll use the app.
 - *Optional, for the Consumption page:* a **published Consumption Central semantic model**, with
   the same Build permission.
@@ -69,6 +71,26 @@ Run these commands from this folder (`5. Fabric App`).
    Fabric must be allowed in your tenant settings.
 
 To ship changes, run `npx rayfin up` again. It updates the same item.
+
+## Rates & packs
+
+The Consumption page prices credits at your commercial terms. Open **Rates & packs** at the top
+of the page to set them:
+
+| Field | What it changes |
+|---|---|
+| **Pay-as-you-go rate** | $ per credit for Cowork / Work IQ and Copilot Studio beyond any prepaid pack |
+| **Prepaid rate** | $ per credit drawn from a Capacity Pack |
+| **Capacity Pack balance** | Credits Cowork uses before it pays as it goes. Leave it at 0 with no pack |
+
+Leave a box empty to keep the model's value. That comes from the `commercial_terms` table in
+[Add Credit Consumption](../3.%20Fabric/Add%20Credit%20Consumption/), or from the model's
+parameters if there's no such table. **Save for everyone** stores the values in the app's SQL
+database, so everyone who opens the app sees the same costs. **Use model values** clears them.
+
+- Anyone who can open the app can change the rates. Share the item only with people who should.
+- Azure AI Foundry cost comes straight from your Azure cost export, so these rates don't change it.
+- The Power BI report keeps the model's rates. Change `commercial_terms` to update both.
 
 ## Change it
 

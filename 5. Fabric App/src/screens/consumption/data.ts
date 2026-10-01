@@ -7,12 +7,13 @@
 
 import { useMemo } from "react";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
+import { useCommercialTerms } from "@/hooks/commercial-terms.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { formatKpi } from "@/lib/format-kpi";
 import { toSummaryRow, type SummaryRow } from "@/lib/summary-row";
 import { toDataTable, type ColumnMetadataMap } from "@/lib/to-data-table";
 import { asNumber } from "@/lib/tree-grid";
-import type { ConsumptionLens } from "@/queries/consumption";
+import { readsCommercialTerms, withCommercialTerms, type ConsumptionLens } from "@/queries/consumption";
 
 export const SMALL = "text-[length:var(--text-200)] leading-200";
 export const BODY = "text-[length:var(--text-300)] leading-300";
@@ -39,9 +40,23 @@ export interface TableResult {
     refetch: () => void;
 }
 
+/**
+ * The query priced at the terms saved in the app. A query that shows a cost
+ * waits, as an empty query, until those terms are known, so no figure is
+ * shown at the model's price and then changes.
+ */
+function usePricedQuery(query: string): string {
+    const { status, saved } = useCommercialTerms();
+    return useMemo(() => {
+        if (status === "loading" && readsCommercialTerms(query)) return "";
+        return withCommercialTerms(query, saved ?? undefined);
+    }, [query, status, saved]);
+}
+
 /** A Consumption Central query with the stage's own slicers applied, as a DataTable. */
 export function useConsumptionTable(source: Source, extra: readonly string[] = []): TableResult {
-    const result = useFilteredQuery({ connection: source.connection, query: source.query }, { extra });
+    const query = usePricedQuery(source.query);
+    const result = useFilteredQuery({ connection: source.connection, query }, { extra });
     const table = useMemo(
         () => (result.data?.status === "success" ? toDataTable(result.data.table, source.columnMetadata) : undefined),
         [result.data, source.columnMetadata],
@@ -60,7 +75,8 @@ export interface SummaryResult {
 
 /** A one-row Consumption Central query, keyed by DAX column name. */
 export function useConsumptionSummary(source: Source, extra: readonly string[] = []): SummaryResult {
-    const result = useFilteredQuery({ connection: source.connection, query: source.query }, { extra });
+    const query = usePricedQuery(source.query);
+    const result = useFilteredQuery({ connection: source.connection, query }, { extra });
     const row = useMemo(
         () => (result.data?.status === "success" ? toSummaryRow(result.data.table) : undefined),
         [result.data],
