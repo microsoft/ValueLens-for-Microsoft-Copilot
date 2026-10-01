@@ -28,6 +28,8 @@ Consumption page has its own period, service, group and cost-basis choices, take
 Consumption Central report. The Agent Evaluation page has its own date, department and agent
 slicers, and a Group by choice. The app opens in light mode, and a toggle switches it to dark.
 
+How each figure is worked out, page by page, is in the [methodology](../docs/METHODOLOGY.md).
+
 ## Prerequisites
 
 - A workspace on **Fabric capacity** (F2 or above, or a trial) to host the app. *My workspace*

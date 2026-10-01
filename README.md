@@ -15,7 +15,7 @@ Microsoft's **Frontier Firm** framework.
 
 Found this useful? ⭐ **Star this repo to help others discover it!**
 
-**[Deployment paths ↓](#-pick-a-deployment-path)** · **[Repo layout ↓](#-repo-layout)** · **[What it measures ↓](#-what-it-measures)** · **[Data sources ↓](#-data-sources)** · **[Dashboard pages ↓](#-dashboard-pages)** · **[Research ↓](#-research-sources)**
+**[Deployment paths ↓](#-pick-a-deployment-path)** · **[Repo layout ↓](#-repo-layout)** · **[What it measures ↓](#-what-it-measures)** · **[Data sources ↓](#-data-sources)** · **[Dashboard pages ↓](#-dashboard-pages)** · **[Research ↓](#-research-sources)** · **[Methodology](docs/METHODOLOGY.md)**
 
 ![ValueLens preview](Images/ValueLens-Preview.gif)
 
@@ -127,11 +127,12 @@ Dataverse path → companion repo: microsoft/AgentEvaluator-for-Copilot-Studio
 
 - **Quantified value** — hours saved and dollar‑equivalent assisted value, grounded in research‑sourced time baselines.
 - **Value by function** — Sales, HR, IT, Legal, Finance, Marketing, Customer Service, with task‑level attribution.
-- **User maturity** — Beginner → Developing → Power, from usage breadth and agent adoption.
+- **Habit formation** — Beginner → Developing → Habitual → Power, from each person's active days in the last complete month.
 - **Business case** — projected annual value, ROI multiple, and licence investment net.
 
 **How:** every interaction → classified into an **AI Task** → mapped to a research‑sourced **time
-baseline** → summed to **Hours Saved** → × hourly rate = **Assisted Value**.
+baseline** → summed to **Hours Saved** → × hourly rate = **Assisted Value**. The
+[methodology](docs/METHODOLOGY.md) explains every step, page by page.
 
 ---
 
@@ -183,8 +184,9 @@ Studio detail is archived.
 
 Human‑time baselines are drawn from published research — Microsoft Research, MIT/Science (Noy &
 Zhang 2023), NBER (Brynjolfsson et al. 2023), BCG/Harvard (Dell'Acqua et al. 2023), McKinsey,
-Forrester TEI, IDC, and others. The full per‑task source list is in the **📖 Metric Glossary** page
-inside the template.
+Forrester TEI, IDC, and others. The full per‑task list, with each band and its source, is in the
+[methodology appendix](docs/METHODOLOGY.md#appendix-time-bands-and-sources) and on the
+**📖 Metric Glossary** page inside the template.
 
 </details>
 
@@ -205,7 +207,7 @@ AI‑in‑One Dashboard. Licensed **MIT** — see [LICENSE](LICENSE).
 | **Reporting a vulnerability** | [SECURITY.md](SECURITY.md) — please don't use public issues |
 | **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
 | **What changed** | [CHANGELOG.md](CHANGELOG.md) |
-| **Reference** | [Data dictionary](docs/DATA-DICTIONARY.md) · [Roles & permissions](docs/PERMISSIONS.md) |
+| **Reference** | [Methodology](docs/METHODOLOGY.md) · [Data dictionary](docs/DATA-DICTIONARY.md) · [Roles & permissions](docs/PERMISSIONS.md) |
 
 **Running the tests.** The offline regression suite needs only Python 3.12 and `pytest`:
 

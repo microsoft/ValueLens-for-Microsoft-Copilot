@@ -16,6 +16,17 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-09-30 — a methodology document
+
+[`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) explains how ValueLens turns audit records into each
+figure. It covers how records are flattened and counted, the classification rules, the value
+model for Copilot, agents and Cowork, the rules behind every page, the settings you can change, and
+the Fabric App's Consumption and Agent Evaluation pages. An appendix lists every time band with
+its source. The root README's maturity bullet now describes the Habit Formation stages the report
+actually uses.
+
+---
+
 ## 2026-09-30 — Fabric App: a Consumption page from Consumption Central
 
 The [Fabric App](5.%20Fabric%20App/) has an eighth page, **Consumption**. It reads a published
