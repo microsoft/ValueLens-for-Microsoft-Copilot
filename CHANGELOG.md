@@ -16,6 +16,17 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-01 — methodology: from signal to task category
+
+[`docs/METHODOLOGY.md`](docs/METHODOLOGY.md#32-from-signal-to-task-category) has a new section
+that traces each audit signal to its behaviour, its task category and its Cowork category. It lists
+every rule in order, the agent keywords, the workflow split, the Cowork file-type test and the
+behaviour-to-category table, with worked examples. It also notes that paths 1, 2 and 4 don't read
+the agent registry or split workflows, and corrects how the doc described the value outcome and
+Could have used.
+
+---
+
 ## 2026-09-30 — a methodology document
 
 [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) explains how ValueLens turns audit records into each
