@@ -1,3 +1,45 @@
+DEFINE
+    // The released Consumption Central templates have no per-user policy yet,
+    // so the query brings its own. Studio bills an environment, not a person,
+    // so the policy is found through the agents a user ran: agent ->
+    // environment -> billing plan. Neither hop has a relationship, hence
+    // TREATAS. An unnamed plan only shows when it is all there is.
+    MEASURE 'Credit Consumption (User)'[ValueLens Studio Billing Policy] =
+        VAR Agents = VALUES('Credit Consumption (User)'[Agent_Id])
+        VAR Envs =
+            CALCULATETABLE(
+                VALUES('Credit Consumption (Agent)'[Environment_Id]),
+                REMOVEFILTERS('Credit Consumption (Agent)'),
+                TREATAS(Agents, 'Credit Consumption (Agent)'[Agent_Id])
+            )
+        VAR Plans =
+            FILTER(
+                CALCULATETABLE(
+                    SUMMARIZE(
+                        'Credit Consumption (Tenant)',
+                        'Credit Consumption (Tenant)'[BillingPlan_Id],
+                        'Credit Consumption (Tenant)'[BillingPlan_Name]
+                    ),
+                    REMOVEFILTERS('Credit Consumption (Tenant)'),
+                    TREATAS(Envs, 'Credit Consumption (Tenant)'[Environment_Id])
+                ),
+                'Credit Consumption (Tenant)'[BillingPlan_Id] <> ""
+                    && 'Credit Consumption (Tenant)'[BillingPlan_Id] <> "00000000-0000-0000-0000-000000000000"
+            )
+        VAR Named =
+            FILTER(
+                DISTINCT(SELECTCOLUMNS(Plans, "PlanName", 'Credit Consumption (Tenant)'[BillingPlan_Name])),
+                [PlanName] <> ""
+            )
+        VAR N = COUNTROWS(Named)
+        RETURN
+            SWITCH(
+                TRUE(),
+                N = 1, MAXX(Named, [PlanName]),
+                N > 1, FORMAT(N, "#,0") & " policies",
+                NOT ISEMPTY(Plans), "(Unnamed policy)",
+                NOT ISEMPTY(Agents), "(No billing policy)"
+            )
 EVALUATE
 SUMMARIZECOLUMNS(
     ROLLUPADDISSUBTOTAL(
@@ -8,7 +50,7 @@ SUMMARIZECOLUMNS(
     "Credit Share", [Group Credit Share %],
     "Billable Credits", [Total Billable Credits Used],
     "Estimated Cost", [Billable Credit Cost (User)],
-    "Policy", [Studio Billing Policy]
+    "Policy", [ValueLens Studio Billing Policy]
 )
 ORDER BY
     [Is Grand Total] DESC,

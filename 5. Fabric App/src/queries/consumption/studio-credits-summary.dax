@@ -10,7 +10,7 @@ ROW(
     "PAYG Cost", [Studio PAYG Cost],
     "PAYG Share", [Studio PAYG Share %],
     "Effective Rate", [Studio Effective Rate],
-    "Avg Cost Per User", [Studio Avg Cost per User],
+    "Avg Cost Per User", DIVIDE([Billable Credit Cost (User)], [Billing Active Users]),
     "Billing Period", [Billing Period],
     "Period Label", [Studio Period Label],
     "Concentration", [Studio Concentration Summary],
