@@ -174,7 +174,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                 className="flex w-[248px] shrink-0 flex-col gap-500 overflow-y-auto border-r border-border bg-card px-400 py-500"
             >
                 <div className="flex flex-col gap-100 px-200">
-                    <span className="text-[length:var(--text-500)] leading-500 font-semibold">ValueLens</span>
+                    <span className="text-[length:var(--text-500)] leading-500 font-semibold">ValueLens App</span>
                     <span className="text-[length:var(--text-200)] leading-200 text-muted-foreground">
                         for Microsoft Copilot
                     </span>
