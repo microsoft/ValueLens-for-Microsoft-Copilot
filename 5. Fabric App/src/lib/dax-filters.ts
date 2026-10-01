@@ -126,6 +126,20 @@ export function applyDaxFilters(query: string, filters: readonly string[]): stri
     return result;
 }
 
+/**
+ * Adds query-scoped definitions such as `MEASURE 'T'[Name] = ...` to a query.
+ * A query may have only one `DEFINE`, so they join an existing one or start
+ * a new one ahead of the first statement.
+ */
+export function addQueryDefinitions(query: string, definitions: readonly string[]): string {
+    if (definitions.length === 0) return query;
+
+    const block = definitions.map((definition) => `    ${definition.trim()}\n`).join("");
+    const define = findTopLevelKeywords(query).find((hit) => hit.keyword === "DEFINE");
+    if (define) return `${query.slice(0, define.end)}\n${block}${query.slice(define.end)}`;
+    return `DEFINE\n${block}${query}`;
+}
+
 /** A DAX string literal, with embedded quotes doubled. */
 export function daxString(value: string): string {
     return `"${value.replace(/"/g, '""')}"`;

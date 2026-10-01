@@ -78,7 +78,7 @@ export function bootstrapAuth(): IAuthService {
  */
 class RayfinAuthService implements IAuthService {
     constructor(
-        private readonly client: RayfinClient,
+        private readonly client: Pick<RayfinClient, "auth">,
         private readonly fabricOptions: FabricAuthOptions,
     ) {}
 

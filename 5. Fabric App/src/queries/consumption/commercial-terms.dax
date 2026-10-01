@@ -1,0 +1,8 @@
+// The model's own rates and Capacity Pack balance, before anything typed in
+// the app. Never priced with the app's terms.
+EVALUATE
+ROW(
+    "Credit Rate", [Cowork PAYG Rate Value],
+    "Prepaid Credit Rate", [Cowork Prepaid Rate Value],
+    "Prepaid Credit Balance", [Cowork Capacity Pack Balance Value]
+)

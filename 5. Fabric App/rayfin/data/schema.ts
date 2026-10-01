@@ -5,9 +5,12 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-export * from "./overview";
-export * from "./options";
-export * from "./cowork";
-export * from "./studio";
-export * from "./azure";
-export * from "./commercial-terms";
+import { CommercialTerms } from "./CommercialTerms.js";
+
+// The app imports only this type. Importing the classes would ship their
+// decorators to the browser.
+export type ValueLensSchema = {
+    CommercialTerms: CommercialTerms;
+};
+
+export const schema = [CommercialTerms];

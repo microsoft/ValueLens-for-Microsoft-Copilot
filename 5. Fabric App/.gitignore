@@ -23,5 +23,8 @@ tmp-dax/
 # Each person deploys into their own workspace, so this stays local.
 rayfin/.deployments.json
 
+# Entities compiled by `rayfin up db apply`
+rayfin/.temp/
+
 # Playwright CLI session state from `npm run test:fabric`
 .playwright-cli/

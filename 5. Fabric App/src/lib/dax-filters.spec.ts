@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { describe, expect, it } from "vitest";
-import { applyDaxFilters, dateBetween, daxString, treatAs } from "./dax-filters";
+import { addQueryDefinitions, applyDaxFilters, dateBetween, daxString, treatAs } from "./dax-filters";
 
 const squash = (text: string) => text.replace(/\s+/g, " ").trim();
 
@@ -91,5 +91,38 @@ describe("filter expressions", () => {
         expect(dateBetween("'Calendar'[Date]", "2026-05-08", "2026-07-06")).toBe(
             "FILTER(ALL('Calendar'[Date]), 'Calendar'[Date] >= DATE(2026, 5, 8) && 'Calendar'[Date] <= DATE(2026, 7, 6))",
         );
+    });
+});
+
+describe("addQueryDefinitions", () => {
+    const measure = "MEASURE 'T'[Rate] = 0.01";
+
+    it("returns the query untouched when there is nothing to add", () => {
+        const query = "EVALUATE ROW(\"A\", 1)";
+        expect(addQueryDefinitions(query, [])).toBe(query);
+    });
+
+    it("starts a DEFINE ahead of the first statement", () => {
+        expect(squash(addQueryDefinitions("// note\nEVALUATE ROW(\"A\", [Rate])", [measure]))).toBe(
+            squash(`DEFINE ${measure} // note\nEVALUATE ROW("A", [Rate])`),
+        );
+    });
+
+    it("joins an existing DEFINE, ignoring the word inside strings and comments", () => {
+        const query = [
+            "// DEFINE is the first keyword",
+            "DEFINE",
+            "    MEASURE 'T'[Own] = \"DEFINE\"",
+            "EVALUATE ROW(\"A\", [Own])",
+        ].join("\n");
+        const result = addQueryDefinitions(query, [measure]);
+        expect(result.match(/^DEFINE\b/gm)).toHaveLength(1);
+        expect(result.indexOf(measure)).toBeGreaterThan(result.indexOf("\nDEFINE"));
+        expect(result.indexOf(measure)).toBeLessThan(result.indexOf("MEASURE 'T'[Own]"));
+    });
+
+    it("keeps a definition ending in a line comment off the next line", () => {
+        const result = addQueryDefinitions("EVALUATE ROW(\"A\", [Rate])", ["MEASURE 'T'[Rate] = 1 // one"]);
+        expect(result).toMatch(/\/\/ one\n/);
     });
 });
