@@ -55,10 +55,13 @@ Run these commands from this folder (`5. Fabric App`).
    ```powershell
    npx rayfin up --workspace-uri "https://app.fabric.microsoft.com/groups/<workspace-id>"
    ```
-   It builds the app, creates a **ValueLens** item in the workspace, and prints the link.
+   It builds the app, creates a **ValueLens** item in the workspace, and prints two links. Use
+   the **Fabric portal** link, or open the item from the workspace. The app loads its data
+   through Fabric, so the `…fabricapps.net` hosting URL on its own shows *Not running inside a
+   Fabric iframe*.
 4. **Share.** Each viewer needs two things:
    - **The app:** add them to the workspace (Viewer is enough), or share the **ValueLens** item
-     with *Run and interact* permission. Then send them the link `rayfin up` printed.
+     with *Run and interact* permission. Then send them the Fabric portal link.
    - **The data:** Build permission on the ValueLens model, and on Consumption Central if you use
      it. Without it the app opens, but its pages can't load.
 
