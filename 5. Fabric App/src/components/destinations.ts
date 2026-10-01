@@ -49,6 +49,17 @@ export const destinations = [
         ],
     },
     {
+        id: "agent-evaluation",
+        label: "Agent Evaluation",
+        blurb: "How well your agents answer, and where they fall short",
+        icon: BotMessageSquare as LucideIcon,
+        filters: [] as FilterKey[],
+        stages: [
+            { id: "agent-performance", label: "Performance", ready: true },
+            { id: "agent-conversations", label: "Conversations & topics", ready: true },
+        ],
+    },
+    {
         id: "readiness",
         label: "Readiness",
         blurb: "Who to license next, and who is ready for Cowork",
@@ -102,17 +113,6 @@ export const destinations = [
         icon: MessageSquareQuote as LucideIcon,
         filters: ["dateRange"] as FilterKey[],
         stages: [{ id: "feedback", label: "Feedback", ready: true }],
-    },
-    {
-        id: "agent-evaluation",
-        label: "Agent Evaluation",
-        blurb: "How well your agents answer, and where they fall short",
-        icon: BotMessageSquare as LucideIcon,
-        filters: [] as FilterKey[],
-        stages: [
-            { id: "agent-performance", label: "Performance", ready: true },
-            { id: "agent-conversations", label: "Conversations & topics", ready: true },
-        ],
     },
     {
         id: "appendix",

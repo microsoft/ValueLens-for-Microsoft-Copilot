@@ -15,12 +15,12 @@ type in.
 |---|---|
 | **Adoption** | Who started, who stayed, who stuck: activation, adoption, habit formation, trend heatmap |
 | **Leaderboards** | The people and agents doing the most, plus the agent registry with descriptions |
+| **Agent Evaluation** | How well Copilot Studio agents answer: how conversations ended, errors, topic health, knowledge sources and feedback comments, from Agent Evaluator. It never shows the conversations themselves |
 | **Readiness** | Who to license next, and who's ready for Cowork |
 | **Consumption** | Credits used and what they cost across Cowork / Work IQ, Copilot Studio and Azure, from Consumption Central, at rates you can set in the app |
 | **Value** | What the work was, and what it was worth: task breakdown and estimated value |
 | **Efficiency** | Whether the right tool is doing the job: Cowork fit, Model fit, and how grading works |
 | **Feedback** | What people say about Copilot |
-| **Agent Evaluation** | How well Copilot Studio agents answer: how conversations ended, errors, topic health, knowledge sources and feedback comments, from Agent Evaluator. It never shows the conversations themselves |
 | **Appendix** | Glossary, plus Signal → Impact value assumptions |
 
 Filters (date, organisation, licence, activity, agent) apply across the ValueLens pages. The
