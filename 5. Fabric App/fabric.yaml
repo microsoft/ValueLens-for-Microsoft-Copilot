@@ -10,3 +10,6 @@ profiles:
       cc:
         workspaceId: "<Consumption Central workspace ID>"
         itemId: "<Consumption Central semantic model ID>"
+      ae:
+        workspaceId: "<Agent Evaluator workspace ID>"
+        itemId: "<Agent Evaluator semantic model ID>"

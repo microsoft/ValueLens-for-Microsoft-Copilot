@@ -248,6 +248,9 @@
     /* Green comes from Consumption Central's theme rather than the ValueLens
        one, so the page built on that report still looks like it. */
     --vl-green: #3d8b4f;       --vl-green-text: #2e6b3c;     --vl-green-tint: #e8f3ea;
+    /* Cyan belongs to Agent Evaluation alone, so a page about agents reads apart
+       from the pages about people. */
+    --vl-cyan: #1b8fb5;        --vl-cyan-text: #0e6a88;      --vl-cyan-tint: #e3f3f8;
     --vl-periwinkle: #95a9ce;
     --vl-slate: #8793a3;
     --vl-ink: #1c2632;
@@ -271,6 +274,7 @@
     --vl-coral: #f4836c;       --vl-coral-text: #f7a392;     --vl-coral-tint: #3d1f19;
     --vl-navy: #5b7bb0;        --vl-navy-text: #a9bde0;      --vl-navy-tint: #1b2536;
     --vl-green: #6cc07f;       --vl-green-text: #93d3a1;     --vl-green-tint: #1a3020;
+    --vl-cyan: #56bfe0;        --vl-cyan-text: #8fd5ec;      --vl-cyan-tint: #14303a;
     --vl-periwinkle: #b3c2de;
     --vl-slate: #a3aebd;
     --vl-ink: #dbdfe4;
@@ -421,6 +425,26 @@
     --color-data-10: var(--vl-ink);
   }
 
+  /* Agent Evaluation leads with cyan and keeps teal, amber and coral clear of
+     its first series, since its charts use them for how conversations end. */
+  .palette-agent-evaluation {
+    --color-brand: var(--vl-cyan);
+    --color-brand-foreground: var(--vl-cyan-text);
+    --color-primary: var(--vl-cyan-text);
+    --color-ring: var(--vl-cyan-text);
+    --color-accent: var(--vl-cyan-tint);
+    --color-accent-foreground: var(--vl-cyan-text);
+    --color-data-1: var(--vl-cyan);
+    --color-data-2: var(--vl-blue);
+    --color-data-3: var(--vl-plum);
+    --color-data-4: var(--vl-lavender);
+    --color-data-5: var(--vl-teal);
+    --color-data-6: var(--vl-amber);
+    --color-data-7: var(--vl-navy);
+    --color-data-8: var(--vl-periwinkle);
+    --color-data-9: var(--vl-slate);
+    --color-data-10: var(--vl-ink);
+  }
   /* The appendix is reference, not a place with its own story, so it takes
      the report's navy: the quietest hue in the family. */
   .palette-appendix {

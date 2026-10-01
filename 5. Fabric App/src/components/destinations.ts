@@ -6,15 +6,15 @@
 //-----------------------------------------------------------------------
 
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, Coins, Gauge, KeyRound, MessageSquareQuote, PoundSterling, TrendingUp, Trophy } from "lucide-react";
+import { BookOpen, BotMessageSquare, Coins, Gauge, KeyRound, MessageSquareQuote, PoundSterling, TrendingUp, Trophy } from "lucide-react";
 import type { FilterKey } from "@/lib/filters";
 
 /**
  * The top-level destinations the report pages were folded into, each
  * holding its pages as stages read top to bottom, plus the report's appendix
- * as a reference destination below them. Consumption comes from a second
- * report, Consumption Central, and brings its own slicers, so it takes none
- * of the filter bar's.
+ * as a reference destination below them. Consumption and Agent Evaluation
+ * come from their own reports, Consumption Central and Agent Evaluator, and
+ * bring their own slicers, so they take none of the filter bar's.
  *
  * A stage that is not built yet stays listed so the shape of the destination
  * is visible; a destination is reachable once any of its stages is built.
@@ -102,6 +102,17 @@ export const destinations = [
         icon: MessageSquareQuote as LucideIcon,
         filters: ["dateRange"] as FilterKey[],
         stages: [{ id: "feedback", label: "Feedback", ready: true }],
+    },
+    {
+        id: "agent-evaluation",
+        label: "Agent Evaluation",
+        blurb: "How well your agents answer, and where they fall short",
+        icon: BotMessageSquare as LucideIcon,
+        filters: [] as FilterKey[],
+        stages: [
+            { id: "agent-performance", label: "Performance", ready: true },
+            { id: "agent-conversations", label: "Conversations & topics", ready: true },
+        ],
     },
     {
         id: "appendix",

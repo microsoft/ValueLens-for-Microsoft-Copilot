@@ -31,6 +31,9 @@ const EfficiencyScreen = lazy(() =>
 const FeedbackScreen = lazy(() =>
     import("./screens/feedback").then((module) => ({ default: module.FeedbackScreen })),
 );
+const AgentEvaluationScreen = lazy(() =>
+    import("./screens/agent-evaluation").then((module) => ({ default: module.AgentEvaluationScreen })),
+);
 const AppendixScreen = lazy(() =>
     import("./screens/appendix").then((module) => ({ default: module.AppendixScreen })),
 );
@@ -50,6 +53,7 @@ function App() {
                     {destination === "value" && <ValueScreen />}
                     {destination === "efficiency" && <EfficiencyScreen />}
                     {destination === "feedback" && <FeedbackScreen />}
+                    {destination === "agent-evaluation" && <AgentEvaluationScreen />}
                     {destination === "appendix" && <AppendixScreen />}
                 </Suspense>
             </AppShell>
