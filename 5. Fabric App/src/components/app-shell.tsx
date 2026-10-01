@@ -7,13 +7,26 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Moon, Sun } from "lucide-react";
+import { fabricConfig } from "@/fabric.generated";
 import { paletteClass, usePaletteTheme } from "@/hooks/use-palette-theme";
 import { ThemeContext, useThemeContext } from "@/hooks/theme.context";
 import { useIsRefreshing } from "@/lib/refresh-tracker";
 import { scrollToAnchor } from "@/lib/scroll-to-anchor";
 import { cn } from "@/lib/utils";
-import { destinations, isDestinationReady, isReference, stageAnchor, type Destination, type DestinationId, type StageId } from "./destinations";
+import {
+    availableDestinations,
+    destinations,
+    isDestinationReady,
+    isReference,
+    stageAnchor,
+    type Destination,
+    type DestinationId,
+    type StageId,
+} from "./destinations";
 import { FilterBar } from "./filter-bar";
+
+/** Pages whose model `fabric.yaml` doesn't set up are left out of the sidebar. */
+const AVAILABLE = availableDestinations(fabricConfig.semanticModels);
 
 interface AppShellProps {
     active: DestinationId;
@@ -152,7 +165,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
         );
     };
 
-    const reference = destinations.filter(isReference);
+    const reference = AVAILABLE.filter(isReference);
 
     return (
         <div className={cn("flex h-screen w-full overflow-hidden bg-background text-foreground", paletteClass(active))}>
@@ -168,7 +181,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                 </div>
 
                 <ul className="flex flex-1 flex-col gap-100-nudge">
-                    {destinations.filter((destination) => !isReference(destination)).map(renderDestination)}
+                    {AVAILABLE.filter((destination) => !isReference(destination)).map(renderDestination)}
                 </ul>
 
                 {reference.length > 0 && (

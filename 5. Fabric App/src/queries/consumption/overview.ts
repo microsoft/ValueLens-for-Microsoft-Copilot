@@ -11,6 +11,7 @@ import { consumptionConnection as connection, FORMAT_CREDITS, FORMAT_MONEY, FORM
 import byProductQuery from "./consumption-by-product.dax?raw";
 import datesQuery from "./consumption-dates.dax?raw";
 import notesQuery from "./consumption-notes.dax?raw";
+import sourcesQuery from "./consumption-sources.dax?raw";
 import productCostSpec from "./product-cost.json";
 
 const datesColumns: ColumnMetadataMap = {
@@ -57,6 +58,25 @@ const notesColumns: ColumnMetadataMap = {
 /** The report's side cards: the date window, its caveat and the credit rates in use. */
 export function consumptionNotes() {
     return { connection, query: notesQuery, columnMetadata: notesColumns };
+}
+
+const sourcesColumns: ColumnMetadataMap = {
+    "[Cowork Rows]": { name: "Cowork Rows", displayName: "Cowork rows", format: FORMAT_WHOLE },
+    "[Studio Rows]": { name: "Studio Rows", displayName: "Copilot Studio rows", format: FORMAT_WHOLE },
+    "[Azure Rows]": { name: "Azure Rows", displayName: "Azure rows", format: FORMAT_WHOLE },
+};
+
+/** How many rows each product's source holds, before any slicer. */
+export function consumptionSources() {
+    return { connection, query: sourcesQuery, columnMetadata: sourcesColumns };
+}
+
+/** Whether any product's source holds a row; the model answers BLANK for an empty table. */
+export function hasConsumptionData(row: Record<string, unknown>): boolean {
+    return Object.keys(sourcesColumns).some((column) => {
+        const count = row[column];
+        return typeof count === "number" && count > 0;
+    });
 }
 
 export interface Coverage {

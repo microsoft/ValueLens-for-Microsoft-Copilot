@@ -23,6 +23,7 @@ import {
     consumptionDates,
     consumptionNotes,
     consumptionOptions,
+    consumptionSources,
     COWORK_LABEL_COLUMN,
     coworkByGroup,
     coworkCreditsSummary,
@@ -34,6 +35,7 @@ import {
     foundrySummary,
     groupByChoices,
     groupByFilter,
+    hasConsumptionData,
     isFullCoverage,
     isoDate,
     readConsumptionOptions,
@@ -56,6 +58,7 @@ const modules = [
     { name: "consumptionDates", factory: () => consumptionDates(), columns: liveColumns.consumptionDates },
     { name: "consumptionByProduct", factory: () => consumptionByProduct(), columns: liveColumns.consumptionByProduct },
     { name: "consumptionNotes", factory: () => consumptionNotes(), columns: liveColumns.consumptionNotes },
+    { name: "consumptionSources", factory: () => consumptionSources(), columns: liveColumns.consumptionSources },
     { name: "consumptionOptions", factory: () => consumptionOptions(), columns: liveColumns.consumptionOptions },
     { name: "coworkCreditsSummary", factory: () => coworkCreditsSummary(), columns: liveColumns.coworkCreditsSummary },
     { name: "coworkWeekly (consumption)", factory: () => coworkWeekly("consumption"), columns: liveColumns.coworkWeekly },
@@ -225,6 +228,12 @@ describe("consumption overview", () => {
         });
         expect(isFullCoverage(splitCoverage("Date span covered | source 2026-05-10 to 2026-08-07"))).toBe(true);
         expect(splitCoverage("")).toBeUndefined();
+    });
+
+    it("counts the model as empty only when every product's source is", () => {
+        expect(hasConsumptionData({ "[Cowork Rows]": 1500, "[Studio Rows]": 810, "[Azure Rows]": 1698 })).toBe(true);
+        expect(hasConsumptionData({ "[Cowork Rows]": null, "[Studio Rows]": 12, "[Azure Rows]": null })).toBe(true);
+        expect(hasConsumptionData({ "[Cowork Rows]": null, "[Studio Rows]": null, "[Azure Rows]": null })).toBe(false);
     });
 });
 

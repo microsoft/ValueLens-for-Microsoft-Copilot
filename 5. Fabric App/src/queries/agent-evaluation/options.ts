@@ -105,6 +105,11 @@ export function readEvaluationOptions(table: DataTable): EvaluationOptions {
     return options;
 }
 
+/** Whether the model holds any conversations at all, as against none in the slicers' current choice. */
+export function hasEvaluationData(options: EvaluationOptions): boolean {
+    return options.firstDate !== undefined || options.agents.length > 0;
+}
+
 /** Group by columns worth offering: one group would only repeat the total. */
 export function groupByChoices(groupCounts: Record<string, number>): GroupByColumn[] {
     return GROUP_BY_COLUMNS.filter((column) => (groupCounts[column.id] ?? 0) >= 2);

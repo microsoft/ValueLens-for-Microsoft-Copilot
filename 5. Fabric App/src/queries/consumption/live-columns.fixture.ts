@@ -14,6 +14,7 @@ export const liveColumns = {
     consumptionDates: ["[First Date]", "[Last Date]"],
     consumptionByProduct: ["[Product]", "[Product Sort]", "[Credits]", "[Cost]", "[Cost Basis]", "[Coverage]"],
     consumptionNotes: ["[Reporting Window]", "[Reporting Caveat]", "[Rates In Use]", "[Azure Currency]"],
+    consumptionSources: ["[Cowork Rows]", "[Studio Rows]", "[Azure Rows]"],
     consumptionOptions: ["[Kind]", "[Value]", "[Sort]"],
     coworkCreditsSummary: [
         "[Credits Used]",

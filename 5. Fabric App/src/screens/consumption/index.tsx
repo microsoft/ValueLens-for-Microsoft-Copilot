@@ -8,16 +8,24 @@
 import { useMemo } from "react";
 import { CommercialTermsProvider } from "@/components/commercial-terms-provider";
 import { stageAnchor } from "@/components/destinations";
-import { QueryError } from "@/components/query-states";
-import { Section } from "@/components/section";
+import { SourceEmpty, SourceError } from "@/components/source-states";
 import { readText } from "@/lib/summary-row";
-import { consumptionNotes, consumptionOptions, readConsumptionOptions } from "@/queries/consumption";
+import {
+    consumptionNotes,
+    consumptionOptions,
+    consumptionSources,
+    hasConsumptionData,
+    readConsumptionOptions,
+} from "@/queries/consumption";
+import { consumptionConnection } from "@/queries/shared";
 import { AzureStage } from "./azure-stage";
 import { CoworkStage } from "./cowork-stage";
 import { OverviewStage } from "./overview-stage";
-import { BODY, useConsumptionSummary, useConsumptionTable } from "./data";
+import { useConsumptionSummary, useConsumptionTable } from "./data";
 import { RatesBar } from "./rates-bar";
 import { StudioStage } from "./studio-stage";
+
+const SOURCE = { anchor: stageAnchor("consumption-overview"), page: "Consumption", model: "Consumption Central" };
 
 /**
  * Consumption Central's consumption and cost pages: every product side by
@@ -41,20 +49,26 @@ function ConsumptionPage() {
     );
     const notes = useConsumptionSummary(consumptionNotes());
     const rates = readText(notes.row, "[Rates In Use]");
+    const sources = useConsumptionSummary(consumptionSources());
 
     if (optionsResult.error !== undefined) {
         return (
-            <Section
-                id={stageAnchor("consumption-overview")}
-                title="Consumption"
-                description="This page reads the Consumption Central semantic model."
-            >
-                <p className={`${BODY} max-w-[68ch] text-muted-foreground`}>
-                    Bind Consumption Central to this app as the <code className="font-mono">cc</code> connection, then
-                    reload. Until it is bound, credit and cost figures can't be shown.
-                </p>
-                <QueryError message={optionsResult.error} onRetry={optionsResult.refetch} />
-            </Section>
+            <SourceError
+                {...SOURCE}
+                alias={consumptionConnection}
+                message={optionsResult.error}
+                onRetry={optionsResult.refetch}
+            />
+        );
+    }
+
+    if (sources.row && !hasConsumptionData(sources.row)) {
+        return (
+            <SourceEmpty
+                {...SOURCE}
+                title="No consumption yet"
+                description="Consumption Central is connected, but its model holds no Cowork, Copilot Studio or Azure usage. Once its lakehouse is loaded and the model refreshes, this page fills in."
+            />
         );
     }
 

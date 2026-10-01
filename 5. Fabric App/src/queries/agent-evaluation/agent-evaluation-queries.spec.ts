@@ -17,6 +17,7 @@ import {
     feedbackComments,
     GROUP_BY_COLUMNS,
     groupByChoices,
+    hasEvaluationData,
     knowledgeSources,
     NO_SELECTION,
     performanceByGroup,
@@ -173,6 +174,22 @@ describe("agent evaluation slicers", () => {
 
     it("offers only Group by columns with at least two groups, in the fixed order", () => {
         expect(groupByChoices(options.groupCounts).map((column) => column.id)).toEqual(["agent", "topic"]);
+    });
+
+    it("tells a model with conversations from an empty one", () => {
+        // An empty model still answers: blank dates, and every Group by column at zero.
+        const empty = readEvaluationOptions(
+            table(
+                ["Kind", "Value", "Sort"],
+                [
+                    ["First date", "", 0],
+                    ["Group by", "agent", 0],
+                    ["Last date", "", 0],
+                ],
+            ),
+        );
+        expect(hasEvaluationData(options)).toBe(true);
+        expect(hasEvaluationData(empty)).toBe(false);
     });
 
     it("filters nothing until a slicer is set", () => {

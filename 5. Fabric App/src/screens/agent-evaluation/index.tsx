@@ -7,22 +7,23 @@
 
 import { useMemo, useState } from "react";
 import { stageAnchor } from "@/components/destinations";
-import { QueryError } from "@/components/query-states";
-import { Section } from "@/components/section";
+import { SourceEmpty, SourceError } from "@/components/source-states";
 import { useTableQuery } from "@/hooks/use-table-query";
-import { BODY } from "@/lib/type-scale";
 import {
     evaluationFilters,
     evaluationOptions,
+    hasEvaluationData,
     NO_SELECTION,
     readEvaluationOptions,
     type EvaluationSelection,
 } from "@/queries/agent-evaluation";
+import { evaluatorConnection } from "@/queries/shared";
 import { ConversationsStage } from "./conversations-stage";
 import { EvaluationBar } from "./evaluation-bar";
 import { PerformanceStage } from "./performance-stage";
 
 const OPTIONS = evaluationOptions();
+const SOURCE = { anchor: stageAnchor("agent-performance"), page: "Agent Evaluation", model: "Agent Evaluator" };
 
 /**
  * The Agent Evaluator report's pages for Copilot Studio agents: how they
@@ -41,17 +42,22 @@ export function AgentEvaluationScreen() {
 
     if (optionsResult.error !== undefined) {
         return (
-            <Section
-                id={stageAnchor("agent-performance")}
-                title="Agent Evaluation"
-                description="This page reads the Agent Evaluator semantic model."
-            >
-                <p className={`${BODY} max-w-[68ch] text-muted-foreground`}>
-                    Bind Agent Evaluator to this app as the <code className="font-mono">ae</code> connection, then
-                    reload. Until it is bound, agent performance can't be shown.
-                </p>
-                <QueryError message={optionsResult.error} onRetry={optionsResult.refetch} />
-            </Section>
+            <SourceError
+                {...SOURCE}
+                alias={evaluatorConnection}
+                message={optionsResult.error}
+                onRetry={optionsResult.refetch}
+            />
+        );
+    }
+
+    if (options && !hasEvaluationData(options)) {
+        return (
+            <SourceEmpty
+                {...SOURCE}
+                title="No agent conversations yet"
+                description="Agent Evaluator is connected, but its model holds no Copilot Studio conversations. Once its lakehouse is loaded and the model refreshes, this page fills in."
+            />
         );
     }
 

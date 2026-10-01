@@ -7,14 +7,17 @@
 
 import type { LucideIcon } from "lucide-react";
 import { BookOpen, BotMessageSquare, Coins, Gauge, KeyRound, MessageSquareQuote, PoundSterling, TrendingUp, Trophy } from "lucide-react";
+import { isConnectionConfigured, type ModelReferences } from "@/lib/connections";
 import type { FilterKey } from "@/lib/filters";
+import { consumptionConnection, evaluatorConnection } from "@/queries/shared";
 
 /**
  * The top-level destinations the report pages were folded into, each
  * holding its pages as stages read top to bottom, plus the report's appendix
  * as a reference destination below them. Consumption and Agent Evaluation
  * come from their own reports, Consumption Central and Agent Evaluator, and
- * bring their own slicers, so they take none of the filter bar's.
+ * bring their own slicers, so they take none of the filter bar's. Their
+ * `connection` is optional: without it in `fabric.yaml` they are left out.
  *
  * A stage that is not built yet stays listed so the shape of the destination
  * is visible; a destination is reachable once any of its stages is built.
@@ -54,6 +57,7 @@ export const destinations = [
         blurb: "How well your agents answer, and where they fall short",
         icon: BotMessageSquare as LucideIcon,
         filters: [] as FilterKey[],
+        connection: evaluatorConnection,
         stages: [
             { id: "agent-performance", label: "Performance", ready: true },
             { id: "agent-conversations", label: "Conversations & topics", ready: true },
@@ -76,6 +80,7 @@ export const destinations = [
         blurb: "Credits used, and what they cost",
         icon: Coins as LucideIcon,
         filters: [] as FilterKey[],
+        connection: consumptionConnection,
         stages: [
             { id: "consumption-overview", label: "All products", ready: true },
             { id: "cowork-credits", label: "Cowork / Work IQ", ready: true },
@@ -140,6 +145,13 @@ export function isDestinationReady(destination: Destination): boolean {
 /** Reference destinations hold definitions rather than activity. */
 export function isReference(destination: Destination): boolean {
     return "reference" in destination && destination.reference;
+}
+
+/** Every destination except those reading a model `fabric.yaml` doesn't set up. */
+export function availableDestinations(models: ModelReferences): Destination[] {
+    return destinations.filter(
+        (destination) => !("connection" in destination) || isConnectionConfigured(models, destination.connection),
+    );
 }
 
 /** The DOM id a stage's section carries, so the sidebar can scroll to it. */

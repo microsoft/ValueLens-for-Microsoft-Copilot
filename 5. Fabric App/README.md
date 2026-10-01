@@ -55,8 +55,9 @@ Run these commands from this folder (`5. Fabric App`).
    `workspaceId` and `itemId` under `vl` with your ValueLens semantic model's, under `cc` with
    your Consumption Central model's, and under `ae` with your Agent Evaluator model's.
    Both IDs are in each model's URL: `app.powerbi.com/groups/<workspaceId>/datasets/<itemId>/…`
-   Without Consumption Central or Agent Evaluator, delete its block (`cc` or `ae`); its page then
-   explains what it needs.
+   Without Consumption Central or Agent Evaluator, leave its placeholders or delete its block
+   (`cc` or `ae`). The app then leaves that page out of the sidebar. If a model is set up but holds
+   no data yet, its page says so instead of showing blanks.
 3. **Deploy.** Sign in when prompted. If your account spans tenants, add `--tenant <tenant-id>`.
    ```powershell
    npx rayfin up --workspace-uri "https://app.fabric.microsoft.com/groups/<workspace-id>"
