@@ -16,6 +16,13 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-02 — Fabric App: reloads itself after a deploy
+
+A page opened before a deploy used to fail on its next page change with *Failed to fetch
+dynamically imported module*, because the deploy replaces the app's code files. The app now
+reloads once to pick up the new build. If the same error comes back straight away, it stays on
+screen rather than reloading again.
+
 ## 2026-10-02 — Fabric App: renamed AI in One 2.0
 
 The [Fabric App](5.%20Fabric%20App/) is now called **AI in One 2.0**: the browser tab, the sidebar
