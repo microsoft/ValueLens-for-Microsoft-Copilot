@@ -127,9 +127,14 @@ export function createUi(opts = {}) {
       return {
         /** @param {string} status */
         update(status) {
-          const text = `    ${label}: ${status} ${c.dim(`(${formatDuration(Date.now() - started)})`)}`;
+          const head = `    ${label}: ${status}`;
+          const tail = `(${formatDuration(Date.now() - started)})`;
+          // A line that wraps can't be redrawn with \r, so keep it within the terminal.
+          const width = process.stdout.columns ?? 0;
+          const fits = !width || head.length + 1 + tail.length < width;
+          const text = fits ? `${head} ${c.dim(tail)}` : head.slice(0, Math.max(1, width - 1));
           if (tty) write(`\r\x1b[K${text}`);
-          else if (status !== last) line(text);
+          else if (status !== last) line(`${head} ${c.dim(tail)}`);
           last = status;
         },
         done() {
