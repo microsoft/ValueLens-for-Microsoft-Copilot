@@ -2,7 +2,8 @@
 /** Runs the pipeline and the data check, and reports on them. */
 import { DATA_CHECK_FILE } from '../transform/notebook.js';
 import { firstRunParameters } from '../transform/pipeline.js';
-import { formatDuration } from '../ui.js';
+import { c, formatDuration } from '../ui.js';
+import { modelRefreshes } from './model.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
@@ -167,12 +168,11 @@ export async function status(ctx) {
   ui.info(`Workspace: ${f.workspaceName ?? f.workspaceId}`);
   ui.info(`Lakehouse: ${f.lakehouseName ?? f.lakehouseId}`);
   ui.info(`Pipeline:  ${f.pipelineName ?? f.pipelineId}`);
-  if (config.app.secretExpires) {
-    const days = Math.floor((Date.parse(config.app.secretExpires) - ctx.now().getTime()) / 86_400_000);
-    const msg = `Client secret expires ${config.app.secretExpires.slice(0, 10)} (${days} days)`;
-    if (days < 30) ui.warn(`${msg}. Run "valuelens-install rotate-secret".`);
-    else ui.info(msg);
-  }
+  const sm = config.semanticModel;
+  if (sm?.id) ui.info(`Model:     ${sm.name}${sm.bound ? '' : ' (not connected to the Lakehouse yet)'}`);
+  if (config.fabricApp?.itemId) ui.info(`App:       ${config.fabricApp.name}  ${c.dim(config.fabricApp.url ?? '')}`);
+  expiry(ctx, 'Client secret', config.app.secretExpires);
+  if (sm?.connectionId) expiry(ctx, 'Model connection secret', sm.secretExpires);
 
   ui.heading('Recent runs');
   const jobs = (await api.fabric.listJobs(f.workspaceId, f.pipelineId))
@@ -200,6 +200,27 @@ export async function status(ctx) {
     }
   }
 
+  if (sm?.id) {
+    const refreshes = await modelRefreshes(ctx).catch(() => null);
+    if (refreshes) {
+      ui.heading('Model refreshes');
+      if (!refreshes.length) ui.note('No refreshes yet.');
+      for (const r of refreshes) {
+        const start = utc(r.startTime);
+        const end = utc(r.endTime);
+        const when = start ? start.toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : 'not started';
+        const took = start && end ? `, ${formatDuration(end.getTime() - start.getTime())}` : '';
+        const state = r.extendedStatus ?? r.status ?? 'Unknown';
+        const line = `${when}  ${state}${took}  ${r.refreshType ?? ''}`.trimEnd();
+        if (state === 'Completed') ui.ok(line);
+        else if (state === 'Failed') {
+          ui.fail(line);
+          if (r.serviceExceptionJson) ui.note(String(r.serviceExceptionJson).slice(0, 400));
+        } else ui.info(line);
+      }
+    }
+  }
+
   if (f.lakehouseId) {
     const summary = await api.oneLake.readJson(f.workspaceId, f.lakehouseId, DATA_CHECK_FILE).catch(() => null);
     if (summary) {
@@ -207,4 +228,17 @@ export async function status(ctx) {
       printDataCheck(ctx, summary);
     }
   }
+}
+
+/**
+ * @param {Ctx} ctx
+ * @param {string} label
+ * @param {string | undefined} expires
+ */
+function expiry(ctx, label, expires) {
+  if (!expires) return;
+  const days = Math.floor((Date.parse(expires) - ctx.now().getTime()) / 86_400_000);
+  const msg = `${label} expires ${expires.slice(0, 10)} (${days} days)`;
+  if (days < 30) ctx.ui.warn(`${msg}. Run "valuelens-install rotate-secret".`);
+  else ctx.ui.info(msg);
 }

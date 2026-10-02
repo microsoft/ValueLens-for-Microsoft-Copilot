@@ -9,6 +9,7 @@ import { allowsAction, armLocation, validateVaultName } from '../clients/azure.j
 import { APP_ROLES, CONSENT_ROLES } from '../clients/graph.js';
 import { HttpError } from '../http.js';
 import { c } from '../ui.js';
+import { MIN_NODE, nodeVersionOk } from './app.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
@@ -42,7 +43,42 @@ export const runsFabric = (capacity) => !/^(PP|A|EM)\d/i.test(String(capacity.sk
  * @property {string[]} roles  Directory role names.
  * @property {boolean} canConsent
  * @property {boolean | undefined} canCreateApps  undefined when the policy can't be read.
+ * @property {Record<string, { enabled?: boolean, delegateToCapacity?: boolean }>} [tenantSettings]  Only for Fabric administrators.
  */
+
+/**
+ * Tenant settings the semantic model and the app rely on, and what breaks without them.
+ * @type {{ name: string, title: string, effect: string, app?: boolean }[]}
+ */
+export const POWER_BI_SETTINGS = [
+  {
+    name: 'ServicePrincipalAccessPermissionAPIs',
+    title: 'Service principals can call Fabric public APIs',
+    effect: 'The model\'s connection signs in as the app registration, so the model can\'t refresh without it.',
+  },
+  {
+    name: 'DatasetExecuteQueries',
+    title: 'Semantic Model Execute Queries REST API',
+    effect: 'The ValueLens app queries the model through it.',
+    app: true,
+  },
+  {
+    name: 'AppBackendTenant',
+    title: 'Fabric App items',
+    effect: 'The ValueLens app is a Fabric App item.',
+    app: true,
+  },
+];
+
+/**
+ * Settings that look switched off. A setting delegated to capacity admins may still be on there.
+ * @param {Preflight['tenantSettings']} settings
+ * @param {{ app: boolean }} opts
+ */
+export function blockedSettings(settings, opts) {
+  if (!settings) return [];
+  return POWER_BI_SETTINGS.filter((s) => (opts.app || !s.app) && settings[s.name]?.enabled === false && !settings[s.name]?.delegateToCapacity);
+}
 
 /**
  * @param {Ctx} ctx
@@ -87,7 +123,60 @@ export async function preflight(ctx) {
   }
   if (subscriptions.length) ui.ok(`${subscriptions.length} Azure ${subscriptions.length === 1 ? 'subscription' : 'subscriptions'} for Key Vault`);
 
-  return { capacities, subscriptions, roles: roles.map((r) => r.displayName), canConsent, canCreateApps };
+  /** @type {Preflight['tenantSettings']} */
+  let tenantSettings;
+  try {
+    tenantSettings = Object.fromEntries((await api.fabric.tenantSettings()).map((s) => [s.settingName, s]));
+  } catch {
+    // Only Fabric administrators can read them.
+  }
+
+  return { capacities, subscriptions, roles: roles.map((r) => r.displayName), canConsent, canCreateApps, tenantSettings };
+}
+
+/**
+ * The semantic model, and the app on top of it.
+ * @param {Ctx} ctx
+ * @param {Preflight} pre
+ */
+async function planPowerBi(ctx, pre) {
+  const { ui, config, sources } = ctx;
+  const sm = config.semanticModel;
+  const fa = config.fabricApp;
+  ui.heading('Power BI');
+  if (!sources.modelFile) {
+    sm.enabled = false;
+    fa.enabled = false;
+    ui.note('This checkout has no "ValueLens - Fabric.pbit", so the installer won\'t deploy a semantic model.');
+    return;
+  }
+  const canApp = !!sources.appDir;
+  const current = sm.enabled === false ? 'none' : fa.enabled === false || !canApp ? 'model' : 'both';
+  const choice = await ui.select(
+    'Deploy the ValueLens semantic model?',
+    [
+      ...(canApp ? [{ name: 'Semantic model and the ValueLens app (recommended)', value: 'both', description: 'A web app in the workspace, built on the model.' }] : []),
+      { name: 'Semantic model only', value: 'model', description: 'Build your own reports on it in Power BI.' },
+      { name: 'Neither', value: 'none', description: 'You publish "ValueLens - Fabric.pbit" yourself.' },
+    ],
+    current,
+  );
+  sm.enabled = choice !== 'none';
+  fa.enabled = choice === 'both';
+  if (fa.enabled && !nodeVersionOk()) {
+    fa.enabled = false;
+    ui.warn(`Building the app needs Node.js ${MIN_NODE.join('.')} or later; this is ${process.versions.node}. Deploying the semantic model only.`);
+    ui.note('Install a newer Node.js, then run "valuelens-install deploy-app".');
+  }
+  if (sm.enabled && !config.modules.orgData) {
+    config.modules.orgData = true;
+    ui.note(`Switched on ${MODULES.orgData.label}: the semantic model needs it.`);
+  }
+  if (!sm.enabled) return;
+  for (const s of blockedSettings(pre.tenantSettings, { app: !!fa.enabled })) {
+    ui.warn(`The tenant setting "${s.title}" is off. ${s.effect}`);
+    ui.note('A Fabric administrator can switch it on in the admin portal, under Tenant settings.');
+  }
 }
 
 /**
@@ -108,6 +197,8 @@ export async function plan(ctx, pre) {
     })),
   );
   config.modules = { orgData: picked.includes('orgData'), agent365: picked.includes('agent365'), productFeedback: picked.includes('productFeedback') };
+
+  await planPowerBi(ctx, pre);
 
   if (config.firstRun?.status !== 'Completed') {
     config.history.days = await ui.select(
@@ -272,6 +363,10 @@ export async function confirmPlan(ctx) {
   ui.info(`App:         ${config.app.appId ? config.app.appId : `${APP_NAME} ${c.dim('(new)')}`}`);
   ui.info(`Key Vault:   ${config.keyVault.name} ${config.keyVault.existing || config.keyVault.uri ? '' : c.dim(`(new, ${config.keyVault.rbac ? 'Azure RBAC' : 'access policies'})`)}`);
   ui.info(`Schedule:    ${config.schedule.frequency === 'weekly' ? `${config.schedule.weekday}s` : 'Daily'} at ${config.schedule.time} ${config.schedule.timeZone}`);
+  if (config.semanticModel.enabled) {
+    const app = config.fabricApp.enabled ? `, and the ValueLens app ${config.fabricApp.itemId ? '' : c.dim('(new)')}` : '';
+    ui.info(`Power BI:    ${config.semanticModel.name} ${config.semanticModel.id ? '' : c.dim('(new)')}${app}`.trimEnd());
+  }
   if (ctx.runFirstLoad) ui.info(`First load:  ${config.history.days} days of history, straight after setup`);
   return ui.confirm('Go ahead?', true);
 }
