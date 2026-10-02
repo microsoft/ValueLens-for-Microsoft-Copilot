@@ -445,8 +445,9 @@
     --color-data-9: var(--vl-slate);
     --color-data-10: var(--vl-ink);
   }
-  /* The appendix is reference, not a place with its own story, so it takes
-     the report's navy: the quietest hue in the family. */
+  /* The assumptions and the appendix are reference, not places with their own
+     story, so they take the report's navy: the quietest hue in the family. */
+  .palette-assumptions,
   .palette-appendix {
     --color-brand: var(--vl-navy);
     --color-brand-foreground: var(--vl-navy-text);

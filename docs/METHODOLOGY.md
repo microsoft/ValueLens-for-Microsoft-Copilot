@@ -341,7 +341,8 @@ hours = units × minutes (Low / Typical / High) × category adjustment ÷ 60
 ```
 
 - **Minutes** come from the `Human Time Estimates` table: one researched band per behaviour, listed
-  in the [appendix](#appendix-time-bands-and-sources).
+  in the [appendix](#appendix-time-bands-and-sources). In the Fabric App, the **Assumptions** page
+  can replace a behaviour's minutes for everyone using the app ([§7](#7-settings-you-can-change)).
 - **Units** depend on the behaviour's grain:
   - **Per turn** (most behaviours): distinct prompts. Each band already assumes a typical number of
     steps, so counting every resource row would apply that assumption twice.
@@ -356,7 +357,7 @@ hours = units × minutes (Low / Typical / High) × category adjustment ÷ 60
 
 ## 6. Page by page
 
-The Fabric App gathers the report's pages into seven of its nine pages:
+The Fabric App gathers the report's pages into seven of its ten pages:
 
 | App page | Report pages it holds |
 |---|---|
@@ -368,6 +369,7 @@ The Fabric App gathers the report's pages into seven of its nine pages:
 | Feedback | User Feedback |
 | Appendix | Glossary, Signal → Impact |
 | Consumption, Agent Evaluation | App only ([§8](#8-fabric-app-only-consumption-agent-evaluation-and-cost-vs-value)) |
+| Assumptions | App only: the task times behind every hours figure, which you can change ([§7](#7-settings-you-can-change)) |
 
 ### Activation: who has started?
 
@@ -530,6 +532,7 @@ From the optional Product Feedback export.
 | Rates & packs | From `commercial_terms` | App Consumption page | Credit prices ([§8](#81-consumption)) |
 | Licence price | $30, the US list price | App Value page, Prices | Licence cost on Cost vs value ([§8.3](#83-cost-vs-value)). The report uses AI PPUPM instead |
 | Exchange rate | Not set | App Value page, Prices | Converts dollar costs into the value's currency ([§8.3](#83-cost-vs-value)) |
+| Time per task | The researched bands in the [appendix](#appendix-time-bands-and-sources) | App Assumptions page | Replaces a behaviour's Low, Typical and High minutes for everyone using the app. Cowork hours keep their task-category bands, and the report keeps the model's times |
 
 ---
 
@@ -654,7 +657,8 @@ cost is licences alone, so the return reads high.
 
 ## Appendix: time bands and sources
 
-Minutes per unit of work, from the `Human Time Estimates` table. Typical is the default. The table
+Minutes per unit of work, from the `Human Time Estimates` table. Typical is the default. The Fabric
+App's Assumptions page lists the same bands and lets you replace them there. The table
 also keeps a single `Human Baseline (min)` column from the earlier method; no measure uses it.
 
 | Behaviour | Low | Typical | High | Grain | Confidence | Source |

@@ -5,14 +5,4 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { CommercialTerms } from "./CommercialTerms.js";
-import { TaskTime } from "./TaskTime.js";
-
-// The app imports only this type. Importing the classes would ship their
-// decorators to the browser.
-export type ValueLensSchema = {
-    CommercialTerms: CommercialTerms;
-    TaskTime: TaskTime;
-};
-
-export const schema = [CommercialTerms, TaskTime];
+export * from "./task-times";

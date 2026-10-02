@@ -7,6 +7,7 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useCommercialTerms } from "@/hooks/commercial-terms.context";
+import { INPUT, PRIMARY, SECONDARY } from "@/lib/form-controls";
 import { SMALL } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 import {
@@ -56,13 +57,6 @@ function formatChanged(saved: SavedCommercialTerms): string | undefined {
     const when = saved.updatedAt.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
     return saved.updatedBy ? `Last changed by ${saved.updatedBy} on ${when}.` : `Last changed on ${when}.`;
 }
-
-const INPUT =
-    "h-[32px] w-full rounded-md border border-input bg-card px-200 text-[length:var(--text-300)] text-foreground tabular-nums placeholder:text-muted-foreground/70 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-destructive";
-const PRIMARY =
-    "h-[32px] rounded-md bg-primary px-300 text-[length:var(--text-300)] font-semibold text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50";
-const SECONDARY =
-    "h-[32px] rounded-md border border-border px-300 text-[length:var(--text-300)] font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50";
 
 /**
  * Some of the app's shared terms, typed in and saved for everyone. Saving
