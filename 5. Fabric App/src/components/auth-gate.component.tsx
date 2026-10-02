@@ -6,14 +6,29 @@
 //-----------------------------------------------------------------------
 
 import { type ReactNode } from "react";
+import { isRunningInFabric } from "@microsoft/fabric-app-data-embed-client";
 
 import { useAuth } from "@/hooks/auth.context";
+import { fabricItemUrl } from "@/lib/fabric-item-url";
 
 interface AuthGateProps {
     children: ReactNode;
+    /** Whether Fabric hosts the app in its iframe. Defaults to checking the window. */
+    embedded?: boolean;
+    /** The app's Fabric item link. Defaults to the one the build's env describes. */
+    fabricLink?: string | null;
 }
 
-export function AuthGate({ children }: AuthGateProps) {
+/**
+ * The app's data only loads inside Fabric, which brokers its semantic model queries. Opened from
+ * its `…fabricapps.net` hosting address instead, every visual would fail with "Not running inside
+ * a Fabric iframe", so the gate sends the visitor to the app's Fabric item first.
+ */
+export function AuthGate({
+    children,
+    embedded = isRunningInFabric(),
+    fabricLink = fabricItemUrl(),
+}: AuthGateProps) {
     const {
         isLoading,
         isAuthenticated,
@@ -21,6 +36,30 @@ export function AuthGate({ children }: AuthGateProps) {
         isSigningIn,
         signInError,
     } = useAuth();
+
+    if (!embedded && fabricLink) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-background p-400">
+                <div className="w-full max-w-md rounded-xl border border-border bg-card p-800 text-center shadow-8">
+                    <h1 className="mb-200 text-500 font-semibold leading-500 text-card-foreground">
+                        Open ValueLens App in Fabric
+                    </h1>
+                    <p className="mb-600 text-300 leading-300 text-muted-foreground">
+                        This address only hosts the app. Its data loads through Fabric, so open it from its Fabric item.
+                    </p>
+                    <a
+                        href={fabricLink}
+                        className="inline-block rounded-lg bg-primary px-400 py-200 text-300 font-semibold text-primary-foreground hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                        Open in Fabric
+                    </a>
+                    <p className="mt-400 text-[length:var(--text-200)] leading-200 text-muted-foreground">
+                        Bookmark or share that page to come straight back.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     if (isLoading) {
         return (

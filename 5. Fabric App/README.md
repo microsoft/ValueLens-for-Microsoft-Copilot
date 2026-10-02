@@ -66,8 +66,7 @@ Run these commands from this folder (`5. Fabric App`).
    ```
    It builds the app, creates a **ValueLens App** item in the workspace, and prints two links. Use
    the **Fabric portal** link, or open the item from the workspace. The app loads its data
-   through Fabric, so the `…fabricapps.net` hosting URL on its own shows *Not running inside a
-   Fabric iframe*.
+   through Fabric, so the `…fabricapps.net` hosting URL on its own only offers a link to the item.
 4. **Share.** Each viewer needs two things:
    - **The app:** add them to the workspace (Viewer is enough), or share the **ValueLens App** item
      with *Run and interact* permission. Then send them the Fabric portal link.

@@ -32,19 +32,49 @@ function createAuthService(
     };
 }
 
-function renderAuthGate(authService: IAuthService) {
+function renderAuthGate(
+    authService: IAuthService,
+    host: { embedded?: boolean; fabricLink?: string | null } = { embedded: false, fabricLink: null },
+) {
     render(
         <AuthProvider rayfinAuthService={authService}>
-            <AuthGate>
+            <AuthGate {...host}>
                 <div>Authenticated app</div>
             </AuthGate>
         </AuthProvider>,
     );
 }
 
+const fabricLink = "https://app.fabric.microsoft.com/groups/ws-1/appbackends/item-1?ctid=tenant-1";
+
 describe("AuthGate", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+    });
+
+    it("sends a visitor on the hosting address to the app's Fabric item instead of signing in", async () => {
+        const authService = createAuthService({
+            initEmbeddedAuth: vi.fn().mockResolvedValue(authenticatedSession),
+        });
+        renderAuthGate(authService, { embedded: false, fabricLink });
+
+        expect(screen.getByRole("heading", { name: "Open ValueLens App in Fabric" })).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: "Open in Fabric" })).toHaveAttribute("href", fabricLink);
+        await waitFor(() => expect(authService.initEmbeddedAuth).toHaveBeenCalledOnce());
+        expect(screen.queryByText("Authenticated app")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Sign in with Fabric" })).not.toBeInTheDocument();
+        expect(authService.signIn).not.toHaveBeenCalled();
+    });
+
+    it("signs in inside Fabric when the embedded handoff has no session", async () => {
+        const authService = createAuthService();
+        renderAuthGate(authService, { embedded: true, fabricLink });
+
+        fireEvent.click(await screen.findByRole("button", { name: "Sign in with Fabric" }));
+
+        expect(authService.signIn).toHaveBeenCalledOnce();
+        expect(await screen.findByText("Authenticated app")).toBeInTheDocument();
+        expect(screen.queryByRole("link", { name: "Open in Fabric" })).not.toBeInTheDocument();
     });
 
     it("signs in from the standalone action and renders the app", async () => {
