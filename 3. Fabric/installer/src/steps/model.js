@@ -3,7 +3,7 @@
  * The ValueLens semantic model: deployed from the Power BI template, connected to the
  * Lakehouse through a cloud connection that signs in as the app registration, and refreshed.
  */
-import { enabledModules } from '../catalog.js';
+import { enabledModules, MODEL_MODULES } from '../catalog.js';
 import { servicePrincipalCredentials, semanticModelDefinition, sqlConnectionBody } from '../clients/fabric.js';
 import { HttpError } from '../http.js';
 import { buildModel, datasourcePath, loadTemplateModel, PBISM } from '../transform/model.js';
@@ -60,7 +60,49 @@ export async function waitForSqlEndpoint(ctx) {
  * @param {string} database
  * @param {import('../catalog.js').ModuleChoice} modules
  */
-export const modelSignature = (server, database, modules) => `${server.toLowerCase()};${database};${enabledModules(modules).join(',')}`;
+export const modelSignature = (server, database, modules) =>
+  `${server.toLowerCase()};${database};${enabledModules(modules).filter((m) => /** @type {readonly string[]} */ (MODEL_MODULES).includes(m)).join(',')}`;
+
+/**
+ * Creates a semantic model item, or updates it when its inputs changed or `force` is set.
+ * An update clears the model's data and its connection binding.
+ * @param {Ctx} ctx
+ * @param {import('../config.js').ModelConfig} m
+ * @param {{ signature: string, definition: () => any, force?: boolean }} o
+ */
+export async function deployModel(ctx, m, o) {
+  const { ui, api } = ctx;
+  const ws = /** @type {string} */ (ctx.config.fabric.workspaceId);
+  const items = await api.fabric.listItems(ws, 'SemanticModel');
+
+  if (m.id && !items.some((i) => i.id === m.id)) {
+    ui.warn(`${m.name} was deleted. Deploying it again.`);
+    delete m.id;
+  }
+  if (!m.id) {
+    const same = byName(items, m.name);
+    if (same) {
+      const replace = await ui.confirm(`A semantic model called ${m.name} is already in the workspace. Replace it with the ValueLens version?`, true);
+      if (!replace) throw new Error(`Stopped: ${m.name} already exists. Rename or remove it, or choose another workspace.`);
+      await api.fabric.updateSemanticModel(ws, same.id, o.definition());
+      m.id = same.id;
+      ui.ok(`Updated semantic model ${m.name}`);
+    } else {
+      const created = await api.fabric.createSemanticModel(ws, m.name, o.definition());
+      m.id = await createdId(ctx, created, 'SemanticModel', m.name);
+      ui.ok(`Created semantic model ${m.name}`);
+    }
+    m.bound = false;
+  } else if (o.force || m.signature !== o.signature) {
+    await api.fabric.updateSemanticModel(ws, m.id, o.definition());
+    m.bound = false;
+    ui.ok(`Updated semantic model ${m.name}`);
+  } else {
+    ui.ok(`Semantic model ${m.name} is in place`);
+  }
+  m.signature = o.signature;
+  ctx.save();
+}
 
 /**
  * Creates the semantic model, or updates it when its inputs changed or `force` is set.
@@ -68,42 +110,17 @@ export const modelSignature = (server, database, modules) => `${server.toLowerCa
  * @param {{ force?: boolean }} [opts]
  */
 export async function ensureSemanticModel(ctx, opts = {}) {
-  const { ui, config, api, sources } = ctx;
+  const { config, sources } = ctx;
   const sm = config.semanticModel;
-  const ws = /** @type {string} */ (config.fabric.workspaceId);
   if (!sources.modelFile) throw new Error('This checkout has no "ValueLens - Fabric.pbit" to build the semantic model from.');
 
   const { server, database } = await waitForSqlEndpoint(ctx);
-  const signature = modelSignature(server, database, config.modules);
-  const definition = () => semanticModelDefinition(buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { server, database, modules: config.modules }), PBISM);
-  const items = await api.fabric.listItems(ws, 'SemanticModel');
-
-  if (sm.id && !items.some((i) => i.id === sm.id)) {
-    ui.warn(`${sm.name} was deleted. Deploying it again.`);
-    delete sm.id;
-  }
-  if (!sm.id) {
-    const same = byName(items, sm.name);
-    if (same) {
-      const replace = await ui.confirm(`A semantic model called ${sm.name} is already in the workspace. Replace it with the ValueLens version?`, true);
-      if (!replace) throw new Error(`Stopped: ${sm.name} already exists. Rename or remove it, or choose another workspace.`);
-      await api.fabric.updateSemanticModel(ws, same.id, definition());
-      sm.id = same.id;
-      ui.ok(`Updated semantic model ${sm.name}`);
-    } else {
-      const created = await api.fabric.createSemanticModel(ws, sm.name, definition());
-      sm.id = await createdId(ctx, created, 'SemanticModel', sm.name);
-      ui.ok(`Created semantic model ${sm.name}`);
-    }
-    sm.bound = false;
-  } else if (opts.force || sm.signature !== signature) {
-    await api.fabric.updateSemanticModel(ws, sm.id, definition());
-    sm.bound = false;
-    ui.ok(`Updated semantic model ${sm.name}`);
-  } else {
-    ui.ok(`Semantic model ${sm.name} is in place`);
-  }
-  Object.assign(sm, { server, database, signature });
+  await deployModel(ctx, sm, {
+    signature: modelSignature(server, database, config.modules),
+    definition: () => semanticModelDefinition(buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { server, database, modules: config.modules }), PBISM),
+    force: opts.force,
+  });
+  Object.assign(sm, { server, database });
   ctx.save();
 }
 
@@ -205,34 +222,36 @@ export async function ensureModelConnection(ctx) {
     }
     const oldKey = sm.secretKeyId;
     Object.assign(sm, { connectionId: conn.id, connectionName: name, secretKeyId: secret.keyId, secretExpires: secret.expires, bound: false });
+    if (config.consumption?.model) config.consumption.model.bound = false;
     ctx.save();
     if (oldKey && oldKey !== secret.keyId) await api.graph.removePassword(/** @type {string} */ (config.app.objectId), oldKey).catch(() => {});
   }
 
-  if (!sm.bound) await bindModel(ctx);
+  if (!sm.bound) await bindModel(ctx, sm);
 }
 
 /**
- * Points the model's SQL data source at the connection.
+ * Points a model's SQL data source at the installer's connection.
  * @param {Ctx} ctx
+ * @param {import('../config.js').ModelConfig} m
  */
-async function bindModel(ctx) {
+export async function bindModel(ctx, m) {
   const { ui, config, api } = ctx;
   const sm = config.semanticModel;
   const ws = /** @type {string} */ (config.fabric.workspaceId);
-  const id = /** @type {string} */ (sm.id);
+  const id = /** @type {string} */ (m.id);
   const sources = await api.powerBi.datasources(ws, id).catch(() => []);
   const sql = sources.find((d) => String(d.datasourceType).toLowerCase() === 'sql')?.connectionDetails;
   const path = sql?.server && sql?.database ? datasourcePath(sql.server, sql.database) : datasourcePath(/** @type {string} */ (sm.server), /** @type {string} */ (sm.database));
   for (;;) {
     try {
       await api.fabric.bindConnection(ws, id, { id: /** @type {string} */ (sm.connectionId), type: 'SQL', path });
-      sm.bound = true;
+      m.bound = true;
       ctx.save();
-      ui.ok(`${sm.name} reads the Lakehouse through "${sm.connectionName}"`);
+      ui.ok(`${m.name} reads the Lakehouse through "${sm.connectionName}"`);
       return true;
     } catch (err) {
-      ui.warn(`Couldn't connect ${sm.name} to "${sm.connectionName}" (${/** @type {Error} */ (err).message}).`);
+      ui.warn(`Couldn't connect ${m.name} to "${sm.connectionName}" (${/** @type {Error} */ (err).message}).`);
       ui.info(`Choose it under "Gateway and cloud connections" in the model's settings: ${modelSettingsUrl(ws, id)}`);
       if (ui.yes) return false;
       const next = await ui.select(
@@ -246,7 +265,7 @@ async function bindModel(ctx) {
       );
       if (next === 'skip') return false;
       if (next === 'done') {
-        sm.bound = true;
+        m.bound = true;
         ctx.save();
         return true;
       }
@@ -257,12 +276,13 @@ async function bindModel(ctx) {
 /**
  * Starts a refresh, or follows one that is already running.
  * @param {Ctx} ctx
+ * @param {import('../config.js').ModelConfig} m
  * @returns {Promise<string>}
  */
-async function startRefresh(ctx) {
+async function startRefresh(ctx, m) {
   const { api, config } = ctx;
   const ws = /** @type {string} */ (config.fabric.workspaceId);
-  const id = /** @type {string} */ (config.semanticModel.id);
+  const id = /** @type {string} */ (m.id);
   try {
     return await api.powerBi.refresh(ws, id, { type: 'full', commitMode: 'transactional', applyRefreshPolicy: true, retryCount: 1 });
   } catch (err) {
@@ -276,20 +296,21 @@ async function startRefresh(ctx) {
 }
 
 /**
+ * Refreshes a model, the ValueLens one unless `model` says otherwise.
  * @param {Ctx} ctx
- * @param {{ wait?: boolean, timeoutMs?: number }} [opts]
+ * @param {{ wait?: boolean, timeoutMs?: number, model?: import('../config.js').ModelConfig }} [opts]
  * @returns {Promise<{ ok: boolean, status?: string }>}
  */
 export async function refreshModel(ctx, opts = {}) {
   const { ui, config, api } = ctx;
-  const sm = config.semanticModel;
+  const sm = opts.model ?? config.semanticModel;
   const ws = /** @type {string} */ (config.fabric.workspaceId);
   if (!sm.id) throw new Error('There is no semantic model yet. Run the installer first.');
   if (!sm.bound) {
     ui.warn(`${sm.name} isn't connected to the Lakehouse yet, so it can't refresh. Run the installer again to connect it.`);
     return { ok: false };
   }
-  const requestId = await startRefresh(ctx);
+  const requestId = await startRefresh(ctx, sm);
   ui.ok(`Started a refresh of ${sm.name}`);
   if (opts.wait === false) return { ok: true, status: 'Unknown' };
 
@@ -327,11 +348,11 @@ export async function refreshModel(ctx, opts = {}) {
 /**
  * Last few refreshes, newest first.
  * @param {Ctx} ctx
+ * @param {import('../config.js').ModelConfig} [m]
  */
-export async function modelRefreshes(ctx) {
-  const sm = ctx.config.semanticModel;
-  if (!sm.id) return [];
-  return ctx.api.powerBi.refreshes(/** @type {string} */ (ctx.config.fabric.workspaceId), sm.id, 3);
+export async function modelRefreshes(ctx, m = ctx.config.semanticModel) {
+  if (!m.id) return [];
+  return ctx.api.powerBi.refreshes(/** @type {string} */ (ctx.config.fabric.workspaceId), m.id, 3);
 }
 
 /**

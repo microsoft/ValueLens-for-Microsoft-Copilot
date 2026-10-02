@@ -22,6 +22,26 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {{ jobId?: string, status?: string, startedAt?: string, finishedAt?: string }} [firstRun]
  * @property {SemanticModelConfig} semanticModel
  * @property {FabricAppConfig} fabricApp
+ * @property {ConsumptionConfig} consumption
+ */
+
+/**
+ * A semantic model the installer deploys and refreshes.
+ * @typedef {object} ModelConfig
+ * @property {string} [id]
+ * @property {string} name
+ * @property {string} [signature]  What the deployed definition was built from.
+ * @property {boolean} [bound]  Reads the Lakehouse through the installer's connection.
+ */
+
+/**
+ * The credit consumption module: Azure AI access, landing folders and the Consumption model.
+ * @typedef {object} ConsumptionConfig
+ * @property {string} [azureSubscriptionId]  Where the Azure AI resources are. Empty when Azure AI was left out.
+ * @property {string} [azureSubscriptionName]
+ * @property {boolean} [azureAccess]  The app has the Azure roles the notebook needs there.
+ * @property {boolean} [landing]  The landing folders exist.
+ * @property {ModelConfig} model
  */
 
 /**
@@ -48,10 +68,12 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {string} [name]
  * @property {string} [url]
  * @property {string} [profile]
+ * @property {string[]} [models]  Model aliases the app was built with. Older records mean just "vl".
  * @property {string} [deployedAt]
  */
 
 export const MODEL_NAME = 'ValueLens Model';
+export const CONSUMPTION_MODEL_NAME = 'ValueLens Consumption Model';
 
 /** @returns {InstallConfig} */
 export function emptyConfig() {
@@ -65,6 +87,7 @@ export function emptyConfig() {
     fabric: { notebooks: {} },
     semanticModel: { name: MODEL_NAME },
     fabricApp: {},
+    consumption: { model: { name: CONSUMPTION_MODEL_NAME } },
   };
 }
 
@@ -95,6 +118,7 @@ export function loadConfig(file) {
     fabric: { ...base.fabric, ...(raw.fabric ?? {}), notebooks: { ...(raw.fabric?.notebooks ?? {}) } },
     semanticModel: { ...base.semanticModel, ...(raw.semanticModel ?? {}) },
     fabricApp: { ...(raw.fabricApp ?? {}) },
+    consumption: { ...(raw.consumption ?? {}), model: { ...base.consumption.model, ...(raw.consumption?.model ?? {}) } },
   };
   assertNoSecrets(config);
   return { config, existed: true };

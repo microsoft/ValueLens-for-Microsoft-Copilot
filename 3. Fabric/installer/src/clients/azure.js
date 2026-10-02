@@ -11,6 +11,9 @@ const AUTHORIZATION_API = '2022-04-01';
 export const ROLES = {
   keyVaultSecretsOfficer: 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7',
   keyVaultSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6',
+  reader: 'acdd72a7-3385-48ef-bd42-f606fba81ae7',
+  costManagementReader: '72fafb9e-0641-4937-9268-a91bfd8191a3',
+  monitoringReader: '43d0d8ad-25c7-4714-9337-8ba259a9fe05',
 };
 
 /**
@@ -105,6 +108,10 @@ export function armApi(http) {
     /** @param {string} subscriptionId */
     listVaults: (subscriptionId) =>
       http.list(`/subscriptions/${subscriptionId}/providers/Microsoft.KeyVault/vaults`, { query: { 'api-version': KEY_VAULT_API } }),
+
+    /** Azure OpenAI, AI Foundry and other AI services accounts. @param {string} subscriptionId */
+    listAiAccounts: (subscriptionId) =>
+      http.list(`/subscriptions/${subscriptionId}/providers/Microsoft.CognitiveServices/accounts`, { query: { 'api-version': '2023-05-01' }, maxRetries: 1 }),
 
     /** @param {string} subscriptionId @param {string} name @returns {Promise<{ nameAvailable: boolean, message?: string }>} */
     checkVaultName: (subscriptionId, name) =>

@@ -266,6 +266,18 @@ export function notebookSettings(ctx, nb) {
     ...(nb.key === 'refreshModel'
       ? { values: { WORKSPACE_ID: /** @type {string} */ (f.workspaceId), SEMANTIC_MODEL_ID: /** @type {string} */ (config.semanticModel.id) } }
       : {}),
+    ...(nb.key === 'azureAi'
+      ? {
+          values: {
+            SUBSCRIPTION_ID: /** @type {string} */ (config.consumption.azureSubscriptionId),
+            TENANT_ID: user.tenantId,
+            CLIENT_ID: /** @type {string} */ (config.app.appId),
+            KEY_VAULT_URL: /** @type {string} */ (config.keyVault.uri),
+            CLIENT_SECRET_NAME: config.keyVault.secretName,
+          },
+        }
+      : {}),
+    patches: nb.patches,
     lakehouse: {
       id: /** @type {string} */ (f.lakehouseId),
       name: /** @type {string} */ (f.lakehouseName),
@@ -286,7 +298,7 @@ export async function ensureNotebooks(ctx, opts = {}) {
   const items = await api.fabric.listItems(ws, 'Notebook');
   const ids = new Set(items.map((i) => i.id));
 
-  for (const nb of notebooksFor(config.modules, { semanticModel: modelDeployed(config) })) {
+  for (const nb of notebooksFor(config.modules, { semanticModel: modelDeployed(config), azureAi: azureAiOn(config) })) {
     const content = serialiseNotebook(prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb)));
     let id = f.notebooks[nb.key];
     if (id && !ids.has(id)) {
@@ -322,8 +334,11 @@ export async function ensureNotebooks(ctx, opts = {}) {
  * @param {import('../config.js').InstallConfig} config
  */
 export function pipelineSignature(config) {
-  const modules = enabledModules(config.modules).join(',');
-  return modelDeployed(config) ? `${modules};model=${config.semanticModel.id}` : modules;
+  const parts = [enabledModules(config.modules).join(',')];
+  if (modelDeployed(config)) parts.push(`model=${config.semanticModel.id}`);
+  if (azureAiOn(config)) parts.push('azureAi');
+  if (consumptionModelDeployed(config)) parts.push(`consumption=${config.consumption.model.id}`);
+  return parts.join(';');
 }
 
 /**
@@ -331,6 +346,18 @@ export function pipelineSignature(config) {
  * @param {import('../config.js').InstallConfig} config
  */
 export const modelDeployed = (config) => !!(config.semanticModel?.enabled && config.semanticModel.id && config.semanticModel.bound);
+
+/**
+ * Credit consumption is on, and the app can read Azure AI costs in the chosen subscription.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const azureAiOn = (config) => !!(config.modules.consumption && config.consumption?.azureSubscriptionId && config.consumption.azureAccess);
+
+/**
+ * The consumption model exists and reads the Lakehouse. It is refreshed by the same notebook as the ValueLens model.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const consumptionModelDeployed = (config) => !!(config.modules.consumption && modelDeployed(config) && config.consumption?.model?.id && config.consumption.model.bound);
 
 /**
  * @param {Ctx} ctx
@@ -346,6 +373,8 @@ export async function ensurePipeline(ctx, opts = {}) {
     modules: config.modules,
     backfillDays: config.history.days,
     semanticModelId: modelDeployed(config) ? config.semanticModel.id : undefined,
+    azureAi: azureAiOn(config),
+    consumptionModelId: consumptionModelDeployed(config) ? config.consumption.model.id : undefined,
   });
   const signature = pipelineSignature(config);
   const items = await api.fabric.listItems(ws, 'DataPipeline');

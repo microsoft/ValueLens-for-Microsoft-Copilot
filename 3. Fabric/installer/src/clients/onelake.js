@@ -1,5 +1,5 @@
 // @ts-check
-/** Reads small files from a Lakehouse through the OneLake (ADLS Gen2) endpoint. */
+/** Reads small files from, and makes folders in, a Lakehouse through the OneLake (ADLS Gen2) endpoint. */
 import { HttpError } from '../http.js';
 
 export const ONELAKE_URL = 'https://onelake.dfs.fabric.microsoft.com';
@@ -7,6 +7,8 @@ export const ONELAKE_URL = 'https://onelake.dfs.fabric.microsoft.com';
 /** @param {import('../http.js').HttpClient} http  A client whose base URL is ONELAKE_URL. */
 export function oneLakeApi(http) {
   const headers = { 'x-ms-version': '2023-11-03' };
+  const url = (/** @type {string} */ workspaceId, /** @type {string} */ lakehouseId, /** @type {string} */ path) =>
+    `/${workspaceId}/${lakehouseId}/${path.split('/').map(encodeURIComponent).join('/')}`;
   return {
     /**
      * Returns the parsed JSON, or null when the file isn't there.
@@ -16,10 +18,27 @@ export function oneLakeApi(http) {
      */
     async readJson(workspaceId, lakehouseId, path) {
       try {
-        const data = await http.get(`/${workspaceId}/${lakehouseId}/${path.split('/').map(encodeURIComponent).join('/')}`, { headers });
+        const data = await http.get(url(workspaceId, lakehouseId, path), { headers });
         return typeof data === 'string' ? JSON.parse(data) : data;
       } catch (err) {
         if (err instanceof HttpError && err.status === 404) return null;
+        throw err;
+      }
+    },
+
+    /**
+     * Creates a folder, and any missing parents. Returns false when it was already there.
+     * @param {string} workspaceId
+     * @param {string} lakehouseId
+     * @param {string} path  Relative to the Lakehouse root, e.g. Files/landing/studio.
+     */
+    async createDirectory(workspaceId, lakehouseId, path) {
+      try {
+        // If-None-Match stops the call replacing a folder that already holds files.
+        await http.put(url(workspaceId, lakehouseId, path), undefined, { query: { resource: 'directory' }, headers: { ...headers, 'If-None-Match': '*' } });
+        return true;
+      } catch (err) {
+        if (err instanceof HttpError && err.status === 409) return false;
         throw err;
       }
     },

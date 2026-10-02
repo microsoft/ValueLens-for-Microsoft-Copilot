@@ -15,12 +15,13 @@ import { saveConfig } from './config.js';
 import { createClient, defaultSleep } from './http.js';
 import { ensureConsent, ensureApp, ensureKeyVault, newSecret } from './steps/identity.js';
 import { deployApp, ensureFabricApp } from './steps/app.js';
-import { describeSchedule, ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, ensureVaultEndpoint, ensureWorkspace, modelDeployed, notebookSettings, PIPELINE_NAME } from './steps/fabric.js';
+import { consumptionModelWanted, consumptionSummary, ensureAzureAiAccess, ensureConsumptionModel, ensureLandingFolders } from './steps/consumption.js';
+import { consumptionModelDeployed, describeSchedule, ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, ensureVaultEndpoint, ensureWorkspace, modelDeployed, notebookSettings, PIPELINE_NAME } from './steps/fabric.js';
 import { ensureModelConnection, ensureSemanticModel, modelUrl, refreshModel, rotateModelSecret } from './steps/model.js';
 import { confirmPlan, plan, preflight } from './steps/plan.js';
 import { runDataCheck, runPipeline, status } from './steps/run.js';
 import { prepareNotebook, serialiseNotebook } from './transform/notebook.js';
-import { buildModel, loadTemplateModel } from './transform/model.js';
+import { buildConsumptionModel, buildModel, loadTemplateModel } from './transform/model.js';
 import { buildPipeline } from './transform/pipeline.js';
 import { c } from './ui.js';
 
@@ -122,12 +123,14 @@ export async function install(ctx, opts) {
   const sm = config.semanticModel;
   const withModel = !!sm.enabled;
   const withApp = withModel && !!config.fabricApp.enabled;
+  const withConsumption = !!config.modules.consumption;
   const titles = [
     'Key Vault',
     'App registration',
     'Microsoft Graph permissions',
     'Workspace and Lakehouse',
     ...(withModel ? ['Semantic model'] : []),
+    ...(withConsumption ? ['Credit consumption'] : []),
     'Notebooks, pipeline and schedule',
     ...(withApp ? ['ValueLens app'] : []),
     ...(ctx.runFirstLoad ? ['First load'] : withModel ? ['Model refresh'] : []),
@@ -150,6 +153,10 @@ export async function install(ctx, opts) {
     await ensureSemanticModel(ctx);
     await ensureModelConnection(ctx);
   }
+  if (withConsumption) {
+    step('Credit consumption');
+    await consumptionSteps(ctx);
+  }
   step('Notebooks, pipeline and schedule');
   await ensureNotebooks(ctx);
   await ensurePipeline(ctx);
@@ -166,16 +173,44 @@ export async function install(ctx, opts) {
     } else if (!vaultReachable) {
       ui.warn(`Skipped until the private endpoint to ${config.keyVault.name} is approved. Then run: valuelens-install run --backfill-days ${config.history.days}`);
     } else {
-      if (modelDeployed(config)) ui.note(`The pipeline refreshes ${sm.name} as its last step.`);
+      if (modelDeployed(config)) ui.note(`The pipeline refreshes ${[sm.name, ...(consumptionModelDeployed(config) ? [config.consumption.model.name] : [])].join(' and ')} as its last step.`);
       const result = await runPipeline(ctx, { backfillDays: config.history.days, wait: opts.wait, first: true });
       if (result.ok) await runDataCheck(ctx);
     }
   } else if (withModel) {
     step('Model refresh');
-    if (modelDeployed(config)) await refreshModel(ctx, { wait: opts.wait });
-    else ui.warn(`Skipped: ${sm.name} isn't connected to the Lakehouse yet.`);
+    await refreshModels(ctx, { wait: opts.wait });
   }
   await summary(ctx);
+}
+
+/**
+ * Azure AI access, the upload folders and the Consumption model.
+ * @param {Ctx} ctx
+ * @param {{ force?: boolean }} [opts]
+ */
+async function consumptionSteps(ctx, opts = {}) {
+  await ensureAzureAiAccess(ctx);
+  await ensureLandingFolders(ctx);
+  if (consumptionModelWanted(ctx)) await ensureConsumptionModel(ctx, opts);
+}
+
+/**
+ * Refreshes the ValueLens model and, when it is deployed, the Consumption model.
+ * @param {Ctx} ctx
+ * @param {{ wait?: boolean }} opts
+ */
+async function refreshModels(ctx, opts) {
+  const { ui, config } = ctx;
+  /** @type {{ ok: boolean, status?: string }} */
+  let result = { ok: false };
+  if (modelDeployed(config)) result = await refreshModel(ctx, opts);
+  else ui.warn(`Skipped: ${config.semanticModel.name} isn't connected to the Lakehouse yet.`);
+  if (consumptionModelDeployed(config)) {
+    const cc = await refreshModel(ctx, { ...opts, model: config.consumption.model });
+    result = { ...result, ok: result.ok && cc.ok };
+  }
+  return result;
 }
 
 /**
@@ -213,13 +248,14 @@ export async function update(ctx, opts = {}) {
     await ensureSemanticModel(ctx, { force: true });
     await ensureModelConnection(ctx);
   }
+  if (config.modules.consumption) await consumptionSteps(ctx, { force: true });
   await ensureNotebooks(ctx, { force: true });
   await ensurePipeline(ctx, { force: true });
   await ensureSchedule(ctx);
   if (sm.enabled && config.fabricApp.enabled && (await ui.confirm('Rebuild and redeploy the ValueLens app too?', true))) await tryDeployApp(ctx, { force: true });
   if (modelDeployed(config)) {
-    ui.note('Updating the model clears its data, so it refreshes now.');
-    await refreshModel(ctx, { wait: opts.wait ?? true });
+    ui.note('Updating a model clears its data, so it refreshes now.');
+    await refreshModels(ctx, { wait: opts.wait ?? true });
   }
   ui.ok('Up to date. The next scheduled run uses the new versions.');
 }
@@ -237,13 +273,14 @@ export async function run(ctx, opts) {
 export { status };
 
 /**
- * Refreshes the semantic model now.
+ * Refreshes the semantic models now.
  * @param {Ctx} ctx
  * @param {{ wait: boolean }} opts
  */
 export async function refresh(ctx, opts) {
   if (!ctx.config.semanticModel.id) throw new Error('There is no semantic model yet. Run the installer and choose to deploy it.');
-  return refreshModel(ctx, opts);
+  if (!consumptionModelDeployed(ctx.config)) return refreshModel(ctx, opts);
+  return refreshModels(ctx, opts);
 }
 
 /**
@@ -305,6 +342,7 @@ export async function summary(ctx) {
     ui.info('2. Scheduled runs read the Key Vault secret as you, the schedule\'s owner, and refresh the model');
     ui.info('   as you. Anyone who takes over the pipeline needs "get" on the secret and Contributor on the workspace.');
     ui.info(`3. Keep ${c.bold('valuelens-install.json')}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);
+    if (config.modules.consumption) consumptionSummary(ctx);
     return;
   }
 
@@ -324,6 +362,7 @@ export async function summary(ctx) {
   ui.info('3. Scheduled runs read the Key Vault secret as you, the schedule\'s owner. Anyone who edits the');
   ui.info('   pipeline or takes over the schedule needs "get" on the secret first.');
   ui.info(`4. Keep ${c.bold('valuelens-install.json')}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);
+  if (config.modules.consumption) consumptionSummary(ctx);
 }
 
 /**
@@ -337,6 +376,9 @@ export function preview(o) {
   const f = config.fabric;
   const sm = config.semanticModel;
   const withModel = sm.enabled !== false && !!sources.modelFile;
+  const cc = config.consumption;
+  const withConsumptionModel = withModel && !!config.modules.consumption && !!sources.consumptionModelFile;
+  const withAzureAi = !!config.modules.consumption && !!cc.azureSubscriptionId;
   /** @type {Ctx} */
   const ctx = /** @type {any} */ ({
     config: {
@@ -351,13 +393,14 @@ export function preview(o) {
         notebooks: { ...f.notebooks },
       },
       semanticModel: withModel ? { ...sm, id: sm.id ?? fake(4), bound: true } : { ...sm, enabled: false },
+      consumption: { ...cc, model: { ...cc.model, id: cc.model.id ?? fake(5), bound: true } },
     },
     user: { tenantId: config.tenantId ?? fake(0) },
   });
 
   mkdirSync(join(out, 'notebooks'), { recursive: true });
   let n = 10;
-  for (const nb of notebooksFor(config.modules, { semanticModel: withModel })) {
+  for (const nb of notebooksFor(config.modules, { semanticModel: withModel, azureAi: withAzureAi })) {
     const prepared = prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb));
     writeFileSync(join(out, 'notebooks', `${nb.displayName}.ipynb`), serialiseNotebook(prepared), 'utf8');
     ctx.config.fabric.notebooks[nb.key] = ctx.config.fabric.notebooks[nb.key] ?? fake(n++);
@@ -368,6 +411,8 @@ export function preview(o) {
     modules: config.modules,
     backfillDays: config.history.days,
     semanticModelId: withModel ? ctx.config.semanticModel.id : undefined,
+    azureAi: withAzureAi,
+    consumptionModelId: withConsumptionModel ? ctx.config.consumption.model.id : undefined,
   });
   writeFileSync(join(out, 'pipeline-content.json'), `${JSON.stringify(pipeline, null, 2)}\n`, 'utf8');
   writeFileSync(join(out, 'schedule.json'), `${JSON.stringify(scheduleBody(config.schedule, o.now), null, 2)}\n`, 'utf8');
@@ -384,8 +429,16 @@ export function preview(o) {
     });
     writeFileSync(join(out, 'model.bim'), `${JSON.stringify(bim, null, 2)}\n`, 'utf8');
   }
+  if (withConsumptionModel) {
+    const bim = buildConsumptionModel(loadTemplateModel(/** @type {string} */ (sources.consumptionModelFile)), {
+      server: sm.server ?? 'your-endpoint.datawarehouse.fabric.microsoft.com',
+      database: /** @type {string} */ (ctx.config.fabric.lakehouseName),
+    });
+    writeFileSync(join(out, 'consumption-model.bim'), `${JSON.stringify(bim, null, 2)}\n`, 'utf8');
+  }
 
+  const models = [withModel ? 'model.bim' : '', withConsumptionModel ? 'consumption-model.bim' : ''].filter(Boolean);
   ui.heading('Preview written');
   ui.info(out);
-  ui.note(`Notebooks, pipeline-content.json, schedule.json${withModel ? ', model.bim' : ''} and graph-permissions.txt, with placeholder IDs where none are known yet.`);
+  ui.note(`Notebooks, pipeline-content.json, schedule.json${models.map((m) => `, ${m}`).join('')} and graph-permissions.txt, with placeholder IDs where none are known yet.`);
 }

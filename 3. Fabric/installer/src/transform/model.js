@@ -7,6 +7,8 @@ import { readFileSync } from 'node:fs';
 import { readZipEntry } from './zip.js';
 
 export const MODEL_TEMPLATE = 'ValueLens - Fabric.pbit';
+/** The credit consumption report from Consumption Central, relative to `3. Fabric`. */
+export const CONSUMPTION_TEMPLATE = 'Add Credit Consumption/Consumption Central - Fabric.pbit';
 
 /** The table that has an incremental refresh policy. */
 export const AUDIT_TABLE = 'Chat + Agent Interactions (Audit Logs)';
@@ -109,6 +111,20 @@ export function buildModel(template, settings) {
   for (const [parameter, module] of SWITCHES) {
     if (model.expressions?.some((e) => e.name === parameter)) setMParameter(model, parameter, settings.modules[module] ? 'Include' : 'Exclude');
   }
+  return { compatibilityLevel: template.compatibilityLevel, model };
+}
+
+/**
+ * The credit consumption model. Every table in it is optional, so it deploys and
+ * refreshes before any consumption data has landed.
+ * @param {ModelBim} template
+ * @param {{ server: string, database: string }} settings
+ * @returns {ModelBim}
+ */
+export function buildConsumptionModel(template, settings) {
+  const model = structuredClone(template.model);
+  setMParameter(model, 'FabricSQLEndpoint', settings.server);
+  setMParameter(model, 'LakehouseName', settings.database);
   return { compatibilityLevel: template.compatibilityLevel, model };
 }
 

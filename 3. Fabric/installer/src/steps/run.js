@@ -169,7 +169,9 @@ export async function status(ctx) {
   ui.info(`Lakehouse: ${f.lakehouseName ?? f.lakehouseId}`);
   ui.info(`Pipeline:  ${f.pipelineName ?? f.pipelineId}`);
   const sm = config.semanticModel;
+  const cm = config.consumption?.model;
   if (sm?.id) ui.info(`Model:     ${sm.name}${sm.bound ? '' : ' (not connected to the Lakehouse yet)'}`);
+  if (cm?.id) ui.info(`Model:     ${cm.name}${cm.bound ? '' : ' (not connected to the Lakehouse yet)'}`);
   if (config.fabricApp?.itemId) ui.info(`App:       ${config.fabricApp.name}  ${c.dim(config.fabricApp.url ?? '')}`);
   expiry(ctx, 'Client secret', config.app.secretExpires);
   if (sm?.connectionId) expiry(ctx, 'Model connection secret', sm.secretExpires);
@@ -200,10 +202,11 @@ export async function status(ctx) {
     }
   }
 
-  if (sm?.id) {
-    const refreshes = await modelRefreshes(ctx).catch(() => null);
+  for (const m of [sm, cm]) {
+    if (!m?.id) continue;
+    const refreshes = await modelRefreshes(ctx, m).catch(() => null);
     if (refreshes) {
-      ui.heading('Model refreshes');
+      ui.heading(m === sm ? 'Model refreshes' : `${m.name} refreshes`);
       if (!refreshes.length) ui.note('No refreshes yet.');
       for (const r of refreshes) {
         const start = utc(r.startTime);

@@ -44,9 +44,63 @@ const BINDINGS = {
  * @property {import('../catalog.js').ModuleChoice} modules
  * @property {number} [backfillDays]  Default for BackfillDays.
  * @property {string} [semanticModelId]  Adds a last step that refreshes this model.
+ * @property {boolean} [azureAi]  Runs the Azure AI notebook (credit consumption).
+ * @property {string} [consumptionModelId]  Adds a step that refreshes the consumption model.
  */
 
 export const REFRESH_ACTIVITY = 'Refresh_Semantic_Model';
+export const CONSUMPTION_REFRESH_ACTIVITY = 'Refresh_Consumption_Model';
+
+/** The credit consumption notebooks, as pipeline activities. */
+export const CONSUMPTION_ACTIVITIES = /** @type {const} */ ([
+  {
+    key: 'azureAi',
+    name: 'Run_Consumption_Azure_AI',
+    description: 'Azure AI spend from Cost Management and token use from Azure Monitor, for one subscription. Writes azure_ai_spend and azure_ai_tokens.',
+    timeout: '0.01:00:00',
+    // New Azure role assignments can take several minutes to apply.
+    retries: 2,
+    retryIntervalInSeconds: 300,
+  },
+  {
+    key: 'studioConsumption',
+    name: 'Run_Consumption_Studio',
+    description: 'Loads the Copilot Studio exports from Files/landing/studio. Writes studio_tenant_daily, studio_agent and studio_user. Does nothing when the folder is empty.',
+    timeout: '0.00:30:00',
+  },
+  {
+    key: 'vivaConsumption',
+    name: 'Run_Consumption_Viva',
+    description: 'Loads Viva Insights Copilot credit CSVs from Files/landing/viva. Writes viva_credits_weekly and viva_spending_policy. Does nothing when the folder is empty.',
+    timeout: '0.00:30:00',
+  },
+]);
+
+/**
+ * A step that runs ValueLens_Refresh_Model against one model.
+ * @param {PipelineSettings} settings
+ * @param {{ name: string, description: string, modelId: string, dependsOn: any[], writeMode: any }} o
+ */
+function refreshStep(settings, o) {
+  const notebookId = settings.notebookIds.refreshModel;
+  if (!notebookId) throw new Error('The semantic model refresh notebook has not been deployed.');
+  return {
+    name: o.name,
+    description: o.description,
+    type: 'TridentNotebook',
+    dependsOn: o.dependsOn,
+    policy: { timeout: '0.03:00:00', retry: 0, retryIntervalInSeconds: 60, secureOutput: false, secureInput: false },
+    typeProperties: {
+      notebookId,
+      workspaceId: settings.workspaceId,
+      parameters: {
+        WORKSPACE_ID: { value: settings.workspaceId, type: 'string' },
+        SEMANTIC_MODEL_ID: { value: o.modelId, type: 'string' },
+        WRITE_MODE: { value: o.writeMode, type: 'string' },
+      },
+    },
+  };
+}
 
 /**
  * Runs once the curated table is built and the optional tables have had their turn,
@@ -55,29 +109,57 @@ export const REFRESH_ACTIVITY = 'Refresh_Semantic_Model';
  * @param {PipelineSettings} settings
  */
 function refreshActivity(activities, settings) {
-  const notebookId = settings.notebookIds.refreshModel;
-  if (!notebookId) throw new Error('The semantic model refresh notebook has not been deployed.');
   const has = (/** @type {string} */ name) => activities.some((a) => a.name === name);
   const dependsOn = [{ activity: 'Run_Audit_Log_Processor', dependencyConditions: ['Succeeded'] }];
   for (const name of ['Conditionally_Run_Org_Data', 'Conditionally_Run_Product_Feedback']) {
     if (has(name)) dependsOn.push({ activity: name, dependencyConditions: ['Completed'] });
   }
-  return {
+  return refreshStep(settings, {
     name: REFRESH_ACTIVITY,
     description: 'Refreshes the ValueLens semantic model. After a backfill it reloads every partition of the audit table.',
-    type: 'TridentNotebook',
+    modelId: /** @type {string} */ (settings.semanticModelId),
     dependsOn,
-    policy: { timeout: '0.03:00:00', retry: 0, retryIntervalInSeconds: 60, secureOutput: false, secureInput: false },
-    typeProperties: {
-      notebookId,
-      workspaceId: settings.workspaceId,
-      parameters: {
-        WORKSPACE_ID: { value: settings.workspaceId, type: 'string' },
-        SEMANTIC_MODEL_ID: { value: settings.semanticModelId, type: 'string' },
-        WRITE_MODE: { value: { value: '@pipeline().parameters.ProcessorWriteMode', type: 'Expression' }, type: 'string' },
-      },
-    },
-  };
+    writeMode: { value: '@pipeline().parameters.ProcessorWriteMode', type: 'Expression' },
+  });
+}
+
+/**
+ * One activity per consumption notebook. They don't depend on the audit load or on each other.
+ * @param {PipelineSettings} settings
+ */
+function consumptionActivities(settings) {
+  return CONSUMPTION_ACTIVITIES.filter((a) => a.key !== 'azureAi' || settings.azureAi).map((/** @type {{ key: 'azureAi' | 'studioConsumption' | 'vivaConsumption', name: string, description: string, timeout: string, retries?: number, retryIntervalInSeconds?: number }} */ a) => {
+    const notebookId = settings.notebookIds[a.key];
+    if (!notebookId) throw new Error(`The ${a.name.replace(/^Run_/, '').replace(/_/g, ' ')} notebook has not been deployed.`);
+    return {
+      name: a.name,
+      description: a.description,
+      type: 'TridentNotebook',
+      dependsOn: [],
+      policy: { timeout: a.timeout, retry: a.retries ?? 1, retryIntervalInSeconds: a.retryIntervalInSeconds ?? 120, secureOutput: false, secureInput: false },
+      typeProperties: { notebookId, workspaceId: settings.workspaceId, parameters: {} },
+    };
+  });
+}
+
+/**
+ * Refreshes the consumption model only when every consumption load succeeded, so a
+ * failed collection never shows up as an empty page.
+ * @param {any[]} activities
+ * @param {PipelineSettings} settings
+ */
+function consumptionRefreshActivity(activities, settings) {
+  const dependsOn = activities
+    .filter((a) => CONSUMPTION_ACTIVITIES.some((c) => c.name === a.name))
+    .map((a) => ({ activity: a.name, dependencyConditions: ['Succeeded'] }));
+  if (activities.some((a) => a.name === 'Conditionally_Run_Org_Data')) dependsOn.push({ activity: 'Conditionally_Run_Org_Data', dependencyConditions: ['Completed'] });
+  return refreshStep(settings, {
+    name: CONSUMPTION_REFRESH_ACTIVITY,
+    description: 'Refreshes the consumption model once every consumption load has succeeded.',
+    modelId: /** @type {string} */ (settings.consumptionModelId),
+    dependsOn,
+    writeMode: 'merge',
+  });
 }
 
 /**
@@ -136,10 +218,15 @@ export function buildPipeline(template, settings) {
   if (left.length) throw new Error(`Pipeline still has placeholders: ${[...new Set(left)].join(', ')}`);
 
   if (settings.semanticModelId) filled.properties.activities.push(refreshActivity(filled.properties.activities, settings));
+  if (settings.modules.consumption) {
+    filled.properties.activities.push(...consumptionActivities(settings));
+    if (settings.consumptionModelId) filled.properties.activities.push(consumptionRefreshActivity(filled.properties.activities, settings));
+  }
 
   filled.properties.description =
     'Created by the ValueLens installer. Runs the ingesters, then the Audit Log Processor' +
     `${settings.semanticModelId ? ', then refreshes the semantic model' : ''}. ` +
+    `${settings.modules.consumption ? `The credit consumption loads run alongside${settings.consumptionModelId ? ' and refresh the consumption model when they all succeed' : ''}. ` : ''}` +
     'Scheduled runs use the parameter defaults (incremental audit load, merge into the curated table). ' +
     'The first run overrides them with AuditMode=backfill and ProcessorWriteMode=overwrite. ' +
     'Re-run the installer with "update" to pick up new notebook and pipeline versions.';
