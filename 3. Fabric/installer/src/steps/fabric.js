@@ -4,6 +4,7 @@
  * install record points at; `update` pushes fresh notebook and pipeline content.
  */
 import { enabledModules, notebooksFor } from '../catalog.js';
+import { parseResourceId } from '../clients/azure.js';
 import { scheduleBody } from '../clients/fabric.js';
 import { HttpError } from '../http.js';
 import { prepareNotebook, serialiseNotebook } from '../transform/notebook.js';
@@ -101,6 +102,147 @@ export async function ensureLakehouse(ctx) {
     ui.ok(`Created Lakehouse "${name}"`);
   }
   ctx.save();
+}
+
+export const ENDPOINT_POLL_MS = 15_000;
+const ENDPOINT_MAX_POLLS = 80;
+
+/** Fabric allows up to 64 characters. @param {string} vaultName */
+export const endpointName = (vaultName) => `valuelens-${vaultName}`.slice(0, 64);
+
+/**
+ * Shown to whoever approves the request on the vault. It carries the workspace ID so
+ * the installer can tell its own request from others.
+ * @param {string} workspaceId
+ */
+export const endpointRequest = (workspaceId) => `ValueLens: Fabric workspace ${workspaceId} reads the app secret.`;
+
+/** @param {string | undefined} a @param {string | undefined} b */
+const sameResource = (a, b) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
+
+/**
+ * Polls a managed private endpoint until `done`, for up to 20 minutes.
+ * @param {Ctx} ctx
+ * @param {any} endpoint
+ * @param {(e: any) => boolean} done
+ * @param {string} waiting  e.g. "Fabric is provisioning the private endpoint"
+ */
+async function pollEndpoint(ctx, endpoint, done, waiting) {
+  const ws = /** @type {string} */ (ctx.config.fabric.workspaceId);
+  let e = endpoint;
+  for (let i = 0; !done(e); i++) {
+    if (i === ENDPOINT_MAX_POLLS) throw new Error(`${waiting} for more than 20 minutes. Run the installer again later to carry on.`);
+    if (i === 0) ctx.ui.info(`${waiting}. This usually takes a few minutes.`);
+    await ctx.sleep(ENDPOINT_POLL_MS);
+    e = await ctx.api.fabric.getPrivateEndpoint(ws, e.id);
+  }
+  return e;
+}
+
+/**
+ * Approves the workspace's request on the vault. Returns true once the vault shows it
+ * approved, false if the request hasn't arrived or the user may not approve it.
+ * @param {Ctx} ctx
+ * @param {any} endpoint
+ */
+async function approveOnVault(ctx, endpoint) {
+  const { ui, api, config } = ctx;
+  const kv = config.keyVault;
+  const ws = /** @type {string} */ (config.fabric.workspaceId);
+  const ours = (/** @type {any} */ conn) =>
+    String(conn.properties?.privateLinkServiceConnectionState?.description ?? '').includes(ws) ||
+    String(conn.properties?.privateEndpoint?.id ?? '').toLowerCase().includes(String(endpoint.name).toLowerCase());
+  for (let i = 0; i < 8; i++) {
+    const mine = (await api.arm.listPrivateEndpointConnections(/** @type {string} */ (kv.id))).filter(ours);
+    if (mine.some((conn) => conn.properties?.privateLinkServiceConnectionState?.status === 'Approved')) return true;
+    const pending = mine.filter((conn) => conn.properties?.privateLinkServiceConnectionState?.status === 'Pending');
+    if (pending.length) {
+      try {
+        for (const conn of pending) await api.arm.approvePrivateEndpointConnection(conn.id, 'Approved by the ValueLens installer.');
+      } catch (err) {
+        if (err instanceof HttpError && err.status === 403) return false;
+        throw err;
+      }
+      ui.ok(`Approved the workspace's private endpoint on ${kv.name}`);
+      return true;
+    }
+    await ctx.sleep(ENDPOINT_POLL_MS);
+  }
+  return false;
+}
+
+/**
+ * Fabric can only read a vault that blocks public access through a managed private
+ * endpoint. Creates one from the workspace, approves it on the vault, and waits until
+ * notebooks can use it. Returns false if it isn't approved yet.
+ * @param {Ctx} ctx
+ */
+export async function ensureVaultEndpoint(ctx) {
+  const { ui, config, api } = ctx;
+  const kv = config.keyVault;
+  const f = config.fabric;
+  if (!kv.private) return true;
+  const ws = /** @type {string} */ (f.workspaceId);
+  const vaultId = /** @type {string} */ (kv.id);
+
+  let endpoint = (await api.fabric.listPrivateEndpoints(ws)).find((e) => sameResource(e.targetPrivateLinkResourceId, vaultId));
+  if (!endpoint) {
+    const { subscriptionId } = parseResourceId(vaultId);
+    if (await api.arm.ensureProvider(subscriptionId, 'Microsoft.Network')) ui.ok('Registered the Microsoft.Network resource provider');
+    try {
+      endpoint = await api.fabric.createPrivateEndpoint(ws, {
+        name: endpointName(/** @type {string} */ (kv.name)),
+        targetPrivateLinkResourceId: vaultId,
+        targetSubresourceType: 'vault',
+        requestMessage: endpointRequest(ws),
+      });
+    } catch (err) {
+      throw new Error(
+        `Fabric couldn't create a managed private endpoint to ${kv.name} (${/** @type {Error} */ (err).message}). ` +
+          'They need an F or trial capacity in a region where Fabric Data Engineering runs.',
+      );
+    }
+    ui.ok(`Created a managed private endpoint from the workspace to ${kv.name}`);
+  }
+  f.vaultEndpointId = endpoint.id;
+  ctx.save();
+
+  endpoint = await pollEndpoint(ctx, endpoint, (e) => !['Provisioning', 'Updating'].includes(e.provisioningState), 'Fabric is provisioning the private endpoint');
+  if (endpoint.provisioningState === 'Failed') {
+    throw new Error(`The managed private endpoint to ${kv.name} failed to provision. Delete it under the workspace's Network security settings, then run the installer again.`);
+  }
+
+  for (;;) {
+    const status = endpoint.connectionState?.status;
+    if (status === 'Approved') {
+      ui.ok(`The workspace reaches ${kv.name} through a managed private endpoint`);
+      return true;
+    }
+    if (status === 'Rejected' || status === 'Disconnected') {
+      throw new Error(`The private endpoint to ${kv.name} was ${status.toLowerCase()}. Delete it under the workspace's Network security settings, then run the installer again.`);
+    }
+    if (await approveOnVault(ctx, endpoint)) {
+      endpoint = await pollEndpoint(ctx, endpoint, (e) => e.connectionState?.status !== 'Pending', 'Waiting for Fabric to see the approval');
+      continue;
+    }
+    ui.warn(`The workspace's private endpoint request is waiting for approval on ${kv.name}.`);
+    ui.info('Someone who manages the vault can approve it under Networking, Private endpoint connections:');
+    ui.info(`https://portal.azure.com/#@${ctx.user.tenantId}/resource${vaultId}/networking`);
+    if (ui.yes) {
+      ui.warn('Carrying on. Data loads will fail until it is approved.');
+      return false;
+    }
+    const next = await ui.select(
+      'Once it is approved:',
+      [
+        { name: 'Check again', value: 'check' },
+        { name: 'Carry on without it (skip the first load for now)', value: 'skip' },
+      ],
+      'check',
+    );
+    if (next === 'skip') return false;
+    endpoint = await api.fabric.getPrivateEndpoint(ws, endpoint.id);
+  }
 }
 
 /**

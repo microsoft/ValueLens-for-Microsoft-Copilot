@@ -27,6 +27,28 @@ export function allowsAction(permissions, action, kind = 'actions') {
 }
 
 /**
+ * Whether a vault blocks public traffic, so Fabric can only reach it through a
+ * managed private endpoint. Azure Policy often forces this on new vaults.
+ * @param {any} vault  ARM vault resource.
+ */
+export function isPrivateVault(vault) {
+  const p = vault?.properties ?? {};
+  return p.publicNetworkAccess === 'Disabled' || p.networkAcls?.defaultAction === 'Deny';
+}
+
+const NETWORK_BLOCK = /ForbiddenByConnection|ForbiddenByFirewall|public network access is disabled|not authorized by firewall|client address is not authorized/i;
+
+/**
+ * Key Vault answers 403 both for a missing role and for a network block. Only the
+ * first is worth waiting on.
+ * @param {unknown} body  The error response body.
+ */
+export const networkBlocked = (body) => NETWORK_BLOCK.test(typeof body === 'string' ? body : JSON.stringify(body ?? ''));
+
+/** @type {(status: number, data: any) => boolean} */
+const awaitingRole = (status, data) => status === 403 && !networkBlocked(data);
+
+/**
  * Key Vault names: 3-24 characters, letters, digits and hyphens, starting with a
  * letter, ending with a letter or digit, no double hyphens.
  * @param {string} name
@@ -58,9 +80,13 @@ export function armApi(http) {
     /** @param {string} scope  e.g. /subscriptions/{id} */
     permissions: (scope) => http.list(`${scope}/providers/Microsoft.Authorization/permissions`, { query: { 'api-version': AUTHORIZATION_API } }),
 
-    /** @param {string} subscriptionId */
-    async ensureKeyVaultProvider(subscriptionId) {
-      const path = `/subscriptions/${subscriptionId}/providers/Microsoft.KeyVault`;
+    /**
+     * Registers a resource provider in the subscription. Returns true if it had to.
+     * @param {string} subscriptionId
+     * @param {string} namespace  e.g. Microsoft.KeyVault
+     */
+    async ensureProvider(subscriptionId, namespace) {
+      const path = `/subscriptions/${subscriptionId}/providers/${namespace}`;
       const p = await http.get(path, { query: { 'api-version': RESOURCES_API } });
       if (p.registrationState === 'Registered') return false;
       await http.post(`${path}/register`, undefined, { query: { 'api-version': RESOURCES_API } });
@@ -69,7 +95,7 @@ export function armApi(http) {
         const s = await http.get(path, { query: { 'api-version': RESOURCES_API } });
         if (s.registrationState === 'Registered') return true;
       }
-      throw new Error('Timed out registering the Microsoft.KeyVault resource provider.');
+      throw new Error(`Timed out registering the ${namespace} resource provider.`);
     },
 
     /** @param {string} subscriptionId @param {string} name @param {string} location */
@@ -119,6 +145,49 @@ export function armApi(http) {
     /** @param {string} vaultId */
     getVault: (vaultId) => http.get(vaultId, { query: { 'api-version': KEY_VAULT_API } }),
 
+    /**
+     * Writes a secret through Resource Manager rather than the vault's own endpoint, so it
+     * works when the vault blocks public access. Needs Microsoft.KeyVault/vaults/secrets/write
+     * (e.g. Contributor on the vault), not a data-plane role.
+     * @param {string} vaultId
+     * @param {string} name
+     * @param {string} value
+     * @param {{ expires?: Date, contentType?: string }} [o]
+     */
+    setSecret: (vaultId, name, value, o = {}) =>
+      http.put(
+        `${vaultId}/secrets/${name}`,
+        {
+          properties: {
+            value,
+            contentType: o.contentType,
+            attributes: o.expires ? { exp: Math.floor(o.expires.getTime() / 1000) } : undefined,
+          },
+          tags: { app: 'ValueLens' },
+        },
+        { query: { 'api-version': KEY_VAULT_API } },
+      ),
+    /** Reads a secret's metadata (never its value) through Resource Manager. @param {string} vaultId @param {string} name */
+    async secretExists(vaultId, name) {
+      try {
+        await http.get(`${vaultId}/secrets/${name}`, { query: { 'api-version': KEY_VAULT_API } });
+        return true;
+      } catch (err) {
+        if (err instanceof HttpError && err.status === 404) return false;
+        throw err;
+      }
+    },
+
+    /** @param {string} vaultId @returns {Promise<any[]>} */
+    listPrivateEndpointConnections: (vaultId) => http.list(`${vaultId}/privateEndpointConnections`, { query: { 'api-version': KEY_VAULT_API } }),
+    /** @param {string} connectionId  Full resource ID of the connection. @param {string} description */
+    approvePrivateEndpointConnection: (connectionId, description) =>
+      http.put(
+        connectionId,
+        { properties: { privateLinkServiceConnectionState: { status: 'Approved', description } } },
+        { query: { 'api-version': KEY_VAULT_API } },
+      ),
+
     /** Gives a user secret get/list/set on an access-policy vault. @param {string} vaultId @param {string} tenantId @param {string} objectId */
     addAccessPolicy: (vaultId, tenantId, objectId) =>
       http.put(
@@ -160,12 +229,28 @@ export function armApi(http) {
 /** @typedef {ReturnType<typeof armApi>} ArmApi */
 
 /**
- * Key Vault data plane. The first write after a new role assignment can take a few
- * minutes to be allowed, so 403 is retried for up to ten minutes.
+ * Key Vault data plane. The first call after a new role assignment can take a few
+ * minutes to be allowed, so a 403 for a missing role is retried for up to ten minutes.
+ * A 403 for a network block fails at once.
  * @param {import('../http.js').HttpClient} http  A client with an absolute-URL base.
  */
 export function keyVaultApi(http) {
+  const waitForRole = { retryIf: awaitingRole, maxRetries: 40, maxWaitMs: 10 * 60_000 };
   return {
+    /**
+     * Returns once the signed-in user can use the vault's secrets. Call it before making
+     * a secret that has nowhere else to go.
+     * @param {string} vaultUri
+     * @param {string} name
+     */
+    async waitForAccess(vaultUri, name) {
+      try {
+        await http.get(`${vaultUri.replace(/\/$/, '')}/secrets/${name}`, { query: { 'api-version': '7.4' }, ...waitForRole });
+      } catch (err) {
+        if (err instanceof HttpError && err.status === 404) return;
+        throw err;
+      }
+    },
     /**
      * @param {string} vaultUri  e.g. https://name.vault.azure.net/
      * @param {string} name
@@ -181,7 +266,7 @@ export function keyVaultApi(http) {
           attributes: o.expires ? { exp: Math.floor(o.expires.getTime() / 1000) } : undefined,
           tags: { app: 'ValueLens' },
         },
-        { query: { 'api-version': '7.4' }, retryOn: [403], maxRetries: 40, maxWaitMs: 10 * 60_000 },
+        { query: { 'api-version': '7.4' }, ...waitForRole },
       ),
     /** @param {string} vaultUri @param {string} name */
     async secretExists(vaultUri, name) {

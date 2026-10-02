@@ -133,6 +133,8 @@ export function graphApi(http) {
       http.post(`/applications/${applicationObjectId}/addPassword`, {
         passwordCredential: { displayName: 'ValueLens installer', endDateTime: endDateTime.toISOString() },
       }),
+    /** @param {string} applicationObjectId @param {string} keyId */
+    removePassword: (applicationObjectId, keyId) => http.post(`/applications/${applicationObjectId}/removePassword`, { keyId }),
 
     /** @param {string} servicePrincipalId */
     appRoleAssignments: (servicePrincipalId) => http.list(`/servicePrincipals/${servicePrincipalId}/appRoleAssignments`),

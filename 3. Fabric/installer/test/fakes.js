@@ -113,7 +113,7 @@ export function fakeFabric() {
 }
 
 /**
- * @param {{ ui?: import('../src/ui.js').Ui, fabric?: any, graph?: any, oneLake?: any, config?: import('../src/config.js').InstallConfig, now?: Date }} [o]
+ * @param {{ ui?: import('../src/ui.js').Ui, fabric?: any, graph?: any, oneLake?: any, arm?: any, keyVault?: any, config?: import('../src/config.js').InstallConfig, now?: Date }} [o]
  */
 export function fakeCtx(o = {}) {
   const config = o.config ?? emptyConfig();
@@ -133,7 +133,7 @@ export function fakeCtx(o = {}) {
       save: () => {
         saves++;
       },
-      api: { fabric: o.fabric, graph: o.graph, oneLake: o.oneLake },
+      api: { fabric: o.fabric, graph: o.graph, oneLake: o.oneLake, arm: o.arm, keyVault: o.keyVault },
       user: { id: 'user-1', upn: 'admin@contoso.com', tenantId: 'tenant-1' },
       sources: realSources(),
       sleep: async (/** @type {number} */ ms) => {

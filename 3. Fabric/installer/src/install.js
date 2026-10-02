@@ -13,7 +13,7 @@ import { ONELAKE_URL, oneLakeApi } from './clients/onelake.js';
 import { saveConfig } from './config.js';
 import { createClient, defaultSleep } from './http.js';
 import { ensureConsent, ensureApp, ensureKeyVault, newSecret } from './steps/identity.js';
-import { describeSchedule, ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, ensureWorkspace, notebookSettings, PIPELINE_NAME } from './steps/fabric.js';
+import { describeSchedule, ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, ensureVaultEndpoint, ensureWorkspace, notebookSettings, PIPELINE_NAME } from './steps/fabric.js';
 import { confirmPlan, plan, preflight } from './steps/plan.js';
 import { runDataCheck, runPipeline, status } from './steps/run.js';
 import { prepareNotebook, serialiseNotebook } from './transform/notebook.js';
@@ -122,6 +122,7 @@ export async function install(ctx, opts) {
   ui.step(4, total, 'Workspace and Lakehouse');
   await ensureWorkspace(ctx);
   await ensureLakehouse(ctx);
+  const vaultReachable = await ensureVaultEndpoint(ctx);
   ui.step(5, total, 'Notebooks, pipeline and schedule');
   await ensureNotebooks(ctx);
   await ensurePipeline(ctx);
@@ -131,6 +132,8 @@ export async function install(ctx, opts) {
     ui.step(6, total, 'First load');
     if (!consented) {
       ui.warn(`Skipped until admin consent is granted. Then run: valuelens-install run --backfill-days ${config.history.days}`);
+    } else if (!vaultReachable) {
+      ui.warn(`Skipped until the private endpoint to ${config.keyVault.name} is approved. Then run: valuelens-install run --backfill-days ${config.history.days}`);
     } else {
       const result = await runPipeline(ctx, { backfillDays: config.history.days, wait: opts.wait, first: true });
       if (result.ok) await runDataCheck(ctx);
@@ -153,6 +156,7 @@ export async function update(ctx) {
   await ensureConsent(ctx, { canConsent: await canConsent(ctx) });
   await ensureWorkspace(ctx);
   await ensureLakehouse(ctx);
+  await ensureVaultEndpoint(ctx);
   await ensureNotebooks(ctx, { force: true });
   await ensurePipeline(ctx, { force: true });
   await ensureSchedule(ctx);
@@ -200,6 +204,7 @@ export async function summary(ctx) {
   ui.info(`Lakehouse:  ${f.lakehouseName}`);
   ui.info(`Pipeline:   ${f.pipelineName ?? PIPELINE_NAME}, ${describeSchedule(config.schedule)}`);
   ui.info(`Secret:     ${config.keyVault.name} / ${config.keyVault.secretName}${config.app.secretExpires ? `, expires ${config.app.secretExpires.slice(0, 10)}` : ''}`);
+  if (config.keyVault.private) ui.info(`            ${c.dim('Private vault, reached through a managed private endpoint. Spark sessions take a few minutes longer to start.')}`);
 
   ui.heading('Connect Power BI');
   ui.info(c.bold('ValueLens - Fabric.pbit'));

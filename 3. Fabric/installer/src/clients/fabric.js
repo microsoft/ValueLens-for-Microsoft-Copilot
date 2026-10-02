@@ -71,6 +71,16 @@ export function fabricApi(http) {
     assignToCapacity: (workspaceId, capacityId) =>
       http.requestLro('POST', `/workspaces/${workspaceId}/assignToCapacity`, { body: { capacityId } }),
 
+    /** @param {string} workspaceId @returns {Promise<any[]>} */
+    listPrivateEndpoints: (workspaceId) => http.list(`/workspaces/${workspaceId}/managedPrivateEndpoints`),
+    /** @param {string} workspaceId @param {string} id */
+    getPrivateEndpoint: (workspaceId, id) => http.get(`/workspaces/${workspaceId}/managedPrivateEndpoints/${id}`),
+    /**
+     * @param {string} workspaceId
+     * @param {{ name: string, targetPrivateLinkResourceId: string, targetSubresourceType: string, requestMessage: string }} body
+     */
+    createPrivateEndpoint: (workspaceId, body) => http.post(`/workspaces/${workspaceId}/managedPrivateEndpoints`, body),
+
     /** @param {string} workspaceId @param {string} [type] */
     listItems: (workspaceId, type) => http.list(`/workspaces/${workspaceId}/items`, { query: { type } }),
     /** @param {string} workspaceId @param {string} itemId */
