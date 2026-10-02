@@ -684,7 +684,8 @@ aggregates and feedback comments only. It never shows the conversations.
 
 The last stage of the app's Value page sets what Copilot cost against the estimated value of the
 work it did. Value is the Estimated Value figure ([§5](#5-estimated-value)), at the hourly rate
-and effort scenario set on the stage before. Credit costs come from Consumption Central
+set on the stage before. The effort scenario is shared by both stages and can be switched on
+either; it starts at Typical. Credit costs come from Consumption Central
 ([§8.1](#81-consumption)).
 
 **Dates.** The days ValueLens holds activity for, inside the date filter. With Consumption Central

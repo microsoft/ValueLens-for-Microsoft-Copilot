@@ -27,7 +27,8 @@ the cost beside that agent's value. Copilot Chat by people without a licence is 
 value, because it's free with Microsoft 365.
 
 A **Prices** menu on the stage saves a licence price (the $30 US list price by default) and an
-exchange rate, alongside the shared rates. Saving rates or prices now writes only the fields that
+exchange rate, alongside the shared rates. A **Scenario** switch beside it changes the effort
+scenario here and on Estimated value; it starts at Typical. Saving rates or prices now writes only the fields that
 changed, so one person's save no longer overwrites another's. In the Consumption Central sample,
 seven of the eight Copilot Studio agents now share names with the ValueLens sample's agents, so
 the agents comparison has data. Onboarding Buddy is left unmatched on purpose. The sample's Cowork credits

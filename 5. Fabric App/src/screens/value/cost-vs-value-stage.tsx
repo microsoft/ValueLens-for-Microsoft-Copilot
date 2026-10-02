@@ -14,9 +14,11 @@ import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { ChartPanel, NoteCard, Panel, type Note } from "@/components/report-panels";
 import { Section } from "@/components/section";
+import { SegmentedControl } from "@/components/segmented-control";
 import { TermsForm, type TermField } from "@/components/terms-form";
 import { useCommercialTerms } from "@/hooks/commercial-terms.context";
 import { useThemeContext } from "@/hooks/theme.context";
+import { SCENARIOS, useValueAssumptions } from "@/hooks/value-assumptions.context";
 import { gridHeight, rowChartHeight } from "@/lib/chart-height";
 import { formatDateRange } from "@/lib/filters";
 import { formatKpi } from "@/lib/format-kpi";
@@ -102,7 +104,7 @@ function howNotes(data: CostVsValue): Note[] {
         { term: "Credits", text: creditsNote(data) },
         {
             term: "Value",
-            text: `Expert-equivalent hours at ${symbol}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort, as set under Estimated value. The range under Return uses the conservative and optimistic scenarios at the same rate.`,
+            text: `Expert-equivalent hours at ${symbol}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort. The rate is set under Estimated value; the scenario here or there. The range under Return uses the conservative and optimistic scenarios at the same rate.`,
         },
         {
             term: "Pairing",
@@ -206,6 +208,8 @@ function PricesMenu({ data }: { data: CostVsValue }) {
 
 const noop = () => {};
 
+const scenarioOptions = SCENARIOS.map((id) => ({ id, label: id }));
+
 /**
  * Stands in for the comparison until an exchange rate is set: the box to type
  * it in, right where the charts will appear.
@@ -249,11 +253,12 @@ function RatePrompt({ symbol }: { symbol: string }) {
 /**
  * Sets what Copilot cost over the dates against the estimated value of the
  * work it did: licences against licensed users' Copilot chat and apps, Copilot Studio credits
- * against agents, and Cowork credits against Cowork, at the rate and effort
- * scenario chosen on the Estimated value stage.
+ * against agents, and Cowork credits against Cowork, at the rate chosen on
+ * the Estimated value stage and the effort scenario shared with it.
  */
 export function CostVsValueStage() {
     const data = useCostVsValue();
+    const { setScenario } = useValueAssumptions();
     const { theme } = useThemeContext();
     const { symbol, rate, scenario, span, comparison, costs, usd, convertible, credits, summary, agents } = data;
     const counted = credits.kind === "ready";
@@ -316,7 +321,6 @@ export function CostVsValueStage() {
     );
 
     const needRate = "Needs an exchange rate, set below.";
-    const assumption = `At ${symbol}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort`;
     const productsHeight = rowChartHeight(data.pairs.length, { perRow: 56, chrome: 140, min: 220 });
     const agentsChartHeight = rowChartHeight(agents.lines.length, { perRow: 40, chrome: 140, min: 240 });
 
@@ -350,7 +354,12 @@ export function CostVsValueStage() {
             id={stageAnchor("cost-vs-value")}
             title="Cost vs value"
             description="What Copilot cost over these dates, set against the estimated value of the work it did."
-            actions={<PricesMenu data={data} />}
+            actions={
+                <div className="flex flex-wrap items-center gap-200">
+                    <SegmentedControl label="Scenario" options={scenarioOptions} value={scenario} onChange={setScenario} />
+                    <PricesMenu data={data} />
+                </div>
+            }
         >
             <FilterNote ignored={COST_IGNORED_FILTERS} reason="costs aren't recorded that way, so this compares the whole tenant." />
 
@@ -358,13 +367,14 @@ export function CostVsValueStage() {
                 <>
                     <p className={cn(SMALL, "text-muted-foreground")}>
                         {span ? `${formatDateRange(span.from, span.to)} · ` : ""}
-                        {assumption}, as set under{" "}
+                        {`At ${symbol}${formatKpi(rate, "whole")} an hour, as set under `}
                         <a
                             href={`#${stageAnchor("estimated-value")}`}
                             className="text-foreground underline underline-offset-2 hover:text-primary"
                         >
                             Estimated value
                         </a>
+                        {`, ${scenario.toLowerCase()} effort`}
                         {!data.dollar && data.exchangeRate !== undefined ? ` · $1 = ${symbol}${data.exchangeRate}` : ""}
                     </p>
 

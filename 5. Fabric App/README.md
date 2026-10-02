@@ -102,7 +102,9 @@ database, so everyone who opens the app sees the same costs. **Use model values*
 ## Prices
 
 The **Cost vs value** stage, at the end of the Value page, sets what Copilot cost against the
-estimated value of the work it did. Open **Prices** at the top of the stage to set:
+estimated value of the work it did. **Scenario**, at the top of the stage, switches between
+conservative, typical and optimistic effort here and on Estimated value. Open **Prices** beside it
+to set:
 
 | Field | What it changes |
 |---|---|
