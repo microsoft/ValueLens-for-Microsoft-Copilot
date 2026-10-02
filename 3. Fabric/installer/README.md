@@ -3,7 +3,9 @@
 One command that sets up the [Fabric path](../README.md) in your tenant. It asks a few questions,
 shows you the plan, and then creates everything the manual steps would: the app registration, its
 secret in Azure Key Vault, admin consent, a workspace and Lakehouse, the notebooks, the pipeline
-and its schedule. It then runs the first load and checks the data that arrives.
+and its schedule. It can also deploy the ValueLens semantic model and the
+[ValueLens app](../../5.%20Fabric%20App/) on top of it, so there is nothing to publish from
+Power BI Desktop. It then runs the first load and checks the data that arrives.
 
 It keeps its answers and the IDs it creates in `valuelens-install.json`. Run it again with that
 file to repair, change or update the set-up. The file holds no secrets.
@@ -23,11 +25,12 @@ npx valuelens-install
 
 | You need | Why |
 |---|---|
-| **Node.js 20.12 or later** and a clone of this repo | The installer deploys the notebooks and pipeline from this checkout. |
+| **Node.js 20.12 or later** and a clone of this repo | The installer deploys the notebooks and pipeline from this checkout. The ValueLens app needs **Node.js 22.13 or later** to build. |
 | An **active Fabric capacity** (F2 or larger, or a trial) you can assign workspaces to | It creates the workspace on it. Or pick an existing workspace where you're an Admin or Member. |
 | An **Azure subscription** where you can create a Key Vault (Contributor), or an existing vault you can write secrets to | The client secret lives in Key Vault, never in a notebook. Owner or User Access Administrator lets it use Azure RBAC; otherwise the vault uses access policies. |
 | Permission to **register apps** in Entra | The default user setting is enough, or Application Administrator. You can also use an app you already have. |
 | A **Global Administrator** or **Privileged Role Administrator** | Only to grant admin consent for the Graph permissions. If that isn't you, the installer gives you a link to send them. |
+| For the semantic model and app, these **Fabric tenant settings** | *Service principals can call Fabric public APIs*, because the model reads the Lakehouse as the app registration. For the app, also *Semantic Model Execute Queries REST API* and *Fabric App items*. If you're a Fabric administrator, the installer checks them and warns you. |
 
 The permissions it requests are the ones in [`/docs/PERMISSIONS.md`](../../docs/PERMISSIONS.md):
 `AuditLogsQuery.Read.All`, `Reports.Read.All` and `User.Read.All`, plus `CopilotPackages.Read.All`
@@ -46,18 +49,21 @@ It checks your tenant first (roles, capacities, subscriptions), then asks:
 
 1. **What to collect.** Copilot usage and licences are always on. Org data from Entra is on by
    default. The Agent 365 registry and product feedback are off.
-2. **How much audit history** the first load pulls: 30, 90 or 180 days.
-3. **Capacity, workspace and Lakehouse name.**
-4. **App registration**: create "ValueLens Data Collector", or use one you have. If you use your
+2. **Power BI**: the semantic model and the ValueLens app (the default), the model only, or
+   neither. The model needs org data, so choosing it switches org data on.
+3. **How much audit history** the first load pulls: 30, 90 or 180 days.
+4. **Capacity, workspace and Lakehouse name.**
+5. **App registration**: create "ValueLens Data Collector", or use one you have. If you use your
    own, you paste its secret once and it goes straight to Key Vault.
-5. **Key Vault**: create one (resource group, region, name) or pick one you have.
-6. **Schedule**: daily or weekly, and the time (UTC).
-7. **Whether to run the first load** straight away.
+6. **Key Vault**: create one (resource group, region, name) or pick one you have.
+7. **Schedule**: daily or weekly, and the time (UTC).
+8. **Whether to run the first load** straight away.
 
 Then it shows the plan and asks to go ahead. Nothing is created before you say yes. Your
 answers are saved either way.
 
-When it finishes, it prints the values for the Power BI templates: the SQL endpoint and
+When it finishes, it prints links to the semantic model and the app, and how to share them. If
+you chose neither, it prints the values for the Power BI templates instead: the SQL endpoint and
 Lakehouse name for `ValueLens - Fabric.pbit`, or the workspace and Lakehouse IDs for
 `ValueLens - Fabric OneLake.pbit`. Carry on from step 5 of the [Fabric quick start](../README.md#quick-start).
 
@@ -71,10 +77,13 @@ Lakehouse name for `ValueLens - Fabric.pbit`, or the workspace and Lakehouse IDs
 | Workspace | On the capacity you chose. An existing workspace with no capacity is assigned to it. |
 | Managed private endpoint | Only if the vault blocks public access. It connects the workspace to the vault, and the installer approves it on the vault. See [Private Key Vaults](#private-key-vaults). |
 | Lakehouse | `ValueLens` by default, with schemas turned on, so tables land in `dbo`. |
-| Notebooks | The core ingesters, the processor, `ValueLens_Data_Check` and any optional modules. Each one is bound to the Lakehouse. Notebooks that call Graph read the secret from Key Vault when they run. |
-| Pipeline | `ValueLens_Pipeline`, built from [`pipelines/`](../pipelines/) with your notebook IDs filled in. Archived and switched-off branches are removed. |
+| Notebooks | The core ingesters, the processor, `ValueLens_Data_Check` and any optional modules. Each one is bound to the Lakehouse. Notebooks that call Graph read the secret from Key Vault when they run. With the semantic model, also `ValueLens_Refresh_Model`. |
+| Pipeline | `ValueLens_Pipeline`, built from [`pipelines/`](../pipelines/) with your notebook IDs filled in. Archived and switched-off branches are removed. With the semantic model, its last step, `Refresh_Semantic_Model`, refreshes the model once the data has loaded. |
 | Schedule | Daily or weekly at the time you chose, starting tomorrow. |
-| First load | A pipeline run with your chosen history, then the data check. The run reports row counts and the date range of the audit data. |
+| Semantic model | `ValueLens Model`, built from `ValueLens - Fabric.pbit` and pointed at your Lakehouse. Optional pages follow the modules you chose. |
+| Connection | `ValueLens SQL <workspace>`, a cloud connection to the Lakehouse's SQL endpoint that signs in as the app registration, with a secret of its own. The app registration gets Viewer on the workspace so it can read the Lakehouse. |
+| ValueLens app | A Fabric App item, "AI in One 2.0", built from [`5. Fabric App`](../../5.%20Fabric%20App/) against your semantic model. Rayfin, the app's build tool, may open a browser for you to sign in. |
+| First load | A pipeline run with your chosen history, then the data check. The run reports row counts and the date range of the audit data. Without a first load, the model is refreshed straight away. |
 
 The data check copy is the only notebook the installer adds to. It writes a short summary to
 `Files/valuelens_installer/data_check.json` in the Lakehouse, so the installer can read the
@@ -84,38 +93,51 @@ result back.
 
 | Command | What it does |
 |---|---|
-| `install` (default) | Sets everything up, or repairs it from the install record. Re-running only does what is missing. |
-| `update` | Pushes the notebooks and pipeline from this checkout over the deployed ones. Use it after you pull a new version of the repo. |
+| `install` (default) | Sets everything up, or repairs it from the install record. Re-running only does what is missing. It asks before rebuilding an app that is already deployed. |
+| `update` | Pushes the notebooks, pipeline and semantic model from this checkout over the deployed ones, then refreshes the model. It asks whether to redeploy the app too. Use it after you pull a new version of the repo. |
 | `run` | Runs the pipeline now, then the data check. `--backfill-days <n>` reloads that much audit history and rebuilds the curated table. |
-| `status` | Shows recent runs, the last data check, and when the client secret expires. |
-| `rotate-secret` | Creates a new client secret and replaces the one in Key Vault. |
-| `preview` | Writes the notebooks, pipeline and schedule it would deploy to `./valuelens-preview`, without signing in. |
+| `refresh` | Refreshes the semantic model now and waits for it. |
+| `deploy-app` | Builds and deploys the ValueLens app again, for example after a failed deploy or once you have a newer Node.js. |
+| `status` | Shows recent pipeline runs and model refreshes, the last data check, and when the secrets expire. |
+| `rotate-secret` | Creates a new client secret and replaces the one in Key Vault. It also gives the model's connection a new secret and removes its old one. |
+| `preview` | Writes the notebooks, pipeline, schedule and `model.bim` it would deploy to `./valuelens-preview`, without signing in. |
 
 | Option | |
 |---|---|
 | `--config <file>` | Install record to use (default `./valuelens-install.json`). |
 | `--source <dir>` | The `3. Fabric` folder to deploy from (default: this checkout). |
 | `--yes`, `-y` | Take saved answers and defaults without asking. A question with no answer stops the run. |
-| `--no-wait` | Start the first load and finish without waiting for it. |
+| `--no-wait` | Don't wait for the first load or a model refresh to finish. |
 | `--verbose` | Print each API call, and the full error body when one fails. |
 
 ## Good to know
 
 **Who the notebooks run as.** Fabric runs pipeline notebooks as the person who last changed the
 pipeline, and scheduled runs as the schedule's owner. The notebooks read the client secret from
-Key Vault as that person. If someone else edits the pipeline or takes over the schedule, give
-them "get" on the secret first (Key Vault Secrets User), or the next run fails.
+Key Vault as that person, and `ValueLens_Refresh_Model` refreshes the model as them too. If
+someone else edits the pipeline or takes over the schedule, give them "get" on the secret first
+(Key Vault Secrets User) and Contributor on the workspace, or the next run fails.
 
-**`update` replaces the pipeline definition.** That includes anything you added to it, such as the
-semantic model refresh from [`pipelines/README.md`](../pipelines/README.md#refresh-power-bi-from-the-pipeline).
-The installer asks first. Re-add the refresh afterwards, or say no and keep your version.
-Changing the modules on a re-run of `install` asks the same question.
+**Sharing the app.** Open the app in the workspace, choose **Share**, and add people or a group.
+They also need **Build** on `ValueLens Model` (its **Manage permissions** page), or Viewer on the
+workspace, because the app queries the model as them. To build your own reports, connect Power BI
+Desktop to `ValueLens Model` instead of publishing a template.
 
-**Same-name items.** If the workspace already has a notebook or pipeline with a ValueLens name,
-the installer asks before replacing it.
+**`update` replaces the pipeline definition.** That includes anything you added to it yourself.
+The installer asks first. If you deploy the semantic model, the installer adds the refresh step
+for you; otherwise re-add the one from
+[`pipelines/README.md`](../pipelines/README.md#refresh-power-bi-from-the-pipeline) afterwards, or
+say no and keep your version. Changing the modules on a re-run of `install` asks the same question.
 
-**The secret expires after 12 months.** `status` warns you 30 days before. Run `rotate-secret`;
-the old secret keeps working until it expires.
+**`update` reloads the model.** Deploying a new model definition clears its data, so `update`
+refreshes it straight away.
+
+**Same-name items.** If the workspace already has a notebook, pipeline or semantic model with a
+ValueLens name, the installer asks before replacing it.
+
+**The secrets expire after 12 months.** `status` warns you 30 days before, for both the Key
+Vault secret and the model connection's. Run `rotate-secret`; the notebooks' old secret keeps
+working until it expires.
 
 **Admin consent without the role.** The installer prints the app's API permissions page. An admin
 opens it and selects **Grant admin consent**. You can wait and choose **Check again**, or carry on.
@@ -154,6 +176,10 @@ few more minutes to start.
 | A run fails with `Forbidden` from Graph | Admin consent is missing or still propagating. Run `install` again to check consent, then `run`. |
 | A run fails reading the secret | The person the run uses can't read the secret. See "Who the notebooks run as" above. On a private vault, check the workspace's private endpoint is approved. |
 | `Fabric couldn't create a managed private endpoint` | Use an F or trial capacity, and make sure you're a workspace Admin. See [Private Key Vaults](#private-key-vaults). |
+| `Fabric couldn't set up the model's connection` | Check *Service principals can call Fabric public APIs* is on for the app registration. Then run `install` again. |
+| `Couldn't connect ValueLens Model to …` | Open the link it prints, and under **Gateway and cloud connections** pick `ValueLens SQL …` for the SQL source. Then choose **I've connected it myself**. |
+| A model refresh fails with `Login failed` | The connection's secret expired or was removed from the app. Run `rotate-secret`. |
+| `The app wasn't deployed` | Read the Rayfin output above the message, fix the cause, then run `deploy-app`. |
 | `The install record is for tenant …` | Pass `--tenant` with the tenant in the record, or use another `--config`. |
 
 Run with `--verbose` to see each call and the full error.

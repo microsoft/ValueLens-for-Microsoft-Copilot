@@ -34,6 +34,12 @@ repairs what is missing. Other commands: `update`, `run`, `status`, `rotate-secr
 `preview`. The canonical notebooks and pipeline JSON are unchanged; the installer fills in a copy
 of each as it deploys.
 
+It can also deploy the semantic model from `ValueLens - Fabric.pbit` and the ValueLens app
+(`5. Fabric App`) on top of it, so nothing has to be published from Power BI Desktop. The model
+reads the Lakehouse through a cloud connection that signs in as the app registration. A new
+notebook, `ValueLens_Refresh_Model`, refreshes the model as the pipeline's last step. New
+commands: `refresh` and `deploy-app`.
+
 ## 2026-10-02 — Fabric App: reloads itself after a deploy
 
 A page opened before a deploy used to fail on its next page change with *Failed to fetch
