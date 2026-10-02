@@ -31,6 +31,8 @@ function fromRow(row: Record<string, unknown>): SavedCommercialTerms {
         creditRate: toNumber(row.creditRate),
         prepaidCreditRate: toNumber(row.prepaidCreditRate),
         prepaidCreditBalance: toNumber(row.prepaidCreditBalance),
+        licensePrice: toNumber(row.licensePrice),
+        exchangeRate: toNumber(row.exchangeRate),
         updatedBy: typeof row.updatedBy === "string" && row.updatedBy ? row.updatedBy : undefined,
         updatedAt: updatedAt && !Number.isNaN(updatedAt.getTime()) ? updatedAt : undefined,
     };
@@ -58,23 +60,27 @@ export async function loadCommercialTerms(): Promise<SavedCommercialTerms | null
     return row ? fromRow(row as unknown as Record<string, unknown>) : null;
 }
 
+const TERM_KEYS = ["creditRate", "prepaidCreditRate", "prepaidCreditBalance", "licensePrice", "exchangeRate"] as const;
+
 /**
- * Saves the terms for everyone. A term left undefined is cleared, so the
- * model's own applies to it again.
+ * Saves the terms in `patch` for everyone and leaves the rest as they are in
+ * the database, so terms someone else saved since this page loaded are kept.
+ * A term in `patch` left undefined is cleared, so its default applies again:
+ * the model's for a credit term.
  */
 export async function saveCommercialTerms(
-    values: CommercialTermsValues,
+    patch: CommercialTermsValues,
     updatedBy: string | undefined,
 ): Promise<SavedCommercialTerms> {
     // The database clears a column only when sent null; undefined is left out of the mutation.
-    const fields = {
-        creditRate: values.creditRate ?? null,
-        prepaidCreditRate: values.prepaidCreditRate ?? null,
-        prepaidCreditBalance: values.prepaidCreditBalance ?? null,
-        updatedBy: updatedBy ?? null,
-        updatedAt: new Date(),
-    } as unknown as Partial<SavedCommercialTerms>;
+    const changed: Record<string, unknown> = {};
+    for (const key of TERM_KEYS) {
+        if (Object.hasOwn(patch, key)) changed[key] = patch[key] ?? null;
+    }
+    const stamp = { updatedBy: updatedBy ?? null, updatedAt: new Date() };
+    const create = { id: COMMERCIAL_TERMS_ID, ...changed, ...stamp } as unknown as Partial<SavedCommercialTerms>;
+    const update = { ...changed, ...stamp } as unknown as Partial<SavedCommercialTerms>;
     const terms = getRayfinClient().data.CommercialTerms;
-    const row = await terms.upsert({ id: COMMERCIAL_TERMS_ID }, { id: COMMERCIAL_TERMS_ID, ...fields }, fields);
+    const row = await terms.upsert({ id: COMMERCIAL_TERMS_ID }, create, update);
     return fromRow(row as unknown as Record<string, unknown>);
 }

@@ -12,9 +12,10 @@ import modelTermsQuery from "./commercial-terms.dax?raw";
 import { RATE_MEASURES, type ModelMeasure } from "./rate-measures";
 
 /**
- * The prices typed in on the Consumption page. Each one left empty keeps the
- * model's own, which comes from the Lakehouse `commercial_terms` table or the
- * report's parameters.
+ * The prices typed in the app: the credit terms on the Consumption page, and
+ * the licence price and exchange rate on the Value page. A credit term left
+ * empty keeps the model's own, which comes from the Lakehouse
+ * `commercial_terms` table or the report's parameters.
  */
 export interface CommercialTermsValues {
     /** Pay-as-you-go price of one Copilot credit, in US dollars. */
@@ -23,7 +24,18 @@ export interface CommercialTermsValues {
     prepaidCreditRate?: number;
     /** Capacity Pack credits Cowork draws down before paying as it goes. */
     prepaidCreditBalance?: number;
+    /** Microsoft 365 Copilot licence price per user per month, in US dollars. Empty uses the list price. */
+    licensePrice?: number;
+    /** How much of ValueLens's currency one US dollar buys. Empty leaves costs in dollars. */
+    exchangeRate?: number;
 }
+
+/** The Microsoft 365 Copilot US list price, per user per month, used when no licence price is typed in. */
+export const LICENSE_LIST_PRICE = 30;
+
+/** The highest licence price and exchange rate the app accepts. */
+export const LICENSE_PRICE_MAX = 1000;
+export const EXCHANGE_RATE_MAX = 100000;
 
 export type CommercialTermKey = keyof CommercialTermsValues;
 
@@ -98,7 +110,7 @@ function isSet(value: number | null | undefined): value is number {
     return typeof value === "number" && Number.isFinite(value);
 }
 
-/** True when any term is typed in, so the model's own no longer all apply. */
+/** True when any credit term is typed in, so the model's own no longer all apply. */
 export function hasCommercialTerms(terms: CommercialTermsValues | undefined): boolean {
     return INPUTS.some((input) => isSet(terms?.[input.term]));
 }
@@ -150,10 +162,19 @@ export function withCommercialTerms(query: string, terms: CommercialTermsValues 
     return addQueryDefinitions(query, definitions);
 }
 
-/** Why a typed value cannot be used, or undefined when it can. Empty is allowed: it keeps the model's. */
+/** Why a typed value cannot be used, or undefined when it can. Empty is allowed: it keeps the default. */
 export function validateTerm(term: CommercialTermKey, value: number | undefined): string | undefined {
     if (value === undefined) return undefined;
     if (!Number.isFinite(value)) return "Enter a number.";
+    if (term === "licensePrice") {
+        if (value < 0 || value > LICENSE_PRICE_MAX) return `Enter a price between $0 and $${LICENSE_PRICE_MAX}.`;
+        return undefined;
+    }
+    if (term === "exchangeRate") {
+        if (value <= 0) return "Enter a rate above zero.";
+        if (value > EXCHANGE_RATE_MAX) return "Enter a smaller rate.";
+        return undefined;
+    }
     if (term === "prepaidCreditBalance") {
         if (value < 0) return "Enter zero or more credits.";
         if (!Number.isInteger(value)) return "Enter whole credits.";
@@ -165,11 +186,11 @@ export function validateTerm(term: CommercialTermKey, value: number | undefined)
 }
 
 /**
- * Reads a typed value: blank is "not set", commas and a leading `$` are
- * allowed, and anything else that is not a number comes back as NaN.
+ * Reads a typed value: blank is "not set", commas and a leading currency
+ * symbol are allowed, and anything else that is not a number comes back as NaN.
  */
 export function parseTerm(text: string): number | undefined {
-    const cleaned = text.trim().replace(/^\$/, "").replace(/,/g, "").trim();
+    const cleaned = text.trim().replace(/^[$£€¥]/, "").replace(/,/g, "").trim();
     if (cleaned === "") return undefined;
     return /^\d*\.?\d+$|^\d+\.$/.test(cleaned) ? Number(cleaned) : Number.NaN;
 }

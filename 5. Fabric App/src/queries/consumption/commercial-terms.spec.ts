@@ -143,6 +143,12 @@ describe("hasCommercialTerms", () => {
         expect(hasCommercialTerms({})).toBe(false);
         expect(hasCommercialTerms({ prepaidCreditBalance: 0 })).toBe(true);
     });
+
+    it("ignores the licence price and exchange rate, which no model query reads", () => {
+        expect(hasCommercialTerms({ licensePrice: 30, exchangeRate: 0.75 })).toBe(false);
+        const query = queries["./cowork-credits-summary.dax"];
+        expect(withCommercialTerms(query, { licensePrice: 30, exchangeRate: 0.75 })).toBe(query);
+    });
 });
 
 describe("readsCommercialTerms", () => {
@@ -175,6 +181,8 @@ describe("parseTerm and validateTerm", () => {
         expect(parseTerm("$0.0085")).toBe(0.0085);
         expect(parseTerm(".01")).toBe(0.01);
         expect(parseTerm("100,000")).toBe(100000);
+        expect(parseTerm("£30")).toBe(30);
+        expect(parseTerm("€0.92")).toBe(0.92);
         expect(parseTerm("1e5")).toBeNaN();
         expect(parseTerm("-1")).toBeNaN();
         expect(parseTerm("ten")).toBeNaN();
@@ -195,5 +203,19 @@ describe("parseTerm and validateTerm", () => {
         expect(validateTerm("prepaidCreditBalance", 250000)).toBeUndefined();
         expect(validateTerm("prepaidCreditBalance", -5)).toMatch(/zero or more/);
         expect(validateTerm("prepaidCreditBalance", 10.5)).toMatch(/whole/);
+    });
+
+    it("accepts licence prices from nothing to $1,000", () => {
+        expect(validateTerm("licensePrice", 0)).toBeUndefined();
+        expect(validateTerm("licensePrice", 30)).toBeUndefined();
+        expect(validateTerm("licensePrice", 21.5)).toBeUndefined();
+        expect(validateTerm("licensePrice", 1001)).toMatch(/between/);
+    });
+
+    it("accepts exchange rates above zero", () => {
+        expect(validateTerm("exchangeRate", 0.75)).toBeUndefined();
+        expect(validateTerm("exchangeRate", 150)).toBeUndefined();
+        expect(validateTerm("exchangeRate", 0)).toMatch(/above zero/);
+        expect(validateTerm("exchangeRate", 1e6)).toMatch(/smaller/);
     });
 });

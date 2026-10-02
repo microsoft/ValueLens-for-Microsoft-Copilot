@@ -15,6 +15,7 @@ import { parse, View, type Scene, type SceneItem } from "vega";
 import type { TopLevelSpec } from "vega-lite";
 import type { ColumnMetadataMap } from "@/lib/to-data-table";
 import { toValueTaskTree, valueByTask } from "./value-by-task";
+import { costValueSpec, pairTable, type PairLine } from "./cost-vs-value";
 import { toDataTable } from "@/lib/to-data-table";
 import { liveColumns } from "./live-columns.fixture";
 import taskRows from "./__fixtures__/value-by-task.rows.json";
@@ -101,5 +102,68 @@ describe("time saved by task renders", () => {
         expect(top.datum["Expert Equivalent Hours Per Week"]).toBe(
             Math.max(...rows.map((row) => row["Expert Equivalent Hours Per Week"] as number)),
         );
+    });
+});
+
+interface Mark {
+    datum: Row;
+    x: number;
+    x2?: number;
+    y: number;
+}
+
+/** Renders a spec and returns the items of every mark of one type. */
+async function renderMarks(spec: unknown, values: Row[], marktype: string): Promise<Mark[]> {
+    const sized = { ...(spec as object), width: 600, height: 300, data: { values } } as TopLevelSpec;
+    const view = new View(parse(compile(sized).spec), { renderer: "none" });
+    await view.runAsync();
+    const found: SceneItem[] = [];
+    const walk = (node: Scene | SceneItem) => {
+        const scene = node as Scene;
+        if (scene.marktype === marktype && (scene as { role?: string }).role === "mark") found.push(...(scene.items as SceneItem[]));
+        for (const item of (scene.items ?? []) as (Scene | SceneItem)[]) {
+            if ((item as Scene).marktype || (item as { items?: unknown }).items) walk(item);
+        }
+    };
+    walk((view.scenegraph() as unknown as { root: Scene }).root);
+    await view.finalize();
+    return found as unknown as Mark[];
+}
+
+describe("cost and value chart renders", () => {
+    const lines: PairLine[] = [
+        { id: "licences", cost: 5000, value: 96872, ratio: 96872 / 5000 },
+        { id: "studio", cost: 500, value: 34135, ratio: 34135 / 500 },
+        { id: "cowork", cost: 7500, value: 3474, ratio: 3474 / 7500 },
+    ];
+    const table = pairTable(lines);
+    const rows = table.rows.map((row) => Object.fromEntries(table.columns.map((column, i) => [column.name, row[i]]))) as Row[];
+
+    it("joins each cost to its value with one line", async () => {
+        const rules = await renderMarks(costValueSpec("?"), rows, "rule");
+        expect(rules).toHaveLength(3);
+        for (const rule of rules) {
+            expect(Number.isFinite(rule.x)).toBe(true);
+            expect(Number.isFinite(rule.x2!)).toBe(true);
+            // A value above cost ends to the right of where it starts.
+            const pair = rule.datum;
+            expect(Math.sign(rule.x2! - rule.x)).toBe(Math.sign((pair.Value as number) - (pair.Cost as number)));
+        }
+    });
+
+    it("puts a dot at each end, the order the pairs are listed in", async () => {
+        const dots = await renderMarks(costValueSpec("?"), rows, "symbol");
+        expect(dots).toHaveLength(6);
+        const rowsTopDown = [...new Set([...dots].sort((a, b) => a.y - b.y).map((dot) => dot.datum.Pair))];
+        expect(rowsTopDown).toEqual(rows.map((row) => row.Pair));
+        const measures = new Set(dots.map((dot) => dot.datum.Measure));
+        expect(measures).toEqual(new Set(["Cost", "Estimated value"]));
+    });
+
+    it("draws the dot it has when one side is blank, and no line", async () => {
+        const partial = pairTable([{ id: "cowork", cost: undefined, value: 3474, ratio: undefined }]);
+        const values = partial.rows.map((row) => Object.fromEntries(partial.columns.map((column, i) => [column.name, row[i]]))) as Row[];
+        expect(await renderMarks(costValueSpec("?"), values, "rule")).toHaveLength(0);
+        expect(await renderMarks(costValueSpec("?"), values, "symbol")).toHaveLength(1);
     });
 });

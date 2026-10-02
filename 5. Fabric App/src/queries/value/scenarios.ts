@@ -5,9 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-export * from "./value-summary";
-export * from "./value-by-task";
-export * from "./agent-value";
-export * from "./organization-value";
-export * from "./cost-vs-value";
-export * from "./scenarios";
+/** The model's Effort Scenario choices: how long each task would have taken without Copilot. */
+export type Scenario = "Conservative" | "Typical" | "Optimistic";
+
+export const SCENARIOS: readonly Scenario[] = ["Conservative", "Typical", "Optimistic"];

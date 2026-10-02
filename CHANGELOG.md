@@ -16,6 +16,29 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-02 — Fabric App: cost vs value
+
+The [Fabric App](5.%20Fabric%20App/)'s Value page ends with a new stage, **Cost vs value**. It sets
+Microsoft 365 Copilot licences, Copilot Studio credits and Cowork / Work IQ credits against the
+estimated value of the work each pays for, over the days ValueLens and Consumption Central both
+hold. It shows the return on cost, with a conservative-to-optimistic range, and the break-even
+hourly rate. It also shows each cost beside its value, and each Copilot Studio agent's share of
+the cost beside that agent's value. Copilot Chat by people without a licence is left out of the
+value, because it's free with Microsoft 365.
+
+A **Prices** menu on the stage saves a licence price (the $30 US list price by default) and an
+exchange rate, alongside the shared rates. A **Scenario** switch beside it changes the effort
+scenario here and on Estimated value; it starts at Typical. Saving rates or prices now writes only the fields that
+changed, so one person's save no longer overwrites another's. In the Consumption Central sample,
+seven of the eight Copilot Studio agents now share names with the ValueLens sample's agents, so
+the agents comparison has data. Onboarding Buddy is left unmatched on purpose. The sample's Cowork credits
+now follow the ValueLens sample's Cowork pilot, with a session for each Cowork thread, so both
+samples describe the same company. Cowork credits are priced as the Consumption page's Cowork
+section prices them: Capacity Pack first at the prepaid rate, then pay-as-you-go. The method is in
+[`docs/METHODOLOGY.md`](docs/METHODOLOGY.md#83-cost-vs-value).
+
+---
+
 ## 2026-10-01 — Fabric App: set-up checked from a fresh clone
 
 A clean Windows clone of `5. Fabric App` now passes every README step: `npm install`, build, test,

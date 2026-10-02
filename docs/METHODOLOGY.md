@@ -5,8 +5,8 @@ is counted, how each interaction is classified, how value is estimated, and the 
 the assumptions.
 
 It applies to the Power BI template, where all four data paths share one model, and to the
-[Fabric App](../5.%20Fabric%20App/). The app reads the same model and adds two pages of its own
-([§8](#8-fabric-app-only-consumption-and-agent-evaluation)). Every rule here is taken from
+[Fabric App](../5.%20Fabric%20App/). The app reads the same model and adds two pages and a Value
+stage of its own ([§8](#8-fabric-app-only-consumption-agent-evaluation-and-cost-vs-value)). Every rule here is taken from
 `3. Fabric/ValueLens - Fabric.pbit` and the `Copilot_Audit_Log_Processor` notebook. If this page
 and the model ever disagree, the model is right. The template's **📖 Metric Glossary** page
 carries the same caveats inside the report.
@@ -21,7 +21,7 @@ carries the same caveats inside the report.
 5. [Estimated value](#5-estimated-value)
 6. [Page by page](#6-page-by-page)
 7. [Settings you can change](#7-settings-you-can-change)
-8. [Fabric App only: Consumption and Agent Evaluation](#8-fabric-app-only-consumption-and-agent-evaluation)
+8. [Fabric App only: Consumption, Agent Evaluation and Cost vs value](#8-fabric-app-only-consumption-agent-evaluation-and-cost-vs-value)
 9. [Known limits](#9-known-limits)
 10. [Appendix: time bands and sources](#appendix-time-bands-and-sources)
 
@@ -430,11 +430,11 @@ The Fabric App gathers the report's pages into seven of its nine pages:
 | Adoption | Activation, Adoption, Habit Formation, Trend Heatmap |
 | Leaderboards | Leaderboard, Agent Registry |
 | Readiness | License Readiness, License Allocation, Cowork Readiness |
-| Value | Task Breakdown, Estimated Value |
+| Value | Task Breakdown, Estimated Value, plus Cost vs value, which is app only ([§8.3](#83-cost-vs-value)) |
 | Efficiency | Cowork Fit, Model Fit |
 | Feedback | User Feedback |
 | Appendix | Glossary, Signal → Impact |
-| Consumption, Agent Evaluation | App only ([§8](#8-fabric-app-only-consumption-and-agent-evaluation)) |
+| Consumption, Agent Evaluation | App only ([§8](#8-fabric-app-only-consumption-agent-evaluation-and-cost-vs-value)) |
 
 ### Activation: who has started?
 
@@ -523,6 +523,8 @@ AI tasks and their share of all activity in the selection, by behaviour
 
 Hours, value, cost, net ROI and projected annual value, by task category
 ([§3.2](#32-from-signal-to-task-category)) and by organisation ([§5](#5-estimated-value)). The effort scenario and hourly rate are set on the page.
+In the app, the Value page ends with **Cost vs value**, which sets licence and credit costs
+against this value ([§8.3](#83-cost-vs-value)).
 
 ### Cowork Fit: was Cowork the right tool?
 
@@ -630,13 +632,16 @@ From the optional Product Feedback export.
 | Currency symbol | £ | `Assumptions` table | Display only; it doesn't convert. Enter money settings in this currency |
 | Fit grading | Balanced | `Assumptions[Fit Grading]`, applied at refresh | Strict, Balanced or Lenient ([§6](#cowork-fit-was-cowork-the-right-tool)) |
 | Rates & packs | From `commercial_terms` | App Consumption page | Credit prices ([§8](#81-consumption)) |
+| Licence price | $30, the US list price | App Value page, Prices | Licence cost on Cost vs value ([§8.3](#83-cost-vs-value)). The report uses AI PPUPM instead |
+| Exchange rate | Not set | App Value page, Prices | Converts dollar costs into the value's currency ([§8.3](#83-cost-vs-value)) |
 
 ---
 
-## 8. Fabric App only: Consumption and Agent Evaluation
+## 8. Fabric App only: Consumption, Agent Evaluation and Cost vs value
 
-These two pages read optional models, not ValueLens. Each appears only when its model is
-connected in `fabric.yaml`.
+The Consumption and Agent Evaluation pages read optional models, not ValueLens. Each appears only
+when its model is connected in `fabric.yaml`. Cost vs value, at the end of the Value page, sets
+ValueLens's estimated value against costs, most of them from Consumption Central.
 
 ### 8.1 Consumption
 
@@ -674,6 +679,60 @@ aggregates and feedback comments only. It never shows the conversations.
 | Knowledge gap rate | Of the times the agent searched, how often it found nothing usable |
 | Friction | A 0–100 score where higher is worse: 60% give-up rate, 40% turns taken |
 | Answer archetype | The most advanced thing the agent did: answered from your content, answered from the model alone, passed to a specialist, or hit an error |
+
+### 8.3 Cost vs value
+
+The last stage of the app's Value page sets what Copilot cost against the estimated value of the
+work it did. Value is the Estimated Value figure ([§5](#5-estimated-value)), at the hourly rate
+set on the stage before. The effort scenario is shared by both stages and can be switched on
+either; it starts at Typical. Credit costs come from Consumption Central
+([§8.1](#81-consumption)).
+
+**Dates.** The days ValueLens holds activity for, inside the date filter. With Consumption Central
+connected, only the days both models hold, so cost and value cover the same days. Costs are
+tenant-wide, so the other filters don't apply to this stage.
+
+**Costs.** Licences and credits are billed in US dollars.
+
+| Cost | How it's worked out |
+|---|---|
+| Microsoft 365 Copilot licences | Licensed users × price per month × days ÷ 30.44, the average month (365.25 ÷ 12). Licensed users is the model's **Total Licensed Users**. It's a snapshot, so one count covers every day ([§9](#9-known-limits)). The price is the $30 US list price unless one is set under **Prices** |
+| Copilot Studio credits | Copilot Studio's cost over the dates, at the Consumption page's **Rates & packs** |
+| Cowork / Work IQ credits | Cowork / Work IQ's credits over the dates, priced as the Consumption page's Cowork section prices them: up to the **Capacity Pack balance** at the prepaid rate, the rest at pay-as-you-go. Pack credits left unused aren't counted |
+
+When the model's currency symbol isn't $, each cost is converted at the **exchange rate** set under
+**Prices**, in value currency per $1. Until one is set, the stage asks for it instead of comparing.
+
+**Pairing.** Each cost is set against the work it pays for, using the model's Activity column:
+
+| Cost | Set against |
+|---|---|
+| Licences | Copilot, by licensed users |
+| Copilot Studio credits | Agents, by anyone |
+| Cowork / Work IQ credits | Cowork |
+
+Copilot Chat by people without a licence is left out of the value. It's free with Microsoft 365,
+so no cost here pays for it. Agent use by unlicensed people stays in, because its credits are
+billed. The Agents value also covers built-in and Agent Builder agents that a licence pays for, so
+the Agents pair reads high.
+
+**Figures.**
+
+| Figure | Definition |
+|---|---|
+| Return on cost | Value ÷ (licences + credits), under the chosen scenario. The range below it uses the conservative and optimistic scenarios at the same hourly rate |
+| Break-even hourly rate | Hourly rate ÷ return: the rate at which the value would just cover the cost |
+| Each pair's return | Its value ÷ its cost. Below 1×, the cost is more than the value set against it |
+
+**Agents.** Consumption Central's credits by agent aren't dated. Each Copilot Studio agent's cost is
+Copilot Studio's cost over the dates, split by that agent's share of all the credits held by
+agent. It's set against the value ValueLens records for the agent with the same name, matched
+ignoring case and extra spaces. An agent with no activity under that name is listed as not found,
+and its share isn't set against any value.
+
+**Left out.** Azure AI Foundry, because ValueLens doesn't record the work it does. GitHub Copilot,
+which neither model holds. Without Consumption Central, or when the two models share no days, the
+cost is licences alone, so the return reads high.
 
 ---
 

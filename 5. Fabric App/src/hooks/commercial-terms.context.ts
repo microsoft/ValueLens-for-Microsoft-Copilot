@@ -20,14 +20,18 @@ export interface CommercialTermsContextValue {
     unavailableReason?: string;
     /** The terms saved in the app, applied to every cost on the page. */
     saved: SavedCommercialTerms | null;
-    /** The model's own terms, before anything saved in the app. */
+    /** The model's own credit terms, before anything saved in the app. */
     model: CommercialTermsValues | undefined;
-    /** Saves terms for everyone; an undefined term goes back to the model's. */
-    save: (values: CommercialTermsValues) => Promise<void>;
+    /**
+     * Saves the terms given for everyone and keeps the rest. A term given as
+     * undefined goes back to its default: the model's, for a credit term.
+     */
+    save: (patch: CommercialTermsValues) => Promise<void>;
 }
 
 /**
- * The prices every cost on the Consumption page is worked out at.
+ * The prices every cost on the Consumption page, and the cost side of the
+ * Value page, is worked out at.
  *
  * Without a provider, as in isolated component tests, the model's own
  * terms apply and nothing waits.

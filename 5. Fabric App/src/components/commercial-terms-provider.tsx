@@ -28,9 +28,10 @@ function describe(error: unknown): string {
 
 /**
  * Reads the terms saved in the app once, and the model's own beside them,
- * for the Consumption page's costs and its rates control.
+ * for the costs on the page and its terms controls. `readModel` is off
+ * where Consumption Central isn't set up, so its terms aren't asked for.
  */
-export function CommercialTermsProvider({ children }: { children: ReactNode }) {
+export function CommercialTermsProvider({ children, readModel = true }: { children: ReactNode; readModel?: boolean }) {
     const [state, setState] = useState<LoadState>({ status: "loading" });
     const auth = useContext(AuthContext);
     const email = auth?.session?.user?.email;
@@ -47,7 +48,10 @@ export function CommercialTermsProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const modelSource = modelCommercialTerms();
-    const modelResult = useSemanticModelQuery({ connection: modelSource.connection, query: modelSource.query });
+    const modelResult = useSemanticModelQuery({
+        connection: readModel ? modelSource.connection : "",
+        query: modelSource.query,
+    });
     const model = useMemo<CommercialTermsValues | undefined>(() => {
         if (modelResult.data?.status !== "success") return undefined;
         const row = toSummaryRow(modelResult.data.table);
@@ -59,8 +63,8 @@ export function CommercialTermsProvider({ children }: { children: ReactNode }) {
     }, [modelResult.data]);
 
     const save = useCallback(
-        async (values: CommercialTermsValues) => {
-            const saved = await saveCommercialTerms(values, email);
+        async (patch: CommercialTermsValues) => {
+            const saved = await saveCommercialTerms(patch, email);
             setState({ status: "ready", saved });
         },
         [email],

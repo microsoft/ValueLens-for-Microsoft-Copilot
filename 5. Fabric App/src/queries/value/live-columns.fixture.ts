@@ -40,4 +40,7 @@ export const liveColumns = {
         "[Expert Equivalent Hours Per Week]",
         "[AI Assisted Value]",
     ],
+    costValueWindow: ["[First Date]", "[Last Date]", "[Licensed Users]", "[Currency Symbol]"],
+    costValueBySource: ["[Source]", "[Licence]", "[Scenario]", "[Hours]", "[Value]"],
+    costValueAgents: ["[Agent]", "[Sessions]", "[Hours]", "[Value]"],
 } as const;
