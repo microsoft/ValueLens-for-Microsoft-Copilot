@@ -1,0 +1,31 @@
+{
+  "name": "valuelens-fabric-installer",
+  "version": "0.1.0",
+  "description": "Sets up the ValueLens data pipeline in Microsoft Fabric: app registration, Key Vault secret, workspace, Lakehouse, notebooks, pipeline, schedule and first load.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "valuelens-install": "bin/valuelens-install.js"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "start": "node bin/valuelens-install.js",
+    "test": "node --test",
+    "typecheck": "tsc -p jsconfig.json"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.13.3",
+    "@inquirer/prompts": "^8.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}
