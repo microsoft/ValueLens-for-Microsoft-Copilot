@@ -10,6 +10,7 @@ import { AppShell } from "./components/app-shell";
 import { destinations, type DestinationId } from "./components/destinations";
 import { FilterProvider } from "./components/filter-provider";
 import { QueryLoading } from "./components/query-states";
+import { TaskTimesProvider } from "./components/task-times-provider";
 
 // Screens load on demand so only the visible destination queries the model.
 const AdoptionScreen = lazy(() =>
@@ -37,27 +38,33 @@ const AgentEvaluationScreen = lazy(() =>
 const AppendixScreen = lazy(() =>
     import("./screens/appendix").then((module) => ({ default: module.AppendixScreen })),
 );
+const AssumptionsScreen = lazy(() =>
+    import("./screens/assumptions").then((module) => ({ default: module.AssumptionsScreen })),
+);
 
 function App() {
     const [destination, setDestination] = useState<DestinationId>("adoption");
     const applicable = destinations.find((candidate) => candidate.id === destination)?.filters ?? [];
 
     return (
-        <FilterProvider applicable={applicable}>
-            <AppShell active={destination} onNavigate={setDestination}>
-                <Suspense fallback={<QueryLoading />}>
-                    {destination === "adoption" && <AdoptionScreen />}
-                    {destination === "leaderboards" && <LeaderboardsScreen />}
-                    {destination === "readiness" && <ReadinessScreen />}
-                    {destination === "consumption" && <ConsumptionScreen />}
-                    {destination === "value" && <ValueScreen />}
-                    {destination === "efficiency" && <EfficiencyScreen />}
-                    {destination === "feedback" && <FeedbackScreen />}
-                    {destination === "agent-evaluation" && <AgentEvaluationScreen />}
-                    {destination === "appendix" && <AppendixScreen />}
-                </Suspense>
-            </AppShell>
-        </FilterProvider>
+        <TaskTimesProvider>
+            <FilterProvider applicable={applicable}>
+                <AppShell active={destination} onNavigate={setDestination}>
+                    <Suspense fallback={<QueryLoading />}>
+                        {destination === "adoption" && <AdoptionScreen />}
+                        {destination === "leaderboards" && <LeaderboardsScreen />}
+                        {destination === "readiness" && <ReadinessScreen />}
+                        {destination === "consumption" && <ConsumptionScreen />}
+                        {destination === "value" && <ValueScreen />}
+                        {destination === "efficiency" && <EfficiencyScreen />}
+                        {destination === "feedback" && <FeedbackScreen />}
+                        {destination === "agent-evaluation" && <AgentEvaluationScreen />}
+                        {destination === "assumptions" && <AssumptionsScreen />}
+                        {destination === "appendix" && <AppendixScreen />}
+                    </Suspense>
+                </AppShell>
+            </FilterProvider>
+        </TaskTimesProvider>
     );
 }
 

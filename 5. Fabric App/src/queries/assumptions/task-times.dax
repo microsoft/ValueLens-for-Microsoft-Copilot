@@ -1,0 +1,14 @@
+EVALUATE
+SELECTCOLUMNS(
+    'Human Time Estimates',
+    "Task", 'Human Time Estimates'[Behavior],
+    "Category", 'Human Time Estimates'[Category],
+    "Grain", 'Human Time Estimates'[Effort Grain],
+    "Low", 'Human Time Estimates'[Min Low],
+    "Typical", 'Human Time Estimates'[Min Typical],
+    "High", 'Human Time Estimates'[Min High],
+    "Source", 'Human Time Estimates'[Primary Source],
+    "Source URL", 'Human Time Estimates'[Source URL],
+    "Confidence", 'Human Time Estimates'[Confidence]
+)
+ORDER BY [Category], [Task]

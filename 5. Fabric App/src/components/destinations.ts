@@ -6,15 +6,26 @@
 //-----------------------------------------------------------------------
 
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, BotMessageSquare, Coins, Gauge, KeyRound, MessageSquareQuote, PoundSterling, TrendingUp, Trophy } from "lucide-react";
+import {
+    BookOpen,
+    BotMessageSquare,
+    Coins,
+    Gauge,
+    KeyRound,
+    MessageSquareQuote,
+    PoundSterling,
+    Timer,
+    TrendingUp,
+    Trophy,
+} from "lucide-react";
 import { isConnectionConfigured, type ModelReferences } from "@/lib/connections";
 import type { FilterKey } from "@/lib/filters";
 import { consumptionConnection, evaluatorConnection } from "@/queries/shared";
 
 /**
  * The top-level destinations the report pages were folded into, each
- * holding its pages as stages read top to bottom, plus the report's appendix
- * as a reference destination below them. Consumption and Agent Evaluation
+ * holding its pages as stages read top to bottom, plus the app's assumptions
+ * and the report's appendix as reference destinations below them. Consumption and Agent Evaluation
  * come from their own reports, Consumption Central and Agent Evaluator, and
  * bring their own slicers, so they take none of the filter bar's. Their
  * `connection` is optional: without it in `fabric.yaml` they are left out.
@@ -119,6 +130,15 @@ export const destinations = [
         icon: MessageSquareQuote as LucideIcon,
         filters: ["dateRange"] as FilterKey[],
         stages: [{ id: "feedback", label: "Feedback", ready: true }],
+    },
+    {
+        id: "assumptions",
+        label: "Assumptions",
+        blurb: "The task times behind every value figure",
+        icon: Timer as LucideIcon,
+        filters: [] as FilterKey[],
+        reference: true,
+        stages: [{ id: "time-per-task", label: "Time per task", ready: true }],
     },
     {
         id: "appendix",

@@ -3,8 +3,8 @@
 **Preview.** The ValueLens dashboard rebuilt as a fast web app. It's hosted as an item in your
 Fabric workspace, and it reads the ValueLens semantic model you've already published. The app
 keeps no copy of your data: every page queries the model live, as the person viewing it, so
-row-level security applies. The only things it saves are the [rates and pack](#rates--packs)
-and the [prices](#prices) you type in.
+row-level security applies. The only things it saves are the [rates and pack](#rates--packs),
+the [prices](#prices) and the [task times](#task-times) you type in.
 
 > **You need a published ValueLens model first.** Set up any path, 1 to 4, and publish its
 > template to a Power BI workspace. All five templates share the fields this app queries.
@@ -21,6 +21,7 @@ and the [prices](#prices) you type in.
 | **Value** | What the work was, and what it was worth: task breakdown, estimated value, and cost vs value, which sets licence and credit costs against that value |
 | **Efficiency** | Whether the right tool is doing the job: Cowork fit, Model fit, and how grading works |
 | **Feedback** | What people say about Copilot |
+| **Assumptions** | The minutes each task would take without Copilot, with the research behind them. You can change them for your organisation |
 | **Appendix** | Glossary, plus Signal → Impact value assumptions |
 
 Filters (date, organisation, licence, activity, agent) apply across the ValueLens pages. The
@@ -33,8 +34,8 @@ How each figure is worked out, page by page, is in the [methodology](../docs/MET
 ## Prerequisites
 
 - A workspace on **Fabric capacity** (F2 or above, or a trial) to host the app. *My workspace*
-  can't host it. The app adds a small **SQL database** under its item to hold the rates and
-  prices; it uses that capacity too.
+  can't host it. The app adds a small **SQL database** under its item to hold the rates, prices
+  and task times; it uses that capacity too.
 - A **published ValueLens semantic model**, with **Build** permission on it for everyone who'll use the app.
 - *Optional, for the Consumption page:* a **published Consumption Central semantic model**, with
   the same Build permission.
@@ -114,6 +115,23 @@ They're saved with the rates and pack, for everyone, and used only on this stage
 come from the Consumption page at its rates, so they need Consumption Central. Without it, the
 stage sets licences alone against value. How each figure is worked out is in the
 [methodology](../docs/METHODOLOGY.md#83-cost-vs-value).
+
+## Task times
+
+Every hours and value figure starts from how many minutes each task would take someone without
+Copilot. ValueLens ships researched Conservative, Typical and Optimistic minutes for each task,
+in the model's `Human Time Estimates` table. **Assumptions → Time per task** lists them, with the
+research link and confidence behind each one.
+
+Type over any minutes to match how long the work takes in your organisation. The page shows the
+hours each change gives before you save. **Save for everyone** stores your times in the app's SQL
+database, and every page in the app then uses them. **Use research** puts one task back, and
+**Use research for every task** puts them all back.
+
+- Anyone who can open the app can change the times. Share the item only with people who should.
+- Times must run Conservative ≤ Typical ≤ Optimistic, from 0 to 480 minutes.
+- Cowork hours come from its task-category bands, not these times, so they don't change.
+- The Power BI report keeps the model's times. Change `Human Time Estimates` to update both.
 
 ## Change it
 

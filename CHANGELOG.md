@@ -16,6 +16,20 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-02 — Fabric App: change the task times
+
+The [Fabric App](5.%20Fabric%20App/) has a new reference page, **Assumptions**. Its **Time per
+task** stage lists the Conservative, Typical and Optimistic minutes behind each task's hours, with
+the research link and confidence for each, and the hours each task gives at Typical.
+
+Type over any minutes to match your organisation; the page shows the hours before you save.
+**Save for everyone** stores them in the app's SQL database, in a new `TaskTime` table, and every
+page in the app then values work at them. **Use research** puts a task back. Cowork hours keep their
+task-category bands. The Power BI report, and the CSV, SharePoint, Fabric and Power Automate
+paths, keep the model's `Human Time Estimates`.
+
+---
+
 ## 2026-10-02 — Fabric App: the hosting address points to Fabric
 
 Opening the [Fabric App](5.%20Fabric%20App/) at its `…fabricapps.net` hosting address used to offer

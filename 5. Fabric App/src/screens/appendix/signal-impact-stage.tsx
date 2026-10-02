@@ -176,8 +176,8 @@ export function SignalImpactStage() {
             }
         >
             <p className="max-w-[85ch] text-[length:var(--text-300)] leading-300 text-muted-foreground">
-                The minutes live in the semantic model's Human Time Estimates table, so an organisation can replace
-                them with its own timings; the Value destination uses whatever that table holds. Each estimate links
+                The minutes come from the semantic model's Human Time Estimates table. To use your own timings in
+                this app, change them under Assumptions; the Power BI report keeps the model's. Each estimate links
                 to the research it loosely draws on, with the model's confidence in it.
             </p>
 
