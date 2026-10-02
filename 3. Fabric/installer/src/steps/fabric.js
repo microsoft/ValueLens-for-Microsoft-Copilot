@@ -21,7 +21,7 @@ const isNotFound = (err) => err instanceof HttpError && (err.status === 404 || e
  * @param {any[]} items
  * @param {string} name
  */
-const byName = (items, name) => items.find((i) => String(i.displayName).toLowerCase() === name.toLowerCase());
+export const byName = (items, name) => items.find((i) => String(i.displayName).toLowerCase() === name.toLowerCase());
 
 /**
  * A create can answer 201 with the item, or 202 and a result. If neither carries an ID, look it up by name.
@@ -31,7 +31,7 @@ const byName = (items, name) => items.find((i) => String(i.displayName).toLowerC
  * @param {string} name
  * @returns {Promise<string>}
  */
-async function createdId(ctx, created, type, name) {
+export async function createdId(ctx, created, type, name) {
   if (created?.id) return created.id;
   const ws = /** @type {string} */ (ctx.config.fabric.workspaceId);
   const found = byName(await ctx.api.fabric.listItems(ws, type), name);
@@ -263,6 +263,9 @@ export function notebookSettings(ctx, nb) {
         }
       : {}),
     parameters: nb.parameters,
+    ...(nb.key === 'refreshModel'
+      ? { values: { WORKSPACE_ID: /** @type {string} */ (f.workspaceId), SEMANTIC_MODEL_ID: /** @type {string} */ (config.semanticModel.id) } }
+      : {}),
     lakehouse: {
       id: /** @type {string} */ (f.lakehouseId),
       name: /** @type {string} */ (f.lakehouseName),
@@ -283,7 +286,7 @@ export async function ensureNotebooks(ctx, opts = {}) {
   const items = await api.fabric.listItems(ws, 'Notebook');
   const ids = new Set(items.map((i) => i.id));
 
-  for (const nb of notebooksFor(config.modules)) {
+  for (const nb of notebooksFor(config.modules, { semanticModel: modelDeployed(config) })) {
     const content = serialiseNotebook(prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb)));
     let id = f.notebooks[nb.key];
     if (id && !ids.has(id)) {
@@ -315,6 +318,21 @@ export async function ensureNotebooks(ctx, opts = {}) {
 }
 
 /**
+ * What the pipeline definition is built from. A change means the deployed pipeline is out of date.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export function pipelineSignature(config) {
+  const modules = enabledModules(config.modules).join(',');
+  return modelDeployed(config) ? `${modules};model=${config.semanticModel.id}` : modules;
+}
+
+/**
+ * The semantic model is switched on, exists and reads the Lakehouse, so the pipeline can refresh it.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const modelDeployed = (config) => !!(config.semanticModel?.enabled && config.semanticModel.id && config.semanticModel.bound);
+
+/**
  * @param {Ctx} ctx
  * @param {{ force?: boolean }} [opts]
  */
@@ -327,8 +345,9 @@ export async function ensurePipeline(ctx, opts = {}) {
     notebookIds: f.notebooks,
     modules: config.modules,
     backfillDays: config.history.days,
+    semanticModelId: modelDeployed(config) ? config.semanticModel.id : undefined,
   });
-  const signature = enabledModules(config.modules).join(',');
+  const signature = pipelineSignature(config);
   const items = await api.fabric.listItems(ws, 'DataPipeline');
 
   if (f.pipelineId && !items.some((i) => i.id === f.pipelineId)) {
@@ -353,7 +372,7 @@ export async function ensurePipeline(ctx, opts = {}) {
     }
     f.pipelineName = name;
   } else if (opts.force || f.pipelineModules !== signature) {
-    ui.note('This replaces the pipeline definition, including any activities you added to it (such as a semantic model refresh).');
+    ui.note('This replaces the pipeline definition, including any activities you added to it yourself.');
     if (await ui.confirm(`Update ${f.pipelineName ?? PIPELINE_NAME}?`, true)) {
       await api.fabric.updatePipeline(ws, f.pipelineId, definition);
       ui.ok(`Updated pipeline ${f.pipelineName ?? PIPELINE_NAME}`);

@@ -60,7 +60,7 @@ export const MODULES = {
   },
 };
 
-/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'agent365Registry' | 'agent365Lander' | 'productFeedback'} NotebookKey */
+/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel'} NotebookKey */
 
 /**
  * @typedef {object} NotebookInfo
@@ -71,6 +71,7 @@ export const MODULES = {
  * @property {boolean} credentials  Has TENANT_ID / CLIENT_ID / CLIENT_SECRET to fill in.
  * @property {string[]} parameters  Assignments the pipeline overrides; the cell holding them is tagged `parameters`.
  * @property {string | null} placeholder  Notebook-ID placeholder in the pipeline template.
+ * @property {boolean} [semanticModel]  Only deployed with the semantic model.
  */
 
 /** @type {NotebookInfo[]} */
@@ -147,6 +148,16 @@ export const NOTEBOOKS = [
     parameters: [],
     placeholder: 'REPLACE_WITH_PRODUCT_FEEDBACK_NOTEBOOK_ID',
   },
+  {
+    key: 'refreshModel',
+    file: 'ValueLens_Refresh_Model.ipynb',
+    displayName: 'ValueLens_Refresh_Model',
+    module: 'core',
+    credentials: false,
+    parameters: ['WORKSPACE_ID', 'SEMANTIC_MODEL_ID', 'WRITE_MODE'],
+    placeholder: null,
+    semanticModel: true,
+  },
 ];
 
 /** @typedef {{ orgData: boolean, agent365: boolean, productFeedback: boolean }} ModuleChoice */
@@ -184,11 +195,12 @@ export function enabledModules(modules) {
 /**
  * Notebooks to deploy for the chosen modules, in deployment order.
  * @param {ModuleChoice} modules
+ * @param {{ semanticModel?: boolean }} [opts]
  * @returns {NotebookInfo[]}
  */
-export function notebooksFor(modules) {
+export function notebooksFor(modules, opts = {}) {
   const on = new Set(enabledModules(modules));
-  return NOTEBOOKS.filter((nb) => on.has(nb.module));
+  return NOTEBOOKS.filter((nb) => on.has(nb.module) && (!nb.semanticModel || opts.semanticModel));
 }
 
 /**
