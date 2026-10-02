@@ -9,3 +9,5 @@ export * from "./value-summary";
 export * from "./value-by-task";
 export * from "./agent-value";
 export * from "./organization-value";
+export * from "./cost-vs-value";
+export * from "./scenarios";

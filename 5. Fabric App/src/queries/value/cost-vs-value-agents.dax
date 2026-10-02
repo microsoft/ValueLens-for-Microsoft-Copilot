@@ -1,0 +1,20 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        CALCULATETABLE(
+            SUMMARIZECOLUMNS(
+                'Chat + Agent Interactions (Audit Logs)'[AgentName],
+                "@Sessions", [Observed Agent Sessions],
+                "@Hours", [Expert Equivalent Hours],
+                "@Value", [AI Assisted Value]
+            ),
+            KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)] = "Agents")
+        ),
+        NOT ISBLANK('Chat + Agent Interactions (Audit Logs)'[AgentName]) && [@Sessions] > 0
+    ),
+    "Agent", 'Chat + Agent Interactions (Audit Logs)'[AgentName],
+    "Sessions", [@Sessions],
+    "Hours", [@Hours],
+    "Value", [@Value]
+)
+ORDER BY [Value] DESC, [Agent] ASC

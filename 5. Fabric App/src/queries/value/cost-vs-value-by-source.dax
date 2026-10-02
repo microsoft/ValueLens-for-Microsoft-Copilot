@@ -1,0 +1,17 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)],
+            'Effort Scenario'[Scenario],
+            "@Hours", [Expert Equivalent Hours],
+            "@Value", [AI Assisted Value]
+        ),
+        NOT ISBLANK('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)])
+    ),
+    "Source", 'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)],
+    "Scenario", 'Effort Scenario'[Scenario],
+    "Hours", [@Hours],
+    "Value", [@Value]
+)
+ORDER BY [Source] ASC, [Scenario] ASC

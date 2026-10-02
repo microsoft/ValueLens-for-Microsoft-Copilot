@@ -7,10 +7,16 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    agentTable,
     agentValue,
     AGENT_NAME_COLUMN,
+    costValueAgents,
+    costValueBySource,
+    costValueSpec,
+    costValueWindow,
     organizationValue,
     ORGANIZATION_COLUMN,
+    pairTable,
     TASK_LABEL_COLUMN,
     toValueTaskTree,
     valueByTask,
@@ -25,6 +31,9 @@ const modules = [
     { name: "valueByTask", factory: () => valueByTask(), columns: liveColumns.valueByTask },
     { name: "agentValue", factory: () => agentValue(), columns: liveColumns.agentValue },
     { name: "organizationValue", factory: () => organizationValue(), columns: liveColumns.organizationValue },
+    { name: "costValueWindow", factory: () => costValueWindow(), columns: liveColumns.costValueWindow },
+    { name: "costValueBySource", factory: () => costValueBySource(), columns: liveColumns.costValueBySource },
+    { name: "costValueAgents", factory: () => costValueAgents(), columns: liveColumns.costValueAgents },
 ];
 
 const specModules = [{ name: "valueByTask", factory: () => valueByTask() }];
@@ -72,10 +81,17 @@ describe("value query contract", () => {
     });
 
     it("keeps the what-if parameters outside the base DAX", () => {
-        for (const { factory } of modules) {
+        for (const { name, factory } of modules) {
             expect(factory().query).not.toContain("'Hourly Value'[Hourly Value]");
-            expect(factory().query).not.toContain("'Effort Scenario'[Scenario]");
+            // The cost comparison reads every scenario at once, to give the return as a range.
+            if (name !== "costValueBySource") expect(factory().query).not.toContain("'Effort Scenario'[Scenario]");
         }
+    });
+
+    it("reads value by source under every scenario, leaving the rate outside", () => {
+        const { query } = costValueBySource();
+        expect(query).toMatch(/SUMMARIZECOLUMNS\([\s\S]*'Effort Scenario'\[Scenario\]/);
+        expect(query).not.toMatch(/TREATAS|'Effort Scenario'\[Scenario\]\s*=/);
     });
 });
 
@@ -95,6 +111,27 @@ describe("value spec field references", () => {
 
     it.each(specModules)("$name never relies on timeUnit to parse dates", ({ factory }) => {
         expect(JSON.stringify(factory().vegaLiteSpec)).not.toMatch(/"timeUnit"/);
+    });
+});
+
+describe("cost and value chart field references", () => {
+    const tables = [
+        { name: "pairs", table: pairTable([]) },
+        { name: "agents", table: agentTable([]) },
+    ];
+    // Columns the chart works out for itself.
+    const derived = new Set(["Amount", "Measure", "Amount Label", "Return Label"]);
+
+    it.each(tables)("only references columns the $name table has", ({ table }) => {
+        const available = new Set(table.columns.map((column) => column.name));
+        for (const field of collectFields(costValueSpec("?"))) {
+            if (derived.has(field)) continue;
+            expect(available, `unknown field "${field}"`).toContain(field);
+        }
+    });
+
+    it("leaves no unsubstituted placeholders", () => {
+        expect(JSON.stringify(costValueSpec("?"))).not.toMatch(/__[A-Z]+__/);
     });
 });
 

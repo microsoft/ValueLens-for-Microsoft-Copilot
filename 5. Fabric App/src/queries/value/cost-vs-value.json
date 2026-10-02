@@ -1,0 +1,55 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "encoding": {
+    "y": {
+      "field": "Pair",
+      "type": "nominal",
+      "title": null,
+      "sort": { "field": "Sort", "op": "min", "order": "ascending" },
+      "axis": { "labelLimit": 240 }
+    }
+  },
+  "layer": [
+    {
+      "transform": [{ "filter": "isValid(datum.Cost) && isValid(datum.Value)" }],
+      "mark": { "type": "rule", "strokeWidth": 3, "opacity": 0.35, "color": "#8a8886" },
+      "encoding": {
+        "x": {
+          "field": "Cost",
+          "type": "quantitative",
+          "title": null,
+          "axis": { "labelExpr": "'__CURRENCY__' + format(datum.value, '~s')" }
+        },
+        "x2": { "field": "Value" }
+      }
+    },
+    {
+      "transform": [
+        { "fold": ["Cost", "Value"], "as": ["Key", "Amount"] },
+        { "filter": "isValid(datum.Amount)" },
+        { "calculate": "datum.Key === 'Cost' ? 'Cost' : 'Estimated value'", "as": "Measure" },
+        { "calculate": "'__CURRENCY__' + format(datum.Amount, ',.0f')", "as": "Amount Label" },
+        { "calculate": "isValid(datum.Return) ? format(datum.Return, '.1f') + '×' : '—'", "as": "Return Label" }
+      ],
+      "mark": { "type": "circle", "size": 160, "opacity": 1 },
+      "encoding": {
+        "x": { "field": "Amount", "type": "quantitative", "title": null },
+        "color": {
+          "field": "Measure",
+          "type": "nominal",
+          "title": null,
+          "sort": ["Cost", "Estimated value"],
+          "legend": { "orient": "top", "direction": "horizontal" }
+        },
+        "tooltip": [
+          { "field": "Pair", "type": "nominal", "title": "Set against" },
+          { "field": "Measure", "type": "nominal", "title": "Figure" },
+          { "field": "Amount Label", "type": "nominal", "title": "Amount" },
+          { "field": "Return Label", "type": "nominal", "title": "Return" }
+        ]
+      }
+    }
+  ]
+}
