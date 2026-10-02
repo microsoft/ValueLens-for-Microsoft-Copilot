@@ -3,8 +3,8 @@
 **Preview.** The ValueLens dashboard rebuilt as a fast web app. It's hosted as an item in your
 Fabric workspace, and it reads the ValueLens semantic model you've already published. The app
 keeps no copy of your data: every page queries the model live, as the person viewing it, so
-row-level security applies. The only thing it saves is the [rates and pack](#rates--packs) you
-type in.
+row-level security applies. The only things it saves are the [rates and pack](#rates--packs)
+and the [prices](#prices) you type in.
 
 > **You need a published ValueLens model first.** Set up any path, 1 to 4, and publish its
 > template to a Power BI workspace. All five templates share the fields this app queries.
@@ -18,7 +18,7 @@ type in.
 | **Agent Evaluation** | How well Copilot Studio agents answer: how conversations ended, errors, topic health, knowledge sources and feedback comments, from Agent Evaluator. It never shows the conversations themselves |
 | **Readiness** | Who to license next, and who's ready for Cowork |
 | **Consumption** | Credits used and what they cost across Cowork / Work IQ, Copilot Studio and Azure, from Consumption Central, at rates you can set in the app |
-| **Value** | What the work was, and what it was worth: task breakdown and estimated value |
+| **Value** | What the work was, and what it was worth: task breakdown, estimated value, and cost vs value, which sets licence and credit costs against that value |
 | **Efficiency** | Whether the right tool is doing the job: Cowork fit, Model fit, and how grading works |
 | **Feedback** | What people say about Copilot |
 | **Appendix** | Glossary, plus Signal → Impact value assumptions |
@@ -33,8 +33,8 @@ How each figure is worked out, page by page, is in the [methodology](../docs/MET
 ## Prerequisites
 
 - A workspace on **Fabric capacity** (F2 or above, or a trial) to host the app. *My workspace*
-  can't host it. The app adds a small **SQL database** under its item to hold the rates; it
-  uses that capacity too.
+  can't host it. The app adds a small **SQL database** under its item to hold the rates and
+  prices; it uses that capacity too.
 - A **published ValueLens semantic model**, with **Build** permission on it for everyone who'll use the app.
 - *Optional, for the Consumption page:* a **published Consumption Central semantic model**, with
   the same Build permission.
@@ -98,6 +98,21 @@ database, so everyone who opens the app sees the same costs. **Use model values*
 - Anyone who can open the app can change the rates. Share the item only with people who should.
 - Azure AI Foundry cost comes straight from your Azure cost export, so these rates don't change it.
 - The Power BI report keeps the model's rates. Change `commercial_terms` to update both.
+
+## Prices
+
+The **Cost vs value** stage, at the end of the Value page, sets what Copilot cost against the
+estimated value of the work it did. Open **Prices** at the top of the stage to set:
+
+| Field | What it changes |
+|---|---|
+| **Microsoft 365 Copilot licence** | $ per user per month. Leave it empty to use the $30 US list price |
+| **Exchange rate** | How much of your value's currency $1 buys, for example 0.75 for £. It only appears when the model's currency symbol isn't $. Licences and credits are billed in dollars, so the stage asks for this before it compares |
+
+They're saved with the rates and pack, for everyone, and used only on this stage. Credit costs
+come from the Consumption page at its rates, so they need Consumption Central. Without it, the
+stage sets licences alone against value. How each figure is worked out is in the
+[methodology](../docs/METHODOLOGY.md#83-cost-vs-value).
 
 ## Change it
 
