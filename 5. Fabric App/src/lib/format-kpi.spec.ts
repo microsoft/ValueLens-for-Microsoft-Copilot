@@ -30,6 +30,14 @@ describe("formatKpi", () => {
         expect(formatKpi(0.008566567, "price", { prefix: "$" })).toBe("$0.0086");
     });
 
+    it("never shows a real spend under a cent as free", () => {
+        expect(formatKpi(0.000575, "money", { prefix: "$" })).toBe("<$0.01");
+        expect(formatKpi(0.0049, "money", { prefix: "$" })).toBe("<$0.01");
+        expect(formatKpi(0.005, "money", { prefix: "$" })).toBe("$0.01");
+        expect(formatKpi(0, "money", { prefix: "$" })).toBe("$0.00");
+        expect(formatKpi(0.0003, "currency", { prefix: "$" })).toBe("$0");
+    });
+
     it("shows how many times one figure covers another, to one decimal", () => {
         expect(formatKpi(5.4523, "multiple")).toBe("5.5×");
         expect(formatKpi(0.2, "multiple")).toBe("0.2×");

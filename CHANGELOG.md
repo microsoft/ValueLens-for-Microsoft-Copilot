@@ -16,6 +16,13 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-03 — Fabric App: small costs
+
+On the Consumption pages, cost axes printed every tick as a whole number, so a tenant that had
+spent a few cents saw a column of zeros. The axes now show as many decimals as the ticks need
+(0.0001, 0.0002…) and still show whole numbers for ordinary spend. Cost cards and grid cells show a
+real spend under half a cent as "<$0.01" instead of "$0.00", which read as free.
+
 ## 2026-10-03 — Consumption Central: Foundry token counts
 
 `[Foundry Tokens (M)]` treated every Azure token meter as billed per 1M tokens. Older meters are

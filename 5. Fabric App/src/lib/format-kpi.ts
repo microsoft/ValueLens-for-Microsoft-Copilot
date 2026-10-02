@@ -37,6 +37,9 @@ const formatters: Record<KpiFormat, Intl.NumberFormat> = {
  */
 export function formatKpi(value: number | undefined, format: KpiFormat, options: FormatKpiOptions = {}): string {
     if (value === undefined) return "—";
+    const prefix = options.prefix ?? "";
+    // A real spend under half a cent would round to 0.00 and read as free.
+    if (format === "money" && value > 0 && value < 0.005) return `<${prefix}${formatters.money.format(0.01)}`;
     const shown = format === "millions" ? value * 1_000_000 : value;
-    return `${options.prefix ?? ""}${formatters[format].format(shown)}${format === "multiple" ? "×" : ""}`;
+    return `${prefix}${formatters[format].format(shown)}${format === "multiple" ? "×" : ""}`;
 }
