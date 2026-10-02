@@ -25,6 +25,10 @@ for an admin. It also sets up the workspace, Lakehouse, notebooks, pipeline and 
 it runs the first load and reports what arrived. The notebooks read the secret from Key Vault
 when they run.
 
+If Azure Policy makes the vault private, the installer saves the secret through Azure Resource
+Manager. It also connects the workspace to the vault with a managed private endpoint and
+approves it.
+
 Its answers and IDs are saved in `valuelens-install.json`, which holds no secrets. Re-running it
 repairs what is missing. Other commands: `update`, `run`, `status`, `rotate-secret` and
 `preview`. The canonical notebooks and pipeline JSON are unchanged; the installer fills in a copy

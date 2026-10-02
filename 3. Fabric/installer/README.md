@@ -69,6 +69,7 @@ Lakehouse name for `ValueLens - Fabric.pbit`, or the workspace and Lakehouse IDs
 | App registration | "ValueLens Data Collector", single tenant, with the Graph application permissions above and a 12-month client secret. |
 | Admin consent | Granted for you if you have the role; otherwise a link for an admin. |
 | Workspace | On the capacity you chose. An existing workspace with no capacity is assigned to it. |
+| Managed private endpoint | Only if the vault blocks public access. It connects the workspace to the vault, and the installer approves it on the vault. See [Private Key Vaults](#private-key-vaults). |
 | Lakehouse | `ValueLens` by default, with schemas turned on, so tables land in `dbo`. |
 | Notebooks | The core ingesters, the processor, `ValueLens_Data_Check` and any optional modules. Each one is bound to the Lakehouse. Notebooks that call Graph read the secret from Key Vault when they run. |
 | Pipeline | `ValueLens_Pipeline`, built from [`pipelines/`](../pipelines/) with your notebook IDs filled in. Archived and switched-off branches are removed. |
@@ -125,8 +126,23 @@ If you carry on, the first load is skipped. Once consent is granted, run
 the Azure Identity library. Your tenant must allow it, as it does for `az login`. Nothing is
 registered for the installer itself.
 
-**Key Vault networking.** If the vault blocks public access, the Fabric notebooks can't reach it.
-The installer warns you about this. Allow access from Fabric, or use a vault that allows it.
+### Private Key Vaults
+
+Some tenants use Azure Policy to turn off public network access on every new Key Vault. The
+installer notices this and works with it:
+
+- It saves the client secret through Azure Resource Manager instead of the vault's own endpoint.
+  That needs Contributor or Key Vault Contributor on the vault. You have it on a vault the
+  installer creates.
+- It creates a managed private endpoint from the workspace to the vault and approves it on the
+  vault. The notebooks then read the secret through it. You need to be a workspace Admin, on an
+  F or trial capacity.
+- If you can't approve the endpoint, the installer prints the vault's Networking page. Someone
+  who manages the vault approves the request under **Private endpoint connections**. Until then,
+  the first load is skipped. Run `install` again once it's approved.
+
+A workspace with a managed private endpoint has no starter pool, so each notebook run takes a
+few more minutes to start.
 
 ## Troubleshooting
 
@@ -136,7 +152,8 @@ The installer warns you about this. Allow access from Fabric, or use a vault tha
 | `No Azure subscription you can use` | Ask for Contributor on a subscription, or on a resource group with an existing vault. |
 | A run fails with `AADSTS7000215` (invalid client secret) | The secret in Key Vault doesn't match the app. Run `rotate-secret`. |
 | A run fails with `Forbidden` from Graph | Admin consent is missing or still propagating. Run `install` again to check consent, then `run`. |
-| A run fails reading the secret | The person the run uses can't read the secret. See "Who the notebooks run as" above. |
+| A run fails reading the secret | The person the run uses can't read the secret. See "Who the notebooks run as" above. On a private vault, check the workspace's private endpoint is approved. |
+| `Fabric couldn't create a managed private endpoint` | Use an F or trial capacity, and make sure you're a workspace Admin. See [Private Key Vaults](#private-key-vaults). |
 | `The install record is for tenant …` | Pass `--tenant` with the tenant in the record, or use another `--config`. |
 
 Run with `--verbose` to see each call and the full error.
