@@ -127,11 +127,12 @@ export function graphApi(http) {
     /**
      * @param {string} applicationObjectId
      * @param {Date} endDateTime
+     * @param {string} [displayName]
      * @returns {Promise<{ secretText: string, endDateTime: string, keyId: string }>}
      */
-    addPassword: (applicationObjectId, endDateTime) =>
+    addPassword: (applicationObjectId, endDateTime, displayName = 'ValueLens installer') =>
       http.post(`/applications/${applicationObjectId}/addPassword`, {
-        passwordCredential: { displayName: 'ValueLens installer', endDateTime: endDateTime.toISOString() },
+        passwordCredential: { displayName, endDateTime: endDateTime.toISOString() },
       }),
     /** @param {string} applicationObjectId @param {string} keyId */
     removePassword: (applicationObjectId, keyId) => http.post(`/applications/${applicationObjectId}/removePassword`, { keyId }),
