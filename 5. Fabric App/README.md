@@ -1,6 +1,6 @@
-# 5. Fabric App — ValueLens as a web app in your Fabric workspace
+# 5. Fabric App — AI in One 2.0, ValueLens as a web app in your Fabric workspace
 
-**Preview.** The ValueLens dashboard rebuilt as a fast web app. It's hosted as an item in your
+**Preview.** AI in One 2.0 is the ValueLens dashboard rebuilt as a fast web app. It's hosted as an item in your
 Fabric workspace, and it reads the ValueLens semantic model you've already published. The app
 keeps no copy of your data: every page queries the model live, as the person viewing it, so
 row-level security applies. The only things it saves are the [rates and pack](#rates--packs),
@@ -65,11 +65,13 @@ Run these commands from this folder (`5. Fabric App`).
    ```powershell
    npx rayfin up --workspace-uri "https://app.fabric.microsoft.com/groups/<workspace-id>"
    ```
-   It builds the app, creates a **ValueLens App** item in the workspace, and prints two links. Use
-   the **Fabric portal** link, or open the item from the workspace. The app loads its data
+   It builds the app, creates an item called **valuelens** in the workspace, and prints two links.
+   Use the **Fabric portal** link, or open the item from the workspace. The app loads its data
    through Fabric, so the `…fabricapps.net` hosting URL on its own only offers a link to the item.
+   To show the item as **AI in One 2.0** in the workspace, rename it in its settings; later
+   deploys keep the name.
 4. **Share.** Each viewer needs two things:
-   - **The app:** add them to the workspace (Viewer is enough), or share the **ValueLens App** item
+   - **The app:** add them to the workspace (Viewer is enough), or share the app's item
      with *Run and interact* permission. Then send them the Fabric portal link.
    - **The data:** Build permission on the ValueLens model, and on Consumption Central and Agent
      Evaluator if you use them. Without it the app opens, but its pages can't load.

@@ -16,6 +16,13 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-02 — Fabric App: renamed AI in One 2.0
+
+The [Fabric App](5.%20Fabric%20App/) is now called **AI in One 2.0**: the browser tab, the sidebar
+title and the page that points visitors to Fabric all use the new name. The data model is still
+ValueLens, and nothing else in the app changes. A new deploy still creates an item called
+`valuelens`; rename it in the workspace to match.
+
 ## 2026-10-02 — Fabric App: change the task times
 
 The [Fabric App](5.%20Fabric%20App/) has a new reference page, **Assumptions**. Its **Time per
