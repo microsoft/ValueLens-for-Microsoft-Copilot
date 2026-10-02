@@ -30,15 +30,7 @@ interface Mark {
 }
 
 async function render(spec: unknown, rows: Row[], columnMetadata: ColumnMetadataMap, marktype: string): Promise<Mark[]> {
-    const rename = new Map(Object.entries(columnMetadata).map(([daxName, column]) => [daxName, column.name]));
-    const values = rows.map((row) =>
-        Object.fromEntries(Object.entries(row).map(([key, value]) => [rename.get(key) ?? key, value])),
-    );
-
-    const sized = { ...(spec as object), width: 600, height: 320, data: { values } } as TopLevelSpec;
-    const view = new View(parse(compile(sized).spec), { renderer: "none" });
-    await view.runAsync();
-
+    const view = await run(spec, rows, columnMetadata);
     const found: SceneItem[] = [];
     const walk = (node: Scene | SceneItem) => {
         const scene = node as Scene;
@@ -50,6 +42,43 @@ async function render(spec: unknown, rows: Row[], columnMetadata: ColumnMetadata
     walk((view.scenegraph() as unknown as { root: Scene }).root);
     await view.finalize();
     return found as unknown as Mark[];
+}
+
+/** The numeric tick labels the chart prints on its value axis. */
+async function valueAxisLabels(spec: unknown, rows: Row[], columnMetadata: ColumnMetadataMap): Promise<string[]> {
+    const view = await run(spec, rows, columnMetadata);
+    const labels: string[] = [];
+    const walk = (node: Scene | SceneItem) => {
+        const scene = node as Scene & { role?: string };
+        if (scene.role === "axis-label") labels.push(...(scene.items as unknown as { text: string }[]).map((item) => item.text));
+        for (const item of (scene.items ?? []) as (Scene | SceneItem)[]) {
+            if ((item as Scene).marktype || (item as { items?: unknown }).items) walk(item);
+        }
+    };
+    walk((view.scenegraph() as unknown as { root: Scene }).root);
+    await view.finalize();
+    return labels.filter((text) => /^[\d.,]+$/.test(text));
+}
+
+async function run(spec: unknown, rows: Row[], columnMetadata: ColumnMetadataMap): Promise<View> {
+    const rename = new Map(Object.entries(columnMetadata).map(([daxName, column]) => [daxName, column.name]));
+    const values = rows.map((row) =>
+        Object.fromEntries(Object.entries(row).map(([key, value]) => [rename.get(key) ?? key, value])),
+    );
+
+    const sized = { ...(spec as object), width: 600, height: 320, data: { values } } as TopLevelSpec;
+    const view = new View(parse(compile(sized).spec), { renderer: "none" });
+    await view.runAsync();
+    return view;
+}
+
+/** Scales every cost in the rows, to stand in for a tenant that has barely spent. */
+function scaleCosts(rows: Row[], factor: number): Row[] {
+    return rows.map((row) =>
+        Object.fromEntries(
+            Object.entries(row).map(([key, value]) => [key, /Cost\]$/.test(key) && typeof value === "number" ? value * factor : value]),
+        ),
+    );
 }
 
 function expectFinite(marks: Mark[]) {
@@ -145,5 +174,35 @@ describe("azure renders", () => {
         expect(bars).toHaveLength(rows.length);
         const top = bars.reduce((first, bar) => (bar.bounds.y1 < first.bounds.y1 ? bar : first));
         expect(top.datum.Item).toBe(rows[0]["[Item]"]);
+    });
+});
+
+describe("cost axes", () => {
+    const charts = [
+        { name: "cost by product", factory: () => consumptionByProduct(), rows: productRows as Row[] },
+        { name: "cowork weekly cost", factory: () => coworkWeekly("cost"), rows: weeklyRows as Row[] },
+        { name: "studio daily cost", factory: () => studioDaily("cost"), rows: studioDailyRows as Row[] },
+        {
+            name: "studio breakdown cost",
+            factory: () => studioBreakdown("cost"),
+            rows: (breakdownRows as Row[]).filter((row) => row["[Breakdown]"] === "Model"),
+        },
+        { name: "foundry daily cost", factory: () => foundryDaily(), rows: foundryDailyRows as Row[] },
+        { name: "foundry cost by model", factory: () => foundryByModel(), rows: modelRows as Row[] },
+    ];
+
+    // A tenant that has barely spent: whole-number labels used to print every tick as 0.
+    it.each(charts)("$name labels each tick differently when the spend is a fraction of a cent", async ({ factory, rows }) => {
+        const { vegaLiteSpec, columnMetadata } = factory();
+        const labels = await valueAxisLabels(vegaLiteSpec, scaleCosts(rows, 0.0001), columnMetadata);
+        expect(labels.length).toBeGreaterThan(1);
+        expect(new Set(labels).size).toBe(labels.length);
+    });
+
+    it.each(charts)("$name keeps whole-number labels for ordinary spend", async ({ factory, rows }) => {
+        const { vegaLiteSpec, columnMetadata } = factory();
+        const labels = await valueAxisLabels(vegaLiteSpec, scaleCosts(rows, 100), columnMetadata);
+        expect(labels.length).toBeGreaterThan(1);
+        expect(labels.every((label) => !label.includes("."))).toBe(true);
     });
 });
