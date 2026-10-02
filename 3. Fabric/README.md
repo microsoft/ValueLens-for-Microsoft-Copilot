@@ -38,6 +38,7 @@ just want to see the thing working first, start at [1. Local CSV](../1.%20Local%
 | `ValueLens - Fabric.pbit` | Import template using the Lakehouse SQL analytics endpoint. |
 | `ValueLens - Fabric OneLake.pbit` | Import template using the OneLake Tables endpoint over HTTPS/443. |
 | `notebooks/` | Core ingesters, `Copilot_Audit_Log_Processor`, and optional-source ingesters. |
+| [`installer/`](installer/) | Command-line installer that sets up the app registration, Key Vault secret, workspace, Lakehouse, notebooks, pipeline and schedule, then runs the first load. |
 | `notebooks/optional/` | Edge-case add-ons outside the core path, each self-contained with its own README. |
 | `pipelines/` | Fabric pipeline JSON for the reviewed **core** orchestration plus opt-in branches. |
 | `docs/` | Fabric-specific reference notes, including the read-only SQL checker pack. Cross-path references (data dictionary, permissions) live in [`/docs`](../docs/). |
@@ -67,6 +68,22 @@ just want to see the thing working first, start at [1. Local CSV](../1.%20Local%
 ---
 
 ## 🛠 Setup
+
+### Installer
+
+The [installer](installer/) does steps 1 to 4 below for you, plus the schedule and a first load.
+It creates the app registration, keeps its secret in Key Vault, and grants admin consent if you
+can, or gives you a link for an admin. It then sets up the workspace, Lakehouse, notebooks and
+pipeline, runs the first load and checks the data.
+
+```text
+cd "3. Fabric/installer"
+npm install
+npx valuelens-install
+```
+
+It needs Node.js 20.12 or later and an Azure subscription for the Key Vault. When it finishes,
+it prints the connection values for both templates. Carry on from step 5.
 
 ### Quick start
 

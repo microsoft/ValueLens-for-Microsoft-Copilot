@@ -1,0 +1,150 @@
+# ValueLens Fabric installer
+
+One command that sets up the [Fabric path](../README.md) in your tenant. It asks a few questions,
+shows you the plan, and then creates everything the manual steps would: the app registration, its
+secret in Azure Key Vault, admin consent, a workspace and Lakehouse, the notebooks, the pipeline
+and its schedule. It then runs the first load and checks the data that arrives.
+
+It keeps its answers and the IDs it creates in `valuelens-install.json`. Run it again with that
+file to repair, change or update the set-up. The file holds no secrets.
+
+```text
+cd "3. Fabric/installer"
+npm install
+npx valuelens-install
+```
+
+**Jump to:** [Before you start](#before-you-start) · [What it creates](#what-it-creates) ·
+[Commands](#commands) · [Good to know](#good-to-know) · [Troubleshooting](#troubleshooting)
+
+---
+
+## Before you start
+
+| You need | Why |
+|---|---|
+| **Node.js 20.12 or later** and a clone of this repo | The installer deploys the notebooks and pipeline from this checkout. |
+| An **active Fabric capacity** (F2 or larger, or a trial) you can assign workspaces to | It creates the workspace on it. Or pick an existing workspace where you're an Admin or Member. |
+| An **Azure subscription** where you can create a Key Vault (Contributor), or an existing vault you can write secrets to | The client secret lives in Key Vault, never in a notebook. Owner or User Access Administrator lets it use Azure RBAC; otherwise the vault uses access policies. |
+| Permission to **register apps** in Entra | The default user setting is enough, or Application Administrator. You can also use an app you already have. |
+| A **Global Administrator** or **Privileged Role Administrator** | Only to grant admin consent for the Graph permissions. If that isn't you, the installer gives you a link to send them. |
+
+The permissions it requests are the ones in [`/docs/PERMISSIONS.md`](../../docs/PERMISSIONS.md):
+`AuditLogsQuery.Read.All`, `Reports.Read.All` and `User.Read.All`, plus `CopilotPackages.Read.All`
+and `Application.Read.All` if you add the Agent 365 registry.
+
+## Run it
+
+```text
+npx valuelens-install                 # sign in with a browser
+npx valuelens-install --device-code   # sign in with a code on another device
+npx valuelens-install --use-az        # use your Azure CLI sign-in (az login)
+npx valuelens-install --tenant contoso.onmicrosoft.com
+```
+
+It checks your tenant first (roles, capacities, subscriptions), then asks:
+
+1. **What to collect.** Copilot usage and licences are always on. Org data from Entra is on by
+   default. The Agent 365 registry and product feedback are off.
+2. **How much audit history** the first load pulls: 30, 90 or 180 days.
+3. **Capacity, workspace and Lakehouse name.**
+4. **App registration**: create "ValueLens Data Collector", or use one you have. If you use your
+   own, you paste its secret once and it goes straight to Key Vault.
+5. **Key Vault**: create one (resource group, region, name) or pick one you have.
+6. **Schedule**: daily or weekly, and the time (UTC).
+7. **Whether to run the first load** straight away.
+
+Then it shows the plan and asks to go ahead. Nothing is created before you say yes. Your
+answers are saved either way.
+
+When it finishes, it prints the values for the Power BI templates: the SQL endpoint and
+Lakehouse name for `ValueLens - Fabric.pbit`, or the workspace and Lakehouse IDs for
+`ValueLens - Fabric OneLake.pbit`. Carry on from step 5 of the [Fabric quick start](../README.md#quick-start).
+
+## What it creates
+
+| Item | Details |
+|---|---|
+| Key Vault | Secret `valuelens-client-secret` (you can rename it), with its expiry date set. You get Key Vault Secrets Officer on a new RBAC vault. |
+| App registration | "ValueLens Data Collector", single tenant, with the Graph application permissions above and a 12-month client secret. |
+| Admin consent | Granted for you if you have the role; otherwise a link for an admin. |
+| Workspace | On the capacity you chose. An existing workspace with no capacity is assigned to it. |
+| Lakehouse | `ValueLens` by default, with schemas turned on, so tables land in `dbo`. |
+| Notebooks | The core ingesters, the processor, `ValueLens_Data_Check` and any optional modules. Each one is bound to the Lakehouse. Notebooks that call Graph read the secret from Key Vault when they run. |
+| Pipeline | `ValueLens_Pipeline`, built from [`pipelines/`](../pipelines/) with your notebook IDs filled in. Archived and switched-off branches are removed. |
+| Schedule | Daily or weekly at the time you chose, starting tomorrow. |
+| First load | A pipeline run with your chosen history, then the data check. The run reports row counts and the date range of the audit data. |
+
+The data check copy is the only notebook the installer adds to. It writes a short summary to
+`Files/valuelens_installer/data_check.json` in the Lakehouse, so the installer can read the
+result back.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `install` (default) | Sets everything up, or repairs it from the install record. Re-running only does what is missing. |
+| `update` | Pushes the notebooks and pipeline from this checkout over the deployed ones. Use it after you pull a new version of the repo. |
+| `run` | Runs the pipeline now, then the data check. `--backfill-days <n>` reloads that much audit history and rebuilds the curated table. |
+| `status` | Shows recent runs, the last data check, and when the client secret expires. |
+| `rotate-secret` | Creates a new client secret and replaces the one in Key Vault. |
+| `preview` | Writes the notebooks, pipeline and schedule it would deploy to `./valuelens-preview`, without signing in. |
+
+| Option | |
+|---|---|
+| `--config <file>` | Install record to use (default `./valuelens-install.json`). |
+| `--source <dir>` | The `3. Fabric` folder to deploy from (default: this checkout). |
+| `--yes`, `-y` | Take saved answers and defaults without asking. A question with no answer stops the run. |
+| `--no-wait` | Start the first load and finish without waiting for it. |
+| `--verbose` | Print each API call, and the full error body when one fails. |
+
+## Good to know
+
+**Who the notebooks run as.** Fabric runs pipeline notebooks as the person who last changed the
+pipeline, and scheduled runs as the schedule's owner. The notebooks read the client secret from
+Key Vault as that person. If someone else edits the pipeline or takes over the schedule, give
+them "get" on the secret first (Key Vault Secrets User), or the next run fails.
+
+**`update` replaces the pipeline definition.** That includes anything you added to it, such as the
+semantic model refresh from [`pipelines/README.md`](../pipelines/README.md#refresh-power-bi-from-the-pipeline).
+The installer asks first. Re-add the refresh afterwards, or say no and keep your version.
+Changing the modules on a re-run of `install` asks the same question.
+
+**Same-name items.** If the workspace already has a notebook or pipeline with a ValueLens name,
+the installer asks before replacing it.
+
+**The secret expires after 12 months.** `status` warns you 30 days before. Run `rotate-secret`;
+the old secret keeps working until it expires.
+
+**Admin consent without the role.** The installer prints the app's API permissions page. An admin
+opens it and selects **Grant admin consent**. You can wait and choose **Check again**, or carry on.
+If you carry on, the first load is skipped. Once consent is granted, run
+`npx valuelens-install run --backfill-days 90`.
+
+**Sign-in.** Browser and device-code sign-in use the Azure CLI's public client, the default for
+the Azure Identity library. Your tenant must allow it, as it does for `az login`. Nothing is
+registered for the installer itself.
+
+**Key Vault networking.** If the vault blocks public access, the Fabric notebooks can't reach it.
+The installer warns you about this. Allow access from Fabric, or use a vault that allows it.
+
+## Troubleshooting
+
+| Symptom | What to do |
+|---|---|
+| `No active Fabric capacity you can use` | Start a Fabric trial, or ask a capacity admin to make you a Contributor on a capacity. |
+| `No Azure subscription you can use` | Ask for Contributor on a subscription, or on a resource group with an existing vault. |
+| A run fails with `AADSTS7000215` (invalid client secret) | The secret in Key Vault doesn't match the app. Run `rotate-secret`. |
+| A run fails with `Forbidden` from Graph | Admin consent is missing or still propagating. Run `install` again to check consent, then `run`. |
+| A run fails reading the secret | The person the run uses can't read the secret. See "Who the notebooks run as" above. |
+| `The install record is for tenant …` | Pass `--tenant` with the tenant in the record, or use another `--config`. |
+
+Run with `--verbose` to see each call and the full error.
+
+## Development
+
+```text
+npm test                       # unit tests with fakes, no sign-in
+npm run typecheck              # TypeScript checks over the JSDoc types
+npx valuelens-install preview  # writes ./valuelens-preview (ignored by git)
+```

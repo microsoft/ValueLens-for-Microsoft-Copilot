@@ -16,6 +16,20 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-02 — Fabric: installer
+
+New [`3. Fabric/installer`](3.%20Fabric/installer/): run `npx valuelens-install` to set up the
+Fabric path in one go. It checks the tenant and asks a few questions. It then creates the app
+registration, with its secret in Azure Key Vault, and grants admin consent, or gives you a link
+for an admin. It also sets up the workspace, Lakehouse, notebooks, pipeline and schedule. Last,
+it runs the first load and reports what arrived. The notebooks read the secret from Key Vault
+when they run.
+
+Its answers and IDs are saved in `valuelens-install.json`, which holds no secrets. Re-running it
+repairs what is missing. Other commands: `update`, `run`, `status`, `rotate-secret` and
+`preview`. The canonical notebooks and pipeline JSON are unchanged; the installer fills in a copy
+of each as it deploys.
+
 ## 2026-10-02 — Fabric App: reloads itself after a deploy
 
 A page opened before a deploy used to fail on its next page change with *Failed to fetch
