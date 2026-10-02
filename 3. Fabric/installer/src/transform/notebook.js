@@ -17,6 +17,7 @@
  * @property {Record<string, string>} [values]  Defaults to write into the notebook, e.g. IDs for a manual run.
  * @property {{ id: string, name: string, workspaceId: string }} [lakehouse]
  * @property {boolean} [dataCheckSummary]  Append a cell that returns a JSON summary to the installer.
+ * @property {import('../catalog.js').NotebookPatch[]} [patches]  Text changes to code cells.
  */
 
 export const MARKER = 'Set by the ValueLens installer';
@@ -177,6 +178,13 @@ export function prepareNotebook(source, settings) {
     const idx = findAssignmentCell(nb, name);
     if (idx < 0) throw new Error(`Could not find "${name} = ..." in the notebook.`);
     updateCell(nb.cells[idx], (t) => setAssignment(t, name, pyString(value)));
+  }
+
+  for (const patch of settings.patches ?? []) {
+    const hits = nb.cells.filter((c) => c.cell_type === 'code' && cellText(c).includes(patch.find));
+    const count = hits.reduce((n, c) => n + cellText(c).split(patch.find).length - 1, 0);
+    if (count !== 1) throw new Error(`Expected "${patch.find.trim()}" once in the notebook, found it ${count} times. The installer's patch needs updating.`);
+    updateCell(hits[0], (t) => t.replace(patch.find, () => patch.replace));
   }
 
   if (settings.lakehouse) {

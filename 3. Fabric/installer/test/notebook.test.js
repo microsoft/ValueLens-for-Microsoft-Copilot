@@ -17,9 +17,8 @@ import {
 } from '../src/transform/notebook.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const notebooksDir = join(here, '..', '..', 'notebooks');
-/** @param {string} file */
-const load = (file) => JSON.parse(readFileSync(join(notebooksDir, file), 'utf8'));
+/** @param {string} file @param {string} [dir]  Folder under `3. Fabric`. */
+const load = (file, dir = 'notebooks') => JSON.parse(readFileSync(join(here, '..', '..', dir, file), 'utf8'));
 
 const TENANT = '11111111-2222-3333-4444-555555555555';
 const CLIENT = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
@@ -62,7 +61,7 @@ test('toSourceLines matches Jupyter line storage', () => {
 
 for (const info of NOTEBOOKS.filter((n) => n.credentials)) {
   test(`${info.file}: credentials come from Key Vault`, () => {
-    const source = load(info.file);
+    const source = load(info.file, info.dir);
     const before = JSON.stringify(source);
     const nb = prepareNotebook(source, { tenantId: TENANT, clientId: CLIENT, secret: SECRET, lakehouse: LAKEHOUSE });
     assert.equal(JSON.stringify(source), before, 'source notebook must not change');
@@ -83,7 +82,7 @@ for (const info of NOTEBOOKS.filter((n) => n.credentials)) {
 
 for (const info of NOTEBOOKS.filter((n) => n.parameters.length)) {
   test(`${info.file}: one cell is tagged parameters`, () => {
-    const nb = prepareNotebook(load(info.file), { parameters: info.parameters });
+    const nb = prepareNotebook(load(info.file, info.dir), { parameters: info.parameters });
     const tagged = nb.cells.filter((cell) => cell.metadata?.tags?.includes('parameters'));
     assert.equal(tagged.length, 1);
     for (const p of info.parameters) assert.match(cellText(tagged[0]), new RegExp(`^${p}\\s*=`, 'm'));
@@ -92,14 +91,14 @@ for (const info of NOTEBOOKS.filter((n) => n.parameters.length)) {
 
 test('every notebook in the catalogue exists and parses', () => {
   for (const info of NOTEBOOKS) {
-    const nb = load(info.file);
+    const nb = load(info.file, info.dir);
     assert.ok(Array.isArray(nb.cells) && nb.cells.length > 0, info.file);
   }
 });
 
 test('notebooks without credentials have none to fill in', () => {
   for (const info of NOTEBOOKS.filter((n) => !n.credentials)) {
-    assert.equal(findAssignmentCell(load(info.file), 'CLIENT_SECRET'), -1, info.file);
+    assert.equal(findAssignmentCell(load(info.file, info.dir), 'CLIENT_SECRET'), -1, info.file);
   }
 });
 
@@ -119,4 +118,36 @@ test('serialiseNotebook round-trips', () => {
 
 test('credentials must be given together', () => {
   assert.throws(() => prepareNotebook(load('Copilot_Org_Data_Direct_Ingester.ipynb'), { tenantId: TENANT }), /together/);
+});
+
+const consumption = (/** @type {string} */ key) => /** @type {import('../src/catalog.js').NotebookInfo} */ (NOTEBOOKS.find((n) => n.key === key));
+
+test('Viva consumption: an empty landing folder ends the notebook quietly', () => {
+  const info = consumption('vivaConsumption');
+  const source = load(info.file, info.dir);
+  const nb = prepareNotebook(source, { patches: info.patches, lakehouse: LAKEHOUSE });
+  const all = nb.cells.map(cellText).join('\n');
+  assert.match(all, /notebookutils\.fs\.ls\(LANDING\) if notebookutils\.fs\.exists\(LANDING\) else \[\]/);
+  assert.match(all, /notebookutils\.notebook\.exit\(f'No PersonServiceCreditsMetrics CSV files in \{LANDING\}/);
+  assert.doesNotMatch(all, /raise ValueError\(f'No PersonServiceCreditsMetrics/);
+  assert.equal(nb.metadata.dependencies.lakehouse.default_lakehouse, LAKEHOUSE.id);
+});
+
+test('a patch that no longer matches exactly once is an error', () => {
+  const info = consumption('vivaConsumption');
+  assert.throws(() => prepareNotebook(load(info.file, info.dir), { patches: [{ find: 'no such text', replace: '' }] }), /found it 0 times/);
+  assert.throws(() => prepareNotebook(load(info.file, info.dir), { patches: [{ find: 'LANDING', replace: '' }] }), /LANDING/);
+});
+
+test('Azure AI: the subscription, app and Key Vault secret are filled in', () => {
+  const info = consumption('azureAi');
+  const nb = prepareNotebook(load(info.file, info.dir), {
+    values: { SUBSCRIPTION_ID: TENANT, TENANT_ID: TENANT, CLIENT_ID: CLIENT, KEY_VAULT_URL: SECRET.vaultUri, CLIENT_SECRET_NAME: SECRET.secretName },
+  });
+  const all = nb.cells.map(cellText).join('\n');
+  assert.match(all, new RegExp(`^SUBSCRIPTION_ID = '${TENANT}'`, 'm'));
+  assert.match(all, new RegExp(`^CLIENT_ID = '${CLIENT}'`, 'm'));
+  assert.match(all, /^KEY_VAULT_URL = 'https:\/\/vl-kv-test\.vault\.azure\.net\/'/m);
+  assert.match(all, /^CLIENT_SECRET_NAME = 'valuelens-client-secret'/m);
+  assert.match(all, /notebookutils\.credentials\.getSecret\(KEY_VAULT_URL, CLIENT_SECRET_NAME\)/);
 });

@@ -4,12 +4,13 @@
  * install can run unattended.
  */
 import { randomBytes } from 'node:crypto';
-import { MODULES } from '../catalog.js';
+import { MODULES, OPTIONAL_MODULES } from '../catalog.js';
 import { allowsAction, armLocation, validateVaultName } from '../clients/azure.js';
 import { APP_ROLES, CONSENT_ROLES } from '../clients/graph.js';
 import { HttpError } from '../http.js';
 import { c } from '../ui.js';
 import { MIN_NODE, nodeVersionOk } from './app.js';
+import { consumptionModelWanted, planConsumption } from './consumption.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
@@ -189,16 +190,17 @@ export async function plan(ctx, pre) {
   ui.heading('What to collect');
   const picked = await ui.checkbox(
     'Copilot usage and licences are always included. Add:',
-    /** @type {const} */ (['orgData', 'agent365', 'productFeedback']).map((id) => ({
+    OPTIONAL_MODULES.map((id) => ({
       name: MODULES[id].label,
       value: id,
       description: MODULES[id].description,
       checked: config.modules[id],
     })),
   );
-  config.modules = { orgData: picked.includes('orgData'), agent365: picked.includes('agent365'), productFeedback: picked.includes('productFeedback') };
+  config.modules = /** @type {import('../catalog.js').ModuleChoice} */ (Object.fromEntries(OPTIONAL_MODULES.map((id) => [id, picked.includes(id)])));
 
   await planPowerBi(ctx, pre);
+  if (config.modules.consumption) await planConsumption(ctx, pre);
 
   if (config.firstRun?.status !== 'Completed') {
     config.history.days = await ui.select(
@@ -355,7 +357,7 @@ export function uniqueName(base, taken) {
  */
 export async function confirmPlan(ctx) {
   const { ui, config } = ctx;
-  const mods = ['Copilot usage and licences', ...(['orgData', 'agent365', 'productFeedback'].filter((m) => config.modules[/** @type {'orgData'} */ (m)]).map((m) => MODULES[/** @type {'orgData'} */ (m)].label))];
+  const mods = ['Copilot usage and licences', ...OPTIONAL_MODULES.filter((m) => config.modules[m]).map((m) => MODULES[m].label)];
   ui.heading('Ready to set up');
   ui.info(`Data:        ${mods.join(', ')}`);
   ui.info(`Workspace:   ${config.fabric.workspaceName ?? config.fabric.workspaceId} ${config.fabric.workspaceId ? '' : c.dim('(new)')}`);
@@ -364,8 +366,14 @@ export async function confirmPlan(ctx) {
   ui.info(`Key Vault:   ${config.keyVault.name} ${config.keyVault.existing || config.keyVault.uri ? '' : c.dim(`(new, ${config.keyVault.rbac ? 'Azure RBAC' : 'access policies'})`)}`);
   ui.info(`Schedule:    ${config.schedule.frequency === 'weekly' ? `${config.schedule.weekday}s` : 'Daily'} at ${config.schedule.time} ${config.schedule.timeZone}`);
   if (config.semanticModel.enabled) {
+    const cm = config.consumption.model;
+    const consumption = consumptionModelWanted(ctx) ? `, ${cm.name} ${cm.id ? '' : c.dim('(new)')}`.trimEnd() : '';
     const app = config.fabricApp.enabled ? `, and the ValueLens app ${config.fabricApp.itemId ? '' : c.dim('(new)')}` : '';
-    ui.info(`Power BI:    ${config.semanticModel.name} ${config.semanticModel.id ? '' : c.dim('(new)')}${app}`.trimEnd());
+    ui.info(`Power BI:    ${config.semanticModel.name} ${config.semanticModel.id ? '' : c.dim('(new)')}`.trimEnd() + consumption + app.trimEnd());
+  }
+  if (config.modules.consumption) {
+    const cc = config.consumption;
+    ui.info(`Azure AI:    ${cc.azureSubscriptionId ? `${cc.azureSubscriptionName ?? cc.azureSubscriptionId}${cc.azureAccess ? '' : c.dim(' (the app gets Reader, Cost Management Reader and Monitoring Reader)')}` : c.dim('left out')}`);
   }
   if (ctx.runFirstLoad) ui.info(`First load:  ${config.history.days} days of history, straight after setup`);
   return ui.confirm('Go ahead?', true);

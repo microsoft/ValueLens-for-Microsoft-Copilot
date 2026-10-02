@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NOTEBOOKS } from './catalog.js';
-import { MODEL_TEMPLATE } from './transform/model.js';
+import { CONSUMPTION_TEMPLATE, MODEL_TEMPLATE } from './transform/model.js';
 
 /** `3. Fabric`, when the installer runs from inside the repo. */
 export const DEFAULT_SOURCE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -18,6 +18,7 @@ export const APP_DIR = join('..', '5. Fabric App');
  * @property {Record<import('./catalog.js').NotebookKey, import('./transform/notebook.js').Notebook>} notebooks
  * @property {any} pipeline
  * @property {string} [modelFile]  `ValueLens - Fabric.pbit`, read only when the semantic model is deployed.
+ * @property {string} [consumptionModelFile]  `Consumption Central - Fabric.pbit`, for the credit consumption model.
  * @property {string} [appDir]  The web app's source, when this checkout has it.
  */
 
@@ -34,17 +35,19 @@ export function loadSources(dir = DEFAULT_SOURCE_DIR) {
   /** @type {any} */
   const notebooks = {};
   for (const nb of NOTEBOOKS) {
-    const file = join(root, 'notebooks', nb.file);
+    const file = join(root, nb.dir ?? 'notebooks', nb.file);
     if (!existsSync(file)) throw new Error(`Missing notebook ${file}.`);
     notebooks[nb.key] = readJson(file);
   }
   const modelFile = join(root, MODEL_TEMPLATE);
+  const consumptionModelFile = join(root, CONSUMPTION_TEMPLATE);
   const appDir = resolve(root, APP_DIR);
   return {
     dir: root,
     notebooks,
     pipeline: readJson(pipelineFile),
     modelFile: existsSync(modelFile) ? modelFile : undefined,
+    consumptionModelFile: existsSync(consumptionModelFile) ? consumptionModelFile : undefined,
     appDir: existsSync(join(appDir, 'rayfin', 'rayfin.yml')) ? appDir : undefined,
   };
 }

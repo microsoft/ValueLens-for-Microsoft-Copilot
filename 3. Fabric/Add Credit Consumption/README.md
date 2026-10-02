@@ -9,6 +9,11 @@ You can use the **same Lakehouse as ValueLens**. Its table names and `Files/land
 overlap with anything ValueLens reads or writes. Load only the products you have; the other pages
 stay empty.
 
+> **Using the [Fabric installer](../installer/#credit-consumption)?** Choose *Credit consumption*
+> and it sets up the Azure AI, Copilot Studio and Cowork notebooks, the upload folders, the
+> semantic model and the app's Consumption pages for you. You still land the Cowork data
+> ([step 1](#viva-dataflow)) and the Copilot Studio exports yourself; the installer prints how.
+
 ### What's here
 
 | Item | Purpose |

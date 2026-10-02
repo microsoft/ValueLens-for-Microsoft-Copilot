@@ -67,7 +67,7 @@ function ResourceGrid({ result, prefix, labels, tokens, title, subtitle }: Resou
                 cellRenderer: heatRenderer({ domain: columnHeat(result.table, "Cost"), format: moneyCell(prefix) }),
             },
             ...(tokens
-                ? [{ id: "Tokens M", header: "Tokens (M)", width: 112, numericStyling: true, cellRenderer: formatCell("decimal") }]
+                ? [{ id: "Tokens M", header: "Tokens", width: 112, numericStyling: true, cellRenderer: formatCell("millions") }]
                 : []),
         ],
         [labels, prefix, result.table, tokens],
@@ -132,9 +132,9 @@ function FoundryView({ currency }: { currency: string | undefined }) {
                     }
                 />
                 <KpiCard
-                    label="Tokens (millions)"
+                    label="Tokens"
                     value={readNumber(row, "[Tokens M]")}
-                    format="hours"
+                    format="millions"
                     detail={<KpiStat label="Output share" value={readNumber(row, "[Output Share]")} format="percent" />}
                 />
                 <KpiCard label="Cost per 1M tokens" value={readNumber(row, "[Cost Per 1M Tokens]")} format="money" prefix={prefix} />
@@ -236,7 +236,7 @@ function SolutionView({ filters, prefix }: { filters: readonly string[]; prefix:
                     format="percent"
                     detail="Cost with a department tag"
                 />
-                <KpiCard label="Tokens (millions)" value={readNumber(row, "[Tokens M]")} format="hours" />
+                <KpiCard label="Tokens" value={readNumber(row, "[Tokens M]")} format="millions" />
                 <KpiCard label="Speech hours" value={readNumber(row, "[Speech Hours]")} format="hours" />
                 <KpiCard label="Document pages" value={readNumber(row, "[Document Pages]")} />
                 <KpiCard label="Generated images" value={readNumber(row, "[Generated Images]")} />

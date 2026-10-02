@@ -7,7 +7,7 @@
 /** Microsoft Graph's application ID. Same in every tenant. */
 export const GRAPH_APP_ID = '00000003-0000-0000-c000-000000000000';
 
-/** @typedef {'core' | 'orgData' | 'agent365' | 'productFeedback'} ModuleId */
+/** @typedef {'core' | 'orgData' | 'agent365' | 'productFeedback' | 'consumption'} ModuleId */
 
 /**
  * @typedef {object} ModuleInfo
@@ -58,21 +58,48 @@ export const MODULES = {
     permissions: [],
     pipelineParameter: 'EnableProductFeedback',
   },
+  consumption: {
+    id: 'consumption',
+    label: 'Credit consumption',
+    description: 'Azure AI spend and tokens, plus Copilot Studio and Cowork credits from exports you land in the Lakehouse.',
+    required: false,
+    defaultOn: false,
+    permissions: [],
+    pipelineParameter: null,
+  },
 };
 
-/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel'} NotebookKey */
+/** Modules that change the ValueLens semantic model. The others have their own model or none. */
+export const MODEL_MODULES = /** @type {const} */ (['core', 'orgData', 'agent365', 'productFeedback']);
+
+/** Modules offered under "What to collect", in order. */
+export const OPTIONAL_MODULES = /** @type {const} */ (['orgData', 'agent365', 'productFeedback', 'consumption']);
+
+/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption'} NotebookKey */
+
+/**
+ * A text change the installer makes to its copy of a notebook. `find` must occur exactly once.
+ * @typedef {{ find: string, replace: string }} NotebookPatch
+ */
 
 /**
  * @typedef {object} NotebookInfo
  * @property {NotebookKey} key
- * @property {string} file  File name in `3. Fabric/notebooks`.
+ * @property {string} file  File name in `dir`.
+ * @property {string} [dir]  Folder under `3. Fabric`. Defaults to `notebooks`.
  * @property {string} displayName  Item name in the Fabric workspace.
  * @property {ModuleId} module
  * @property {boolean} credentials  Has TENANT_ID / CLIENT_ID / CLIENT_SECRET to fill in.
  * @property {string[]} parameters  Assignments the pipeline overrides; the cell holding them is tagged `parameters`.
  * @property {string | null} placeholder  Notebook-ID placeholder in the pipeline template.
  * @property {boolean} [semanticModel]  Only deployed with the semantic model.
+ * @property {boolean} [azure]  Only deployed when an Azure subscription is chosen for Azure AI.
+ * @property {NotebookPatch[]} [patches]
  */
+
+export const CONSUMPTION_NOTEBOOKS_DIR = 'Add Credit Consumption/notebooks';
+export const STUDIO_LANDING = 'Files/landing/studio';
+export const VIVA_LANDING = 'Files/landing/viva';
 
 /** @type {NotebookInfo[]} */
 export const NOTEBOOKS = [
@@ -158,9 +185,51 @@ export const NOTEBOOKS = [
     placeholder: null,
     semanticModel: true,
   },
+  {
+    key: 'azureAi',
+    file: 'Ingest_Azure_AI.ipynb',
+    dir: CONSUMPTION_NOTEBOOKS_DIR,
+    displayName: 'Consumption_Ingest_Azure_AI',
+    module: 'consumption',
+    credentials: false,
+    parameters: [],
+    placeholder: null,
+    azure: true,
+  },
+  {
+    key: 'studioConsumption',
+    file: 'Ingest_Studio.ipynb',
+    dir: CONSUMPTION_NOTEBOOKS_DIR,
+    displayName: 'Consumption_Ingest_Studio',
+    module: 'consumption',
+    credentials: false,
+    parameters: [],
+    placeholder: null,
+  },
+  {
+    key: 'vivaConsumption',
+    file: 'Ingest_Viva_Consumption.ipynb',
+    dir: CONSUMPTION_NOTEBOOKS_DIR,
+    displayName: 'Consumption_Ingest_Viva',
+    module: 'consumption',
+    credentials: false,
+    parameters: [],
+    placeholder: null,
+    // Cowork data usually arrives through a Dataflow, so an empty landing folder is normal.
+    patches: [
+      {
+        find: 'for f in notebookutils.fs.ls(LANDING)\n',
+        replace: 'for f in (notebookutils.fs.ls(LANDING) if notebookutils.fs.exists(LANDING) else [])\n',
+      },
+      {
+        find: "raise ValueError(f'No PersonServiceCreditsMetrics CSV files found in {LANDING}')",
+        replace: "notebookutils.notebook.exit(f'No PersonServiceCreditsMetrics CSV files in {LANDING}, so nothing to load.')  # Set by the ValueLens installer",
+      },
+    ],
+  },
 ];
 
-/** @typedef {{ orgData: boolean, agent365: boolean, productFeedback: boolean }} ModuleChoice */
+/** @typedef {{ orgData: boolean, agent365: boolean, productFeedback: boolean, consumption: boolean }} ModuleChoice */
 
 /** @returns {ModuleChoice} */
 export function defaultModules() {
@@ -168,6 +237,7 @@ export function defaultModules() {
     orgData: MODULES.orgData.defaultOn,
     agent365: MODULES.agent365.defaultOn,
     productFeedback: MODULES.productFeedback.defaultOn,
+    consumption: MODULES.consumption.defaultOn,
   };
 }
 
@@ -189,18 +259,19 @@ export function enabledModules(modules) {
   if (modules.orgData) out.push('orgData');
   if (modules.agent365) out.push('agent365');
   if (modules.productFeedback) out.push('productFeedback');
+  if (modules.consumption) out.push('consumption');
   return out;
 }
 
 /**
  * Notebooks to deploy for the chosen modules, in deployment order.
  * @param {ModuleChoice} modules
- * @param {{ semanticModel?: boolean }} [opts]
+ * @param {{ semanticModel?: boolean, azureAi?: boolean }} [opts]
  * @returns {NotebookInfo[]}
  */
 export function notebooksFor(modules, opts = {}) {
   const on = new Set(enabledModules(modules));
-  return NOTEBOOKS.filter((nb) => on.has(nb.module) && (!nb.semanticModel || opts.semanticModel));
+  return NOTEBOOKS.filter((nb) => on.has(nb.module) && (!nb.semanticModel || opts.semanticModel) && (!nb.azure || opts.azureAi));
 }
 
 /**

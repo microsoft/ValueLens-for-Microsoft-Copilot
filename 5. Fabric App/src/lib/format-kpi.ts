@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 /** How a figure should be rendered when it is present. */
-export type KpiFormat = "whole" | "percent" | "rate" | "hours" | "currency" | "money" | "price" | "multiple";
+export type KpiFormat = "whole" | "percent" | "rate" | "hours" | "currency" | "money" | "price" | "multiple" | "millions";
 
 interface FormatKpiOptions {
     /** Symbol or short unit printed directly before a present value. */
@@ -25,6 +25,9 @@ const formatters: Record<KpiFormat, Intl.NumberFormat> = {
     price: new Intl.NumberFormat(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 }),
     // How many times one figure covers another, such as value over cost: 5.4×.
     multiple: new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+    // A count the model reports in millions, such as tokens, shown at its own
+    // scale: 0.000212 is 212, and 1.25 is 1.3M.
+    millions: new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }),
 };
 
 /**
@@ -34,5 +37,6 @@ const formatters: Record<KpiFormat, Intl.NumberFormat> = {
  */
 export function formatKpi(value: number | undefined, format: KpiFormat, options: FormatKpiOptions = {}): string {
     if (value === undefined) return "—";
-    return `${options.prefix ?? ""}${formatters[format].format(value)}${format === "multiple" ? "×" : ""}`;
+    const shown = format === "millions" ? value * 1_000_000 : value;
+    return `${options.prefix ?? ""}${formatters[format].format(shown)}${format === "multiple" ? "×" : ""}`;
 }

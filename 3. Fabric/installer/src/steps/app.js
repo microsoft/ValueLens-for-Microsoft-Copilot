@@ -7,11 +7,14 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { HttpError } from '../http.js';
+import { consumptionModelDeployed } from './fabric.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
 /** The model alias the app's ValueLens pages query. */
 export const APP_ALIAS = 'vl';
+/** The alias the app's credit consumption pages query (`consumptionConnection` in the app). */
+export const CONSUMPTION_ALIAS = 'cc';
 export const RAYFIN_CLI = join('node_modules', '@microsoft', 'rayfin-cli', 'scripts', 'main');
 export const DATA_CLI = join('node_modules', '@microsoft', 'fabric-app-data-cli', 'dist', 'cli.js');
 export const GENERATED = 'src/fabric.generated.ts';
@@ -80,7 +83,13 @@ export function findDeployment(deployments, workspaceId) {
 }
 
 /**
- * Deploys the app unless it is already there.
+ * The model aliases the app is built with. Pages for a missing alias stay hidden.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const appModels = (config) => [APP_ALIAS, ...(consumptionModelDeployed(config) ? [CONSUMPTION_ALIAS] : [])];
+
+/**
+ * Deploys the app unless it is already there with the same models.
  * @param {Ctx} ctx
  */
 export async function ensureFabricApp(ctx) {
@@ -90,7 +99,11 @@ export async function ensureFabricApp(ctx) {
     const ws = /** @type {string} */ (config.fabric.workspaceId);
     const item = await api.fabric.getItem(ws, fa.itemId).catch((err) => (err instanceof HttpError && err.status === 404 ? null : Promise.reject(err)));
     if (item) {
-      if (!(await ui.confirm(`The app "${item.displayName}" is deployed. Build and deploy it again?`, false))) {
+      const changed = (fa.models ?? [APP_ALIAS]).join(',') !== appModels(config).join(',');
+      const question = changed
+        ? `The app "${item.displayName}" needs rebuilding to ${appModels(config).includes(CONSUMPTION_ALIAS) ? 'add' : 'remove'} the credit consumption pages. Build and deploy it again?`
+        : `The app "${item.displayName}" is deployed. Build and deploy it again?`;
+      if (!(await ui.confirm(question, changed))) {
         ui.ok(`App ${item.displayName} is in place`);
         return;
       }
@@ -138,7 +151,13 @@ export async function deployApp(ctx) {
   const restore = !!previous && String(previous.fabricWorkspaceId).toLowerCase() !== ws.toLowerCase();
 
   const profile = profileName(ws);
+  const models = appModels(config);
   await data('add', 'semanticModel', APP_ALIAS, '--workspace', ws, '--item', modelId, '--profile', profile);
+  if (models.includes(CONSUMPTION_ALIAS)) {
+    await data('add', 'semanticModel', CONSUMPTION_ALIAS, '--workspace', ws, '--item', /** @type {string} */ (config.consumption.model.id), '--profile', profile);
+  } else if (fa.models?.includes(CONSUMPTION_ALIAS)) {
+    await data('remove', CONSUMPTION_ALIAS, '--profile', profile).catch(() => {});
+  }
 
   /** @type {any} */
   let record;
@@ -174,6 +193,7 @@ export async function deployApp(ctx) {
     name,
     url: record.fabricDeepLink ?? record.hostingUrl,
     profile,
+    models,
     deployedAt: record.deployedAt ?? ctx.now().toISOString(),
   });
   ctx.save();
