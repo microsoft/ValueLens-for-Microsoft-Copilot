@@ -27,7 +27,7 @@ Commands:
 
 Options:
   --config <file>      Install record (default ./${DEFAULT_CONFIG_FILE})
-  --source <dir>       The "3. Fabric" folder to deploy from (default: this checkout)
+  --source <dir>       The "1. Fabric" folder to deploy from (default: this checkout)
   --tenant <id>        Tenant ID or domain to sign in to
   --device-code        Sign in with a code on another device instead of a browser
   --use-az             Use the account you are signed in to with the Azure CLI

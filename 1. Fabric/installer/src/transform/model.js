@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { readZipEntry } from './zip.js';
 
 export const MODEL_TEMPLATE = 'ValueLens - Fabric.pbit';
-/** The credit consumption report from Consumption Central, relative to `3. Fabric`. */
+/** The credit consumption report from Consumption Central, relative to `1. Fabric`. */
 export const CONSUMPTION_TEMPLATE = 'Add Credit Consumption/Consumption Central - Fabric.pbit';
 
 /** The table that has an incremental refresh policy. */

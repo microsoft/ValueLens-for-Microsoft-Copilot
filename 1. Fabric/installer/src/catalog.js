@@ -86,7 +86,7 @@ export const OPTIONAL_MODULES = /** @type {const} */ (['orgData', 'agent365', 'p
  * @typedef {object} NotebookInfo
  * @property {NotebookKey} key
  * @property {string} file  File name in `dir`.
- * @property {string} [dir]  Folder under `3. Fabric`. Defaults to `notebooks`.
+ * @property {string} [dir]  Folder under `1. Fabric`. Defaults to `notebooks`.
  * @property {string} displayName  Item name in the Fabric workspace.
  * @property {ModuleId} module
  * @property {boolean} credentials  Has TENANT_ID / CLIENT_ID / CLIENT_SECRET to fill in.

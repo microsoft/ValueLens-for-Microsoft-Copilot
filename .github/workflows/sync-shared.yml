@@ -3,21 +3,21 @@ name: sync-shared
 on:
   push:
     paths:
-      - '3. Fabric/pipelines/**'
-      - '3. Fabric/notebooks/**'
-      - '3. Fabric/archive/extended/**/notebooks/_core/**'
-      - '3. Fabric/archive/flows/**'
-      - '3. Fabric/*.pbit'
+      - '1. Fabric/pipelines/**'
+      - '1. Fabric/notebooks/**'
+      - '1. Fabric/archive/extended/**/notebooks/_core/**'
+      - '1. Fabric/archive/flows/**'
+      - '1. Fabric/*.pbit'
       - 'tests/**'
       - 'scripts/sync-shared.ps1'
       - '.github/workflows/sync-shared.yml'
   pull_request:
     paths:
-      - '3. Fabric/pipelines/**'
-      - '3. Fabric/notebooks/**'
-      - '3. Fabric/archive/extended/**/notebooks/_core/**'
-      - '3. Fabric/archive/flows/**'
-      - '3. Fabric/*.pbit'
+      - '1. Fabric/pipelines/**'
+      - '1. Fabric/notebooks/**'
+      - '1. Fabric/archive/extended/**/notebooks/_core/**'
+      - '1. Fabric/archive/flows/**'
+      - '1. Fabric/*.pbit'
       - 'tests/**'
       - 'scripts/sync-shared.ps1'
       - '.github/workflows/sync-shared.yml'
@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   check-shared:
-    name: Verify archived _core notebooks match 3. Fabric/notebooks
+    name: Verify archived _core notebooks match 1. Fabric/notebooks
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

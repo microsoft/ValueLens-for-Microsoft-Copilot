@@ -13,8 +13,8 @@ import uuid
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE_TEMPLATE = ROOT / "2. SharePoint" / "ValueLens - SharePoint.pbit"
-TARGET_TEMPLATE = ROOT / "4. Power Automate + Dataverse" / "ValueLens - Power Automate + Dataverse.pbit"
+SOURCE_TEMPLATE = ROOT / "3. SharePoint" / "ValueLens - SharePoint.pbit"
+TARGET_TEMPLATE = ROOT / "2. Power Automate + Dataverse" / "ValueLens - Power Automate + Dataverse.pbit"
 QUERY_ORDER = "PBI_QueryOrder"
 ZIP_METADATA = (
     "filename",

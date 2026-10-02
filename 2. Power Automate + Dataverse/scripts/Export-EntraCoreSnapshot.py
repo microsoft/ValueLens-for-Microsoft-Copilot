@@ -5,7 +5,7 @@ Dataverse core pathway (the "PA+DV" alternative to the Local CSV pathway).
 This is a *basic org* exporter only: it reads ``GET /v1.0/users`` (paged) and
 ``GET /v1.0/subscribedSkus`` and writes a CSV that is a drop-in "--entra" input
 for ``Build-DataverseCoreFeeds.py``, which in turn hands it to the canonical
-processor (``1. Local CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py``).
+processor (``4. Local CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py``).
 It does not walk manager chains, groups, or any deeper org hierarchy — bring
 your own data (BYOD) via a CSV built from your own HR/org source for that.
 

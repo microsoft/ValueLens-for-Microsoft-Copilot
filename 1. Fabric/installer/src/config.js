@@ -61,7 +61,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  */
 
 /**
- * The ValueLens web app (Fabric App item) from `5. Fabric App`.
+ * The ValueLens web app (Fabric App item) from `1. Fabric/Fabric App`.
  * @typedef {object} FabricAppConfig
  * @property {boolean} [enabled]
  * @property {string} [itemId]

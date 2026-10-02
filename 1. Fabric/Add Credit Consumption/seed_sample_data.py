@@ -3,7 +3,7 @@ Load the sample dataset straight into a Fabric Lakehouse.
 
 The quickest way to see the Fabric template working. It writes the eleven
 Consumption Central tables from the synthetic CSVs in
-`1. Local CSV/Add Credit Consumption/sample-data/`, so you can point the
+`4. Local CSV/Add Credit Consumption/sample-data/`, so you can point the
 template at a real Lakehouse without first standing up the ingester
 notebooks, arranging exports, or waiting for a billing cycle.
 
@@ -37,7 +37,7 @@ except ImportError:
     sys.exit("pip install pandas deltalake requests")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SAMPLE = os.path.join(HERE, "..", "..", "1. Local CSV", "Add Credit Consumption", "sample-data")
+SAMPLE = os.path.join(HERE, "..", "..", "4. Local CSV", "Add Credit Consumption", "sample-data")
 
 # Written in full every run. Nothing outside this set is created or removed.
 OURS = ["viva_credits_weekly", "viva_spending_policy", "studio_tenant_daily",

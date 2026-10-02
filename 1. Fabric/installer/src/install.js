@@ -358,7 +358,7 @@ export async function summary(ctx) {
   ui.info('1. Open a template in Power BI Desktop with the values above, then publish it to this workspace.');
   ui.info('2. Add a semantic model refresh to the end of the pipeline so the report updates after each load,');
   ui.info('   or re-run the installer and let it deploy the semantic model, which adds one for you.');
-  ui.note('   See "Refresh Power BI from the pipeline" in 3. Fabric/pipelines/README.md.');
+  ui.note('   See "Refresh Power BI from the pipeline" in 1. Fabric/pipelines/README.md.');
   ui.info('3. Scheduled runs read the Key Vault secret as you, the schedule\'s owner. Anyone who edits the');
   ui.info('   pipeline or takes over the schedule needs "get" on the secret first.');
   ui.info(`4. Keep ${c.bold('valuelens-install.json')}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);

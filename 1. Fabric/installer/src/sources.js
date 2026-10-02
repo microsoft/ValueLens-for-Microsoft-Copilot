@@ -6,11 +6,11 @@ import { fileURLToPath } from 'node:url';
 import { NOTEBOOKS } from './catalog.js';
 import { CONSUMPTION_TEMPLATE, MODEL_TEMPLATE } from './transform/model.js';
 
-/** `3. Fabric`, when the installer runs from inside the repo. */
+/** `1. Fabric`, when the installer runs from inside the repo. */
 export const DEFAULT_SOURCE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const PIPELINE_TEMPLATE = join('pipelines', 'CopilotAdoptionPipeline.DataPipeline', 'pipeline-content.json');
-/** The ValueLens web app, next to `3. Fabric` in the repo. */
-export const APP_DIR = join('..', '5. Fabric App');
+/** The ValueLens web app, inside `1. Fabric`. */
+export const APP_DIR = 'Fabric App';
 
 /**
  * @typedef {object} Sources
@@ -23,14 +23,14 @@ export const APP_DIR = join('..', '5. Fabric App');
  */
 
 /**
- * @param {string} [dir]  The `3. Fabric` folder of a ValueLens checkout.
+ * @param {string} [dir]  The `1. Fabric` folder of a ValueLens checkout.
  * @returns {Sources}
  */
 export function loadSources(dir = DEFAULT_SOURCE_DIR) {
   const root = resolve(dir);
   const pipelineFile = join(root, PIPELINE_TEMPLATE);
   if (!existsSync(pipelineFile)) {
-    throw new Error(`No ValueLens pipeline template at ${pipelineFile}. Point --source at the "3. Fabric" folder of the repo.`);
+    throw new Error(`No ValueLens pipeline template at ${pipelineFile}. Point --source at the "1. Fabric" folder of the repo.`);
   }
   /** @type {any} */
   const notebooks = {};
