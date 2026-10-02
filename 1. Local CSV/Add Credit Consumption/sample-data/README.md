@@ -60,8 +60,8 @@ The data is shaped to exercise the parts of the report that matter, rather than 
   20 cities, 35 managers. None of them dominated by a single value, so the breakdowns are worth
   looking at rather than one bar and a sliver.
 - **Seven of the eight Copilot Studio agents share their names with the ValueLens sample**, so the
-  ValueLens App's *Cost vs value* section can set each agent's credits against the value ValueLens
-  estimates for it. *Onboarding Buddy* has no match on purpose: an agent with a cost and no measured value.
+  *Cost vs value* section of AI in One 2.0 (the Fabric App) can set each agent's credits against the
+  value ValueLens estimates for it. *Onboarding Buddy* has no match on purpose: an agent with a cost and no measured value.
 - **Cowork is the ValueLens sample's pilot.** Each of the 25 people with Cowork credits stands in for one
   of the ValueLens sample's Cowork users, week by week from 31 May, with one session for each Cowork
   thread ValueLens records. So *Cost vs value* sets Cowork's credits against the work they paid for.

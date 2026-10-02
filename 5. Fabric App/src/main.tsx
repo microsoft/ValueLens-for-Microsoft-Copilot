@@ -16,8 +16,11 @@ import { ThemeContext } from './hooks/theme.context';
 import { AuthProvider } from './hooks/use-auth';
 import { bootstrapAuth } from './services/rayfin-auth.service';
 import { AuthGate } from './components/auth-gate.component';
+import { reloadOnStaleBuild } from './lib/reload-on-stale-build';
 
 import "./global.css"
+
+reloadOnStaleBuild();
 
 const rayfinAuthService = bootstrapAuth();
 
