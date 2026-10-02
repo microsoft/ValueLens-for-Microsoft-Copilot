@@ -39,7 +39,7 @@ So every figure falls into one of three tiers. Read each tier differently.
 | Tier | Examples | How far to trust it |
 |---|---|---|
 | **Observed** | Active users, active days, sessions, prompts | Exact counts of what the audit log holds |
-| **Inferred** | Behaviour, task category, Cowork fit, model fit | Fixed, explainable rules over metadata. Right in aggregate, but they can misread any single interaction. They won't match the AI-inferred categories in Copilot Analytics |
+| **Inferred** | Behaviour, task category, model fit | Fixed, explainable rules over metadata. Right in aggregate, but they can misread any single interaction. They won't match the AI-inferred categories in Copilot Analytics |
 | **Modelled** | Hours, value, ROI | Research-based minutes × observed counts. A scenario, not a measurement |
 
 Absence of evidence is not evidence of absence. An agent with no matched activity may still be
@@ -66,7 +66,7 @@ flowchart LR
 | Step | What happens |
 |---|---|
 | **1. Collect** | On Fabric, `Copilot_Audit_Log_Direct_Ingester` calls the Microsoft Graph audit log query API (`security/auditLog/queries`) for `copilotInteraction` records each week. The other paths export the same records; see each path's README. |
-| **2. Flatten** | Each record carries a list of messages and a list of accessed resources. Responses are dropped. Each prompt is paired with every resource the interaction accessed, so there is **one row per prompt × resource**; a prompt with no resources keeps one row. On the reference data that averages 2.65 rows per prompt, and 5.4 in Cowork. |
+| **2. Flatten** | Each record carries a list of messages and a list of accessed resources. Responses are dropped. Each prompt is paired with every resource the interaction accessed, so there is **one row per prompt × resource**; a prompt with no resources keeps one row. On the reference data that averages 2.65 rows per prompt. |
 | **3. De-duplicate** | Each row's ID is a SHA-256 hash of its record, message and resource keys. Duplicate IDs are dropped, so re-running a week never double-counts. |
 | **4. Date** | `InteractionDate`, `WeekStart` (Monday) and `MonthStart`, all from the record's UTC timestamp. |
 | **5. Licence** | The user ID is lower-cased and trimmed, then matched to the licensed-users table. `Has license` of YES, TRUE, Y or 1 gives **M365 Copilot Licensed**; anything else, including no match, gives **Unlicensed**. |
@@ -93,13 +93,14 @@ is a separate dimension, so you can combine the two, for example "Unlicensed × 
 
 ### 3.2 From signal to task category
 
-Each interaction is classified at three levels: a behaviour, and two groupings of behaviours.
+Each Copilot and agent interaction is classified at two levels: a behaviour, and the task category
+that groups it. Cowork prompts are categorised separately; that method is being revised and isn't
+documented here yet.
 
 | Level | Column | Values | What it says |
 |---|---|---|---|
 | **Behaviour** | `Behavior_Enriched_Full` | About 50 | What was done, for example Email Drafting or PDF Analysis |
 | **Task category** | `Task Breakdown Group` | 12 | The kind of work, whatever the tool: Email, Meetings, Document Creation, Document Summarisation, Presentations, Data & Analysis, Search & Research, Coding & Technical, Creative & Design, Collaboration & Workflows, Specialist Support, General Chat & Q&A |
-| **Cowork category** | `Cowork Task Category` for Cowork prompts; the behaviour's `Cowork Category` otherwise | 8 | The same work in the terms of the Cowork method ([§5.3](#53-cowork-task-category-basis)), so Copilot, agents and Cowork can be compared |
 
 ```mermaid
 flowchart LR
@@ -107,15 +108,12 @@ flowchart LR
     B1 --> B2["2. Agent keywords"]
     B2 --> B3["3. Workflow split"]
     B3 --> BE["Behaviour"]
-    BE --> L["5. Lookup"]
+    BE --> L["4. Lookup"]
     L --> T["Task category (12)"]
-    L --> CC["Cowork category (8)"]
     L --> M["Time band (§5.2)"]
-    CW["Cowork prompt<br/>attached file types"] --> C4["4. Cowork category"]
-    C4 --> T
 ```
 
-Steps 1 to 3 run in the processor. Steps 4 and 5 run in the semantic model. Every step works
+Steps 1 to 3 run in the processor. Step 4 runs in the semantic model. Every step works
 through its rules from the top, and the first match wins.
 
 #### Step 1: base behaviour
@@ -187,7 +185,7 @@ Research). Failing that, the open file and then the app host decide:
 
 #### Step 2: agent keywords
 
-Agent and Cowork rows rarely carry a useful resource, so most reach step 1's General Chat. When
+Agent rows rarely carry a useful resource, so most reach step 1's General Chat. When
 they do, the agent's name is searched for keywords. An agent still unmatched is then searched in
 its Agent 365 description and custom actions, then by its capabilities.
 
@@ -208,8 +206,8 @@ its Agent 365 description and custom actions, then by its capabilities.
 | | Can read SharePoint | Knowledge Base | Search & Research |
 | No match | No match | General Assistance | General Chat & Q&A |
 
-The name is checked for agents and Cowork; the description, actions and capabilities only for
-agents linked to the registry. Keywords match parts of words, so order matters. "Sales Coach" is
+The name is checked for every agent; the description, actions and capabilities only for agents
+linked to the registry. Keywords match parts of words, so order matters. "Sales Coach" is
 Coaching, because coaching is checked before sales. "Thread Summariser" is HR & People, because
 "thread" contains "hr". Clear agent names and descriptions give better categories.
 
@@ -228,74 +226,47 @@ All seven results are in the Collaboration & Workflows task category.
 | planner, task, approv, teams, notify, post, list | Coordination Workflow |
 | No match | General Workflow |
 
-#### Step 4: Cowork prompts
+#### Step 4: behaviour to category
 
-The feed tags every Cowork prompt General Chat, so Cowork gets its own category, read from the
-file types the prompt attached. The test covers every file in the prompt, so all of a prompt's rows
-share one category.
-
-| Attached material | Cowork category | Task category |
-|---|---|---|
-| Email (`rfc822`, Outlook) | Email workflows | Email |
-| Spreadsheet, CSV, JSON, XML, PDF, zip | Analysis & Research | Data & Analysis |
-| Word, PowerPoint, Markdown, HTML, images | Document & content creation | Document Creation |
-| Messages only | Communication workflows | Collaboration & Workflows |
-| Nothing typed | General assistance / Other | General Chat & Q&A |
-
-No file type leads to Meeting workflows, Specialized workflows or Write or debug code, so a Cowork
-prompt never gets those three.
-
-#### Step 5: behaviour to category
-
-Each behaviour has a row in the `Human Time Estimates` table, which holds its task category, Cowork
-category and time band. The model reaches it through the `Behavior Value Map`. Every behaviour the
+Each behaviour has a row in the `Human Time Estimates` table, which holds its task category and time
+band. The model reaches it through the `Behavior Value Map`. Every behaviour the
 processors can produce has a row, so no Copilot or agent row is left without a category.
 
-| Task category | Behaviours | Cowork category |
-|---|---|---|
-| **Email** | Email Drafting, Email Summarising, *Email Triage*, *Email Thread Summary* | Email workflows |
-| **Meetings** | Meeting Scheduling, Meeting Prep, Video Summarising | Meeting workflows |
-| **Document Creation** | Document Drafting, Note Taking, Content Generation | Document & content creation |
-| **Document Summarisation** | Document Summarising, Presentation Summarising | Document & content creation |
-| | PDF Analysis | Analysis & Research |
-| **Presentations** | Presentation Creation | Document & content creation |
-| **Data & Analysis** | Data Querying, Spreadsheet Review, Excel Assistance, Data & Reporting, *Spreadsheet Analysis* | Analysis & Research |
-| **Search & Research** | Web Searching, Enterprise Searching, SharePoint Access, File Retrieval, Research & Analysis, *Multi-source Synthesis* | Analysis & Research |
-| | People Lookup | General assistance / Other |
-| | Knowledge Base | Specialized workflows |
-| **Coding & Technical** | Code Writing, Code Analysis, *Code Analysis (URL)*, *Code Review & PR* | Write or debug code |
-| | *Build & Deploy Run* | Specialized workflows |
-| **Creative & Design** | Image Generation, Image / Media Analysis, Ideation & Creative | Document & content creation |
-| **Collaboration & Workflows** | Teams Messaging, Task Management, Real-time Collaboration, Coordination Workflow | Communication workflows |
-| | Email Workflow | Email workflows |
-| | Meeting Workflow | Meeting workflows |
-| | Document Workflow | Document & content creation |
-| | Running a Workflow, Specialist / Line-of-Business Workflow, Data & Reporting Workflow, General Workflow, Form / Survey Work, *Scheduled / Recurring Run*, *Monitoring & Alerting* | Specialized workflows |
-| **Specialist Support** | Coaching, Sales & Customer, IT & Service Desk, HR & People, Compliance & Policy, Domain-Specific Agent, *Coaching (URL)*, *Sensitive Content Interaction*, *Cross-Org Agent* | Specialized workflows |
-| **General Chat & Q&A** | General Chat, General Assistance, *General, M365 Chat, Teams and Browser Q&A* | General assistance / Other |
+| Task category | Behaviours |
+|---|---|
+| **Email** | Email Drafting, Email Summarising, *Email Triage*, *Email Thread Summary* |
+| **Meetings** | Meeting Scheduling, Meeting Prep, Video Summarising |
+| **Document Creation** | Document Drafting, Note Taking, Content Generation |
+| **Document Summarisation** | Document Summarising, Presentation Summarising, PDF Analysis |
+| **Presentations** | Presentation Creation |
+| **Data & Analysis** | Data Querying, Spreadsheet Review, Excel Assistance, Data & Reporting, *Spreadsheet Analysis* |
+| **Search & Research** | Web Searching, Enterprise Searching, SharePoint Access, File Retrieval, Research & Analysis, People Lookup, Knowledge Base, *Multi-source Synthesis* |
+| **Coding & Technical** | Code Writing, Code Analysis, *Code Analysis (URL)*, *Code Review & PR*, *Build & Deploy Run* |
+| **Creative & Design** | Image Generation, Image / Media Analysis, Ideation & Creative |
+| **Collaboration & Workflows** | Teams Messaging, Task Management, Real-time Collaboration, Running a Workflow, Email Workflow, Meeting Workflow, Document Workflow, Coordination Workflow, Specialist / Line-of-Business Workflow, Data & Reporting Workflow, General Workflow, Form / Survey Work, *Scheduled / Recurring Run*, *Monitoring & Alerting* |
+| **Specialist Support** | Coaching, Sales & Customer, IT & Service Desk, HR & People, Compliance & Policy, Domain-Specific Agent, *Coaching (URL)*, *Sensitive Content Interaction*, *Cross-Org Agent* |
+| **General Chat & Q&A** | General Chat, General Assistance, *General, M365 Chat, Teams and Browser Q&A* |
 
 *Behaviours in italics have a row and a time band, but no current rule produces them.*
 
 #### Worked examples
 
-| Interaction | Signal | Behaviour | Task category | Cowork category |
-|---|---|---|---|---|
-| Copilot drafts a reply in Outlook | Email message, draft action | Email Drafting | Email | Email workflows |
-| A Copilot Chat prompt reads two Word documents | Two Word documents, read | File Retrieval, on two rows | Search & Research | Analysis & Research |
-| A Copilot Chat conversation with an agent called "Sales Coach", nothing attached | Agent name | Coaching | Specialist Support | Specialized workflows |
-| An agent raises a ServiceNow ticket through a connector | Connector, create action, servicenow.com | Running a Workflow, then Specialist / Line-of-Business Workflow | Collaboration & Workflows | Specialized workflows |
-| A Cowork prompt attaches a spreadsheet and a Word document | Spreadsheet and Word file types | Not used for Cowork | Data & Analysis | Analysis & Research |
+| Interaction | Signal | Behaviour | Task category |
+|---|---|---|---|
+| Copilot drafts a reply in Outlook | Email message, draft action | Email Drafting | Email |
+| A Copilot Chat prompt reads two Word documents | Two Word documents, read | File Retrieval, on two rows | Search & Research |
+| A Copilot Chat conversation with an agent called "Sales Coach", nothing attached | Agent name | Coaching | Specialist Support |
+| An agent raises a ServiceNow ticket through a connector | Connector, create action, servicenow.com | Running a Workflow, then Specialist / Line-of-Business Workflow | Collaboration & Workflows |
 
-Order decides the last two. Rule 6 (a connector with an active action) comes before rule 25 (a
-ServiceNow site), so the ticket counts as a workflow, not a service desk question. And Analysis &
-Research is checked before Document & content creation.
+Order decides the last one. Rule 6 (a connector with an active action) comes before rule 25 (a
+ServiceNow site), so the ticket counts as a workflow, not a service desk question.
 
 #### Paths 1, 2 and 4
 
 These paths classify with
 [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../1.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py).
-It runs step 1 the same way, and steps 4 and 5 are in the shared model. But it has no Agent 365
-registry and doesn't split workflows, and it applies the name keywords to Cowork rows only. So on
+It runs step 1 the same way, and step 4 is in the shared model. But it has no Agent 365 registry,
+doesn't split workflows, and doesn't apply the name keywords to agent rows. So on
 these paths agent chats with no matching resource stay General Chat, and workflows stay Running a
 Workflow. Both still get a task category.
 
@@ -304,11 +275,9 @@ Workflow. Both still get a task category.
 | Level | Where |
 |---|---|
 | Behaviour | Task Breakdown's behaviour view, the Leaderboard's activity table for Copilot and agents, and the time bands ([§5.2](#52-copilot-and-agents-behaviour-basis)) |
-| Task category | Estimated Value by task, Model Fit by task, the Leaderboard's activity table for Cowork, and the **🧬 Appendix: Signal → Impact** page |
-| Cowork category | Cowork hours ([§5.3](#53-cowork-task-category-basis)), Cowork Fit by task, and Could have used |
+| Task category | Estimated Value by task, Model Fit by task, and the **🧬 Appendix: Signal → Impact** page |
 
-Under each task category, the detail rows (`Task Breakdown Category`) show the behaviour for
-Copilot and agent rows and the Cowork category for Cowork rows. The pages label the two levels
+Under each task category, the detail rows (`Task Breakdown Category`) show the behaviour. The pages label the two levels
 differently: Estimated Value calls them Category and Task, and the Leaderboard calls them task group
 and task category.
 
@@ -316,8 +285,8 @@ and task category.
 
 | Column | Rule |
 |---|---|
-| **Usage mode** | A ladder, highest first. **5 Delegating**: Cowork, autonomous runs, workflows, and autonomous, workflow or triggered agents. **4 Producing**: drafting, creating, coding and specialist agents. **3 Consuming**: summarising, meeting prep and media analysis. **2 Finding**: search and retrieval. **1 Asking**: everything else |
-| **Value outcome** | Set per behaviour by the processor, for example Time Saved (Email) or Search Time Saved. Most Cowork rows are Workflow Automation |
+| **Usage mode** | A ladder, highest first. **5 Delegating**: autonomous runs, workflows, and autonomous, workflow or triggered agents. **4 Producing**: drafting, creating, coding and specialist agents. **3 Consuming**: summarising, meeting prep and media analysis. **2 Finding**: search and retrieval. **1 Asking**: everything else |
+| **Value outcome** | Set per behaviour by the processor, for example Time Saved (Email) or Search Time Saved |
 | **Expertise role** | The specialist a behaviour stands in for, for example Data Querying → Data Analyst |
 | **Grounding source** | Web (a Bing or web plugin), Internal (resources or context), Mixed, or Ungrounded |
 | **AI model** | The logged model name, bucketed into GPT-4, GPT-4.1, GPT-5, o-series, Claude, Gemini, LLaMA and Phi. No model logged gives "Embedded App (no model logged)" |
@@ -344,12 +313,15 @@ and task category.
 ### 5.1 The chain
 
 ```
-Hours   = Copilot and Agent hours (behaviour basis) + Cowork hours (task-category basis)
+Hours   = Copilot and Agent hours (behaviour basis) + Cowork hours
 Value   = Hours × hourly rate × penalty factor (1)
 Cost    = Σ months (active licensed users that month × price per user per month)
 Net ROI = Value − Cost
 Annual  = Value × 52 ÷ weeks in view
 ```
+
+Cowork hours are priced on their own basis. That method is being revised and isn't documented here
+yet.
 
 There are no hidden haircuts. Earlier versions cut value by 70% for realisation and 50% for
 reinvestment. Neither cut had a source, so both were removed. Uncertainty is carried by the
@@ -379,45 +351,6 @@ hours = units × minutes (Low / Typical / High) × category adjustment ÷ 60
     reads per prompt, compared with the estate-wide average for that behaviour.
 - **Category adjustment** is a multiplier that defaults to 1. It is set in five groups: Comms,
   Meetings, Content, Search and Agents ([§7](#7-settings-you-can-change)).
-
-### 5.3 Cowork: task-category basis
-
-Cowork is priced with the
-[Cowork time-savings methodology](https://microsoft.github.io/CopilotAnalyticsLabs/Cowork_Methodology_2026-09.pdf),
-the same method the *What I did with Cowork* tool uses. For each session and each task category
-the session touched:
-
-```
-hours = runs × category band (minutes) × category adjustment ÷ 60
-runs  = max(1, round(material reads ÷ chain length))      for chained categories
-runs  = 1                                                   for Document, Specialized and General
-```
-
-| Category | Low | Typical | High | Chain length |
-|---|---:|---:|---:|---:|
-| Analysis & Research | 30 | 67 | 92 | 5 |
-| Document & content creation | 12 | 24 | 42 | per session |
-| Email workflows | 3 | 7 | 12 | 4 |
-| Meeting workflows | 12 | 31 | 43 | 3 |
-| Communication workflows | 2 | 4 | 11 | 4 |
-| Specialized workflows | 10 | 25 | 40 | per session |
-| Write or debug code | 30 | 56 | 96 | 6 |
-| General assistance / Other | 2 | 5 | 8 | per session |
-
-The original method counts tool calls. Audit logs carry no tool calls, so **material reads**
-(resources with a type other than "message") stand in for them. Rounding is banker's rounding,
-as in the original Python. This sits between the two simpler options: charging the band on every
-prompt over-counts, and charging it once per session under-counts. A long, read-heavy analysis
-earns several runs, and a one-line ask earns one.
-
-The Cowork methodology's primary source is a Microsoft Research difference-in-differences study of
-72,186 Word users. It compared people who kept using Copilot with similar coworkers who adopted it
-later
-([Verma, Suri & Counts, *How Copilot Changed the Pace of Work in Word*](https://microsoft.github.io/nfw-reader/posts/causal-impact-copilot)).
-
-**Worked example.** A Cowork session reads 12 spreadsheets and PDFs, so it is Analysis &
-Research. Runs = max(1, round(12 ÷ 5)) = 2, and Typical gives 2 × 67 = 134 minutes, or 2.2
-hours. A Copilot Chat Email Drafting prompt adds 8 minutes at Typical.
 
 ---
 
@@ -452,8 +385,7 @@ For each cohort (all, licensed, unlicensed, agents, Cowork): active users, sessi
 user per week, expert-equivalent hours per week, and the top value outcome.
 
 - **Agent return rate:** people with two or more agent sessions ÷ people with at least one.
-- **Top value outcome** ranks outcomes by hours. In a Cowork-only view it ranks Cowork task
-  categories instead, because every Cowork row has the same behaviour.
+- **Top value outcome** ranks outcomes by hours.
 
 ### Habit Formation: has it become a habit?
 
@@ -524,33 +456,10 @@ AI tasks and their share of all activity in the selection, by behaviour
 Hours, value, cost, net ROI and projected annual value, by task category
 ([§3.2](#32-from-signal-to-task-category)) and by organisation ([§5](#5-estimated-value)). The effort scenario and hourly rate are set on the page.
 
-### Cowork Fit: was Cowork the right tool?
+### Cowork Fit and Cowork Readiness
 
-Each Cowork **session**, not each prompt, is graded on how much material work it did. Grading per
-session stops long, chatty sessions from counting more than once. The first rule that fits wins:
-
-| Session evidence | Grade |
-|---|---|
-| Touched two or more apps (Excel, Word, PowerPoint, Outlook, PDF, Teams) | Strong fit |
-| Built an artifact (zip, HTML, JSON, XML, script, notebook) | Strong fit |
-| 3+ material references of 2+ types, or more than 5 references | Strong fit |
-| No references but read messages *(Balanced and Lenient)* | Fair fit |
-| No references, more than one turn *(Lenient only)* | Fair fit |
-| No references | Worth a look |
-| 2+ types or 3+ references | Fair fit |
-| One app *(Balanced and Lenient)* | Fair fit |
-| One app *(Strict)* | Worth a look |
-| Anything else | Unclassified |
-
-- The grading mode is a model setting ([§7](#7-settings-you-can-change)). Balanced is the default;
-  Strict reproduces the original, harsher grade.
-- **⚑ flag:** a person with five or more graded sessions, half or more of them Worth a look. It is
-  a coaching prompt, not a ranking.
-- **Could have used** appears on Worth a look rows. It suggests Copilot Chat, and counts the
-  Copilot prompts whose behaviours share the row's Cowork category
-  ([§3.2](#32-from-signal-to-task-category)), for example "Copilot Chat (12K similar)".
-- The grade is a floor. Audit logs can't see Cowork's internal tool calls, so a session can do
-  more than its references show.
+These pages grade Cowork sessions and score who is ready for Cowork. Their method is being revised
+and isn't documented here yet.
 
 ### Model Fit: was the model heavier than the task?
 
@@ -560,7 +469,8 @@ session stops long, chatty sessions from counting more than once. The first rule
 | Sonnet, other Claude, GPT-5, GPT-4 | Workhorse (mid cost) |
 | None logged | Not attributed |
 
-A session takes the most premium tier it used. Graded sessions with a known tier are **judged**:
+A session takes the most premium tier it used. Sessions with a Cowork Fit grade and a known tier
+are **judged**:
 
 - **Lighter model may do:** a Frontier model on a session graded Worth a look.
 - **Try stronger:** a Workhorse model on a session graded Strong fit.
@@ -568,19 +478,6 @@ A session takes the most premium tier it used. Graded sessions with a known tier
 
 The verdict is the most common outcome. It is greyed out below five judged sessions. The feed
 carries no token counts, so this compares tiers, not actual spend.
-
-### Cowork Readiness: who is ready for Cowork?
-
-Covers active users who have **never** used Cowork. Each gets a score out of 100:
-
-| Signal | Weight | Measure |
-|---|---:|---|
-| Breadth | 45 | Distinct non-Cowork apps per active day, scaled to the highest in the selection |
-| Depth | 35 | Prompts per session, scaled to the highest in the selection |
-| Agents | 20 | Has used an agent |
-
-An organisation's score is the average of its people's scores. The weights are a design choice,
-not a research result.
 
 ### License Readiness: who should get a licence next?
 
@@ -628,7 +525,6 @@ From the optional Product Feedback export.
 | AI PPUPM | 30 | `Assumptions` table | Licence price per user per month, for cost and ROI |
 | Monthly Licence Cost | 0 | `Assumptions` table | Prices dormant seats; 0 means not costed |
 | Currency symbol | £ | `Assumptions` table | Display only; it doesn't convert. Enter money settings in this currency |
-| Fit grading | Balanced | `Assumptions[Fit Grading]`, applied at refresh | Strict, Balanced or Lenient ([§6](#cowork-fit-was-cowork-the-right-tool)) |
 | Rates & packs | From `commercial_terms` | App Consumption page | Credit prices ([§8](#81-consumption)) |
 
 ---
@@ -690,7 +586,6 @@ aggregates and feedback comments only. It never shows the conversations.
 - **Some time bands are provisional.** Rows marked *Low* confidence or *Provisional* in the
   appendix are estimates waiting for a better source.
 - **Habit and readiness thresholds are design choices**, not research results.
-- **The Cowork grade is a floor.** The log has no tool calls, so material reads stand in for them.
 - **Model fit has no cost data.** It compares tiers, many surfaces log no model, and tiers are
   matched on the model name.
 - **Dates are UTC.** Days and weeks can shift by one for people far from UTC.
@@ -763,5 +658,5 @@ also keeps a single `Human Baseline (min)` column from the earlier method; no me
 | General Assistance | 3 | 8 | 8 | Turn | Low | [Microsoft WTI 2023](https://www.microsoft.com/en-us/worklab/work-trend-index); IDC 2023 |
 | General Chat and Q&A (M365 Chat, Teams, browser) | 3 | 8 | 8 | Turn | Medium | [Microsoft WTI 2023](https://www.microsoft.com/en-us/worklab/work-trend-index); IDC 2018 |
 
-Where a band repeats its top value, for example Document Drafting at 21 / 42 / 42, it has reached
-the high end of its Cowork category's band ([§5.3](#53-cowork-task-category-basis)).
+Where a band repeats its top value, for example Document Drafting at 21 / 42 / 42, its high end is
+capped.
