@@ -8,9 +8,10 @@
 // @vitest-environment node
 
 import { describe, expect, it } from "vitest";
-import { parse, View, type Scene, type SceneItem } from "vega";
+import { expressionFunction, parse, View, type Scene, type SceneItem } from "vega";
 import { compile } from "vega-lite";
 import type { TopLevelSpec } from "vega-lite";
+import { formatValue } from "@microsoft/fabric-visuals-core";
 import type { ColumnMetadataMap } from "@/lib/to-data-table";
 import { consumptionByProduct, coworkWeekly, foundryByModel, foundryDaily, studioBreakdown, studioDaily } from "./index";
 import productRows from "./__fixtures__/consumption-by-product.rows.json";
@@ -44,9 +45,9 @@ async function render(spec: unknown, rows: Row[], columnMetadata: ColumnMetadata
     return found as unknown as Mark[];
 }
 
-/** The numeric tick labels the chart prints on its value axis. */
+/** The numeric tick labels the app prints on the chart's value axis. */
 async function valueAxisLabels(spec: unknown, rows: Row[], columnMetadata: ColumnMetadataMap): Promise<string[]> {
-    const view = await run(spec, rows, columnMetadata);
+    const view = await run(asVegaVisual(spec, columnMetadata), rows, columnMetadata);
     const labels: string[] = [];
     const walk = (node: Scene | SceneItem) => {
         const scene = node as Scene & { role?: string };
@@ -57,7 +58,44 @@ async function valueAxisLabels(spec: unknown, rows: Row[], columnMetadata: Colum
     };
     walk((view.scenegraph() as unknown as { root: Scene }).root);
     await view.finalize();
-    return labels.filter((text) => /^[\d.,]+$/.test(text));
+    return labels.filter((text) => /^[\d.,]+[KMB]?$/.test(text));
+}
+
+expressionFunction("vbaFormat", (value: unknown, format: string) => String(formatValue(value, format)));
+expressionFunction("compactFormat", (value: unknown, format: string) => String(formatValue(value, format, { compact: true })));
+
+type AxisDef = Record<string, unknown>;
+type Encoding = Record<string, { field?: string; type?: string; axis?: AxisDef | null }>;
+
+/**
+ * VegaVisual rewrites quantitative axes before Vega sees them: an axis with no
+ * formatType takes its column's format string, and an axis with no labelExpr in
+ * that format is then printed compactly. Applies the same two rules, so the
+ * labels here are the ones the app draws.
+ */
+function asVegaVisual(spec: unknown, columnMetadata: ColumnMetadataMap): unknown {
+    const formats = new Map(Object.values(columnMetadata).map((column) => [column.name, column.format]));
+    const rewrite = (encoding: Encoding) => {
+        const result = { ...encoding };
+        for (const channel of ["x", "y"]) {
+            const def = result[channel];
+            if (!def || def.type !== "quantitative" || def.axis === null) continue;
+            let axis: AxisDef = { ...def.axis };
+            const format = def.field === undefined ? undefined : formats.get(def.field);
+            if (format !== undefined && axis.formatType === undefined) axis = { ...axis, format, formatType: "vbaFormat" };
+            if (axis.labelExpr === undefined && (axis.formatType === "vbaFormat" || axis.format === undefined)) {
+                const vba = axis.formatType === "vbaFormat" ? axis.format : "";
+                axis = { ...axis, labelExpr: `compactFormat(datum.value, ${JSON.stringify(vba ?? "")})` };
+            }
+            result[channel] = { ...def, axis };
+        }
+        return result;
+    };
+    const source = spec as { encoding?: Encoding; layer?: { encoding?: Encoding }[]; config?: object };
+    const rewritten: Record<string, unknown> = { ...source, config: { ...source.config, customFormatTypes: true } };
+    if (source.encoding) rewritten.encoding = rewrite(source.encoding);
+    if (source.layer) rewritten.layer = source.layer.map((layer) => (layer.encoding ? { ...layer, encoding: rewrite(layer.encoding) } : layer));
+    return rewritten;
 }
 
 async function run(spec: unknown, rows: Row[], columnMetadata: ColumnMetadataMap): Promise<View> {
