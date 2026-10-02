@@ -8,7 +8,7 @@ from pathlib import Path
 from fabric_audit_passthrough import build
 
 ROOT = Path(__file__).resolve().parents[1]
-PROCESSOR = ROOT / "3. Fabric" / "notebooks" / "Copilot_Audit_Log_Processor.ipynb"
+PROCESSOR = ROOT / "1. Fabric" / "notebooks" / "Copilot_Audit_Log_Processor.ipynb"
 
 
 def sources():

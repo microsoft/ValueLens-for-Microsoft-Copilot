@@ -7,9 +7,9 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CORE = ROOT / "3. Fabric" / "notebooks"
+CORE = ROOT / "1. Fabric" / "notebooks"
 MIRRORS = (
-    ROOT / "3. Fabric" / "archive" / "extended" / "Fabric + Copilot Studio" / "notebooks" / "_core",
+    ROOT / "1. Fabric" / "archive" / "extended" / "Fabric + Copilot Studio" / "notebooks" / "_core",
 )
 
 # DataModelSchema bytes stay pinned (the templates ship no UnappliedChanges part);
@@ -28,10 +28,10 @@ SCHEMA_HASHES = {
 class ConsolidatedReleaseTests(unittest.TestCase):
     def test_exactly_two_core_transport_templates(self):
         self.assertEqual(
-            {path.name for path in (ROOT / "3. Fabric").glob("*.pbit")},
+            {path.name for path in (ROOT / "1. Fabric").glob("*.pbit")},
             set(SCHEMA_HASHES),
         )
-        self.assertFalse((ROOT / "3. Fabric" / "ValueLens - Fabric (OneLake).pbit").exists())
+        self.assertFalse((ROOT / "1. Fabric" / "ValueLens - Fabric (OneLake).pbit").exists())
 
     def test_previous_schema_fixes_preserved_without_model_rewrite(self):
         spec = importlib.util.spec_from_file_location(
@@ -40,7 +40,7 @@ class ConsolidatedReleaseTests(unittest.TestCase):
         packager = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(packager)
         for name, expected in SCHEMA_HASHES.items():
-            with zipfile.ZipFile(ROOT / "3. Fabric" / name) as archive:
+            with zipfile.ZipFile(ROOT / "1. Fabric" / name) as archive:
                 for member, sha in expected.items():
                     payload = archive.read(member)
                     if "OneLake" in name:

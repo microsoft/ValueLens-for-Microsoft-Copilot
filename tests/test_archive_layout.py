@@ -7,11 +7,11 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-FABRIC = ROOT / "3. Fabric"
+FABRIC = ROOT / "1. Fabric"
 EXTENDED = FABRIC / "archive" / "extended"
 STUDIO = EXTENDED / "Fabric + Copilot Studio"
 MIRRORS = (
-    Path("3. Fabric") / "archive" / "extended" / "Fabric + Copilot Studio" / "notebooks" / "_core",
+    Path("1. Fabric") / "archive" / "extended" / "Fabric + Copilot Studio" / "notebooks" / "_core",
 )
 SHARED_NAMES = {
     "Copilot_Agent365_Lander.ipynb",
@@ -92,19 +92,19 @@ class ArchiveLayoutTests(unittest.TestCase):
         pull_request = pull_request.split("\njobs:", 1)[0]
         for block in (push, pull_request):
             for pattern in (
-                "3. Fabric/pipelines/**",
-                "3. Fabric/notebooks/**",
-                "3. Fabric/archive/extended/**/notebooks/_core/**",
-                "3. Fabric/archive/flows/**",
-                "3. Fabric/*.pbit",
+                "1. Fabric/pipelines/**",
+                "1. Fabric/notebooks/**",
+                "1. Fabric/archive/extended/**/notebooks/_core/**",
+                "1. Fabric/archive/flows/**",
+                "1. Fabric/*.pbit",
                 "tests/**",
                 "scripts/sync-shared.ps1",
                 ".github/workflows/sync-shared.yml",
             ):
                 self.assertIn(f"      - '{pattern}'", block)
-            self.assertNotIn("'3. Fabric/extended/", block)
+            self.assertNotIn("'1. Fabric/extended/", block)
         self.assertIn("sync-shared.ps1 -Check", workflow)
-        self.assertNotIn("3. Fabric/archive/extended/_shared/notebooks/**", workflow)
+        self.assertNotIn("1. Fabric/archive/extended/_shared/notebooks/**", workflow)
         self.assertNotIn("unittest discover", workflow)
 
     def test_tests_workflow_runs_pytest(self):
@@ -120,7 +120,7 @@ class ArchiveSyncTests(unittest.TestCase):
         self.root = Path(self.directory.name)
         (self.root / "scripts").mkdir()
         shutil.copyfile(ROOT / "scripts" / "sync-shared.ps1", self.root / "scripts" / "sync-shared.ps1")
-        self.source = self.root / "3. Fabric" / "notebooks"
+        self.source = self.root / "1. Fabric" / "notebooks"
         self.source.mkdir(parents=True)
         for name in SHARED_NAMES | {PROCESSOR}:
             (self.source / name).write_bytes((FABRIC / "notebooks" / name).read_bytes())
@@ -131,8 +131,8 @@ class ArchiveSyncTests(unittest.TestCase):
             + (["-Check"] if check else []),
             cwd=self.root, capture_output=True, text=True, timeout=60,
         )
-        self.assertFalse((self.root / "3. Fabric" / "extended").exists())
-        self.assertFalse((self.root / "3. Fabric" / "archive" / "extended" / "_shared").exists())
+        self.assertFalse((self.root / "1. Fabric" / "extended").exists())
+        self.assertFalse((self.root / "1. Fabric" / "archive" / "extended" / "_shared").exists())
         return result
 
     def assert_synced(self):
@@ -147,7 +147,7 @@ class ArchiveSyncTests(unittest.TestCase):
         result = self.run_sync(check=True)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(result.stdout.count("MISSING DIR:"), 1)
-        self.assertFalse((self.root / "3. Fabric" / "archive").exists())
+        self.assertFalse((self.root / "1. Fabric" / "archive").exists())
         result = self.run_sync()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assert_synced()

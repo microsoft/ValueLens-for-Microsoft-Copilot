@@ -17,7 +17,7 @@ import {
 } from '../src/transform/notebook.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-/** @param {string} file @param {string} [dir]  Folder under `3. Fabric`. */
+/** @param {string} file @param {string} [dir]  Folder under `1. Fabric`. */
 const load = (file, dir = 'notebooks') => JSON.parse(readFileSync(join(here, '..', '..', dir, file), 'utf8'));
 
 const TENANT = '11111111-2222-3333-4444-555555555555';

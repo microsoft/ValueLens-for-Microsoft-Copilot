@@ -366,7 +366,7 @@ test('app: needs the model and the app source', async () => {
     t.config.semanticModel.id = undefined;
     await assert.rejects(deployApp(t.ctx), /needs the semantic model/);
     t.ctx.sources = { ...t.ctx.sources, appDir: undefined };
-    await assert.rejects(deployApp(t.ctx), /no "5\. Fabric App" folder/);
+    await assert.rejects(deployApp(t.ctx), /no "1\. Fabric\/Fabric App" folder/);
   } finally {
     t.cleanup();
   }

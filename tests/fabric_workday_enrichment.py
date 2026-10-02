@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "3. Fabric" / "notebooks" / "optional" / "workday-org-data" / "Copilot_Org_Data_Workday_Lander.ipynb"
+SOURCE = ROOT / "1. Fabric" / "notebooks" / "optional" / "workday-org-data" / "Copilot_Org_Data_Workday_Lander.ipynb"
 
 
 def verification():
