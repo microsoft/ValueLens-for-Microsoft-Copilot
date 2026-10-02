@@ -35,7 +35,12 @@
       ],
       "mark": { "type": "circle", "size": 160, "opacity": 1 },
       "encoding": {
-        "x": { "field": "Amount", "type": "quantitative", "title": null },
+        "x": {
+          "field": "Amount",
+          "type": "quantitative",
+          "title": null,
+          "axis": { "labelExpr": "'__CURRENCY__' + format(datum.value, '~s')" }
+        },
         "color": {
           "field": "Measure",
           "type": "nominal",

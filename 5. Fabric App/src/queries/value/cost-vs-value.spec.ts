@@ -26,23 +26,37 @@ import {
     scenarioValue,
     spanDays,
     toValueCurrency,
+    UNLICENSED_CHAT,
     type Costs,
 } from "./cost-vs-value";
 
-/** Value by source and scenario at £50 an hour, as the live model returned it for Jun–Aug 2026. */
+/** Value by source, licence and scenario at £50 an hour, shaped as the live model returns it. */
 const bySource: DataTable = {
-    columns: [{ name: "Source" }, { name: "Scenario" }, { name: "Hours" }, { name: "Value" }],
+    columns: [{ name: "Source" }, { name: "Licence" }, { name: "Scenario" }, { name: "Hours" }, { name: "Value" }],
     rows: [
-        ["Agents", "Conservative", 286.3, 14316],
-        ["Agents", "Optimistic", 966.2, 48311],
-        ["Agents", "Typical", 682.7, 34135],
-        ["Copilot", "Conservative", 899.1, 44956],
-        ["Copilot", "Optimistic", 2620.4, 131021],
-        ["Copilot", "Typical", 1937.4, 96872],
-        ["Cowork", "Conservative", 32.1, 1603],
-        ["Cowork", "Optimistic", 109.7, 5486],
-        ["Cowork", "Typical", 69.5, 3474],
+        ["Agents", "Licensed", "Conservative", 286.3, 14316],
+        ["Agents", "Licensed", "Optimistic", 966.2, 48311],
+        ["Agents", "Licensed", "Typical", 682.7, 34135],
+        ["Agents", "Unlicensed", "Conservative", 12.5, 626],
+        ["Agents", "Unlicensed", "Optimistic", 44.2, 2211],
+        ["Agents", "Unlicensed", "Typical", 29.9, 1493],
+        ["Copilot", "Licensed", "Conservative", 899.1, 44956],
+        ["Copilot", "Licensed", "Optimistic", 2620.4, 131021],
+        ["Copilot", "Licensed", "Typical", 1937.4, 96872],
+        ["Copilot", "Unlicensed", "Conservative", 82.8, 4138],
+        ["Copilot", "Unlicensed", "Optimistic", 245.8, 12289],
+        ["Copilot", "Unlicensed", "Typical", 177.9, 8896],
+        ["Cowork", "Licensed", "Conservative", 32.1, 1603],
+        ["Cowork", "Licensed", "Optimistic", 109.7, 5486],
+        ["Cowork", "Licensed", "Typical", 69.5, 3474],
     ],
+};
+
+/** The value the costs pay for: everything but unlicensed Copilot Chat. */
+const PAID = {
+    Conservative: 14316 + 626 + 44956 + 1603,
+    Typical: 34135 + 1493 + 96872 + 3474,
+    Optimistic: 48311 + 2211 + 131021 + 5486,
 };
 
 describe("dates compared", () => {
@@ -101,22 +115,39 @@ describe("currency", () => {
 describe("value by source", () => {
     const values = readSourceValues(bySource);
 
-    it("reads each source under each scenario", () => {
+    it("reads licensed users' Copilot apart from unlicensed Copilot Chat", () => {
         expect(values.get("Copilot")).toEqual({ Conservative: 44956, Optimistic: 131021, Typical: 96872 });
-        expect([...values.keys()].sort()).toEqual(["Agents", "Copilot", "Cowork"]);
+        expect(values.get(UNLICENSED_CHAT)).toEqual({ Conservative: 4138, Optimistic: 12289, Typical: 8896 });
+        expect([...values.keys()].sort()).toEqual(["Agents", "Copilot", "Cowork", UNLICENSED_CHAT].sort());
     });
 
-    it("adds the sources up under one scenario", () => {
-        expect(scenarioValue(values, "Typical")).toBe(34135 + 96872 + 3474);
+    it("adds licensed and unlicensed use together for every other source", () => {
+        expect(values.get("Agents")).toEqual({ Conservative: 14316 + 626, Optimistic: 48311 + 2211, Typical: 34135 + 1493 });
+    });
+
+    it("adds up the value a cost pays for under one scenario, leaving out unlicensed Copilot Chat", () => {
+        expect(scenarioValue(values, "Typical")).toBe(PAID.Typical);
+    });
+
+    it("counts every row as paid for when the model has no licence column", () => {
+        const plain = readSourceValues({
+            columns: [{ name: "Source" }, { name: "Scenario" }, { name: "Hours" }, { name: "Value" }],
+            rows: [
+                ["Copilot", "Typical", 1, 10],
+                ["Agents", "Typical", 1, 5],
+            ],
+        });
+        expect(plain.has(UNLICENSED_CHAT)).toBe(false);
+        expect(scenarioValue(plain, "Typical")).toBe(15);
     });
 
     it("skips rows with no source or an unknown scenario", () => {
         const odd = readSourceValues({
             columns: bySource.columns,
             rows: [
-                [null, "Typical", 1, 10],
-                ["Copilot", "Heroic", 1, 10],
-                ["Copilot", "Typical", 1, 10],
+                [null, "Licensed", "Typical", 1, 10],
+                ["Copilot", "Licensed", "Heroic", 1, 10],
+                ["Copilot", "Licensed", "Typical", 1, 10],
             ],
         });
         expect(odd.size).toBe(1);
@@ -133,19 +164,20 @@ describe("comparison", () => {
     const values = readSourceValues(bySource);
     const costs: Costs = { licences: 5000, studio: 500, cowork: 7500 };
 
-    it("sets all the value against licences and credits", () => {
+    it("sets the value they pay for against licences and credits", () => {
         const result = compare(values, costs, "Typical", 50);
         expect(result.cost).toBe(13000);
         expect(result.credits).toBe(8000);
-        expect(result.value).toBe(134481);
-        expect(result.ratio).toBeCloseTo(134481 / 13000, 9);
-        expect(result.low).toBeCloseTo((14316 + 44956 + 1603) / 13000, 9);
-        expect(result.high).toBeCloseTo((48311 + 131021 + 5486) / 13000, 9);
+        expect(result.value).toBe(PAID.Typical);
+        expect(result.unlicensedChat).toBe(8896);
+        expect(result.ratio).toBeCloseTo(PAID.Typical / 13000, 9);
+        expect(result.low).toBeCloseTo(PAID.Conservative / 13000, 9);
+        expect(result.high).toBeCloseTo(PAID.Optimistic / 13000, 9);
     });
 
     it("gives the rate at which value would just cover cost", () => {
         const result = compare(values, costs, "Typical", 50);
-        expect(result.breakEvenRate).toBeCloseTo((50 * 13000) / 134481, 9);
+        expect(result.breakEvenRate).toBeCloseTo((50 * 13000) / PAID.Typical, 9);
     });
 
     it("counts licences alone when there are no credit costs", () => {
@@ -159,7 +191,7 @@ describe("comparison", () => {
         expect(result.cost).toBeUndefined();
         expect(result.ratio).toBeUndefined();
         expect(result.breakEvenRate).toBeUndefined();
-        expect(result.value).toBe(134481);
+        expect(result.value).toBe(PAID.Typical);
     });
 
     it("has no return on a zero cost", () => {
@@ -173,11 +205,11 @@ describe("pairs", () => {
     const values = readSourceValues(bySource);
     const costs: Costs = { licences: 5000, studio: 500, cowork: 7500 };
 
-    it("sets each cost against the activity it pays for", () => {
+    it("sets each cost against the activity it pays for, licences against licensed users only", () => {
         const lines = pairLines(values, costs, "Typical", ["licences", "studio", "cowork"]);
         expect(lines.map((line) => [line.id, line.cost, line.value])).toEqual([
             ["licences", 5000, 96872],
-            ["studio", 500, 34135],
+            ["studio", 500, 34135 + 1493],
             ["cowork", 7500, 3474],
         ]);
         expect(lines[2].ratio).toBeCloseTo(3474 / 7500, 9);

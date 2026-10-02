@@ -62,13 +62,12 @@ export function CommercialTermsProvider({ children, readModel = true }: { childr
         };
     }, [modelResult.data]);
 
-    const current = state.status === "ready" ? state.saved : null;
     const save = useCallback(
         async (patch: CommercialTermsValues) => {
-            const saved = await saveCommercialTerms({ ...current, ...patch }, email);
+            const saved = await saveCommercialTerms(patch, email);
             setState({ status: "ready", saved });
         },
-        [current, email],
+        [email],
     );
 
     const value = useMemo<CommercialTermsContextValue>(

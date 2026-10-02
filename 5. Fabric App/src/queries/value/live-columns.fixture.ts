@@ -41,6 +41,6 @@ export const liveColumns = {
         "[AI Assisted Value]",
     ],
     costValueWindow: ["[First Date]", "[Last Date]", "[Licensed Users]", "[Currency Symbol]"],
-    costValueBySource: ["[Source]", "[Scenario]", "[Hours]", "[Value]"],
+    costValueBySource: ["[Source]", "[Licence]", "[Scenario]", "[Hours]", "[Value]"],
     costValueAgents: ["[Agent]", "[Sessions]", "[Hours]", "[Value]"],
 } as const;

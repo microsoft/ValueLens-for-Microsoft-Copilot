@@ -224,7 +224,9 @@ export function useCostVsValue(): CostVsValue {
         [agentValues.table, agentCredits.table, costs.studio],
     );
 
-    const summaryError = activityWindow.error ?? bySource.error ?? byProduct.error;
+    // A skipped query keeps its last result, so its error counts only while it runs.
+    const summaryError =
+        activityWindow.error ?? (span ? bySource.error : undefined) ?? (ready ? byProduct.error : undefined);
     const summaryLoading =
         summaryError === undefined &&
         (!activityWindow.loaded ||
@@ -238,11 +240,11 @@ export function useCostVsValue(): CostVsValue {
         isLoading: summaryLoading,
         refetch: () => {
             activityWindow.refetch();
-            bySource.refetch();
+            if (span) bySource.refetch();
             if (ready) byProduct.refetch();
         },
     };
-    const agentError = agentValues.error ?? agentCredits.error;
+    const agentError = ready ? ((span ? agentValues.error : undefined) ?? agentCredits.error) : undefined;
     const agentResult: TableResult = {
         table: agentValues.table,
         error: agentError,

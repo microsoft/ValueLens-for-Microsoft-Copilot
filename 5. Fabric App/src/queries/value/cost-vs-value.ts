@@ -32,15 +32,17 @@ export function costValueWindow() {
 
 const bySourceColumns: ColumnMetadataMap = {
     "[Source]": { name: "Source", displayName: "Activity" },
+    "[Licence]": { name: "Licence", displayName: "Licence" },
     "[Scenario]": { name: "Scenario", displayName: "Scenario" },
     "[Hours]": { name: "Hours", displayName: "Expert-equivalent hours", format: FORMAT_HOURS },
     "[Value]": { name: "Value", displayName: "Estimated value", format: FORMAT_WHOLE },
 };
 
 /**
- * Value by activity source under all three effort scenarios at once, so the
- * return can be given as a range. The hourly rate is applied outside, as on
- * the Estimated value stage; the scenario is iterated here instead.
+ * Value by activity source and licence under all three effort scenarios at
+ * once, so the return can be given as a range. The hourly rate is applied
+ * outside, as on the Estimated value stage; the scenario is iterated here
+ * instead.
  */
 export function costValueBySource() {
     return { connection, query: bySourceQuery, columnMetadata: bySourceColumns };
@@ -120,25 +122,37 @@ function textIn(row: readonly unknown[], index: number): string | undefined {
 /** Each activity source's value under each scenario. */
 export type SourceValues = ReadonlyMap<string, Partial<Record<Scenario, number>>>;
 
+/**
+ * Copilot Chat by people without a Microsoft 365 Copilot licence: free with
+ * Microsoft 365, so no cost pays for it. Kept apart from the licensed
+ * "Copilot" source and left out of the value set against cost.
+ */
+export const UNLICENSED_CHAT = "Unlicensed Copilot Chat";
+
 export function readSourceValues(table: DataTable | undefined): SourceValues {
     const values = new Map<string, Partial<Record<Scenario, number>>>();
     if (!table) return values;
-    const [source, scenario, value] = ["Source", "Scenario", "Value"].map((name) => columnIndex(table, name));
+    const [source, licence, scenario, value] = ["Source", "Licence", "Scenario", "Value"].map((name) =>
+        columnIndex(table, name),
+    );
     for (const row of table.rows) {
-        const name = textIn(row, source);
+        const activity = textIn(row, source);
         const which = textIn(row, scenario) as Scenario | undefined;
-        if (!name || !which || !SCENARIOS.includes(which)) continue;
+        if (!activity || !which || !SCENARIOS.includes(which)) continue;
+        const name = activity === "Copilot" && textIn(row, licence) === "Unlicensed" ? UNLICENSED_CHAT : activity;
         const entry = values.get(name) ?? {};
-        entry[which] = numberIn(row, value);
+        const amount = numberIn(row, value);
+        if (amount !== undefined) entry[which] = (entry[which] ?? 0) + amount;
         values.set(name, entry);
     }
     return values;
 }
 
-/** Every source's value under one scenario, or undefined when none has any. */
+/** The value a cost pays for under one scenario, every source but unlicensed Copilot Chat, or undefined when none has any. */
 export function scenarioValue(values: SourceValues, scenario: Scenario): number | undefined {
     let total: number | undefined;
-    for (const entry of values.values()) {
+    for (const [name, entry] of values) {
+        if (name === UNLICENSED_CHAT) continue;
         const value = entry[scenario];
         if (value !== undefined) total = (total ?? 0) + value;
     }
@@ -163,8 +177,10 @@ export interface Costs {
 }
 
 export interface Comparison {
-    /** All recorded work under the chosen scenario. */
+    /** The work the costs pay for under the chosen scenario: all recorded work but unlicensed Copilot Chat. */
     value: number | undefined;
+    /** Unlicensed Copilot Chat under the chosen scenario, left out of `value` as no cost pays for it. */
+    unlicensedChat: number | undefined;
     /** Licences and credits. Undefined until the licences can be priced in the value's currency. */
     cost: number | undefined;
     credits: number | undefined;
@@ -185,6 +201,7 @@ export function compare(values: SourceValues, costs: Costs, scenario: Scenario, 
     const ratio = returnOn(value, cost);
     return {
         value,
+        unlicensedChat: values.get(UNLICENSED_CHAT)?.[scenario],
         cost,
         credits,
         ratio,
@@ -196,14 +213,18 @@ export function compare(values: SourceValues, costs: Costs, scenario: Scenario, 
 
 export type PairId = "licences" | "studio" | "cowork";
 
-/** Each cost and the activity it pays for, as the model's Activity column names it. */
+/**
+ * Each cost and the activity it pays for, as the model's Activity column names
+ * it. Licences pay only for licensed users' Copilot: the "Copilot" source
+ * leaves out unlicensed Copilot Chat once read.
+ */
 export const PAIRS: readonly { id: PairId; cost: string; source: string; value: string; chart: string }[] = [
     {
         id: "licences",
         cost: "Microsoft 365 Copilot licences",
         source: "Copilot",
-        value: "Copilot chat and apps",
-        chart: "Licences → Copilot chat and apps",
+        value: "Licensed users' Copilot",
+        chart: "Licences → Licensed users' Copilot",
     },
     { id: "studio", cost: "Copilot Studio credits", source: "Agents", value: "Agents", chart: "Studio credits → Agents" },
     { id: "cowork", cost: "Cowork / Work IQ credits", source: "Cowork", value: "Cowork", chart: "Cowork credits → Cowork" },

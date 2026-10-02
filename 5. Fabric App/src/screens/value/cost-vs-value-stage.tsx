@@ -5,9 +5,8 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
-import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { stageAnchor } from "@/components/destinations";
 import { FilterMenu } from "@/components/filter-menu";
 import { FilterNote } from "@/components/filter-note";
@@ -35,7 +34,9 @@ function asNumber(value: unknown): number | undefined {
 function returnCell(value: unknown) {
     const ratio = asNumber(value);
     if (ratio === undefined) return null;
-    return <span className={ratio < 1 ? "text-destructive" : undefined}>{formatKpi(ratio, "multiple")}</span>;
+    // Red only when the figure shown, to one decimal, is below 1×.
+    const below = Math.round(ratio * 10) < 10;
+    return <span className={below ? "text-destructive" : undefined}>{formatKpi(ratio, "multiple")}</span>;
 }
 
 function amountCell(prefix: string, format: "currency" | "money") {
@@ -61,10 +62,6 @@ const dollars = (value: number, digits = 0) =>
 function rangeText(span: DateSpan): string {
     const days = spanDays(span);
     return `${formatDateRange(span.from, span.to)} (${days} ${days === 1 ? "day" : "days"})`;
-}
-
-function emptyLike(table: DataTable): DataTable {
-    return { columns: table.columns, rows: [] };
 }
 
 /** Why the credit costs are, or aren't, in the comparison. */
@@ -110,12 +107,16 @@ function howNotes(data: CostVsValue): Note[] {
         {
             term: "Pairing",
             text: counted
-                ? "Licences pay for Copilot chat and apps, Copilot Studio credits for agents, and Cowork credits for Cowork. Agents' value also covers built-in and Agent Builder agents a licence pays for, so that pair reads high."
-                : "Licences are set against Copilot chat and apps.",
+                ? "Licences pay for licensed users' Copilot chat and apps, Copilot Studio credits for agents, and Cowork credits for Cowork. Agents' value also covers built-in and Agent Builder agents a licence pays for, so that pair reads high."
+                : "Licences are set against licensed users' Copilot chat and apps.",
         },
         {
             term: "Left out",
             text: `${
+                data.comparison.unlicensedChat !== undefined && data.comparison.unlicensedChat > 0
+                    ? `Copilot Chat by people without a licence (${formatKpi(data.comparison.unlicensedChat, "currency", { prefix: symbol })} of value), as it's free with Microsoft 365 and no cost here pays for it. `
+                    : ""
+            }${
                 azure.cost !== undefined
                     ? `Azure AI Foundry (${formatKpi(azure.cost, "money", { prefix: azure.currency === "USD" || !azure.currency ? "$" : `${azure.currency} ` })} over these dates), as ValueLens doesn't record the work it does. `
                     : "Azure AI Foundry, as ValueLens doesn't record the work it does. "
@@ -128,6 +129,28 @@ function howNotes(data: CostVsValue): Note[] {
                 : exchangeRate !== undefined
                   ? `$1 = ${symbol}${exchangeRate}, set under Prices. Licences and credits are billed in US dollars.`
                   : `Not set. Licences and credits are billed in US dollars, so set how many ${symbol || "units of the value's currency"} make $1 under Prices.`,
+        },
+    ];
+}
+
+function agentNotes(data: CostVsValue): Note[] {
+    const { symbol, rate, scenario, costs, agents } = data;
+    const studio = costs.studio !== undefined ? ` (${formatKpi(costs.studio, "currency", { prefix: symbol })})` : "";
+    return [
+        {
+            term: "Cost",
+            text: `Copilot Studio's cost over these dates${studio}, split by each agent's share of all the Copilot Studio credits Consumption Central holds by agent.`,
+        },
+        {
+            term: "Value",
+            text: `The work ValueLens records for the agent with the same name, at ${symbol}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort.`,
+        },
+        {
+            term: "Not found",
+            text:
+                agents.unmatched.length > 0
+                    ? `${agents.unmatched.join(", ")}: no activity under that name in ValueLens over these dates, so ${agents.unmatched.length === 1 ? "its" : "their"} share isn't set against any value.`
+                    : undefined,
         },
     ];
 }
@@ -181,9 +204,51 @@ function PricesMenu({ data }: { data: CostVsValue }) {
     );
 }
 
+const noop = () => {};
+
+/**
+ * Stands in for the comparison until an exchange rate is set: the box to type
+ * it in, right where the charts will appear.
+ */
+function RatePrompt({ symbol }: { symbol: string }) {
+    const headingId = useId();
+    const unit = symbol || "units of the value's currency";
+    const fields = useMemo<TermField[]>(
+        () => [
+            {
+                key: "exchangeRate",
+                label: `${symbol || "Value currency"} per $1`,
+                hint: `For example 0.75 if $1 buys ${symbol || ""}0.75.`,
+                inputMode: "decimal",
+            },
+        ],
+        [symbol],
+    );
+    return (
+        <section
+            aria-labelledby={headingId}
+            className="flex flex-col gap-300 rounded-xl border border-dashed border-border bg-card p-500"
+        >
+            <h3 id={headingId} className="text-[length:var(--text-400)] leading-400 font-semibold text-foreground">
+                Set an exchange rate to compare
+            </h3>
+            <div className="max-w-[360px]">
+                <TermsForm
+                    fields={fields}
+                    intro={`Licences and credits are billed in US dollars and value is in ${symbol || "another currency"}. Type how many ${unit} make $1.`}
+                    resetLabel="Clear"
+                    unavailableText="The exchange rate can't be saved here right now."
+                    note="It's also under Prices, above."
+                    close={noop}
+                />
+            </div>
+        </section>
+    );
+}
+
 /**
  * Sets what Copilot cost over the dates against the estimated value of the
- * work it did: licences against Copilot chat and apps, Copilot Studio credits
+ * work it did: licences against licensed users' Copilot chat and apps, Copilot Studio credits
  * against agents, and Cowork credits against Cowork, at the rate and effort
  * scenario chosen on the Estimated value stage.
  */
@@ -224,7 +289,7 @@ export function CostVsValueStage() {
 
     const agentColumns: GridColumnDef[] = useMemo(
         () => [
-            { id: "Pair", header: "Agent", minWidth: 200 },
+            { id: "Pair", header: "Agent", width: 280 },
             { id: "Share", header: "Share of credits", width: 136, numericStyling: true, cellRenderer: percentCell },
             {
                 id: "Cost",
@@ -250,13 +315,10 @@ export function CostVsValueStage() {
         [symbol, agentRows],
     );
 
-    const needRate = "Set an exchange rate under Prices to compare.";
+    const needRate = "Needs an exchange rate, set below.";
     const assumption = `At ${symbol}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort`;
     const productsHeight = rowChartHeight(data.pairs.length, { perRow: 56, chrome: 140, min: 220 });
-    const agentsHeight = Math.max(
-        rowChartHeight(agents.lines.length, { perRow: 40, chrome: 140, min: 240 }),
-        gridHeight(agents.lines.length, { max: 520 }),
-    );
+    const agentsChartHeight = rowChartHeight(agents.lines.length, { perRow: 40, chrome: 140, min: 240 });
 
     const body = (() => {
         if (summary.error !== undefined && !data.activity) {
@@ -339,7 +401,11 @@ export function CostVsValueStage() {
                                 value={comparison.value}
                                 format="currency"
                                 prefix={symbol}
-                                detail={`${scenario} effort at ${symbol}${formatKpi(rate, "whole")} an hour`}
+                                detail={
+                                    comparison.unlicensedChat !== undefined && comparison.unlicensedChat > 0
+                                        ? `${scenario} effort at ${symbol}${formatKpi(rate, "whole")} an hour. Leaves out ${formatKpi(comparison.unlicensedChat, "currency", { prefix: symbol })} of free Copilot Chat by people without a licence.`
+                                        : `${scenario} effort at ${symbol}${formatKpi(rate, "whole")} an hour`
+                                }
                             />
                             {convertible ? (
                                 <KpiCard
@@ -380,65 +446,70 @@ export function CostVsValueStage() {
                     )}
 
                     <div className="grid grid-cols-1 gap-500 xl:grid-cols-[minmax(0,1fr)_320px]">
-                        <div className="flex min-w-0 flex-col gap-300">
-                            <ChartPanel
-                                result={summary}
-                                table={convertible ? products : emptyLike(products)}
-                                spec={spec}
-                                height={productsHeight}
-                                title="Each cost and the work it pays for"
-                                subtitle={`Cost and estimated value, in ${symbol || "the value's currency"}`}
-                                emptyTitle={convertible ? "Nothing to compare" : "Set an exchange rate to compare"}
-                                emptyDescription={
-                                    convertible
-                                        ? "There's no cost or value over these dates."
-                                        : `Costs are billed in US dollars and value is in ${symbol || "another currency"}. Set how many ${symbol || "units"} make $1 under Prices.`
-                                }
-                            />
-                            <Panel
-                                result={summary}
-                                table={convertible ? products : emptyLike(products)}
-                                height={gridHeight(data.pairs.length)}
-                                emptyTitle={convertible ? "Nothing to compare" : "Set an exchange rate to compare"}
-                                emptyDescription={convertible ? "There's no cost or value over these dates." : needRate}
-                            >
-                                {(table) => (
-                                    <DataGrid
-                                        columns={productColumns}
-                                        data={table}
-                                        theme={theme}
-                                        header={{
-                                            title: "Cost and value side by side",
-                                            subtitle: "Below 1× the cost is more than the value it was set against.",
-                                        }}
-                                    />
-                                )}
-                            </Panel>
-                        </div>
+                        {convertible ? (
+                            <div className="flex min-w-0 flex-col gap-300">
+                                <ChartPanel
+                                    result={summary}
+                                    table={products}
+                                    spec={spec}
+                                    height={productsHeight}
+                                    title="Each cost and the work it pays for"
+                                    subtitle={`Cost and estimated value, in ${symbol || "the value's currency"}`}
+                                    emptyTitle="Nothing to compare"
+                                    emptyDescription="There's no cost or value over these dates."
+                                />
+                                <Panel
+                                    result={summary}
+                                    table={products}
+                                    height={gridHeight(data.pairs.length, { perRow: 52 })}
+                                    emptyTitle="Nothing to compare"
+                                    emptyDescription="There's no cost or value over these dates."
+                                >
+                                    {(table) => (
+                                        <DataGrid
+                                            columns={productColumns}
+                                            data={table}
+                                            theme={theme}
+                                            header={{
+                                                title: "Cost and value side by side",
+                                                subtitle: "Below 1× the cost is more than the value it was set against.",
+                                            }}
+                                        />
+                                    )}
+                                </Panel>
+                            </div>
+                        ) : (
+                            <div className="min-w-0">
+                                <RatePrompt symbol={symbol} />
+                            </div>
+                        )}
                         <NoteCard title="How this is worked out" notes={howNotes(data)} />
                     </div>
 
-                    {counted && (
+                    {counted && convertible && (
                         <div className="flex flex-col gap-300">
-                            <div className="grid grid-cols-1 gap-500 xl:grid-cols-2">
-                                <ChartPanel
-                                    result={data.agentResult}
-                                    table={convertible ? agentRows : emptyLike(agentRows)}
-                                    spec={spec}
-                                    height={agentsHeight}
-                                    title="Copilot Studio agents"
-                                    subtitle="Each agent's share of the credit cost and the value of its work"
-                                    emptyTitle={convertible ? "No agents found by name" : "Set an exchange rate to compare"}
-                                    emptyDescription={
-                                        convertible
-                                            ? "None of the agents with Copilot Studio credits has activity under the same name in ValueLens over these dates."
-                                            : needRate
-                                    }
-                                />
+                            <div className="grid grid-cols-1 gap-500 xl:grid-cols-[minmax(0,1fr)_320px]">
+                                <div className="min-w-0">
+                                    <ChartPanel
+                                        result={data.agentResult}
+                                        table={agentRows}
+                                        spec={spec}
+                                        height={agentsChartHeight}
+                                        title="Copilot Studio agents"
+                                        subtitle="Each agent's share of the credit cost and the value of its work"
+                                        emptyTitle="No agents found by name"
+                                        emptyDescription="None of the agents with Copilot Studio credits has activity under the same name in ValueLens over these dates."
+                                    />
+                                </div>
+                                <div className="xl:self-start">
+                                    <NoteCard title="How agents are costed" notes={agentNotes(data)} />
+                                </div>
+                            </div>
+                            {agents.lines.length > 0 && (
                                 <Panel
                                     result={data.agentResult}
                                     table={agentRows}
-                                    height={agentsHeight}
+                                    height={gridHeight(agents.lines.length, { max: 520 })}
                                     emptyTitle="No agents found by name"
                                     emptyDescription="None of the agents with Copilot Studio credits has activity under the same name in ValueLens over these dates."
                                 >
@@ -448,20 +519,12 @@ export function CostVsValueStage() {
                                             data={table}
                                             theme={theme}
                                             header={{
-                                                title: "Agents by return",
+                                                title: "Agent cost and value",
                                                 subtitle: `${agents.lines.length} of ${agents.total} Copilot Studio agents found in ValueLens by name`,
                                             }}
                                         />
                                     )}
                                 </Panel>
-                            </div>
-                            {!data.agentResult.isLoading && (
-                                <p className={cn(SMALL, "max-w-[68ch] text-muted-foreground")}>
-                                    Copilot Studio's cost over these dates is split by each agent's share of all the Copilot
-                                    Studio credits Consumption Central holds by agent.
-                                    {agents.unmatched.length > 0 &&
-                                        ` Not found in ValueLens over these dates, so their share isn't set against any value: ${agents.unmatched.join(", ")}.`}
-                                </p>
                             )}
                         </div>
                     )}
