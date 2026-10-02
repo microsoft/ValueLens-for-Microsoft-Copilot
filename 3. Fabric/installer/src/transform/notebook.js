@@ -14,6 +14,7 @@
  * @property {string} [clientId]
  * @property {{ vaultUri: string, secretName: string }} [secret]
  * @property {string[]} [parameters]  Assignments the pipeline overrides.
+ * @property {Record<string, string>} [values]  Defaults to write into the notebook, e.g. IDs for a manual run.
  * @property {{ id: string, name: string, workspaceId: string }} [lakehouse]
  * @property {boolean} [dataCheckSummary]  Append a cell that returns a JSON summary to the installer.
  */
@@ -170,6 +171,12 @@ export function prepareNotebook(source, settings) {
     const cell = nb.cells[idx];
     cell.metadata = cell.metadata ?? {};
     cell.metadata.tags = [...(cell.metadata.tags ?? []), 'parameters'];
+  }
+
+  for (const [name, value] of Object.entries(settings.values ?? {})) {
+    const idx = findAssignmentCell(nb, name);
+    if (idx < 0) throw new Error(`Could not find "${name} = ..." in the notebook.`);
+    updateCell(nb.cells[idx], (t) => setAssignment(t, name, pyString(value)));
   }
 
   if (settings.lakehouse) {

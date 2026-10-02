@@ -265,6 +265,16 @@ when the Credit Meter page was retired, because no template reads that table. It
 
 ---
 
+## Semantic model refresh
+
+`ValueLens_Refresh_Model.ipynb` refreshes the ValueLens semantic model through the Power BI REST
+API. The [installer](../installer/) deploys it when it deploys the model and runs it as the
+pipeline's last step (`Refresh_Semantic_Model`). It writes nothing to the Lakehouse. After a
+backfill (`WRITE_MODE = 'overwrite'`) it also reloads every partition of the audit table, because
+an incremental refresh only reloads recent days. It isn't mirrored into the archived templates.
+
+---
+
 ## Diagnostic notebook
 
 Run `ValueLens_Data_Check.ipynb` only as a **read-only diagnostic**:

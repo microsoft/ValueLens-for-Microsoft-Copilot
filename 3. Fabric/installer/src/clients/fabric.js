@@ -20,6 +20,57 @@ export function pipelineDefinition(pipeline) {
 }
 
 /**
+ * @param {import('../transform/model.js').ModelBim} bim
+ * @param {any} pbism
+ */
+export function semanticModelDefinition(bim, pbism) {
+  return {
+    parts: [
+      { path: 'model.bim', payload: b64(JSON.stringify(bim)), payloadType: 'InlineBase64' },
+      { path: 'definition.pbism', payload: b64(JSON.stringify(pbism, null, 2)), payloadType: 'InlineBase64' },
+    ],
+  };
+}
+
+/**
+ * A shareable cloud connection to a SQL endpoint that signs in as an app registration.
+ * @param {{ displayName: string, server: string, database: string, tenantId: string, clientId: string, clientSecret: string }} o
+ */
+export function sqlConnectionBody(o) {
+  return {
+    connectivityType: 'ShareableCloud',
+    displayName: o.displayName,
+    privacyLevel: 'Organizational',
+    connectionDetails: {
+      type: 'SQL',
+      creationMethod: 'Sql',
+      parameters: [
+        { dataType: 'Text', name: 'server', value: o.server },
+        { dataType: 'Text', name: 'database', value: o.database },
+      ],
+    },
+    credentialDetails: servicePrincipalCredentials(o),
+  };
+}
+
+/**
+ * @param {{ tenantId: string, clientId: string, clientSecret: string }} o
+ */
+export function servicePrincipalCredentials(o) {
+  return {
+    singleSignOnType: 'None',
+    connectionEncryption: 'Encrypted',
+    skipTestConnection: false,
+    credentials: {
+      credentialType: 'ServicePrincipal',
+      tenantId: o.tenantId,
+      servicePrincipalClientId: o.clientId,
+      servicePrincipalSecret: o.clientSecret,
+    },
+  };
+}
+
+/**
  * Converts installer job parameters into Fabric's typed form.
  * @param {Record<string, string | number | boolean>} params
  */
@@ -71,10 +122,69 @@ export function fabricApi(http) {
     assignToCapacity: (workspaceId, capacityId) =>
       http.requestLro('POST', `/workspaces/${workspaceId}/assignToCapacity`, { body: { capacityId } }),
 
+    /** @param {string} workspaceId @returns {Promise<any[]>} */
+    listPrivateEndpoints: (workspaceId) => http.list(`/workspaces/${workspaceId}/managedPrivateEndpoints`),
+    /** @param {string} workspaceId @param {string} id */
+    getPrivateEndpoint: (workspaceId, id) => http.get(`/workspaces/${workspaceId}/managedPrivateEndpoints/${id}`),
+    /**
+     * @param {string} workspaceId
+     * @param {{ name: string, targetPrivateLinkResourceId: string, targetSubresourceType: string, requestMessage: string }} body
+     */
+    createPrivateEndpoint: (workspaceId, body) => http.post(`/workspaces/${workspaceId}/managedPrivateEndpoints`, body),
+
     /** @param {string} workspaceId @param {string} [type] */
     listItems: (workspaceId, type) => http.list(`/workspaces/${workspaceId}/items`, { query: { type } }),
     /** @param {string} workspaceId @param {string} itemId */
     getItem: (workspaceId, itemId) => http.get(`/workspaces/${workspaceId}/items/${itemId}`),
+    /** @param {string} workspaceId @param {string} itemId @param {string} displayName */
+    renameItem: (workspaceId, itemId, displayName) => http.patch(`/workspaces/${workspaceId}/items/${itemId}`, { displayName }),
+
+    /** @param {string} workspaceId @returns {Promise<any[]>} */
+    listRoleAssignments: (workspaceId) => http.list(`/workspaces/${workspaceId}/roleAssignments`),
+    /**
+     * @param {string} workspaceId
+     * @param {string} principalId
+     * @param {'User' | 'Group' | 'ServicePrincipal'} type
+     * @param {'Admin' | 'Member' | 'Contributor' | 'Viewer'} role
+     */
+    addRoleAssignment: (workspaceId, principalId, type, role) =>
+      http.post(`/workspaces/${workspaceId}/roleAssignments`, { principal: { id: principalId, type }, role }),
+
+    /** Tenant settings. Needs a Fabric administrator; others get 401 or 403. */
+    tenantSettings: async () => /** @type {any[]} */ ((await http.get('/admin/tenantsettings'))?.tenantSettings ?? []),
+
+    /** @param {string} workspaceId @param {string} displayName @param {any} definition */
+    createSemanticModel: (workspaceId, displayName, definition) =>
+      http.requestLro('POST', `/workspaces/${workspaceId}/semanticModels`, {
+        body: { displayName, description: 'ValueLens: Copilot usage and value. Deployed by the ValueLens installer.', definition },
+        lroResult: true,
+      }),
+    /** @param {string} workspaceId @param {string} id @param {any} definition */
+    updateSemanticModel: (workspaceId, id, definition) =>
+      http.requestLro('POST', `/workspaces/${workspaceId}/semanticModels/${id}/updateDefinition`, { body: { definition } }),
+    /**
+     * Points the model's data source at a connection.
+     * @param {string} workspaceId
+     * @param {string} id
+     * @param {{ id: string, type: string, path: string }} connection
+     */
+    bindConnection: (workspaceId, id, connection) =>
+      http.post(`/workspaces/${workspaceId}/semanticModels/${id}/bindConnection`, {
+        connectionBinding: {
+          id: connection.id,
+          connectivityType: 'ShareableCloud',
+          connectionDetails: { type: connection.type, path: connection.path },
+        },
+      }),
+
+    /** @returns {Promise<any[]>} */
+    listConnections: () => http.list('/connections'),
+    /** @param {string} id */
+    getConnection: (id) => http.get(`/connections/${id}`),
+    /** @param {any} body */
+    createConnection: (body) => http.post('/connections', body),
+    /** @param {string} id @param {any} body */
+    updateConnection: (id, body) => http.patch(`/connections/${id}`, body),
 
     /** @param {string} workspaceId @param {string} id */
     getLakehouse: (workspaceId, id) => http.get(`/workspaces/${workspaceId}/lakehouses/${id}`),

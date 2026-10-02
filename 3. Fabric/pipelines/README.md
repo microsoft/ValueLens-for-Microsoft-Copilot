@@ -37,6 +37,10 @@ Scheduled orchestration for the Direct Ingester notebooks and the downstream Aud
 
 ### Refresh Power BI from the pipeline
 
+> **Using the [installer](../installer/)?** When it deploys the semantic model, it adds this step
+> for you: a `Refresh_Semantic_Model` activity that runs `ValueLens_Refresh_Model` last. After a
+> backfill it also reloads every partition of the audit table. The steps below are for a manual set-up.
+
 1. Publish the configured report/model and configure its OneLake or SQL source credentials in the semantic model's settings.
 2. In the pipeline, add **Activities → Semantic model refresh**. Select a **Power BI connection**, the published **Workspace**, and **Dataset/semantic model**.
 3. Add **On success** dependencies from `Run_Audit_Log_Processor` **and every other branch supplying the model**, including the outer organisation-data and enabled optional-source conditionals. Waiting for the processor alone does not wait for those independent branches. Agents 365 is the exception: the processor already waits for it, so do **not** add a dependency on `Conditionally_Run_Agent365`, which reports *Failed* whenever the CSV fallback took over.

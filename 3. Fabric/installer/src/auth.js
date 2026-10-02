@@ -10,6 +10,7 @@ export const SCOPES = {
   arm: 'https://management.azure.com/.default',
   keyVault: 'https://vault.azure.net/.default',
   storage: 'https://storage.azure.com/.default',
+  powerbi: 'https://analysis.windows.net/powerbi/api/.default',
 };
 
 /** @typedef {keyof typeof SCOPES} Resource */

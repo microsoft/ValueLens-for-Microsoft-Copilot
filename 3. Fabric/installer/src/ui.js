@@ -64,7 +64,12 @@ export function createUi(opts = {}) {
      * @returns {Promise<T>}
      */
     async select(message, choices, defaultValue) {
-      if (yes) return defaultValue !== undefined ? defaultValue : choices.length === 1 ? choices[0].value : needsAnswer(message);
+      const open = choices.filter((ch) => !ch.disabled);
+      if (open.length === 1) {
+        line(`${c.green('✔')} ${message} ${c.cyan(open[0].name)}`);
+        return open[0].value;
+      }
+      if (yes) return defaultValue !== undefined ? defaultValue : needsAnswer(message);
       return select({ message, choices, default: defaultValue });
     },
 
@@ -122,9 +127,14 @@ export function createUi(opts = {}) {
       return {
         /** @param {string} status */
         update(status) {
-          const text = `    ${label}: ${status} ${c.dim(`(${formatDuration(Date.now() - started)})`)}`;
+          const head = `    ${label}: ${status}`;
+          const tail = `(${formatDuration(Date.now() - started)})`;
+          // A line that wraps can't be redrawn with \r, so keep it within the terminal.
+          const width = process.stdout.columns ?? 0;
+          const fits = !width || head.length + 1 + tail.length < width;
+          const text = fits ? `${head} ${c.dim(tail)}` : head.slice(0, Math.max(1, width - 1));
           if (tty) write(`\r\x1b[K${text}`);
-          else if (status !== last) line(text);
+          else if (status !== last) line(`${head} ${c.dim(tail)}`);
           last = status;
         },
         done() {

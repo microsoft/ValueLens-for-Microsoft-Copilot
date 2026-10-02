@@ -25,10 +25,20 @@ for an admin. It also sets up the workspace, Lakehouse, notebooks, pipeline and 
 it runs the first load and reports what arrived. The notebooks read the secret from Key Vault
 when they run.
 
+If Azure Policy makes the vault private, the installer saves the secret through Azure Resource
+Manager. It also connects the workspace to the vault with a managed private endpoint and
+approves it.
+
 Its answers and IDs are saved in `valuelens-install.json`, which holds no secrets. Re-running it
 repairs what is missing. Other commands: `update`, `run`, `status`, `rotate-secret` and
 `preview`. The canonical notebooks and pipeline JSON are unchanged; the installer fills in a copy
 of each as it deploys.
+
+It can also deploy the semantic model from `ValueLens - Fabric.pbit` and the ValueLens app
+(`5. Fabric App`) on top of it, so nothing has to be published from Power BI Desktop. The model
+reads the Lakehouse through a cloud connection that signs in as the app registration. A new
+notebook, `ValueLens_Refresh_Model`, refreshes the model as the pipeline's last step. New
+commands: `refresh` and `deploy-app`.
 
 ## 2026-10-02 — Fabric App: reloads itself after a deploy
 

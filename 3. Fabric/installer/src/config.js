@@ -17,10 +17,41 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {{ days: number }} history
  * @property {{ frequency: 'daily' | 'weekly', time: string, weekday: string, timeZone: string }} schedule
  * @property {{ appId?: string, objectId?: string, servicePrincipalId?: string, displayName?: string, secretExpires?: string, existing?: boolean }} app
- * @property {{ subscriptionId?: string, resourceGroup?: string, name?: string, id?: string, uri?: string, location?: string, secretName: string, existing?: boolean, rbac?: boolean, secretSetAt?: string }} keyVault
- * @property {{ capacityId?: string, workspaceId?: string, workspaceName?: string, lakehouseId?: string, lakehouseName?: string, notebooks: Partial<Record<import('./catalog.js').NotebookKey, string>>, pipelineId?: string, pipelineName?: string, pipelineModules?: string, scheduleId?: string }} fabric
+ * @property {{ subscriptionId?: string, resourceGroup?: string, name?: string, id?: string, uri?: string, location?: string, secretName: string, existing?: boolean, rbac?: boolean, private?: boolean, secretSetAt?: string }} keyVault
+ * @property {{ capacityId?: string, workspaceId?: string, workspaceName?: string, lakehouseId?: string, lakehouseName?: string, notebooks: Partial<Record<import('./catalog.js').NotebookKey, string>>, pipelineId?: string, pipelineName?: string, pipelineModules?: string, scheduleId?: string, vaultEndpointId?: string }} fabric
  * @property {{ jobId?: string, status?: string, startedAt?: string, finishedAt?: string }} [firstRun]
+ * @property {SemanticModelConfig} semanticModel
+ * @property {FabricAppConfig} fabricApp
  */
+
+/**
+ * The semantic model built from `ValueLens - Fabric.pbit`, and the connection it reads the Lakehouse through.
+ * @typedef {object} SemanticModelConfig
+ * @property {boolean} [enabled]
+ * @property {string} [id]
+ * @property {string} name
+ * @property {string} [server]  SQL analytics endpoint the model points at.
+ * @property {string} [database]
+ * @property {string} [signature]  What the deployed definition was built from.
+ * @property {string} [connectionId]
+ * @property {string} [connectionName]
+ * @property {string} [secretKeyId]  The app secret that only the connection holds.
+ * @property {string} [secretExpires]
+ * @property {boolean} [bound]
+ */
+
+/**
+ * The ValueLens web app (Fabric App item) from `5. Fabric App`.
+ * @typedef {object} FabricAppConfig
+ * @property {boolean} [enabled]
+ * @property {string} [itemId]
+ * @property {string} [name]
+ * @property {string} [url]
+ * @property {string} [profile]
+ * @property {string} [deployedAt]
+ */
+
+export const MODEL_NAME = 'ValueLens Model';
 
 /** @returns {InstallConfig} */
 export function emptyConfig() {
@@ -32,6 +63,8 @@ export function emptyConfig() {
     app: {},
     keyVault: { secretName: 'valuelens-client-secret' },
     fabric: { notebooks: {} },
+    semanticModel: { name: MODEL_NAME },
+    fabricApp: {},
   };
 }
 
@@ -60,6 +93,8 @@ export function loadConfig(file) {
     app: { ...(raw.app ?? {}) },
     keyVault: { ...base.keyVault, ...(raw.keyVault ?? {}) },
     fabric: { ...base.fabric, ...(raw.fabric ?? {}), notebooks: { ...(raw.fabric?.notebooks ?? {}) } },
+    semanticModel: { ...base.semanticModel, ...(raw.semanticModel ?? {}) },
+    fabricApp: { ...(raw.fabricApp ?? {}) },
   };
   assertNoSecrets(config);
   return { config, existed: true };

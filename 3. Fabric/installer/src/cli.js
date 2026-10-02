@@ -5,22 +5,24 @@ import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { DEFAULT_CONFIG_FILE, loadConfig } from './config.js';
 import { HttpError } from './http.js';
-import { connect, createCtx, install, preview, rotateSecret, run, status, update } from './install.js';
+import { connect, createCtx, deployAppNow, install, preview, refresh, rotateSecret, run, status, update } from './install.js';
 import { loadSources } from './sources.js';
 import { c, createUi } from './ui.js';
 
-const COMMANDS = ['install', 'update', 'run', 'status', 'rotate-secret', 'preview'];
+const COMMANDS = ['install', 'update', 'run', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'preview'];
 
-export const HELP = `Sets up the ValueLens data pipeline in Microsoft Fabric.
+export const HELP = `Sets up ValueLens in Microsoft Fabric: the data pipeline, the semantic model and the app.
 
 Usage: valuelens-install [command] [options]
 
 Commands:
   install          Set up ValueLens, or repair it from the install record (default)
-  update           Push the notebooks and pipeline from this checkout to Fabric
+  update           Push the notebooks, pipeline and semantic model from this checkout to Fabric
   run              Run the pipeline now, then the data check
-  status           Show recent runs, the last data check and when the secret expires
-  rotate-secret    Create a new client secret and put it in Key Vault
+  refresh          Refresh the semantic model now
+  deploy-app       Build and deploy the ValueLens app again
+  status           Show recent runs and refreshes, the last data check and when secrets expire
+  rotate-secret    Create new client secrets for Key Vault and the model's connection
   preview          Write what would be deployed to a folder, without signing in
 
 Options:
@@ -32,7 +34,7 @@ Options:
   --backfill-days <n>  With run: reload n days of audit history and rebuild the curated table
   --out <dir>          With preview: where to write (default ./valuelens-preview)
   --yes                Take saved answers and defaults without asking
-  --no-wait            Start the first load and finish without waiting for it
+  --no-wait            Don't wait for the first load or a refresh to finish
   --verbose            Print each API call
   -h, --help           Show this help
   -v, --version        Show the version
@@ -135,13 +137,21 @@ export async function main(argv) {
         await install(ctx, { wait: args.wait });
         break;
       case 'update':
-        await update(ctx);
+        await update(ctx, { wait: args.wait });
         break;
       case 'run': {
         const result = await run(ctx, { backfillDays: args.backfillDays, wait: args.wait });
         if (args.wait && !result.ok) return 1;
         break;
       }
+      case 'refresh': {
+        const result = await refresh(ctx, { wait: args.wait });
+        if (args.wait && !result.ok) return 1;
+        break;
+      }
+      case 'deploy-app':
+        await deployAppNow(ctx);
+        break;
       case 'status':
         await status(ctx);
         break;
@@ -155,6 +165,10 @@ export async function main(argv) {
     if (e?.name === 'ExitPromptError') {
       process.stderr.write('\nCancelled.\n');
       return 130;
+    }
+    if (/device_code_expired|expired_token|code_expired/i.test(String(e?.message ?? e?.errorCode ?? ''))) {
+      process.stderr.write(`\n${c.red('✗')} The sign-in code expired before it was used. Run the installer again and enter the new code within 15 minutes.\n`);
+      return 1;
     }
     process.stderr.write(`\n${c.red('✗')} ${e?.message ?? String(err)}\n`);
     if (verbose && err instanceof HttpError && err.body) process.stderr.write(`${c.dim(JSON.stringify(err.body, null, 2))}\n`);

@@ -43,7 +43,42 @@ const BINDINGS = {
  * @property {Partial<Record<import('../catalog.js').NotebookKey, string>>} notebookIds
  * @property {import('../catalog.js').ModuleChoice} modules
  * @property {number} [backfillDays]  Default for BackfillDays.
+ * @property {string} [semanticModelId]  Adds a last step that refreshes this model.
  */
+
+export const REFRESH_ACTIVITY = 'Refresh_Semantic_Model';
+
+/**
+ * Runs once the curated table is built and the optional tables have had their turn,
+ * so the model never reads a half-loaded Lakehouse.
+ * @param {any[]} activities
+ * @param {PipelineSettings} settings
+ */
+function refreshActivity(activities, settings) {
+  const notebookId = settings.notebookIds.refreshModel;
+  if (!notebookId) throw new Error('The semantic model refresh notebook has not been deployed.');
+  const has = (/** @type {string} */ name) => activities.some((a) => a.name === name);
+  const dependsOn = [{ activity: 'Run_Audit_Log_Processor', dependencyConditions: ['Succeeded'] }];
+  for (const name of ['Conditionally_Run_Org_Data', 'Conditionally_Run_Product_Feedback']) {
+    if (has(name)) dependsOn.push({ activity: name, dependencyConditions: ['Completed'] });
+  }
+  return {
+    name: REFRESH_ACTIVITY,
+    description: 'Refreshes the ValueLens semantic model. After a backfill it reloads every partition of the audit table.',
+    type: 'TridentNotebook',
+    dependsOn,
+    policy: { timeout: '0.03:00:00', retry: 0, retryIntervalInSeconds: 60, secureOutput: false, secureInput: false },
+    typeProperties: {
+      notebookId,
+      workspaceId: settings.workspaceId,
+      parameters: {
+        WORKSPACE_ID: { value: settings.workspaceId, type: 'string' },
+        SEMANTIC_MODEL_ID: { value: settings.semanticModelId, type: 'string' },
+        WRITE_MODE: { value: { value: '@pipeline().parameters.ProcessorWriteMode', type: 'Expression' }, type: 'string' },
+      },
+    },
+  };
+}
 
 /**
  * @param {any} template  Parsed `pipeline-content.json`.
@@ -100,8 +135,11 @@ export function buildPipeline(template, settings) {
   const left = [...JSON.stringify(filled).matchAll(/REPLACE_WITH_[A-Z0-9_]+/g)].map((m) => m[0]);
   if (left.length) throw new Error(`Pipeline still has placeholders: ${[...new Set(left)].join(', ')}`);
 
+  if (settings.semanticModelId) filled.properties.activities.push(refreshActivity(filled.properties.activities, settings));
+
   filled.properties.description =
-    'Created by the ValueLens installer. Runs the ingesters, then the Audit Log Processor. ' +
+    'Created by the ValueLens installer. Runs the ingesters, then the Audit Log Processor' +
+    `${settings.semanticModelId ? ', then refreshes the semantic model' : ''}. ` +
     'Scheduled runs use the parameter defaults (incremental audit load, merge into the curated table). ' +
     'The first run overrides them with AuditMode=backfill and ProcessorWriteMode=overwrite. ' +
     'Re-run the installer with "update" to pick up new notebook and pipeline versions.';

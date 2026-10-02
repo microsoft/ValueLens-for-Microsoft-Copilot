@@ -54,7 +54,8 @@ class ConsolidatedReleaseTests(unittest.TestCase):
                     self.assertEqual(actual, sha, (name, member))
 
     def test_all_shared_notebooks_match_canonical_bytes(self):
-        sources = [p for p in CORE.glob("*.ipynb") if p.name != "Copilot_Audit_Log_Processor.ipynb"]
+        unmirrored = {"Copilot_Audit_Log_Processor.ipynb", "ValueLens_Refresh_Model.ipynb"}
+        sources = [p for p in CORE.glob("*.ipynb") if p.name not in unmirrored]
         self.assertEqual(len(sources), 7)
         for source in sources:
             for folder in MIRRORS:
