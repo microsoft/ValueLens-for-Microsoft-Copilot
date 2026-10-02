@@ -30,7 +30,9 @@ A **Prices** menu on the stage saves a licence price (the $30 US list price by d
 exchange rate, alongside the shared rates. Saving rates or prices now writes only the fields that
 changed, so one person's save no longer overwrites another's. In the Consumption Central sample,
 seven of the eight Copilot Studio agents now share names with the ValueLens sample's agents, so
-the agents comparison has data. Onboarding Buddy is left unmatched on purpose. The method is in
+the agents comparison has data. Onboarding Buddy is left unmatched on purpose. Cowork credits are
+priced as the Consumption page's Cowork section prices them: Capacity Pack first at the prepaid
+rate, then pay-as-you-go. The method is in
 [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md#83-cost-vs-value).
 
 ---

@@ -21,6 +21,7 @@ import summaryQuery from "./cowork-credits-summary.dax?raw";
 import weeklyQuery from "./cowork-weekly.dax?raw";
 import weeklyCostSpec from "./cowork-weekly-cost.json";
 import weeklyCreditsSpec from "./cowork-weekly-credits.json";
+import windowCostQuery from "./cowork-window-cost.dax?raw";
 
 /** The report's two Cowork pages: what was consumed, and what it cost. */
 export type ConsumptionLens = "consumption" | "cost";
@@ -70,6 +71,21 @@ const weeklyColumns: ColumnMetadataMap = {
 export function coworkWeekly(lens: ConsumptionLens = "consumption") {
     const spec = lens === "cost" ? weeklyCostSpec : weeklyCreditsSpec;
     return { connection, query: weeklyQuery, columnMetadata: weeklyColumns, vegaLiteSpec: spec as VisualizationSpec };
+}
+
+const windowCostColumns: ColumnMetadataMap = {
+    "[Credits]": { name: "Credits", displayName: "Credits used", format: FORMAT_CREDITS },
+    "[Prepaid Credits]": { name: "Prepaid Credits", displayName: "Prepaid credits", format: FORMAT_CREDITS },
+    "[Cost]": { name: "Cost", displayName: "Cost", format: FORMAT_MONEY },
+};
+
+/**
+ * Cowork's credits and cost over the dates the report's date filter sets,
+ * priced with the Capacity Pack: up to the balance at the prepaid rate, the
+ * rest at pay-as-you-go. The Combined page prices them all at pay-as-you-go.
+ */
+export function coworkWindowCost() {
+    return { connection, query: windowCostQuery, columnMetadata: windowCostColumns };
 }
 
 const GROUP_COLUMN = "Group ByGroup";

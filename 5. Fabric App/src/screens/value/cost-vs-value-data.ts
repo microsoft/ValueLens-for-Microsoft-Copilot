@@ -20,6 +20,7 @@ import {
     consumptionByProduct,
     consumptionDates,
     consumptionNotes,
+    coworkWindowCost,
     groupByFilter,
     isoDate,
     LICENSE_LIST_PRICE,
@@ -68,7 +69,6 @@ export type CreditsState =
     | { kind: "ready" };
 
 const STUDIO = /studio/i;
-const COWORK = /cowork/i;
 const AZURE = /azure|foundry/i;
 
 function productCost(table: DataTable | undefined, pattern: RegExp): number | undefined {
@@ -189,6 +189,8 @@ export function useCostVsValue(): CostVsValue {
     const creditExtra = useMemo(() => (ready && span ? [reportingDateFilter(span.from, span.to)] : []), [ready, span]);
     const byProductSource = consumptionByProduct();
     const byProduct = useConsumptionTable(ready ? byProductSource : { ...byProductSource, ...SKIP }, creditExtra);
+    const coworkSource = coworkWindowCost();
+    const coworkCost = useConsumptionSummary(ready ? coworkSource : { ...coworkSource, ...SKIP }, creditExtra);
     const notes = useConsumptionSummary(ready ? consumptionNotes() : { ...consumptionNotes(), ...SKIP }, creditExtra);
     const studioSource = studioAgents();
     const agentExtraCredits = useMemo(() => [groupByFilter(undefined)], []);
@@ -202,9 +204,9 @@ export function useCostVsValue(): CostVsValue {
     const usd = useMemo(() => {
         const licences = users !== undefined && span ? licenceCost(users, licencePrice, span) : undefined;
         const studio = ready ? productCost(byProduct.table, STUDIO) : undefined;
-        const cowork = ready ? productCost(byProduct.table, COWORK) : undefined;
+        const cowork = ready ? readNumber(coworkCost.row, "[Cost]") : undefined;
         return { licences, studio, cowork, total: sumKnown([licences, studio, cowork]) };
-    }, [users, span, licencePrice, ready, byProduct.table]);
+    }, [users, span, licencePrice, ready, byProduct.table, coworkCost.row]);
 
     const costs = useMemo<Costs>(
         () => ({
@@ -226,14 +228,16 @@ export function useCostVsValue(): CostVsValue {
 
     // A skipped query keeps its last result, so its error counts only while it runs.
     const summaryError =
-        activityWindow.error ?? (span ? bySource.error : undefined) ?? (ready ? byProduct.error : undefined);
+        activityWindow.error ??
+        (span ? bySource.error : undefined) ??
+        (ready ? (byProduct.error ?? coworkCost.error) : undefined);
     const summaryLoading =
         summaryError === undefined &&
         (!activityWindow.loaded ||
             terms.status === "loading" ||
             credits.kind === "loading" ||
             (activity !== undefined && !bySource.table) ||
-            (ready && !byProduct.table));
+            (ready && (!byProduct.table || !coworkCost.loaded)));
     const summary: TableResult = {
         table: bySource.table,
         error: summaryError,
@@ -241,7 +245,10 @@ export function useCostVsValue(): CostVsValue {
         refetch: () => {
             activityWindow.refetch();
             if (span) bySource.refetch();
-            if (ready) byProduct.refetch();
+            if (ready) {
+                byProduct.refetch();
+                coworkCost.refetch();
+            }
         },
     };
     const agentError = ready ? ((span ? agentValues.error : undefined) ?? agentCredits.error) : undefined;

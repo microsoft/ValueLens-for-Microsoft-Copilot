@@ -697,7 +697,7 @@ tenant-wide, so the other filters don't apply to this stage.
 |---|---|
 | Microsoft 365 Copilot licences | Licensed users × price per month × days ÷ 30.44, the average month (365.25 ÷ 12). Licensed users is the model's **Total Licensed Users**. It's a snapshot, so one count covers every day ([§9](#9-known-limits)). The price is the $30 US list price unless one is set under **Prices** |
 | Copilot Studio credits | Copilot Studio's cost over the dates, at the Consumption page's **Rates & packs** |
-| Cowork / Work IQ credits | Cowork / Work IQ's cost over the dates, at the same rates. This is the pay-as-you-go reference value, before any Capacity Pack, so it can read high |
+| Cowork / Work IQ credits | Cowork / Work IQ's credits over the dates, priced as the Consumption page's Cowork section prices them: up to the **Capacity Pack balance** at the prepaid rate, the rest at pay-as-you-go. Pack credits left unused aren't counted |
 
 When the model's currency symbol isn't $, each cost is converted at the **exchange rate** set under
 **Prices**, in value currency per $1. Until one is set, the stage asks for it instead of comparing.

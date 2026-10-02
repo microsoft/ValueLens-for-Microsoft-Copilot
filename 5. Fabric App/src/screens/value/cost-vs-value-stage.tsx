@@ -68,7 +68,7 @@ function rangeText(span: DateSpan): string {
 function creditsNote(data: CostVsValue): string {
     switch (data.credits.kind) {
         case "ready":
-            return "Copilot Studio and Cowork / Work IQ, from Consumption Central at the rates set under Rates & packs on the Consumption page. Cowork is its pay-as-you-go reference value, before any Capacity Pack, so it can read high.";
+            return "Copilot Studio and Cowork / Work IQ, from Consumption Central at the rates set under Rates & packs on the Consumption page. Cowork credits use the Capacity Pack first, at the prepaid rate, then pay-as-you-go, as on the Consumption page's Cowork section. Unused pack credits aren't counted.";
         case "off":
             return "Not counted: Consumption Central isn't set up for this app, so the cost is licences alone and the return reads high.";
         case "apart":

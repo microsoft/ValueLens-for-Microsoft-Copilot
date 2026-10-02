@@ -42,6 +42,7 @@ export const liveColumns = {
         "[PAYG Cost]",
         "[Credits WoW]",
     ],
+    coworkWindowCost: ["[Credits]", "[Prepaid Credits]", "[Cost]"],
     coworkByGroup: [
         "Group By[Group]",
         "Org[DisplayName]",
