@@ -23,8 +23,9 @@ interface AuthProviderProps {
  * - When loaded inside a Fabric iframe (`?fabricEmbedded=true`), calls
  *   `initEmbeddedAuth` to acquire a Rayfin session via postMessage.
  * - When loaded standalone, `initEmbeddedAuth` returns `null` immediately
- *   and the provider settles in an unauthenticated state so `<AuthGate>`
- *   can offer interactive Fabric sign-in.
+ *   and the provider settles in an unauthenticated state. `<AuthGate>` then
+ *   sends the visitor to the app's Fabric item, or offers interactive Fabric
+ *   sign-in when the build has no item link.
  *
  * Consume the session with the `useAuth` hook.
  */

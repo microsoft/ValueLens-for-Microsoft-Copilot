@@ -16,6 +16,15 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-02 — Fabric App: the hosting address points to Fabric
+
+Opening the [Fabric App](5.%20Fabric%20App/) at its `…fabricapps.net` hosting address used to offer
+a sign-in, then fail every visual with *Not running inside a Fabric iframe*, because the app's
+data only loads through Fabric. That address now shows an **Open in Fabric** button that goes to
+the app's Fabric item, in the tenant it was deployed to.
+
+---
+
 ## 2026-10-02 — Fabric App: cost vs value
 
 The [Fabric App](5.%20Fabric%20App/)'s Value page ends with a new stage, **Cost vs value**. It sets

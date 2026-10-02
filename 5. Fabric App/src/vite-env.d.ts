@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_FABRIC_ITEM_ID?: string;
   /** Fabric portal base URL (e.g. https://app.fabric.microsoft.com/). */
   readonly VITE_FABRIC_PORTAL_URL?: string;
+  /** Tenant the app is deployed to; opens the Fabric item link in that tenant. */
+  readonly VITE_FABRIC_TENANT_ID?: string;
 }
 
 interface ImportMeta {
