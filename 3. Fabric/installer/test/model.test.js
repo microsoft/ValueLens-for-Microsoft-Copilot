@@ -54,7 +54,7 @@ function makeZip(files) {
 
 const MODEL_FILE = /** @type {string} */ (realSources().modelFile);
 const template = loadTemplateModel(MODEL_FILE);
-const settings = { server: 'abc.datawarehouse.fabric.microsoft.com', database: 'ValueLens', modules: { orgData: true, agent365: false, productFeedback: true } };
+const settings = { server: 'abc.datawarehouse.fabric.microsoft.com', database: 'ValueLens', modules: { orgData: true, agent365: false, productFeedback: true, consumption: false } };
 
 test('zip: stored and deflated entries read back; a missing entry or non-zip fails', () => {
   const text = Buffer.from('hello '.repeat(200));
@@ -144,7 +144,7 @@ test('pipeline: no model, no refresh; a model without the notebook is an error',
 });
 
 test('the refresh notebook is deployed only with a connected model, with its IDs filled in', () => {
-  const modules = { orgData: true, agent365: false, productFeedback: false };
+  const modules = { orgData: true, agent365: false, productFeedback: false, consumption: false };
   assert.ok(!notebooksFor(modules).some((nb) => nb.key === 'refreshModel'));
   const nb = notebooksFor(modules, { semanticModel: true }).find((n) => n.key === 'refreshModel');
   assert.ok(nb);

@@ -331,6 +331,35 @@ test('app: an app already deployed is left alone unless asked; a deleted one is 
   }
 });
 
+test('app: the credit consumption pages get the cc alias, and a deployed app is rebuilt to add them', async () => {
+  const t = appSetup();
+  try {
+    const item = t.fabric.add('AppBackend', 'AI in One 2.0', null);
+    Object.assign(t.config.fabricApp, { itemId: item.id, models: ['vl'] });
+    t.config.modules.consumption = true;
+    Object.assign(t.config.consumption.model, { id: 'cc-1', bound: true });
+    await ensureFabricApp(t.ctx);
+    const data = `node ${join('<app>', DATA_CLI)}`;
+    assert.deepEqual(t.runs.slice(0, 2), [
+      `${data} add semanticModel vl --workspace ws-1 --item model-1 --profile valuelens-ws-1`,
+      `${data} add semanticModel cc --workspace ws-1 --item cc-1 --profile valuelens-ws-1`,
+    ]);
+    assert.match(t.ui.asked.join('\n'), /needs rebuilding to add the credit consumption pages/);
+    assert.deepEqual(t.config.fabricApp.models, ['vl', 'cc']);
+
+    t.runs.length = 0;
+    await ensureFabricApp(t.ctx);
+    assert.deepEqual(t.runs, [], 'same models: left alone by default');
+
+    t.config.modules.consumption = false;
+    await deployApp(t.ctx);
+    assert.equal(t.runs[1], `${data} remove cc --profile valuelens-ws-1`);
+    assert.deepEqual(t.config.fabricApp.models, ['vl']);
+  } finally {
+    t.cleanup();
+  }
+});
+
 test('app: needs the model and the app source', async () => {
   const t = appSetup();
   try {
