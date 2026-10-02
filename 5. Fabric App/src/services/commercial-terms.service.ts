@@ -31,6 +31,8 @@ function fromRow(row: Record<string, unknown>): SavedCommercialTerms {
         creditRate: toNumber(row.creditRate),
         prepaidCreditRate: toNumber(row.prepaidCreditRate),
         prepaidCreditBalance: toNumber(row.prepaidCreditBalance),
+        licensePrice: toNumber(row.licensePrice),
+        exchangeRate: toNumber(row.exchangeRate),
         updatedBy: typeof row.updatedBy === "string" && row.updatedBy ? row.updatedBy : undefined,
         updatedAt: updatedAt && !Number.isNaN(updatedAt.getTime()) ? updatedAt : undefined,
     };
@@ -59,8 +61,8 @@ export async function loadCommercialTerms(): Promise<SavedCommercialTerms | null
 }
 
 /**
- * Saves the terms for everyone. A term left undefined is cleared, so the
- * model's own applies to it again.
+ * Saves every term for everyone. A term left undefined is cleared, so its
+ * default applies again: the model's for a credit term.
  */
 export async function saveCommercialTerms(
     values: CommercialTermsValues,
@@ -71,6 +73,8 @@ export async function saveCommercialTerms(
         creditRate: values.creditRate ?? null,
         prepaidCreditRate: values.prepaidCreditRate ?? null,
         prepaidCreditBalance: values.prepaidCreditBalance ?? null,
+        licensePrice: values.licensePrice ?? null,
+        exchangeRate: values.exchangeRate ?? null,
         updatedBy: updatedBy ?? null,
         updatedAt: new Date(),
     } as unknown as Partial<SavedCommercialTerms>;
