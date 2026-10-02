@@ -21,7 +21,7 @@
 | | Before (PAX ≤ v1.11.4) | Now (PAX ≥ v1.11.5) |
 |---|---|---|
 | Embedded rollup processor | v3.1.0 (33-column schema) | **v4.0.0** (50-column AIBV schema) |
-| AIBV rollup | Not available in PAX — needed this repo's separate [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../../1.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py) | Built in — select with **`-Dashboard AIBV`** (auto-enables `-Rollup`) |
+| AIBV rollup | Not available in PAX — needed this repo's separate [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../../4.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py) | Built in — select with **`-Dashboard AIBV`** (auto-enables `-Rollup`) |
 | Container story | Custom image layering the v4.0.0 processor over PAX | **Vanilla PAX image** ([`PAX.Dockerfile`](https://github.com/microsoft/PAX/blob/release/fabric_resources/Dockerfile/PAX.Dockerfile)) — no layer needed |
 
 > [!NOTE]

@@ -87,7 +87,7 @@ That's it — no code. The folder should now contain your MAC export.
 ### Option B — Automate it with a Power Automate flow (hands-off)
 
 If you'd rather not upload by hand each month, import one of the ready-made flows in
-[`3. Fabric/archive/flows/`](./) so the file lands automatically:
+[`1. Fabric/archive/flows/`](./) so the file lands automatically:
 
 - **`Copilot_CostConsumption_Email_to_OneLake.json`** — watches an inbox; when an email with the
   consumption CSV arrives (e.g. a scheduled MAC export or a colleague forwarding the download), it
@@ -181,6 +181,6 @@ The ingester and column contract are stable regardless of where MAC hides the ex
 
 *Related: [archived credit-consumption flow README](../extended/Fabric%20+%20Copilot%20Studio/flows/README.md) (shared landing setup) ·
 [`COST-CONSUMPTION.md`](COST-CONSUMPTION.md) (column contract + model wiring) ·
-[`3. Fabric/docs/OPTIONAL-SOURCES.md`](../../docs/OPTIONAL-SOURCES.md) (how optional sources stay "green"
+[`1. Fabric/docs/OPTIONAL-SOURCES.md`](../../docs/OPTIONAL-SOURCES.md) (how optional sources stay "green"
 when absent) · [`docs/DATA-DICTIONARY.md`](../../../docs/DATA-DICTIONARY.md) (column reference) ·
 [archived Copilot Studio credit guide](../extended/Fabric%20+%20Copilot%20Studio/CREDIT-CONSUMPTION-SETUP.md) (the different, PPAC-side credit guide).*

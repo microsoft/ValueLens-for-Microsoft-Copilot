@@ -5,9 +5,9 @@ is counted, how each interaction is classified, how value is estimated, and the 
 the assumptions.
 
 It applies to the Power BI template, where all four data paths share one model, and to the
-[Fabric App](../5.%20Fabric%20App/). The app reads the same model and adds two pages and a Value
+[Fabric App](../1.%20Fabric/Fabric%20App/). The app reads the same model and adds two pages and a Value
 stage of its own ([§8](#8-fabric-app-only-consumption-agent-evaluation-and-cost-vs-value)). Every rule here is taken from
-`3. Fabric/ValueLens - Fabric.pbit` and the `Copilot_Audit_Log_Processor` notebook. If this page
+`1. Fabric/ValueLens - Fabric.pbit` and the `Copilot_Audit_Log_Processor` notebook. If this page
 and the model ever disagree, the model is right. The template's **📖 Metric Glossary** page
 carries the same caveats inside the report.
 
@@ -71,7 +71,7 @@ flowchart LR
 | **4. Date** | `InteractionDate`, `WeekStart` (Monday) and `MonthStart`, all from the record's UTC timestamp. |
 | **5. Licence** | The user ID is lower-cased and trimmed, then matched to the licensed-users table. `Has license` of YES, TRUE, Y or 1 gives **M365 Copilot Licensed**; anything else, including no match, gives **Unlicensed**. |
 | **6. Link agents** | Each agent row is linked to the Agent 365 registry by Entra app ID, then Title ID, then normalised name. The first match wins. |
-| **7. Classify** | The rules in [§3](#3-how-each-interaction-is-classified). On Fabric the `Copilot_Audit_Log_Processor` notebook runs them in Spark and writes `copilot_interactions_curated`. The other paths run [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../1.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py), which classifies agents less finely ([§3.2](#paths-1-2-and-4)). |
+| **7. Classify** | The rules in [§3](#3-how-each-interaction-is-classified). On Fabric the `Copilot_Audit_Log_Processor` notebook runs them in Spark and writes `copilot_interactions_curated`. The other paths run [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../4.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py), which classifies agents less finely ([§3.2](#paths-2-3-and-4)). |
 | **8. Model** | The model reads the curated rows without reclassifying them. It joins org data (organisation, department, location) on the normalised person ID, and computes the measures. On Fabric, refresh is incremental by `CreationDate`. |
 
 Table and column contracts are in the [data dictionary](DATA-DICTIONARY.md).
@@ -261,10 +261,10 @@ processors can produce has a row, so no Copilot or agent row is left without a c
 Order decides the last one. Rule 6 (a connector with an active action) comes before rule 25 (a
 ServiceNow site), so the ticket counts as a workflow, not a service desk question.
 
-#### Paths 1, 2 and 4
+#### Paths 2, 3 and 4
 
 These paths classify with
-[`Purview_CopilotInteraction_Processor_v4.0.0.py`](../1.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py).
+[`Purview_CopilotInteraction_Processor_v4.0.0.py`](../4.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py).
 It runs step 1 the same way, and step 4 is in the shared model. But it has no Agent 365 registry,
 doesn't split workflows, and doesn't apply the name keywords to agent rows. So on
 these paths agent chats with no matching resource stay General Chat, and workflows stay Running a
@@ -544,7 +544,7 @@ ValueLens's estimated value against costs, most of them from Consumption Central
 
 ### 8.1 Consumption
 
-Reads a published [Consumption Central](../3.%20Fabric/Add%20Credit%20Consumption/) model and
+Reads a published [Consumption Central](../1.%20Fabric/Add%20Credit%20Consumption/) model and
 rebuilds its consumption and cost pages.
 
 | Section | Source | How cost is worked out |
@@ -643,8 +643,8 @@ cost is licences alone, so the return reads high.
 - **Tasks are rows, not prompts.** Use prompts or sessions when you need a per-interaction count.
 - **Categories are rule-based.** They are deterministic and explainable, but they won't match
   Copilot Analytics' AI-inferred categories, and agent categories are only as good as agent names
-  and descriptions. Paths 1, 2 and 4 don't read the agent registry or split workflows
-  ([§3.2](#paths-1-2-and-4)).
+  and descriptions. Paths 2, 3 and 4 don't read the agent registry or split workflows
+  ([§3.2](#paths-2-3-and-4)).
 - **Some time bands are provisional.** Rows marked *Low* confidence or *Provisional* in the
   appendix are estimates waiting for a better source.
 - **Habit and readiness thresholds are design choices**, not research results.

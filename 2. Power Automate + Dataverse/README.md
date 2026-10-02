@@ -1,4 +1,4 @@
-# 4. Power Automate + Dataverse — preview: the same dashboard, Dataverse as the core transport
+# 2. Power Automate + Dataverse — preview: the same dashboard, Dataverse as the core transport
 
 **Additional preview pathway, same ValueLens dashboard.** Every template ships the same
 report; this one reads its required interaction and user/licence feeds from Dataverse
@@ -34,8 +34,8 @@ You want a **Dataverse-backed** pathway — typically because a compatible Power
 collector solution already runs in your tenant and you'd rather keep the audit records there
 than in SharePoint CSVs or a Lakehouse. Expect to run a scheduled Python/PowerShell refresh
 runner alongside it, and to advance the snapshot parameter by hand. This is a **preview**:
-if you want the settled, supported routes, use [2. SharePoint](../2.%20SharePoint/) or
-[3. Fabric](../3.%20Fabric/).
+if you want the settled, supported routes, use [1. Fabric](../1.%20Fabric/) or
+[3. SharePoint](../3.%20SharePoint/).
 
 ---
 
@@ -228,7 +228,7 @@ it writes Dataverse only with `-ExecuteDataverseWrite`.
 | `Core Snapshot ID` | The successful run ID emitted in step 4. |
 | `Use SharePoint CSV fallback` | Leave `false` for the new pathway. |
 | `Copilot Interactions File` / `Org Data File` | Not required in Dataverse mode; used only with explicit CSV fallback. |
-| `Agent 365` *(optional)* | SharePoint URL of `agents_365.csv`, the [`Get-Agents365Registry.ps1`](../2.%20SharePoint/scripts/Get-Agents365Registry.ps1) output (same 48 columns as the Fabric table). Without an Agent 365 licence, upload the Microsoft 365 admin centre **Agents** export instead (`Upload-Rollups-SharePoint.ps1 -Agents365Csv`). Not invented from audit data. |
+| `Agent 365` *(optional)* | SharePoint URL of `agents_365.csv`, the [`Get-Agents365Registry.ps1`](../3.%20SharePoint/scripts/Get-Agents365Registry.ps1) output (same 48 columns as the Fabric table). Without an Agent 365 licence, upload the Microsoft 365 admin centre **Agents** export instead (`Upload-Rollups-SharePoint.ps1 -Agents365Csv`). Not invented from audit data. |
 | `Feedback File` *(optional)* | SharePoint URL of the admin centre feedback export. |
 
 All three core queries use the **same immutable run ID** and refuse missing,
@@ -315,7 +315,7 @@ The Tool pills at the top of each page filter on `Agent Filter` (Copilot, Agents
 The curated Dataverse snapshot supplies core interactions and users/licences; it does
 **not** manufacture Agent 365 telemetry, transcript outcomes or billing credits.
 Agent 365 registry detail comes from the optional `Agent 365` CSV
-([`Get-Agents365Registry.ps1`](../2.%20SharePoint/scripts/Get-Agents365Registry.ps1)), which is
+([`Get-Agents365Registry.ps1`](../3.%20SharePoint/scripts/Get-Agents365Registry.ps1)), which is
 an inventory, not an observability export — see the
 [source contract](../docs/DATA-DICTIONARY.md#4-agents_365) and this path's
 [source map](source-map.json).
@@ -351,9 +351,9 @@ cost-consumption input.
 
 | Path | When you'd go there instead |
 |---|---|
-| [1. Local CSV](../1.%20Local%20CSV/) | You want to see the dashboard working in two minutes, no tenant needed. |
-| [2. SharePoint](../2.%20SharePoint/) | Settled scheduled refresh on Power BI Pro. This path keeps it as an explicit fallback. |
-| [3. Fabric](../3.%20Fabric/) | Fabric capacity, Lakehouse ingestion at scale — the recommended route. |
+| [1. Fabric](../1.%20Fabric/) | Fabric capacity, Lakehouse ingestion at scale — the recommended route. |
+| [3. SharePoint](../3.%20SharePoint/) | Settled scheduled refresh on Power BI Pro. This path keeps it as an explicit fallback. |
+| [4. Local CSV](../4.%20Local%20CSV/) | You want to see the dashboard working in two minutes, no tenant needed. |
 
 Reference:
 

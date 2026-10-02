@@ -4,7 +4,7 @@ One command that sets up the [Fabric path](../README.md) in your tenant. It asks
 shows you the plan, and then creates everything the manual steps would: the app registration, its
 secret in Azure Key Vault, admin consent, a workspace and Lakehouse, the notebooks, the pipeline
 and its schedule. It can also deploy the ValueLens semantic model and the
-[ValueLens app](../../5.%20Fabric%20App/) on top of it, so there is nothing to publish from
+[ValueLens app](../Fabric%20App/) on top of it, so there is nothing to publish from
 Power BI Desktop. With [credit consumption](#credit-consumption), it adds the Consumption Central
 notebooks and model too. It then runs the first load and checks the data that arrives.
 
@@ -12,7 +12,7 @@ It keeps its answers and the IDs it creates in `valuelens-install.json`. Run it 
 file to repair, change or update the set-up. The file holds no secrets.
 
 ```text
-cd "3. Fabric/installer"
+cd "1. Fabric/installer"
 npm install
 npx valuelens-install
 ```
@@ -87,7 +87,7 @@ Lakehouse name for `ValueLens - Fabric.pbit`, or the workspace and Lakehouse IDs
 | Schedule | Daily or weekly at the time you chose, starting tomorrow. |
 | Semantic model | `ValueLens Model`, built from `ValueLens - Fabric.pbit` and pointed at your Lakehouse. Optional pages follow the modules you chose. |
 | Connection | `ValueLens SQL <workspace>`, a cloud connection to the Lakehouse's SQL endpoint that signs in as the app registration, with a secret of its own. The app registration gets Viewer on the workspace so it can read the Lakehouse. |
-| ValueLens app | A Fabric App item, "AI in One 2.0", built from [`5. Fabric App`](../../5.%20Fabric%20App/) against your semantic model. Rayfin, the app's build tool, may open a browser for you to sign in. |
+| ValueLens app | A Fabric App item, "AI in One 2.0", built from [`1. Fabric/Fabric App`](../Fabric%20App/) against your semantic model. Rayfin, the app's build tool, may open a browser for you to sign in. |
 | Credit consumption | Only if you choose it. Three more notebooks, the `ValueLens Consumption Model`, two upload folders, and read access to Azure costs. See [Credit consumption](#credit-consumption). |
 | First load | A pipeline run with your chosen history, then the data check. The run reports row counts and the date range of the audit data. Without a first load, the model is refreshed straight away. |
 
@@ -140,7 +140,7 @@ upload anything. GitHub Copilot and commercial terms aren't set up by the instal
 | Option | |
 |---|---|
 | `--config <file>` | Install record to use (default `./valuelens-install.json`). |
-| `--source <dir>` | The `3. Fabric` folder to deploy from (default: this checkout). |
+| `--source <dir>` | The `1. Fabric` folder to deploy from (default: this checkout). |
 | `--yes`, `-y` | Take saved answers and defaults without asking. A question with no answer stops the run. |
 | `--no-wait` | Don't wait for the first load or a model refresh to finish. |
 | `--verbose` | Print each API call, and the full error body when one fails. |

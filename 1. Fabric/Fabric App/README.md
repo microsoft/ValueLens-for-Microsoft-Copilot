@@ -1,4 +1,4 @@
-# 5. Fabric App — AI in One 2.0, ValueLens as a web app in your Fabric workspace
+# Fabric App — AI in One 2.0, ValueLens as a web app in your Fabric workspace
 
 **Preview.** AI in One 2.0 is the ValueLens dashboard rebuilt as a fast web app. It's hosted as an item in your
 Fabric workspace, and it reads the ValueLens semantic model you've already published. The app
@@ -29,7 +29,7 @@ Consumption page has its own period, service, group and cost-basis choices, take
 Consumption Central report. The Agent Evaluation page has its own date, department and agent
 slicers, and a Group by choice. The app opens in light mode, and a toggle switches it to dark.
 
-How each figure is worked out, page by page, is in the [methodology](../docs/METHODOLOGY.md).
+How each figure is worked out, page by page, is in the [methodology](../../docs/METHODOLOGY.md).
 
 ## Prerequisites
 
@@ -48,7 +48,7 @@ How each figure is worked out, page by page, is in the [methodology](../docs/MET
 
 ## Set up
 
-Run these commands from this folder (`5. Fabric App`).
+Run these commands from this folder (`1. Fabric/Fabric App`).
 
 1. **Install.**
    ```powershell
@@ -93,7 +93,7 @@ of the page to set them:
 | **Capacity Pack balance** | Credits Cowork uses before it pays as it goes. Leave it at 0 with no pack |
 
 Leave a box empty to keep the model's value. That comes from the `commercial_terms` table in
-[Add Credit Consumption](../3.%20Fabric/Add%20Credit%20Consumption/), or from the model's
+[Add Credit Consumption](../Add%20Credit%20Consumption/), or from the model's
 parameters if there's no such table. **Save for everyone** stores the values in the app's SQL
 database, so everyone who opens the app sees the same costs. **Use model values** clears them.
 
@@ -116,7 +116,7 @@ to set:
 They're saved with the rates and pack, for everyone, and used only on this stage. Credit costs
 come from the Consumption page at its rates, so they need Consumption Central. Without it, the
 stage sets licences alone against value. How each figure is worked out is in the
-[methodology](../docs/METHODOLOGY.md#83-cost-vs-value).
+[methodology](../../docs/METHODOLOGY.md#83-cost-vs-value).
 
 ## Task times
 

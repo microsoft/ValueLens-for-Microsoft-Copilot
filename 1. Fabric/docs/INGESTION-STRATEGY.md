@@ -101,11 +101,11 @@ repo rather than tracking `main`, so an upstream change can't break a running pi
 
 1. Validate a commit in a non-prod workspace (run the ingesters + refresh the PBIT).
 2. Tag it (e.g. `v2026.07-fabric`) and point production at that tag.
-3. To upgrade: diff the new tag's `3. Fabric/notebooks/`, test in non-prod, then move the tag.
+3. To upgrade: diff the new tag's `1. Fabric/notebooks/`, test in non-prod, then move the tag.
 
 **Compatibility tips:**
-- Canonical notebooks remain in `3. Fabric/notebooks/`; `scripts/sync-shared.ps1` syncs them to
-  their mirrors in `3. Fabric/archive/extended/`. Preserve this shared-notebook sync contract;
+- Canonical notebooks remain in `1. Fabric/notebooks/`; `scripts/sync-shared.ps1` syncs them to
+  their mirrors in `1. Fabric/archive/extended/`. Preserve this shared-notebook sync contract;
   the archive mirrors are not independent sources of truth.
 - Drive notebooks via the CONFIG cell (tagged as the pipeline `parameters` cell) — don't fork the
   notebook body, so upgrades are a definition swap.

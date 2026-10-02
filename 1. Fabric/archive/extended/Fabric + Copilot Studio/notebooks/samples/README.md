@@ -26,7 +26,7 @@ no Dataverse tenant, no Spark required**.
 From the repository root, change to the archived sample folder:
 
 ```powershell
-Set-Location -LiteralPath '.\3. Fabric\archive\extended\Fabric + Copilot Studio\notebooks\samples'
+Set-Location -LiteralPath '.\1. Fabric\archive\extended\Fabric + Copilot Studio\notebooks\samples'
 python smoketest_files_mode.py
 ```
 

@@ -2,7 +2,7 @@
 
 > **ARCHIVED / reference only — not a recommended active add-on.** The historical instructions
 > below apply to the archived Copilot Studio build. For new deployments, start with
-> the active [`3. Fabric`](../../../README.md) build.
+> the active [`1. Fabric`](../../../README.md) build.
 
 **Who this is for:** anyone setting up the **optional** "Copilot Studio credit consumption"
 billing pages on the Fabric version of the dashboard. **No coding required for the basic path.**

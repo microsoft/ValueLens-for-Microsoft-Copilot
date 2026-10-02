@@ -1,11 +1,11 @@
 # ARCHIVED — Fabric + Copilot Studio
 
 > **ARCHIVED / reference only — not a recommended active add-on.** Historical setup instructions
-> are retained below. Start new deployments with the active [`3. Fabric`](../../../README.md) build.
+> are retained below. Start new deployments with the active [`1. Fabric`](../../../README.md) build.
 
 *(Formerly "Studio Agent Deepdive".)* A **formerly optional extension** of the standard Fabric dashboard for
 tenants running **Copilot Studio agents**. The base
-[`3. Fabric/ValueLens - Fabric.pbit`](../../../ValueLens%20-%20Fabric.pbit)
+[`1. Fabric/ValueLens - Fabric.pbit`](../../../ValueLens%20-%20Fabric.pbit)
 is the recommended starting point; this archived layer provided a deeper view of
 **agent transcripts** and the **Agent 365 registry**.
 
@@ -19,7 +19,7 @@ mirrored and remains a dependency from the active base Fabric build.
 Fabric + Copilot Studio/
 ├── ValueLens - Fabric (+ Studio Agent Deepdive).pbit   ← the report
 ├── notebooks/
-│   ├── _core/                                          ← core ingesters (mirrored from 3. Fabric — do not edit here)
+│   ├── _core/                                          ← core ingesters (mirrored from 1. Fabric — do not edit here)
 │   │   ├── Copilot_Audit_Log_Direct_Ingester.ipynb
 │   │   ├── Copilot_Licensed_Users_Direct_Ingester.ipynb
 │   │   ├── Copilot_Org_Data_Direct_Ingester.ipynb
@@ -35,7 +35,7 @@ Fabric + Copilot Studio/
 
 | Notebook | Purpose |
 |---|---|
-| **`_core/*`** | Seven canonical notebooks: six M365 Copilot ingesters/landers plus `ValueLens_Data_Check.ipynb`. Byte-identical to those in `3. Fabric/notebooks/` (kept in sync by [`scripts/sync-shared.ps1`](../../../../scripts/sync-shared.ps1), not frozen). |
+| **`_core/*`** | Seven canonical notebooks: six M365 Copilot ingesters/landers plus `ValueLens_Data_Check.ipynb`. Byte-identical to those in `1. Fabric/notebooks/` (kept in sync by [`scripts/sync-shared.ps1`](../../../../scripts/sync-shared.ps1), not frozen). |
 | `Copilot_Agent_Transcript_Parser.ipynb` | Parses **Copilot Studio agent transcripts** (Dataverse `ConversationTranscript`) into a Lakehouse Delta table for the agent pages. |
 | `Copilot_Credit_Consumption_Ingester.ipynb` | Ingests the **Power Platform Admin Center (PPAC) per-agent Copilot Studio message credit** export into the `credit_consumption_*` Lakehouse tables (gated by `Enable_Consumption`). |
 | `flows/` | Power Automate flows that auto-land the PPAC credit export into OneLake (email or SharePoint trigger). See [`flows/README.md`](flows/README.md). |
@@ -54,7 +54,7 @@ agents** that wanted:
 ## Historical setup (reference only)
 
 1. Provision your **Fabric Lakehouse** and Entra app registration — see
-   [`3. Fabric/README.md`](../../../README.md) for the parameters, RBAC roles, and Graph
+   [`1. Fabric/README.md`](../../../README.md) for the parameters, RBAC roles, and Graph
    permissions the core ingesters need. (You only need to *read* that guide; you'll run the notebooks
    from this folder.)
 2. Run the notebooks in **`notebooks/_core/`** in order — audit logs → licensed users → org data →
@@ -74,14 +74,14 @@ agents** that wanted:
 ## Editing the core notebooks
 
 The `_core/` copies are **mirrors** — do not edit them directly. Edit the source in
-[`3. Fabric/notebooks/`](../../../notebooks/), then run:
+[`1. Fabric/notebooks/`](../../../notebooks/), then run:
 
 ```powershell
 .\scripts\sync-shared.ps1
 ```
 
 from the repo root. All eight canonical notebooks continue to sync into
-`3. Fabric/archive/extended/Fabric + Copilot Studio/notebooks/_core/` — archiving does **not**
+`1. Fabric/archive/extended/Fabric + Copilot Studio/notebooks/_core/` — archiving does **not**
 freeze these mirrors. The redundant `_shared/notebooks/` second copy has been removed;
 historical setup still uses this local `_core/` folder. CI enforces zero drift on matching
 pushes and pull requests.

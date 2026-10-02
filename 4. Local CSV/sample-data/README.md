@@ -18,7 +18,7 @@ land before wiring anything up to your own tenant.
 
 That's it — no export, no app registration, no Fabric capacity, no Purview access.
 
-> Use the template in **[`1. Local CSV/`](../)** — not `2. SharePoint/ValueLens - SharePoint.pbit`,
+> Use the template in **[`4. Local CSV/`](../)** — not `3. SharePoint/ValueLens - SharePoint.pbit`,
 > which deliberately accepts SharePoint URLs only.
 
 ## This data is fabricated

@@ -15,7 +15,7 @@ Cowork data comes straight from Viva Insights, with no files and no extract task
 | `Consumption Central - Viva Direct.pbit` | The report, connected directly to Viva Insights. |
 
 Want to try it on sample data first? Use the
-[Local CSV add-on](../../1.%20Local%20CSV/Add%20Credit%20Consumption/).
+[Local CSV add-on](../../4.%20Local%20CSV/Add%20Credit%20Consumption/).
 
 ---
 
@@ -41,7 +41,7 @@ dialog point at a multi-table result this template can't read, and fail with
 ### Other products *(optional)*
 
 Set **`DataFolder`** to a folder of Copilot Studio, GitHub or Azure AI exports (file names as in the
-[Local CSV add-on](../../1.%20Local%20CSV/Add%20Credit%20Consumption/)). Add
+[Local CSV add-on](../../4.%20Local%20CSV/Add%20Credit%20Consumption/)). Add
 `M365SpendingPolicyMetaData.csv` from the Viva query download to show policy names instead of IDs.
 
 `DataFolder` is a local folder path, so a scheduled refresh in the Power BI service then needs an

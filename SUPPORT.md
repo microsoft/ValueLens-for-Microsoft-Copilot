@@ -11,10 +11,10 @@ there is no guaranteed response time or support service-level agreement.
 Start with the [README](README.md), then follow the setup and troubleshooting
 guidance for your deployment path:
 
-- [1. Local CSV](1.%20Local%20CSV/README.md)
-- [2. SharePoint](2.%20SharePoint/README.md)
-- [3. Fabric](3.%20Fabric/README.md)
-- [4. Power Automate + Dataverse](4.%20Power%20Automate%20+%20Dataverse/README.md)
+- [1. Fabric](1.%20Fabric/README.md), including the [Fabric App](1.%20Fabric/Fabric%20App/README.md)
+- [2. Power Automate + Dataverse](2.%20Power%20Automate%20+%20Dataverse/README.md)
+- [3. SharePoint](3.%20SharePoint/README.md)
+- [4. Local CSV](4.%20Local%20CSV/README.md)
 
 Search existing issues for the same symptom. For a new bug report, include:
 

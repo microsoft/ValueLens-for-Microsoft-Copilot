@@ -1,4 +1,4 @@
-# 2. SharePoint — scheduled refresh on Power BI Pro, no Fabric needed
+# 3. SharePoint — scheduled refresh on Power BI Pro, no Fabric needed
 
 Run **ValueLens** with an **automatic scheduled refresh** on **Power BI Pro** — no Fabric
 capacity, no gateway.
@@ -23,7 +23,7 @@ scheduled PowerShell job.
 
 > ### 👋 Want a first look before setting this up?
 >
-> Use **[1. Local CSV](../1.%20Local%20CSV/)** instead — it includes a **sample dataset** that
+> Use **[4. Local CSV](../4.%20Local%20CSV/)** instead — it includes a **sample dataset** that
 > fills the dashboard with no tenant access at all, and it also covers the **manual one-off**
 > route for your own data (export → processor → local file paths).
 >
@@ -31,7 +31,7 @@ scheduled PowerShell job.
 > come back here to automate it.
 >
 > Need the **same dashboard** with Dataverse as the core transport? Use
-> **[4. Power Automate + Dataverse](../4.%20Power%20Automate%20+%20Dataverse/)**. It preserves this
+> **[2. Power Automate + Dataverse](../2.%20Power%20Automate%20+%20Dataverse/)**. It preserves this
 > path as an explicit fallback, but defaults to full raw audit retention + canonical ValueLens processing
 > into Dataverse curated tables. This additional preview requires a Python refresh runner and
 > Power Automate/Dataverse licensing; a bounded demo interval has been validated end-to-end.
@@ -46,7 +46,7 @@ scheduled PowerShell job.
 | [`Add Credit Consumption/`](Add%20Credit%20Consumption/) | *Optional.* The separate Consumption Central report for Copilot credit consumption and cost. |
 
 > Looking for the **local file path** template? It moved to
-> [`../1. Local CSV/ValueLens - Local CSV.pbit`](../1.%20Local%20CSV/) along with the sample data.
+> [`../4. Local CSV/ValueLens - Local CSV.pbit`](../4.%20Local%20CSV/) along with the sample data.
 > This template deliberately accepts SharePoint URLs only.
 
 ---
@@ -100,7 +100,7 @@ Three helper scripts do the work, in order —
 
 > **Using your own org data instead of Entra?** Point the extract at your own org/HR file with
 > `-UserInfoFile <path|SharePoint-URL|OneLake-path>` — copy the
-> [sample template](../1.%20Local%20CSV/scripts/OrgData-Template.csv) (same shape as a Viva Insights org-data file) to
+> [sample template](../4.%20Local%20CSV/scripts/OrgData-Template.csv) (same shape as a Viva Insights org-data file) to
 > get started. Only `UserPrincipalName` is required. See step 3 below.
 
 ### 1. Grant the app write access to your SharePoint site
@@ -260,7 +260,7 @@ The Tool pills at the top of each page filter on `Agent Filter` (Copilot, Agents
 | `404 Not Found` on upload | `-FolderPath` doesn't exist in SharePoint — create it, or use `/` for the library root. |
 | **Agent Registry usage fields blank** (`Active Users`, `Total sessions`, `Exception rate`, `Last Activity Date`) | Expected on the registry path. The catalogue rarely returns usage telemetry; that comes from the Admin Center → **Agents** observability export. The template adds missing columns as typed nulls so refresh still succeeds, and observed use comes from the audit log. See [`../docs/DATA-DICTIONARY.md`](../docs/DATA-DICTIONARY.md#4-agents_365). |
 | Agent Registry shows no creator, Entra ID or blocked flag | You are on `-Agent365Source PAX` (28 columns). Use the default canonical export. |
-| Refresh hits 1 GB / 2-hour cap | Move to [`../3. Fabric/`](../3.%20Fabric/) for high-volume tenants. |
+| Refresh hits 1 GB / 2-hour cap | Move to [`../1. Fabric/`](../1.%20Fabric/) for high-volume tenants. |
 
 </details>
 
@@ -272,8 +272,8 @@ This path tops out where Power BI Pro does — a 1 GB model and a two-hour refre
 
 | Next | Gives you |
 |---|---|
-| **[3. Fabric](../3.%20Fabric/)** | Lakehouse ingestion at scale, plus the optional feedback and Agent 365 sources |
-| **[4. Power Automate + Dataverse](../4.%20Power%20Automate%20+%20Dataverse/)** | Preview: Dataverse as the core transport, with full raw audit retention |
+| **[1. Fabric](../1.%20Fabric/)** | Lakehouse ingestion at scale, plus the optional feedback and Agent 365 sources |
+| **[2. Power Automate + Dataverse](../2.%20Power%20Automate%20+%20Dataverse/)** | Preview: Dataverse as the core transport, with full raw audit retention |
 
-Going the other way, [1. Local CSV](../1.%20Local%20CSV/) is still the fastest way to sanity-check
+Going the other way, [4. Local CSV](../4.%20Local%20CSV/) is still the fastest way to sanity-check
 a change before you schedule it.

@@ -1,4 +1,4 @@
-# 1. Local CSV — see the whole dashboard in about two minutes
+# 4. Local CSV — see the whole dashboard in about two minutes
 
 Run **ValueLens** from CSV files on your own machine. No tenant access, no scripts, no
 Fabric capacity, no SharePoint.
@@ -114,7 +114,7 @@ exports, joined on **UPN**. Supply them as two files (recommended) or pre-merged
 > **Big tenant?** The Purview UI export caps out well before millions of rows. Use
 > [microsoft/PAX ↗](https://github.com/microsoft/PAX) to pull the raw audit data instead — it
 > partitions the query and runs unattended. PAX now embeds this same v4.0.0 rollup, so it can
-> produce the processed CSVs directly; see [`../2. SharePoint/`](../2.%20SharePoint/) for the
+> produce the processed CSVs directly; see [`../3. SharePoint/`](../3.%20SharePoint/) for the
 > scheduled version of that.
 
 #### 2. Run the processor
@@ -142,7 +142,7 @@ Open **`ValueLens - Local CSV.pbit`** and point the parameters at the rollup CSV
 |---|---|
 | Copilot Interactions File | local path to `*_Interactions_*.csv` |
 | Org Data File | local path to `*_Users_*.csv` |
-| Agent 365 *(optional)* | blank, or a local path to the `Get-Agents365Registry.ps1` output ([how](../2.%20SharePoint/scripts/README.md#get-agents365registryps1-on-its-own)); without an Agent 365 licence, the Microsoft 365 admin centre **Agents** export works too |
+| Agent 365 *(optional)* | blank, or a local path to the `Get-Agents365Registry.ps1` output ([how](../3.%20SharePoint/scripts/README.md#get-agents365registryps1-on-its-own)); without an Agent 365 licence, the Microsoft 365 admin centre **Agents** export works too |
 | Feedback File *(optional)* | blank, or a local path to the Microsoft 365 admin centre product feedback export (**Health → Product feedback → Export**) |
 
 **Load** — done. To refresh: re-export, re-run the processor, **Refresh** in Desktop.
@@ -181,7 +181,7 @@ The Tool pills at the top of each page filter on `Agent Filter` (Copilot, Agents
 
 The two core rollups supply the adoption/value signals; the sample dataset also includes
 Agent 365 data. With your own data, export the registry with
-[`Get-Agents365Registry.ps1`](../2.%20SharePoint/scripts/Get-Agents365Registry.ps1) (the same
+[`Get-Agents365Registry.ps1`](../3.%20SharePoint/scripts/Get-Agents365Registry.ps1) (the same
 48-column shape the Fabric notebook writes). Registry exports do **not** carry observability
 telemetry, so those agent fields stay blank. See the
 [Agent 365 source contract](../docs/DATA-DICTIONARY.md#4-agents_365).
@@ -207,7 +207,7 @@ the audit rollups.
 | `0 records returned` from the export | `AuditLogsQuery.Read.All` consent missing — re-grant in Entra. |
 | Masked UPNs (32-char hex) | M365 Admin → Org settings → Reports → untick "Display concealed names". |
 | Agent Registry usage fields blank | Expected without an Agent 365 observability export — see [`../docs/DATA-DICTIONARY.md`](../docs/DATA-DICTIONARY.md#4-agents_365). |
-| Refresh is slow or hits limits | Volume is too high for a local file path — move to [`../3. Fabric/`](../3.%20Fabric/). |
+| Refresh is slow or hits limits | Volume is too high for a local file path — move to [`../1. Fabric/`](../1.%20Fabric/). |
 
 </details>
 
@@ -220,9 +220,9 @@ When you want it hands-off:
 
 | Next | Gives you |
 |---|---|
-| **[2. SharePoint](../2.%20SharePoint/)** | Scheduled extract → SharePoint → automatic Power BI refresh, on Power BI Pro |
-| **[3. Fabric](../3.%20Fabric/)** | Lakehouse ingestion at scale, plus the optional feedback and Agent 365 sources |
-| **[4. Power Automate + Dataverse](../4.%20Power%20Automate%20+%20Dataverse/)** | Preview: the same dashboard with Dataverse as the core transport |
+| **[1. Fabric](../1.%20Fabric/)** | Lakehouse ingestion at scale, plus the optional feedback and Agent 365 sources |
+| **[2. Power Automate + Dataverse](../2.%20Power%20Automate%20+%20Dataverse/)** | Preview: the same dashboard with Dataverse as the core transport |
+| **[3. SharePoint](../3.%20SharePoint/)** | Scheduled extract → SharePoint → automatic Power BI refresh, on Power BI Pro |
 
-Paths 2 and 3 read the **same two rollup CSVs** this path produces, so nothing you learn here is
+Paths 1 and 3 read the **same two rollup CSVs** this path produces, so nothing you learn here is
 wasted.

@@ -1,4 +1,4 @@
-# 3. Fabric — Lakehouse ingestion at scale, on your own capacity
+# 1. Fabric — Lakehouse ingestion at scale, on your own capacity
 
 Run **ValueLens** on **Fabric**: PySpark notebooks pull straight from Graph into a Lakehouse, a
 processor builds the curated fact table, and a Power BI template imports it. No scripts to
@@ -28,8 +28,8 @@ Both are **Import**, not Direct Lake.
 
 You have **Fabric capacity** (or Premium / PPU), you want the dashboard refreshing itself at
 tenant scale, and you're comfortable running notebooks in a workspace. If you don't have capacity,
-[2. SharePoint](../2.%20SharePoint/) gets you scheduled refresh on Power BI Pro instead. If you
-just want to see the thing working first, start at [1. Local CSV](../1.%20Local%20CSV/).
+[3. SharePoint](../3.%20SharePoint/) gets you scheduled refresh on Power BI Pro instead. If you
+just want to see the thing working first, start at [4. Local CSV](../4.%20Local%20CSV/).
 
 ### What's here
 
@@ -39,6 +39,7 @@ just want to see the thing working first, start at [1. Local CSV](../1.%20Local%
 | `ValueLens - Fabric OneLake.pbit` | Import template using the OneLake Tables endpoint over HTTPS/443. |
 | `notebooks/` | Core ingesters, `Copilot_Audit_Log_Processor`, and optional-source ingesters. |
 | [`installer/`](installer/) | Command-line installer that sets up the app registration, Key Vault secret, workspace, Lakehouse, notebooks, pipeline and schedule, then runs the first load. |
+| [`Fabric App/`](Fabric%20App/) | *Preview.* The dashboard as a web app in your Fabric workspace, over the published model. The installer deploys it for you. |
 | `notebooks/optional/` | Edge-case add-ons outside the core path, each self-contained with its own README. |
 | `pipelines/` | Fabric pipeline JSON for the reviewed **core** orchestration plus opt-in branches. |
 | `docs/` | Fabric-specific reference notes, including the read-only SQL checker pack. Cross-path references (data dictionary, permissions) live in [`/docs`](../docs/). |
@@ -77,7 +78,7 @@ can, or gives you a link for an admin. It then sets up the workspace, Lakehouse,
 pipeline, runs the first load and checks the data.
 
 ```text
-cd "3. Fabric/installer"
+cd "1. Fabric/installer"
 npm install
 npx valuelens-install
 ```
@@ -266,9 +267,9 @@ and identity overlap. It does not independently classify licences or prove histo
 
 | Path | When you'd go there instead |
 |---|---|
-| [1. Local CSV](../1.%20Local%20CSV/) | You want a two-minute look before committing capacity to this. |
-| [2. SharePoint](../2.%20SharePoint/) | No Fabric capacity — scheduled refresh on Power BI Pro. |
-| [4. Power Automate + Dataverse](../4.%20Power%20Automate%20+%20Dataverse/) | Preview: Dataverse as the core transport for the same dashboard. |
+| [2. Power Automate + Dataverse](../2.%20Power%20Automate%20+%20Dataverse/) | Preview: Dataverse as the core transport for the same dashboard. |
+| [3. SharePoint](../3.%20SharePoint/) | No Fabric capacity — scheduled refresh on Power BI Pro. |
+| [4. Local CSV](../4.%20Local%20CSV/) | You want a two-minute look before committing capacity to this. |
 
 Reference:
 

@@ -16,7 +16,7 @@ exact column names below (casing and spaces matter).
 > **Base (No-Studio) build.** This build reads three **core** sources plus a few standard **optional**
 > sources. Copilot Studio agent-transcript analytics (the `agent_*` Dataverse tables) and the PPAC
 > per-agent / per-user message-credit tables are **not** part of this build — they live in the archived
-> [Fabric + Copilot Studio](../3.%20Fabric/archive/extended/Fabric%20+%20Copilot%20Studio/) template,
+> [Fabric + Copilot Studio](../1.%20Fabric/archive/extended/Fabric%20+%20Copilot%20Studio/) template,
 > kept as reference rather than a recommended active deployment.
 
 ---
@@ -24,7 +24,7 @@ exact column names below (casing and spaces matter).
 ## Tier model — core vs optional
 
 Optional sources must **degrade to an empty table with the correct columns** when absent, so the
-template never breaks. See [`OPTIONAL-SOURCES.md`](../3.%20Fabric/docs/OPTIONAL-SOURCES.md) for the `EmptyTable` + `try…otherwise` +
+template never breaks. See [`OPTIONAL-SOURCES.md`](../1.%20Fabric/docs/OPTIONAL-SOURCES.md) for the `EmptyTable` + `try…otherwise` +
 `Enable_*` toggle pattern.
 
 | # | Dashboard table | Lakehouse Delta name | Tier | Fabric producer | SharePoint producer |
@@ -101,7 +101,7 @@ columns `AppIdentity_Raw`, `AccessedResources_Raw` and `AISystemPlugin_Raw`; the
 keys remain in these complete raw payloads, not dynamically flattened columns. Canonical
 values and resource-row grain do not change. The entire resource array is repeated for
 each exploded row, and the raw plugin array includes elements after the first.
-See [processor settings, privacy and schema transitions](../3.%20Fabric/notebooks/README.md#audit-processor-copilot_audit_log_processor)
+See [processor settings, privacy and schema transitions](../1.%20Fabric/notebooks/README.md#audit-processor-copilot_audit_log_processor)
 before enabling this default-off option.
 
 ```
@@ -149,7 +149,7 @@ officeLocation, city, country, accountEnabled, managerUPN
 
 #### Optional Workday / HRIS enrichment or standalone source
 
-`Copilot_Org_Data_Workday_Lander` ([`notebooks/optional/workday-org-data/`](../3.%20Fabric/notebooks/optional/workday-org-data/README.md))
+`Copilot_Org_Data_Workday_Lander` ([`notebooks/optional/workday-org-data/`](../1.%20Fabric/notebooks/optional/workday-org-data/README.md))
 lands a worker extract from `Files/org_workday/` as a user-level org table. Default `MODE='auto'`
 uses additive enrichment if `BASE_TABLE` exists, or standalone mode if it is absent. An invalid
 existing baseline is rejected, not silently replaced. It remains an optional source, not a
@@ -202,7 +202,7 @@ model is now **100% Lakehouse-sourced**.
 
 **Local CSV, SharePoint and Dataverse templates** read the same contract from a CSV set in the
 `Agent 365` parameter (blank = the page loads empty). Produce it with
-[`Get-Agents365Registry.ps1`](../2.%20SharePoint/scripts/Get-Agents365Registry.ps1), which calls the
+[`Get-Agents365Registry.ps1`](../3.%20SharePoint/scripts/Get-Agents365Registry.ps1), which calls the
 same Graph endpoints as the ingester and writes the same **48 columns in the same order**, with the
 same value rules; a parity test runs one mocked Graph response through both. `Run-PAX-AIBV.ps1
 -IncludeAgent365Info` runs it for you and `Upload-Rollups-SharePoint.ps1` lands it as
@@ -339,7 +339,7 @@ Date Submitted Date, Sentiment
 ### 6. `copilot_cost_consumption` — Copilot credit usage (MAC Cost management export)
 > **Not read by any current template.** The Credit Meter page and its cost tables were retired from
 > every variant, and the `Cost Consumption File` parameter was removed. The ingester is archived
-> (`3. Fabric/archive/notebooks/`); it and the contract below remain for your own analysis.
+> (`1. Fabric/archive/notebooks/`); it and the contract below remain for your own analysis.
 
 Produced by the archived `Copilot_Cost_Consumption_Ingester` from the **Microsoft 365 Admin Center → Copilot →
 Cost management** per-user CSV export (export-only; no API). **Auto-detects two export shapes** and maps
@@ -364,8 +364,8 @@ SourceFile, LoadDate  (lineage)
 Columns absent from a given export load as null. Grain is a **per-user snapshot**. UPN match isn't 100% —
 unmatched users surface under an **"(Unattributed)"** organization bucket. The ingester, the two
 `COST-CONSUMPTION` guides and the cost flow JSON are all **archived reference** under
-`3. Fabric/archive/` (`notebooks/` and `flows/`), not recommended active deployment instructions. See the
-[archived cost guide](../3.%20Fabric/archive/flows/COST-CONSUMPTION.md).
+`1. Fabric/archive/` (`notebooks/` and `flows/`), not recommended active deployment instructions. See the
+[archived cost guide](../1.%20Fabric/archive/flows/COST-CONSUMPTION.md).
 
 ---
 
