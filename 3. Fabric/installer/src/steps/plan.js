@@ -1,0 +1,271 @@
+// @ts-check
+/**
+ * Checks the tenant, then asks every question up front so the rest of the
+ * install can run unattended.
+ */
+import { randomBytes } from 'node:crypto';
+import { MODULES } from '../catalog.js';
+import { allowsAction, armLocation, validateVaultName } from '../clients/azure.js';
+import { APP_ROLES, CONSENT_ROLES } from '../clients/graph.js';
+import { HttpError } from '../http.js';
+import { c } from '../ui.js';
+
+/** @typedef {import('../install.js').Ctx} Ctx */
+
+export const APP_NAME = 'ValueLens Data Collector';
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** @param {string} v */
+export const isGuid = (v) => GUID.test(v.trim());
+
+/** Fabric item names for a Lakehouse: letter first, then letters, digits, underscores. @param {string} v */
+export function validateLakehouseName(v) {
+  return /^[A-Za-z][A-Za-z0-9_]{0,122}$/.test(v) ? true : 'Start with a letter; use only letters, digits and underscores.';
+}
+
+/** @param {string} v */
+export function validateTime(v) {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(v);
+  return m ? true : 'Use 24-hour HH:MM, e.g. 02:00.';
+}
+
+/**
+ * @typedef {object} Preflight
+ * @property {any[]} capacities  Active capacities the user can use.
+ * @property {any[]} subscriptions  Enabled Azure subscriptions.
+ * @property {string[]} roles  Directory role names.
+ * @property {boolean} canConsent
+ * @property {boolean | undefined} canCreateApps  undefined when the policy can't be read.
+ */
+
+/**
+ * @param {Ctx} ctx
+ * @returns {Promise<Preflight>}
+ */
+export async function preflight(ctx) {
+  const { ui, api, user } = ctx;
+  ui.heading('Checking your tenant');
+  ui.ok(`Signed in as ${user.upn} (tenant ${user.tenantId})`);
+
+  const roles = await api.graph.myDirectoryRoles().catch(() => []);
+  const roleIds = new Set(roles.map((r) => r.roleTemplateId));
+  const canConsent = Object.keys(CONSENT_ROLES).some((id) => roleIds.has(id));
+  const appAdmin = Object.keys(APP_ROLES).some((id) => roleIds.has(id));
+  /** @type {boolean | undefined} */
+  let canCreateApps = canConsent || appAdmin ? true : undefined;
+  if (canCreateApps === undefined) canCreateApps = await api.graph.usersCanRegisterApps().catch(() => undefined);
+
+  if (canConsent) ui.ok(`You can grant admin consent (${roles.filter((r) => CONSENT_ROLES[/** @type {keyof typeof CONSENT_ROLES} */ (r.roleTemplateId)]).map((r) => r.displayName).join(', ')})`);
+  else ui.warn('You can\'t grant admin consent for Microsoft Graph. The installer will give you a link for a Global Administrator or Privileged Role Administrator to approve.');
+  if (!ctx.config.app.appId && canCreateApps === false) {
+    ui.warn('Users in this tenant can\'t register apps and you have no app admin role. Choose "use an existing app registration" or ask an admin.');
+  }
+
+  const capacities = (await api.fabric.listCapacities()).filter((cap) => cap.state === 'Active');
+  if (!capacities.length) {
+    ui.fail('No active Fabric capacity you can use.');
+    throw new Error('Start a Fabric trial, or ask a capacity admin to make you a contributor on an F2 or larger capacity, then run the installer again.');
+  }
+  ui.ok(`${capacities.length} active Fabric ${capacities.length === 1 ? 'capacity' : 'capacities'}`);
+
+  /** @type {any[]} */
+  let subscriptions = [];
+  try {
+    subscriptions = (await api.arm.listSubscriptions()).filter((s) => s.state === 'Enabled');
+  } catch (err) {
+    if (!(err instanceof HttpError)) throw err;
+  }
+  if (!subscriptions.length && !ctx.config.keyVault.uri) {
+    ui.fail('No Azure subscription you can use.');
+    throw new Error('The installer keeps the app secret in Azure Key Vault, which needs an Azure subscription in this tenant. Ask for Contributor on one, then run the installer again.');
+  }
+  if (subscriptions.length) ui.ok(`${subscriptions.length} Azure ${subscriptions.length === 1 ? 'subscription' : 'subscriptions'} for Key Vault`);
+
+  return { capacities, subscriptions, roles: roles.map((r) => r.displayName), canConsent, canCreateApps };
+}
+
+/**
+ * @param {Ctx} ctx
+ * @param {Preflight} pre
+ */
+export async function plan(ctx, pre) {
+  const { ui, config, api } = ctx;
+
+  ui.heading('What to collect');
+  const picked = await ui.checkbox(
+    'Copilot usage and licences are always included. Add:',
+    /** @type {const} */ (['orgData', 'agent365', 'productFeedback']).map((id) => ({
+      name: MODULES[id].label,
+      value: id,
+      description: MODULES[id].description,
+      checked: config.modules[id],
+    })),
+  );
+  config.modules = { orgData: picked.includes('orgData'), agent365: picked.includes('agent365'), productFeedback: picked.includes('productFeedback') };
+
+  if (config.firstRun?.status !== 'Completed') {
+    config.history.days = await ui.select(
+      'How much audit history should the first load pull?',
+      [
+        { name: '30 days (quickest)', value: 30 },
+        { name: '90 days', value: 90 },
+        { name: '180 days (the most the audit log keeps by default)', value: 180 },
+      ],
+      config.history.days,
+    );
+  }
+
+  ui.heading('Fabric');
+  const capacityChoices = pre.capacities.map((cap) => ({ name: `${cap.displayName} (${cap.sku}, ${cap.region})`, value: cap.id }));
+  config.fabric.capacityId = await ui.select(
+    'Which capacity should run it?',
+    capacityChoices,
+    pre.capacities.some((cap) => cap.id === config.fabric.capacityId) ? config.fabric.capacityId : pre.capacities[0].id,
+  );
+  const capacity = pre.capacities.find((cap) => cap.id === config.fabric.capacityId);
+
+  if (config.fabric.workspaceId) {
+    ui.ok(`Workspace: ${config.fabric.workspaceName ?? config.fabric.workspaceId}`);
+  } else {
+    const workspaces = (await api.fabric.listWorkspaces()).filter((w) => w.type === 'Workspace');
+    const choice = await ui.select(
+      'Workspace',
+      [{ name: 'Create a new workspace', value: '' }, ...workspaces.map((w) => ({ name: `Use "${w.displayName}"`, value: w.id }))],
+      '',
+    );
+    if (choice) {
+      config.fabric.workspaceId = choice;
+      config.fabric.workspaceName = workspaces.find((w) => w.id === choice)?.displayName;
+    } else {
+      const taken = new Set(workspaces.map((w) => w.displayName.toLowerCase()));
+      config.fabric.workspaceName = await ui.input('New workspace name', {
+        default: config.fabric.workspaceName ?? uniqueName('ValueLens', taken),
+        validate: (v) => (!v.trim() ? 'Required' : taken.has(v.trim().toLowerCase()) ? 'A workspace with that name exists.' : true),
+      });
+    }
+  }
+  if (!config.fabric.lakehouseId) {
+    config.fabric.lakehouseName = await ui.input('Lakehouse name', { default: config.fabric.lakehouseName ?? 'ValueLens', validate: validateLakehouseName });
+  }
+
+  ui.heading('App registration');
+  if (config.app.appId) {
+    ui.ok(`Using ${config.app.displayName ?? 'app'} (${config.app.appId})`);
+  } else {
+    const mode = await ui.select(
+      'The notebooks sign in to Microsoft Graph as an app.',
+      [
+        { name: `Create "${APP_NAME}" (recommended)`, value: 'new' },
+        { name: 'Use an app registration I already have', value: 'existing' },
+      ],
+      'new',
+    );
+    if (mode === 'existing') {
+      config.app.appId = (await ui.input('Application (client) ID', { validate: (v) => (isGuid(v) ? true : 'Paste the GUID from the app\'s Overview page.') })).trim();
+      config.app.existing = true;
+      ctx.pendingSecret = await ui.secret('Client secret value (not the secret ID). It goes straight to Key Vault.');
+    } else {
+      config.app.existing = false;
+    }
+  }
+
+  ui.heading('Key Vault for the app secret');
+  if (config.keyVault.uri) {
+    ui.ok(`Using ${config.keyVault.name} (${config.keyVault.uri})`);
+  } else {
+    await planKeyVault(ctx, pre, capacity ? armLocation(capacity.region) : 'westeurope');
+  }
+
+  ui.heading('Schedule');
+  const freq = await ui.select(
+    'How often should the pipeline run?',
+    [
+      { name: 'Daily (recommended)', value: 'daily' },
+      { name: 'Weekly', value: 'weekly' },
+    ],
+    config.schedule.frequency,
+  );
+  config.schedule.frequency = /** @type {'daily' | 'weekly'} */ (freq);
+  if (freq === 'weekly') {
+    config.schedule.weekday = await ui.select(
+      'Which day?',
+      ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((d) => ({ name: d, value: d })),
+      config.schedule.weekday,
+    );
+  }
+  config.schedule.time = await ui.input(`Time (${config.schedule.timeZone}, 24-hour)`, { default: config.schedule.time, validate: validateTime });
+
+  ctx.runFirstLoad = config.firstRun?.status === 'Completed' ? false : await ui.confirm('Run the first load as soon as setup finishes?', true);
+}
+
+/**
+ * @param {Ctx} ctx
+ * @param {Preflight} pre
+ * @param {string} location
+ */
+async function planKeyVault(ctx, pre, location) {
+  const { ui, config, api } = ctx;
+  const kv = config.keyVault;
+  kv.subscriptionId = await ui.select(
+    'Azure subscription',
+    pre.subscriptions.map((s) => ({ name: `${s.displayName} (${s.subscriptionId})`, value: s.subscriptionId })),
+    pre.subscriptions.some((s) => s.subscriptionId === kv.subscriptionId) ? kv.subscriptionId : pre.subscriptions[0].subscriptionId,
+  );
+  const subscriptionId = /** @type {string} */ (kv.subscriptionId);
+
+  const vaults = await api.arm.listVaults(subscriptionId).catch(() => []);
+  const choice = await ui.select(
+    'Vault',
+    [{ name: 'Create a new Key Vault', value: '' }, ...vaults.map((v) => ({ name: `Use "${v.name}" (${v.location})`, value: v.id }))],
+    '',
+  );
+  if (choice) {
+    const v = vaults.find((x) => x.id === choice);
+    kv.existing = true;
+    kv.id = v.id;
+    kv.name = v.name;
+    kv.resourceGroup = v.id.split('/')[4];
+    kv.location = v.location;
+  } else {
+    kv.existing = false;
+    kv.resourceGroup = await ui.input('Resource group (created if missing)', { default: kv.resourceGroup ?? 'rg-valuelens' });
+    kv.location = await ui.input('Azure region', { default: kv.location ?? location });
+    kv.name = await ui.input('Vault name (globally unique)', {
+      default: kv.name ?? `valuelens-${randomBytes(3).toString('hex')}`,
+      validate: validateVaultName,
+    });
+    const available = await api.arm.checkVaultName(subscriptionId, kv.name);
+    if (!available.nameAvailable) throw new Error(`Key Vault name "${kv.name}" is taken: ${available.message ?? 'choose another'}.`);
+    const perms = await api.arm.permissions(`/subscriptions/${subscriptionId}`).catch(() => []);
+    kv.rbac = allowsAction(perms, 'Microsoft.Authorization/roleAssignments/write');
+    if (!kv.rbac) ui.note('You can\'t assign Azure roles here, so the vault will use access policies instead of Azure RBAC.');
+  }
+  kv.secretName = await ui.input('Secret name', { default: kv.secretName, validate: (v) => (/^[0-9a-zA-Z-]{1,127}$/.test(v) ? true : 'Letters, digits and hyphens only.') });
+}
+
+/**
+ * @param {string} base
+ * @param {Set<string>} taken  Lower-case names.
+ */
+export function uniqueName(base, taken) {
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let i = 2; ; i++) if (!taken.has(`${base} ${i}`.toLowerCase())) return `${base} ${i}`;
+}
+
+/**
+ * Prints the plan and asks to go ahead.
+ * @param {Ctx} ctx
+ */
+export async function confirmPlan(ctx) {
+  const { ui, config } = ctx;
+  const mods = ['Copilot usage and licences', ...(['orgData', 'agent365', 'productFeedback'].filter((m) => config.modules[/** @type {'orgData'} */ (m)]).map((m) => MODULES[/** @type {'orgData'} */ (m)].label))];
+  ui.heading('Ready to set up');
+  ui.info(`Data:        ${mods.join(', ')}`);
+  ui.info(`Workspace:   ${config.fabric.workspaceName ?? config.fabric.workspaceId} ${config.fabric.workspaceId ? '' : c.dim('(new)')}`);
+  ui.info(`Lakehouse:   ${config.fabric.lakehouseName}`);
+  ui.info(`App:         ${config.app.appId ? config.app.appId : `${APP_NAME} ${c.dim('(new)')}`}`);
+  ui.info(`Key Vault:   ${config.keyVault.name} ${config.keyVault.existing || config.keyVault.uri ? '' : c.dim(`(new, ${config.keyVault.rbac ? 'Azure RBAC' : 'access policies'})`)}`);
+  ui.info(`Schedule:    ${config.schedule.frequency === 'weekly' ? `${config.schedule.weekday}s` : 'Daily'} at ${config.schedule.time} ${config.schedule.timeZone}`);
+  if (ctx.runFirstLoad) ui.info(`First load:  ${config.history.days} days of history, straight after setup`);
+  return ui.confirm('Go ahead?', true);
+}
