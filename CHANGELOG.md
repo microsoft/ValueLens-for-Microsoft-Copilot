@@ -16,6 +16,18 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-03 — Consumption Central: Foundry token counts
+
+`[Foundry Tokens (M)]` treated every Azure token meter as billed per 1M tokens. Older meters are
+billed per 1K, so 212 tokens showed as 0.2 million. The measure now reads the unit from the meter
+name: meters with "1M Token" are per million, other token meters are per thousand, and meters that
+aren't tokens (pages, images, hours) count as zero. `[Foundry Cost per 1M Tokens]` is corrected by
+the same change. Fixed in all four [Consumption Central](3.%20Fabric/Add%20Credit%20Consumption/)
+templates. The sample data only uses per-1M meters, so its figures don't change.
+
+The [Fabric App](5.%20Fabric%20App/) now shows token counts at their own scale (212, 45K, 1.3M)
+instead of in millions, where small counts rounded to 0.0.
+
 ## 2026-10-02 — Fabric installer: credit consumption
 
 The [installer](3.%20Fabric/installer/#credit-consumption) has a new optional module, *Credit
