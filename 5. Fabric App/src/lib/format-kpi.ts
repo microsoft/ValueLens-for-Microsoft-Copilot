@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 /** How a figure should be rendered when it is present. */
-export type KpiFormat = "whole" | "percent" | "rate" | "hours" | "currency" | "money" | "price";
+export type KpiFormat = "whole" | "percent" | "rate" | "hours" | "currency" | "money" | "price" | "multiple";
 
 interface FormatKpiOptions {
     /** Symbol or short unit printed directly before a present value. */
@@ -23,6 +23,8 @@ const formatters: Record<KpiFormat, Intl.NumberFormat> = {
     money: new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     // Unit prices such as cost per credit, which live in the fourth decimal.
     price: new Intl.NumberFormat(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 }),
+    // How many times one figure covers another, such as value over cost: 5.4×.
+    multiple: new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
 };
 
 /**
@@ -32,5 +34,5 @@ const formatters: Record<KpiFormat, Intl.NumberFormat> = {
  */
 export function formatKpi(value: number | undefined, format: KpiFormat, options: FormatKpiOptions = {}): string {
     if (value === undefined) return "—";
-    return `${options.prefix ?? ""}${formatters[format].format(value)}`;
+    return `${options.prefix ?? ""}${formatters[format].format(value)}${format === "multiple" ? "×" : ""}`;
 }

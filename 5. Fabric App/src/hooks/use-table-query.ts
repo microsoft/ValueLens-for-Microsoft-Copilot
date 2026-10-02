@@ -8,6 +8,7 @@
 import { useMemo } from "react";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { toSummaryRow, type SummaryRow } from "@/lib/summary-row";
+import type { FilterKey } from "@/lib/filters";
 import { toDataTable, type ColumnMetadataMap } from "@/lib/to-data-table";
 import { useFilteredQuery } from "./use-filtered-query";
 
@@ -34,10 +35,15 @@ export interface SummaryResult {
 
 /**
  * A query with the destination's filters and the caller's own `extra` DAX
- * filters applied, as a DataTable ready for a chart or grid.
+ * filters applied, as a DataTable ready for a chart or grid. Filters in
+ * `ignore` are left off, as for a model that has no column they could filter.
  */
-export function useTableQuery(source: TableSource, extra: readonly string[] = []): TableResult {
-    const result = useFilteredQuery({ connection: source.connection, query: source.query }, { extra });
+export function useTableQuery(
+    source: TableSource,
+    extra: readonly string[] = [],
+    ignore?: readonly FilterKey[],
+): TableResult {
+    const result = useFilteredQuery({ connection: source.connection, query: source.query }, { extra, ignore });
     const table = useMemo(
         () => (result.data?.status === "success" ? toDataTable(result.data.table, source.columnMetadata) : undefined),
         [result.data, source.columnMetadata],
@@ -50,8 +56,9 @@ export function useTableQuery(source: TableSource, extra: readonly string[] = []
 export function useSummaryQuery(
     source: { connection: string; query: string },
     extra: readonly string[] = [],
+    ignore?: readonly FilterKey[],
 ): SummaryResult {
-    const result = useFilteredQuery({ connection: source.connection, query: source.query }, { extra });
+    const result = useFilteredQuery({ connection: source.connection, query: source.query }, { extra, ignore });
     const row = useMemo(
         () => (result.data?.status === "success" ? toSummaryRow(result.data.table) : undefined),
         [result.data],

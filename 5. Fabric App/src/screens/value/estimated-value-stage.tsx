@@ -15,6 +15,7 @@ import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import { SCENARIOS, useValueAssumptions } from "@/hooks/value-assumptions.context";
 import { gridHeight } from "@/lib/chart-height";
 import { treatAs } from "@/lib/dax-filters";
 import { formatKpi } from "@/lib/format-kpi";
@@ -31,13 +32,7 @@ import {
 } from "@/queries/value";
 import { TaskValueBreakdown } from "./task-value-breakdown";
 
-type Scenario = "Conservative" | "Typical" | "Optimistic";
-
-const scenarios: { id: Scenario; label: string }[] = [
-    { id: "Conservative", label: "Conservative" },
-    { id: "Typical", label: "Typical" },
-    { id: "Optimistic", label: "Optimistic" },
-];
+const scenarios = SCENARIOS.map((id) => ({ id, label: id }));
 
 const clampRate = (value: number): number => Math.min(1000, Math.max(0, value));
 
@@ -65,9 +60,8 @@ function formatWholeCell(value: unknown): string {
  * by task group, agent and organization so the assumptions stay visible.
  */
 export function EstimatedValueStage() {
-    const [rate, setRate] = useState(50);
-    const [draftRate, setDraftRate] = useState("50");
-    const [scenario, setScenario] = useState<Scenario>("Typical");
+    const { rate, setRate, scenario, setScenario } = useValueAssumptions();
+    const [draftRate, setDraftRate] = useState(() => String(rate));
     const { theme } = useThemeContext();
     const org = useOrgAttribute();
 

@@ -29,4 +29,11 @@ describe("formatKpi", () => {
         expect(formatKpi(6085.818, "money", { prefix: "$" })).toBe("$6,085.82");
         expect(formatKpi(0.008566567, "price", { prefix: "$" })).toBe("$0.0086");
     });
+
+    it("shows how many times one figure covers another, to one decimal", () => {
+        expect(formatKpi(5.4523, "multiple")).toBe("5.5×");
+        expect(formatKpi(0.2, "multiple")).toBe("0.2×");
+        expect(formatKpi(31, "multiple")).toBe("31.0×");
+        expect(formatKpi(undefined, "multiple")).toBe("—");
+    });
 });
