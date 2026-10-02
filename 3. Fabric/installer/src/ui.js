@@ -64,7 +64,12 @@ export function createUi(opts = {}) {
      * @returns {Promise<T>}
      */
     async select(message, choices, defaultValue) {
-      if (yes) return defaultValue !== undefined ? defaultValue : choices.length === 1 ? choices[0].value : needsAnswer(message);
+      const open = choices.filter((ch) => !ch.disabled);
+      if (open.length === 1) {
+        line(`${c.green('✔')} ${message} ${c.cyan(open[0].name)}`);
+        return open[0].value;
+      }
+      if (yes) return defaultValue !== undefined ? defaultValue : needsAnswer(message);
       return select({ message, choices, default: defaultValue });
     },
 
