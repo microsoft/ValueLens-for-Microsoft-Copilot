@@ -24,7 +24,7 @@
       "type": "quantitative",
       "stack": "zero",
       "title": "Cost ($)",
-      "axis": { "labelExpr": "format(datum.value, ',.0f')" }
+      "axis": { "format": ",~f" }
     },
     "color": {
       "field": "Billing",

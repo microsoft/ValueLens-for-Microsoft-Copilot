@@ -16,7 +16,7 @@
       "field": "Cost",
       "type": "quantitative",
       "title": "Estimated cost ($)",
-      "axis": { "labelExpr": "format(datum.value, ',.2~f')" }
+      "axis": { "format": ",~f" }
     },
     "tooltip": [
       { "field": "Item", "type": "nominal", "title": "Item" },
