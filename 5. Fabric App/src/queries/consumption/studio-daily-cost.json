@@ -25,7 +25,7 @@
       "type": "quantitative",
       "stack": "zero",
       "title": "Cost ($)",
-      "axis": { "format": ",~f" }
+      "axis": { "format": ",~f", "formatType": "number" }
     },
     "color": {
       "field": "Billing",
