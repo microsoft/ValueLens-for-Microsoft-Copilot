@@ -156,6 +156,10 @@ export async function main(argv) {
       process.stderr.write('\nCancelled.\n');
       return 130;
     }
+    if (/device_code_expired|expired_token|code_expired/i.test(String(e?.message ?? e?.errorCode ?? ''))) {
+      process.stderr.write(`\n${c.red('✗')} The sign-in code expired before it was used. Run the installer again and enter the new code within 15 minutes.\n`);
+      return 1;
+    }
     process.stderr.write(`\n${c.red('✗')} ${e?.message ?? String(err)}\n`);
     if (verbose && err instanceof HttpError && err.body) process.stderr.write(`${c.dim(JSON.stringify(err.body, null, 2))}\n`);
     else if (verbose && e?.stack) process.stderr.write(`${c.dim(e.stack)}\n`);
