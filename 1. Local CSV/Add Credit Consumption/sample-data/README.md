@@ -59,6 +59,9 @@ The data is shaped to exercise the parts of the report that matter, rather than 
 - **Every Group By attribute splits sensibly** — 16 departments, 14 job families, 6 countries,
   20 cities, 35 managers. None of them dominated by a single value, so the breakdowns are worth
   looking at rather than one bar and a sliver.
+- **Seven of the eight Copilot Studio agents share their names with the ValueLens sample**, so the
+  ValueLens App's *Cost vs value* section can set each agent's credits against the value ValueLens
+  estimates for it. *Onboarding Buddy* has no match on purpose: an agent with a cost and no measured value.
 
 ## Using it
 
