@@ -16,6 +16,17 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-02 — Fabric installer: credit consumption
+
+The [installer](3.%20Fabric/installer/#credit-consumption) has a new optional module, *Credit
+consumption*, that sets up [Consumption Central](3.%20Fabric/Add%20Credit%20Consumption/) in the
+same Lakehouse. It deploys the Azure AI, Copilot Studio and Cowork notebooks into the pipeline. It
+gives the app registration read-only Azure roles on the subscription you choose, and makes the
+upload folders. It also deploys `ValueLens Consumption Model` and adds it to the app, which turns
+on the Consumption pages. Copilot Studio and Cowork have no API, so the installer prints the
+steps to land their exports. `Ingest_Viva_Consumption` now skips quietly when there's no CSV, in
+the installer's copy only.
+
 ## 2026-10-02 — Fabric: installer
 
 New [`3. Fabric/installer`](3.%20Fabric/installer/): run `npx valuelens-install` to set up the
