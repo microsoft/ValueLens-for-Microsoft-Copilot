@@ -16,6 +16,29 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-03 — Fabric: licences that don't match people, and agent accounts
+
+A walk-through of an older AI in One 2.0 install found three problems that our sample data
+never showed.
+
+**Hidden user names.** When the Microsoft 365 setting "Display concealed user, group, and site
+names in all reports" is on, the licensed-users table holds hashed names that can't match the
+audit log. The app then said 0 licensed and everyone unlicensed, with no explanation. The
+`ValueLens_Data_Check` notebook now spots the hashed names and prints the admin center fix, and
+the installer's data check repeats it. It also reports how many people using Copilot have a licence.
+
+**Readiness without a matching roster.** "Who to license next" ranked every active user as if
+nobody had a licence. When the roster doesn't match, Readiness now says so at the top and on the
+list, and the dormancy chart explains why it is empty.
+
+**Agent accounts counted as people.** Security Copilot agents sign in as
+`SecurityCopilotAgentUser-<id>`; in that install they made 62% of audit rows and topped the
+licence list. `Copilot_Audit_Log_Processor` now drops them by default
+(`EXCLUDE_AGENT_IDENTITIES`, `AGENT_IDENTITY_PATTERNS`). Only the Fabric path has this so far;
+Power Automate + Dataverse, SharePoint and Local CSV will follow.
+
+---
+
 ## 2026-10-03 — Fabric App: readable consumption charts over time
 
 The Copilot Studio "Consumption over time" and "Cost over time" charts were unreadable.
