@@ -5,9 +5,11 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-export * from "./license-demand-summary";
-export * from "./license-estate-summary";
-export * from "./license-priority-by-org";
-export * from "./license-candidates";
-export * from "./license-candidates-m365";
-export * from "./license-dormancy";
+export * from "./m365-status";
+export * from "./m365-summary";
+export * from "./m365-workload-trend";
+export * from "./m365-workload-reach";
+export * from "./m365-apps";
+export * from "./m365-copilot-summary";
+export * from "./m365-copilot-index";
+export * from "./m365-by-org";

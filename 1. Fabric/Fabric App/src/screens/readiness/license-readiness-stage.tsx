@@ -17,6 +17,7 @@ import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import { useM365Activity } from "@/hooks/use-m365-activity";
 import { rowChartHeight } from "@/lib/chart-height";
 import type { FilterKey } from "@/lib/filters";
 import { formatKpi } from "@/lib/format-kpi";
@@ -28,6 +29,7 @@ import { SMALL } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 import {
     licenseCandidates,
+    licenseCandidatesM365,
     licenseDemandSummary,
     licenseDormancy,
     licenseEstateSummary,
@@ -36,8 +38,8 @@ import {
 
 const LICENSE_ESTATE_IGNORES: FilterKey[] = ["dateRange", "organizations"];
 
-function candidateColumns(orgLabel: string, table: DataTable | undefined): GridColumnDef[] {
-    return [
+function candidateColumns(orgLabel: string, table: DataTable | undefined, withBreadth: boolean): GridColumnDef[] {
+    const columns: GridColumnDef[] = [
         { id: "Rank", header: "Rank", width: 88, numericStyling: true },
         { id: "User", header: "User", minWidth: 240 },
         { id: "Organization", header: orgLabel, minWidth: 160 },
@@ -53,6 +55,10 @@ function candidateColumns(orgLabel: string, table: DataTable | undefined): GridC
         { id: "Sessions Per Week", header: "Sessions per week", numericStyling: true },
         { id: "Active Days Per Week", header: "Active days per week", numericStyling: true },
     ];
+    if (withBreadth) {
+        columns.push({ id: "Workloads Per Day", header: "Microsoft 365 workloads per day", numericStyling: true });
+    }
+    return columns;
 }
 
 /**
@@ -68,8 +74,17 @@ export function LicenseReadinessStage() {
     const estate = useFilteredQuery(licenseEstateSummary(), { ignore: LICENSE_ESTATE_IGNORES });
     const byOrg = useMemo(() => withOrgAttribute(licensePriorityByOrg(), org), [org]);
     const byOrgResult = useFilteredQuery({ connection: byOrg.connection, query: byOrg.query });
-    const candidates = useMemo(() => withOrgAttribute(licenseCandidates(), org), [org]);
-    const candidatesResult = useFilteredQuery({ connection: candidates.connection, query: candidates.query });
+    // With Microsoft 365 activity matched to people, the score also weighs how widely they work across it.
+    const m365 = useM365Activity();
+    const withBreadth = m365.state === "ready" && !m365.concealed;
+    const candidates = useMemo(
+        () => withOrgAttribute(withBreadth ? licenseCandidatesM365() : licenseCandidates(), org),
+        [withBreadth, org],
+    );
+    const candidatesResult = useFilteredQuery({
+        connection: candidates.connection,
+        query: m365.state === "loading" ? "" : candidates.query,
+    });
     const dormancy = licenseDormancy();
     const dormancyResult = useFilteredQuery(
         { connection: dormancy.connection, query: dormancy.query },
@@ -98,7 +113,10 @@ export function LicenseReadinessStage() {
                 : undefined,
         [candidatesResult.data, candidates.columnMetadata],
     );
-    const columns = useMemo(() => candidateColumns(org.label, candidatesTable), [org.label, candidatesTable]);
+    const columns = useMemo(
+        () => candidateColumns(org.label, candidatesTable, withBreadth),
+        [org.label, candidatesTable, withBreadth],
+    );
     const dormancyTable = useMemo(
         () =>
             dormancyResult.data?.status === "success"
@@ -248,8 +266,10 @@ export function LicenseReadinessStage() {
                         header={{
                             title: "Who to license next",
                             subtitle: `${formatKpi(candidatesTable.rows.length, "whole")} unlicensed users, ranked by priority score${
-                                unreconciled ? ". Some may already have a license: see the note above." : ""
-                            }`,
+                                withBreadth
+                                    ? ": how much they use Copilot, and how many Microsoft 365 workloads they use a day"
+                                    : ""
+                            }${unreconciled ? ". Some may already have a license: see the note above." : ""}`,
                         }}
                     />
                 )}

@@ -19,6 +19,9 @@ const AdoptionScreen = lazy(() =>
 const LeaderboardsScreen = lazy(() =>
     import("./screens/leaderboards").then((module) => ({ default: module.LeaderboardsScreen })),
 );
+const WorkPatternsScreen = lazy(() =>
+    import("./screens/work-patterns").then((module) => ({ default: module.WorkPatternsScreen })),
+);
 const ReadinessScreen = lazy(() =>
     import("./screens/readiness").then((module) => ({ default: module.ReadinessScreen })),
 );
@@ -53,6 +56,7 @@ function App() {
                     <Suspense fallback={<QueryLoading />}>
                         {destination === "adoption" && <AdoptionScreen />}
                         {destination === "leaderboards" && <LeaderboardsScreen />}
+                        {destination === "work-patterns" && <WorkPatternsScreen />}
                         {destination === "readiness" && <ReadinessScreen />}
                         {destination === "consumption" && <ConsumptionScreen />}
                         {destination === "value" && <ValueScreen />}

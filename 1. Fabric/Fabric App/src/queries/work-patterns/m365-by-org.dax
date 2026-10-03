@@ -1,0 +1,38 @@
+EVALUATE
+VAR _copilot =
+    FILTER(
+        VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+        'Chat + Agent Interactions (Audit Logs)'[Audit_UserId] <> ""
+    )
+VAR _weeks = DIVIDE(DISTINCTCOUNT('M365 Activity'[ActivityDate]), 7)
+VAR _orgs =
+    ADDCOLUMNS(
+        FILTER(
+            VALUES('Chat + Agent Org Data'[Organization]),
+            NOT ISBLANK('Chat + Agent Org Data'[Organization])
+        ),
+        "@People",
+            CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0),
+        "@Copilot",
+            COUNTROWS(
+                INTERSECT(
+                    CALCULATETABLE(VALUES('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0),
+                    _copilot
+                )
+            ),
+        "@PersonDays", CALCULATE(COUNTROWS('M365 Activity'), 'M365 Activity'[WorkloadsActive] > 0),
+        "@Meetings", CALCULATE(SUM('M365 Activity'[TeamsMeetings])),
+        "@Emails", CALCULATE(SUM('M365 Activity'[EmailSent]))
+    )
+RETURN
+SELECTCOLUMNS(
+    FILTER(_orgs, [@People] > 0),
+    "Organization", 'Chat + Agent Org Data'[Organization],
+    "People Active", [@People],
+    "Copilot Users", COALESCE([@Copilot], 0),
+    "Copilot Reach", DIVIDE(COALESCE([@Copilot], 0), [@People]),
+    "Active Days Per Week", DIVIDE([@PersonDays], [@People] * _weeks),
+    "Meetings Per Week", DIVIDE([@Meetings], [@People] * _weeks),
+    "Emails Sent Per Week", DIVIDE([@Emails], [@People] * _weeks)
+)
+ORDER BY [People Active] DESC, [Organization]

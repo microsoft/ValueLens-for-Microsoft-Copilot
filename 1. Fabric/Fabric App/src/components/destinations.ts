@@ -9,6 +9,7 @@ import type { LucideIcon } from "lucide-react";
 import {
     BookOpen,
     BotMessageSquare,
+    Briefcase,
     Coins,
     Gauge,
     KeyRound,
@@ -60,6 +61,17 @@ export const destinations = [
         stages: [
             { id: "leaderboard", label: "Leaderboard", ready: true },
             { id: "agent-registry", label: "Agent registry", ready: true },
+        ],
+    },
+    {
+        id: "work-patterns",
+        label: "Work patterns",
+        blurb: "How people work across Microsoft 365, and where Copilot fits",
+        icon: Briefcase as LucideIcon,
+        filters: ["dateRange", "organizations"] as FilterKey[],
+        stages: [
+            { id: "m365-activity", label: "Microsoft 365 activity", ready: true },
+            { id: "m365-copilot", label: "Copilot in the flow of work", ready: true },
         ],
     },
     {
