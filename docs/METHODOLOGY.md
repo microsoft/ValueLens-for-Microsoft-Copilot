@@ -659,9 +659,18 @@ active × days loaded ÷ 7).
 | Meetings, call hours, emails sent, chat messages per week | Teams meetings, Teams audio time, emails sent, and chat plus private chat messages, each ÷ person-weeks |
 | Workload reach | People who used the workload ÷ people active. The trend shows it for each full week |
 | App reach | People who used the app on any platform ÷ people active |
+| Apps used | How many of the six apps (Outlook, Teams, Word, Excel, PowerPoint, OneNote) each person used on any platform in the period, as a share of people active. *No app use reported* means active in Teams, email, SharePoint, OneDrive or Viva Engage with no apps-report entry; it isn't a depth of zero |
+| Platform reach | People who used any of the apps on Windows, Mac, the web or mobile ÷ people active. One person can count on several platforms |
 | Copilot reach | People active in Microsoft 365 who also appear in the Copilot audit log in the period ÷ people active |
 | Licensed, not using | People active in Microsoft 365 with a Copilot licence and no Copilot activity in the period ÷ those licensed |
 | Copilot users vs others | Each measure per person per week for people active in Microsoft 365 who used Copilot, ÷ the same for those who didn't. 1.2× means 20% more. It compares the two groups, and doesn't show that Copilot caused the difference |
+
+**Coverage.** The page says which dates the figures cover and how many days in that span have
+nothing loaded. Days with no rows are left out of every per-week figure rather than counted as zero.
+
+**Smaller groups.** In the comparison by organisation, organisations with fewer than five people
+active share one *Smaller groups* row, so no small team can be picked out. Its figures are worked
+out over everyone in those organisations together.
 
 People are matched on their lowercase UPN. If the Microsoft 365 admin center conceals user names in
 reports, the activity arrives under random IDs: the page's totals still hold, but the organisation

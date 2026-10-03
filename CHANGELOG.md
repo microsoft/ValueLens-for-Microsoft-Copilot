@@ -27,8 +27,11 @@ The Power BI templates don't change. `update` adds the module to existing instal
 installer's data check reports the activity table's rows and dates after each `run`.
 
 The Analytics Hub app has a new **Work patterns** page: people active, active days, meetings and
-email per week, how far each workload and app reaches, and how Copilot users' working weeks compare
-with everyone else's, overall and by organisation. With the activity loaded, Readiness's *Who to
+email per week, how far each workload and app reaches, how many of the apps each person uses and on
+which devices, and how Copilot users' working weeks compare with everyone else's, overall and by
+organisation. The page says which days its figures cover, explains how each is worked out, and
+puts organisations with fewer than five active people into one *Smaller groups* row. With the
+activity loaded, Readiness's *Who to
 license next* adds breadth, the Microsoft 365 workloads someone uses a day, to its priority score:
 50 / 30 / 20 for tasks, days and breadth, instead of 60 / 40. People with no Microsoft 365 activity
 keep the 60 / 40 score.
