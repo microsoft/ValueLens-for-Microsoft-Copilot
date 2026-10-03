@@ -16,6 +16,24 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-03 — Fabric installer: Agent Evaluator
+
+The installer can now set up the [Agent Evaluator](1.%20Fabric/Add%20Agent%20Evaluator/) from
+[AgentEvaluator-for-Copilot-Studio](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio),
+so the app's Agent Evaluation pages show how Copilot Studio agents perform. It's off by default.
+
+Choose it and the installer lists the Power Platform environments you're a member of. In each one
+you pick, it adds the app registration as an application user with the Bot Transcript Viewer role,
+or prints the admin center steps if you aren't a System Administrator there. It deploys the
+transcript parser notebook with those environments, adds it to the pipeline in merge mode so
+history builds past Dataverse's 30 days, and deploys the `ValueLens Agent Evaluator Model` on the
+ValueLens model's connection. The app is rebuilt with the model as its `ae` source.
+
+The parser and template are copied from upstream commit `e37b1ac`. The notebook gains one cell that
+looks up each user's UPN in Entra, so agent sessions join to org data.
+
+---
+
 ## 2026-10-03 — Fabric: licences that don't match people, and agent accounts
 
 A walk-through of an older AI in One 2.0 install found three problems that our sample data

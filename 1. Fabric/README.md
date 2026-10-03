@@ -46,6 +46,7 @@ just want to see the thing working first, start at [4. Local CSV](../4.%20Local%
 | `archive/extended/` | Archived Fabric + Copilot Studio reference, not a recommended active deployment; core notebook mirrors remain synchronized. |
 | `archive/flows/` | Archived cost-consumption landing flows and guides, not active setup. |
 | [`Add Credit Consumption/`](Add%20Credit%20Consumption/) | *Optional.* The separate Consumption Central report for Copilot credit consumption and cost. |
+| [`Add Agent Evaluator/`](Add%20Agent%20Evaluator/) | *Optional.* The separate Agent Evaluator report for Copilot Studio agent conversations, and the notebook that reads them from Dataverse. |
 
 ---
 

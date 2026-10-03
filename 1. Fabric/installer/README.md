@@ -6,7 +6,8 @@ secret in Azure Key Vault, admin consent, a workspace and Lakehouse, the noteboo
 and its schedule. It can also deploy the ValueLens semantic model and the
 [ValueLens app](../Fabric%20App/) on top of it, so there is nothing to publish from
 Power BI Desktop. With [credit consumption](#credit-consumption), it adds the Consumption Central
-notebooks and model too. It then runs the first load and checks the data that arrives.
+notebooks and model too. With the [Agent Evaluator](#agent-evaluator), it reads your Copilot Studio
+agent conversations as well. It then runs the first load and checks the data that arrives.
 
 It keeps its answers and the IDs it creates in `valuelens-install.json`. Run it again with that
 file to repair, change or update the set-up. The file holds no secrets.
@@ -18,8 +19,8 @@ npx valuelens-install
 ```
 
 **Jump to:** [Before you start](#before-you-start) · [What it creates](#what-it-creates) ·
-[Credit consumption](#credit-consumption) · [Commands](#commands) · [Good to know](#good-to-know) ·
-[Troubleshooting](#troubleshooting)
+[Credit consumption](#credit-consumption) · [Agent Evaluator](#agent-evaluator) ·
+[Commands](#commands) · [Good to know](#good-to-know) · [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -34,6 +35,7 @@ npx valuelens-install
 | A **Global Administrator** or **Privileged Role Administrator** | Only to grant admin consent for the Graph permissions. If that isn't you, the installer gives you a link to send them. |
 | For the semantic model and app, these **Fabric tenant settings** | *Service principals can call Fabric public APIs*, because the model reads the Lakehouse as the app registration. For the app, also *Semantic Model Execute Queries REST API* and *Fabric App items*. If you're a Fabric administrator, the installer checks them and warns you. |
 | For Azure AI costs, **Owner** or **User Access Administrator** on the subscription | Only if you add credit consumption. The installer gives the app registration three read-only roles there. See [Credit consumption](#credit-consumption). |
+| For agent transcripts, **System Administrator** in each Power Platform environment | Only if you add the Agent Evaluator. The installer adds the app registration to each environment you pick. If you aren't an admin there, it prints the steps for one. See [Agent Evaluator](#agent-evaluator). |
 
 The permissions it requests are the ones in [`/docs/PERMISSIONS.md`](../../docs/PERMISSIONS.md):
 `AuditLogsQuery.Read.All`, `Reports.Read.All` and `User.Read.All`, plus `CopilotPackages.Read.All`
@@ -51,11 +53,14 @@ npx valuelens-install --tenant contoso.onmicrosoft.com
 It checks your tenant first (roles, capacities, subscriptions), then asks:
 
 1. **What to collect.** Copilot usage and licences are always on. Org data from Entra is on by
-   default. The Agent 365 registry, product feedback and credit consumption are off.
+   default. The Agent 365 registry, product feedback, credit consumption and the Agent Evaluator
+   are off.
 2. **Power BI**: the semantic model and the ValueLens app (the default), the model only, or
    neither. The model needs org data, so choosing it switches org data on.
    - With credit consumption, **which subscription's Azure AI costs** to read, or leave Azure AI
      out. It defaults to the first subscription with Azure OpenAI or AI Foundry resources.
+   - With the Agent Evaluator, **which Power Platform environments** to read transcripts from.
+     It lists the environments you're a member of. If it can't, paste their URLs.
 3. **How much audit history** the first load pulls: 30, 90 or 180 days.
 4. **Capacity, workspace and Lakehouse name.**
 5. **App registration**: create "ValueLens Data Collector", or use one you have. If you use your
@@ -89,6 +94,7 @@ Lakehouse name for `ValueLens - Fabric.pbit`, or the workspace and Lakehouse IDs
 | Connection | `ValueLens SQL <workspace>`, a cloud connection to the Lakehouse's SQL endpoint that signs in as the app registration, with a secret of its own. The app registration gets Viewer on the workspace so it can read the Lakehouse. |
 | ValueLens app | A Fabric App item, "AI in One 2.0", built from [`1. Fabric/Fabric App`](../Fabric%20App/) against your semantic model. Rayfin, the app's build tool, may open a browser for you to sign in. |
 | Credit consumption | Only if you choose it. Three more notebooks, the `ValueLens Consumption Model`, two upload folders, and read access to Azure costs. See [Credit consumption](#credit-consumption). |
+| Agent Evaluator | Only if you choose it. The app registration as a transcript reader in each environment you pick, one more notebook and the `ValueLens Agent Evaluator Model`. See [Agent Evaluator](#agent-evaluator). |
 | First load | A pipeline run with your chosen history, then the data check. The run reports row counts and the date range of the audit data. Without a first load, the model is refreshed straight away. |
 
 The data check copy is the only notebook the installer adds to. It writes a short summary to
@@ -124,6 +130,36 @@ The notebooks skip a source with nothing in its folder, so the pipeline still su
 upload anything. GitHub Copilot and commercial terms aren't set up by the installer; see the
 [Consumption Central README](../Add%20Credit%20Consumption/) for those.
 
+## Agent Evaluator
+
+An optional module. It sets up the [Agent Evaluator](../Add%20Agent%20Evaluator/) in the same
+Lakehouse, so the app's Agent Evaluation pages show how your Copilot Studio agents perform:
+sessions, outcomes, topics, knowledge, errors and feedback. Copilot Studio keeps conversation
+transcripts in Dataverse for about 30 days; each run adds to the Lakehouse, so history builds up
+past that.
+
+| Item | Details |
+|---|---|
+| Environments | You pick them from the Power Platform environments you're a member of. Only the ones you pick are read. |
+| Access | In each environment, the app registration becomes an application user with the **Bot Transcript Viewer** role, in the root business unit. This needs System Administrator there. |
+| Notebook | `AgentEval_Transcript_Parser`, from [`Add Agent Evaluator/notebooks`](../Add%20Agent%20Evaluator/notebooks/), with your environments filled in. It signs in with the same Key Vault secret, merges each run into the `agent_*` tables, and looks up each user's UPN in Entra so sessions join to org data. It's only deployed once the app can read at least one environment. |
+| Pipeline | `Run_Agent_Evaluator_Transcripts` runs alongside the ValueLens notebooks and re-reads the last 14 days of transcripts. The first load and `run --backfill-days <n>` read the history you ask for instead, up to what Dataverse still holds. |
+| Semantic model | `ValueLens Agent Evaluator Model`, built from `Agent Evaluator.pbit`. It uses the ValueLens model's connection, so it's only deployed with the semantic model. The pipeline refreshes it after the transcripts and org data load. |
+| App pages | The app gets the model as its `ae` data source, which turns on its Agent Evaluation pages. A deployed app is rebuilt to add them. |
+
+If you aren't a System Administrator in an environment, the installer skips it and prints the steps
+for an admin:
+
+1. In the [Power Platform admin center](https://admin.powerplatform.microsoft.com), go to
+   **Manage** > **Environments** > the environment > **Settings** > **Users + permissions** >
+   **Application users** > **New app user**.
+2. Pick the app registration, the root business unit and the **Bot Transcript Viewer** role.
+
+Then run `install` again. It finds the access and deploys the notebook, or answer *It already has
+access* when it asks. An environment without the Bot Transcript Viewer role doesn't have Copilot
+Studio set up, so it's skipped. The template's Credit Consumption page stays empty; use
+[credit consumption](#credit-consumption) for Copilot Studio credits.
+
 ## Commands
 
 | Command | What it does |
@@ -135,7 +171,7 @@ upload anything. GitHub Copilot and commercial terms aren't set up by the instal
 | `deploy-app` | Builds and deploys the ValueLens app again, for example after a failed deploy or once you have a newer Node.js. |
 | `status` | Shows recent pipeline runs and model refreshes, the last data check, and when the secrets expire. |
 | `rotate-secret` | Creates a new client secret and replaces the one in Key Vault. It also gives the model's connection a new secret and removes its old one. |
-| `preview` | Writes the notebooks, pipeline, schedule and `model.bim` it would deploy to `./valuelens-preview`, without signing in. With credit consumption, also `consumption-model.bim`. |
+| `preview` | Writes the notebooks, pipeline, schedule and `model.bim` it would deploy to `./valuelens-preview`, without signing in. With credit consumption, also `consumption-model.bim`; with the Agent Evaluator, `agent-evaluator-model.bim`. |
 
 | Option | |
 |---|---|
@@ -217,6 +253,8 @@ few more minutes to start.
 | `The app wasn't deployed` | Read the Rayfin output above the message, fix the cause, then run `deploy-app`. |
 | `You can't assign Azure roles in …` | Ask an Owner or User Access Administrator on the subscription to give the app registration Reader, Cost Management Reader and Monitoring Reader. Then run `install` again. |
 | `Run_Consumption_Azure_AI` fails with `AuthorizationFailed` | New Azure roles can take a few minutes to apply. The activity retries twice; if it still fails, run `run` later. |
+| `You can't add … to …, so its transcripts are skipped` | Ask a System Administrator of that environment to follow the steps it prints. See [Agent Evaluator](#agent-evaluator). Then run `install` again. |
+| `Run_Agent_Evaluator_Transcripts` fails with 401 or 403 from Dataverse | The app's application user was removed, disabled or lost the Bot Transcript Viewer role. Check it in the Power Platform admin center, then run `run`. |
 | `The install record is for tenant …` | Pass `--tenant` with the tenant in the record, or use another `--config`. |
 
 Run with `--verbose` to see each call and the full error.
