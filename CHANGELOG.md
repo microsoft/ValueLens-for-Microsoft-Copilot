@@ -16,6 +16,44 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-03 — Fabric installer: in your browser
+
+`npx valuelens-install --ui` runs the installer as a page in your browser instead of the terminal.
+It opens on a home page: set up Analytics Hub, or, once it's installed, run the pipeline, refresh
+the models, check status, update, redeploy the app, create new secrets, or repair the set-up. The
+questions, the plan and each step's progress appear on the page, and nothing is created before you
+approve the plan. You can save the plan, or a record of a finished run, as Markdown. It works on a
+phone-sized window too.
+
+The page is served on `127.0.0.1` only and opens from the link the installer prints; every request
+needs the key in that link. Pasted secrets never reach the page's history or the saved record. The
+terminal mirrors the page and must stay open. See
+[In your browser](1.%20Fabric/installer/README.md#in-your-browser).
+
+---
+
+## 2026-10-03 — Fabric: Copilot pay-as-you-go billed in Azure
+
+The Copilot Studio and Cowork credit figures come from exports that count credits, not what was
+charged. Credits beyond prepaid capacity are billed to the Azure subscription on a Power Platform
+billing policy, and Azure Cost Management records that bill. The Consumption pages now show it.
+
+`Ingest_Azure_AI` reads Copilot pay-as-you-go from the Azure AI subscription and any listed in
+`PAYG_SUBSCRIPTION_IDS`, splits Copilot Studio from Cowork by the tag Azure puts on the charges, and
+writes `copilot_payg_spend`. The installer reads the billing policies to find their subscriptions,
+gives the app registration Cost Management Reader on each one, and adds a `CopilotPaygSpend` table
+to `ValueLens Consumption Model` at deploy time. The Power BI template doesn't change. A
+subscription it can't grant, or billing policies it can't read, are left out with a note, rather
+than failing the run.
+
+In the Analytics Hub, the Copilot Studio stage has a **Pay-as-you-go billed in Azure** panel: daily
+cost or credits by product for the same period, with totals, the subscriptions and how the bill
+compares with the export. The Cowork stage notes what Azure billed for Cowork. Billing can lag usage
+by a day or more, and no currency conversion is done. Without the table, both stay hidden. See the
+[data dictionary](1.%20Fabric/Add%20Credit%20Consumption/DATA-DICTIONARY.md#copilot_payg_spend).
+
+---
+
 ## 2026-10-03 — Fabric: Microsoft 365 activity and the Work patterns page
 
 The installer has a new module, **Microsoft 365 activity**, on by default. Its notebook,

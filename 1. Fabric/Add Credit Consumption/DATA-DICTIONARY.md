@@ -1,6 +1,7 @@
 # Data dictionary
 
-The nine Delta tables Consumption Central reads, and what each column means.
+The nine Delta tables Consumption Central reads, and what each column means. A tenth,
+[`copilot_payg_spend`](#copilot_payg_spend), is read only by the model the Fabric installer deploys.
 
 If you build your own pipeline instead of using the notebooks, match this and the template works
 unchanged. The tables are deliberately close to the source exports — renamed to `snake_case` and
@@ -266,6 +267,32 @@ a perfectly good use of this.
 > **More than one row and only the first is read.** This is a settings table, not a history — if you
 > want to keep old rates, keep them somewhere else. Re-pricing history against a rate that changed
 > mid-period is a bigger question than this template answers.
+
+---
+
+## `copilot_payg_spend`
+
+**Copilot pay-as-you-go as Azure billed it.** Written by `Ingest_Azure_AI`. Power Platform billing
+policies charge Copilot Studio and Cowork credits beyond prepaid capacity to an Azure subscription;
+this is what Cost Management recorded there, a day at a time. The template doesn't read it. The
+[Fabric installer](../installer/README.md#credit-consumption) adds it to `ValueLens Consumption Model`
+as `CopilotPaygSpend`, and the Analytics Hub's Consumption pages compare it with the exports.
+
+Grain: day × subscription × meter × `ServiceTag` × currency.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `UsageDate` | date | The day Azure billed. Billing can lag usage by a day or more. |
+| `SubscriptionId` | string | The subscription a billing policy charges. |
+| `Meter` | string | Usually `Pay As You Go Copilot Credit`. Other Copilot Studio meters are kept too. |
+| `ServiceTag` | string | The `serviceName` tag Azure puts on the charge: `cowork` for Cowork, empty for Copilot Studio. |
+| `Product` | string | `Copilot Studio` or `Cowork`, from `ServiceTag`. Any other tag value is kept as it is. |
+| `Cost` | double | Billed cost in `Currency`. No currency conversion. |
+| `UsageQuantity` | double | Credits on the credit meter. Other meters have their own units, so don't sum across meters. |
+| `Currency` | string | The billing currency. |
+
+It has no per-policy or per-environment detail: Cost Management doesn't split these charges that
+way.
 
 ---
 

@@ -104,6 +104,10 @@ database, so everyone who opens the app sees the same costs. **Use model values*
 
 - Anyone who can open the app can change the rates. Share the item only with people who should.
 - Azure AI Foundry cost comes straight from your Azure cost export, so these rates don't change it.
+- Neither does **Pay-as-you-go billed in Azure**, on the Copilot Studio stage. It shows what Azure
+  Cost Management charged for Copilot Studio and Cowork credits, so you can check the rates
+  against the bill. It needs a model the [installer](../installer/README.md#credit-consumption)
+  deployed, and stays hidden until the table has rows.
 - The Power BI report keeps the model's rates. Change `commercial_terms` to update both.
 
 ## Prices

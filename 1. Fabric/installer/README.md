@@ -20,7 +20,8 @@ npm install
 npx valuelens-install
 ```
 
-**Jump to:** [Before you start](#before-you-start) · [What it creates](#what-it-creates) ·
+**Jump to:** [Before you start](#before-you-start) · [In your browser](#in-your-browser) ·
+[What it creates](#what-it-creates) ·
 [Microsoft 365 activity](#microsoft-365-activity) · [Credit consumption](#credit-consumption) ·
 [Agent Evaluator](#agent-evaluator) · [Commands](#commands) · [Good to know](#good-to-know) ·
 [Troubleshooting](#troubleshooting)
@@ -37,7 +38,7 @@ npx valuelens-install
 | Permission to **register apps** in Entra | The default user setting is enough, or Application Administrator. You can also use an app you already have. |
 | A **Global Administrator** or **Privileged Role Administrator** | Only to grant admin consent for the Graph permissions. If that isn't you, the installer gives you a link to send them. |
 | For the semantic model and app, these **Fabric tenant settings** | *Service principals can call Fabric public APIs*, because the model reads the Lakehouse as the app registration. For the app, also *Semantic Model Execute Queries REST API* and *Fabric App items*. If you're a Fabric administrator, the installer checks them and warns you. |
-| For Azure AI costs, **Owner** or **User Access Administrator** on the subscription | Only if you add credit consumption. The installer gives the app registration three read-only roles there. See [Credit consumption](#credit-consumption). |
+| For Azure AI costs, **Owner** or **User Access Administrator** on the subscription | Only if you add credit consumption. The installer gives the app registration three read-only roles there, and Cost Management Reader on any other subscription billed for Copilot pay-as-you-go. A **Power Platform administrator** lets it find those subscriptions. See [Credit consumption](#credit-consumption). |
 | For agent transcripts, **System Administrator** in each Power Platform environment | Only if you add the Agent Evaluator. The installer adds the app registration to each environment you pick. If you aren't an admin there, it prints the steps for one. See [Agent Evaluator](#agent-evaluator). |
 
 The permissions it requests are the ones in [`/docs/PERMISSIONS.md`](../../docs/PERMISSIONS.md):
@@ -51,6 +52,7 @@ npx valuelens-install                 # sign in with a browser
 npx valuelens-install --device-code   # sign in with a code on another device
 npx valuelens-install --use-az        # use your Azure CLI sign-in (az login)
 npx valuelens-install --tenant contoso.onmicrosoft.com
+npx valuelens-install --ui            # do it all in your browser instead
 ```
 
 It checks your tenant first (roles, capacities, subscriptions), then asks:
@@ -61,7 +63,8 @@ It checks your tenant first (roles, capacities, subscriptions), then asks:
 2. **Power BI**: the semantic model and the Analytics Hub app (the default), the model only, or
    neither. The model needs org data, so choosing it switches org data on.
    - With credit consumption, **which subscription's Azure AI costs** to read, or leave Azure AI
-     out. It defaults to the first subscription with Azure OpenAI or AI Foundry resources.
+     out. It defaults to the first subscription with Azure OpenAI or AI Foundry resources, and
+     shows which subscriptions Power Platform billing policies charge Copilot pay-as-you-go to.
    - With the Agent Evaluator, **which Power Platform environments** to read transcripts from.
      It lists the environments you're a member of. If it can't, paste their URLs.
 3. **How much audit history** the first load pulls: 30, 90 or 180 days.
@@ -79,6 +82,29 @@ When it finishes, it prints links to the semantic model and the app, and how to 
 you chose neither, it prints the values for the Power BI templates instead: the SQL endpoint and
 Lakehouse name for `ValueLens - Fabric.pbit`, or the workspace and Lakehouse IDs for
 `ValueLens - Fabric OneLake.pbit`. Carry on from step 5 of the [Fabric quick start](../README.md#quick-start).
+
+### In your browser
+
+```text
+npx valuelens-install --ui            # opens the installer in your browser
+npx valuelens-install --ui --no-open  # prints the link instead
+```
+
+`--ui` runs the same installer as a page in your browser. It opens on a home page. With no install
+record, you set up Analytics Hub from there. With one, the page shows what's installed and lets
+you run the pipeline, refresh the models, check status, update, redeploy the app, create new
+secrets, or repair or change the set-up. `--tenant`, `--device-code`, `--use-az`, `--config` and
+`--source` work as they do in the terminal. It doesn't take a command, `--yes` or `preview`.
+
+The questions, the plan and each step's progress appear on the page. Nothing is created before
+you approve the plan, and you can save the plan, or a record of a finished run, as Markdown.
+Secrets you paste go to the installer and Key Vault, and are never shown again or saved in the
+record.
+
+The page is served on `127.0.0.1` only, and it opens only from the link the installer prints,
+which holds a key made for that run. Keep the terminal open while you use it: it mirrors the
+page, and the page stops working when it closes. Press **Ctrl+C** there, or **Close installer** on
+the page when nothing is running, to stop.
 
 ## What it creates
 
@@ -142,6 +168,7 @@ Lakehouse, so the app's Consumption pages show what Copilot costs alongside what
 |---|---|
 | Notebooks | `Consumption_Ingest_Azure_AI`, `Consumption_Ingest_Studio` and `Consumption_Ingest_Viva`, from [`Add Credit Consumption/notebooks`](../Add%20Credit%20Consumption/notebooks/). The pipeline runs them alongside the ValueLens notebooks. |
 | Azure access | Reader, Cost Management Reader and Monitoring Reader for the app registration on the subscription you chose. The Azure AI notebook reads 90 days of cost and token metrics for that one subscription, signing in with the same Key Vault secret. If you can't assign roles, Azure AI stays out of the pipeline until someone does and you run `install` again. |
+| Copilot pay-as-you-go | The installer reads your Power Platform billing policies to find the subscriptions they charge, and gives the app registration Cost Management Reader on each one besides the Azure AI subscription. The Azure AI notebook then writes what Azure billed for Copilot Studio and Cowork to `copilot_payg_spend`, and the model gets a `CopilotPaygSpend` table. A subscription you can't grant is left out; without a Power Platform administrator, only the Azure AI subscription is read. |
 | Upload folders | `Files/landing/studio` and `Files/landing/viva` in the Lakehouse. |
 | Semantic model | `ValueLens Consumption Model`, built from `Consumption Central - Fabric.pbit`. It uses the ValueLens model's connection, so it's only deployed with the semantic model. The pipeline refreshes it after the consumption notebooks. |
 | App pages | The app gets the model as its `cc` data source, which turns on its Consumption pages. A deployed app is rebuilt to add them. |
@@ -284,6 +311,8 @@ few more minutes to start.
 | A model refresh fails with `Login failed` | The connection's secret expired or was removed from the app. Run `rotate-secret`. |
 | `The app wasn't deployed` | Read the Rayfin output above the message, fix the cause, then run `deploy-app`. |
 | `You can't assign Azure roles in …` | Ask an Owner or User Access Administrator on the subscription to give the app registration Reader, Cost Management Reader and Monitoring Reader. Then run `install` again. |
+| `You can't assign Azure roles in …, so its Copilot pay-as-you-go is left out` | Ask an Owner or User Access Administrator on that subscription to give the app registration Cost Management Reader. Then run `install` again. |
+| `Couldn't read Power Platform billing policies` | Only the Azure AI subscription's pay-as-you-go is read. Ask a Power Platform administrator to run `install` again. |
 | `Run_Consumption_Azure_AI` fails with `AuthorizationFailed` | New Azure roles can take a few minutes to apply. The activity retries twice; if it still fails, run `run` later. |
 | `You can't add … to …, so its transcripts are skipped` | Ask a System Administrator of that environment to follow the steps it prints. See [Agent Evaluator](#agent-evaluator). Then run `install` again. |
 | `Run_Agent_Evaluator_Transcripts` fails with 401 or 403 from Dataverse | The app's application user was removed, disabled or lost the Bot Transcript Viewer role. Check it in the Power Platform admin center, then run `run`. |
