@@ -4,7 +4,7 @@ One command that sets up the [Fabric path](../README.md) in your tenant. It asks
 shows you the plan, and then creates everything the manual steps would: the app registration, its
 secret in Azure Key Vault, admin consent, a workspace and Lakehouse, the notebooks, the pipeline
 and its schedule. It can also deploy the ValueLens semantic model and the
-[ValueLens app](../Fabric%20App/) on top of it, so there is nothing to publish from
+[Analytics Hub app](../Fabric%20App/) on top of it, so there is nothing to publish from
 Power BI Desktop. With [credit consumption](#credit-consumption), it adds the Consumption Central
 notebooks and model too. With the [Agent Evaluator](#agent-evaluator), it reads your Copilot Studio
 agent conversations as well. It then runs the first load and checks the data that arrives.
@@ -28,7 +28,7 @@ npx valuelens-install
 
 | You need | Why |
 |---|---|
-| **Node.js 20.12 or later** and a clone of this repo | The installer deploys the notebooks and pipeline from this checkout. The ValueLens app needs **Node.js 22.13 or later** to build. |
+| **Node.js 20.12 or later** and a clone of this repo | The installer deploys the notebooks and pipeline from this checkout. The Analytics Hub app needs **Node.js 22.13 or later** to build. |
 | An **active Fabric capacity** (F2 or larger, or a trial) you can assign workspaces to | It creates the workspace on it. Or pick an existing workspace where you're an Admin or Member. |
 | An **Azure subscription** where you can create a Key Vault (Contributor), or an existing vault you can write secrets to | The client secret lives in Key Vault, never in a notebook. Owner or User Access Administrator lets it use Azure RBAC; otherwise the vault uses access policies. |
 | Permission to **register apps** in Entra | The default user setting is enough, or Application Administrator. You can also use an app you already have. |
@@ -55,7 +55,7 @@ It checks your tenant first (roles, capacities, subscriptions), then asks:
 1. **What to collect.** Copilot usage and licences are always on. Org data from Entra is on by
    default. The Agent 365 registry, product feedback, credit consumption and the Agent Evaluator
    are off.
-2. **Power BI**: the semantic model and the ValueLens app (the default), the model only, or
+2. **Power BI**: the semantic model and the Analytics Hub app (the default), the model only, or
    neither. The model needs org data, so choosing it switches org data on.
    - With credit consumption, **which subscription's Azure AI costs** to read, or leave Azure AI
      out. It defaults to the first subscription with Azure OpenAI or AI Foundry resources.
@@ -92,7 +92,7 @@ Lakehouse name for `ValueLens - Fabric.pbit`, or the workspace and Lakehouse IDs
 | Schedule | Daily or weekly at the time you chose, starting tomorrow. |
 | Semantic model | `ValueLens Model`, built from `ValueLens - Fabric.pbit` and pointed at your Lakehouse. Optional pages follow the modules you chose. |
 | Connection | `ValueLens SQL <workspace>`, a cloud connection to the Lakehouse's SQL endpoint that signs in as the app registration, with a secret of its own. The app registration gets Viewer on the workspace so it can read the Lakehouse. |
-| ValueLens app | A Fabric App item, "AI in One 2.0", built from [`1. Fabric/Fabric App`](../Fabric%20App/) against your semantic model. Rayfin, the app's build tool, may open a browser for you to sign in. |
+| Analytics Hub app | A Fabric App item, "Analytics Hub", built from [`1. Fabric/Fabric App`](../Fabric%20App/) against your semantic model. Rayfin, the app's build tool, may open a browser for you to sign in. |
 | Credit consumption | Only if you choose it. Three more notebooks, the `ValueLens Consumption Model`, two upload folders, and read access to Azure costs. See [Credit consumption](#credit-consumption). |
 | Agent Evaluator | Only if you choose it. The app registration as a transcript reader in each environment you pick, one more notebook and the `ValueLens Agent Evaluator Model`. See [Agent Evaluator](#agent-evaluator). |
 | First load | A pipeline run with your chosen history, then the data check. The run reports row counts and the date range of the audit data. Without a first load, the model is refreshed straight away. |
@@ -168,7 +168,7 @@ Studio set up, so it's skipped. The template's Credit Consumption page stays emp
 | `update` | Pushes the notebooks, pipeline and semantic models from this checkout over the deployed ones, then refreshes the models. It asks whether to redeploy the app too. Use it after you pull a new version of the repo. |
 | `run` | Runs the pipeline now, then the data check. `--backfill-days <n>` reloads that much audit history and rebuilds the curated table. |
 | `refresh` | Refreshes the semantic models now and waits for them. |
-| `deploy-app` | Builds and deploys the ValueLens app again, for example after a failed deploy or once you have a newer Node.js. |
+| `deploy-app` | Builds and deploys the Analytics Hub app again, for example after a failed deploy or once you have a newer Node.js. |
 | `status` | Shows recent pipeline runs and model refreshes, the last data check, and when the secrets expire. |
 | `rotate-secret` | Creates a new client secret and replaces the one in Key Vault. It also gives the model's connection a new secret and removes its old one. |
 | `preview` | Writes the notebooks, pipeline, schedule and `model.bim` it would deploy to `./valuelens-preview`, without signing in. With credit consumption, also `consumption-model.bim`; with the Agent Evaluator, `agent-evaluator-model.bim`. |

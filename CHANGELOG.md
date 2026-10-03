@@ -16,6 +16,18 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-03 — Fabric App: renamed Analytics Hub
+
+The [Fabric App](1.%20Fabric/Fabric%20App/) is now called **Analytics Hub**: the browser tab, the
+sidebar title, the page that points visitors to Fabric, and the installer's prompts. The data side
+keeps the ValueLens name: workspace, Lakehouse, models, pipeline and app registration.
+
+The installer renames an app item still called `valuelens` or "AI in One 2.0" the next time it
+runs, even if you don't rebuild the app. A name you gave it yourself is kept. A manual
+`rayfin up` still creates an item called `valuelens`; rename it in the workspace.
+
+---
+
 ## 2026-10-03 — Fabric installer: Agent Evaluator
 
 The installer can now set up the [Agent Evaluator](1.%20Fabric/Add%20Agent%20Evaluator/) from
@@ -30,7 +42,9 @@ history builds past Dataverse's 30 days, and deploys the `ValueLens Agent Evalua
 ValueLens model's connection. The app is rebuilt with the model as its `ae` source.
 
 The parser and template are copied from upstream commit `e37b1ac`. The notebook gains one cell that
-looks up each user's UPN in Entra, so agent sessions join to org data.
+looks up each user's UPN in Entra, so agent sessions join to org data. The installer adjusts the
+template so the service can bind it to the Lakehouse connection, and so it refreshes before the
+parser's first run, when it reads empty tables.
 
 ---
 
