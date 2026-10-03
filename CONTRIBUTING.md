@@ -50,7 +50,7 @@ rely on CI or install PowerShell 7.
 - Use fabricated fixtures only. Never commit tenant exports, user identities,
   prompts, credentials, private solution packages or populated report files.
   Review notebook outputs and screenshots before attaching them.
-- Edit shared Fabric notebooks in `3. Fabric/notebooks/`, then run
+- Edit shared Fabric notebooks in `1. Fabric/notebooks/`, then run
   `pwsh -NoProfile -File scripts/sync-shared.ps1` and
   `pwsh -NoProfile -File scripts/sync-shared.ps1 -Check`.
   The archived add-on's `_core/` folder is generated; do not edit it directly or

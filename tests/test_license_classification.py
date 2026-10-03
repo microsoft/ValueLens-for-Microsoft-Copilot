@@ -11,11 +11,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
-CORE = ROOT / "3. Fabric" / "notebooks"
+CORE = ROOT / "1. Fabric" / "notebooks"
 NOTEBOOK = "Copilot_Licensed_Users_Direct_Ingester.ipynb"
 COPIES = (
     CORE / NOTEBOOK,
-    ROOT / "3. Fabric" / "archive" / "extended" / "Fabric + Copilot Studio" / "notebooks" / "_core" / NOTEBOOK,
+    ROOT / "1. Fabric" / "archive" / "extended" / "Fabric + Copilot Studio" / "notebooks" / "_core" / NOTEBOOK,
 )
 E7 = (
     "Microsoft 365 E7",
@@ -143,7 +143,7 @@ class LicenseClassificationTests(unittest.TestCase):
         self.assertEqual(len(paths), 5)
         # Keep the moved Studio template in the existing classifier checks.
         paths.append(
-            ROOT / "3. Fabric" / "archive" / "extended" / "Fabric + Copilot Studio"
+            ROOT / "1. Fabric" / "archive" / "extended" / "Fabric + Copilot Studio"
             / "ValueLens - Fabric (+ Studio Agent Deepdive).pbit"
         )
         self.assertEqual(len(paths), 6)
@@ -159,7 +159,7 @@ class LicenseClassificationTests(unittest.TestCase):
                 self.assertNotIn("Assigned Products", read)
                 self.assertNotIn("Assigned_Products", read)
                 self.assertIn('"Has license"', expression)
-                if "3. Fabric" in path.parts:
+                if "1. Fabric" in path.parts:
                     self.assertIn('FabricTable("copilot_licensed_users")', expression)
                     self.assertIn('"Has_license"', expression)
                     self.assertIn('"HasCopilot"', expression)
@@ -168,7 +168,7 @@ class LicenseClassificationTests(unittest.TestCase):
                     self.assertIn("Csv.Document", expression)
 
     def test_supplied_flags_feed_optional_processor_without_sku_inference(self):
-        path = ROOT / "1. Local CSV" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
+        path = ROOT / "4. Local CSV" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
         tree = ast.parse(path.read_text(encoding="utf-8-sig"))
         nodes = [
             node for node in tree.body

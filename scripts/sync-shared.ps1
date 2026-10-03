@@ -1,21 +1,21 @@
 <#
 .SYNOPSIS
-Mirrors the seven shared Fabric notebooks from `3. Fabric/notebooks/`
+Mirrors the seven shared Fabric notebooks from `1. Fabric/notebooks/`
 into the archived Copilot Studio add-on's local `_core` folder.
 
 .DESCRIPTION
-The source of truth for the shared notebooks is `3. Fabric/notebooks/`. To keep
+The source of truth for the shared notebooks is `1. Fabric/notebooks/`. To keep
 the archived add-on copies consistent with the core, we mirror those notebooks into:
 
-  3. Fabric/archive/extended/Fabric + Copilot Studio/notebooks/_core/
+  1. Fabric/archive/extended/Fabric + Copilot Studio/notebooks/_core/
 
 The former `_shared/notebooks/` second copy was redundant and is no longer generated.
 
-Run this after editing any file in `3. Fabric/notebooks/`.
+Run this after editing any file in `1. Fabric/notebooks/`.
 
 `Copilot_Audit_Log_Processor.ipynb` is deliberately NOT mirrored: it is a
 downstream transform (parsed -> curated), not an ingester, and the add-ons
-inherit it from the base `3. Fabric` build. `ValueLens_Refresh_Model.ipynb`
+inherit it from the base `1. Fabric` build. `ValueLens_Refresh_Model.ipynb`
 is the installer's semantic model refresh and is not mirrored either. Both
 are listed in $excluded below.
 
@@ -33,15 +33,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$source   = Join-Path $repoRoot '3. Fabric\notebooks'
+$source   = Join-Path $repoRoot '1. Fabric\notebooks'
 
 $destinations = @(
-    (Join-Path $repoRoot '3. Fabric\archive\extended\Fabric + Copilot Studio\notebooks\_core')
+    (Join-Path $repoRoot '1. Fabric\archive\extended\Fabric + Copilot Studio\notebooks\_core')
 )
 
 # Notebooks in $source that are NOT mirrored into the add-ons. The processor is
 # a downstream transform, not an ingester, so the add-ons inherit it from the
-# base 3. Fabric build rather than shipping their own copy. The refresh notebook
+# base 1. Fabric build rather than shipping their own copy. The refresh notebook
 # belongs to the installer's semantic model and has no add-on equivalent.
 $excluded = @(
     'Copilot_Audit_Log_Processor.ipynb',

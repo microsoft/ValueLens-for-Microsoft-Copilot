@@ -1,0 +1,228 @@
+# 4. Local CSV — see the whole dashboard in about two minutes
+
+Run **ValueLens** from CSV files on your own machine. No tenant access, no scripts, no
+Fabric capacity, no SharePoint.
+
+**Jump to:** [Who it's for](#-who-its-for) · [Prerequisites](#-prerequisites) ·
+[Setup](#-setup) · [Dashboard pages](#-dashboard-pages) ·
+[Troubleshooting](#-troubleshooting) · [When to move on](#-when-to-move-on)
+
+---
+
+## 👤 Who it's for
+
+Anyone who wants to **see it working now** — or run a one-off look at their own numbers.
+Two ways to use this path:
+
+| | You get | Time |
+|---|---|---|
+| **A — Sample data** 🧪 | The whole dashboard populated with a **fabricated dataset**. Nothing from your tenant. | ~2 min |
+| **B — Your own data** | *Your* numbers, from a one-off export. | ~20 min |
+
+Start with **A**. It shows you exactly what the dashboard measures and how the value model
+lands — *before* you spend any effort on exports or automation.
+
+### What's here
+
+| Item | Purpose |
+|---|---|
+| `ValueLens - Local CSV.pbit` | The dashboard template. Parameters take **local file paths**. |
+| [`sample-data/`](sample-data/) | Fabricated dataset + the generator that produced it. |
+| [`scripts/`](scripts/) | The processor that turns a raw Purview export into what the template reads, plus org-data helpers. |
+| [`Add Credit Consumption/`](Add%20Credit%20Consumption/) | *Optional.* The separate Consumption Central report for Copilot credit consumption and cost. |
+
+> **The template reads *processed* CSVs, not a raw Purview export.** 55 of the 56 columns it needs
+> don't exist in the raw audit log — they're produced by the processor in
+> [`scripts/`](scripts/). The sample data is already processed, which is why path A works with no
+> extra step.
+
+> Using the **SharePoint** template by mistake is the most common trip-up — that one deliberately
+> accepts SharePoint URLs only. For local paths, use the template in this folder.
+
+---
+
+## ✅ Prerequisites
+
+**For A — sample data:**
+- **Power BI Desktop**. That's the whole list.
+
+**For B — your own data, additionally:**
+- Any shell and **Python 3.9+**.
+- Read access to the admin exports listed in [step 1](#1-export-the-source-files) below —
+  in permission terms, Audit Reader (or Compliance Administrator) for Purview, and Global
+  Reader for the Entra and M365 Admin Center exports. Full breakdown:
+  [`/docs/PERMISSIONS.md`](../docs/PERMISSIONS.md).
+
+---
+
+## 🛠 Setup
+
+### A — Sample data (no tenant needed)
+
+1. Open **`ValueLens - Local CSV.pbit`** in Power BI Desktop.
+2. When it prompts for parameters, point each at the matching file in
+   [`sample-data/`](sample-data/) — use **full local paths**:
+
+   | Parameter | File |
+   |---|---|
+   | Copilot Interactions File | `sample-data/copilot_interactions_sample.csv` |
+   | Org Data File | `sample-data/copilot_users_sample.csv` |
+   | Agent 365 *(optional)* | `sample-data/agents_365_sample.csv` |
+   | Feedback File *(optional)* | `sample-data/product_feedback_sample.csv` |
+
+3. **Load**.
+
+That's it. Every page fills in.
+
+The data models a ~260-person company over roughly two months — uneven adoption, a power-user
+tail, some dormant licences, and a 50-agent estate spanning declarative agents, Copilot Studio
+custom engine agents, autonomous agents, Copilot Cowork and Microsoft Scout. It is
+**generated, not anonymised**:
+see [`sample-data/README.md`](sample-data/README.md) for how, and why that distinction matters.
+
+> The figures are fictional, but the **arithmetic is the shipping value model** — the same
+> behaviour taxonomy and time baselines as the production classifier. Don't read the totals as a
+> benchmark; do read them as a faithful demonstration of the method.
+
+### B — Your own data
+
+Same template, your export. Three steps.
+
+<details open>
+<summary><strong>Step by step</strong></summary>
+
+#### 1. Export the source files
+
+The processor takes the raw audit log plus **users** and **licence** info. Org attributes come
+from **Entra**; the Copilot **licence** flag comes from the **M365 Admin Center** — different
+exports, joined on **UPN**. Supply them as two files (recommended) or pre-merged as one:
+
+| Export | Where | Becomes |
+|---|---|---|
+| Raw **Copilot interactions** (audit log CSV) | Microsoft **Purview** → Audit → search `CopilotInteraction` → Export | `--purview` |
+| **Org / users** (UPN, department, job title, manager) | Microsoft **Entra** → Users → Export, **or your own org/HR file** ([sample template](scripts/OrgData-Template.csv)) | `--entra` |
+| **Licensing** (UPN + a `Has License` flag) | **M365 Admin Center** → Copilot user export | `--licensing` |
+
+> **One combined file instead?** If your users export already contains a licence column, pass it
+> as `--entra` and **omit** `--licensing` — the licence column is auto-detected.
+>
+> **Bring your own org data (instead of Entra)?** Copy the
+> [sample template](scripts/OrgData-Template.csv) — the same shape a **Viva Insights** org-data
+> file uses — fill in your users, and pass it as `--entra`. Messy HR export with different headers?
+> Run it through [`scripts/Adapt-OrgFile-To-EntraUsers.py`](scripts/Adapt-OrgFile-To-EntraUsers.py) first.
+>
+> **Big tenant?** The Purview UI export caps out well before millions of rows. Use
+> [microsoft/PAX ↗](https://github.com/microsoft/PAX) to pull the raw audit data instead — it
+> partitions the query and runs unattended. PAX now embeds this same v4.0.0 rollup, so it can
+> produce the processed CSVs directly; see [`../3. SharePoint/`](../3.%20SharePoint/) for the
+> scheduled version of that.
+
+#### 2. Run the processor
+
+[`scripts/Purview_CopilotInteraction_Processor_v4.0.0.py`](scripts/Purview_CopilotInteraction_Processor_v4.0.0.py)
+turns the raw export into the two files the template reads:
+
+```bash
+python "scripts/Purview_CopilotInteraction_Processor_v4.0.0.py" \
+    --purview    "<raw_copilot_interactions.csv>" \
+    --entra      "<entra_users_org.csv>" \
+    --licensing  "<m365_copilot_licence_list.csv>" \   # omit if --entra already has a licence column
+    --profile    aibv
+```
+
+It writes two rollup CSVs next to your inputs (`*_Interactions_*.csv`, `*_Users_*.csv`). Run with
+`--help` for all options (`--out-dir`, `--with-aggregates`, …). Full column expectations are in
+[`../docs/DATA-DICTIONARY.md`](../docs/DATA-DICTIONARY.md).
+
+#### 3. Connect the template
+
+Open **`ValueLens - Local CSV.pbit`** and point the parameters at the rollup CSVs from step 2:
+
+| Parameter | Value |
+|---|---|
+| Copilot Interactions File | local path to `*_Interactions_*.csv` |
+| Org Data File | local path to `*_Users_*.csv` |
+| Agent 365 *(optional)* | blank, or a local path to the `Get-Agents365Registry.ps1` output ([how](../3.%20SharePoint/scripts/README.md#get-agents365registryps1-on-its-own)); without an Agent 365 licence, the Microsoft 365 admin centre **Agents** export works too |
+| Feedback File *(optional)* | blank, or a local path to the Microsoft 365 admin centre product feedback export (**Health → Product feedback → Export**) |
+
+**Load** — done. To refresh: re-export, re-run the processor, **Refresh** in Desktop.
+
+</details>
+
+---
+
+## 📚 Dashboard pages
+
+<details>
+<summary>15 report pages — activation, adoption, habits, agents, tasks, value, model and Cowork fit, readiness &amp; appendices</summary>
+
+| Page | Purpose |
+|---|---|
+| **◆ Activation** | Licensed vs unlicensed, active vs inactive users, across teams |
+| **📡 Adoption** | Adoption and reach, and usage trends by tool |
+| **🌱 Habit Formation** | How usage matures into habits over time |
+| **🛡 Agent Registry** | Agent catalogue, tenant builds and observed use; registry detail needs the optional **Agent 365** source |
+| **🔮 Task Breakdown** | What Copilot, agents and Cowork are used for, by task category |
+| **🚀 Estimated Value** | Hours saved and assisted value, by task and function |
+| **🧠 Model Fit** | Which AI models handle which tasks, and whether each session's model suits the work (Good match / Lighter model may do / Try stronger) |
+| **🧭 Cowork Fit** | How well each Cowork task suits Cowork (Strong fit / Fair fit / Worth a look), why, and who might benefit from coaching. Grading is adjustable: Balanced by default, or Strict / Lenient |
+| **🎯 Cowork Readiness** | Where to roll out Cowork next, from observed signals, ranked by organization, then user |
+| **🎯 License Readiness** | Where to roll out Copilot licences next, from observed unlicensed use |
+| **💬 User Feedback** | User satisfaction and sentiment; needs the optional feedback export |
+| **🏅 Leaderboard** | Usage rankings for users, agents and functions |
+| **📈 Trend Heatmap** | Weekly trend of a selected metric |
+| **📘 Appendix: Glossary** | Definitions, evidence limits and guidance |
+| **🧬 Appendix: Signal - Impact Table** | AI tasks performed → human-time estimate → value, with editable assumptions |
+
+A hidden **⚖ License Allocation** page (expansion candidates and dormancy review) is kept for
+drill-through. Every template ships this same report; only the data connection differs.
+The Tool pills at the top of each page filter on `Agent Filter` (Copilot, Agents, Cowork);
+`Environment` is licensing only (Licensed / Unlicensed).
+
+The two core rollups supply the adoption/value signals; the sample dataset also includes
+Agent 365 data. With your own data, export the registry with
+[`Get-Agents365Registry.ps1`](../3.%20SharePoint/scripts/Get-Agents365Registry.ps1) (the same
+48-column shape the Fabric notebook writes). Registry exports do **not** carry observability
+telemetry, so those agent fields stay blank. See the
+[Agent 365 source contract](../docs/DATA-DICTIONARY.md#4-agents_365).
+
+User Feedback loads empty unless you set the optional `Feedback File` parameter; the sample data
+includes one (`product_feedback_sample.csv`). There is no
+Credit Meter / cost-consumption input. Do not infer billing credits or transcript health from
+the audit rollups.
+
+</details>
+
+---
+
+## 🩺 Troubleshooting
+
+<details>
+<summary><strong>Common symptoms and fixes</strong></summary>
+
+| Symptom | Fix |
+|---|---|
+| Parameters reject a local path | You've opened `ValueLens - SharePoint.pbit`. Use `ValueLens - Local CSV.pbit` from this folder. |
+| `python: command not found` | Install Python 3.9+ and retry. |
+| `0 records returned` from the export | `AuditLogsQuery.Read.All` consent missing — re-grant in Entra. |
+| Masked UPNs (32-char hex) | M365 Admin → Org settings → Reports → untick "Display concealed names". |
+| Agent Registry usage fields blank | Expected without an Agent 365 observability export — see [`../docs/DATA-DICTIONARY.md`](../docs/DATA-DICTIONARY.md#4-agents_365). |
+| Refresh is slow or hits limits | Volume is too high for a local file path — move to [`../1. Fabric/`](../1.%20Fabric/). |
+
+</details>
+
+---
+
+## ➡️ When to move on
+
+This path is manual by design — every refresh means re-exporting and re-running the processor.
+When you want it hands-off:
+
+| Next | Gives you |
+|---|---|
+| **[1. Fabric](../1.%20Fabric/)** | Lakehouse ingestion at scale, plus the optional feedback and Agent 365 sources |
+| **[2. Power Automate + Dataverse](../2.%20Power%20Automate%20+%20Dataverse/)** | Preview: the same dashboard with Dataverse as the core transport |
+| **[3. SharePoint](../3.%20SharePoint/)** | Scheduled extract → SharePoint → automatic Power BI refresh, on Power BI Pro |
+
+Paths 1 and 3 read the **same two rollup CSVs** this path produces, so nothing you learn here is
+wasted.

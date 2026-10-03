@@ -12,11 +12,11 @@ Use fabricated examples and redact screenshots. -->
 
 ### Deployment path
 
-- [ ] 1. Local CSV
-- [ ] 2. SharePoint
-- [ ] 3. Fabric (SQL endpoint or OneLake? Specify below.)
-- [ ] 4. Power Automate + Dataverse (preview)
-- [ ] 5. Fabric App (preview)
+- [ ] 1. Fabric (SQL endpoint or OneLake? Specify below.)
+- [ ] 1. Fabric/Fabric App (preview)
+- [ ] 2. Power Automate + Dataverse (preview)
+- [ ] 3. SharePoint
+- [ ] 4. Local CSV
 
 ### Environment
 

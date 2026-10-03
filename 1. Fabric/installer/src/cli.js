@@ -1,0 +1,178 @@
+// @ts-check
+/** Command-line entry point. */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { parseArgs } from 'node:util';
+import { DEFAULT_CONFIG_FILE, loadConfig } from './config.js';
+import { HttpError } from './http.js';
+import { connect, createCtx, deployAppNow, install, preview, refresh, rotateSecret, run, status, update } from './install.js';
+import { loadSources } from './sources.js';
+import { c, createUi } from './ui.js';
+
+const COMMANDS = ['install', 'update', 'run', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'preview'];
+
+export const HELP = `Sets up ValueLens in Microsoft Fabric: the data pipeline, the semantic model and the app.
+
+Usage: valuelens-install [command] [options]
+
+Commands:
+  install          Set up ValueLens, or repair it from the install record (default)
+  update           Push the notebooks, pipeline and semantic model from this checkout to Fabric
+  run              Run the pipeline now, then the data check
+  refresh          Refresh the semantic model now
+  deploy-app       Build and deploy the ValueLens app again
+  status           Show recent runs and refreshes, the last data check and when secrets expire
+  rotate-secret    Create new client secrets for Key Vault and the model's connection
+  preview          Write what would be deployed to a folder, without signing in
+
+Options:
+  --config <file>      Install record (default ./${DEFAULT_CONFIG_FILE})
+  --source <dir>       The "1. Fabric" folder to deploy from (default: this checkout)
+  --tenant <id>        Tenant ID or domain to sign in to
+  --device-code        Sign in with a code on another device instead of a browser
+  --use-az             Use the account you are signed in to with the Azure CLI
+  --backfill-days <n>  With run: reload n days of audit history and rebuild the curated table
+  --out <dir>          With preview: where to write (default ./valuelens-preview)
+  --yes                Take saved answers and defaults without asking
+  --no-wait            Don't wait for the first load or a refresh to finish
+  --verbose            Print each API call
+  -h, --help           Show this help
+  -v, --version        Show the version
+`;
+
+/**
+ * @param {string[]} argv
+ */
+export function parseCli(argv) {
+  const { values, positionals } = parseArgs({
+    args: argv,
+    allowPositionals: true,
+    options: {
+      config: { type: 'string' },
+      source: { type: 'string' },
+      tenant: { type: 'string' },
+      'device-code': { type: 'boolean' },
+      'use-az': { type: 'boolean' },
+      'backfill-days': { type: 'string' },
+      out: { type: 'string' },
+      yes: { type: 'boolean', short: 'y' },
+      'no-wait': { type: 'boolean' },
+      'dry-run': { type: 'boolean' },
+      verbose: { type: 'boolean' },
+      help: { type: 'boolean', short: 'h' },
+      version: { type: 'boolean', short: 'v' },
+    },
+  });
+  if (positionals.length > 1) throw new Error(`Unexpected argument: ${positionals[1]}`);
+  const command = values['dry-run'] ? 'preview' : positionals[0] ?? 'install';
+  if (!COMMANDS.includes(command)) throw new Error(`Unknown command "${command}". Try --help.`);
+  if (values['device-code'] && values['use-az']) throw new Error('Choose one of --device-code and --use-az.');
+  /** @type {number | undefined} */
+  let backfillDays;
+  if (values['backfill-days'] !== undefined) {
+    backfillDays = Number(values['backfill-days']);
+    if (!Number.isInteger(backfillDays) || backfillDays < 1 || backfillDays > 180) throw new Error('--backfill-days must be a whole number from 1 to 180.');
+  }
+  return {
+    command,
+    configFile: resolve(values.config ?? DEFAULT_CONFIG_FILE),
+    sourceDir: values.source,
+    tenantId: values.tenant,
+    method: /** @type {'browser' | 'device-code' | 'azure-cli'} */ (values['use-az'] ? 'azure-cli' : values['device-code'] ? 'device-code' : 'browser'),
+    backfillDays,
+    outDir: values.out ?? 'valuelens-preview',
+    yes: !!values.yes,
+    wait: !values['no-wait'],
+    verbose: !!values.verbose,
+    help: !!values.help,
+    version: !!values.version,
+  };
+}
+
+export function version() {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  return String(pkg.version);
+}
+
+/**
+ * @param {string[]} argv
+ * @returns {Promise<number>} Exit code.
+ */
+export async function main(argv) {
+  let verbose = false;
+  try {
+    const args = parseCli(argv);
+    verbose = args.verbose;
+    if (args.help) {
+      process.stdout.write(HELP);
+      return 0;
+    }
+    if (args.version) {
+      process.stdout.write(`${version()}\n`);
+      return 0;
+    }
+    const ui = createUi({ yes: args.yes });
+    const { config, existed } = loadConfig(args.configFile);
+    const sources = loadSources(args.sourceDir);
+
+    ui.line(c.bold(`ValueLens Fabric installer ${version()}`));
+    if (args.command === 'preview') {
+      preview({ ui, config, sources, outDir: args.outDir });
+      return 0;
+    }
+    if (args.command !== 'install' && !existed) throw new Error(`No install record at ${args.configFile}. Run the installer first, or pass --config.`);
+    if (existed) ui.note(`Install record: ${args.configFile}`);
+
+    ui.note(args.method === 'azure-cli' ? 'Using your Azure CLI sign-in…' : 'Signing in…');
+    const { api, user } = await connect({
+      tenantId: args.tenantId ?? config.tenantId,
+      method: args.method,
+      ui,
+      debug: verbose ? (m) => process.stderr.write(`${c.dim(m)}\n`) : undefined,
+    });
+    const ctx = createCtx({ ui, config, file: args.configFile, api, user, sources });
+
+    switch (args.command) {
+      case 'install':
+        await install(ctx, { wait: args.wait });
+        break;
+      case 'update':
+        await update(ctx, { wait: args.wait });
+        break;
+      case 'run': {
+        const result = await run(ctx, { backfillDays: args.backfillDays, wait: args.wait });
+        if (args.wait && !result.ok) return 1;
+        break;
+      }
+      case 'refresh': {
+        const result = await refresh(ctx, { wait: args.wait });
+        if (args.wait && !result.ok) return 1;
+        break;
+      }
+      case 'deploy-app':
+        await deployAppNow(ctx);
+        break;
+      case 'status':
+        await status(ctx);
+        break;
+      case 'rotate-secret':
+        await rotateSecret(ctx);
+        break;
+    }
+    return 0;
+  } catch (err) {
+    const e = /** @type {any} */ (err);
+    if (e?.name === 'ExitPromptError') {
+      process.stderr.write('\nCancelled.\n');
+      return 130;
+    }
+    if (/device_code_expired|expired_token|code_expired/i.test(String(e?.message ?? e?.errorCode ?? ''))) {
+      process.stderr.write(`\n${c.red('✗')} The sign-in code expired before it was used. Run the installer again and enter the new code within 15 minutes.\n`);
+      return 1;
+    }
+    process.stderr.write(`\n${c.red('✗')} ${e?.message ?? String(err)}\n`);
+    if (verbose && err instanceof HttpError && err.body) process.stderr.write(`${c.dim(JSON.stringify(err.body, null, 2))}\n`);
+    else if (verbose && e?.stack) process.stderr.write(`${c.dim(e.stack)}\n`);
+    return 1;
+  }
+}

@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-FABRIC = ROOT / "3. Fabric"
+FABRIC = ROOT / "1. Fabric"
 CHECKER = FABRIC / "docs" / "checker"
 ARCHITECTURE = FABRIC / "ValueLens_Fabric_Architecture.excalidraw"
 

@@ -40,7 +40,7 @@ template running on Databricks, Synapse or Azure SQL.
 
 https://github.com/user-attachments/assets/bc0712c0-e50b-4c8d-91f4-e9aa61e999a1
 
-> ### 👉 New here? Start with **[1. Local CSV](1.%20Local%20CSV/)**
+> ### 👉 New here? Start with **[4. Local CSV](4.%20Local%20CSV/)**
 >
 > It ships with a **fabricated sample dataset** that fills the whole dashboard. Open the
 > template, point it at the sample CSVs, done — **no tenant, no exports, no setup**. Roughly two
@@ -65,27 +65,28 @@ open an issue in this repo.
 
 ## 🚀 Pick a deployment path
 
-**Same dashboard, a choice of data pathways.** Paths 1–3 remain unchanged. Path 4 is an
-additional preview for Power Automate and Dataverse, exercised end-to-end on a bounded demo interval.
-Path 5 is a preview that runs the dashboard as a web app in your Fabric workspace, on top of the
-model you publish from any of paths 1–4.
+**Same dashboard, a choice of data pathways.** Path 1, Fabric, is the recommended route. It
+includes an installer that sets the whole path up for you, and the **Fabric App**: a preview that
+runs the dashboard as a web app in your Fabric workspace, on top of the model you publish from any
+of paths 1–4. Path 2 is a preview for Power Automate and Dataverse, exercised end-to-end on a
+bounded demo interval. Paths 3 and 4 need no Fabric capacity.
 
-**Quick decision:** no tenant access → **1** · Power BI Pro only → **2** · Fabric capacity → **3** ·
-Dataverse-centric → **4** · want a web app on top of any of them → **5**.
+**Quick decision:** Fabric capacity → **1** · Dataverse-centric → **2** · Power BI Pro only → **3** ·
+no tenant access → **4** · want a web app on top of any of them → **1. Fabric/Fabric App**.
 
 | Path | Licence needed | Refresh | Setup | Scale | Best for |
 |---|---|---|---|---|---|
-| **[1. Local CSV](1.%20Local%20CSV/)** · *start here* 🧪 | Power BI Desktop only | Manual — re-export, re-run, refresh | **Sample data included.** Open the template, point it at the sample CSVs. ~2 min | One-off; a local file path, so high volumes get slow | Seeing it working now, or a one-off look at your own numbers |
-| **[2. SharePoint](2.%20SharePoint/)** | Power BI **Pro** | Scheduled, hands-off | App registration + a SharePoint library + a scheduled extract task | Up to Pro's 1 GB model / 2-hour refresh cap | Automatic refresh without Fabric or Premium |
-| **[3. Fabric](3.%20Fabric/)** · *recommended* | **Fabric capacity** (F2+ or trial), Premium or PPU | Pipeline-orchestrated, plus a success-gated model refresh | Lakehouse + app registration + notebooks + pipeline | Tenant scale — Lakehouse ingestion, no file caps | High volume, plus the optional feedback and Agent 365 sources |
-| **[4. Power Automate + Dataverse](4.%20Power%20Automate%20+%20Dataverse/)** · *preview* | Power Automate premium + Dataverse capacity, plus Power BI | Scheduled collector + runner; you advance the snapshot parameter by hand | Collector solution + Dataverse tables + a Python refresh runner | Preview — validated on a bounded demo interval; benchmark before a production cadence | Tenants already collecting Copilot interactions into Dataverse |
-| **[5. Fabric App](5.%20Fabric%20App/)** · *preview* | **Fabric capacity** to host the app, plus a published model from paths 1–4 | Live: each page queries the published model as the viewer | `npm install`, point `fabric.yaml` at the model, `npx rayfin up` | As the model beneath it | A fast, shareable app in Fabric instead of a report |
+| **[1. Fabric](1.%20Fabric/)** · *recommended* | **Fabric capacity** (F2+ or trial), Premium or PPU | Pipeline-orchestrated, plus a success-gated model refresh | Lakehouse + app registration + notebooks + pipeline | Tenant scale — Lakehouse ingestion, no file caps | High volume, plus the optional feedback and Agent 365 sources |
+| **[1. Fabric/Fabric App](1.%20Fabric/Fabric%20App/)** · *preview* | **Fabric capacity** to host the app, plus a published model from paths 1–4 | Live: each page queries the published model as the viewer | `npm install`, point `fabric.yaml` at the model, `npx rayfin up` | As the model beneath it | A fast, shareable app in Fabric instead of a report |
+| **[2. Power Automate + Dataverse](2.%20Power%20Automate%20+%20Dataverse/)** · *preview* | Power Automate premium + Dataverse capacity, plus Power BI | Scheduled collector + runner; you advance the snapshot parameter by hand | Collector solution + Dataverse tables + a Python refresh runner | Preview — validated on a bounded demo interval; benchmark before a production cadence | Tenants already collecting Copilot interactions into Dataverse |
+| **[3. SharePoint](3.%20SharePoint/)** | Power BI **Pro** | Scheduled, hands-off | App registration + a SharePoint library + a scheduled extract task | Up to Pro's 1 GB model / 2-hour refresh cap | Automatic refresh without Fabric or Premium |
+| **[4. Local CSV](4.%20Local%20CSV/)** · *start here* 🧪 | Power BI Desktop only | Manual — re-export, re-run, refresh | **Sample data included.** Open the template, point it at the sample CSVs. ~2 min | One-off; a local file path, so high volumes get slow | Seeing it working now, or a one-off look at your own numbers |
 
-**Not sure?** **Start with path 1.** It takes minutes and tells you whether the numbers are worth
-automating — *before* you set up any automation. Move to 2 or 3 when you want it hands-off.
+**Not sure?** **Start with path 4.** It takes minutes and tells you whether the numbers are worth
+automating — *before* you set up any automation. Move to 3 or 1 when you want it hands-off.
 
 > The former **Copilot Studio** agent / topic / CSAT add-on is retained as
-> [archived reference](3.%20Fabric/archive/extended/), not a recommended active deployment.
+> [archived reference](1.%20Fabric/archive/extended/), not a recommended active deployment.
 > For agent transcripts in **Dataverse**, use the
 > [Dataverse companion repo ↗](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio), which
 > reads them natively — no Fabric or SharePoint needed.
@@ -93,7 +94,7 @@ automating — *before* you set up any automation. Move to 2 or 3 when you want 
 > 💳 **Want credit consumption and cost too?** Paths 1–4 each have an optional
 > **`Add Credit Consumption/`** add-on: the separate **Consumption Central** report for Cowork /
 > Work IQ, Copilot Studio, GitHub Copilot and Azure AI Foundry spend. Start with the
-> [Local CSV add-on](1.%20Local%20CSV/Add%20Credit%20Consumption/) and its sample data. Once
+> [Local CSV add-on](4.%20Local%20CSV/Add%20Credit%20Consumption/) and its sample data. Once
 > it's published, the Fabric App's Consumption page reads it too.
 
 > Each path folder has its **own README** with the exact, step‑by‑step setup. This page is just the
@@ -106,14 +107,15 @@ README.md  ·  CHANGELOG.md  ·  LICENSE  ·  Images/
 CONTRIBUTING.md  ·  CODE_OF_CONDUCT.md  ·  SECURITY.md  ·  SUPPORT.md
 
 docs/              DATA-DICTIONARY.md  ·  PERMISSIONS.md   ← cross-path reference
-1. Local CSV/      Local CSV.pbit  ·  sample-data/   ← start here, fabricated demo dataset
-2. SharePoint/     SharePoint.pbit  ·  scripts/  ·  azure-container/
-3. Fabric/         Fabric.pbit  ·  docs/  ·  flows/  ·  notebooks/  ·  pipelines/
+1. Fabric/         Fabric.pbit  ·  docs/  ·  flows/  ·  notebooks/  ·  pipelines/
+     installer/         `npx valuelens-install` — sets up the whole Fabric path for you
+     Fabric App/        web app (React + Vite) over a published model  ·  deployed with `npx rayfin up`
      docs/              Fabric-only notes: ingestion, storage modes, troubleshooting, checker pack
      archive/extended/  archived Copilot Studio add-on reference (core notebook mirrors still synchronized)
      archive/flows/     archived cost-consumption flows and guides, not active setup
-4. Power Automate + Dataverse/  Power Automate + Dataverse.pbit  ·  scripts/  ·  source-map.json
-5. Fabric App/     web app (React + Vite) over a published model  ·  deployed with `npx rayfin up`
+2. Power Automate + Dataverse/  Power Automate + Dataverse.pbit  ·  scripts/  ·  source-map.json
+3. SharePoint/     SharePoint.pbit  ·  scripts/  ·  azure-container/
+4. Local CSV/      Local CSV.pbit  ·  sample-data/   ← start here, fabricated demo dataset
 */Add Credit Consumption/  optional Consumption Central cost report, one per path
 archive/            superseded versions — kept for reference, not maintained
 tests/             offline pytest regressions, run in CI by .github/workflows/tests.yml
@@ -142,10 +144,10 @@ Availability varies by deployment path. Use the path README for the maintained s
 
 | Source | Required? | Where it comes from |
 |---|---|---|
-| Copilot interactions (audit logs) | ✅ Core | Microsoft Purview; path 4 retains full raw payloads in Dataverse before processing |
-| Licensed users | ✅ Core | Microsoft 365 Admin Center / Graph; path 4 publishes curated users to Dataverse |
+| Copilot interactions (audit logs) | ✅ Core | Microsoft Purview; path 2 retains full raw payloads in Dataverse before processing |
+| Licensed users | ✅ Core | Microsoft 365 Admin Center / Graph; path 2 publishes curated users to Dataverse |
 | Org data (department / function) | ✅ Core | Microsoft Entra / BYOD equivalent |
-| Agents 365 | ⬜ Optional | Graph Agent 365 registry — Fabric notebook, or [`Get-Agents365Registry.ps1`](2.%20SharePoint/scripts/Get-Agents365Registry.ps1) on every other path (same 48 columns) |
+| Agents 365 | ⬜ Optional | Graph Agent 365 registry — Fabric notebook, or [`Get-Agents365Registry.ps1`](3.%20SharePoint/scripts/Get-Agents365Registry.ps1) on every other path (same 48 columns) |
 | Copilot credit consumption & cost | ⬜ Optional, separate report | Cowork / Work IQ, Copilot Studio, GitHub Copilot and Azure AI Foundry → the **Consumption Central** report in each path's `Add Credit Consumption/` folder. Not read by the ValueLens templates |
 | Product feedback | ⬜ Optional | M365 Admin Center → Health → Product Feedback export (Fabric table, or the `Feedback File` parameter on the other paths) |
 | Copilot Studio agent transcripts | ⬜ Optional | Dataverse `ConversationTranscript` table — use the [Dataverse companion repo ↗](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio) |
@@ -161,14 +163,14 @@ the path README you choose above.
 
 Maintained page lists live in the path READMEs:
 
-- [`1. Local CSV/README.md`](1.%20Local%20CSV/README.md)
-- [`2. SharePoint/README.md`](2.%20SharePoint/README.md)
-- [`3. Fabric/README.md`](3.%20Fabric/README.md)
-- [`4. Power Automate + Dataverse/README.md`](4.%20Power%20Automate%20+%20Dataverse/README.md)
-- [`5. Fabric App/README.md`](5.%20Fabric%20App/README.md)
+- [`1. Fabric/README.md`](1.%20Fabric/README.md)
+- [`1. Fabric/Fabric App/README.md`](1.%20Fabric/Fabric%20App/README.md)
+- [`2. Power Automate + Dataverse/README.md`](2.%20Power%20Automate%20+%20Dataverse/README.md)
+- [`3. SharePoint/README.md`](3.%20SharePoint/README.md)
+- [`4. Local CSV/README.md`](4.%20Local%20CSV/README.md)
 
 Archived Studio page reference (not an active deployment):
-[`3. Fabric/archive/extended/Fabric + Copilot Studio/README.md`](3.%20Fabric/archive/extended/Fabric%20+%20Copilot%20Studio/README.md).
+[`1. Fabric/archive/extended/Fabric + Copilot Studio/README.md`](1.%20Fabric/archive/extended/Fabric%20+%20Copilot%20Studio/README.md).
 
 Every path ships the same 15-page report (activation, adoption, habit formation, agent registry,
 task breakdown, estimated value, model fit, Cowork fit, Cowork and licence readiness, user

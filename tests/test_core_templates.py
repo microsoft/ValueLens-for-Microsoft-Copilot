@@ -10,11 +10,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = (
-    Path("1. Local CSV") / "ValueLens - Local CSV.pbit",
-    Path("2. SharePoint") / "ValueLens - SharePoint.pbit",
-    Path("3. Fabric") / "ValueLens - Fabric.pbit",
-    Path("3. Fabric") / "ValueLens - Fabric OneLake.pbit",
-    Path("4. Power Automate + Dataverse") / "ValueLens - Power Automate + Dataverse.pbit",
+    Path("4. Local CSV") / "ValueLens - Local CSV.pbit",
+    Path("3. SharePoint") / "ValueLens - SharePoint.pbit",
+    Path("1. Fabric") / "ValueLens - Fabric.pbit",
+    Path("1. Fabric") / "ValueLens - Fabric OneLake.pbit",
+    Path("2. Power Automate + Dataverse") / "ValueLens - Power Automate + Dataverse.pbit",
 )
 PAGE_COUNT = 16
 # Separate Consumption Central report shipped as an optional add-on in each path.
@@ -124,7 +124,7 @@ class CoreTemplateTests(unittest.TestCase):
                                  (name, expression["name"]))
 
     def test_optional_fabric_tables_load_empty_when_missing(self):
-        fabric = [(name, model) for name, _, model, _ in self.templates if name.startswith("3. Fabric")]
+        fabric = [(name, model) for name, _, model, _ in self.templates if name.startswith("1. Fabric")]
         self.assertEqual(len(fabric), 2)
         for name, model in fabric:
             queries = {t["name"]: text(t["partitions"][0]["source"]["expression"])

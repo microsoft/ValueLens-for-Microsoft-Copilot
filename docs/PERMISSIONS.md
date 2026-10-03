@@ -31,26 +31,26 @@ One app registration covers all three. Put the client secret in **Azure Key Vaul
 
 | Source | API? | Automated-pull permission | Manual-export role |
 |---|---|---|---|
-| **Cost consumption** (M365 Admin Center → Copilot → Cost management) | ❌ export-only | Not read by the current templates (the Credit Meter page was retired). The Fabric ingester is archived in [`3. Fabric/archive/notebooks/`](../3.%20Fabric/archive/notebooks/). | Global Administrator or Billing Administrator |
+| **Cost consumption** (M365 Admin Center → Copilot → Cost management) | ❌ export-only | Not read by the current templates (the Credit Meter page was retired). The Fabric ingester is archived in [`1. Fabric/archive/notebooks/`](../1.%20Fabric/archive/notebooks/). | Global Administrator or Billing Administrator |
 | **Product feedback** (OCV / M365 Health) | ❌ export-only | None — there is no API. Landed by the Power Automate flow, then ingested. | Global Administrator or Reports Reader |
 | **Agents 365** | ✅ Graph | `CopilotPackages.Read.All` + `Application.Read.All` (+ `User.Read.All` to resolve creators), admin-consented, **and an Agent 365 licence** in the tenant (else `403`). Used by `Copilot_Agent365_Registry_Ingester` (Fabric) and `Get-Agents365Registry.ps1` (every other path). | Global Administrator or Reports Reader (with **AI Admin** in a Frontier-enrolled tenant), for the CSV fallback via the admin centre |
 
 For the two **export-only** sources, the only "permission" to automate landing is the automation's **OneLake write**
 right (next section) — the data itself must be exported by an admin (or a scheduled portal export) first.
 
-The four `COST-CONSUMPTION` guides and cost flow JSON in [archive/flows](../3.%20Fabric/archive/flows/) are
+The four `COST-CONSUMPTION` guides and cost flow JSON in [archive/flows](../1.%20Fabric/archive/flows/) are
 **archived reference**, not recommended active deployment instructions. The cost ingester remains,
 but no current template reads its table.
 
 > **Studio add-ons.** Copilot Studio agent-transcript (Dataverse) analytics and PPAC per-agent /
 > per-user message-credit consumption need extra grants (a Dataverse **Application User** with read on
 > the **Conversation Transcript** table; Power Platform admin export). Those are covered in the archived
-> [Fabric + Copilot Studio](../3.%20Fabric/archive/extended/Fabric%20+%20Copilot%20Studio/) build,
+> [Fabric + Copilot Studio](../1.%20Fabric/archive/extended/Fabric%20+%20Copilot%20Studio/) build,
 > kept as reference rather than a recommended active deployment.
 
 ---
 
-## Fabric workspace & capacity (path 3 only)
+## Fabric workspace & capacity (path 1 only)
 
 | What | Role / requirement |
 |---|---|
@@ -68,7 +68,7 @@ but no current template reads its table.
 - **+ Agents 365:** add `CopilotPackages.Read.All` + `Application.Read.All` (+ `User.Read.All`) to the same app reg, and confirm the tenant has an Agent 365 licence.
 
 See the path README you're following for the step-by-step —
-[1](../1.%20Local%20CSV/README.md) · [2](../2.%20SharePoint/README.md) ·
-[3](../3.%20Fabric/README.md) · [4](../4.%20Power%20Automate%20+%20Dataverse/README.md) — and
-[`OPTIONAL-SOURCES.md`](../3.%20Fabric/docs/OPTIONAL-SOURCES.md)
+[1](../1.%20Fabric/README.md) · [2](../2.%20Power%20Automate%20+%20Dataverse/README.md) ·
+[3](../3.%20SharePoint/README.md) · [4](../4.%20Local%20CSV/README.md) — and
+[`OPTIONAL-SOURCES.md`](../1.%20Fabric/docs/OPTIONAL-SOURCES.md)
 for how absent sources stay green on the Fabric path.
