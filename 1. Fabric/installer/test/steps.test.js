@@ -281,3 +281,35 @@ test('printDataCheck flags missing core tables', () => {
   assert.match(ui.text(), /! Licensed users: no table yet/);
   assert.match(ui.text(), /! Copilot interactions: no table yet/);
 });
+
+test('printDataCheck explains hidden user names in the licence roster', () => {
+  const ui = fakeUi();
+  const { ctx } = fakeCtx({ ui: ui.ui });
+  printDataCheck(ctx, { tables: {}, identity: { licensed: 98, audit: 166, matched: 0, masked: 98 } });
+  assert.match(ui.text(), /! Licensed users: 98 of 98 user names are hidden/);
+  assert.match(ui.text(), /Settings > Org settings > Reports/);
+  assert.match(ui.text(), /Display concealed user, group, and site names in all reports/);
+});
+
+test('printDataCheck warns when no licence matches Copilot activity', () => {
+  const ui = fakeUi();
+  const { ctx } = fakeCtx({ ui: ui.ui });
+  printDataCheck(ctx, { tables: {}, identity: { licensed: 1250, audit: 900, matched: 0, masked: 0 } });
+  assert.match(ui.text(), /! Licensed users: none of the 900 people using Copilot match a licensed user/);
+  assert.doesNotMatch(ui.text(), /concealed/);
+});
+
+test('printDataCheck reports how many people using Copilot have a licence', () => {
+  const ui = fakeUi();
+  const { ctx } = fakeCtx({ ui: ui.ui });
+  printDataCheck(ctx, { tables: {}, identity: { licensed: 1250, audit: 900, matched: 812, masked: 0 } });
+  assert.match(ui.text(), /✓ Licensed users: 812 of 900 people using Copilot have a licence/);
+});
+
+test('printDataCheck says nothing about matching when the check did not run', () => {
+  const ui = fakeUi();
+  const { ctx } = fakeCtx({ ui: ui.ui });
+  printDataCheck(ctx, { tables: {}, identity: null });
+  printDataCheck(ctx, { tables: {}, identity: { licensed: 0, audit: 900, matched: 0, masked: 0 } });
+  assert.doesNotMatch(ui.text(), /match|have a licence/);
+});

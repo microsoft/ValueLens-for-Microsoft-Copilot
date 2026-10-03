@@ -3,6 +3,7 @@
     "[Total Licensed Users]": 225,
     "[Avg Days Since Last Active]": 22.119230769230768,
     "[License Evidence Notice]": "Dormancy is measured against the audit window (8 May 2026 to 6 Jul 2026, 59 days), not against today. The window is shorter than 90 days, so a never-active seat reads as roughly 59 days dormant and the 90d+ and 180d+ cuts cannot be evidenced. Treat 30d+ as 'no activity in the loaded window', not as a confirmed reclaim list.",
-    "[Reclaim Cost Notice]": "Not costed: the Monthly Licence Cost assumption is 0, so the reclaimable value reads as zero. Set it in the model's Assumptions table to price the dormant seats."
+    "[Reclaim Cost Notice]": "Not costed: the Monthly Licence Cost assumption is 0, so the reclaimable value reads as zero. Set it in the model's Assumptions table to price the dormant seats.",
+    "[License Inventory Usable]": 1
   }
 ]
