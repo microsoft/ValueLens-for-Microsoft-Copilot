@@ -5,6 +5,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { addM365Activity } from './m365.js';
+import { addCopilotPaygSpend } from './payg.js';
 import { readZipEntry } from './zip.js';
 
 export const MODEL_TEMPLATE = 'ValueLens - Fabric.pbit';
@@ -129,6 +130,7 @@ export function buildConsumptionModel(template, settings) {
   const model = structuredClone(template.model);
   setMParameter(model, 'FabricSQLEndpoint', settings.server);
   setMParameter(model, 'LakehouseName', settings.database);
+  addCopilotPaygSpend(model);
   return { compatibilityLevel: template.compatibilityLevel, model };
 }
 
@@ -152,7 +154,7 @@ export function buildAgentEvaluatorModel(template, settings) {
   setMParameter(model, 'Source Mode', 'Fabric');
   for (const name of AGENT_EVALUATOR_OFFLINE_FUNCTIONS) {
     const expr = model.expressions?.find((e) => e.name === name);
-    if (!expr) throw new Error(`The Agent Evaluator model has no "${name}" function.`);
+    if (!expr) throw new Error(`The transcripts model template has no "${name}" function.`);
     const text = Array.isArray(expr.expression) ? expr.expression.join('\n') : String(expr.expression);
     const at = text.indexOf('=>');
     if (at < 0) throw new Error(`"${name}" is not a function.`);
@@ -164,7 +166,7 @@ export function buildAgentEvaluatorModel(template, settings) {
   const fabricTable = model.expressions?.find((e) => e.name === 'FabricTable');
   const fabricText = fabricTable && (Array.isArray(fabricTable.expression) ? fabricTable.expression.join('\n') : String(fabricTable.expression));
   const direct = fabricText?.replace(/^([ \t]*)FabEndpoint = [^\n]*\n[ \t]*FabLakehouse = [^\n]*\n[ \t]*Db = [^\n]*Sql\.Database\(FabEndpoint, FabLakehouse\),/m, '$1Db = Sql.Database(#"Fabric SQL Endpoint", #"Lakehouse Name"),');
-  if (!fabricTable || !direct || direct === fabricText) throw new Error('The Agent Evaluator "FabricTable" function has changed shape.');
+  if (!fabricTable || !direct || direct === fabricText) throw new Error('The transcripts model template\'s "FabricTable" function has changed shape.');
   fabricTable.expression = direct;
   completeAgentEvaluatorFallbacks(model);
   const diagnostic = model.tables.find((t) => t.name === AGENT_EVALUATOR_DIAGNOSTIC_TABLE);

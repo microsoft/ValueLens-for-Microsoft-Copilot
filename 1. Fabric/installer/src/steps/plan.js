@@ -4,14 +4,17 @@
  * install can run unattended.
  */
 import { randomBytes } from 'node:crypto';
-import { MODULES, OPTIONAL_MODULES } from '../catalog.js';
+import { MODULES, notebooksFor, OPTIONAL_MODULES, permissionsFor } from '../catalog.js';
 import { allowsAction, armLocation, validateVaultName } from '../clients/azure.js';
+import { TRANSCRIPT_ROLE } from '../clients/dataverse.js';
 import { APP_ROLES, CONSENT_ROLES } from '../clients/graph.js';
 import { HttpError } from '../http.js';
 import { c } from '../ui.js';
 import { MIN_NODE, nodeVersionOk } from './app.js';
 import { agentEvaluatorModelWanted, planAgentEvaluator } from './agent-evaluator.js';
-import { consumptionModelWanted, planConsumption } from './consumption.js';
+import { AZURE_AI_ROLES, consumptionModelWanted, planConsumption } from './consumption.js';
+import { describeSchedule, PIPELINE_NAME } from './fabric.js';
+import { connectionName } from './model.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
@@ -155,7 +158,7 @@ async function planPowerBi(ctx, pre) {
   const canApp = !!sources.appDir;
   const current = sm.enabled === false ? 'none' : fa.enabled === false || !canApp ? 'model' : 'both';
   const choice = await ui.select(
-    'Deploy the ValueLens semantic model?',
+    'Deploy the Analytics Hub semantic model?',
     [
       ...(canApp ? [{ name: 'Semantic model and the Analytics Hub app (recommended)', value: 'both', description: 'A web app in the workspace, built on the model.' }] : []),
       { name: 'Semantic model only', value: 'model', description: 'Build your own reports on it in Power BI.' },
@@ -354,10 +357,131 @@ export function uniqueName(base, taken) {
 }
 
 /**
+ * @typedef {{ kind: string, name: string, detail?: string, isNew: boolean }} ReviewItem
+ * @typedef {{ who: string, what: string, where: string, detail?: string }} ReviewGrant
+ * @typedef {{ what: string, where: string, detail?: string }} ReviewRun
+ * @typedef {{ creates: ReviewItem[], grants: ReviewGrant[], runsOn: ReviewRun[] }} PlanReview
+ */
+
+/**
+ * What the plan creates, who it gives access to what, and where it runs: the record a
+ * reviewer reads before saying go ahead.
+ * @param {Ctx} ctx
+ * @param {Pick<Preflight, 'capacities' | 'subscriptions' | 'canConsent'>} [pre]
+ * @returns {PlanReview}
+ */
+export function planReview(ctx, pre) {
+  const { config, user } = ctx;
+  const f = config.fabric;
+  const kv = config.keyVault;
+  const sm = config.semanticModel;
+  const fa = config.fabricApp;
+  const cc = config.consumption;
+  const ae = config.agentEvaluator;
+  const appName = config.app.appId ? config.app.displayName ?? config.app.appId : APP_NAME;
+  const withAzureAi = !!config.modules.consumption && !!cc.azureSubscriptionId;
+  const withTranscripts = !!config.modules.agentEvaluator && ae.environments.length > 0;
+  const notebooks = notebooksFor(config.modules, { semanticModel: !!sm.enabled, azureAi: withAzureAi, dataverse: withTranscripts });
+
+  /** @type {ReviewItem[]} */
+  const creates = [
+    {
+      kind: 'App registration',
+      name: appName,
+      isNew: !config.app.appId,
+      detail: config.app.existing ? 'Yours. A client secret you paste goes straight to Key Vault.' : 'Signs in to Microsoft Graph for the notebooks, with a client secret kept in Key Vault.',
+    },
+    {
+      kind: 'Key Vault',
+      name: kv.name ?? 'Not chosen',
+      isNew: !kv.existing && !kv.uri,
+      detail: [
+        kv.existing || kv.uri ? undefined : `In resource group ${kv.resourceGroup}, ${kv.location}, using ${kv.rbac ? 'Azure RBAC' : 'access policies'}.`,
+        `Holds the secret "${kv.secretName}".`,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    },
+    { kind: 'Workspace', name: f.workspaceName ?? f.workspaceId ?? 'Not chosen', isNew: !f.workspaceId },
+    { kind: 'Lakehouse', name: f.lakehouseName ?? 'ValueLens', isNew: !f.lakehouseId },
+    {
+      kind: 'Notebooks',
+      name: `${notebooks.length} notebooks`,
+      isNew: notebooks.some((nb) => !f.notebooks[nb.key]),
+      detail: notebooks.map((nb) => nb.displayName).join(', '),
+    },
+    { kind: 'Pipeline', name: f.pipelineName ?? PIPELINE_NAME, isNew: !f.pipelineId, detail: `Runs the notebooks ${describeSchedule(config.schedule)}.` },
+  ];
+  if (sm.enabled) {
+    creates.push({ kind: 'Semantic model', name: sm.name, isNew: !sm.id });
+    if (consumptionModelWanted(ctx)) creates.push({ kind: 'Semantic model', name: cc.model.name, isNew: !cc.model.id });
+    if (agentEvaluatorModelWanted(ctx)) creates.push({ kind: 'Semantic model', name: ae.model.name, isNew: !ae.model.id });
+    creates.push({
+      kind: 'Connection',
+      name: sm.connectionName ?? (f.workspaceId ? connectionName(f.workspaceId) : 'ValueLens SQL connection'),
+      isNew: !sm.connectionId,
+      detail: 'Lets the models read the Lakehouse, with a second client secret that only the connection holds.',
+    });
+    if (fa.enabled) creates.push({ kind: 'Fabric app', name: fa.name ?? 'Analytics Hub', isNew: !fa.itemId, detail: 'A web app in the workspace, built on the semantic model.' });
+  }
+
+  const appWho = `${appName} (app)`;
+  /** @type {ReviewGrant[]} */
+  const grants = [
+    {
+      who: appWho,
+      what: `Microsoft Graph application permissions: ${permissionsFor(config.modules).join(', ')}`,
+      where: 'Your tenant, through admin consent',
+      detail: pre && !pre.canConsent ? 'You can\'t grant it yourself. You get a link for a Global Administrator or Privileged Role Administrator to approve.' : undefined,
+    },
+  ];
+  if (!kv.uri) {
+    grants.push({
+      who: `${user.upn} (you)`,
+      what: kv.existing
+        ? 'Key Vault Secrets Officer, or an access policy with secret get, list and set if the vault doesn\'t use Azure RBAC'
+        : kv.rbac === false
+          ? 'An access policy with secret get, list and set'
+          : 'Key Vault Secrets Officer, so you can write the secret',
+      where: `Key Vault ${kv.name}`,
+      detail: kv.existing ? 'Only when you don\'t have it already.' : undefined,
+    });
+  }
+  if (sm.enabled) grants.push({ who: appWho, what: 'Viewer', where: `Workspace ${f.workspaceName ?? f.workspaceId}`, detail: 'So the semantic models can read the Lakehouse.' });
+  if (withAzureAi && !cc.azureAccess) {
+    grants.push({ who: appWho, what: AZURE_AI_ROLES.map((r) => r.name).join(', '), where: `Azure subscription ${cc.azureSubscriptionName ?? cc.azureSubscriptionId}`, detail: 'So the notebook can read Azure AI usage and cost.' });
+  }
+  const waiting = ae.environments.filter((e) => !e.access);
+  if (config.modules.agentEvaluator && waiting.length) {
+    grants.push({
+      who: appWho,
+      what: `Application user with the ${TRANSCRIPT_ROLE} role`,
+      where: waiting.map((e) => e.name ?? new URL(e.url).host).join(', '),
+      detail: 'So the notebook can read Copilot Studio transcripts from Dataverse.',
+    });
+  }
+
+  const capacity = pre?.capacities.find((cap) => cap.id === f.capacityId);
+  const subscription = pre?.subscriptions.find((s) => s.subscriptionId === kv.subscriptionId);
+  /** @type {ReviewRun[]} */
+  const runsOn = [
+    {
+      what: sm.enabled ? `Notebooks, pipeline, semantic models${fa.enabled ? ' and the app' : ''}` : 'Notebooks and pipeline',
+      where: capacity ? `Fabric capacity ${capacity.displayName} (${capacity.sku}, ${capacity.region})` : `Fabric capacity ${f.capacityId ?? 'not chosen'}`,
+    },
+    { what: 'Key Vault', where: `Azure subscription ${subscription?.displayName ?? kv.subscriptionId ?? 'already chosen'}`, detail: 'Standard tier.' },
+    { what: 'Scheduled runs', where: `${describeSchedule(config.schedule)}, as ${user.upn}`, detail: 'The schedule\'s owner reads the secret and refreshes the models.' },
+  ];
+  if (ctx.runFirstLoad) runsOn.push({ what: 'First load', where: `${config.history.days} days of audit history, straight after setup` });
+  return { creates, grants, runsOn };
+}
+
+/**
  * Prints the plan and asks to go ahead.
  * @param {Ctx} ctx
+ * @param {Preflight} [pre]
  */
-export async function confirmPlan(ctx) {
+export async function confirmPlan(ctx, pre) {
   const { ui, config } = ctx;
   const mods = ['Copilot usage and licences', ...OPTIONAL_MODULES.filter((m) => config.modules[m]).map((m) => MODULES[m].label)];
   ui.heading('Ready to set up');
@@ -386,5 +510,6 @@ export async function confirmPlan(ctx) {
     ui.info(`Agents:      ${envs.length ? `${names}${waiting}` : c.dim('no environments chosen')}`);
   }
   if (ctx.runFirstLoad) ui.info(`First load:  ${config.history.days} days of history, straight after setup`);
+  ui.review(planReview(ctx, pre));
   return ui.confirm('Go ahead?', true);
 }

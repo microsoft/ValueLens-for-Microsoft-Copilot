@@ -48,12 +48,12 @@ const host = (url) => new URL(url).host;
 export async function planAgentEvaluator(ctx) {
   const { ui, config, api, sources } = ctx;
   const ae = config.agentEvaluator;
-  ui.heading('Agent Evaluator');
+  ui.heading('Copilot Studio transcripts');
   if (!config.semanticModel.enabled) {
-    ui.note('The Agent Evaluator model shares the ValueLens model\'s connection, so it is only deployed with it.');
-    ui.note('The notebook still loads the transcripts; publish "Agent Evaluator.pbit" yourself.');
+    ui.note('The transcripts model shares the main semantic model\'s connection, so it is only deployed with it.');
+    ui.note('The notebook still loads the transcripts; publish the transcripts report ("Agent Evaluator.pbit") yourself.');
   } else if (!sources.agentEvaluatorModelFile) {
-    ui.note('This checkout has no "Agent Evaluator.pbit", so only the notebook is deployed.');
+    ui.note('This checkout has no transcripts report ("Agent Evaluator.pbit"), so only the notebook is deployed.');
   }
 
   /** @type {import('../clients/dataverse.js').DataverseInstance[] | undefined} */
@@ -212,7 +212,7 @@ export async function ensureAgentEvaluatorModel(ctx, opts = {}) {
   const { config, sources } = ctx;
   const m = config.agentEvaluator.model;
   const file = sources.agentEvaluatorModelFile;
-  if (!file) throw new Error('This checkout has no "Agent Evaluator.pbit" to build the Agent Evaluator model from.');
+  if (!file) throw new Error('This checkout has no "Agent Evaluator.pbit" to build the transcripts model from.');
   const { server, database } = await waitForSqlEndpoint(ctx);
   await deployModel(ctx, m, {
     signature: `${server.toLowerCase()};${database}`,
@@ -230,7 +230,7 @@ export function agentEvaluatorSummary(ctx) {
   const { ui, config } = ctx;
   const ae = config.agentEvaluator;
   const ws = /** @type {string} */ (config.fabric.workspaceId);
-  ui.heading('Agent Evaluator');
+  ui.heading('Copilot Studio transcripts');
   if (!ae.environments.length) {
     ui.info(`Environments: ${c.dim('none chosen')}`);
     return;

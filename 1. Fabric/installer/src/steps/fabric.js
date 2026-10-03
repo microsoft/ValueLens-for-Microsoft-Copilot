@@ -115,7 +115,7 @@ export const endpointName = (vaultName) => `valuelens-${vaultName}`.slice(0, 64)
  * the installer can tell its own request from others.
  * @param {string} workspaceId
  */
-export const endpointRequest = (workspaceId) => `ValueLens: Fabric workspace ${workspaceId} reads the app secret.`;
+export const endpointRequest = (workspaceId) => `Analytics Hub: Fabric workspace ${workspaceId} reads the app secret.`;
 
 /** @param {string | undefined} a @param {string | undefined} b */
 const sameResource = (a, b) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
@@ -158,7 +158,7 @@ async function approveOnVault(ctx, endpoint) {
     const pending = mine.filter((conn) => conn.properties?.privateLinkServiceConnectionState?.status === 'Pending');
     if (pending.length) {
       try {
-        for (const conn of pending) await api.arm.approvePrivateEndpointConnection(conn.id, 'Approved by the ValueLens installer.');
+        for (const conn of pending) await api.arm.approvePrivateEndpointConnection(conn.id, 'Approved by the Analytics Hub installer.');
       } catch (err) {
         if (err instanceof HttpError && err.status === 403) return false;
         throw err;
@@ -283,7 +283,12 @@ export function notebookSettings(ctx, nb) {
           values: { SOURCE_MODE: 'dataverse', WRITE_MODE: 'merge', RAW_TABLE: '' },
         }
       : {}),
-    patches: nb.key === 'agentTranscripts' ? [...(nb.patches ?? []), environmentsPatch(config.agentEvaluator.environments)] : nb.patches,
+    patches:
+      nb.key === 'agentTranscripts'
+        ? [...(nb.patches ?? []), environmentsPatch(config.agentEvaluator.environments)]
+        : nb.key === 'azureAi' && paygReadable(config).length
+          ? [...(nb.patches ?? []), paygPatch(paygReadable(config))]
+          : nb.patches,
     lakehouse: {
       id: /** @type {string} */ (f.lakehouseId),
       name: /** @type {string} */ (f.lakehouseName),
@@ -295,6 +300,30 @@ export function notebookSettings(ctx, nb) {
 
 /** The transcript parser's environment list, as it ships. */
 export const ENVIRONMENTS_FIND = "DATAVERSE_URLS = [\n    # 'https://org1.crm.dynamics.com',\n    # 'https://org2.crm.dynamics.com',\n]";
+
+/** The Azure AI notebook's extra pay-as-you-go subscriptions, as it ships. */
+export const PAYG_FIND = 'PAYG_SUBSCRIPTION_IDS = []';
+
+/**
+ * The other subscriptions whose Copilot pay-as-you-go the app can read.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const paygReadable = (config) => (config.consumption?.paygSubscriptions ?? []).filter((p) => p.access);
+
+/**
+ * The pay-as-you-go subscriptions in the Azure AI notebook, as stored with the deployed notebook.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const paygIds = (config) => paygReadable(config).map((p) => p.subscriptionId).join(',');
+
+/**
+ * @param {import('../config.js').PaygSubscription[]} subs
+ * @returns {import('../catalog.js').NotebookPatch}
+ */
+export function paygPatch(subs) {
+  const lines = subs.map((s) => `    ${pyString(s.subscriptionId)},${s.name ? `  # ${s.name.replace(/[\r\n]+/g, ' ')}` : ''}`);
+  return { find: PAYG_FIND, replace: ['PAYG_SUBSCRIPTION_IDS = [  # ' + MARKER, ...lines, ']'].join('\n') };
+}
 
 /**
  * Lists every chosen environment, including those still waiting for access: the parser skips
@@ -321,6 +350,7 @@ export async function ensureNotebooks(ctx, opts = {}) {
   for (const nb of notebooksFor(config.modules, { semanticModel: modelDeployed(config), azureAi: azureAiOn(config), dataverse: agentEvaluatorOn(config) })) {
     const content = serialiseNotebook(prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb)));
     const urls = nb.key === 'agentTranscripts' ? environmentUrls(config) : undefined;
+    const payg = nb.key === 'azureAi' ? paygIds(config) : undefined;
     let id = f.notebooks[nb.key];
     if (id && !ids.has(id)) {
       ui.warn(`${nb.displayName} was deleted. Deploying it again.`);
@@ -329,7 +359,7 @@ export async function ensureNotebooks(ctx, opts = {}) {
     if (!id) {
       const same = byName(items, nb.displayName);
       if (same) {
-        const replace = await ui.confirm(`A notebook called ${nb.displayName} is already in the workspace. Replace it with the ValueLens version?`, true);
+        const replace = await ui.confirm(`A notebook called ${nb.displayName} is already in the workspace. Replace it with the Analytics Hub version?`, true);
         if (!replace) throw new Error(`Stopped: ${nb.displayName} already exists. Rename or remove it, or choose another workspace.`);
         await api.fabric.updateNotebook(ws, same.id, content);
         id = same.id;
@@ -339,7 +369,11 @@ export async function ensureNotebooks(ctx, opts = {}) {
         id = await createdId(ctx, created, 'Notebook', nb.displayName);
         ui.ok(`Created ${nb.displayName}`);
       }
-    } else if (opts.force || (urls !== undefined && urls !== config.agentEvaluator.deployedUrls)) {
+    } else if (
+      opts.force ||
+      (urls !== undefined && urls !== config.agentEvaluator.deployedUrls) ||
+      (payg !== undefined && payg !== (config.consumption.deployedPayg ?? ''))
+    ) {
       await api.fabric.updateNotebook(ws, id, content);
       ui.ok(`Updated ${nb.displayName}`);
     } else {
@@ -347,6 +381,7 @@ export async function ensureNotebooks(ctx, opts = {}) {
     }
     f.notebooks[nb.key] = id;
     if (urls !== undefined) config.agentEvaluator.deployedUrls = urls;
+    if (payg !== undefined) config.consumption.deployedPayg = payg;
     ctx.save();
   }
 }
@@ -435,7 +470,7 @@ export async function ensurePipeline(ctx, opts = {}) {
     const name = f.pipelineName ?? PIPELINE_NAME;
     const same = byName(items, name);
     if (same) {
-      const replace = await ui.confirm(`A pipeline called ${name} is already in the workspace. Replace it with the ValueLens version?`, true);
+      const replace = await ui.confirm(`A pipeline called ${name} is already in the workspace. Replace it with the Analytics Hub version?`, true);
       if (!replace) throw new Error(`Stopped: ${name} already exists. Rename or remove it, or choose another workspace.`);
       await api.fabric.updatePipeline(ws, same.id, definition);
       f.pipelineId = same.id;

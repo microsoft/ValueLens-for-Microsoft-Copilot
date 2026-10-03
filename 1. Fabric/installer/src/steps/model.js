@@ -82,7 +82,7 @@ export async function deployModel(ctx, m, o) {
   if (!m.id) {
     const same = byName(items, m.name);
     if (same) {
-      const replace = await ui.confirm(`A semantic model called ${m.name} is already in the workspace. Replace it with the ValueLens version?`, true);
+      const replace = await ui.confirm(`A semantic model called ${m.name} is already in the workspace. Replace it with the Analytics Hub version?`, true);
       if (!replace) throw new Error(`Stopped: ${m.name} already exists. Rename or remove it, or choose another workspace.`);
       await api.fabric.updateSemanticModel(ws, same.id, o.definition());
       m.id = same.id;

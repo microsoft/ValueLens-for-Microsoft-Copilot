@@ -78,8 +78,8 @@ export const MODULES = {
   },
   agentEvaluator: {
     id: 'agentEvaluator',
-    label: 'Agent Evaluator',
-    description: 'Copilot Studio agent conversations from Dataverse: how they ended, what people thought, and where agents fall short.',
+    label: 'Copilot Studio transcripts',
+    description: 'Agent conversations from Dataverse: how they ended, what people thought, and where agents fall short.',
     required: false,
     defaultOn: false,
     permissions: [],

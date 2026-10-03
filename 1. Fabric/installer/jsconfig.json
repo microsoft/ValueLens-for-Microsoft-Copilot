@@ -11,5 +11,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["bin/**/*.js", "src/**/*.js", "test/**/*.js"]
+  "include": ["bin/**/*.js", "src/**/*.js", "test/**/*.js"],
+  "exclude": ["src/web/**"]
 }

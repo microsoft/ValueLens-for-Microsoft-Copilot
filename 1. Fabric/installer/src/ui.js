@@ -55,6 +55,11 @@ export function createUi(opts = {}) {
     info: (s) => line(`    ${s}`),
     /** @param {string} s */
     note: (s) => line(`    ${c.dim(s)}`),
+    /**
+     * The plan as structured data. The terminal already printed it line by line.
+     * @param {import('./steps/plan.js').PlanReview} _plan
+     */
+    review: (_plan) => {},
 
     /**
      * @template T

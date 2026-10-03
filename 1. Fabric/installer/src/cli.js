@@ -5,18 +5,20 @@ import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { DEFAULT_CONFIG_FILE, loadConfig } from './config.js';
 import { HttpError } from './http.js';
-import { connect, createCtx, deployAppNow, install, preview, refresh, rotateSecret, run, status, update } from './install.js';
+import { connect, createCtx, preview, runCommand } from './install.js';
+import { runWizard } from './server.js';
 import { loadSources } from './sources.js';
 import { c, createUi } from './ui.js';
 
 const COMMANDS = ['install', 'update', 'run', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'preview'];
 
-export const HELP = `Sets up ValueLens in Microsoft Fabric: the data pipeline, the semantic model and the app.
+export const HELP = `Sets up Analytics Hub in Microsoft Fabric: the data pipeline, the semantic model and the app.
 
 Usage: valuelens-install [command] [options]
+       valuelens-install --ui [options]
 
 Commands:
-  install          Set up ValueLens, or repair it from the install record (default)
+  install          Set up Analytics Hub, or repair it from the install record (default)
   update           Push the notebooks, pipeline and semantic model from this checkout to Fabric
   run              Run the pipeline now, then the data check
   refresh          Refresh the semantic model now
@@ -26,6 +28,9 @@ Commands:
   preview          Write what would be deployed to a folder, without signing in
 
 Options:
+  --ui                 Run the installer in your browser instead of the terminal, and choose
+                       the command there. Only this computer can reach the page.
+  --no-open            With --ui: print the link instead of opening the browser
   --config <file>      Install record (default ./${DEFAULT_CONFIG_FILE})
   --source <dir>       The "1. Fabric" folder to deploy from (default: this checkout)
   --tenant <id>        Tenant ID or domain to sign in to
@@ -58,6 +63,8 @@ export function parseCli(argv) {
       yes: { type: 'boolean', short: 'y' },
       'no-wait': { type: 'boolean' },
       'dry-run': { type: 'boolean' },
+      ui: { type: 'boolean' },
+      'no-open': { type: 'boolean' },
       verbose: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
@@ -67,6 +74,8 @@ export function parseCli(argv) {
   const command = values['dry-run'] ? 'preview' : positionals[0] ?? 'install';
   if (!COMMANDS.includes(command)) throw new Error(`Unknown command "${command}". Try --help.`);
   if (values['device-code'] && values['use-az']) throw new Error('Choose one of --device-code and --use-az.');
+  if (values.ui && (positionals.length || values['dry-run'])) throw new Error('--ui opens a home page where you choose what to do. Leave out the command.');
+  if (values.ui && values.yes) throw new Error('Choose one of --ui and --yes.');
   /** @type {number | undefined} */
   let backfillDays;
   if (values['backfill-days'] !== undefined) {
@@ -83,6 +92,8 @@ export function parseCli(argv) {
     outDir: values.out ?? 'valuelens-preview',
     yes: !!values.yes,
     wait: !values['no-wait'],
+    ui: !!values.ui,
+    open: !values['no-open'],
     verbose: !!values.verbose,
     help: !!values.help,
     version: !!values.version,
@@ -111,11 +122,16 @@ export async function main(argv) {
       process.stdout.write(`${version()}\n`);
       return 0;
     }
+    const debug = verbose ? (/** @type {string} */ m) => process.stderr.write(`${c.dim(m)}\n`) : undefined;
+    if (args.ui) {
+      await runWizard({ configFile: args.configFile, sourceDir: args.sourceDir, tenantId: args.tenantId, method: args.method, open: args.open, version: version(), debug });
+      return 0;
+    }
     const ui = createUi({ yes: args.yes });
     const { config, existed } = loadConfig(args.configFile);
     const sources = loadSources(args.sourceDir);
 
-    ui.line(c.bold(`ValueLens Fabric installer ${version()}`));
+    ui.line(c.bold(`Analytics Hub installer ${version()}`));
     if (args.command === 'preview') {
       preview({ ui, config, sources, outDir: args.outDir });
       return 0;
@@ -128,38 +144,11 @@ export async function main(argv) {
       tenantId: args.tenantId ?? config.tenantId,
       method: args.method,
       ui,
-      debug: verbose ? (m) => process.stderr.write(`${c.dim(m)}\n`) : undefined,
+      debug,
     });
     const ctx = createCtx({ ui, config, file: args.configFile, api, user, sources });
-
-    switch (args.command) {
-      case 'install':
-        await install(ctx, { wait: args.wait });
-        break;
-      case 'update':
-        await update(ctx, { wait: args.wait });
-        break;
-      case 'run': {
-        const result = await run(ctx, { backfillDays: args.backfillDays, wait: args.wait });
-        if (args.wait && !result.ok) return 1;
-        break;
-      }
-      case 'refresh': {
-        const result = await refresh(ctx, { wait: args.wait });
-        if (args.wait && !result.ok) return 1;
-        break;
-      }
-      case 'deploy-app':
-        await deployAppNow(ctx);
-        break;
-      case 'status':
-        await status(ctx);
-        break;
-      case 'rotate-secret':
-        await rotateSecret(ctx);
-        break;
-    }
-    return 0;
+    const ok = await runCommand(ctx, args.command, { wait: args.wait, backfillDays: args.backfillDays });
+    return ok ? 0 : 1;
   } catch (err) {
     const e = /** @type {any} */ (err);
     if (e?.name === 'ExitPromptError') {
