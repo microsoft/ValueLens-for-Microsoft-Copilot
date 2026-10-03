@@ -15,7 +15,7 @@ the [prices](#prices) and the [task times](#task-times) you type in.
 |---|---|
 | **Adoption** | Who started, who stayed, who stuck: activation, adoption, habit formation, trend heatmap |
 | **Leaderboards** | The people and agents doing the most, plus the agent registry with descriptions |
-| **Work patterns** | How people work across Microsoft 365: meetings, email, chat and files, which apps they use, and how Copilot users' working weeks compare with everyone else's. From the optional [Microsoft 365 activity](../installer/README.md#microsoft-365-activity) data |
+| **Work patterns** | How people work across Microsoft 365: meetings, email, chat and files, which apps they use, how many of the apps each person uses and on which devices, and how Copilot users' working weeks compare with everyone else's. Organisations with fewer than five active people share one *Smaller groups* row. From the optional [Microsoft 365 activity](../installer/README.md#microsoft-365-activity) data |
 | **Agent Evaluation** | How well Copilot Studio agents answer: how conversations ended, errors, topic health, knowledge sources and feedback comments, from Agent Evaluator. It never shows the conversations themselves |
 | **Readiness** | Who to license next, and who's ready for Cowork. With Microsoft 365 activity, the licence priority score also weighs how many Microsoft 365 workloads each person uses a day |
 | **Consumption** | Credits used and what they cost across Cowork / Work IQ, Copilot Studio and Azure, from Consumption Central, at rates you can set in the app |

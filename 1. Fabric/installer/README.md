@@ -108,8 +108,8 @@ result back.
 ## Microsoft 365 activity
 
 On by default. It reads the Microsoft 365 usage reports, so the app's **Work patterns** page shows
-how people work: meetings, email, chat and files, which workloads and apps they use, and how
-Copilot users' weeks compare with everyone else's. It also lets Readiness's *Who to license next*
+how people work: meetings, email, chat and files, which workloads and apps they use and on which
+devices, and how Copilot users' weeks compare with everyone else's. It also lets Readiness's *Who to license next*
 weigh how many workloads each person uses a day. It needs `Reports.Read.All`, which the core
 already has, so there's nothing more to consent to.
 
