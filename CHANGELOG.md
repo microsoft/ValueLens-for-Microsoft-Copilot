@@ -16,6 +16,19 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-03 — Fabric App: readable consumption charts over time
+
+The Copilot Studio "Consumption over time" and "Cost over time" charts were unreadable.
+Each of about 90 daily bars carried a white value label, and the date axis showed no dates,
+because every day got its own text slot only a few pixels wide. The days now sit on a real
+time axis with a tick each week, the bars keep a sensible width at any panel size, and the
+value labels are gone. Hover over a bar to see the day's numbers.
+
+The Cowork / Work IQ weekly "Cost over time" chart also loses its per-bar labels, which showed
+uneven decimals and a stray 0 on every week with no pay-as-you-go spend. The Azure "Foundry cost
+over time" chart now has the same weekly date ticks as Copilot Studio, where before it showed only
+the first of each month.
+
 ## 2026-10-03 — Paths renumbered: Fabric first
 
 The path folders are renumbered so the recommended route comes first, and the web app now lives
