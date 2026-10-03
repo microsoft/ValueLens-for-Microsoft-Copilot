@@ -38,6 +38,8 @@ import { ChartPanel, KpiRowState, NoteCard, Panel, RollupGrid, type TreeColumn }
 const KPI_GRID = "grid gap-300 md:grid-cols-2 xl:grid-cols-5";
 const money = moneyCell(CREDIT_CURRENCY);
 const BREAKDOWN_CHART = { perRow: 36, chrome: 130, min: 220 };
+// A label on each of ~90 daily bars can't fit; the tooltip carries the numbers.
+const NO_STACK_LABELS = { disableStackedDataLabels: true };
 
 const CONSUMPTION_COLUMNS: readonly TreeColumn[] = [
     { id: "Credits Used", header: "Credits used", width: 128, format: formatCell("whole"), heat: true },
@@ -218,6 +220,7 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                 <ChartPanel
                     result={daily}
                     spec={dailySource.vegaLiteSpec}
+                    capabilities={NO_STACK_LABELS}
                     height={340}
                     title={cost ? "Cost over time" : "Consumption over time"}
                     subtitle={cost ? "Tenant cost each day, prepaid then pay-as-you-go" : "Tenant credits each day, prepaid then pay-as-you-go"}

@@ -11,7 +11,7 @@
       "field": "Day",
       "type": "temporal",
       "title": null,
-      "axis": { "labelExpr": "timeFormat(datum.value, '%-d %b')", "labelAngle": 0, "labelOverlap": true }
+      "axis": { "labelExpr": "timeFormat(datum.value, '%-d %b')", "labelAngle": 0, "labelOverlap": true, "tickCount": "week", "grid": false }
     },
     "y": {
       "field": "Cost",

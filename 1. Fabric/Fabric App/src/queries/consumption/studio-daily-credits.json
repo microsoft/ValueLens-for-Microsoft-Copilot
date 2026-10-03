@@ -7,18 +7,15 @@
     { "filter": "isValid(datum['Value'])" },
     { "calculate": "datum['Series'] === 'Prepaid Credits' ? 'Prepaid' : 'Pay-as-you-go'", "as": "Billing" },
     { "calculate": "datum['Series'] === 'Prepaid Credits' ? 1 : 2", "as": "Billing Order" },
-    { "calculate": "toDate(datum['Usage Date'])", "as": "Day" },
-    { "calculate": "time(datum['Day'])", "as": "Day Order" },
-    { "calculate": "timeFormat(datum['Day'], '%-d %b')", "as": "Day Label" }
+    { "calculate": "toDate(datum['Usage Date'])", "as": "Day" }
   ],
-  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "mark": { "type": "bar", "width": { "expr": "max(1, 0.7 * (scale('x', 86400000) - scale('x', 0)))" } },
   "encoding": {
     "x": {
-      "field": "Day Label",
-      "type": "ordinal",
+      "field": "Day",
+      "type": "temporal",
       "title": null,
-      "sort": { "field": "Day Order", "op": "min", "order": "ascending" },
-      "axis": { "labelAngle": 0, "labelOverlap": true }
+      "axis": { "labelExpr": "timeFormat(datum.value, '%-d %b')", "labelAngle": 0, "labelOverlap": true, "tickCount": "week", "grid": false }
     },
     "y": {
       "field": "Value",

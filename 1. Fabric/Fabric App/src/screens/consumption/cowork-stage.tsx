@@ -32,6 +32,9 @@ import { ChartPanel, KpiRowState, NoteCard, RollupGrid, type TreeColumn } from "
 
 const KPI_GRID = "grid gap-300 md:grid-cols-2 xl:grid-cols-5";
 const money = moneyCell(CREDIT_CURRENCY);
+// A white label inside every prepaid and pay-as-you-go segment reads as noise
+// (and a 0 on each empty one); the tooltip carries the numbers.
+const NO_STACK_LABELS = { disableStackedDataLabels: true };
 
 const CONSUMPTION_COLUMNS: readonly TreeColumn[] = [
     { id: "Users", header: "Users", width: 80, format: formatCell("whole"), groupOnly: true },
@@ -199,6 +202,7 @@ export function CoworkStage({ options, rates }: CoworkStageProps) {
             <ChartPanel
                 result={weekly}
                 spec={weeklySource.vegaLiteSpec}
+                capabilities={NO_STACK_LABELS}
                 height={340}
                 title={cost ? "Cost over time" : "Credit consumption over time"}
                 subtitle={
