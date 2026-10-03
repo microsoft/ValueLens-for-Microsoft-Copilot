@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/pipeline/definition/pipeline/1.0.0/schema.json",
   "properties": {
-    "description": "Orchestrates ingestion followed by the Audit Log Processor, which writes copilot_interactions_curated before semantic-model refresh. Core: Audit log + Licensed Users always run; Org Data is optional via EnableOrgDataPull. The processor waits for audit log, licensed users and the Agents 365 branch (Graph API first, CSV fallback if the API step fails) to succeed. Optional sources (Dataverse transcripts, credit consumption, product feedback, Agents 365) are opt-in via their Enable* parameters (default false). Export-only sources (consumption, feedback) require their CSVs to be landed first (manually or via the flows in flows/). Semantic-model refresh is scheduled separately after pipeline success. See docs/PERMISSIONS.md for roles.",
+    "description": "Orchestrates ingestion followed by the Audit Log Processor, which writes copilot_interactions_curated before semantic-model refresh. Core: Audit log + Licensed Users always run; Org Data is optional via EnableOrgDataPull. The processor waits for audit log, licensed users and the Agents 365 branch (Graph API first, CSV fallback if the API step fails) to succeed. Optional sources (M365 activity, Dataverse transcripts, credit consumption, product feedback, Agents 365) are opt-in via their Enable* parameters (default false). Export-only sources (consumption, feedback) require their CSVs to be landed first (manually or via the flows in flows/). Semantic-model refresh is scheduled separately after pipeline success. See docs/PERMISSIONS.md for roles.",
     "activities": [
       {
         "name": "Run_Audit_Log_Ingester",
@@ -95,6 +95,39 @@
               },
               "typeProperties": {
                 "notebookId": "REPLACE_WITH_ORG_DATA_NOTEBOOK_ID",
+                "workspaceId": "REPLACE_WITH_WORKSPACE_ID",
+                "parameters": {}
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "Conditionally_Run_M365_Activity",
+        "description": "Optional. Runs the M365 Activity Ingester (Microsoft Graph usage reports for Teams, Outlook, SharePoint, OneDrive, Viva Engage and Microsoft 365 apps -> m365_activity_daily Delta table) only when EnableM365Activity = true. Needs Reports.Read.All, which the audit log ingester already uses. Loads the days not yet in the table and re-reads the most recent ones.",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@pipeline().parameters.EnableM365Activity",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Run_M365_Activity_Ingester",
+              "description": "Reads the six daily Microsoft 365 usage reports from Microsoft Graph and writes one row per person per day to Delta table dbo.m365_activity_daily. Typical runtime 2-10 min; the first run loads 28 days.",
+              "type": "TridentNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 2,
+                "retryIntervalInSeconds": 60,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "notebookId": "REPLACE_WITH_M365_ACTIVITY_NOTEBOOK_ID",
                 "workspaceId": "REPLACE_WITH_WORKSPACE_ID",
                 "parameters": {}
               }
@@ -260,6 +293,10 @@
       "EnableOrgDataPull": {
         "type": "Boolean",
         "defaultValue": true
+      },
+      "EnableM365Activity": {
+        "type": "Boolean",
+        "defaultValue": false
       },
       "EnableDataverse": {
         "type": "Boolean",

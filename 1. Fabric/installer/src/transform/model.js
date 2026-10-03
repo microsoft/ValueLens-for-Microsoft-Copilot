@@ -4,6 +4,7 @@
  * Fabric: the template's own model, with its source parameters filled in.
  */
 import { readFileSync } from 'node:fs';
+import { addM365Activity } from './m365.js';
 import { readZipEntry } from './zip.js';
 
 export const MODEL_TEMPLATE = 'ValueLens - Fabric.pbit';
@@ -113,6 +114,7 @@ export function buildModel(template, settings) {
   for (const [parameter, module] of SWITCHES) {
     if (model.expressions?.some((e) => e.name === parameter)) setMParameter(model, parameter, settings.modules[module] ? 'Include' : 'Exclude');
   }
+  addM365Activity(model, !!settings.modules.m365Activity);
   return { compatibilityLevel: template.compatibilityLevel, model };
 }
 
