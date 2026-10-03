@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { emptyConfig } from '../src/config.js';
-import { DATA_CLI, deployApp, ensureFabricApp, findDeployment, nodeVersionOk, profileName, RAYFIN_CLI, yamlValue } from '../src/steps/app.js';
+import { DATA_CLI, deployApp, ensureAppName, ensureFabricApp, findDeployment, nodeVersionOk, profileName, RAYFIN_CLI, yamlValue } from '../src/steps/app.js';
 import { CONNECTION_SECRET_NAME, connectionName, ensureModelConnection, ensureSemanticModel, refreshModel, rotateModelSecret } from '../src/steps/model.js';
 import { blockedSettings } from '../src/steps/plan.js';
 import { fakeCtx, fakeFabric, fakeGraph, fakePowerBi, fakeUi, httpError, realSources } from './fakes.js';
@@ -218,7 +218,7 @@ test('app helpers: Node version, YAML values, deployment lookup', () => {
   assert.equal(nodeVersionOk('22.12.9'), false);
   assert.equal(nodeVersionOk('24.0.0'), true);
   assert.equal(nodeVersionOk('20.19.0'), false);
-  assert.equal(yamlValue('id: valuelens\nname: "AI in One 2.0"\n', 'name'), 'AI in One 2.0');
+  assert.equal(yamlValue('id: valuelens\nname: "Analytics Hub"\n', 'name'), 'Analytics Hub');
   assert.equal(yamlValue('activeProfile: msit\r\n', 'activeProfile'), 'msit');
   assert.equal(yamlValue(null, 'x'), undefined);
   const d = { active: 'a', deployments: { a: { fabricWorkspaceId: 'WS-OTHER' }, b: { fabricWorkspaceId: 'ws-1', fabricItemId: 'i' } } };
@@ -234,7 +234,7 @@ test('app helpers: Node version, YAML values, deployment lookup', () => {
 function appSetup(o = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'vl-app-'));
   mkdirSync(join(dir, 'rayfin'), { recursive: true });
-  writeFileSync(join(dir, 'rayfin', 'rayfin.yml'), 'id: valuelens\nname: AI in One 2.0\n');
+  writeFileSync(join(dir, 'rayfin', 'rayfin.yml'), 'id: valuelens\nname: Analytics Hub\n');
   writeFileSync(join(dir, 'fabric.yaml'), 'activeProfile: msit\nprofiles: {}\n');
   const deploymentsFile = join(dir, 'rayfin', '.deployments.json');
   writeFileSync(deploymentsFile, JSON.stringify({ active: 'team', deployments: { team: { fabricWorkspaceId: 'ws-team', fabricItemId: 'team-app' } } }));
@@ -287,10 +287,10 @@ test('app: deployed to the customer workspace, renamed, and a developer checkout
       `${data} use msit -o src/fabric.generated.ts`,
     ]);
     const fa = t.config.fabricApp;
-    assert.equal(fa.name, 'AI in One 2.0');
+    assert.equal(fa.name, 'Analytics Hub');
     assert.match(String(fa.url), /appbackends\//);
     assert.equal(fa.profile, 'valuelens-ws-1');
-    assert.ok(t.fabric.calls.some((c) => c === 'renameItem valuelens -> AI in One 2.0'));
+    assert.ok(t.fabric.calls.some((c) => c === 'renameItem valuelens -> Analytics Hub'));
     assert.equal(JSON.parse(readFileSync(t.deploymentsFile, 'utf8')).active, 'team');
     assert.equal(readFileSync(join(t.dir, 'rayfin', '.env'), 'utf8'), 'TEAM=1\n');
     assert.equal(yamlValue(readFileSync(join(t.dir, 'fabric.yaml'), 'utf8'), 'activeProfile'), 'msit');
@@ -316,11 +316,12 @@ test('app: a failed deploy still restores the checkout; missing tools are instal
 test('app: an app already deployed is left alone unless asked; a deleted one is deployed again', async () => {
   const t = appSetup();
   try {
-    const item = t.fabric.add('AppBackend', 'AI in One 2.0', null);
+    const item = t.fabric.add('AppBackend', 'Analytics Hub', null);
     t.config.fabricApp.itemId = item.id;
     await ensureFabricApp(t.ctx);
     assert.deepEqual(t.runs, []);
-    assert.match(t.ui.text(), /App AI in One 2.0 is in place/);
+    assert.ok(!t.fabric.calls.some((c) => c.startsWith('renameItem')));
+    assert.match(t.ui.text(), /App Analytics Hub is in place/);
 
     t.config.fabricApp.itemId = 'gone';
     await ensureFabricApp(t.ctx);
@@ -331,10 +332,36 @@ test('app: an app already deployed is left alone unless asked; a deleted one is 
   }
 });
 
-test('app: the credit consumption pages get the cc alias, and a deployed app is rebuilt to add them', async () => {
+test('app: one still called AI in One 2.0 takes the new name without a rebuild; a name the customer chose stays', async () => {
   const t = appSetup();
   try {
     const item = t.fabric.add('AppBackend', 'AI in One 2.0', null);
+    Object.assign(t.config.fabricApp, { itemId: item.id, name: 'AI in One 2.0' });
+    await ensureFabricApp(t.ctx);
+    assert.deepEqual(t.runs, []);
+    assert.ok(t.fabric.calls.includes('renameItem AI in One 2.0 -> Analytics Hub'));
+    assert.equal(t.config.fabricApp.name, 'Analytics Hub');
+    assert.match(t.ui.text(), /Renamed the app "AI in One 2\.0" to "Analytics Hub"/);
+
+    item.displayName = 'Contoso Copilot Insights';
+    t.fabric.calls.length = 0;
+    await ensureFabricApp(t.ctx);
+    assert.ok(!t.fabric.calls.some((c) => c.startsWith('renameItem')));
+    assert.match(t.ui.text(), /App Contoso Copilot Insights is in place/);
+
+    item.displayName = 'AI in One 2.0';
+    await ensureAppName(t.ctx);
+    assert.ok(t.fabric.calls.includes('renameItem AI in One 2.0 -> Analytics Hub'), 'an update that skips the rebuild still renames');
+    assert.deepEqual(t.runs, []);
+  } finally {
+    t.cleanup();
+  }
+});
+
+test('app: the credit consumption pages get the cc alias, and a deployed app is rebuilt to add them', async () => {
+  const t = appSetup();
+  try {
+    const item = t.fabric.add('AppBackend', 'Analytics Hub', null);
     Object.assign(t.config.fabricApp, { itemId: item.id, models: ['vl'] });
     t.config.modules.consumption = true;
     Object.assign(t.config.consumption.model, { id: 'cc-1', bound: true });
