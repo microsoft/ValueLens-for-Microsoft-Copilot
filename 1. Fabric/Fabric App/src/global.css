@@ -251,6 +251,9 @@
     /* Cyan belongs to Agent Evaluation alone, so a page about agents reads apart
        from the pages about people. */
     --vl-cyan: #1b8fb5;        --vl-cyan-text: #0e6a88;      --vl-cyan-tint: #e3f3f8;
+    /* Indigo belongs to Work patterns, the page about Microsoft 365 rather than
+       Copilot, and borrows the Teams hue so it reads as the suite around it. */
+    --vl-indigo: #5b5fc7;      --vl-indigo-text: #444791;    --vl-indigo-tint: #e8ebfa;
     --vl-periwinkle: #95a9ce;
     --vl-slate: #8793a3;
     --vl-ink: #1c2632;
@@ -275,6 +278,7 @@
     --vl-navy: #5b7bb0;        --vl-navy-text: #a9bde0;      --vl-navy-tint: #1b2536;
     --vl-green: #6cc07f;       --vl-green-text: #93d3a1;     --vl-green-tint: #1a3020;
     --vl-cyan: #56bfe0;        --vl-cyan-text: #8fd5ec;      --vl-cyan-tint: #14303a;
+    --vl-indigo: #7f85f5;      --vl-indigo-text: #aab1fa;    --vl-indigo-tint: #262848;
     --vl-periwinkle: #b3c2de;
     --vl-slate: #a3aebd;
     --vl-ink: #dbdfe4;
@@ -440,6 +444,27 @@
     --color-data-4: var(--vl-lavender);
     --color-data-5: var(--vl-teal);
     --color-data-6: var(--vl-amber);
+    --color-data-7: var(--vl-navy);
+    --color-data-8: var(--vl-periwinkle);
+    --color-data-9: var(--vl-slate);
+    --color-data-10: var(--vl-ink);
+  }
+
+  /* Work patterns leads with indigo and leaves lavender out, since the two sit
+     too close to tell apart as neighbouring series. */
+  .palette-work-patterns {
+    --color-brand: var(--vl-indigo);
+    --color-brand-foreground: var(--vl-indigo-text);
+    --color-primary: var(--vl-indigo-text);
+    --color-ring: var(--vl-indigo-text);
+    --color-accent: var(--vl-indigo-tint);
+    --color-accent-foreground: var(--vl-indigo-text);
+    --color-data-1: var(--vl-indigo);
+    --color-data-2: var(--vl-teal);
+    --color-data-3: var(--vl-amber);
+    --color-data-4: var(--vl-blue);
+    --color-data-5: var(--vl-plum);
+    --color-data-6: var(--vl-coral);
     --color-data-7: var(--vl-navy);
     --color-data-8: var(--vl-periwinkle);
     --color-data-9: var(--vl-slate);

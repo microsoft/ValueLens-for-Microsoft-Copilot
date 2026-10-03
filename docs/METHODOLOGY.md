@@ -5,8 +5,8 @@ is counted, how each interaction is classified, how value is estimated, and the 
 the assumptions.
 
 It applies to the Power BI template, where all four data paths share one model, and to the
-[Fabric App](../1.%20Fabric/Fabric%20App/). The app reads the same model and adds two pages and a Value
-stage of its own ([§8](#8-fabric-app-only-consumption-agent-evaluation-and-cost-vs-value)). Every rule here is taken from
+[Fabric App](../1.%20Fabric/Fabric%20App/). The app reads the same model and adds three pages and a Value
+stage of its own ([§8](#8-fabric-app-only-consumption-agent-evaluation-cost-vs-value-and-work-patterns)). Every rule here is taken from
 `1. Fabric/ValueLens - Fabric.pbit` and the `Copilot_Audit_Log_Processor` notebook. If this page
 and the model ever disagree, the model is right. The template's **📖 Metric Glossary** page
 carries the same caveats inside the report.
@@ -21,7 +21,7 @@ carries the same caveats inside the report.
 5. [Estimated value](#5-estimated-value)
 6. [Page by page](#6-page-by-page)
 7. [Settings you can change](#7-settings-you-can-change)
-8. [Fabric App only: Consumption, Agent Evaluation and Cost vs value](#8-fabric-app-only-consumption-agent-evaluation-and-cost-vs-value)
+8. [Fabric App only: Consumption, Agent Evaluation, Cost vs value and Work patterns](#8-fabric-app-only-consumption-agent-evaluation-cost-vs-value-and-work-patterns)
 9. [Known limits](#9-known-limits)
 10. [Appendix: time bands and sources](#appendix-time-bands-and-sources)
 
@@ -357,7 +357,7 @@ hours = units × minutes (Low / Typical / High) × category adjustment ÷ 60
 
 ## 6. Page by page
 
-The Fabric App gathers the report's pages into seven of its ten pages:
+The Fabric App gathers the report's pages into seven of its eleven pages:
 
 | App page | Report pages it holds |
 |---|---|
@@ -368,7 +368,7 @@ The Fabric App gathers the report's pages into seven of its ten pages:
 | Efficiency | Cowork Fit, Model Fit |
 | Feedback | User Feedback |
 | Appendix | Glossary, Signal → Impact |
-| Consumption, Agent Evaluation | App only ([§8](#8-fabric-app-only-consumption-agent-evaluation-and-cost-vs-value)) |
+| Consumption, Agent Evaluation, Work patterns | App only ([§8](#8-fabric-app-only-consumption-agent-evaluation-cost-vs-value-and-work-patterns)) |
 | Assumptions | App only: the task times behind every hours figure, which you can change ([§7](#7-settings-you-can-change)) |
 
 ### Activation: who has started?
@@ -501,6 +501,11 @@ score = 60 × min(median tasks per active week ÷ 30, 1) + 40 × min(median acti
 
 - A confidence flag reflects how many weeks of data sit behind each score. People with no
   unlicensed activity have no score, rather than a zero.
+- **In the Fabric App, with Microsoft 365 activity loaded**, the score also weighs breadth: the
+  average number of Microsoft 365 workloads the person uses on an active day, with full marks at
+  four. It's 50 × tasks + 30 × days + 20 × breadth, each part capped at 1 as above. Someone with
+  no Microsoft 365 activity keeps the 60 / 40 score rather than losing the 20. The report and the
+  other paths use 60 / 40 only ([§8.4](#84-work-patterns)).
 - **Dormant seats** are licensed people inactive for 30 days or more before the newest audit date.
   Their reclaim value is dormant seats × Monthly Licence Cost, which defaults to 0 (not costed).
 - **License Allocation** ranks organisations by unlicensed sessions per person per week, then by
@@ -536,11 +541,12 @@ From the optional Product Feedback export.
 
 ---
 
-## 8. Fabric App only: Consumption, Agent Evaluation and Cost vs value
+## 8. Fabric App only: Consumption, Agent Evaluation, Cost vs value and Work patterns
 
 The Consumption and Agent Evaluation pages read optional models, not ValueLens. Each appears only
 when its model is connected in `fabric.yaml`. Cost vs value, at the end of the Value page, sets
-ValueLens's estimated value against costs, most of them from Consumption Central.
+ValueLens's estimated value against costs, most of them from Consumption Central. Work patterns
+reads an optional table the installer adds to the ValueLens model.
 
 ### 8.1 Consumption
 
@@ -632,6 +638,49 @@ and its share isn't set against any value.
 **Left out.** Azure AI Foundry, because ValueLens doesn't record the work it does. GitHub Copilot,
 which neither model holds. Without Consumption Central, or when the two models share no days, the
 cost is licences alone, so the return reads high.
+
+### 8.4 Work patterns
+
+Reads the `M365 Activity` table, which the [installer](../1.%20Fabric/installer/README.md#microsoft-365-activity)
+adds to the ValueLens model. `Copilot_M365_Activity_Ingester` fills it from the Microsoft 365 usage
+reports in Graph: one row per person per day they were active in Teams, Outlook, SharePoint,
+OneDrive, Viva Engage or the Microsoft 365 apps. Microsoft keeps 28 days of these reports and
+publishes each day two to three days late, so history builds up from the first load. The date and
+organisation filters apply; the other filters don't.
+
+Throughout, a **week** is seven loaded days, so a figure per person per week is the total ÷ (people
+active × days loaded ÷ 7).
+
+| Figure | Definition |
+|---|---|
+| People active | People with at least one active workload on a day in the period |
+| Active days per week | Days people were active ÷ person-weeks |
+| Workloads per active day | Average number of the six workloads used on a day someone was active |
+| Meetings, call hours, emails sent, chat messages per week | Teams meetings, Teams audio time, emails sent, and chat plus private chat messages, each ÷ person-weeks |
+| Workload reach | People who used the workload ÷ people active. The trend shows it for each full week |
+| App reach | People who used the app on any platform ÷ people active |
+| Apps used | How many of the six apps (Outlook, Teams, Word, Excel, PowerPoint, OneNote) each person used on any platform in the period, as a share of people active. *No app use reported* means active in Teams, email, SharePoint, OneDrive or Viva Engage with no apps-report entry; it isn't a depth of zero |
+| Platform reach | People who used any of the apps on Windows, Mac, the web or mobile ÷ people active. One person can count on several platforms |
+| Copilot reach | People active in Microsoft 365 who also appear in the Copilot audit log in the period ÷ people active |
+| Licensed, not using | People active in Microsoft 365 with a Copilot licence and no Copilot activity in the period ÷ those licensed |
+| Copilot users vs others | Each measure per person per week for people active in Microsoft 365 who used Copilot, ÷ the same for those who didn't. 1.2× means 20% more. It compares the two groups, and doesn't show that Copilot caused the difference |
+
+**Coverage.** The page says which dates the figures cover and how many days in that span have
+nothing loaded. Days with no rows are left out of every per-week figure rather than counted as zero.
+
+**Smaller groups.** In the comparison by organisation, organisations with fewer than five people
+active share one *Smaller groups* row, so no small team can be picked out. Its figures are worked
+out over everyone in those organisations together.
+
+People are matched on their lowercase UPN. If the Microsoft 365 admin center conceals user names in
+reports, the activity arrives under random IDs: the page's totals still hold, but the organisation
+filter, the Copilot comparison and the licence score's breadth can't use it. The page says so, and
+how to turn the setting off. Once it's off, the next run reloads the concealed days.
+
+**Licence score.** With the activity loaded and names not concealed, Readiness's *Who to license
+next* adds breadth to the priority score ([License Readiness](#license-readiness-who-should-get-a-licence-next)).
+Breadth is a sign of how much of someone's work Copilot could reach, so a person who uses four or
+more workloads a day scores full marks for it.
 
 ---
 

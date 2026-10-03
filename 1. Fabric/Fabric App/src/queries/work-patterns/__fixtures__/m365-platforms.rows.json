@@ -1,0 +1,6 @@
+[
+  { "[Platform]": "Windows", "[People]": 186, "[Reach]": 0.8942307692307693, "[Days Per Week]": 4.6 },
+  { "[Platform]": "Web", "[People]": 141, "[Reach]": 0.6778846153846154, "[Days Per Week]": 2.9 },
+  { "[Platform]": "Mobile", "[People]": 97, "[Reach]": 0.46634615384615385, "[Days Per Week]": 3.4 },
+  { "[Platform]": "Mac", "[People]": 18, "[Reach]": 0.08653846153846154, "[Days Per Week]": 4.1 }
+]

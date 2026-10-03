@@ -25,6 +25,11 @@ Pulled automatically by the 3 core notebooks via one **Entra app registration** 
 
 One app registration covers all three. Put the client secret in **Azure Key Vault**, not in a notebook.
 
+The optional **Microsoft 365 activity** notebook (Fabric path, `m365_activity_daily`) reads the
+Microsoft 365 usage reports with the same `Reports.Read.All`, so it needs no extra permission.
+Its activity only matches people if **Display concealed user, group, and site names in all
+reports** is off (Microsoft 365 admin center → Settings → Org settings → Reports).
+
 ---
 
 ## Optional sources (opt-in)

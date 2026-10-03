@@ -109,6 +109,7 @@ from pyspark.sql import functions as _F
 
 _tables = dict(resolved)
 _tables['org'] = _resolve('copilot_org_data')
+_tables['m365'] = _resolve('m365_activity_daily')
 _summary = {'checkedAt': _dt.now(_tz.utc).isoformat(timespec='seconds'), 'tables': {}}
 for _key, _table in _tables.items():
     if not _table:
@@ -116,8 +117,9 @@ for _key, _table in _tables.items():
         continue
     _df = spark.read.table(_table)
     _info = {'table': _table, 'rows': _df.count()}
-    if _key == 'audit' and _info['rows']:
-        _col = _pick(_df, DATE_NAMES, ['creationdate', 'activitydate'])
+    if _key in ('audit', 'm365') and _info['rows']:
+        _col = (_pick(_df, DATE_NAMES, ['creationdate', 'activitydate']) if _key == 'audit'
+                else _pick(_df, ['ActivityDate']))
         if _col:
             _r = _df.select(_F.min(_col).alias('lo'), _F.max(_col).alias('hi')).collect()[0]
             _info['from'], _info['to'] = str(_r['lo']), str(_r['hi'])

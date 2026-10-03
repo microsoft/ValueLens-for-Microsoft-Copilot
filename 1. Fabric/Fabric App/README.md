@@ -1,6 +1,6 @@
-# Fabric App — AI in One 2.0, ValueLens as a web app in your Fabric workspace
+# Fabric App — Analytics Hub, ValueLens as a web app in your Fabric workspace
 
-**Preview.** AI in One 2.0 is the ValueLens dashboard rebuilt as a fast web app. It's hosted as an item in your
+**Preview.** Analytics Hub is the ValueLens dashboard rebuilt as a fast web app. It's hosted as an item in your
 Fabric workspace, and it reads the ValueLens semantic model you've already published. The app
 keeps no copy of your data: every page queries the model live, as the person viewing it, so
 row-level security applies. The only things it saves are the [rates and pack](#rates--packs),
@@ -15,8 +15,9 @@ the [prices](#prices) and the [task times](#task-times) you type in.
 |---|---|
 | **Adoption** | Who started, who stayed, who stuck: activation, adoption, habit formation, trend heatmap |
 | **Leaderboards** | The people and agents doing the most, plus the agent registry with descriptions |
+| **Work patterns** | How people work across Microsoft 365: meetings, email, chat and files, which apps they use, how many of the apps each person uses and on which devices, and how Copilot users' working weeks compare with everyone else's. Organisations with fewer than five active people share one *Smaller groups* row. From the optional [Microsoft 365 activity](../installer/README.md#microsoft-365-activity) data |
 | **Agent Evaluation** | How well Copilot Studio agents answer: how conversations ended, errors, topic health, knowledge sources and feedback comments, from Agent Evaluator. It never shows the conversations themselves |
-| **Readiness** | Who to license next, and who's ready for Cowork |
+| **Readiness** | Who to license next, and who's ready for Cowork. With Microsoft 365 activity, the licence priority score also weighs how many Microsoft 365 workloads each person uses a day |
 | **Consumption** | Credits used and what they cost across Cowork / Work IQ, Copilot Studio and Azure, from Consumption Central, at rates you can set in the app |
 | **Value** | What the work was, and what it was worth: task breakdown, estimated value, and cost vs value, which sets licence and credit costs against that value |
 | **Efficiency** | Whether the right tool is doing the job: Cowork fit, Model fit, and how grading works |
@@ -27,7 +28,8 @@ the [prices](#prices) and the [task times](#task-times) you type in.
 Filters (date, organisation, licence, activity, agent) apply across the ValueLens pages. The
 Consumption page has its own period, service, group and cost-basis choices, taken from the
 Consumption Central report. The Agent Evaluation page has its own date, department and agent
-slicers, and a Group by choice. The app opens in light mode, and a toggle switches it to dark.
+slicers, and a Group by choice. The Work patterns page takes the date and organisation filters
+only. The app opens in light mode, and a toggle switches it to dark.
 
 How each figure is worked out, page by page, is in the [methodology](../../docs/METHODOLOGY.md).
 
@@ -41,6 +43,9 @@ How each figure is worked out, page by page, is in the [methodology](../../docs/
   the same Build permission.
 - *Optional, for the Agent Evaluation page:* a **published Agent Evaluator semantic model**, with
   the same Build permission.
+- *Optional, for the Work patterns page:* the `M365 Activity` table in the ValueLens model. The
+  [installer](../installer/README.md#microsoft-365-activity) adds it. Without it, the page says how
+  to switch it on.
 - The Fabric tenant setting **Fabric Apps (preview)** turned on (Admin portal → Tenant settings).
 - The Power BI tenant setting **Dataset Execute Queries REST API** turned on (Admin portal →
   Integration settings).
@@ -68,7 +73,7 @@ Run these commands from this folder (`1. Fabric/Fabric App`).
    It builds the app, creates an item called **valuelens** in the workspace, and prints two links.
    Use the **Fabric portal** link, or open the item from the workspace. The app loads its data
    through Fabric, so the `…fabricapps.net` hosting URL on its own only offers a link to the item.
-   To show the item as **AI in One 2.0** in the workspace, rename it in its settings; later
+   To show the item as **Analytics Hub** in the workspace, rename it in its settings; later
    deploys keep the name.
 4. **Share.** Each viewer needs two things:
    - **The app:** add them to the workspace (Viewer is enough), or share the app's item

@@ -90,7 +90,7 @@ const ids = {
   studioConsumption: 'nb-studio',
   vivaConsumption: 'nb-viva',
 };
-const modules = { orgData: true, agent365: false, productFeedback: false, consumption: true, agentEvaluator: false };
+const modules = { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: true, agentEvaluator: false };
 /** @param {any} doc */
 const names = (doc) => doc.properties.activities.map((/** @type {any} */ a) => a.name);
 
@@ -142,7 +142,7 @@ test('pipeline: without Azure access or a Consumption model, those steps are lef
 test('notebooks and signature: Azure AI only with access; existing installs keep their signature', () => {
   const config = emptyConfig();
   Object.assign(config.semanticModel, { enabled: true, id: 'model-1', bound: true });
-  assert.equal(pipelineSignature(config), 'core,orgData;model=model-1', 'unchanged for installs without consumption');
+  assert.equal(pipelineSignature(config), 'core,orgData,m365Activity;model=model-1', 'no consumption parts without consumption');
 
   config.modules.consumption = true;
   assert.deepEqual(notebooksFor(config.modules, { semanticModel: true }).filter((n) => n.module === 'consumption').map((n) => n.key), ['studioConsumption', 'vivaConsumption']);
@@ -154,7 +154,7 @@ test('notebooks and signature: Azure AI only with access; existing installs keep
   Object.assign(config.consumption.model, { id: 'cc-1', bound: true });
   assert.equal(azureAiOn(config), true);
   assert.equal(consumptionModelDeployed(config), true);
-  assert.equal(pipelineSignature(config), 'core,orgData,consumption;model=model-1;azureAi;consumption=cc-1');
+  assert.equal(pipelineSignature(config), 'core,orgData,m365Activity,consumption;model=model-1;azureAi;consumption=cc-1');
 
   config.semanticModel.enabled = false;
   assert.equal(consumptionModelDeployed(config), false, 'it shares the ValueLens connection');

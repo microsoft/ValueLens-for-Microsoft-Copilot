@@ -42,7 +42,7 @@ export function AuthGate({
             <div className="flex min-h-screen items-center justify-center bg-background p-400">
                 <div className="w-full max-w-md rounded-xl border border-border bg-card p-800 text-center shadow-8">
                     <h1 className="mb-200 text-500 font-semibold leading-500 text-card-foreground">
-                        Open AI in One 2.0 in Fabric
+                        Open Analytics Hub in Fabric
                     </h1>
                     <p className="mb-600 text-300 leading-300 text-muted-foreground">
                         This address only hosts the app. Its data loads through Fabric, so open it from its Fabric item.

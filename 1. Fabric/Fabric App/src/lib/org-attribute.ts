@@ -74,6 +74,20 @@ export function describeOrgAttribute(column: string): OrgAttribute {
     return { column, label, noun, plural: pluralise(noun) };
 }
 
+/**
+ * Prefixes a noun phrase with "a" or "an" by how its first word sounds:
+ * "an organization", "a unit", "an HR team", "a UK region".
+ */
+export function withIndefiniteArticle(phrase: string): string {
+    const first = phrase.trim().split(/\s+/)[0] ?? "";
+    const isAcronym = first.length > 1 && first === first.toUpperCase() && /[A-Z]/.test(first);
+    const vowelSound = isAcronym
+        ? /^[AEFHILMNORSX]/.test(first)
+        : /^(hour|honest|honou?r|heir)/i.test(first) ||
+          (/^[aeiou]/i.test(first) && !/^(u[nrst]i|us[eu]|uk|eu|one|once)/i.test(first));
+    return `${vowelSound ? "an" : "a"} ${phrase}`;
+}
+
 export interface OrgColumnStatistic {
     column: string;
     cardinality: number;

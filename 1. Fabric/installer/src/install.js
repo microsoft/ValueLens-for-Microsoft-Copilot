@@ -16,7 +16,7 @@ import { saveConfig } from './config.js';
 import { createClient, defaultSleep } from './http.js';
 import { ensureConsent, ensureApp, ensureKeyVault, newSecret } from './steps/identity.js';
 import { agentEvaluatorModelWanted, agentEvaluatorSummary, ensureAgentEvaluatorModel, ensureTranscriptAccess } from './steps/agent-evaluator.js';
-import { deployApp, ensureFabricApp } from './steps/app.js';
+import { deployApp, ensureAppName, ensureFabricApp } from './steps/app.js';
 import { consumptionModelWanted, consumptionSummary, ensureAzureAiAccess, ensureConsumptionModel, ensureLandingFolders } from './steps/consumption.js';
 import {
   agentEvaluatorModelDeployed,
@@ -153,7 +153,7 @@ export async function install(ctx, opts) {
     ...(withConsumption ? ['Credit consumption'] : []),
     ...(withAgentEvaluator ? ['Agent Evaluator'] : []),
     'Notebooks, pipeline and schedule',
-    ...(withApp ? ['ValueLens app'] : []),
+    ...(withApp ? ['Analytics Hub app'] : []),
     ...(ctx.runFirstLoad ? ['First load'] : withModel ? ['Model refresh'] : []),
   ];
   let n = 0;
@@ -187,7 +187,7 @@ export async function install(ctx, opts) {
   await ensurePipeline(ctx);
   await ensureSchedule(ctx);
   if (withApp) {
-    step('ValueLens app');
+    step('Analytics Hub app');
     await tryDeployApp(ctx);
   }
 
@@ -305,7 +305,10 @@ export async function update(ctx, opts = {}) {
   await ensureNotebooks(ctx, { force: true });
   await ensurePipeline(ctx, { force: true });
   await ensureSchedule(ctx);
-  if (sm.enabled && config.fabricApp.enabled && (await ui.confirm('Rebuild and redeploy the ValueLens app too?', true))) await tryDeployApp(ctx, { force: true });
+  if (sm.enabled && config.fabricApp.enabled) {
+    if (await ui.confirm('Rebuild and redeploy the Analytics Hub app too?', true)) await tryDeployApp(ctx, { force: true });
+    else await ensureAppName(ctx);
+  }
   if (modelDeployed(config)) {
     ui.note('Updating a model clears its data, so it refreshes now.');
     await refreshModels(ctx, { wait: opts.wait ?? true });
@@ -337,13 +340,13 @@ export async function refresh(ctx, opts) {
 }
 
 /**
- * Builds and deploys the ValueLens app on its own.
+ * Builds and deploys the Analytics Hub app on its own.
  * @param {Ctx} ctx
  */
 export async function deployAppNow(ctx) {
   const { config, ui } = ctx;
-  if (!modelDeployed(config)) throw new Error('The app needs the semantic model. Run the installer and choose "Semantic model and the ValueLens app".');
-  ui.heading('Deploying the ValueLens app');
+  if (!modelDeployed(config)) throw new Error('The app needs the semantic model. Run the installer and choose "Semantic model and the Analytics Hub app".');
+  ui.heading('Deploying the Analytics Hub app');
   await deployApp(ctx);
   if (config.fabricApp.url) ui.info(config.fabricApp.url);
 }

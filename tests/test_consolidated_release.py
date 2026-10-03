@@ -54,7 +54,11 @@ class ConsolidatedReleaseTests(unittest.TestCase):
                     self.assertEqual(actual, sha, (name, member))
 
     def test_all_shared_notebooks_match_canonical_bytes(self):
-        unmirrored = {"Copilot_Audit_Log_Processor.ipynb", "ValueLens_Refresh_Model.ipynb"}
+        unmirrored = {
+            "Copilot_Audit_Log_Processor.ipynb",
+            "Copilot_M365_Activity_Ingester.ipynb",
+            "ValueLens_Refresh_Model.ipynb",
+        }
         sources = [p for p in CORE.glob("*.ipynb") if p.name not in unmirrored]
         self.assertEqual(len(sources), 7)
         for source in sources:
@@ -67,6 +71,7 @@ class ConsolidatedReleaseTests(unittest.TestCase):
             "Copilot_Agent365_Lander.ipynb",
             "Copilot_Agent365_Registry_Ingester.ipynb",
             "Copilot_Licensed_Users_Direct_Ingester.ipynb",
+            "Copilot_M365_Activity_Ingester.ipynb",
             "ValueLens_Data_Check.ipynb",
         ):
             notebook = json.loads((CORE / name).read_text(encoding="utf-8"))

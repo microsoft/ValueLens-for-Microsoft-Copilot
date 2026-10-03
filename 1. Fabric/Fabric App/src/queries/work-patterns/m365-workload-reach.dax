@@ -1,0 +1,50 @@
+EVALUATE
+VAR _people =
+    CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0)
+VAR _weeks = DIVIDE(DISTINCTCOUNT('M365 Activity'[ActivityDate]), 7)
+VAR _workloads =
+    DATATABLE(
+        "Workload", STRING,
+        "Order", INTEGER,
+        {
+            { "Teams", 1 },
+            { "Email", 2 },
+            { "SharePoint", 3 },
+            { "OneDrive", 4 },
+            { "Office apps", 5 },
+            { "Viva Engage", 6 }
+        }
+    )
+VAR _measured =
+    ADDCOLUMNS(
+        _workloads,
+        "@People",
+            SWITCH(
+                [Order],
+                1, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[TeamsActive] = 1),
+                2, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[EmailActive] = 1),
+                3, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[SharePointActive] = 1),
+                4, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[OneDriveActive] = 1),
+                5, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[AppsActive] = 1),
+                6, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[VivaEngageActive] = 1)
+            ),
+        "@PersonDays",
+            SWITCH(
+                [Order],
+                1, CALCULATE(COUNTROWS('M365 Activity'), 'M365 Activity'[TeamsActive] = 1),
+                2, CALCULATE(COUNTROWS('M365 Activity'), 'M365 Activity'[EmailActive] = 1),
+                3, CALCULATE(COUNTROWS('M365 Activity'), 'M365 Activity'[SharePointActive] = 1),
+                4, CALCULATE(COUNTROWS('M365 Activity'), 'M365 Activity'[OneDriveActive] = 1),
+                5, CALCULATE(COUNTROWS('M365 Activity'), 'M365 Activity'[AppsActive] = 1),
+                6, CALCULATE(COUNTROWS('M365 Activity'), 'M365 Activity'[VivaEngageActive] = 1)
+            )
+    )
+RETURN
+SELECTCOLUMNS(
+    FILTER(_measured, [@People] > 0),
+    "Workload", [Workload],
+    "People", [@People],
+    "Reach", DIVIDE([@People], _people),
+    "Days Per Week", DIVIDE([@PersonDays], [@People] * _weeks)
+)
+ORDER BY [Reach] DESC, [Workload]

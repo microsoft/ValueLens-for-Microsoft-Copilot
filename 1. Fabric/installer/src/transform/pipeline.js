@@ -12,6 +12,7 @@ export const ARCHIVED_PARAMETERS = ['EnableDataverse', 'EnableConsumption'];
 /** Module branches in the template, so they can be dropped when a module is off. */
 const MODULE_BRANCHES = {
   orgData: { activities: ['Conditionally_Run_Org_Data'], parameter: 'EnableOrgDataPull' },
+  m365Activity: { activities: ['Conditionally_Run_M365_Activity'], parameter: 'EnableM365Activity' },
   agent365: { activities: ['Conditionally_Run_Agent365', 'Run_Agent365_CSV_Fallback'], parameter: 'EnableAgent365' },
   productFeedback: { activities: ['Conditionally_Run_Product_Feedback'], parameter: 'EnableProductFeedback' },
 };
@@ -118,7 +119,7 @@ function refreshStep(settings, o) {
 function refreshActivity(activities, settings) {
   const has = (/** @type {string} */ name) => activities.some((a) => a.name === name);
   const dependsOn = [{ activity: 'Run_Audit_Log_Processor', dependencyConditions: ['Succeeded'] }];
-  for (const name of ['Conditionally_Run_Org_Data', 'Conditionally_Run_Product_Feedback']) {
+  for (const name of ['Conditionally_Run_Org_Data', 'Conditionally_Run_M365_Activity', 'Conditionally_Run_Product_Feedback']) {
     if (has(name)) dependsOn.push({ activity: name, dependencyConditions: ['Completed'] });
   }
   return refreshStep(settings, {

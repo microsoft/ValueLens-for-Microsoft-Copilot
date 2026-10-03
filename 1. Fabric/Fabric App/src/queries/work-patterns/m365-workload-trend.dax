@@ -1,0 +1,50 @@
+EVALUATE
+VAR _weeks =
+    FILTER(
+        ADDCOLUMNS(
+            VALUES('M365 Activity'[WeekStart]),
+            "@Days", CALCULATE(DISTINCTCOUNT('M365 Activity'[ActivityDate])),
+            "@People",
+                CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0)
+        ),
+        [@Days] = 7 && [@People] > 0
+    )
+VAR _workloads =
+    DATATABLE(
+        "Workload", STRING,
+        "Order", INTEGER,
+        {
+            { "Teams", 1 },
+            { "Email", 2 },
+            { "SharePoint", 3 },
+            { "OneDrive", 4 },
+            { "Office apps", 5 },
+            { "Viva Engage", 6 }
+        }
+    )
+VAR _long =
+    GENERATE(
+        _weeks,
+        ADDCOLUMNS(
+            _workloads,
+            "@Using",
+                SWITCH(
+                    [Order],
+                    1, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[TeamsActive] = 1),
+                    2, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[EmailActive] = 1),
+                    3, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[SharePointActive] = 1),
+                    4, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[OneDriveActive] = 1),
+                    5, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[AppsActive] = 1),
+                    6, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[VivaEngageActive] = 1)
+                )
+        )
+    )
+RETURN
+SELECTCOLUMNS(
+    FILTER(_long, [@Using] > 0),
+    "Week Start", 'M365 Activity'[WeekStart],
+    "Workload", [Workload],
+    "People", [@Using],
+    "Share", DIVIDE([@Using], [@People])
+)
+ORDER BY [Week Start], [Workload]

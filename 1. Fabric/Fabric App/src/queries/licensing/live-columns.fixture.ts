@@ -38,5 +38,16 @@ export const liveColumns = {
         "[Sessions Per Week]",
         "[Active Days Per Week]",
     ],
+    // Ran cleanly on the live model on 2026-10-03 but returned no rows (no Copilot
+    // interactions on that tenant yet), so these columns are as authored.
+    licenseCandidatesM365: [
+        "[Rank]",
+        "[User]",
+        "[Organization]",
+        "[Priority Score]",
+        "[Sessions Per Week]",
+        "[Active Days Per Week]",
+        "[Workloads Per Day]",
+    ],
     licenseDormancy: ["[Dormancy Bucket Order]", "[Dormancy Bucket]", "[Licensed Users]"],
 } as const;

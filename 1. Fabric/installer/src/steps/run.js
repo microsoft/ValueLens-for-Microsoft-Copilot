@@ -131,6 +131,7 @@ const TABLE_LABELS = /** @type {const} */ ({
   licensed: 'Licensed users',
   audit: 'Copilot interactions',
   org: 'Org data',
+  m365: 'Microsoft 365 activity',
   agents: 'Agents',
 });
 

@@ -1,0 +1,17 @@
+EVALUATE
+VAR _people = DISTINCTCOUNT('M365 Activity'[UPN_Normalized])
+VAR _concealed =
+    COUNTROWS(
+        FILTER(
+            VALUES('M365 Activity'[UPN_Normalized]),
+            NOT CONTAINSSTRING('M365 Activity'[UPN_Normalized], "@")
+        )
+    )
+RETURN
+ROW(
+    "Rows", COUNTROWS('M365 Activity'),
+    "People", _people,
+    "First Date", FORMAT(MIN('M365 Activity'[ActivityDate]), "yyyy-MM-dd"),
+    "Last Date", FORMAT(MAX('M365 Activity'[ActivityDate]), "yyyy-MM-dd"),
+    "Concealed Share", DIVIDE(COALESCE(_concealed, 0), _people)
+)

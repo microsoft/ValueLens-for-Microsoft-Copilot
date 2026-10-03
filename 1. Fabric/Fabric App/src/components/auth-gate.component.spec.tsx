@@ -58,7 +58,7 @@ describe("AuthGate", () => {
         });
         renderAuthGate(authService, { embedded: false, fabricLink });
 
-        expect(screen.getByRole("heading", { name: "Open AI in One 2.0 in Fabric" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Open Analytics Hub in Fabric" })).toBeInTheDocument();
         expect(screen.getByRole("link", { name: "Open in Fabric" })).toHaveAttribute("href", fabricLink);
         await waitFor(() => expect(authService.initEmbeddedAuth).toHaveBeenCalledOnce());
         expect(screen.queryByText("Authenticated app")).not.toBeInTheDocument();
