@@ -72,12 +72,12 @@ test('resolveAppRoles: required permissions must exist, optional ones are report
 });
 
 test('permissions follow the chosen modules', () => {
-  assert.deepEqual(permissionsFor({ orgData: false, agent365: false, productFeedback: false, consumption: false }), [
+  assert.deepEqual(permissionsFor({ orgData: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false }), [
     'AuditLogsQuery.Read.All',
     'Reports.Read.All',
     'User.Read.All',
   ]);
-  assert.deepEqual(permissionsFor({ orgData: true, agent365: true, productFeedback: true, consumption: false }), [
+  assert.deepEqual(permissionsFor({ orgData: true, agent365: true, productFeedback: true, consumption: false, agentEvaluator: false }), [
     'Application.Read.All',
     'AuditLogsQuery.Read.All',
     'CopilotPackages.Read.All',
@@ -185,7 +185,7 @@ test('install record round-trips, fills defaults and refuses secrets', () => {
   const partial = loadConfig(file).config;
   assert.equal(partial.schedule.time, '05:00');
   assert.equal(partial.schedule.frequency, 'daily');
-  assert.deepEqual(partial.modules, { orgData: true, agent365: true, productFeedback: false, consumption: false });
+  assert.deepEqual(partial.modules, { orgData: true, agent365: true, productFeedback: false, consumption: false, agentEvaluator: false });
   assert.deepEqual(partial.fabric.notebooks, {});
 
   const leaky = /** @type {any} */ (emptyConfig());

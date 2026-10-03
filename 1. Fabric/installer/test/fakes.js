@@ -42,6 +42,19 @@ export function fakeUi(opts = {}) {
       if (!answers.length) throw new Error(`No answer scripted for "${message}"`);
       return answers.shift();
     },
+    /** @param {string} message @param {{ default?: string, validate?: (v: string) => true | string }} [o] */
+    async input(message, o = {}) {
+      asked.push(message);
+      const value = answers.length ? answers.shift() : o.default;
+      const verdict = o.validate?.(value) ?? true;
+      if (verdict !== true) throw new Error(`${message}: ${verdict}`);
+      return value;
+    },
+    /** @param {string} message @param {{ value: any, checked?: boolean }[]} choices */
+    async checkbox(message, choices) {
+      asked.push(message);
+      return answers.length ? answers.shift() : choices.filter((ch) => ch.checked).map((ch) => ch.value);
+    },
   };
   return { ui: /** @type {import('../src/ui.js').Ui} */ (/** @type {unknown} */ (ui)), out, asked, text: () => out.join('') };
 }
@@ -273,7 +286,7 @@ export function fakePowerBi() {
 }
 
 /**
- * @param {{ ui?: import('../src/ui.js').Ui, fabric?: any, graph?: any, oneLake?: any, arm?: any, keyVault?: any, powerBi?: any, runner?: import('../src/steps/app.js').Runner, sources?: import('../src/sources.js').Sources, config?: import('../src/config.js').InstallConfig, now?: Date }} [o]
+ * @param {{ ui?: import('../src/ui.js').Ui, fabric?: any, graph?: any, oneLake?: any, arm?: any, keyVault?: any, powerBi?: any, discovery?: any, dataverse?: (url: string) => any, runner?: import('../src/steps/app.js').Runner, sources?: import('../src/sources.js').Sources, config?: import('../src/config.js').InstallConfig, now?: Date }} [o]
  */
 export function fakeCtx(o = {}) {
   const config = o.config ?? emptyConfig();
@@ -294,7 +307,7 @@ export function fakeCtx(o = {}) {
       save: () => {
         saves++;
       },
-      api: { fabric: o.fabric, graph: o.graph, oneLake: o.oneLake, arm: o.arm, keyVault: o.keyVault, powerBi: o.powerBi },
+      api: { fabric: o.fabric, graph: o.graph, oneLake: o.oneLake, arm: o.arm, keyVault: o.keyVault, powerBi: o.powerBi, discovery: o.discovery, dataverse: o.dataverse },
       user: { id: 'user-1', upn: 'admin@contoso.com', tenantId: 'tenant-1' },
       sources: o.sources ?? realSources(),
       runner: o.runner,

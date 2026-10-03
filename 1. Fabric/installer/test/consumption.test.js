@@ -90,7 +90,7 @@ const ids = {
   studioConsumption: 'nb-studio',
   vivaConsumption: 'nb-viva',
 };
-const modules = { orgData: true, agent365: false, productFeedback: false, consumption: true };
+const modules = { orgData: true, agent365: false, productFeedback: false, consumption: true, agentEvaluator: false };
 /** @param {any} doc */
 const names = (doc) => doc.properties.activities.map((/** @type {any} */ a) => a.name);
 
@@ -132,7 +132,7 @@ test('pipeline: without Azure access or a Consumption model, those steps are lef
   assert.ok(names(noModel).includes('Run_Consumption_Studio'));
   assert.ok(!names(noModel).includes(CONSUMPTION_REFRESH_ACTIVITY));
 
-  const off = buildPipeline(realSources().pipeline, { workspaceId: 'ws-1', notebookIds: ids, modules: { ...modules, consumption: false }, azureAi: true, consumptionModelId: 'cc-1' });
+  const off = buildPipeline(realSources().pipeline, { workspaceId: 'ws-1', notebookIds: ids, modules: { ...modules, consumption: false, agentEvaluator: false }, azureAi: true, consumptionModelId: 'cc-1' });
   assert.ok(!names(off).some((/** @type {string} */ n) => n.includes('Consumption')));
 
   const { studioConsumption, ...missing } = ids;
