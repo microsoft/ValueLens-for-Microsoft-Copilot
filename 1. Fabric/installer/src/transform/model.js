@@ -157,6 +157,13 @@ export function buildAgentEvaluatorModel(template, settings) {
     expr.expression = `${text.slice(0, at)}=> error "Not used: the ValueLens installer reads Agent Evaluator data from the Lakehouse."`;
     expr.description = 'Not used: the ValueLens installer reads Agent Evaluator data from the Lakehouse.';
   }
+  // The service can't bind a Sql.Database whose arguments are worked out inside an if/error, so
+  // read the parameters directly, as the ValueLens model does.
+  const fabricTable = model.expressions?.find((e) => e.name === 'FabricTable');
+  const fabricText = fabricTable && (Array.isArray(fabricTable.expression) ? fabricTable.expression.join('\n') : String(fabricTable.expression));
+  const direct = fabricText?.replace(/^([ \t]*)FabEndpoint = [^\n]*\n[ \t]*FabLakehouse = [^\n]*\n[ \t]*Db = [^\n]*Sql\.Database\(FabEndpoint, FabLakehouse\),/m, '$1Db = Sql.Database(#"Fabric SQL Endpoint", #"Lakehouse Name"),');
+  if (!fabricTable || !direct || direct === fabricText) throw new Error('The Agent Evaluator "FabricTable" function has changed shape.');
+  fabricTable.expression = direct;
   const diagnostic = model.tables.find((t) => t.name === AGENT_EVALUATOR_DIAGNOSTIC_TABLE);
   for (const p of diagnostic?.partitions ?? []) {
     const text = Array.isArray(p.source.expression) ? p.source.expression.join('\n') : String(p.source.expression);
