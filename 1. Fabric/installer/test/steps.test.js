@@ -256,6 +256,7 @@ test('data check runs the notebook and prints the summary it saved', async () =>
           audit: { table: 'dbo.audit', rows: 48211, from: '2026-03-03 00:01:00', to: '2026-05-31 23:59:00' },
           agents: null,
           org: { table: 'dbo.copilot_org_data', rows: 0 },
+          m365: { table: 'dbo.m365_activity_daily', rows: 118, from: '2026-09-06', to: '2026-09-29' },
         },
       };
     },
@@ -271,6 +272,7 @@ test('data check runs the notebook and prints the summary it saved', async () =>
   assert.match(text, /✓ Licensed users: 1,250 rows/);
   assert.match(text, /✓ Copilot interactions: 48,211 rows, 2026-03-03 to 2026-05-31/);
   assert.match(text, /! Org data: 0 rows/);
+  assert.match(text, /✓ Microsoft 365 activity: 118 rows, 2026-09-06 to 2026-09-29/);
   assert.match(text, /Agents: not loaded/);
 });
 
@@ -280,6 +282,8 @@ test('printDataCheck flags missing core tables', () => {
   printDataCheck(ctx, { tables: { licensed: null } });
   assert.match(ui.text(), /! Licensed users: no table yet/);
   assert.match(ui.text(), /! Copilot interactions: no table yet/);
+  assert.match(ui.text(), /Microsoft 365 activity: not loaded/);
+  assert.doesNotMatch(ui.text(), /! Microsoft 365 activity/);
 });
 
 test('printDataCheck explains hidden user names in the licence roster', () => {

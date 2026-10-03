@@ -38,7 +38,8 @@ export const liveColumns = {
         "[Sessions Per Week]",
         "[Active Days Per Week]",
     ],
-    // Authored from the query; confirm against the live model after the first Microsoft 365 load.
+    // Ran cleanly on the live model on 2026-10-03 but returned no rows (no Copilot
+    // interactions on that tenant yet), so these columns are as authored.
     licenseCandidatesM365: [
         "[Rank]",
         "[User]",

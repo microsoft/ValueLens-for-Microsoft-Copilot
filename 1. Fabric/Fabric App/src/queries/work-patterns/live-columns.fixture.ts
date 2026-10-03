@@ -5,7 +5,13 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-/** Column names the queries return, as authored. Confirm against the live model after the first M365 load. */
+/**
+ * Column names returned by the live semantic model on 2026-10-03, after the
+ * first Microsoft 365 load. `m365Apps`, `m365CopilotIndex` and `m365ByOrg`
+ * ran cleanly but returned no rows on that tenant (no desktop-app use, no
+ * Copilot interactions, no organisation on the active people), so their
+ * columns are as authored.
+ */
 export const liveColumns = {
     m365Status: ["[Rows]", "[People]", "[First Date]", "[Last Date]", "[Concealed Share]"],
     m365Summary: [
