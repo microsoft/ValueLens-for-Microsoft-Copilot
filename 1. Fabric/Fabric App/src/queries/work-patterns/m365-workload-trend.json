@@ -19,7 +19,7 @@
       "field": "Share",
       "type": "quantitative",
       "title": "Share of active people",
-      "scale": { "domain": [0, 1] },
+      "scale": { "domain": [0, 1], "padding": 0 },
       "axis": { "labelExpr": "format(datum.value, '.0%')" }
     },
     "color": {
