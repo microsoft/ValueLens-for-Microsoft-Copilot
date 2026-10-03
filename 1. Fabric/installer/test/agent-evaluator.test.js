@@ -116,7 +116,7 @@ const ids = {
   refreshModel: 'nb-refresh',
   agentTranscripts: 'nb-ae',
 };
-const modules = { orgData: true, agent365: false, productFeedback: false, consumption: false, agentEvaluator: true };
+const modules = { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: true };
 /** @param {any} doc */
 const names = (doc) => doc.properties.activities.map((/** @type {any} */ a) => a.name);
 
@@ -197,10 +197,10 @@ test('switches: on once an environment is readable; the model only counts once b
   assert.equal(agentEvaluatorModelDeployed(config), false);
   config.agentEvaluator.model.bound = true;
   assert.equal(agentEvaluatorModelDeployed(config), true);
-  assert.equal(pipelineSignature(config), 'core,orgData,agentEvaluator;model=model-1;agentEvaluator;ae=ae-1');
+  assert.equal(pipelineSignature(config), 'core,orgData,m365Activity,agentEvaluator;model=model-1;agentEvaluator;ae=ae-1');
   config.modules.agentEvaluator = false;
   assert.equal(agentEvaluatorOn(config), false);
-  assert.equal(pipelineSignature(config), 'core,orgData;model=model-1');
+  assert.equal(pipelineSignature(config), 'core,orgData,m365Activity;model=model-1');
 });
 
 test('plan: lists enabled environments by name, keeps earlier choices and access, and flags non-admins', async () => {

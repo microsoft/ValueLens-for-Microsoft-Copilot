@@ -130,6 +130,7 @@ class PipelineTests(unittest.TestCase):
             {name: p["defaultValue"] for name, p in self.properties["parameters"].items()},
             {
                 "EnableOrgDataPull": True,
+                "EnableM365Activity": False,
                 "EnableDataverse": False,
                 "EnableConsumption": False,
                 "EnableProductFeedback": False,

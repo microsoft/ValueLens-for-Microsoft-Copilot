@@ -75,7 +75,7 @@ test('pipeline: created once, left alone on re-run, updated when modules change'
   assert.deepEqual(fabric.calls, ['createPipeline ValueLens_Pipeline']);
   const pipeline = fabric.items.find((i) => i.type === 'DataPipeline');
   assert.equal(config.fabric.pipelineId, pipeline?.id, 'ID found by name when the create returns no body');
-  assert.equal(config.fabric.pipelineModules, 'core,orgData');
+  assert.equal(config.fabric.pipelineModules, 'core,orgData,m365Activity');
   const json = JSON.stringify(pipeline?.content);
   assert.doesNotMatch(json, /REPLACE_WITH_/);
   assert.match(json, new RegExp(config.fabric.notebooks.auditIngester ?? 'missing'));
@@ -87,7 +87,7 @@ test('pipeline: created once, left alone on re-run, updated when modules change'
   config.modules.orgData = false;
   await ensurePipeline(ctx);
   assert.deepEqual(fabric.calls, ['updatePipeline ValueLens_Pipeline']);
-  assert.equal(config.fabric.pipelineModules, 'core');
+  assert.equal(config.fabric.pipelineModules, 'core,m365Activity');
   assert.match(ui.text(), /replaces the pipeline definition/);
 });
 
