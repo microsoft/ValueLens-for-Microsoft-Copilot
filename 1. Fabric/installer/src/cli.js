@@ -20,7 +20,7 @@ Commands:
   update           Push the notebooks, pipeline and semantic model from this checkout to Fabric
   run              Run the pipeline now, then the data check
   refresh          Refresh the semantic model now
-  deploy-app       Build and deploy the ValueLens app again
+  deploy-app       Build and deploy the Analytics Hub app again
   status           Show recent runs and refreshes, the last data check and when secrets expire
   rotate-secret    Create new client secrets for Key Vault and the model's connection
   preview          Write what would be deployed to a folder, without signing in

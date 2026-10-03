@@ -61,13 +61,13 @@ export const POWER_BI_SETTINGS = [
   {
     name: 'DatasetExecuteQueries',
     title: 'Semantic Model Execute Queries REST API',
-    effect: 'The ValueLens app queries the model through it.',
+    effect: 'The Analytics Hub app queries the model through it.',
     app: true,
   },
   {
     name: 'AppBackendTenant',
     title: 'Fabric App items',
-    effect: 'The ValueLens app is a Fabric App item.',
+    effect: 'The Analytics Hub app is a Fabric App item.',
     app: true,
   },
 ];
@@ -157,7 +157,7 @@ async function planPowerBi(ctx, pre) {
   const choice = await ui.select(
     'Deploy the ValueLens semantic model?',
     [
-      ...(canApp ? [{ name: 'Semantic model and the ValueLens app (recommended)', value: 'both', description: 'A web app in the workspace, built on the model.' }] : []),
+      ...(canApp ? [{ name: 'Semantic model and the Analytics Hub app (recommended)', value: 'both', description: 'A web app in the workspace, built on the model.' }] : []),
       { name: 'Semantic model only', value: 'model', description: 'Build your own reports on it in Power BI.' },
       { name: 'Neither', value: 'none', description: 'You publish "ValueLens - Fabric.pbit" yourself.' },
     ],
@@ -372,7 +372,7 @@ export async function confirmPlan(ctx) {
     const consumption = consumptionModelWanted(ctx) ? `, ${cm.name} ${cm.id ? '' : c.dim('(new)')}`.trimEnd() : '';
     const am = config.agentEvaluator.model;
     const evaluator = agentEvaluatorModelWanted(ctx) ? `, ${am.name} ${am.id ? '' : c.dim('(new)')}`.trimEnd() : '';
-    const app = config.fabricApp.enabled ? `, and the ValueLens app ${config.fabricApp.itemId ? '' : c.dim('(new)')}` : '';
+    const app = config.fabricApp.enabled ? `, and the Analytics Hub app ${config.fabricApp.itemId ? '' : c.dim('(new)')}` : '';
     ui.info(`Power BI:    ${config.semanticModel.name} ${config.semanticModel.id ? '' : c.dim('(new)')}`.trimEnd() + consumption + evaluator + app.trimEnd());
   }
   if (config.modules.consumption) {

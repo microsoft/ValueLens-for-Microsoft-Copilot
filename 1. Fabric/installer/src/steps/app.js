@@ -22,6 +22,8 @@ export const DATA_CLI = join('node_modules', '@microsoft', 'fabric-app-data-cli'
 export const GENERATED = 'src/fabric.generated.ts';
 /** Rayfin's minimum. */
 export const MIN_NODE = /** @type {const} */ ([22, 13]);
+/** Names the app shipped under before, so a redeploy renames an item that still carries one. */
+export const FORMER_APP_NAMES = ['AI in One 2.0'];
 
 /**
  * @typedef {{ cwd: string, inherit?: boolean, shell?: boolean }} RunOptions
@@ -98,6 +100,30 @@ export const appModels = (config) => [
 const ALIAS_PAGES = { [CONSUMPTION_ALIAS]: 'credit consumption', [EVALUATOR_ALIAS]: 'agent evaluation' };
 
 /**
+ * Gives the app item the name in `rayfin.yml` when it still has Rayfin's default (the app id) or
+ * a name the app shipped under before. A name the customer chose is left alone.
+ * @param {Ctx} ctx
+ * @param {string} ws
+ * @param {string} itemId
+ * @param {string} current
+ * @returns {Promise<string>} The item's name afterwards.
+ */
+async function nameApp(ctx, ws, itemId, current) {
+  const dir = ctx.sources.appDir;
+  const rayfinYml = dir ? readText(join(dir, 'rayfin', 'rayfin.yml')) : null;
+  const wanted = yamlValue(rayfinYml, 'name');
+  if (!wanted || current === wanted || ![yamlValue(rayfinYml, 'id'), ...FORMER_APP_NAMES].includes(current)) return current;
+  try {
+    await ctx.api.fabric.renameItem(ws, itemId, wanted);
+  } catch (err) {
+    ctx.ui.warn(`Couldn't rename the app "${current}" to "${wanted}": ${err instanceof Error ? err.message : err}`);
+    return current;
+  }
+  if (current !== yamlValue(rayfinYml, 'id')) ctx.ui.ok(`Renamed the app "${current}" to "${wanted}"`);
+  return wanted;
+}
+
+/**
  * Why the app needs rebuilding, e.g. "add the credit consumption pages".
  * @param {string[]} before
  * @param {string[]} after
@@ -125,7 +151,8 @@ export async function ensureFabricApp(ctx) {
         ? `The app "${item.displayName}" needs rebuilding to ${pagesChange(fa.models ?? [APP_ALIAS], appModels(config))}. Build and deploy it again?`
         : `The app "${item.displayName}" is deployed. Build and deploy it again?`;
       if (!(await ui.confirm(question, changed))) {
-        ui.ok(`App ${item.displayName} is in place`);
+        const name = await keepAppName(ctx, ws, item);
+        ui.ok(`App ${name} is in place`);
         return;
       }
     } else {
@@ -134,6 +161,34 @@ export async function ensureFabricApp(ctx) {
     }
   }
   await deployApp(ctx);
+}
+
+/**
+ * Renames a deployed app that still has an old name, without rebuilding it.
+ * @param {Ctx} ctx
+ */
+export async function ensureAppName(ctx) {
+  const { config, api } = ctx;
+  const ws = config.fabric.workspaceId;
+  if (!config.fabricApp.itemId || !ws) return;
+  const item = await api.fabric.getItem(ws, config.fabricApp.itemId).catch(() => null);
+  if (item) await keepAppName(ctx, ws, item);
+}
+
+/**
+ * @param {Ctx} ctx
+ * @param {string} ws
+ * @param {{ id: string, displayName: string }} item
+ * @returns {Promise<string>}
+ */
+async function keepAppName(ctx, ws, item) {
+  const fa = ctx.config.fabricApp;
+  const name = await nameApp(ctx, ws, item.id, item.displayName);
+  if (name !== fa.name) {
+    fa.name = name;
+    ctx.save();
+  }
+  return name;
 }
 
 /**
@@ -204,15 +259,8 @@ export async function deployApp(ctx) {
     }
   }
 
-  const rayfinYml = readText(join(dir, 'rayfin', 'rayfin.yml'));
-  const wanted = yamlValue(rayfinYml, 'name');
   const item = await api.fabric.getItem(ws, record.fabricItemId).catch(() => null);
-  let name = item?.displayName ?? wanted;
-  if (wanted && item && item.displayName === yamlValue(rayfinYml, 'id') && item.displayName !== wanted) {
-    await api.fabric.renameItem(ws, record.fabricItemId, wanted);
-    name = wanted;
-  }
-
+  const name = item ? await nameApp(ctx, ws, record.fabricItemId, item.displayName) : yamlValue(readText(join(dir, 'rayfin', 'rayfin.yml')), 'name');
   Object.assign(fa, {
     enabled: true,
     itemId: record.fabricItemId,
