@@ -173,6 +173,24 @@ describe("studio daily renders", () => {
         const days = [...new Set([...bars].sort((a, b) => a.bounds.x1 - b.bounds.x1).map((bar) => bar.datum["Usage Date"]))];
         expect(days).toEqual(rows.map((row) => row["[Usage Date]"]));
     });
+
+    // An ordinal day axis squeezed ~90 labels into ~8px bands and drew none of
+    // them; on a time axis each day spans its own slot, so bars keep a width
+    // and never overlap however narrow the panel.
+    it("gives each day its own bar on a time axis, stacked and never overlapping", async () => {
+        const { vegaLiteSpec, columnMetadata } = studioDaily("consumption");
+        expect((vegaLiteSpec as { encoding: { x: { type: string } } }).encoding.x.type).toBe("temporal");
+        const bars = await render(vegaLiteSpec, rows, columnMetadata, "rect");
+        const byDay = [...new Set(bars.map((bar) => bar.datum["Usage Date"]))].map((day) =>
+            bars.filter((bar) => bar.datum["Usage Date"] === day),
+        );
+        const spans = byDay.map((group) => group[0].bounds).sort((a, b) => a.x1 - b.x1);
+        for (const span of spans) expect(span.x2 - span.x1).toBeGreaterThan(1);
+        spans.slice(1).forEach((span, index) => expect(span.x1).toBeGreaterThanOrEqual(spans[index].x2));
+        const both = byDay.find((group) => group.length === 2)!;
+        const [prepaid, payg] = ["Prepaid", "Pay-as-you-go"].map((billing) => both.find((bar) => bar.datum.Billing === billing)!);
+        expect(payg.bounds.y2).toBeCloseTo(prepaid.bounds.y1, 0);
+    });
 });
 
 describe("studio breakdown renders", () => {
