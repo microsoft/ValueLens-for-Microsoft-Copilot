@@ -78,6 +78,13 @@ and output tables), then run the lander before model refresh. Without Entra, use
 - If those conditions are not met, the notebook refuses the merge rather than silently
   producing an ambiguous curated table.
 
+**Agent accounts are dropped** by default (`EXCLUDE_AGENT_IDENTITIES = True`). Some agents,
+such as Security Copilot agents, sign in as their own user (`SecurityCopilotAgentUser-<id>@<tenant>`).
+They are not people, so left in they inflate active users and top the "who to license next" list.
+`AGENT_IDENTITY_PATTERNS` holds the regexes, matched against the lower-case UPN; add your own
+service accounts there. In merge mode, rows merged before the filter was on are deleted too.
+Set `EXCLUDE_AGENT_IDENTITIES = False` to keep them.
+
 **Optional raw passthrough** is disabled by default (`INCLUDE_RAW_PASSTHROUGH = False`).
 Enable it to retain `AppIdentity_Raw`, `AccessedResources_Raw`, `AISystemPlugin_Raw`,
 and the original `Audit_UserId_Normalized` when present. Existing canonical parsing,
@@ -293,6 +300,12 @@ query can still yield no parsed prompts: the ingester intentionally retains only
 messages whose `isPrompt` value is true. Only investigate identity formats or
 tenant/environment selection as possible mismatch causes when both user sets are
 nonempty.
+
+If most licensed UPNs are 32-character hex strings, the Microsoft 365 reports are hiding
+user names, so no licence can match a person. The check prints **MASKED USER NAMES** and the
+fix: in the Microsoft 365 admin center, go to Settings > Org settings > Reports and untick
+"Display concealed user, group, and site names in all reports", then rerun the licensed-users
+ingester, the audit processor and the model refresh. The installer shows the same warning.
 
 Audit staging and checkpoints use `notebookutils.fs` for Lakehouse `Files/` and
 ABFSS paths rather than relying on the local Lakehouse mount. Pages are published

@@ -822,5 +822,51 @@ class AuditReliabilityTests(unittest.TestCase):
         self.assertEqual(helpers["list_window_files"](helpers["STAGING_ABS"], key, include_partial=True), [])
 
 
+class AgentIdentityTests(unittest.TestCase):
+    """Agent accounts such as SecurityCopilotAgentUser-<id> are not people."""
+
+    @classmethod
+    def setUpClass(cls):
+        ns = exec_named_defs(PROCESSOR, 2, ["agent_identity_regex"], include_imports=False)
+        cls.regex = staticmethod(ns["agent_identity_regex"])
+        cls.config = exec_notebook_cell(PROCESSOR, 1, {})
+        cls.sources = cells(PROCESSOR)
+
+    def default_regex(self):
+        return self.regex(self.config["EXCLUDE_AGENT_IDENTITIES"], self.config["AGENT_IDENTITY_PATTERNS"])
+
+    def test_default_config_drops_security_copilot_agents(self):
+        import re
+        self.assertIs(self.config["EXCLUDE_AGENT_IDENTITIES"], True)
+        pattern = self.default_regex()
+        self.assertTrue(re.search(pattern, "securitycopilotagentuser-1f2e3d4c@contoso.onmicrosoft.com"))
+        for upn in ("jane@contoso.com", "agent.smith@contoso.com", "me-securitycopilotagentuser-1@contoso.com"):
+            with self.subTest(upn=upn):
+                self.assertIsNone(re.search(pattern, upn))
+
+    def test_filter_can_be_switched_off_or_left_empty(self):
+        self.assertIsNone(self.regex(False, [r"^securitycopilotagentuser-"]))
+        self.assertIsNone(self.regex(True, []))
+        self.assertIsNone(self.regex(True, None))
+        self.assertIsNone(self.regex(True, ["", "  "]))
+
+    def test_several_patterns_combine_into_one_regex(self):
+        import re
+        pattern = self.regex(True, [r"^svc-", r"@agents\.contoso\.com$"])
+        self.assertEqual(pattern, r"(?:^svc-)|(?:@agents\.contoso\.com$)")
+        self.assertTrue(re.search(pattern, "svc-bot@contoso.com"))
+        self.assertTrue(re.search(pattern, "x@agents.contoso.com"))
+        self.assertIsNone(re.search(pattern, "jane@contoso.com"))
+
+    def test_processor_filters_new_rows_and_cleans_merged_ones(self):
+        filter_cell = next(text for text in self.sources if "# 6b. AGENT IDENTITIES" in text)
+        self.assertIn("AGENT_IDENTITY_REGEX = agent_identity_regex(EXCLUDE_AGENT_IDENTITIES, AGENT_IDENTITY_PATTERNS)", filter_cell)
+        self.assertIn('F.lower(F.col("_NormUPN")).rlike(AGENT_IDENTITY_REGEX)', filter_cell)
+        self.assertLess(filter_cell.index('fact = fact.withColumn("_NormUPN", norm)'), filter_cell.index("# 6b."))
+        writer = next(text for text in self.sources if "def write_curated_output" in text)
+        self.assertIn("if AGENT_IDENTITY_REGEX and \"Audit_UserId\" in target_columns:", writer)
+        self.assertIn(".rlike(AGENT_IDENTITY_REGEX))", writer)
+
+
 if __name__ == "__main__":
     unittest.main()

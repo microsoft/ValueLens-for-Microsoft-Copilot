@@ -22,6 +22,7 @@ export const liveColumns = {
         "[Avg Days Since Last Active]",
         "[License Evidence Notice]",
         "[Reclaim Cost Notice]",
+        "[License Inventory Usable]",
     ],
     licensePriorityByOrg: [
         "[Organization]",

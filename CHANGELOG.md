@@ -16,6 +16,47 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-03 — Fabric installer: Agent Evaluator
+
+The installer can now set up the [Agent Evaluator](1.%20Fabric/Add%20Agent%20Evaluator/) from
+[AgentEvaluator-for-Copilot-Studio](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio),
+so the app's Agent Evaluation pages show how Copilot Studio agents perform. It's off by default.
+
+Choose it and the installer lists the Power Platform environments you're a member of. In each one
+you pick, it adds the app registration as an application user with the Bot Transcript Viewer role,
+or prints the admin center steps if you aren't a System Administrator there. It deploys the
+transcript parser notebook with those environments, adds it to the pipeline in merge mode so
+history builds past Dataverse's 30 days, and deploys the `ValueLens Agent Evaluator Model` on the
+ValueLens model's connection. The app is rebuilt with the model as its `ae` source.
+
+The parser and template are copied from upstream commit `e37b1ac`. The notebook gains one cell that
+looks up each user's UPN in Entra, so agent sessions join to org data.
+
+---
+
+## 2026-10-03 — Fabric: licences that don't match people, and agent accounts
+
+A walk-through of an older AI in One 2.0 install found three problems that our sample data
+never showed.
+
+**Hidden user names.** When the Microsoft 365 setting "Display concealed user, group, and site
+names in all reports" is on, the licensed-users table holds hashed names that can't match the
+audit log. The app then said 0 licensed and everyone unlicensed, with no explanation. The
+`ValueLens_Data_Check` notebook now spots the hashed names and prints the admin center fix, and
+the installer's data check repeats it. It also reports how many people using Copilot have a licence.
+
+**Readiness without a matching roster.** "Who to license next" ranked every active user as if
+nobody had a licence. When the roster doesn't match, Readiness now says so at the top and on the
+list, and the dormancy chart explains why it is empty.
+
+**Agent accounts counted as people.** Security Copilot agents sign in as
+`SecurityCopilotAgentUser-<id>`; in that install they made 62% of audit rows and topped the
+licence list. `Copilot_Audit_Log_Processor` now drops them by default
+(`EXCLUDE_AGENT_IDENTITIES`, `AGENT_IDENTITY_PATTERNS`). Only the Fabric path has this so far;
+Power Automate + Dataverse, SharePoint and Local CSV will follow.
+
+---
+
 ## 2026-10-03 — Fabric App: readable consumption charts over time
 
 The Copilot Studio "Consumption over time" and "Cost over time" charts were unreadable.
@@ -28,6 +69,11 @@ The Cowork / Work IQ weekly "Cost over time" chart also loses its per-bar labels
 uneven decimals and a stray 0 on every week with no pay-as-you-go spend. The Azure "Foundry cost
 over time" chart now has the same weekly date ticks as Copilot Studio, where before it showed only
 the first of each month.
+
+`rayfin up` could fail with "No rayfin/.temp/compiled/data/*.js files found" after the app
+folder moved or `rayfin/.temp` was cleared. The data service shared the app's TypeScript build
+cache, so the compiler thought it was up to date and emitted nothing. It now keeps its own cache
+inside `rayfin/.temp/compiled`.
 
 ## 2026-10-03 — Paths renumbered: Fabric first
 

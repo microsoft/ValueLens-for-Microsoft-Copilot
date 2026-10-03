@@ -24,6 +24,8 @@ import { columnFormat, columnHeat, heatRenderer } from "@/lib/heat";
 import { withOrgAttribute } from "@/lib/org-attribute";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
+import { SMALL } from "@/lib/type-scale";
+import { cn } from "@/lib/utils";
 import {
     licenseCandidates,
     licenseDemandSummary,
@@ -114,6 +116,8 @@ export function LicenseReadinessStage() {
     const summaryLoading = demand.isLoading || !demand.data || estate.isLoading || !estate.data;
     const evidenceNotice = readText(estateRow, "[License Evidence Notice]");
     const reclaimNotice = readText(estateRow, "[Reclaim Cost Notice]");
+    // The roster doesn't join to the people using Copilot, so everyone reads as unlicensed.
+    const unreconciled = readNumber(estateRow, "[License Inventory Usable]") === 0;
 
     return (
         <Section
@@ -121,6 +125,15 @@ export function LicenseReadinessStage() {
             title="License readiness"
             description="Who is already reaching for Copilot without a license, and which licenses are sitting idle."
         >
+            {unreconciled && (
+                <p role="status" className={cn(SMALL, "max-w-[90ch] rounded-md bg-secondary px-300 py-200 text-foreground")}>
+                    Licenses don't match the people using Copilot, so everyone here counts as unlicensed and the list
+                    below may include people who already have a license. This is usually because Microsoft 365 reports
+                    hide user names: in the Microsoft 365 admin center, go to Settings &gt; Org settings &gt; Reports,
+                    untick "Display concealed user, group, and site names in all reports", then run the pipeline again.
+                </p>
+            )}
+
             {summaryError ? (
                 <QueryError message={summaryError.message} onRetry={summaryError.retry} />
             ) : summaryLoading ? (
@@ -234,7 +247,9 @@ export function LicenseReadinessStage() {
                         theme={theme}
                         header={{
                             title: "Who to license next",
-                            subtitle: `${formatKpi(candidatesTable.rows.length, "whole")} unlicensed users, ranked by priority score`,
+                            subtitle: `${formatKpi(candidatesTable.rows.length, "whole")} unlicensed users, ranked by priority score${
+                                unreconciled ? ". Some may already have a license: see the note above." : ""
+                            }`,
                         }}
                     />
                 )}
@@ -255,8 +270,12 @@ export function LicenseReadinessStage() {
                 ) : dormancyTable.rows.length === 0 ? (
                     <QueryEmpty
                         className="h-full"
-                        title="No license roster"
-                        description="The license inventory returned no dormancy buckets to show."
+                        title={unreconciled ? "Dormancy can't be measured yet" : "No license roster"}
+                        description={
+                            unreconciled
+                                ? "Licenses don't match the people using Copilot, so there's no way to tell which seats are idle. See the note at the top of this section."
+                                : "The license inventory returned no dormancy buckets to show."
+                        }
                     />
                 ) : (
                     <VegaVisual

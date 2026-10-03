@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { createCredential, createTokenProvider, decodeJwt } from './auth.js';
 import { notebooksFor, permissionsFor } from './catalog.js';
 import { armApi, keyVaultApi } from './clients/azure.js';
+import { dataverseApi, dataverseScope, DISCOVERY_URL, discoveryApi, orgUrl } from './clients/dataverse.js';
 import { fabricApi, scheduleBody } from './clients/fabric.js';
 import { CONSENT_ROLES, graphApi } from './clients/graph.js';
 import { ONELAKE_URL, oneLakeApi } from './clients/onelake.js';
@@ -14,14 +15,28 @@ import { powerBiApi } from './clients/powerbi.js';
 import { saveConfig } from './config.js';
 import { createClient, defaultSleep } from './http.js';
 import { ensureConsent, ensureApp, ensureKeyVault, newSecret } from './steps/identity.js';
+import { agentEvaluatorModelWanted, agentEvaluatorSummary, ensureAgentEvaluatorModel, ensureTranscriptAccess } from './steps/agent-evaluator.js';
 import { deployApp, ensureFabricApp } from './steps/app.js';
 import { consumptionModelWanted, consumptionSummary, ensureAzureAiAccess, ensureConsumptionModel, ensureLandingFolders } from './steps/consumption.js';
-import { consumptionModelDeployed, describeSchedule, ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, ensureVaultEndpoint, ensureWorkspace, modelDeployed, notebookSettings, PIPELINE_NAME } from './steps/fabric.js';
+import {
+  agentEvaluatorModelDeployed,
+  consumptionModelDeployed,
+  describeSchedule,
+  ensureLakehouse,
+  ensureNotebooks,
+  ensurePipeline,
+  ensureSchedule,
+  ensureVaultEndpoint,
+  ensureWorkspace,
+  modelDeployed,
+  notebookSettings,
+  PIPELINE_NAME,
+} from './steps/fabric.js';
 import { ensureModelConnection, ensureSemanticModel, modelUrl, refreshModel, rotateModelSecret } from './steps/model.js';
 import { confirmPlan, plan, preflight } from './steps/plan.js';
 import { runDataCheck, runPipeline, status } from './steps/run.js';
 import { prepareNotebook, serialiseNotebook } from './transform/notebook.js';
-import { buildConsumptionModel, buildModel, loadTemplateModel } from './transform/model.js';
+import { buildAgentEvaluatorModel, buildConsumptionModel, buildModel, loadTemplateModel } from './transform/model.js';
 import { buildPipeline } from './transform/pipeline.js';
 import { c } from './ui.js';
 
@@ -33,6 +48,8 @@ import { c } from './ui.js';
  * @property {import('./clients/azure.js').KeyVaultApi} keyVault
  * @property {import('./clients/onelake.js').OneLakeApi} oneLake
  * @property {import('./clients/powerbi.js').PowerBiApi} powerBi
+ * @property {import('./clients/dataverse.js').DiscoveryApi} discovery
+ * @property {(url: string) => import('./clients/dataverse.js').DataverseApi} dataverse  A Dataverse environment, by org URL.
  *
  * @typedef {{ id: string, upn: string, tenantId: string, displayName?: string }} User
  *
@@ -72,6 +89,8 @@ export async function connect(opts) {
     keyVault: keyVaultApi(client('https://vault.azure.net', 'keyVault')),
     oneLake: oneLakeApi(client(ONELAKE_URL, 'storage')),
     powerBi: powerBiApi(client('https://api.powerbi.com/v1.0/myorg', 'powerbi')),
+    discovery: discoveryApi(client(DISCOVERY_URL, 'discovery')),
+    dataverse: (url) => dataverseApi(client(`${orgUrl(url)}/api/data/v9.2`, dataverseScope(url)), url),
   };
   const claims = decodeJwt(await getToken('graph'));
   const me = await api.graph.me();
@@ -124,6 +143,7 @@ export async function install(ctx, opts) {
   const withModel = !!sm.enabled;
   const withApp = withModel && !!config.fabricApp.enabled;
   const withConsumption = !!config.modules.consumption;
+  const withAgentEvaluator = !!config.modules.agentEvaluator;
   const titles = [
     'Key Vault',
     'App registration',
@@ -131,6 +151,7 @@ export async function install(ctx, opts) {
     'Workspace and Lakehouse',
     ...(withModel ? ['Semantic model'] : []),
     ...(withConsumption ? ['Credit consumption'] : []),
+    ...(withAgentEvaluator ? ['Agent Evaluator'] : []),
     'Notebooks, pipeline and schedule',
     ...(withApp ? ['ValueLens app'] : []),
     ...(ctx.runFirstLoad ? ['First load'] : withModel ? ['Model refresh'] : []),
@@ -157,6 +178,10 @@ export async function install(ctx, opts) {
     step('Credit consumption');
     await consumptionSteps(ctx);
   }
+  if (withAgentEvaluator) {
+    step('Agent Evaluator');
+    await agentEvaluatorSteps(ctx);
+  }
   step('Notebooks, pipeline and schedule');
   await ensureNotebooks(ctx);
   await ensurePipeline(ctx);
@@ -173,7 +198,7 @@ export async function install(ctx, opts) {
     } else if (!vaultReachable) {
       ui.warn(`Skipped until the private endpoint to ${config.keyVault.name} is approved. Then run: valuelens-install run --backfill-days ${config.history.days}`);
     } else {
-      if (modelDeployed(config)) ui.note(`The pipeline refreshes ${[sm.name, ...(consumptionModelDeployed(config) ? [config.consumption.model.name] : [])].join(' and ')} as its last step.`);
+      if (modelDeployed(config)) ui.note(`The pipeline refreshes ${joinNames(deployedModels(config).map((m) => m.name))} as its last step.`);
       const result = await runPipeline(ctx, { backfillDays: config.history.days, wait: opts.wait, first: true });
       if (result.ok) await runDataCheck(ctx);
     }
@@ -196,7 +221,34 @@ async function consumptionSteps(ctx, opts = {}) {
 }
 
 /**
- * Refreshes the ValueLens model and, when it is deployed, the Consumption model.
+ * Access to the chosen environments' transcripts, and the Agent Evaluator model.
+ * @param {Ctx} ctx
+ * @param {{ force?: boolean }} [opts]
+ */
+async function agentEvaluatorSteps(ctx, opts = {}) {
+  await ensureTranscriptAccess(ctx);
+  if (agentEvaluatorModelWanted(ctx)) await ensureAgentEvaluatorModel(ctx, opts);
+}
+
+/**
+ * The deployed models that read the Lakehouse, ValueLens's first.
+ * @param {import('./config.js').InstallConfig} config
+ * @returns {{ name: string, id?: string }[]}
+ */
+function deployedModels(config) {
+  if (!modelDeployed(config)) return [];
+  return [
+    config.semanticModel,
+    ...(consumptionModelDeployed(config) ? [config.consumption.model] : []),
+    ...(agentEvaluatorModelDeployed(config) ? [config.agentEvaluator.model] : []),
+  ];
+}
+
+/** @param {string[]} names */
+const joinNames = (names) => (names.length < 3 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
+
+/**
+ * Refreshes the ValueLens model and the other deployed models that share its connection.
  * @param {Ctx} ctx
  * @param {{ wait?: boolean }} opts
  */
@@ -206,9 +258,9 @@ async function refreshModels(ctx, opts) {
   let result = { ok: false };
   if (modelDeployed(config)) result = await refreshModel(ctx, opts);
   else ui.warn(`Skipped: ${config.semanticModel.name} isn't connected to the Lakehouse yet.`);
-  if (consumptionModelDeployed(config)) {
-    const cc = await refreshModel(ctx, { ...opts, model: config.consumption.model });
-    result = { ...result, ok: result.ok && cc.ok };
+  for (const model of deployedModels(config).slice(1)) {
+    const other = await refreshModel(ctx, { ...opts, model: /** @type {import('./config.js').ModelConfig} */ (model) });
+    result = { ...result, ok: result.ok && other.ok };
   }
   return result;
 }
@@ -249,6 +301,7 @@ export async function update(ctx, opts = {}) {
     await ensureModelConnection(ctx);
   }
   if (config.modules.consumption) await consumptionSteps(ctx, { force: true });
+  if (config.modules.agentEvaluator) await agentEvaluatorSteps(ctx, { force: true });
   await ensureNotebooks(ctx, { force: true });
   await ensurePipeline(ctx, { force: true });
   await ensureSchedule(ctx);
@@ -279,7 +332,7 @@ export { status };
  */
 export async function refresh(ctx, opts) {
   if (!ctx.config.semanticModel.id) throw new Error('There is no semantic model yet. Run the installer and choose to deploy it.');
-  if (!consumptionModelDeployed(ctx.config)) return refreshModel(ctx, opts);
+  if (deployedModels(ctx.config).length < 2) return refreshModel(ctx, opts);
   return refreshModels(ctx, opts);
 }
 
@@ -343,6 +396,7 @@ export async function summary(ctx) {
     ui.info('   as you. Anyone who takes over the pipeline needs "get" on the secret and Contributor on the workspace.');
     ui.info(`3. Keep ${c.bold('valuelens-install.json')}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);
     if (config.modules.consumption) consumptionSummary(ctx);
+    if (config.modules.agentEvaluator) agentEvaluatorSummary(ctx);
     return;
   }
 
@@ -363,6 +417,7 @@ export async function summary(ctx) {
   ui.info('   pipeline or takes over the schedule needs "get" on the secret first.');
   ui.info(`4. Keep ${c.bold('valuelens-install.json')}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);
   if (config.modules.consumption) consumptionSummary(ctx);
+  if (config.modules.agentEvaluator) agentEvaluatorSummary(ctx);
 }
 
 /**
@@ -379,6 +434,9 @@ export function preview(o) {
   const cc = config.consumption;
   const withConsumptionModel = withModel && !!config.modules.consumption && !!sources.consumptionModelFile;
   const withAzureAi = !!config.modules.consumption && !!cc.azureSubscriptionId;
+  const ae = config.agentEvaluator;
+  const withTranscripts = !!config.modules.agentEvaluator && ae.environments.length > 0;
+  const withAgentEvaluatorModel = withModel && withTranscripts && !!sources.agentEvaluatorModelFile;
   /** @type {Ctx} */
   const ctx = /** @type {any} */ ({
     config: {
@@ -394,13 +452,14 @@ export function preview(o) {
       },
       semanticModel: withModel ? { ...sm, id: sm.id ?? fake(4), bound: true } : { ...sm, enabled: false },
       consumption: { ...cc, model: { ...cc.model, id: cc.model.id ?? fake(5), bound: true } },
+      agentEvaluator: { ...ae, model: { ...ae.model, id: ae.model.id ?? fake(6), bound: true } },
     },
     user: { tenantId: config.tenantId ?? fake(0) },
   });
 
   mkdirSync(join(out, 'notebooks'), { recursive: true });
   let n = 10;
-  for (const nb of notebooksFor(config.modules, { semanticModel: withModel, azureAi: withAzureAi })) {
+  for (const nb of notebooksFor(config.modules, { semanticModel: withModel, azureAi: withAzureAi, dataverse: withTranscripts })) {
     const prepared = prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb));
     writeFileSync(join(out, 'notebooks', `${nb.displayName}.ipynb`), serialiseNotebook(prepared), 'utf8');
     ctx.config.fabric.notebooks[nb.key] = ctx.config.fabric.notebooks[nb.key] ?? fake(n++);
@@ -413,6 +472,8 @@ export function preview(o) {
     semanticModelId: withModel ? ctx.config.semanticModel.id : undefined,
     azureAi: withAzureAi,
     consumptionModelId: withConsumptionModel ? ctx.config.consumption.model.id : undefined,
+    agentTranscripts: withTranscripts,
+    agentEvaluatorModelId: withAgentEvaluatorModel ? ctx.config.agentEvaluator.model.id : undefined,
   });
   writeFileSync(join(out, 'pipeline-content.json'), `${JSON.stringify(pipeline, null, 2)}\n`, 'utf8');
   writeFileSync(join(out, 'schedule.json'), `${JSON.stringify(scheduleBody(config.schedule, o.now), null, 2)}\n`, 'utf8');
@@ -436,8 +497,15 @@ export function preview(o) {
     });
     writeFileSync(join(out, 'consumption-model.bim'), `${JSON.stringify(bim, null, 2)}\n`, 'utf8');
   }
+  if (withAgentEvaluatorModel) {
+    const bim = buildAgentEvaluatorModel(loadTemplateModel(/** @type {string} */ (sources.agentEvaluatorModelFile)), {
+      server: sm.server ?? 'your-endpoint.datawarehouse.fabric.microsoft.com',
+      database: /** @type {string} */ (ctx.config.fabric.lakehouseName),
+    });
+    writeFileSync(join(out, 'agent-evaluator-model.bim'), `${JSON.stringify(bim, null, 2)}\n`, 'utf8');
+  }
 
-  const models = [withModel ? 'model.bim' : '', withConsumptionModel ? 'consumption-model.bim' : ''].filter(Boolean);
+  const models = [withModel ? 'model.bim' : '', withConsumptionModel ? 'consumption-model.bim' : '', withAgentEvaluatorModel ? 'agent-evaluator-model.bim' : ''].filter(Boolean);
   ui.heading('Preview written');
   ui.info(out);
   ui.note(`Notebooks, pipeline-content.json, schedule.json${models.map((m) => `, ${m}`).join('')} and graph-permissions.txt, with placeholder IDs where none are known yet.`);

@@ -7,7 +7,7 @@ import { enabledModules, notebooksFor } from '../catalog.js';
 import { parseResourceId } from '../clients/azure.js';
 import { scheduleBody } from '../clients/fabric.js';
 import { HttpError } from '../http.js';
-import { prepareNotebook, serialiseNotebook } from '../transform/notebook.js';
+import { MARKER, prepareNotebook, pyString, serialiseNotebook } from '../transform/notebook.js';
 import { buildPipeline } from '../transform/pipeline.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
@@ -277,7 +277,13 @@ export function notebookSettings(ctx, nb) {
           },
         }
       : {}),
-    patches: nb.patches,
+    ...(nb.key === 'agentTranscripts'
+      ? {
+          // Merge upserts each run's window, so environments and days accumulate without duplicates.
+          values: { SOURCE_MODE: 'dataverse', WRITE_MODE: 'merge', RAW_TABLE: '' },
+        }
+      : {}),
+    patches: nb.key === 'agentTranscripts' ? [...(nb.patches ?? []), environmentsPatch(config.agentEvaluator.environments)] : nb.patches,
     lakehouse: {
       id: /** @type {string} */ (f.lakehouseId),
       name: /** @type {string} */ (f.lakehouseName),
@@ -285,6 +291,20 @@ export function notebookSettings(ctx, nb) {
     },
     dataCheckSummary: nb.key === 'dataCheck',
   };
+}
+
+/** The transcript parser's environment list, as it ships. */
+export const ENVIRONMENTS_FIND = "DATAVERSE_URLS = [\n    # 'https://org1.crm.dynamics.com',\n    # 'https://org2.crm.dynamics.com',\n]";
+
+/**
+ * Lists every chosen environment, including those still waiting for access: the parser skips
+ * those, then reads them once an admin adds the app.
+ * @param {import('../config.js').AgentEnvironment[]} environments
+ * @returns {import('../catalog.js').NotebookPatch}
+ */
+export function environmentsPatch(environments) {
+  const lines = environments.map((e) => `    ${pyString(e.url)},${e.name ? `  # ${e.name.replace(/[\r\n]+/g, ' ')}` : ''}`);
+  return { find: ENVIRONMENTS_FIND, replace: ['DATAVERSE_URLS = [  # ' + MARKER, ...lines, ']'].join('\n') };
 }
 
 /**
@@ -298,8 +318,9 @@ export async function ensureNotebooks(ctx, opts = {}) {
   const items = await api.fabric.listItems(ws, 'Notebook');
   const ids = new Set(items.map((i) => i.id));
 
-  for (const nb of notebooksFor(config.modules, { semanticModel: modelDeployed(config), azureAi: azureAiOn(config) })) {
+  for (const nb of notebooksFor(config.modules, { semanticModel: modelDeployed(config), azureAi: azureAiOn(config), dataverse: agentEvaluatorOn(config) })) {
     const content = serialiseNotebook(prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb)));
+    const urls = nb.key === 'agentTranscripts' ? environmentUrls(config) : undefined;
     let id = f.notebooks[nb.key];
     if (id && !ids.has(id)) {
       ui.warn(`${nb.displayName} was deleted. Deploying it again.`);
@@ -318,16 +339,23 @@ export async function ensureNotebooks(ctx, opts = {}) {
         id = await createdId(ctx, created, 'Notebook', nb.displayName);
         ui.ok(`Created ${nb.displayName}`);
       }
-    } else if (opts.force) {
+    } else if (opts.force || (urls !== undefined && urls !== config.agentEvaluator.deployedUrls)) {
       await api.fabric.updateNotebook(ws, id, content);
       ui.ok(`Updated ${nb.displayName}`);
     } else {
       ui.ok(`${nb.displayName} is in place`);
     }
     f.notebooks[nb.key] = id;
+    if (urls !== undefined) config.agentEvaluator.deployedUrls = urls;
     ctx.save();
   }
 }
+
+/**
+ * The environments the transcript notebook reads, as stored with the deployed notebook.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const environmentUrls = (config) => config.agentEvaluator.environments.map((e) => e.url).join(',');
 
 /**
  * What the pipeline definition is built from. A change means the deployed pipeline is out of date.
@@ -338,6 +366,8 @@ export function pipelineSignature(config) {
   if (modelDeployed(config)) parts.push(`model=${config.semanticModel.id}`);
   if (azureAiOn(config)) parts.push('azureAi');
   if (consumptionModelDeployed(config)) parts.push(`consumption=${config.consumption.model.id}`);
+  if (agentEvaluatorOn(config)) parts.push('agentEvaluator');
+  if (agentEvaluatorModelDeployed(config)) parts.push(`ae=${config.agentEvaluator.model.id}`);
   return parts.join(';');
 }
 
@@ -360,6 +390,20 @@ export const azureAiOn = (config) => !!(config.modules.consumption && config.con
 export const consumptionModelDeployed = (config) => !!(config.modules.consumption && modelDeployed(config) && config.consumption?.model?.id && config.consumption.model.bound);
 
 /**
+ * The transcript notebook is deployed: the Agent Evaluator is on and the app can read at least one
+ * environment. The parser stops when it can reach none of them.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const agentEvaluatorOn = (config) => !!(config.modules.agentEvaluator && config.agentEvaluator?.environments.some((e) => e.access));
+
+/**
+ * The Agent Evaluator model exists and reads the Lakehouse. The pipeline refreshes it after the transcripts load.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const agentEvaluatorModelDeployed = (config) =>
+  !!(config.modules.agentEvaluator && modelDeployed(config) && config.agentEvaluator?.model?.id && config.agentEvaluator.model.bound);
+
+/**
  * @param {Ctx} ctx
  * @param {{ force?: boolean }} [opts]
  */
@@ -375,6 +419,8 @@ export async function ensurePipeline(ctx, opts = {}) {
     semanticModelId: modelDeployed(config) ? config.semanticModel.id : undefined,
     azureAi: azureAiOn(config),
     consumptionModelId: consumptionModelDeployed(config) ? config.consumption.model.id : undefined,
+    agentTranscripts: agentEvaluatorOn(config),
+    agentEvaluatorModelId: agentEvaluatorOn(config) && agentEvaluatorModelDeployed(config) ? config.agentEvaluator.model.id : undefined,
   });
   const signature = pipelineSignature(config);
   const items = await api.fabric.listItems(ws, 'DataPipeline');

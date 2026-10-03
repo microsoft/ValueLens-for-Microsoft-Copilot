@@ -23,6 +23,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {SemanticModelConfig} semanticModel
  * @property {FabricAppConfig} fabricApp
  * @property {ConsumptionConfig} consumption
+ * @property {AgentEvaluatorConfig} agentEvaluator
  */
 
 /**
@@ -41,6 +42,23 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {string} [azureSubscriptionName]
  * @property {boolean} [azureAccess]  The app has the Azure roles the notebook needs there.
  * @property {boolean} [landing]  The landing folders exist.
+ * @property {ModelConfig} model
+ */
+
+/**
+ * A Power Platform environment whose Copilot Studio transcripts the Agent Evaluator reads.
+ * @typedef {object} AgentEnvironment
+ * @property {string} url  The Dataverse org URL, without a trailing slash.
+ * @property {string} [id]  The Power Platform environment ID.
+ * @property {string} [name]
+ * @property {boolean} [access]  The app is an application user there with the Bot Transcript Viewer role.
+ */
+
+/**
+ * The Agent Evaluator module: the environments to read and the Agent Evaluator model.
+ * @typedef {object} AgentEvaluatorConfig
+ * @property {AgentEnvironment[]} environments
+ * @property {string} [deployedUrls]  The environment URLs the deployed transcript notebook lists.
  * @property {ModelConfig} model
  */
 
@@ -74,6 +92,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
 
 export const MODEL_NAME = 'ValueLens Model';
 export const CONSUMPTION_MODEL_NAME = 'ValueLens Consumption Model';
+export const AGENT_EVALUATOR_MODEL_NAME = 'ValueLens Agent Evaluator Model';
 
 /** @returns {InstallConfig} */
 export function emptyConfig() {
@@ -88,6 +107,7 @@ export function emptyConfig() {
     semanticModel: { name: MODEL_NAME },
     fabricApp: {},
     consumption: { model: { name: CONSUMPTION_MODEL_NAME } },
+    agentEvaluator: { environments: [], model: { name: AGENT_EVALUATOR_MODEL_NAME } },
   };
 }
 
@@ -119,6 +139,11 @@ export function loadConfig(file) {
     semanticModel: { ...base.semanticModel, ...(raw.semanticModel ?? {}) },
     fabricApp: { ...(raw.fabricApp ?? {}) },
     consumption: { ...(raw.consumption ?? {}), model: { ...base.consumption.model, ...(raw.consumption?.model ?? {}) } },
+    agentEvaluator: {
+      ...(raw.agentEvaluator ?? {}),
+      environments: [...(raw.agentEvaluator?.environments ?? [])],
+      model: { ...base.agentEvaluator.model, ...(raw.agentEvaluator?.model ?? {}) },
+    },
   };
   assertNoSecrets(config);
   return { config, existed: true };

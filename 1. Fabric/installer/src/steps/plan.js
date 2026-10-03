@@ -10,6 +10,7 @@ import { APP_ROLES, CONSENT_ROLES } from '../clients/graph.js';
 import { HttpError } from '../http.js';
 import { c } from '../ui.js';
 import { MIN_NODE, nodeVersionOk } from './app.js';
+import { agentEvaluatorModelWanted, planAgentEvaluator } from './agent-evaluator.js';
 import { consumptionModelWanted, planConsumption } from './consumption.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
@@ -201,6 +202,7 @@ export async function plan(ctx, pre) {
 
   await planPowerBi(ctx, pre);
   if (config.modules.consumption) await planConsumption(ctx, pre);
+  if (config.modules.agentEvaluator) await planAgentEvaluator(ctx);
 
   if (config.firstRun?.status !== 'Completed') {
     config.history.days = await ui.select(
@@ -368,12 +370,20 @@ export async function confirmPlan(ctx) {
   if (config.semanticModel.enabled) {
     const cm = config.consumption.model;
     const consumption = consumptionModelWanted(ctx) ? `, ${cm.name} ${cm.id ? '' : c.dim('(new)')}`.trimEnd() : '';
+    const am = config.agentEvaluator.model;
+    const evaluator = agentEvaluatorModelWanted(ctx) ? `, ${am.name} ${am.id ? '' : c.dim('(new)')}`.trimEnd() : '';
     const app = config.fabricApp.enabled ? `, and the ValueLens app ${config.fabricApp.itemId ? '' : c.dim('(new)')}` : '';
-    ui.info(`Power BI:    ${config.semanticModel.name} ${config.semanticModel.id ? '' : c.dim('(new)')}`.trimEnd() + consumption + app.trimEnd());
+    ui.info(`Power BI:    ${config.semanticModel.name} ${config.semanticModel.id ? '' : c.dim('(new)')}`.trimEnd() + consumption + evaluator + app.trimEnd());
   }
   if (config.modules.consumption) {
     const cc = config.consumption;
     ui.info(`Azure AI:    ${cc.azureSubscriptionId ? `${cc.azureSubscriptionName ?? cc.azureSubscriptionId}${cc.azureAccess ? '' : c.dim(' (the app gets Reader, Cost Management Reader and Monitoring Reader)')}` : c.dim('left out')}`);
+  }
+  if (config.modules.agentEvaluator) {
+    const envs = config.agentEvaluator.environments;
+    const names = envs.map((e) => e.name ?? new URL(e.url).host).join(', ');
+    const waiting = envs.some((e) => !e.access) ? c.dim(' (the app is added to each with the Bot Transcript Viewer role)') : '';
+    ui.info(`Agents:      ${envs.length ? `${names}${waiting}` : c.dim('no environments chosen')}`);
   }
   if (ctx.runFirstLoad) ui.info(`First load:  ${config.history.days} days of history, straight after setup`);
   return ui.confirm('Go ahead?', true);

@@ -152,6 +152,33 @@ export function printDataCheck(ctx, summary) {
     const range = t.from && t.to ? `, ${String(t.from).slice(0, 10)} to ${String(t.to).slice(0, 10)}` : '';
     (t.rows ? ui.ok : ui.warn)(`${label}: ${rows} rows${range}`);
   }
+  printIdentityMatch(ctx, summary?.identity);
+}
+
+/**
+ * Says whether licences match Copilot activity. With no match the app shows 0 licensed users.
+ * @param {Ctx} ctx
+ * @param {{ licensed?: number, audit?: number, matched?: number, masked?: number } | null | undefined} identity
+ */
+function printIdentityMatch(ctx, identity) {
+  const { ui } = ctx;
+  if (!identity) return;
+  const licensed = Number(identity.licensed ?? 0);
+  const audit = Number(identity.audit ?? 0);
+  const matched = Number(identity.matched ?? 0);
+  const masked = Number(identity.masked ?? 0);
+  if (!licensed || !audit) return;
+  const n = (/** @type {number} */ v) => v.toLocaleString('en-GB');
+  if (masked * 2 >= licensed) {
+    ui.warn(`Licensed users: ${n(masked)} of ${n(licensed)} user names are hidden, so no licence matches Copilot activity`);
+    ui.note('In the Microsoft 365 admin center, go to Settings > Org settings > Reports and untick');
+    ui.note('"Display concealed user, group, and site names in all reports". The next pipeline run picks it up.');
+  } else if (!matched) {
+    ui.warn(`Licensed users: none of the ${n(audit)} people using Copilot match a licensed user`);
+    ui.note('Open ValueLens_Data_Check in Fabric to compare the user names in both tables.');
+  } else {
+    ui.ok(`Licensed users: ${n(matched)} of ${n(audit)} people using Copilot have a licence`);
+  }
 }
 
 /**
@@ -170,8 +197,15 @@ export async function status(ctx) {
   ui.info(`Pipeline:  ${f.pipelineName ?? f.pipelineId}`);
   const sm = config.semanticModel;
   const cm = config.consumption?.model;
+  const am = config.agentEvaluator?.model;
   if (sm?.id) ui.info(`Model:     ${sm.name}${sm.bound ? '' : ' (not connected to the Lakehouse yet)'}`);
   if (cm?.id) ui.info(`Model:     ${cm.name}${cm.bound ? '' : ' (not connected to the Lakehouse yet)'}`);
+  if (am?.id) ui.info(`Model:     ${am.name}${am.bound ? '' : ' (not connected to the Lakehouse yet)'}`);
+  if (config.modules.agentEvaluator && config.agentEvaluator.environments.length) {
+    const envs = config.agentEvaluator.environments;
+    const waiting = envs.filter((e) => !e.access).length;
+    ui.info(`Agents:    ${envs.length - waiting} of ${envs.length} environment(s) readable${waiting ? c.dim(' (the rest are waiting for an admin to add the app)') : ''}`);
+  }
   if (config.fabricApp?.itemId) ui.info(`App:       ${config.fabricApp.name}  ${c.dim(config.fabricApp.url ?? '')}`);
   expiry(ctx, 'Client secret', config.app.secretExpires);
   if (sm?.connectionId) expiry(ctx, 'Model connection secret', sm.secretExpires);
@@ -202,7 +236,7 @@ export async function status(ctx) {
     }
   }
 
-  for (const m of [sm, cm]) {
+  for (const m of [sm, cm, am]) {
     if (!m?.id) continue;
     const refreshes = await modelRefreshes(ctx, m).catch(() => null);
     if (refreshes) {

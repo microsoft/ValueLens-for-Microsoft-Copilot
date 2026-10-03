@@ -25,6 +25,9 @@ const columnMetadata: ColumnMetadataMap = {
         displayName: "License evidence notice",
     },
     "[Reclaim Cost Notice]": { name: "Reclaim Cost Notice", displayName: "Reclaim cost notice" },
+    // 1 when the license roster joins to the people using Copilot; 0 when it doesn't
+    // (no roster, or user names hidden in the Microsoft 365 reports).
+    "[License Inventory Usable]": { name: "License Inventory Usable", displayName: "License inventory usable" },
 };
 
 /**

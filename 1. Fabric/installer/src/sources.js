@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NOTEBOOKS } from './catalog.js';
-import { CONSUMPTION_TEMPLATE, MODEL_TEMPLATE } from './transform/model.js';
+import { AGENT_EVALUATOR_TEMPLATE, CONSUMPTION_TEMPLATE, MODEL_TEMPLATE } from './transform/model.js';
 
 /** `1. Fabric`, when the installer runs from inside the repo. */
 export const DEFAULT_SOURCE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -19,6 +19,7 @@ export const APP_DIR = 'Fabric App';
  * @property {any} pipeline
  * @property {string} [modelFile]  `ValueLens - Fabric.pbit`, read only when the semantic model is deployed.
  * @property {string} [consumptionModelFile]  `Consumption Central - Fabric.pbit`, for the credit consumption model.
+ * @property {string} [agentEvaluatorModelFile]  `Agent Evaluator.pbit`, for the Agent Evaluator model.
  * @property {string} [appDir]  The web app's source, when this checkout has it.
  */
 
@@ -41,6 +42,7 @@ export function loadSources(dir = DEFAULT_SOURCE_DIR) {
   }
   const modelFile = join(root, MODEL_TEMPLATE);
   const consumptionModelFile = join(root, CONSUMPTION_TEMPLATE);
+  const agentEvaluatorModelFile = join(root, AGENT_EVALUATOR_TEMPLATE);
   const appDir = resolve(root, APP_DIR);
   return {
     dir: root,
@@ -48,6 +50,7 @@ export function loadSources(dir = DEFAULT_SOURCE_DIR) {
     pipeline: readJson(pipelineFile),
     modelFile: existsSync(modelFile) ? modelFile : undefined,
     consumptionModelFile: existsSync(consumptionModelFile) ? consumptionModelFile : undefined,
+    agentEvaluatorModelFile: existsSync(agentEvaluatorModelFile) ? agentEvaluatorModelFile : undefined,
     appDir: existsSync(join(appDir, 'rayfin', 'rayfin.yml')) ? appDir : undefined,
   };
 }

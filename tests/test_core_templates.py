@@ -19,6 +19,8 @@ TEMPLATES = (
 PAGE_COUNT = 16
 # Separate Consumption Central report shipped as an optional add-on in each path.
 ADDON = "Add Credit Consumption"
+# Separate reports from other repositories, shipped as optional add-ons.
+ADDONS = {ADDON, "Add Agent Evaluator"}
 HIDDEN_PAGES = {"licenseprioritisation"}
 VALUE_PAGE = "0a7ca92c179ad5909bba"
 VALUE_TOGGLES = ("Time Saved", "Value Table")
@@ -78,7 +80,7 @@ class CoreTemplateTests(unittest.TestCase):
 
     def test_exactly_five_active_templates(self):
         active = {p.relative_to(ROOT) for p in ROOT.rglob("*.pbit")
-                  if "archive" not in p.parts and ADDON not in p.parts}
+                  if "archive" not in p.parts and not ADDONS & set(p.parts)}
         self.assertEqual(active, set(TEMPLATES))
 
     def test_portable_parts_only(self):

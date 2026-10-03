@@ -99,5 +99,51 @@ class DataCheckTests(unittest.TestCase):
         self.assertIn("isNotNull() & (F.trim(F.col(f'`{ucol}`')) != '')", source)
 
 
+class MaskedUserNameTests(unittest.TestCase):
+    """Hidden user names in the M365 reports make the licence roster unjoinable."""
+
+    @classmethod
+    def setUpClass(cls):
+        notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+        sources = ["".join(cell["source"]) for cell in notebook["cells"]]
+        cls.source = next(text for text in sources if "def _masked_hint(" in text)
+        body = [
+            node for node in ast.parse(cls.source).body
+            if (isinstance(node, ast.FunctionDef) and node.name == "_masked_hint")
+            or (isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "MASKED_UPN" for t in node.targets))
+        ]
+        namespace = {}
+        exec(compile(ast.Module(body=body, type_ignores=[]), str(NOTEBOOK), "exec"), namespace)
+        cls.hint = staticmethod(namespace["_masked_hint"])
+        cls.pattern = namespace["MASKED_UPN"]
+
+    def test_pattern_matches_concealed_names_only(self):
+        import re
+        self.assertRegex("0f8fad5bd9cb469fa16570867728950e", self.pattern)
+        for upn in ("jane@contoso.com", "0f8fad5b-d9cb-469f-a165-70867728950e", "0f8fad5bd9cb469f"):
+            with self.subTest(upn=upn):
+                self.assertIsNone(re.match(self.pattern, upn))
+
+    def test_mostly_masked_roster_explains_the_admin_center_fix(self):
+        message = self.hint(98, 98)
+        self.assertIn("MASKED USER NAMES", message)
+        self.assertIn("Org settings", message)
+        self.assertIn("Display concealed user, group, and site names in all reports", message)
+        self.assertTrue(self.hint(50, 100))
+
+    def test_a_few_hash_like_names_do_not_warn(self):
+        self.assertEqual(self.hint(0, 100), "")
+        self.assertEqual(self.hint(49, 100), "")
+        self.assertEqual(self.hint(0, 0), "")
+
+    def test_overlap_check_records_a_summary_for_the_installer(self):
+        self.assertIn("overlap_summary = None", self.source)
+        self.assertIn(
+            "overlap_summary = {'licensed': nl, 'audit': na, 'matched': both, 'masked': masked}",
+            self.source,
+        )
+        self.assertIn("hint = _masked_hint(masked, nl)", self.source)
+
+
 if __name__ == "__main__":
     unittest.main()
