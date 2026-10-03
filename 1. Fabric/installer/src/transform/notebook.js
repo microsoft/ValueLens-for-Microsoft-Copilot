@@ -122,6 +122,8 @@ for _key, _table in _tables.items():
             _r = _df.select(_F.min(_col).alias('lo'), _F.max(_col).alias('hi')).collect()[0]
             _info['from'], _info['to'] = str(_r['lo']), str(_r['hi'])
     _summary['tables'][_key] = _info
+# How many licensed users match Copilot activity, from the notebook's overlap check.
+_summary['identity'] = globals().get('overlap_summary')
 
 _path = '/lakehouse/default/${DATA_CHECK_FILE}'
 _os.makedirs(_os.path.dirname(_path), exist_ok=True)

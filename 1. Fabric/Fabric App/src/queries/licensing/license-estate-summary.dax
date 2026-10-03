@@ -3,5 +3,6 @@ ROW(
     "Total Licensed Users", [Total Licensed Users],
     "Avg Days Since Last Active", [Avg Days Since Last Active],
     "License Evidence Notice", [License Evidence Notice],
-    "Reclaim Cost Notice", [Reclaim Cost Notice]
+    "Reclaim Cost Notice", [Reclaim Cost Notice],
+    "License Inventory Usable", [License Inventory Usable]
 )

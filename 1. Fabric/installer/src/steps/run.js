@@ -152,6 +152,33 @@ export function printDataCheck(ctx, summary) {
     const range = t.from && t.to ? `, ${String(t.from).slice(0, 10)} to ${String(t.to).slice(0, 10)}` : '';
     (t.rows ? ui.ok : ui.warn)(`${label}: ${rows} rows${range}`);
   }
+  printIdentityMatch(ctx, summary?.identity);
+}
+
+/**
+ * Says whether licences match Copilot activity. With no match the app shows 0 licensed users.
+ * @param {Ctx} ctx
+ * @param {{ licensed?: number, audit?: number, matched?: number, masked?: number } | null | undefined} identity
+ */
+function printIdentityMatch(ctx, identity) {
+  const { ui } = ctx;
+  if (!identity) return;
+  const licensed = Number(identity.licensed ?? 0);
+  const audit = Number(identity.audit ?? 0);
+  const matched = Number(identity.matched ?? 0);
+  const masked = Number(identity.masked ?? 0);
+  if (!licensed || !audit) return;
+  const n = (/** @type {number} */ v) => v.toLocaleString('en-GB');
+  if (masked * 2 >= licensed) {
+    ui.warn(`Licensed users: ${n(masked)} of ${n(licensed)} user names are hidden, so no licence matches Copilot activity`);
+    ui.note('In the Microsoft 365 admin center, go to Settings > Org settings > Reports and untick');
+    ui.note('"Display concealed user, group, and site names in all reports". The next pipeline run picks it up.');
+  } else if (!matched) {
+    ui.warn(`Licensed users: none of the ${n(audit)} people using Copilot match a licensed user`);
+    ui.note('Open ValueLens_Data_Check in Fabric to compare the user names in both tables.');
+  } else {
+    ui.ok(`Licensed users: ${n(matched)} of ${n(audit)} people using Copilot have a licence`);
+  }
 }
 
 /**
