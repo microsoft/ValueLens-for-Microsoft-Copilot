@@ -12,6 +12,7 @@ import { useM365Activity } from "@/hooks/use-m365-activity";
 import { M365_ACTIVITY_DESCRIPTION, M365_ACTIVITY_TITLE } from "./copy";
 import { M365ActivityStage } from "./m365-activity-stage";
 import { M365CopilotStage } from "./m365-copilot-stage";
+import { M365SuiteStage } from "./m365-suite-stage";
 
 /**
  * How people work across Microsoft 365, and where Copilot sits in that week.
@@ -25,6 +26,7 @@ export function WorkPatternsScreen() {
         return (
             <div className="flex flex-col gap-800">
                 <M365ActivityStage concealed={m365.concealed} />
+                <M365SuiteStage />
                 <M365CopilotStage concealed={m365.concealed} />
             </div>
         );

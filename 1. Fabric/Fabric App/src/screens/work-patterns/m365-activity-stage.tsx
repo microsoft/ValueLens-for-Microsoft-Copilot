@@ -10,24 +10,58 @@ import { VegaVisual } from "@microsoft/fabric-visuals";
 import { stageAnchor } from "@/components/destinations";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
+import { NoteCard, type Note } from "@/components/report-panels";
 import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { rowChartHeight } from "@/lib/chart-height";
 import { formatDateRange } from "@/lib/filters";
-import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
+import { formatKpi } from "@/lib/format-kpi";
+import { readNumber, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import { SMALL } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
-import { m365Apps, m365Summary, m365WorkloadReach, m365WorkloadTrend } from "@/queries/work-patterns";
+import { m365Summary, m365WorkloadReach, m365WorkloadTrend, readM365Coverage, type M365Coverage } from "@/queries/work-patterns";
 import { CONCEALED_FIX, M365_ACTIVITY_DESCRIPTION, M365_ACTIVITY_TITLE } from "./copy";
 
 const SUMMARY = m365Summary();
 const TREND = m365WorkloadTrend();
 const REACH = m365WorkloadReach();
-const APPS = m365Apps();
 
 const ROW_CHART = { perRow: 40, chrome: 100 };
+
+const NOTES: Note[] = [
+    {
+        term: "People active",
+        text: "Anyone who used at least one workload: Teams, Outlook, SharePoint, OneDrive, Viva Engage or the Office apps. Receiving email alone doesn't count.",
+    },
+    {
+        term: "Per week",
+        text: "Each figure is per active person, spread over the weeks that have data. Days with nothing loaded are left out, so a gap doesn't read as a quiet week.",
+    },
+    {
+        term: "Week by week",
+        text: "Only full Monday-to-Sunday weeks are plotted, so a part week at either end doesn't pull the line down.",
+    },
+    {
+        term: "Source",
+        text: "The Microsoft 365 usage reports, one row per person per day. They run two to three days behind, and recent days are read again as they fill in.",
+    },
+];
+
+function days(count: number): string {
+    return `${formatKpi(count, "whole")} ${count === 1 ? "day" : "days"}`;
+}
+
+/** Which days the averages rest on, and which they skip. */
+function coverageText({ firstDate, lastDate, daysLoaded, missingDays }: M365Coverage): string {
+    const span = `Per person, over ${formatDateRange(firstDate, lastDate)}`;
+    const gaps =
+        missingDays > 0
+            ? `: ${days(daysLoaded)} with data. ${days(missingDays)} in that span ${missingDays === 1 ? "has" : "have"} none, and ${missingDays === 1 ? "is" : "are"} left out of the averages rather than counted as quiet.`
+            : ".";
+    return `${span}${gaps} The usage reports run two to three days behind, so the latest days fill in later.`;
+}
 
 interface M365ActivityStageProps {
     /** The usage reports hide user names, so nothing here can be matched to a person. */
@@ -36,9 +70,9 @@ interface M365ActivityStageProps {
 
 /**
  * The shape of a working week on Microsoft 365, from the usage reports: how
- * many people are active, how often, and which workloads and apps they reach
- * for. These are the reports' own daily counts, so they don't depend on
- * Copilot at all.
+ * many people are active, how often, and which workloads they reach for.
+ * These are the reports' own daily counts, so they don't depend on Copilot
+ * at all.
  */
 export function M365ActivityStage({ concealed }: M365ActivityStageProps) {
     const { theme } = useThemeContext();
@@ -46,7 +80,6 @@ export function M365ActivityStage({ concealed }: M365ActivityStageProps) {
     const summary = useFilteredQuery(SUMMARY);
     const trendResult = useFilteredQuery(TREND);
     const reachResult = useFilteredQuery(REACH);
-    const appsResult = useFilteredQuery(APPS);
 
     const summaryRow = useMemo(
         () => (summary.data?.status === "success" ? toSummaryRow(summary.data.table) : undefined),
@@ -60,17 +93,10 @@ export function M365ActivityStage({ concealed }: M365ActivityStageProps) {
         () => (reachResult.data?.status === "success" ? toDataTable(reachResult.data.table, REACH.columnMetadata) : undefined),
         [reachResult.data],
     );
-    const appsTable = useMemo(
-        () => (appsResult.data?.status === "success" ? toDataTable(appsResult.data.table, APPS.columnMetadata) : undefined),
-        [appsResult.data],
-    );
 
     const people = readNumber(summaryRow, "[People Active]");
-    const firstDate = readText(summaryRow, "[First Date]");
-    const lastDate = readText(summaryRow, "[Last Date]");
-    // Both bar charts list a handful of fixed rows, so they share one height and line up side by side.
-    const barRows = Math.max(reachTable?.rows.length ?? 0, appsTable?.rows.length ?? 0);
-    const barHeight = barRows > 0 ? rowChartHeight(barRows, ROW_CHART) : undefined;
+    const coverage = readM365Coverage(summaryRow);
+    const reachHeight = reachTable?.rows.length ? rowChartHeight(reachTable.rows.length, ROW_CHART) : undefined;
 
     return (
         <Section id={stageAnchor("m365-activity")} title={M365_ACTIVITY_TITLE} description={M365_ACTIVITY_DESCRIPTION}>
@@ -142,11 +168,8 @@ export function M365ActivityStage({ concealed }: M365ActivityStageProps) {
                             }
                         />
                     </div>
-                    {firstDate && lastDate && (
-                        <p className={cn(SMALL, "max-w-[80ch] text-muted-foreground")}>
-                            Per person, over {formatDateRange(firstDate, lastDate)}. The usage reports run two to three
-                            days behind, so the latest days fill in later.
-                        </p>
+                    {coverage && (
+                        <p className={cn(SMALL, "max-w-[80ch] text-muted-foreground")}>{coverageText(coverage)}</p>
                     )}
                 </>
             )}
@@ -176,7 +199,7 @@ export function M365ActivityStage({ concealed }: M365ActivityStageProps) {
             </div>
 
             <div className="grid gap-400 xl:grid-cols-2">
-                <div className="h-[340px]" style={barHeight ? { height: barHeight } : undefined}>
+                <div className="h-[340px]" style={reachHeight ? { height: reachHeight } : undefined}>
                     {reachResult.data?.status === "error" ? (
                         <QueryError className="h-full" message={reachResult.data.error.message} onRetry={reachResult.refetch} />
                     ) : reachResult.isLoading || !reachTable ? (
@@ -200,28 +223,8 @@ export function M365ActivityStage({ concealed }: M365ActivityStageProps) {
                     )}
                 </div>
 
-                <div className="h-[340px]" style={barHeight ? { height: barHeight } : undefined}>
-                    {appsResult.data?.status === "error" ? (
-                        <QueryError className="h-full" message={appsResult.data.error.message} onRetry={appsResult.refetch} />
-                    ) : appsResult.isLoading || !appsTable ? (
-                        <QueryLoading className="h-full" />
-                    ) : appsTable.rows.length === 0 ? (
-                        <QueryEmpty
-                            className="h-full"
-                            title="No app activity"
-                            description="Nobody in the current selection opened a Microsoft 365 app."
-                        />
-                    ) : (
-                        <VegaVisual
-                            spec={APPS.vegaLiteSpec}
-                            data={appsTable}
-                            theme={theme}
-                            header={{
-                                title: "Which apps people open",
-                                subtitle: "Share of active people, on desktop, web or mobile.",
-                            }}
-                        />
-                    )}
+                <div className="xl:self-start">
+                    <NoteCard title="How these figures are worked out" notes={NOTES} />
                 </div>
             </div>
         </Section>

@@ -6,6 +6,7 @@
 //-----------------------------------------------------------------------
 
 import type { ColumnMetadataMap } from "@/lib/to-data-table";
+import { readNumber, readText, type SummaryRow } from "@/lib/summary-row";
 import { connection, FORMAT_HOURS, FORMAT_RATE, FORMAT_WHOLE } from "../shared";
 import query from "./m365-summary.dax?raw";
 
@@ -33,4 +34,38 @@ const columnMetadata: ColumnMetadataMap = {
  */
 export function m365Summary() {
     return { connection, query, columnMetadata };
+}
+
+export interface M365Coverage {
+    /** ISO `yyyy-mm-dd`. */
+    firstDate: string;
+    /** ISO `yyyy-mm-dd`. */
+    lastDate: string;
+    /** Days between the first and last date, both included. */
+    spanDays: number;
+    /** Days in that span with any activity loaded. */
+    daysLoaded: number;
+    /** Days in that span with nothing loaded: not published, or nobody active. */
+    missingDays: number;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Which days the summary's averages rest on. The ingester writes nothing for
+ * a day with no activity rows, so a gap can't be told apart from a day the
+ * reports haven't published; either way it's left out of the averages rather
+ * than counted as a quiet day.
+ */
+export function readM365Coverage(row: SummaryRow | undefined): M365Coverage | undefined {
+    const firstDate = readText(row, "[First Date]");
+    const lastDate = readText(row, "[Last Date]");
+    const daysLoaded = readNumber(row, "[Days Loaded]");
+    if (!firstDate || !lastDate || daysLoaded === undefined) return undefined;
+    if (!ISO_DATE.test(firstDate) || !ISO_DATE.test(lastDate)) return undefined;
+
+    const spanDays = Math.round((Date.parse(`${lastDate}T00:00:00Z`) - Date.parse(`${firstDate}T00:00:00Z`)) / 86_400_000) + 1;
+    if (!(spanDays > 0)) return undefined;
+
+    return { firstDate, lastDate, spanDays, daysLoaded, missingDays: Math.max(0, spanDays - daysLoaded) };
 }

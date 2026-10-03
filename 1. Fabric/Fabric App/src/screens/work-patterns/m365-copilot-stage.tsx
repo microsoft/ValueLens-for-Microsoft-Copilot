@@ -5,24 +5,25 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
 import { VegaVisual } from "@microsoft/fabric-visuals";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { stageAnchor } from "@/components/destinations";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
+import { NoteCard, type Note } from "@/components/report-panels";
 import { Section } from "@/components/section";
 import { useOrgAttribute } from "@/hooks/filter.context";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { rowChartHeight } from "@/lib/chart-height";
 import { formatKpi } from "@/lib/format-kpi";
-import { columnFormat, columnHeat, heatRenderer } from "@/lib/heat";
-import { withIndefiniteArticle, withOrgAttribute } from "@/lib/org-attribute";
+import { columnFormat, columnHeat, columnValues, heatRenderer } from "@/lib/heat";
+import { withIndefiniteArticle, withOrgAttribute, type OrgAttribute } from "@/lib/org-attribute";
 import { readNumber, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
-import { m365ByOrg, m365CopilotIndex, m365CopilotSummary } from "@/queries/work-patterns";
+import { m365ByOrg, m365CopilotIndex, m365CopilotSummary, SMALL_GROUP_MIN_PEOPLE } from "@/queries/work-patterns";
 import { CONCEALED_FIX } from "./copy";
 
 const SUMMARY = m365CopilotSummary();
@@ -31,9 +32,54 @@ const INDEX = m365CopilotIndex();
 const TITLE = "Copilot in the flow of work";
 const DESCRIPTION = "How far Copilot reaches into the Microsoft 365 workforce, and how a Copilot user's week differs.";
 
-function orgColumns(orgLabel: string, table: DataTable | undefined): GridColumnDef[] {
+function capitalise(text: string): string {
+    return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function notes(org: OrgAttribute): Note[] {
     return [
-        { id: "Organization", header: orgLabel, minWidth: 200 },
+        {
+            term: "Copilot users",
+            text: "Anyone with Copilot Chat or agent activity in the audit log during the selection. Everyone else active on Microsoft 365 is the comparison group.",
+        },
+        {
+            term: "Licensed",
+            text: "People marked as holding a Copilot license in the license list.",
+        },
+        {
+            term: "The comparison",
+            text: "Sets the two groups' weeks side by side. It shows the gap, not that Copilot caused it: people who take up Copilot early may already work differently.",
+        },
+        {
+            term: "Small groups",
+            text: `${capitalise(org.plural)} with fewer than ${SMALL_GROUP_MIN_PEOPLE} active people share one row, so no row describes a handful of people who could be picked out.`,
+        },
+    ];
+}
+
+/** How many organizations a pooled by-org row holds; 0 on an ordinary row. */
+function pooledGroups(row: Record<string, unknown>): number {
+    const pooled = row["Pooled Groups"];
+    return typeof pooled === "number" && pooled > 0 ? pooled : 0;
+}
+
+function orgColumns(org: OrgAttribute, table: DataTable | undefined): GridColumnDef[] {
+    return [
+        {
+            id: "Organization",
+            header: org.label,
+            minWidth: 200,
+            cellRenderer: (value, row): ReactNode => {
+                const pooled = pooledGroups(row);
+                if (pooled === 0) return value;
+                return (
+                    <span className="text-muted-foreground">
+                        {formatKpi(pooled, "whole")} smaller {pooled === 1 ? org.noun : org.plural}
+                    </span>
+                );
+            },
+        },
+        { id: "Pooled Groups", header: "Groups pooled", hidden: true },
         { id: "People Active", header: "Active on Microsoft 365", numericStyling: true },
         { id: "Copilot Users", header: "Using Copilot", numericStyling: true },
         {
@@ -97,7 +143,13 @@ function CopilotComparison() {
             byOrgResult.data?.status === "success" ? toDataTable(byOrgResult.data.table, byOrg.columnMetadata) : undefined,
         [byOrgResult.data, byOrg.columnMetadata],
     );
-    const columns = useMemo(() => orgColumns(org.label, byOrgTable), [org.label, byOrgTable]);
+    const columns = useMemo(() => orgColumns(org, byOrgTable), [org, byOrgTable]);
+    const pooledCounts = useMemo(
+        () => columnValues(byOrgTable, "Pooled Groups").map((value) => (typeof value === "number" && value > 0 ? value : 0)),
+        [byOrgTable],
+    );
+    const groupCount = pooledCounts.reduce((sum, pooled) => sum + Math.max(1, pooled), 0);
+    const hasPool = pooledCounts.some((pooled) => pooled > 0);
 
     const m365People = readNumber(summaryRow, "[M365 People]");
     const licensed = readNumber(summaryRow, "[Licensed People]");
@@ -152,32 +204,42 @@ function CopilotComparison() {
                 </div>
             )}
 
-            <div
-                className="h-[340px]"
-                style={indexTable?.rows.length ? { height: rowChartHeight(indexTable.rows.length, { perRow: 44, chrome: 116 }) } : undefined}
-            >
-                {indexResult.data?.status === "error" ? (
-                    <QueryError className="h-full" message={indexResult.data.error.message} onRetry={indexResult.refetch} />
-                ) : indexResult.isLoading || !indexTable ? (
-                    <QueryLoading className="h-full" />
-                ) : indexTable.rows.length === 0 ? (
-                    <QueryEmpty
-                        className="h-full"
-                        title="Nothing to compare yet"
-                        description="The comparison needs people who use Copilot and people who don't in the same selection."
-                    />
-                ) : (
-                    <VegaVisual
-                        spec={INDEX.vegaLiteSpec}
-                        data={indexTable}
-                        theme={theme}
-                        header={{
-                            title: "A Copilot user's week, against everyone else's",
-                            subtitle:
-                                "Per person, per week. Right of 1× means Copilot users do more of it. This compares the two groups; it doesn't show Copilot caused the gap.",
-                        }}
-                    />
-                )}
+            <div className="grid gap-400 2xl:grid-cols-3">
+                <div
+                    className="h-[340px] 2xl:col-span-2"
+                    style={
+                        indexTable?.rows.length
+                            ? { height: rowChartHeight(indexTable.rows.length, { perRow: 44, chrome: 116 }) }
+                            : undefined
+                    }
+                >
+                    {indexResult.data?.status === "error" ? (
+                        <QueryError className="h-full" message={indexResult.data.error.message} onRetry={indexResult.refetch} />
+                    ) : indexResult.isLoading || !indexTable ? (
+                        <QueryLoading className="h-full" />
+                    ) : indexTable.rows.length === 0 ? (
+                        <QueryEmpty
+                            className="h-full"
+                            title="Nothing to compare yet"
+                            description="The comparison needs people who use Copilot and people who don't in the same selection."
+                        />
+                    ) : (
+                        <VegaVisual
+                            spec={INDEX.vegaLiteSpec}
+                            data={indexTable}
+                            theme={theme}
+                            header={{
+                                title: "A Copilot user's week, against everyone else's",
+                                subtitle:
+                                    "Per person, per week. Right of 1× means Copilot users do more of it. This compares the two groups; it doesn't show Copilot caused the gap.",
+                            }}
+                        />
+                    )}
+                </div>
+
+                <div className="2xl:self-start">
+                    <NoteCard title="How these figures are worked out" notes={notes(org)} />
+                </div>
             </div>
 
             <div className="flex h-[560px] flex-col">
@@ -199,7 +261,9 @@ function CopilotComparison() {
                         theme={theme}
                         header={{
                             title: `Copilot reach by ${org.noun}`,
-                            subtitle: `${formatKpi(byOrgTable.rows.length, "whole")} ${org.plural}, with their Microsoft 365 week per person`,
+                            subtitle: `${formatKpi(groupCount, "whole")} ${groupCount === 1 ? org.noun : org.plural}, with their Microsoft 365 week per person${
+                                hasPool ? `. Those under ${SMALL_GROUP_MIN_PEOPLE} active people share one row.` : ""
+                            }`,
                         }}
                     />
                 )}

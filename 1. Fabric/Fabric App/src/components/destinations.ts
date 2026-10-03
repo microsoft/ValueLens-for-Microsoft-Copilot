@@ -71,6 +71,7 @@ export const destinations = [
         filters: ["dateRange", "organizations"] as FilterKey[],
         stages: [
             { id: "m365-activity", label: "Microsoft 365 activity", ready: true },
+            { id: "m365-suite", label: "Apps and devices", ready: true },
             { id: "m365-copilot", label: "Copilot in the flow of work", ready: true },
         ],
     },

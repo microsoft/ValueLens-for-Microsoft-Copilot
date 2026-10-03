@@ -1,4 +1,5 @@
 EVALUATE
+VAR _minPeople = 5
 VAR _copilot =
     FILTER(
         VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
@@ -6,28 +7,58 @@ VAR _copilot =
     )
 VAR _weeks = DIVIDE(DISTINCTCOUNT('M365 Activity'[ActivityDate]), 7)
 VAR _orgs =
-    ADDCOLUMNS(
-        FILTER(
-            VALUES('Chat + Agent Org Data'[Organization]),
-            NOT ISBLANK('Chat + Agent Org Data'[Organization])
-        ),
-        "@People",
-            CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0),
-        "@Copilot",
-            COUNTROWS(
-                INTERSECT(
-                    CALCULATETABLE(VALUES('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0),
-                    _copilot
-                )
+    FILTER(
+        ADDCOLUMNS(
+            FILTER(
+                VALUES('Chat + Agent Org Data'[Organization]),
+                NOT ISBLANK('Chat + Agent Org Data'[Organization])
             ),
-        "@PersonDays", CALCULATE(COUNTROWS('M365 Activity'), 'M365 Activity'[WorkloadsActive] > 0),
-        "@Meetings", CALCULATE(SUM('M365 Activity'[TeamsMeetings])),
-        "@Emails", CALCULATE(SUM('M365 Activity'[EmailSent]))
+            "@People",
+                CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0)
+        ),
+        [@People] > 0
+    )
+VAR _small = SELECTCOLUMNS(FILTER(_orgs, [@People] < _minPeople), "@Name", 'Chat + Agent Org Data'[Organization])
+VAR _pooled = COALESCE(COUNTROWS(_small), 0)
+VAR _groups =
+    UNION(
+        SELECTCOLUMNS(
+            FILTER(_orgs, [@People] >= _minPeople),
+            "@Org", 'Chat + Agent Org Data'[Organization],
+            "@Pooled", 0
+        ),
+        FILTER(ROW("@Org", "Smaller groups", "@Pooled", _pooled), _pooled > 0)
+    )
+VAR _measured =
+    GENERATE(
+        _groups,
+        VAR _org = [@Org]
+        VAR _isPool = [@Pooled] > 0
+        VAR _members =
+            FILTER(
+                VALUES('Chat + Agent Org Data'[Organization]),
+                IF(
+                    _isPool,
+                    'Chat + Agent Org Data'[Organization] IN _small,
+                    'Chat + Agent Org Data'[Organization] = _org
+                )
+            )
+        VAR _people =
+            CALCULATETABLE(VALUES('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0, _members)
+        RETURN
+            ROW(
+                "@People", COUNTROWS(_people),
+                "@Copilot", COUNTROWS(INTERSECT(_people, _copilot)),
+                "@PersonDays", CALCULATE(COUNTROWS('M365 Activity'), 'M365 Activity'[WorkloadsActive] > 0, _members),
+                "@Meetings", CALCULATE(SUM('M365 Activity'[TeamsMeetings]), _members),
+                "@Emails", CALCULATE(SUM('M365 Activity'[EmailSent]), _members)
+            )
     )
 RETURN
 SELECTCOLUMNS(
-    FILTER(_orgs, [@People] > 0),
-    "Organization", 'Chat + Agent Org Data'[Organization],
+    _measured,
+    "Organization", [@Org],
+    "Pooled Groups", [@Pooled],
     "People Active", [@People],
     "Copilot Users", COALESCE([@Copilot], 0),
     "Copilot Reach", DIVIDE(COALESCE([@Copilot], 0), [@People]),
@@ -35,4 +66,4 @@ SELECTCOLUMNS(
     "Meetings Per Week", DIVIDE([@Meetings], [@People] * _weeks),
     "Emails Sent Per Week", DIVIDE([@Emails], [@People] * _weeks)
 )
-ORDER BY [People Active] DESC, [Organization]
+ORDER BY [Pooled Groups], [People Active] DESC, [Organization]
