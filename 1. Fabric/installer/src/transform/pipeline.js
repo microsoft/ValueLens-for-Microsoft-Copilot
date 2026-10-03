@@ -46,10 +46,17 @@ const BINDINGS = {
  * @property {string} [semanticModelId]  Adds a last step that refreshes this model.
  * @property {boolean} [azureAi]  Runs the Azure AI notebook (credit consumption).
  * @property {string} [consumptionModelId]  Adds a step that refreshes the consumption model.
+ * @property {boolean} [agentTranscripts]  Runs the Agent Evaluator transcript parser.
+ * @property {string} [agentEvaluatorModelId]  Adds a step that refreshes the Agent Evaluator model.
  */
 
 export const REFRESH_ACTIVITY = 'Refresh_Semantic_Model';
 export const CONSUMPTION_REFRESH_ACTIVITY = 'Refresh_Consumption_Model';
+export const AGENT_EVALUATOR_ACTIVITY = 'Run_Agent_Evaluator_Transcripts';
+export const AGENT_EVALUATOR_REFRESH_ACTIVITY = 'Refresh_Agent_Evaluator_Model';
+
+/** Days of transcripts each scheduled run re-reads. Merge keeps the overlap from duplicating. */
+export const TRANSCRIPT_LOOKBACK_DAYS = 14;
 
 /** The credit consumption notebooks, as pipeline activities. */
 export const CONSUMPTION_ACTIVITIES = /** @type {const} */ ([
@@ -163,6 +170,52 @@ function consumptionRefreshActivity(activities, settings) {
 }
 
 /**
+ * Reads Copilot Studio transcripts from Dataverse. A backfill reads as far back as the audit load.
+ * @param {PipelineSettings} settings
+ */
+function agentTranscriptsActivity(settings) {
+  const notebookId = settings.notebookIds.agentTranscripts;
+  if (!notebookId) throw new Error('The Agent Evaluator transcript notebook has not been deployed.');
+  return {
+    name: AGENT_EVALUATOR_ACTIVITY,
+    description: 'Reads Copilot Studio conversation transcripts from each chosen Dataverse environment and merges them into agent_sessions, agent_turns and the other agent tables.',
+    type: 'TridentNotebook',
+    dependsOn: [],
+    policy: { timeout: '0.02:00:00', retry: 1, retryIntervalInSeconds: 300, secureOutput: false, secureInput: false },
+    typeProperties: {
+      notebookId,
+      workspaceId: settings.workspaceId,
+      parameters: {
+        LOOKBACK_DAYS: {
+          value: {
+            value: `@if(equals(pipeline().parameters.AuditMode, 'backfill'), pipeline().parameters.BackfillDays, ${TRANSCRIPT_LOOKBACK_DAYS})`,
+            type: 'Expression',
+          },
+          type: 'int',
+        },
+      },
+    },
+  };
+}
+
+/**
+ * Refreshes the Agent Evaluator model once the transcripts have loaded and the org data has had its turn.
+ * @param {any[]} activities
+ * @param {PipelineSettings} settings
+ */
+function agentEvaluatorRefreshActivity(activities, settings) {
+  const dependsOn = [{ activity: AGENT_EVALUATOR_ACTIVITY, dependencyConditions: ['Succeeded'] }];
+  if (activities.some((a) => a.name === 'Conditionally_Run_Org_Data')) dependsOn.push({ activity: 'Conditionally_Run_Org_Data', dependencyConditions: ['Completed'] });
+  return refreshStep(settings, {
+    name: AGENT_EVALUATOR_REFRESH_ACTIVITY,
+    description: 'Refreshes the Agent Evaluator model once the transcripts have loaded.',
+    modelId: /** @type {string} */ (settings.agentEvaluatorModelId),
+    dependsOn,
+    writeMode: 'merge',
+  });
+}
+
+/**
  * @param {any} template  Parsed `pipeline-content.json`.
  * @param {PipelineSettings} settings
  */
@@ -222,11 +275,17 @@ export function buildPipeline(template, settings) {
     filled.properties.activities.push(...consumptionActivities(settings));
     if (settings.consumptionModelId) filled.properties.activities.push(consumptionRefreshActivity(filled.properties.activities, settings));
   }
+  const transcripts = !!(settings.modules.agentEvaluator && settings.agentTranscripts);
+  if (transcripts) {
+    filled.properties.activities.push(agentTranscriptsActivity(settings));
+    if (settings.agentEvaluatorModelId) filled.properties.activities.push(agentEvaluatorRefreshActivity(filled.properties.activities, settings));
+  }
 
   filled.properties.description =
     'Created by the ValueLens installer. Runs the ingesters, then the Audit Log Processor' +
     `${settings.semanticModelId ? ', then refreshes the semantic model' : ''}. ` +
     `${settings.modules.consumption ? `The credit consumption loads run alongside${settings.consumptionModelId ? ' and refresh the consumption model when they all succeed' : ''}. ` : ''}` +
+    `${transcripts ? `The Agent Evaluator reads Copilot Studio transcripts alongside${settings.agentEvaluatorModelId ? ' and refreshes its model' : ''}. ` : ''}` +
     'Scheduled runs use the parameter defaults (incremental audit load, merge into the curated table). ' +
     'The first run overrides them with AuditMode=backfill and ProcessorWriteMode=overwrite. ' +
     'Re-run the installer with "update" to pick up new notebook and pipeline versions.';

@@ -9,6 +9,8 @@ import { readZipEntry } from './zip.js';
 export const MODEL_TEMPLATE = 'ValueLens - Fabric.pbit';
 /** The credit consumption report from Consumption Central, relative to `1. Fabric`. */
 export const CONSUMPTION_TEMPLATE = 'Add Credit Consumption/Consumption Central - Fabric.pbit';
+/** The Agent Evaluator report, vendored from microsoft/AgentEvaluator-for-Copilot-Studio. */
+export const AGENT_EVALUATOR_TEMPLATE = 'Add Agent Evaluator/Agent Evaluator.pbit';
 
 /** The table that has an incremental refresh policy. */
 export const AUDIT_TABLE = 'Chat + Agent Interactions (Audit Logs)';
@@ -24,7 +26,7 @@ export const PBISM = {
 };
 
 /**
- * @typedef {{ compatibilityLevel: number, model: { expressions?: { name: string, expression: string | string[] }[], tables: any[], annotations?: { name: string, value: string }[], [k: string]: any } }} ModelBim
+ * @typedef {{ compatibilityLevel: number, model: { expressions?: { name: string, expression: string | string[], description?: string | string[] }[], tables: any[], annotations?: { name: string, value: string }[], [k: string]: any } }} ModelBim
  */
 
 /**
@@ -125,6 +127,43 @@ export function buildConsumptionModel(template, settings) {
   const model = structuredClone(template.model);
   setMParameter(model, 'FabricSQLEndpoint', settings.server);
   setMParameter(model, 'LakehouseName', settings.database);
+  return { compatibilityLevel: template.compatibilityLevel, model };
+}
+
+/** Agent Evaluator functions that read Dataverse, SharePoint or local CSVs. Fabric mode never calls them. */
+export const AGENT_EVALUATOR_OFFLINE_FUNCTIONS = /** @type {const} */ (['CsvBinary', 'CsvFromPath', 'DataverseEntity']);
+/** The Agent Evaluator table that probes Dataverse directly. */
+export const AGENT_EVALUATOR_DIAGNOSTIC_TABLE = 'Dataverse Diagnostic';
+
+/**
+ * The Agent Evaluator model, reading the parser's tables from the Lakehouse. The report also
+ * reads Dataverse or CSV files directly; those paths are switched off and stubbed so the service
+ * only ever sees the Lakehouse as a data source.
+ * @param {ModelBim} template
+ * @param {{ server: string, database: string }} settings
+ * @returns {ModelBim}
+ */
+export function buildAgentEvaluatorModel(template, settings) {
+  const model = structuredClone(template.model);
+  setMParameter(model, 'Fabric SQL Endpoint', settings.server);
+  setMParameter(model, 'Lakehouse Name', settings.database);
+  setMParameter(model, 'Source Mode', 'Fabric');
+  for (const name of AGENT_EVALUATOR_OFFLINE_FUNCTIONS) {
+    const expr = model.expressions?.find((e) => e.name === name);
+    if (!expr) throw new Error(`The Agent Evaluator model has no "${name}" function.`);
+    const text = Array.isArray(expr.expression) ? expr.expression.join('\n') : String(expr.expression);
+    const at = text.indexOf('=>');
+    if (at < 0) throw new Error(`"${name}" is not a function.`);
+    expr.expression = `${text.slice(0, at)}=> error "Not used: the ValueLens installer reads Agent Evaluator data from the Lakehouse."`;
+    expr.description = 'Not used: the ValueLens installer reads Agent Evaluator data from the Lakehouse.';
+  }
+  const diagnostic = model.tables.find((t) => t.name === AGENT_EVALUATOR_DIAGNOSTIC_TABLE);
+  for (const p of diagnostic?.partitions ?? []) {
+    const text = Array.isArray(p.source.expression) ? p.source.expression.join('\n') : String(p.source.expression);
+    const empty = /Empty = (#table\(\{[^}]*\}, \{\}\))/.exec(text);
+    if (!empty) throw new Error(`The "${AGENT_EVALUATOR_DIAGNOSTIC_TABLE}" table has changed shape.`);
+    p.source.expression = empty[1];
+  }
   return { compatibilityLevel: template.compatibilityLevel, model };
 }
 

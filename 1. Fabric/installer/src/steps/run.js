@@ -197,8 +197,15 @@ export async function status(ctx) {
   ui.info(`Pipeline:  ${f.pipelineName ?? f.pipelineId}`);
   const sm = config.semanticModel;
   const cm = config.consumption?.model;
+  const am = config.agentEvaluator?.model;
   if (sm?.id) ui.info(`Model:     ${sm.name}${sm.bound ? '' : ' (not connected to the Lakehouse yet)'}`);
   if (cm?.id) ui.info(`Model:     ${cm.name}${cm.bound ? '' : ' (not connected to the Lakehouse yet)'}`);
+  if (am?.id) ui.info(`Model:     ${am.name}${am.bound ? '' : ' (not connected to the Lakehouse yet)'}`);
+  if (config.modules.agentEvaluator && config.agentEvaluator.environments.length) {
+    const envs = config.agentEvaluator.environments;
+    const waiting = envs.filter((e) => !e.access).length;
+    ui.info(`Agents:    ${envs.length - waiting} of ${envs.length} environment(s) readable${waiting ? c.dim(' (the rest are waiting for an admin to add the app)') : ''}`);
+  }
   if (config.fabricApp?.itemId) ui.info(`App:       ${config.fabricApp.name}  ${c.dim(config.fabricApp.url ?? '')}`);
   expiry(ctx, 'Client secret', config.app.secretExpires);
   if (sm?.connectionId) expiry(ctx, 'Model connection secret', sm.secretExpires);
@@ -229,7 +236,7 @@ export async function status(ctx) {
     }
   }
 
-  for (const m of [sm, cm]) {
+  for (const m of [sm, cm, am]) {
     if (!m?.id) continue;
     const refreshes = await modelRefreshes(ctx, m).catch(() => null);
     if (refreshes) {

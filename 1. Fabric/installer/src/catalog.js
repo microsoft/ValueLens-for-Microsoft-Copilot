@@ -7,7 +7,7 @@
 /** Microsoft Graph's application ID. Same in every tenant. */
 export const GRAPH_APP_ID = '00000003-0000-0000-c000-000000000000';
 
-/** @typedef {'core' | 'orgData' | 'agent365' | 'productFeedback' | 'consumption'} ModuleId */
+/** @typedef {'core' | 'orgData' | 'agent365' | 'productFeedback' | 'consumption' | 'agentEvaluator'} ModuleId */
 
 /**
  * @typedef {object} ModuleInfo
@@ -67,15 +67,24 @@ export const MODULES = {
     permissions: [],
     pipelineParameter: null,
   },
+  agentEvaluator: {
+    id: 'agentEvaluator',
+    label: 'Agent Evaluator',
+    description: 'Copilot Studio agent conversations from Dataverse: how they ended, what people thought, and where agents fall short.',
+    required: false,
+    defaultOn: false,
+    permissions: [],
+    pipelineParameter: null,
+  },
 };
 
 /** Modules that change the ValueLens semantic model. The others have their own model or none. */
 export const MODEL_MODULES = /** @type {const} */ (['core', 'orgData', 'agent365', 'productFeedback']);
 
 /** Modules offered under "What to collect", in order. */
-export const OPTIONAL_MODULES = /** @type {const} */ (['orgData', 'agent365', 'productFeedback', 'consumption']);
+export const OPTIONAL_MODULES = /** @type {const} */ (['orgData', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator']);
 
-/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption'} NotebookKey */
+/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts'} NotebookKey */
 
 /**
  * A text change the installer makes to its copy of a notebook. `find` must occur exactly once.
@@ -94,10 +103,12 @@ export const OPTIONAL_MODULES = /** @type {const} */ (['orgData', 'agent365', 'p
  * @property {string | null} placeholder  Notebook-ID placeholder in the pipeline template.
  * @property {boolean} [semanticModel]  Only deployed with the semantic model.
  * @property {boolean} [azure]  Only deployed when an Azure subscription is chosen for Azure AI.
+ * @property {boolean} [dataverse]  Only deployed when at least one Dataverse environment is chosen.
  * @property {NotebookPatch[]} [patches]
  */
 
 export const CONSUMPTION_NOTEBOOKS_DIR = 'Add Credit Consumption/notebooks';
+export const AGENT_EVALUATOR_NOTEBOOKS_DIR = 'Add Agent Evaluator/notebooks';
 export const STUDIO_LANDING = 'Files/landing/studio';
 export const VIVA_LANDING = 'Files/landing/viva';
 
@@ -227,9 +238,20 @@ export const NOTEBOOKS = [
       },
     ],
   },
+  {
+    key: 'agentTranscripts',
+    file: 'Copilot_Agent_Transcript_Parser.ipynb',
+    dir: AGENT_EVALUATOR_NOTEBOOKS_DIR,
+    displayName: 'AgentEval_Transcript_Parser',
+    module: 'agentEvaluator',
+    credentials: true,
+    parameters: ['LOOKBACK_DAYS'],
+    placeholder: null,
+    dataverse: true,
+  },
 ];
 
-/** @typedef {{ orgData: boolean, agent365: boolean, productFeedback: boolean, consumption: boolean }} ModuleChoice */
+/** @typedef {{ orgData: boolean, agent365: boolean, productFeedback: boolean, consumption: boolean, agentEvaluator: boolean }} ModuleChoice */
 
 /** @returns {ModuleChoice} */
 export function defaultModules() {
@@ -238,6 +260,7 @@ export function defaultModules() {
     agent365: MODULES.agent365.defaultOn,
     productFeedback: MODULES.productFeedback.defaultOn,
     consumption: MODULES.consumption.defaultOn,
+    agentEvaluator: MODULES.agentEvaluator.defaultOn,
   };
 }
 
@@ -260,18 +283,21 @@ export function enabledModules(modules) {
   if (modules.agent365) out.push('agent365');
   if (modules.productFeedback) out.push('productFeedback');
   if (modules.consumption) out.push('consumption');
+  if (modules.agentEvaluator) out.push('agentEvaluator');
   return out;
 }
 
 /**
  * Notebooks to deploy for the chosen modules, in deployment order.
  * @param {ModuleChoice} modules
- * @param {{ semanticModel?: boolean, azureAi?: boolean }} [opts]
+ * @param {{ semanticModel?: boolean, azureAi?: boolean, dataverse?: boolean }} [opts]
  * @returns {NotebookInfo[]}
  */
 export function notebooksFor(modules, opts = {}) {
   const on = new Set(enabledModules(modules));
-  return NOTEBOOKS.filter((nb) => on.has(nb.module) && (!nb.semanticModel || opts.semanticModel) && (!nb.azure || opts.azureAi));
+  return NOTEBOOKS.filter(
+    (nb) => on.has(nb.module) && (!nb.semanticModel || opts.semanticModel) && (!nb.azure || opts.azureAi) && (!nb.dataverse || opts.dataverse),
+  );
 }
 
 /**

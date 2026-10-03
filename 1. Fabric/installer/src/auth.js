@@ -11,9 +11,13 @@ export const SCOPES = {
   keyVault: 'https://vault.azure.net/.default',
   storage: 'https://storage.azure.com/.default',
   powerbi: 'https://analysis.windows.net/powerbi/api/.default',
+  discovery: 'https://globaldisco.crm.dynamics.com/.default',
 };
 
-/** @typedef {keyof typeof SCOPES} Resource */
+/**
+ * A named API, or the scope of one found at run time, such as a Dataverse environment.
+ * @typedef {keyof typeof SCOPES | `https://${string}/.default`} Resource
+ */
 
 /**
  * @typedef {object} AuthOptions
@@ -52,7 +56,7 @@ export function createTokenProvider(credential) {
   return async function getToken(resource) {
     const hit = cache.get(resource);
     if (hit && hit.expiresOn - Date.now() > 5 * 60_000) return hit.token;
-    const t = await credential.getToken(SCOPES[resource]);
+    const t = await credential.getToken(resource in SCOPES ? SCOPES[/** @type {keyof typeof SCOPES} */ (resource)] : resource);
     if (!t) throw new Error(`Could not get a token for ${resource}.`);
     cache.set(resource, { token: t.token, expiresOn: t.expiresOnTimestamp });
     return t.token;

@@ -223,6 +223,7 @@ export async function ensureModelConnection(ctx) {
     const oldKey = sm.secretKeyId;
     Object.assign(sm, { connectionId: conn.id, connectionName: name, secretKeyId: secret.keyId, secretExpires: secret.expires, bound: false });
     if (config.consumption?.model) config.consumption.model.bound = false;
+    if (config.agentEvaluator?.model) config.agentEvaluator.model.bound = false;
     ctx.save();
     if (oldKey && oldKey !== secret.keyId) await api.graph.removePassword(/** @type {string} */ (config.app.objectId), oldKey).catch(() => {});
   }
