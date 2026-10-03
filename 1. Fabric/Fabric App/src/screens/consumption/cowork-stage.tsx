@@ -23,10 +23,12 @@ import {
     groupByFilter,
     serviceFilter,
     serviceLabel,
+    studioAzureBilling,
     toCoworkGroupTree,
     type ConsumptionLens,
     type ConsumptionOptions,
 } from "@/queries/consumption";
+import { billedText, readAzureBilling } from "./azure-billing";
 import { CREDIT_CURRENCY, LENSES, moneyCell, standalone, useConsumptionSummary, useConsumptionTable } from "./data";
 import { ChartPanel, KpiRowState, NoteCard, RollupGrid, type TreeColumn } from "@/components/report-panels";
 
@@ -88,6 +90,10 @@ export function CoworkStage({ options, rates }: CoworkStageProps) {
     const byGroup = useConsumptionTable(coworkByGroup(), extra);
     const row = summary.row;
     const cost = lens === "cost";
+    // Azure's daily billing has no Cowork weeks to follow, so it reads every day it has.
+    const azure = readAzureBilling(useConsumptionSummary(studioAzureBilling()));
+    const azureBilled = azure && billedText(azure, azure.coworkCost, azure.coworkCredits);
+    const azureText = azureBilled && `${azureBilled} of pay-as-you-go, ${azure.window}, as Azure Cost Management recorded it.`;
 
     return (
         <Section
@@ -238,6 +244,7 @@ export function CoworkStage({ options, rates }: CoworkStageProps) {
                         { term: "Period", text: standalone(readText(row, "[Period Label]")) },
                         { term: "Billing basis", text: readText(row, "[Billing Basis]") },
                         { term: "Rates in use", text: rates },
+                        { term: "Billed in Azure", text: azureText },
                     ]}
                 />
             </div>

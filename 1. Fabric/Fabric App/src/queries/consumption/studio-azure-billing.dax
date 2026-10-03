@@ -1,0 +1,28 @@
+// Copilot pay-as-you-go as billed in Azure, from every subscription a Power
+// Platform billing policy charges. "All available days" reads every row; a
+// shorter period ends on the Studio export's last day, like the page's other
+// figures, or on Azure's last day when there is no export.
+EVALUATE
+VAR WindowDays = [Studio Period Days]
+VAR AzureLast = CALCULATE(MAX('CopilotPaygSpend'[UsageDate]), REMOVEFILTERS('CopilotPaygSpend'))
+VAR ExportLast = CALCULATE(MAX('Credit Consumption (Tenant)'[Usage_Date]), REMOVEFILTERS('Credit Consumption (Tenant)'))
+VAR Hi = IF(WindowDays = 0, AzureLast, COALESCE(ExportLast, AzureLast))
+VAR Lo = IF(WindowDays = 0, CALCULATE(MIN('CopilotPaygSpend'[UsageDate]), REMOVEFILTERS('CopilotPaygSpend')), Hi - WindowDays + 1)
+VAR Billed = FILTER(ALL('CopilotPaygSpend'), 'CopilotPaygSpend'[UsageDate] >= Lo && 'CopilotPaygSpend'[UsageDate] <= Hi)
+VAR Credits = FILTER(Billed, CONTAINSSTRING('CopilotPaygSpend'[Meter], "Copilot Credit"))
+VAR Currencies = DISTINCT(SELECTCOLUMNS(Billed, "Currency", 'CopilotPaygSpend'[Currency]))
+RETURN
+ROW(
+    "Studio Cost", SUMX(FILTER(Billed, 'CopilotPaygSpend'[Product] = "Copilot Studio"), 'CopilotPaygSpend'[Cost]),
+    "Studio Credits", SUMX(FILTER(Credits, 'CopilotPaygSpend'[Product] = "Copilot Studio"), 'CopilotPaygSpend'[UsageQuantity]),
+    "Cowork Cost", SUMX(FILTER(Billed, 'CopilotPaygSpend'[Product] = "Cowork"), 'CopilotPaygSpend'[Cost]),
+    "Cowork Credits", SUMX(FILTER(Credits, 'CopilotPaygSpend'[Product] = "Cowork"), 'CopilotPaygSpend'[UsageQuantity]),
+    "Other Cost", SUMX(FILTER(Billed, NOT 'CopilotPaygSpend'[Product] IN {"Copilot Studio", "Cowork"}), 'CopilotPaygSpend'[Cost]),
+    "Total Cost", SUMX(Billed, 'CopilotPaygSpend'[Cost]),
+    "Currency", IF(COUNTROWS(Currencies) = 1, MAXX(Currencies, [Currency])),
+    "Currencies", CONCATENATEX(Currencies, [Currency], ", ", [Currency], ASC),
+    "Subscriptions", COUNTROWS(DISTINCT(SELECTCOLUMNS(Billed, "Subscription", 'CopilotPaygSpend'[SubscriptionId]))),
+    "First Date", MINX(Billed, 'CopilotPaygSpend'[UsageDate]),
+    "Last Date", MAXX(Billed, 'CopilotPaygSpend'[UsageDate]),
+    "Rows", COUNTROWS(Billed)
+)
