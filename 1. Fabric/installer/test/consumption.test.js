@@ -9,14 +9,21 @@ import { ROLES } from '../src/clients/azure.js';
 import { CONFIG_VERSION, CONSUMPTION_MODEL_NAME, emptyConfig, loadConfig } from '../src/config.js';
 import { refresh } from '../src/install.js';
 import { appModels } from '../src/steps/app.js';
-import { consumptionSummary, ensureAzureAiAccess, ensureConsumptionModel, ensureLandingFolders, planConsumption } from '../src/steps/consumption.js';
-import { azureAiOn, consumptionModelDeployed, notebookSettings, pipelineSignature } from '../src/steps/fabric.js';
+import { consumptionSummary, ensureAzureAiAccess, ensureConsumptionModel, ensureLandingFolders, planConsumption, policiesBySubscription } from '../src/steps/consumption.js';
+import { azureAiOn, consumptionModelDeployed, ensureNotebooks, notebookSettings, PAYG_FIND, pipelineSignature } from '../src/steps/fabric.js';
 import { ensureModelConnection, ensureSemanticModel } from '../src/steps/model.js';
-import { prepareNotebook, cellText } from '../src/transform/notebook.js';
+import { MARKER, prepareNotebook, cellText } from '../src/transform/notebook.js';
+import { addCopilotPaygSpend, PAYG_SOURCE_TABLE, PAYG_TABLE } from '../src/transform/payg.js';
 import { buildPipeline, CONSUMPTION_REFRESH_ACTIVITY, findActivity, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
 import { fakeCtx, fakeFabric, fakeGraph, fakePowerBi, fakeUi, httpError, realSources } from './fakes.js';
 
 const SUB = '9c2a9418-0000-0000-0000-000000000000';
+/** A subscription that only a billing policy charges. */
+const PAYG = '4b7e2d10-0000-0000-0000-000000000000';
+/** A billing policy's subscription the signed-in user can't see. */
+const HIDDEN = '7d31c5a2-0000-0000-0000-000000000000';
+/** @param {string} sub @param {string} name */
+const policy = (sub, name) => ({ id: `bp-${name}`, name, billingInstrument: { subscriptionId: sub, resourceGroup: 'rg-billing' } });
 
 /** Resource Manager: role assignments and AI accounts per subscription. */
 function fakeArm() {
@@ -64,7 +71,7 @@ function fakeOneLake() {
   return { api, dirs, failures };
 }
 
-/** @param {{ answers?: any[], yes?: boolean }} [o] */
+/** @param {{ answers?: any[], yes?: boolean, policies?: any[] | Error }} [o] */
 function setup(o = {}) {
   const fabric = fakeFabric();
   const graph = fakeGraph();
@@ -76,7 +83,14 @@ function setup(o = {}) {
   config.semanticModel.enabled = true;
   config.modules.consumption = true;
   config.app.displayName = 'ValueLens Data Collector';
-  const made = fakeCtx({ ui: ui.ui, fabric: fabric.api, graph: graph.api, powerBi: powerBi.api, arm: arm.api, oneLake: oneLake.api, config });
+  const policies = o.policies;
+  const powerPlatform = {
+    billingPolicies: async () => {
+      if (policies instanceof Error) throw policies;
+      return policies ?? [];
+    },
+  };
+  const made = fakeCtx({ ui: ui.ui, fabric: fabric.api, graph: graph.api, powerBi: powerBi.api, arm: arm.api, oneLake: oneLake.api, powerPlatform, config });
   return { ...made, fabric, graph, powerBi, arm, oneLake, ui };
 }
 
@@ -244,6 +258,161 @@ test('Azure access: the app gets three read roles once; without rights the user 
   assert.deepEqual(none.arm.calls, []);
 });
 
+test('billing policies: grouped by subscription, case-insensitively; one with no Azure subscription is skipped', () => {
+  const byName = policiesBySubscription(/** @type {any} */ ([policy(PAYG.toUpperCase(), 'Studio'), policy(PAYG, 'Cowork'), { id: 'bp-x', billingInstrument: {} }, { id: 'bp-y' }]));
+  assert.deepEqual([...byName], [[PAYG, ['Studio', 'Cowork']]]);
+  assert.deepEqual([...policiesBySubscription(/** @type {any} */ ([{ id: 'bp-z', billingInstrument: { subscriptionId: SUB } }]))], [[SUB, ['bp-z']]], 'the ID when a policy has no name');
+});
+
+test('plan: billing policies add their subscriptions for pay-as-you-go; access given before is kept', async () => {
+  const subs = [
+    { subscriptionId: SUB, displayName: 'AI' },
+    { subscriptionId: PAYG, displayName: 'Studio billing' },
+  ];
+  const t = setup({ policies: [policy(PAYG.toUpperCase(), 'Studio'), policy(PAYG, 'Cowork'), policy(SUB, 'Main'), policy(HIDDEN, 'Elsewhere')] });
+  t.arm.aiAccounts[SUB] = 2;
+  t.arm.aiAccounts[PAYG] = 0;
+  /** @type {string[]} */
+  const labels = [];
+  const select = t.ctx.ui.select;
+  t.ctx.ui.select = async (message, choices, def) => {
+    labels.push(...choices.map((ch) => String(ch.name)));
+    return select(message, choices, def);
+  };
+  await planConsumption(t.ctx, /** @type {any} */ ({ subscriptions: subs }));
+  assert.equal(t.config.consumption.azureSubscriptionId, SUB, 'Azure AI resources still pick the subscription');
+  assert.deepEqual(labels.slice(0, 2), [`AI (${SUB}, 2 AI resources, 1 billing policy)`, `Studio billing (${PAYG}, 0 AI resources, 2 billing policies)`]);
+  assert.deepEqual(t.config.consumption.paygSubscriptions, [
+    { subscriptionId: PAYG, name: 'Studio billing', policies: ['Studio', 'Cowork'] },
+    { subscriptionId: HIDDEN, name: undefined, policies: ['Elsewhere'] },
+  ]);
+  assert.match(t.ui.text(), new RegExp(`also reads Copilot pay-as-you-go from Studio billing and ${HIDDEN}`));
+
+  const extra = /** @type {import('../src/config.js').PaygSubscription[]} */ (t.config.consumption.paygSubscriptions);
+  extra[0].access = true;
+  await planConsumption(t.ctx, /** @type {any} */ ({ subscriptions: subs }));
+  assert.equal(t.config.consumption.paygSubscriptions?.[0].access, true, 'a re-run keeps the role');
+  assert.equal(t.config.consumption.paygSubscriptions?.[1].access, undefined);
+
+  const paygOnly = setup({ policies: [policy(PAYG, 'Studio')] });
+  paygOnly.arm.aiAccounts[SUB] = 0;
+  paygOnly.arm.aiAccounts[PAYG] = 0;
+  await planConsumption(paygOnly.ctx, /** @type {any} */ ({ subscriptions: subs }));
+  assert.equal(paygOnly.config.consumption.azureSubscriptionId, PAYG, 'with no AI resources, the billed subscription is the default');
+  assert.deepEqual(paygOnly.config.consumption.paygSubscriptions, [], 'it is read as the main subscription');
+
+  const left = setup({ answers: [''], policies: [policy(PAYG, 'Studio')] });
+  left.arm.aiAccounts[SUB] = 1;
+  await planConsumption(left.ctx, /** @type {any} */ ({ subscriptions: subs }));
+  assert.match(left.ui.text(), /pay-as-you-go billed in Azure is left out too/);
+});
+
+test('plan: unreadable billing policies only cost the extra subscriptions', async () => {
+  const subs = [
+    { subscriptionId: SUB, displayName: 'AI' },
+    { subscriptionId: PAYG, displayName: 'Studio billing' },
+  ];
+  const t = setup({ answers: [PAYG], policies: httpError(403, 'Forbidden') });
+  t.config.consumption.paygSubscriptions = [
+    { subscriptionId: PAYG, policies: ['Studio'], access: true },
+    { subscriptionId: HIDDEN, policies: ['Elsewhere'], access: true },
+  ];
+  await planConsumption(t.ctx, /** @type {any} */ ({ subscriptions: subs }));
+  assert.equal(t.config.consumption.azureSubscriptionId, PAYG);
+  assert.match(t.ui.text(), /Couldn't read Power Platform billing policies \(Forbidden\)/);
+  assert.deepEqual(t.config.consumption.paygSubscriptions, [{ subscriptionId: HIDDEN, policies: ['Elsewhere'], access: true }], 'the ones found before stay, less the main one');
+});
+
+test('pay-as-you-go access: Cost Management Reader on each other subscription; one the user can\'t grant is left out', async () => {
+  /** @param {ReturnType<typeof setup>} t */
+  const billed = (t) => {
+    t.config.consumption.azureSubscriptionId = SUB;
+    t.config.consumption.paygSubscriptions = [
+      { subscriptionId: PAYG, name: 'Studio billing', policies: ['Studio'] },
+      { subscriptionId: HIDDEN, policies: ['Elsewhere'] },
+    ];
+    return /** @type {import('../src/config.js').PaygSubscription[]} */ (t.config.consumption.paygSubscriptions);
+  };
+  const t = setup();
+  const extra = billed(t);
+  t.arm.failures.assignRole = /** @type {any} */ ([null, null, null, null, httpError(404, 'SubscriptionNotFound')]);
+  assert.equal(await ensureAzureAiAccess(t.ctx), true, 'Azure AI runs without them');
+  assert.deepEqual(t.arm.calls.slice(3), [PAYG, HIDDEN].map((s) => `assignRole /subscriptions/${s} ${ROLES.costManagementReader} sp-1 ServicePrincipal`));
+  assert.equal(extra[0].access, true);
+  assert.equal(extra[1].access, undefined);
+  assert.match(t.ui.text(), /Gave ValueLens Data Collector Cost Management Reader on Studio billing/);
+  assert.match(t.ui.text(), new RegExp(`can't assign Azure roles in ${HIDDEN}`));
+
+  t.arm.calls.length = 0;
+  assert.equal(await ensureAzureAiAccess(t.ctx), true);
+  assert.deepEqual(t.arm.calls, [`assignRole /subscriptions/${HIDDEN} ${ROLES.costManagementReader} sp-1 ServicePrincipal`], 'only the one still missing is tried again');
+  assert.equal(extra[1].access, true);
+
+  const granted = setup({ answers: [true] });
+  const told = billed(granted);
+  granted.config.consumption.azureAccess = true;
+  granted.arm.failures.assignRole = [httpError(403, 'AuthorizationFailed')];
+  await ensureAzureAiAccess(granted.ctx);
+  assert.equal(told[0].access, true, '"It already has this role"');
+
+  const broken = setup();
+  billed(broken);
+  broken.config.consumption.azureAccess = true;
+  broken.arm.failures.assignRole = [httpError(500, 'Boom')];
+  await assert.rejects(ensureAzureAiAccess(broken.ctx), /Boom/);
+});
+
+test('Azure AI notebook: the readable pay-as-you-go subscriptions are listed; it is pushed again when they change', async () => {
+  const t = setup();
+  Object.assign(t.config.consumption, { azureSubscriptionId: SUB, azureAccess: true });
+  const info = /** @type {any} */ (notebooksFor(t.config.modules, { azureAi: true }).find((n) => n.key === 'azureAi'));
+  const plain = prepareNotebook(realSources().notebooks.azureAi, notebookSettings(t.ctx, info)).cells.map(cellText).join('\n');
+  assert.ok(plain.includes(PAYG_FIND), 'left as it ships');
+
+  t.config.consumption.paygSubscriptions = [
+    { subscriptionId: PAYG, name: 'Studio\nbilling', policies: ['Studio'], access: true },
+    { subscriptionId: HIDDEN, policies: ['Elsewhere'] },
+  ];
+  const all = prepareNotebook(realSources().notebooks.azureAi, notebookSettings(t.ctx, info)).cells.map(cellText).join('\n');
+  assert.ok(all.includes(`PAYG_SUBSCRIPTION_IDS = [  # ${MARKER}\n    '${PAYG}',  # Studio billing\n]`), 'only the ones the app can read');
+  assert.ok(!all.includes(HIDDEN));
+
+  const fresh = setup();
+  Object.assign(fresh.config.consumption, { azureSubscriptionId: SUB, azureAccess: true });
+  await ensureNotebooks(fresh.ctx);
+  assert.ok(fresh.fabric.calls.includes(`createNotebook ${info.displayName}`));
+  assert.equal(fresh.config.consumption.deployedPayg, '');
+  fresh.fabric.calls.length = 0;
+  await ensureNotebooks(fresh.ctx);
+  assert.deepEqual(fresh.fabric.calls, [], 'nothing to do on a re-run');
+
+  fresh.config.consumption.paygSubscriptions = [{ subscriptionId: HIDDEN, policies: ['Elsewhere'] }];
+  await ensureNotebooks(fresh.ctx);
+  assert.deepEqual(fresh.fabric.calls, [], 'not until the app can read it');
+  /** @type {any} */ (fresh.config.consumption.paygSubscriptions)[0].access = true;
+  await ensureNotebooks(fresh.ctx);
+  assert.deepEqual(fresh.fabric.calls, [`updateNotebook ${info.displayName}`]);
+  assert.equal(fresh.config.consumption.deployedPayg, HIDDEN);
+});
+
+test('pay-as-you-go table: added empty-safe to the Consumption model, once', () => {
+  const model = /** @type {any} */ ({ tables: [{ name: 'Date', columns: [] }], expressions: [{ name: 'GetTable', expression: '' }] });
+  addCopilotPaygSpend(model);
+  addCopilotPaygSpend(model);
+  const tables = model.tables.filter((/** @type {any} */ t) => t.name === PAYG_TABLE);
+  assert.equal(tables.length, 1);
+  const m = tables[0].partitions[0].source.expression.join('\n');
+  assert.match(m, new RegExp(`Raw = GetTable\\("${PAYG_SOURCE_TABLE}"\\)`));
+  assert.match(m, /if Raw = null then #table\(Columns, \{\}\) else Raw/);
+  assert.deepEqual(tables[0].columns.map((/** @type {any} */ c) => c.name), ['UsageDate', 'SubscriptionId', 'Meter', 'ServiceTag', 'Product', 'Cost', 'UsageQuantity', 'Currency']);
+  assert.deepEqual(model.relationships.map((/** @type {any} */ r) => `${r.fromTable}[${r.fromColumn}] ${r.toTable}[${r.toColumn}]`), [`${PAYG_TABLE}[UsageDate] Date[Date]`]);
+
+  const noDate = /** @type {any} */ ({ tables: [], expressions: [{ name: 'GetTable', expression: '' }] });
+  addCopilotPaygSpend(noDate);
+  assert.equal(noDate.relationships, undefined);
+  assert.throws(() => addCopilotPaygSpend(/** @type {any} */ ({ tables: [] })), /no "GetTable" function/);
+});
+
 test('landing folders: both made, existing ones left alone, a failure only warns', async () => {
   const t = setup();
   await ensureLandingFolders(t.ctx);
@@ -275,6 +444,7 @@ test('Consumption model: built from its template, bound through the ValueLens co
   assert.ok(item);
   assert.equal(cm.id, item.id);
   const bim = JSON.parse(Buffer.from(item.content.parts.find((/** @type {any} */ p) => p.path === 'model.bim').payload, 'base64').toString('utf8'));
+  assert.ok(bim.model.tables.some((/** @type {any} */ tb) => tb.name === PAYG_TABLE), 'with the pay-as-you-go table');
   const param = (/** @type {string} */ n) => String(bim.model.expressions.find((/** @type {any} */ e) => e.name === n).expression);
   assert.ok(param('FabricSQLEndpoint').startsWith('"abc.datawarehouse.fabric.microsoft.com" meta ['));
   assert.ok(param('LakehouseName').startsWith('"ValueLens" meta ['));
@@ -326,6 +496,21 @@ test('summary: Azure AI status and the Studio and Cowork upload steps', () => {
   assert.match(text, new RegExp(STUDIO_LANDING));
   assert.match(text, /Dataflow Gen2/);
   assert.match(text, /viva_credits_weekly/);
+  assert.doesNotMatch(text, /PAYG:/, 'not while Azure AI is off');
+
+  const on = setup();
+  Object.assign(on.config.consumption, {
+    azureSubscriptionId: SUB,
+    azureSubscriptionName: 'AI',
+    azureAccess: true,
+    paygSubscriptions: [
+      { subscriptionId: PAYG, name: 'Studio billing', policies: ['Studio'], access: true },
+      { subscriptionId: HIDDEN, policies: ['Elsewhere'] },
+    ],
+  });
+  consumptionSummary(on.ctx);
+  assert.match(on.ui.text(), /PAYG: +Copilot Studio and Cowork pay-as-you-go billed to AI and Studio billing/);
+  assert.match(on.ui.text(), new RegExp(`not ${HIDDEN} until ValueLens Data Collector has Cost Management Reader there`));
 });
 
 test('app: built with the cc alias when the Consumption model is deployed', () => {
