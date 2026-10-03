@@ -29,6 +29,11 @@ uneven decimals and a stray 0 on every week with no pay-as-you-go spend. The Azu
 over time" chart now has the same weekly date ticks as Copilot Studio, where before it showed only
 the first of each month.
 
+`rayfin up` could fail with "No rayfin/.temp/compiled/data/*.js files found" after the app
+folder moved or `rayfin/.temp` was cleared. The data service shared the app's TypeScript build
+cache, so the compiler thought it was up to date and emitted nothing. It now keeps its own cache
+inside `rayfin/.temp/compiled`.
+
 ## 2026-10-03 — Paths renumbered: Fabric first
 
 The path folders are renumbered so the recommended route comes first, and the web app now lives
