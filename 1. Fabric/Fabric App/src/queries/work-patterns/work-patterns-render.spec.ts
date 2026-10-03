@@ -120,6 +120,15 @@ describe("m365 workload trend renders", () => {
 
         expect(new Set(lines.map((line) => line.datum.Workload)).size).toBe(6);
     });
+
+    // fabric-visuals pads and nices continuous scales under point marks, which
+    // stretched this axis to 120%. It leaves any scale that sets `padding` alone.
+    it("keeps the share axis at 0–100% once fabric-visuals has seen it", () => {
+        const { vegaLiteSpec } = m365WorkloadTrend();
+        const y = compile(vegaLiteSpec as TopLevelSpec).spec.scales?.find((scale) => scale.name === "y");
+
+        expect(y).toMatchObject({ domain: [0, 1], padding: 0 });
+    });
 });
 
 describe("m365 workload reach renders", () => {
