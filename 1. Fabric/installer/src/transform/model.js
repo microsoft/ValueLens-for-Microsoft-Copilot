@@ -164,6 +164,7 @@ export function buildAgentEvaluatorModel(template, settings) {
   const direct = fabricText?.replace(/^([ \t]*)FabEndpoint = [^\n]*\n[ \t]*FabLakehouse = [^\n]*\n[ \t]*Db = [^\n]*Sql\.Database\(FabEndpoint, FabLakehouse\),/m, '$1Db = Sql.Database(#"Fabric SQL Endpoint", #"Lakehouse Name"),');
   if (!fabricTable || !direct || direct === fabricText) throw new Error('The Agent Evaluator "FabricTable" function has changed shape.');
   fabricTable.expression = direct;
+  completeAgentEvaluatorFallbacks(model);
   const diagnostic = model.tables.find((t) => t.name === AGENT_EVALUATOR_DIAGNOSTIC_TABLE);
   for (const p of diagnostic?.partitions ?? []) {
     const text = Array.isArray(p.source.expression) ? p.source.expression.join('\n') : String(p.source.expression);
@@ -172,6 +173,38 @@ export function buildAgentEvaluatorModel(template, settings) {
     p.source.expression = empty[1];
   }
   return { compatibilityLevel: template.compatibilityLevel, model };
+}
+
+/** M steps that keep the Lakehouse table's columns as they are, apart from adding some. */
+const PASS_THROUGH_STEPS = new Set(['AddColumn', 'ColumnNames', 'HasColumns', 'TransformColumnTypes', 'TransformColumns']);
+
+/**
+ * Until the parser first runs, a table falls back to an empty one. Some of those lack columns the
+ * model declares, which fails the refresh, so add them. Tables that select, rename or build their
+ * columns are left alone: their declared columns don't come straight from the Lakehouse.
+ * @param {ModelBim['model']} model
+ */
+function completeAgentEvaluatorFallbacks(model) {
+  for (const table of model.tables) {
+    for (const p of table.partitions ?? []) {
+      if (p.source?.type !== 'm') continue;
+      const text = Array.isArray(p.source.expression) ? p.source.expression.join('\n') : String(p.source.expression);
+      const fallback = /(FabricTable\("[^"]+"\)\s*otherwise\s*EmptyTable\(\{)([^}]*)(\}\))/g;
+      const hits = [...text.matchAll(fallback)];
+      if (hits.length !== 1) continue;
+      const steps = [...text.matchAll(/Table\.(\w+)\(/g)].map((m) => m[1]);
+      if (steps.some((s) => !PASS_THROUGH_STEPS.has(s))) continue;
+      const listed = new Set([...hits[0][2].matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+      const added = new Set([...text.matchAll(/Table\.AddColumn\([^,]+,\s*"([^"]+)"/g)].map((m) => m[1]));
+      const missing = table.columns
+        .filter((c) => c.type !== 'calculated' && c.type !== 'rowNumber')
+        .map((c) => c.sourceColumn ?? c.name)
+        .filter((c) => !listed.has(c) && !added.has(c));
+      if (!missing.length) continue;
+      const extra = missing.map((c) => `"${c.replace(/"/g, '""')}"`).join(', ');
+      p.source.expression = text.replace(fallback, (_, open, cols, close) => `${open}${cols.trim() ? `${cols}, ` : ''}${extra}${close}`);
+    }
+  }
 }
 
 /**
