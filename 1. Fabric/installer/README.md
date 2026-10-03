@@ -5,7 +5,9 @@ shows you the plan, and then creates everything the manual steps would: the app 
 secret in Azure Key Vault, admin consent, a workspace and Lakehouse, the notebooks, the pipeline
 and its schedule. It can also deploy the ValueLens semantic model and the
 [Analytics Hub app](../Fabric%20App/) on top of it, so there is nothing to publish from
-Power BI Desktop. With [credit consumption](#credit-consumption), it adds the Consumption Central
+Power BI Desktop. With [Microsoft 365 activity](#microsoft-365-activity), on by default, it reads
+how people work across Teams, Outlook, SharePoint and the Office apps for the app's Work patterns
+page. With [credit consumption](#credit-consumption), it adds the Consumption Central
 notebooks and model too. With the [Agent Evaluator](#agent-evaluator), it reads your Copilot Studio
 agent conversations as well. It then runs the first load and checks the data that arrives.
 
@@ -19,8 +21,9 @@ npx valuelens-install
 ```
 
 **Jump to:** [Before you start](#before-you-start) · [What it creates](#what-it-creates) ·
-[Credit consumption](#credit-consumption) · [Agent Evaluator](#agent-evaluator) ·
-[Commands](#commands) · [Good to know](#good-to-know) · [Troubleshooting](#troubleshooting)
+[Microsoft 365 activity](#microsoft-365-activity) · [Credit consumption](#credit-consumption) ·
+[Agent Evaluator](#agent-evaluator) · [Commands](#commands) · [Good to know](#good-to-know) ·
+[Troubleshooting](#troubleshooting)
 
 ---
 
@@ -52,9 +55,9 @@ npx valuelens-install --tenant contoso.onmicrosoft.com
 
 It checks your tenant first (roles, capacities, subscriptions), then asks:
 
-1. **What to collect.** Copilot usage and licences are always on. Org data from Entra is on by
-   default. The Agent 365 registry, product feedback, credit consumption and the Agent Evaluator
-   are off.
+1. **What to collect.** Copilot usage and licences are always on. Org data from Entra and
+   Microsoft 365 activity are on by default. The Agent 365 registry, product feedback, credit
+   consumption and the Agent Evaluator are off.
 2. **Power BI**: the semantic model and the Analytics Hub app (the default), the model only, or
    neither. The model needs org data, so choosing it switches org data on.
    - With credit consumption, **which subscription's Azure AI costs** to read, or leave Azure AI
@@ -93,6 +96,7 @@ Lakehouse name for `ValueLens - Fabric.pbit`, or the workspace and Lakehouse IDs
 | Semantic model | `ValueLens Model`, built from `ValueLens - Fabric.pbit` and pointed at your Lakehouse. Optional pages follow the modules you chose. |
 | Connection | `ValueLens SQL <workspace>`, a cloud connection to the Lakehouse's SQL endpoint that signs in as the app registration, with a secret of its own. The app registration gets Viewer on the workspace so it can read the Lakehouse. |
 | Analytics Hub app | A Fabric App item, "Analytics Hub", built from [`1. Fabric/Fabric App`](../Fabric%20App/) against your semantic model. Rayfin, the app's build tool, may open a browser for you to sign in. |
+| Microsoft 365 activity | On by default. One more notebook and an `M365 Activity` table in the semantic model. See [Microsoft 365 activity](#microsoft-365-activity). |
 | Credit consumption | Only if you choose it. Three more notebooks, the `ValueLens Consumption Model`, two upload folders, and read access to Azure costs. See [Credit consumption](#credit-consumption). |
 | Agent Evaluator | Only if you choose it. The app registration as a transcript reader in each environment you pick, one more notebook and the `ValueLens Agent Evaluator Model`. See [Agent Evaluator](#agent-evaluator). |
 | First load | A pipeline run with your chosen history, then the data check. The run reports row counts and the date range of the audit data. Without a first load, the model is refreshed straight away. |
@@ -100,6 +104,34 @@ Lakehouse name for `ValueLens - Fabric.pbit`, or the workspace and Lakehouse IDs
 The data check copy is the only notebook the installer adds to. It writes a short summary to
 `Files/valuelens_installer/data_check.json` in the Lakehouse, so the installer can read the
 result back.
+
+## Microsoft 365 activity
+
+On by default. It reads the Microsoft 365 usage reports, so the app's **Work patterns** page shows
+how people work: meetings, email, chat and files, which workloads and apps they use, and how
+Copilot users' weeks compare with everyone else's. It also lets Readiness's *Who to license next*
+weigh how many workloads each person uses a day. It needs `Reports.Read.All`, which the core
+already has, so there's nothing more to consent to.
+
+| Item | Details |
+|---|---|
+| Notebook | `Copilot_M365_Activity_Ingester`, from [`notebooks/`](../notebooks/README.md#optional--microsoft-365-activity). It reads six reports a day (Teams, Outlook, SharePoint, OneDrive, Viva Engage and the Microsoft 365 apps) and writes one row per person per active day to `m365_activity_daily`. |
+| Pipeline | `Conditionally_Run_M365_Activity` runs it alongside the ValueLens notebooks. |
+| Semantic model | An `M365 Activity` table in `ValueLens Model`, joined to the calendar, org data and licences, so the date and organisation filters reach it. It's added at deploy time; the `.pbit` and the Power BI report don't change. |
+| App page | **Work patterns**, between Leaderboards and Agent Evaluation. |
+
+Microsoft keeps 28 days of these reports and publishes each day two to three days late. The first
+load reads all 28 days, and history builds up from there.
+
+**Turn off concealed names.** If **Display concealed user, group, and site names in all reports**
+is on, the reports hold random IDs instead of names. The totals still work, but the organisation
+filter, the Copilot comparison and the licence score can't. Turn it off in the Microsoft 365 admin
+center under **Settings** > **Org settings** > **Reports**. The next run reloads the concealed
+days. The data check and the Work patterns page both warn you while it's on.
+
+**Existing installs.** `update` adds the module, because it's on by default. The page fills in
+after the next pipeline run: run `run`, or wait for the schedule. To leave it out, run `install`
+and clear it under *What to collect*.
 
 ## Credit consumption
 
@@ -165,7 +197,7 @@ Studio set up, so it's skipped. The template's Credit Consumption page stays emp
 | Command | What it does |
 |---|---|
 | `install` (default) | Sets everything up, or repairs it from the install record. Re-running only does what is missing. It asks before rebuilding an app that is already deployed. |
-| `update` | Pushes the notebooks, pipeline and semantic models from this checkout over the deployed ones, then refreshes the models. It asks whether to redeploy the app too. Use it after you pull a new version of the repo. |
+| `update` | Pushes the notebooks, pipeline and semantic models from this checkout over the deployed ones, then refreshes the models. A module that's new in this version and on by default, such as [Microsoft 365 activity](#microsoft-365-activity), is added too. It asks whether to redeploy the app too. Use it after you pull a new version of the repo. |
 | `run` | Runs the pipeline now, then the data check. `--backfill-days <n>` reloads that much audit history and rebuilds the curated table. |
 | `refresh` | Refreshes the semantic models now and waits for them. |
 | `deploy-app` | Builds and deploys the Analytics Hub app again, for example after a failed deploy or once you have a newer Node.js. |
@@ -255,6 +287,7 @@ few more minutes to start.
 | `Run_Consumption_Azure_AI` fails with `AuthorizationFailed` | New Azure roles can take a few minutes to apply. The activity retries twice; if it still fails, run `run` later. |
 | `You can't add … to …, so its transcripts are skipped` | Ask a System Administrator of that environment to follow the steps it prints. See [Agent Evaluator](#agent-evaluator). Then run `install` again. |
 | `Run_Agent_Evaluator_Transcripts` fails with 401 or 403 from Dataverse | The app's application user was removed, disabled or lost the Bot Transcript Viewer role. Check it in the Power Platform admin center, then run `run`. |
+| Work patterns says the usage reports hide user names | Turn off concealed names in the Microsoft 365 admin center, then run `run`. See [Microsoft 365 activity](#microsoft-365-activity). |
 | `The install record is for tenant …` | Pass `--tenant` with the tenant in the record, or use another `--config`. |
 
 Run with `--verbose` to see each call and the full error.

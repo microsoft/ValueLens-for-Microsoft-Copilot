@@ -16,6 +16,28 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-04 — Fabric: Microsoft 365 activity and the Work patterns page
+
+The installer has a new module, **Microsoft 365 activity**, on by default. Its notebook,
+`Copilot_M365_Activity_Ingester`, reads the Microsoft 365 usage reports from Graph (Teams, Outlook,
+SharePoint, OneDrive, Viva Engage and the Microsoft 365 apps) into one row per person per active
+day. It uses `Reports.Read.All`, which the core already has. The installer adds it to the pipeline
+behind `EnableM365Activity`, and adds an `M365 Activity` table to `ValueLens Model` at deploy time.
+The Power BI templates don't change. `update` adds the module to existing installs.
+
+The Analytics Hub app has a new **Work patterns** page: people active, active days, meetings and
+email per week, how far each workload and app reaches, and how Copilot users' working weeks compare
+with everyone else's, overall and by organisation. With the activity loaded, Readiness's *Who to
+license next* adds breadth, the Microsoft 365 workloads someone uses a day, to its priority score:
+50 / 30 / 20 for tasks, days and breadth, instead of 60 / 40. People with no Microsoft 365 activity
+keep the 60 / 40 score.
+
+If the tenant conceals user names in reports, the activity can't be matched to people. The
+notebook and the page say so and how to fix it, and the notebook reloads those days once the
+setting is off. See the [methodology](docs/METHODOLOGY.md#84-work-patterns).
+
+---
+
 ## 2026-10-03 — Fabric App: renamed Analytics Hub
 
 The [Fabric App](1.%20Fabric/Fabric%20App/) is now called **Analytics Hub**: the browser tab, the
