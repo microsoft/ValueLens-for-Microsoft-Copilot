@@ -368,7 +368,8 @@ test('model: Fabric mode, offline sources stubbed, so only the Lakehouse is read
   assert.ok(expr('Lakehouse Name').startsWith('"ValueLens" meta ['));
   const text = JSON.stringify(bim.model);
   for (const fn of ['CommonDataService.Database', 'File.Contents', 'Folder.Files', 'SharePoint.Files', 'Web.Contents']) assert.ok(!text.includes(fn), fn);
-  assert.ok(text.includes('Sql.Database'));
+  assert.equal(text.split('Sql.Database(').length - 1, 1);
+  assert.match(expr('FabricTable'), /Db = Sql\.Database\(#"Fabric SQL Endpoint", #"Lakehouse Name"\),/, 'a source the service can bind');
 });
 
 /** @param {ReturnType<typeof setup>} t */
