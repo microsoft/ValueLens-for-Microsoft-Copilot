@@ -38,5 +38,15 @@ export const liveColumns = {
         "[Sessions Per Week]",
         "[Active Days Per Week]",
     ],
+    // Authored from the query; confirm against the live model after the first Microsoft 365 load.
+    licenseCandidatesM365: [
+        "[Rank]",
+        "[User]",
+        "[Organization]",
+        "[Priority Score]",
+        "[Sessions Per Week]",
+        "[Active Days Per Week]",
+        "[Workloads Per Day]",
+    ],
     licenseDormancy: ["[Dormancy Bucket Order]", "[Dormancy Bucket]", "[Licensed Users]"],
 } as const;

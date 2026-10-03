@@ -7,7 +7,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    LICENSE_BREADTH_FULL_MARKS,
     licenseCandidates,
+    licenseCandidatesM365,
     licenseDemandSummary,
     licenseDormancy,
     licenseEstateSummary,
@@ -23,6 +25,7 @@ const modules = [
     { name: "licenseEstateSummary", factory: () => licenseEstateSummary(), columns: liveColumns.licenseEstateSummary },
     { name: "licensePriorityByOrg", factory: () => licensePriorityByOrg(), columns: liveColumns.licensePriorityByOrg },
     { name: "licenseCandidates", factory: () => licenseCandidates(), columns: liveColumns.licenseCandidates },
+    { name: "licenseCandidatesM365", factory: () => licenseCandidatesM365(), columns: liveColumns.licenseCandidatesM365 },
     { name: "licenseDormancy", factory: () => licenseDormancy(), columns: liveColumns.licenseDormancy },
 ];
 
@@ -86,6 +89,50 @@ describe("licensing query contract", () => {
         const { query } = licenseDormancy();
         expect(query).toContain("'Copilot Licensed'[Dormancy Bucket Order]");
         expect(query).toContain("[Licensed Seats by Dormancy (Verified)]");
+    });
+});
+
+describe("license candidates with Microsoft 365 activity", () => {
+    const { query, columnMetadata } = licenseCandidatesM365();
+
+    it("returns the model's candidate columns plus workload breadth", () => {
+        expect(Object.keys(columnMetadata)).toEqual([...Object.keys(licenseCandidates().columnMetadata), "[Workloads Per Day]"]);
+    });
+
+    it("ranks at user grain, like the model's list", () => {
+        const grouping = query.slice(query.indexOf("SUMMARIZECOLUMNS("), query.indexOf('"@Tasks"'));
+        expect(grouping).toContain("[Audit_UserId]");
+        expect(grouping).not.toContain("[Organization]");
+        expect(query).toContain("RANKX(_scored, [@Score], , DESC, DENSE)");
+        expect(query).toContain("LOOKUPVALUE(");
+    });
+
+    it("scores Copilot use with the same measures as the model's score", () => {
+        expect(query).toContain("[Median Unlicensed AI Tasks Per User Per Week]");
+        expect(query).toContain("[Median Chat + Agent Active Days Per User Per Week (Unlicensed)]");
+        expect(query).toContain("MIN(DIVIDE([@Tasks], 30, 0), 1)");
+        expect(query).toContain("MIN(DIVIDE([@Days], 5, 0), 1)");
+    });
+
+    it("keeps candidates the model's list would show", () => {
+        expect(query).toContain("[@Tasks] > 0 && [@Days] > 0 && [@Observed] > 0");
+        expect(query).toContain("[Observed Unlicensed Sessions]");
+    });
+
+    it("reads breadth from the same person's Microsoft 365 active days", () => {
+        expect(query).toContain(
+            "TREATAS({ 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId] }, 'M365 Activity'[UPN_Normalized])",
+        );
+        expect(query).toContain("AVERAGE('M365 Activity'[WorkloadsActive])");
+        expect(query).toContain("'M365 Activity'[WorkloadsActive] > 0");
+        expect(query).toContain(`MIN(DIVIDE([@Breadth], ${LICENSE_BREADTH_FULL_MARKS}, 0), 1)`);
+    });
+
+    it("weighs both scores out of 100, falling back to the model's weights without Microsoft 365 activity", () => {
+        const blended = query.match(/(\d+) \* _volume \+ (\d+) \* _days \+ (\d+) \* MIN/);
+        const fallback = query.match(/ISBLANK\(\[@Breadth\]\),\s*(\d+) \* _volume \+ (\d+) \* _days,/);
+        expect(blended?.slice(1).map(Number)).toEqual([50, 30, 20]);
+        expect(fallback?.slice(1).map(Number)).toEqual([60, 40]);
     });
 });
 
