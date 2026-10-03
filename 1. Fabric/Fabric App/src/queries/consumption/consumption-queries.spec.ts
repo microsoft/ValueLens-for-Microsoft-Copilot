@@ -43,6 +43,8 @@ import {
     splitCoverage,
     STUDIO_LABEL_COLUMN,
     studioAgents,
+    studioAzureBilling,
+    studioAzureDaily,
     studioBreakdown,
     studioCreditsSummary,
     studioDaily,
@@ -71,6 +73,9 @@ const modules = [
     { name: "studioDaily (cost)", factory: () => studioDaily("cost"), columns: liveColumns.studioDaily },
     { name: "studioBreakdown (consumption)", factory: () => studioBreakdown("consumption"), columns: liveColumns.studioBreakdown },
     { name: "studioBreakdown (cost)", factory: () => studioBreakdown("cost"), columns: liveColumns.studioBreakdown },
+    { name: "studioAzureBilling", factory: () => studioAzureBilling(), columns: liveColumns.studioAzureBilling },
+    { name: "studioAzureDaily (consumption)", factory: () => studioAzureDaily("consumption"), columns: liveColumns.studioAzureDaily },
+    { name: "studioAzureDaily (cost)", factory: () => studioAzureDaily("cost"), columns: liveColumns.studioAzureDaily },
     { name: "studioAgents", factory: () => studioAgents(), columns: liveColumns.studioAgents },
     { name: "studioUsers", factory: () => studioUsers(), columns: liveColumns.studioUsers },
     { name: "azureSource", factory: () => azureSource(), columns: liveColumns.azureSource },
@@ -165,6 +170,18 @@ describe("consumption spec field references", () => {
         expect(coworkWeekly("cost").vegaLiteSpec).not.toEqual(coworkWeekly("consumption").vegaLiteSpec);
         expect(studioDaily("cost").vegaLiteSpec).not.toEqual(studioDaily("consumption").vegaLiteSpec);
         expect(studioBreakdown("cost").vegaLiteSpec).not.toEqual(studioBreakdown("consumption").vegaLiteSpec);
+        expect(studioAzureDaily("cost").query).toBe(studioAzureDaily("consumption").query);
+        expect(studioAzureDaily("cost").vegaLiteSpec).not.toEqual(studioAzureDaily("consumption").vegaLiteSpec);
+    });
+
+    it("keeps Azure-billed pay-as-you-go out of shared queries, since older models have no CopilotPaygSpend", () => {
+        const shared = modules.filter((module) => !module.name.startsWith("studioAzure"));
+        for (const module of shared) expect(module.factory().query).not.toContain("CopilotPaygSpend");
+        // The period has to reach [Studio Period Days], so it is read inside EVALUATE, not in a DEFINE VAR.
+        for (const source of [studioAzureBilling(), studioAzureDaily()]) {
+            expect(source.query).not.toMatch(/^\s*DEFINE\b/m);
+            expect(source.query).toMatch(/EVALUATE\s+VAR WindowDays = \[Studio Period Days\]/);
+        }
     });
 });
 
