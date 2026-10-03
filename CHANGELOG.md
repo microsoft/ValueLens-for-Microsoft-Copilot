@@ -16,14 +16,15 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
-## 2026-10-04 — Fabric: Microsoft 365 activity and the Work patterns page
+## 2026-10-03 — Fabric: Microsoft 365 activity and the Work patterns page
 
 The installer has a new module, **Microsoft 365 activity**, on by default. Its notebook,
 `Copilot_M365_Activity_Ingester`, reads the Microsoft 365 usage reports from Graph (Teams, Outlook,
 SharePoint, OneDrive, Viva Engage and the Microsoft 365 apps) into one row per person per active
 day. It uses `Reports.Read.All`, which the core already has. The installer adds it to the pipeline
 behind `EnableM365Activity`, and adds an `M365 Activity` table to `ValueLens Model` at deploy time.
-The Power BI templates don't change. `update` adds the module to existing installs.
+The Power BI templates don't change. `update` adds the module to existing installs, and the
+installer's data check reports the activity table's rows and dates after each `run`.
 
 The Analytics Hub app has a new **Work patterns** page: people active, active days, meetings and
 email per week, how far each workload and app reaches, and how Copilot users' working weeks compare

@@ -99,7 +99,7 @@ Lakehouse name for `ValueLens - Fabric.pbit`, or the workspace and Lakehouse IDs
 | Microsoft 365 activity | On by default. One more notebook and an `M365 Activity` table in the semantic model. See [Microsoft 365 activity](#microsoft-365-activity). |
 | Credit consumption | Only if you choose it. Three more notebooks, the `ValueLens Consumption Model`, two upload folders, and read access to Azure costs. See [Credit consumption](#credit-consumption). |
 | Agent Evaluator | Only if you choose it. The app registration as a transcript reader in each environment you pick, one more notebook and the `ValueLens Agent Evaluator Model`. See [Agent Evaluator](#agent-evaluator). |
-| First load | A pipeline run with your chosen history, then the data check. The run reports row counts and the date range of the audit data. Without a first load, the model is refreshed straight away. |
+| First load | A pipeline run with your chosen history, then the data check. The run reports row counts and the date range of the audit data and the Microsoft 365 activity. Without a first load, the model is refreshed straight away. |
 
 The data check copy is the only notebook the installer adds to. It writes a short summary to
 `Files/valuelens_installer/data_check.json` in the Lakehouse, so the installer can read the
