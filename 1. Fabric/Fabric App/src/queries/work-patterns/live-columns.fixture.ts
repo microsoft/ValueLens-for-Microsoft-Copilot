@@ -10,7 +10,10 @@
  * first Microsoft 365 load. `m365Apps`, `m365CopilotIndex` and `m365ByOrg`
  * ran cleanly but returned no rows on that tenant (no desktop-app use, no
  * Copilot interactions, no organisation on the active people), so their
- * columns are as authored.
+ * columns are as authored. Later that day `m365SuiteDepth` returned its seven
+ * rows live, `m365Platforms` ran cleanly with no rows, and the pooled
+ * `m365ByOrg` returned the columns below when grouped by person, both with
+ * every group pooled and with none.
  */
 export const liveColumns = {
     m365Status: ["[Rows]", "[People]", "[First Date]", "[Last Date]", "[Concealed Share]"],
@@ -29,6 +32,8 @@ export const liveColumns = {
     m365WorkloadTrend: ["[Week Start]", "[Workload]", "[People]", "[Share]"],
     m365WorkloadReach: ["[Workload]", "[People]", "[Reach]", "[Days Per Week]"],
     m365Apps: ["[App]", "[People]", "[Reach]"],
+    m365SuiteDepth: ["[Apps Used]", "[Apps]", "[People]", "[Share]"],
+    m365Platforms: ["[Platform]", "[People]", "[Reach]", "[Days Per Week]"],
     m365CopilotSummary: [
         "[M365 People]",
         "[Copilot People]",
@@ -41,6 +46,7 @@ export const liveColumns = {
     m365CopilotIndex: ["[Metric]", "[Copilot Users]", "[Others]", "[Index]"],
     m365ByOrg: [
         "[Organization]",
+        "[Pooled Groups]",
         "[People Active]",
         "[Copilot Users]",
         "[Copilot Reach]",

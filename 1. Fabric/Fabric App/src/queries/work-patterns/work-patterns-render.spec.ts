@@ -16,10 +16,14 @@ import type { TopLevelSpec } from "vega-lite";
 import type { ColumnMetadataMap } from "@/lib/to-data-table";
 import { m365Apps } from "./m365-apps";
 import { m365CopilotIndex } from "./m365-copilot-index";
+import { m365Platforms } from "./m365-platforms";
+import { m365SuiteDepth } from "./m365-suite-depth";
 import { m365WorkloadReach } from "./m365-workload-reach";
 import { m365WorkloadTrend } from "./m365-workload-trend";
 import appsRows from "./__fixtures__/m365-apps.rows.json";
 import indexRows from "./__fixtures__/m365-copilot-index.rows.json";
+import platformRows from "./__fixtures__/m365-platforms.rows.json";
+import depthRows from "./__fixtures__/m365-suite-depth.rows.json";
 import reachRows from "./__fixtures__/m365-workload-reach.rows.json";
 import trendRows from "./__fixtures__/m365-workload-trend.rows.json";
 
@@ -31,7 +35,9 @@ interface Mark {
     y?: number;
     width: number;
     height: number;
+    opacity?: number;
     bounds: { x1: number; y1: number; x2: number; y2: number };
+    mark?: { group?: { y?: number; mark?: Mark["mark"] } };
 }
 
 /**
@@ -89,8 +95,19 @@ function expectWidthsProportional(bars: Mark[], valueField: string) {
     }
 }
 
+/**
+ * A bar's distance from the top of the chart. Rounded-end bars sit in a group
+ * per category, so `bounds` is relative to that group; add each enclosing
+ * group's offset to get a position bars can be ranked by.
+ */
+function top(bar: Mark): number {
+    let y = bar.bounds.y1;
+    for (let group = bar.mark?.group; group; group = group.mark?.group) y += group.y ?? 0;
+    return y;
+}
+
 function topmost(bars: Mark[]): Mark {
-    return bars.reduce((first, bar) => (bar.bounds.y1 < first.bounds.y1 ? bar : first));
+    return bars.reduce((first, bar) => (top(bar) < top(first) ? bar : first));
 }
 
 describe("m365 workload trend renders", () => {
@@ -140,7 +157,7 @@ describe("m365 workload reach renders", () => {
 
         expectDrawable(bars, rows.length);
         expectWidthsProportional(bars, "Reach");
-        expect(topmost(bars).datum.Workload).toBe("Teams");
+        expect(topmost(await renderMarks(vegaLiteSpec, [...rows].reverse(), columnMetadata, "rect")).datum.Workload).toBe("Teams");
     });
 });
 
@@ -153,7 +170,58 @@ describe("m365 apps renders", () => {
 
         expectDrawable(bars, rows.length);
         expectWidthsProportional(bars, "Reach");
-        expect(topmost(bars).datum.App).toBe("Teams");
+        expect(topmost(await renderMarks(vegaLiteSpec, [...rows].reverse(), columnMetadata, "rect")).datum.App).toBe("Teams");
+    });
+});
+
+describe("m365 suite depth renders", () => {
+    const rows = depthRows as Row[];
+    const byLabel = (bars: Mark[], label: string) => bars.find((bar) => bar.datum["Apps Used"] === label)!;
+
+    it("draws one bar per depth, sized by share", async () => {
+        const { vegaLiteSpec, columnMetadata } = m365SuiteDepth();
+        const bars = await renderMarks(vegaLiteSpec, rows, columnMetadata, "rect");
+
+        expectDrawable(bars, rows.length);
+        expectWidthsProportional(bars, "Share");
+    });
+
+    it("runs from one app down to all six, with no app use reported last", async () => {
+        const { vegaLiteSpec, columnMetadata } = m365SuiteDepth();
+        const bars = await renderMarks(vegaLiteSpec, rows, columnMetadata, "rect");
+        const order = [...bars].sort((a, b) => top(a) - top(b)).map((bar) => bar.datum["Apps Used"]);
+
+        expect(order).toEqual(["1 app", "2 apps", "3 apps", "4 apps", "5 apps", "All 6 apps", "No app use reported"]);
+    });
+
+    it("fades only the no-app-use bar, which isn't a depth", async () => {
+        const { vegaLiteSpec, columnMetadata } = m365SuiteDepth();
+        const bars = await renderMarks(vegaLiteSpec, rows, columnMetadata, "rect");
+
+        expect(byLabel(bars, "No app use reported").opacity).toBeLessThan(1);
+        for (const bar of bars.filter((item) => item.datum.Apps !== 0)) expect(bar.opacity).toBe(1);
+    });
+
+    it("keeps an empty depth as a row with no bar", async () => {
+        const { vegaLiteSpec, columnMetadata } = m365SuiteDepth();
+        const sparse = rows.map((row) => (row["[Apps]"] === 1 ? { ...row, "[People]": 0, "[Share]": 0 } : row));
+        const bars = await renderMarks(vegaLiteSpec, sparse, columnMetadata, "rect");
+
+        expect(bars).toHaveLength(rows.length);
+        expect(byLabel(bars, "1 app").width).toBe(0);
+    });
+});
+
+describe("m365 platforms renders", () => {
+    const rows = platformRows as Row[];
+
+    it("draws one bar per platform, sized by reach, widest first", async () => {
+        const { vegaLiteSpec, columnMetadata } = m365Platforms();
+        const bars = await renderMarks(vegaLiteSpec, rows, columnMetadata, "rect");
+
+        expectDrawable(bars, rows.length);
+        expectWidthsProportional(bars, "Reach");
+        expect(topmost(await renderMarks(vegaLiteSpec, [...rows].reverse(), columnMetadata, "rect")).datum.Platform).toBe("Windows");
     });
 });
 
@@ -189,7 +257,7 @@ describe("m365 copilot index renders", () => {
 
     it("leads with the biggest ratio", async () => {
         const { vegaLiteSpec, columnMetadata } = m365CopilotIndex();
-        const bars = await renderMarks(vegaLiteSpec, rows, columnMetadata, "rect");
+        const bars = await renderMarks(vegaLiteSpec, [...rows].reverse(), columnMetadata, "rect");
 
         expect(topmost(bars).datum.Metric).toBe("Chat messages");
     });

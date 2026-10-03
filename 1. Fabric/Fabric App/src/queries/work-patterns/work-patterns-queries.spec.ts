@@ -13,11 +13,15 @@ import {
     m365ByOrg,
     m365CopilotIndex,
     m365CopilotSummary,
+    m365Platforms,
     m365Status,
+    m365SuiteDepth,
     m365Summary,
     m365WorkloadReach,
     m365WorkloadTrend,
+    readM365Coverage,
     readM365Status,
+    SMALL_GROUP_MIN_PEOPLE,
 } from "./index";
 import { liveColumns } from "./live-columns.fixture";
 
@@ -27,6 +31,8 @@ const modules = [
     { name: "m365WorkloadTrend", factory: m365WorkloadTrend, columns: liveColumns.m365WorkloadTrend },
     { name: "m365WorkloadReach", factory: m365WorkloadReach, columns: liveColumns.m365WorkloadReach },
     { name: "m365Apps", factory: m365Apps, columns: liveColumns.m365Apps },
+    { name: "m365SuiteDepth", factory: m365SuiteDepth, columns: liveColumns.m365SuiteDepth },
+    { name: "m365Platforms", factory: m365Platforms, columns: liveColumns.m365Platforms },
     { name: "m365CopilotSummary", factory: m365CopilotSummary, columns: liveColumns.m365CopilotSummary },
     { name: "m365CopilotIndex", factory: m365CopilotIndex, columns: liveColumns.m365CopilotIndex },
     { name: "m365ByOrg", factory: m365ByOrg, columns: liveColumns.m365ByOrg },
@@ -36,6 +42,8 @@ const specModules = [
     { name: "m365WorkloadTrend", factory: m365WorkloadTrend },
     { name: "m365WorkloadReach", factory: m365WorkloadReach },
     { name: "m365Apps", factory: m365Apps },
+    { name: "m365SuiteDepth", factory: m365SuiteDepth },
+    { name: "m365Platforms", factory: m365Platforms },
     { name: "m365CopilotIndex", factory: m365CopilotIndex },
 ];
 
@@ -114,6 +122,30 @@ describe("work patterns query contract", () => {
         expect(rebound.query).not.toContain("'Chat + Agent Org Data'[Organization]");
         expect(rebound.columnMetadata["[Organization]"].displayName).toBe("Department");
     });
+
+    it("pools organizations too small to show on their own into one row", () => {
+        const query = m365ByOrg().query;
+        expect(query).toContain(`VAR _minPeople = ${SMALL_GROUP_MIN_PEOPLE}`);
+        expect(query).toContain("[@People] < _minPeople");
+        expect(query).toContain("[@People] >= _minPeople");
+        expect(query).toContain('"Pooled Groups"');
+    });
+
+    it("returns every suite depth, from no app use reported to all six apps", () => {
+        const query = m365SuiteDepth().query;
+        for (const app of ["AppOutlook", "AppTeams", "AppWord", "AppExcel", "AppPowerPoint", "AppOneNote"]) {
+            expect(query).toContain(`MAX('M365 Activity'[${app}])`);
+        }
+        expect(query).toContain('{ 0, "No app use reported" }');
+        expect(query).toContain('{ 6, "All 6 apps" }');
+    });
+
+    it("measures every platform the apps report flags", () => {
+        const query = m365Platforms().query;
+        for (const platform of ["Windows", "Mac", "Web", "Mobile"]) {
+            expect(query).toContain(`'M365 Activity'[Platform${platform}] = 1`);
+        }
+    });
 });
 
 describe("work patterns spec field references", () => {
@@ -186,5 +218,44 @@ describe("readM365Status", () => {
             readM365Status({ loaded: true, row: row({ "[Rows]": 10, "[Concealed Share]": share }) }).concealed;
         expect(at(CONCEALED_THRESHOLD)).toBe(false);
         expect(at(0.98)).toBe(true);
+    });
+});
+
+describe("readM365Coverage", () => {
+    const summary = (values: Record<string, unknown>) => ({
+        "[First Date]": "2026-07-01",
+        "[Last Date]": "2026-07-31",
+        "[Days Loaded]": 27,
+        ...values,
+    });
+
+    it("counts the days in the span with nothing loaded", () => {
+        expect(readM365Coverage(summary({}))).toEqual({
+            firstDate: "2026-07-01",
+            lastDate: "2026-07-31",
+            spanDays: 31,
+            daysLoaded: 27,
+            missingDays: 4,
+        });
+    });
+
+    it("counts both ends of the span, so one day is a span of one", () => {
+        const coverage = readM365Coverage(summary({ "[Last Date]": "2026-07-01", "[Days Loaded]": 1 }));
+        expect(coverage).toMatchObject({ spanDays: 1, missingDays: 0 });
+    });
+
+    it("crosses a clock change without losing a day", () => {
+        const coverage = readM365Coverage(summary({ "[First Date]": "2026-10-20", "[Last Date]": "2026-11-02", "[Days Loaded]": 14 }));
+        expect(coverage).toMatchObject({ spanDays: 14, missingDays: 0 });
+    });
+
+    it.each([
+        ["no summary", undefined],
+        ["no first date", summary({ "[First Date]": "" })],
+        ["no days loaded", summary({ "[Days Loaded]": null })],
+        ["a date it can't read", summary({ "[Last Date]": "31/07/2026" })],
+        ["dates the wrong way round", summary({ "[First Date]": "2026-08-01" })],
+    ])("reads %s as no coverage", (_case, row) => {
+        expect(readM365Coverage(row)).toBeUndefined();
     });
 });
