@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { notebooksFor } from '../src/catalog.js';
 import { emptyConfig } from '../src/config.js';
+import { runCommand } from '../src/install.js';
 import { ensureNotebooks, ensurePipeline, ensureSchedule } from '../src/steps/fabric.js';
 import { ensureConsent } from '../src/steps/identity.js';
-import { printDataCheck, runDataCheck, runPipeline, waitForJob } from '../src/steps/run.js';
+import { printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
 import { DATA_CHECK_FILE } from '../src/transform/notebook.js';
 import { fakeCtx, fakeFabric, fakeUi } from './fakes.js';
 
@@ -274,6 +275,70 @@ test('data check runs the notebook and prints the summary it saved', async () =>
   assert.match(text, /! Org data: 0 rows/);
   assert.match(text, /✓ Microsoft 365 activity: 118 rows, 2026-09-06 to 2026-09-29/);
   assert.match(text, /Agents: not loaded/);
+});
+
+test('check runs the data check on its own, and needs its notebook', async () => {
+  const fabric = fakeFabric();
+  fabric.jobs.push({ status: 'Completed' });
+  const oneLake = { readJson: async () => ({ checkedAt: '2026-06-01T12:30:00+00:00', tables: { licensed: { rows: 5 } } }) };
+  const ui = fakeUi();
+  const { ctx, config } = fakeCtx({ fabric: fabric.api, oneLake, ui: ui.ui });
+  await assert.rejects(runCommand(ctx, 'check', { wait: true }), /no data check notebook yet/);
+  assert.deepEqual(fabric.calls, []);
+
+  config.fabric.notebooks.dataCheck = 'nb-check';
+  assert.equal(await runCommand(ctx, 'check', { wait: true }), true);
+  assert.deepEqual(fabric.calls, ['runJob RunNotebook'], 'the pipeline is left alone');
+  assert.match(ui.text(), /✓ Licensed users: 5 rows/);
+
+  fabric.jobs.push({ status: 'Failed' });
+  assert.equal(await runCommand(ctx, 'check', { wait: true }), false);
+});
+
+test('ranSince: a run that ended after the check makes it out of date', () => {
+  const at = '2026-06-01T12:30:00+00:00';
+  const run = (/** @type {string} */ status, /** @type {string} */ end) => ({ status, endTimeUtc: end });
+  assert.equal(ranSince([run('Completed', '2026-06-02T02:20:00')], at), true);
+  assert.equal(ranSince([run('Failed', '2026-06-02T02:20:00')], at), true);
+  assert.equal(ranSince([run('Completed', '2026-06-01T12:00:00')], at), false, 'the run the check followed');
+  assert.equal(ranSince([run('InProgress', '')], at), false);
+  assert.equal(ranSince([run('Completed', '2026-06-02T02:20:00')], undefined), false);
+});
+
+test('status says when the last data check is out of date, or has never run', async () => {
+  const fabric = fakeFabric();
+  /** @type {any[]} */
+  let jobs = [{ id: 'j-1', status: 'Completed', startTimeUtc: '2026-06-02T02:00:00', endTimeUtc: '2026-06-02T02:20:00', invokeType: 'Scheduled' }];
+  /** @type {any} */ (fabric.api).listJobs = async () => jobs;
+  /** @type {any} */
+  let saved = { checkedAt: '2026-06-01T12:30:00+00:00', tables: { m365: null } };
+  const oneLake = { readJson: async () => saved ?? Promise.reject(new Error('404')) };
+  const run = async () => {
+    const ui = fakeUi();
+    const { ctx, config } = fakeCtx({ fabric: fabric.api, oneLake, ui: ui.ui });
+    config.fabric.pipelineId = 'pipe-1';
+    config.fabric.notebooks.dataCheck = 'nb-check';
+    await status(ctx);
+    return ui.text();
+  };
+
+  let text = await run();
+  assert.match(text, /Last data check \(2026-06-01 12:30 UTC\)/);
+  assert.match(text, /! The pipeline has run since this check, so these results may be out of date/);
+  assert.match(text, /Run "valuelens-install check" to check the data again/);
+  assert.match(text, /Microsoft 365 activity: not loaded/);
+
+  saved = { ...saved, checkedAt: '2026-06-02T02:40:00+00:00' };
+  text = await run();
+  assert.doesNotMatch(text, /out of date/);
+
+  saved = null;
+  text = await run();
+  assert.match(text, /It hasn't run yet. Run "valuelens-install check"/);
+
+  jobs = [];
+  text = await run();
+  assert.doesNotMatch(text, /Data check|hasn't run/, 'nothing to check before the pipeline has loaded anything');
 });
 
 test('printDataCheck flags missing core tables', () => {

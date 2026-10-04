@@ -158,6 +158,7 @@ test('parseCli: commands, sign-in methods and validation', () => {
   assert.match(r.configFile, /x\.json$/);
 
   assert.equal(parseCli(['--dry-run']).command, 'preview');
+  assert.equal(parseCli(['check']).command, 'check');
   assert.equal(parseCli(['--device-code']).method, 'device-code');
   assert.throws(() => parseCli(['nope']), /Unknown command "nope"/);
   assert.throws(() => parseCli(['run', 'extra']), /Unexpected argument: extra/);
