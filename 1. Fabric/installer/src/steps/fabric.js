@@ -24,6 +24,35 @@ const isNotFound = (err) => err instanceof HttpError && (err.status === 404 || e
 export const byName = (items, name) => items.find((i) => String(i.displayName).toLowerCase() === name.toLowerCase());
 
 /**
+ * `name`, or the first free `name_2`, `name_3`… (a space instead of `_` when the name has spaces).
+ * The installer never takes over an item it didn't create, so a clash gets a new name.
+ * @param {string} name
+ * @param {Iterable<string>} taken  Display names already in the workspace.
+ */
+export function freeName(name, taken) {
+  const used = new Set([...taken].map((t) => String(t).toLowerCase()));
+  if (!used.has(name.toLowerCase())) return name;
+  const sep = /\s/.test(name) ? ' ' : '_';
+  for (let n = 2; ; n++) {
+    const candidate = `${name}${sep}${n}`;
+    if (!used.has(candidate.toLowerCase())) return candidate;
+  }
+}
+
+/** @param {any[]} items */
+export const displayNames = (items) => items.map((i) => String(i.displayName));
+
+/**
+ * Says why an item has a different name from usual.
+ * @param {Ctx} ctx
+ * @param {string} wanted
+ * @param {string} name
+ */
+export function noteRenamed(ctx, wanted, name) {
+  if (name !== wanted) ctx.ui.note(`"${wanted}" is already in the workspace and isn't from this install, so it's left as it is. Analytics Hub's is called "${name}".`);
+}
+
+/**
  * A create can answer 201 with the item, or 202 and a result. If neither carries an ID, look it up by name.
  * @param {Ctx} ctx
  * @param {any} created
@@ -90,17 +119,13 @@ export async function ensureLakehouse(ctx) {
       delete f.lakehouseId;
     }
   }
-  const name = /** @type {string} */ (f.lakehouseName);
-  const existing = byName(await api.fabric.listItems(ws, 'Lakehouse'), name);
-  if (existing) {
-    f.lakehouseId = existing.id;
-    f.lakehouseName = existing.displayName;
-    ui.ok(`Using the existing Lakehouse "${existing.displayName}"`);
-  } else {
-    const created = await api.fabric.createLakehouse(ws, name);
-    f.lakehouseId = await createdId(ctx, created, 'Lakehouse', name);
-    ui.ok(`Created Lakehouse "${name}"`);
-  }
+  const wanted = f.lakehouseName ?? 'ValueLens';
+  const name = freeName(wanted, displayNames(await api.fabric.listItems(ws, 'Lakehouse')));
+  noteRenamed(ctx, wanted, name);
+  const created = await api.fabric.createLakehouse(ws, name);
+  f.lakehouseId = await createdId(ctx, created, 'Lakehouse', name);
+  f.lakehouseName = name;
+  ui.ok(`Created Lakehouse "${name}"`);
   ctx.save();
 }
 
@@ -351,33 +376,32 @@ export async function ensureNotebooks(ctx, opts = {}) {
     const content = serialiseNotebook(prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb)));
     const urls = nb.key === 'agentTranscripts' ? environmentUrls(config) : undefined;
     const payg = nb.key === 'azureAi' ? paygIds(config) : undefined;
+    f.notebookNames ??= {};
+    const label = f.notebookNames[nb.key] ?? nb.displayName;
     let id = f.notebooks[nb.key];
     if (id && !ids.has(id)) {
-      ui.warn(`${nb.displayName} was deleted. Deploying it again.`);
+      ui.warn(`${label} was deleted. Deploying it again.`);
       id = undefined;
+      // The pipeline calls notebooks by ID, so it has to be rewritten for the new one.
+      delete f.pipelineModules;
     }
     if (!id) {
-      const same = byName(items, nb.displayName);
-      if (same) {
-        const replace = await ui.confirm(`A notebook called ${nb.displayName} is already in the workspace. Replace it with the Analytics Hub version?`, true);
-        if (!replace) throw new Error(`Stopped: ${nb.displayName} already exists. Rename or remove it, or choose another workspace.`);
-        await api.fabric.updateNotebook(ws, same.id, content);
-        id = same.id;
-        ui.ok(`Updated ${nb.displayName}`);
-      } else {
-        const created = await api.fabric.createNotebook(ws, nb.displayName, content);
-        id = await createdId(ctx, created, 'Notebook', nb.displayName);
-        ui.ok(`Created ${nb.displayName}`);
-      }
+      const name = freeName(label, displayNames(items));
+      noteRenamed(ctx, label, name);
+      const created = await api.fabric.createNotebook(ws, name, content);
+      id = await createdId(ctx, created, 'Notebook', name);
+      items.push({ id, displayName: name });
+      f.notebookNames[nb.key] = name;
+      ui.ok(`Created ${name}`);
     } else if (
       opts.force ||
       (urls !== undefined && urls !== config.agentEvaluator.deployedUrls) ||
       (payg !== undefined && payg !== (config.consumption.deployedPayg ?? ''))
     ) {
       await api.fabric.updateNotebook(ws, id, content);
-      ui.ok(`Updated ${nb.displayName}`);
+      ui.ok(`Updated ${label}`);
     } else {
-      ui.ok(`${nb.displayName} is in place`);
+      ui.ok(`${label} is in place`);
     }
     f.notebooks[nb.key] = id;
     if (urls !== undefined) config.agentEvaluator.deployedUrls = urls;
@@ -467,19 +491,12 @@ export async function ensurePipeline(ctx, opts = {}) {
   }
 
   if (!f.pipelineId) {
-    const name = f.pipelineName ?? PIPELINE_NAME;
-    const same = byName(items, name);
-    if (same) {
-      const replace = await ui.confirm(`A pipeline called ${name} is already in the workspace. Replace it with the Analytics Hub version?`, true);
-      if (!replace) throw new Error(`Stopped: ${name} already exists. Rename or remove it, or choose another workspace.`);
-      await api.fabric.updatePipeline(ws, same.id, definition);
-      f.pipelineId = same.id;
-      ui.ok(`Updated pipeline ${name}`);
-    } else {
-      const created = await api.fabric.createPipeline(ws, name, definition);
-      f.pipelineId = await createdId(ctx, created, 'DataPipeline', name);
-      ui.ok(`Created pipeline ${name}`);
-    }
+    const wanted = f.pipelineName ?? PIPELINE_NAME;
+    const name = freeName(wanted, displayNames(items));
+    noteRenamed(ctx, wanted, name);
+    const created = await api.fabric.createPipeline(ws, name, definition);
+    f.pipelineId = await createdId(ctx, created, 'DataPipeline', name);
+    ui.ok(`Created pipeline ${name}`);
     f.pipelineName = name;
   } else if (opts.force || f.pipelineModules !== signature) {
     ui.note('This replaces the pipeline definition, including any activities you added to it yourself.');

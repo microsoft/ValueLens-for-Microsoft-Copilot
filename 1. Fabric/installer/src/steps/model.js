@@ -9,7 +9,7 @@ import { HttpError } from '../http.js';
 import { commandLine } from '../launch.js';
 import { buildModel, datasourcePath, loadTemplateModel, PBISM } from '../transform/model.js';
 import { formatDuration } from '../ui.js';
-import { byName, createdId } from './fabric.js';
+import { createdId, displayNames, freeName, noteRenamed } from './fabric.js';
 import { addMonths, SECRET_LIFETIME_MONTHS } from './identity.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
@@ -81,18 +81,12 @@ export async function deployModel(ctx, m, o) {
     delete m.id;
   }
   if (!m.id) {
-    const same = byName(items, m.name);
-    if (same) {
-      const replace = await ui.confirm(`A semantic model called ${m.name} is already in the workspace. Replace it with the Analytics Hub version?`, true);
-      if (!replace) throw new Error(`Stopped: ${m.name} already exists. Rename or remove it, or choose another workspace.`);
-      await api.fabric.updateSemanticModel(ws, same.id, o.definition());
-      m.id = same.id;
-      ui.ok(`Updated semantic model ${m.name}`);
-    } else {
-      const created = await api.fabric.createSemanticModel(ws, m.name, o.definition());
-      m.id = await createdId(ctx, created, 'SemanticModel', m.name);
-      ui.ok(`Created semantic model ${m.name}`);
-    }
+    const name = freeName(m.name, displayNames(items));
+    noteRenamed(ctx, m.name, name);
+    const created = await api.fabric.createSemanticModel(ws, name, o.definition());
+    m.id = await createdId(ctx, created, 'SemanticModel', name);
+    m.name = name;
+    ui.ok(`Created semantic model ${name}`);
     m.bound = false;
   } else if (o.force || m.signature !== o.signature) {
     await api.fabric.updateSemanticModel(ws, m.id, o.definition());

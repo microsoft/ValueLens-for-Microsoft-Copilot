@@ -4,8 +4,9 @@ import { test } from 'node:test';
 import { notebooksFor } from '../src/catalog.js';
 import { emptyConfig } from '../src/config.js';
 import { runCommand } from '../src/install.js';
-import { ensureNotebooks, ensurePipeline, ensureSchedule } from '../src/steps/fabric.js';
+import { ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, freeName } from '../src/steps/fabric.js';
 import { ensureConsent } from '../src/steps/identity.js';
+import { planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
 import { printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
 import { DATA_CHECK_FILE } from '../src/transform/notebook.js';
 import { fakeCtx, fakeFabric, fakeUi } from './fakes.js';
@@ -38,7 +39,7 @@ test('notebooks: first run creates, a re-run changes nothing, update pushes cont
   );
 });
 
-test('notebooks: a deleted one is deployed again; a same-name one is replaced only with consent', async () => {
+test('notebooks: a deleted one is deployed again; one with the same name that is not ours is left alone', async () => {
   const fabric = fakeFabric();
   const { ctx, config } = fakeCtx({ fabric: fabric.api });
   await ensureNotebooks(ctx);
@@ -48,21 +49,99 @@ test('notebooks: a deleted one is deployed again; a same-name one is replaced on
   fabric.calls.length = 0;
   await ensureNotebooks(ctx);
   assert.deepEqual(fabric.calls, ['createNotebook ValueLens_Data_Check']);
+  assert.ok(config.fabric.notebooks.dataCheck);
 
   const other = fakeFabric();
   const theirs = other.add('Notebook', 'Copilot_Audit_Log_Processor', 'theirs');
-  const yes = fakeCtx({ fabric: other.api, ui: fakeUi({ answers: [true] }).ui });
-  await ensureNotebooks(yes.ctx);
-  assert.equal(yes.config.fabric.notebooks.processor, theirs.id);
-  assert.ok(other.calls.includes('updateNotebook Copilot_Audit_Log_Processor'));
+  const ui = fakeUi();
+  const shared = fakeCtx({ fabric: other.api, ui: ui.ui });
+  await ensureNotebooks(shared.ctx);
+  assert.deepEqual(ui.asked, [], 'never asks to replace it');
+  assert.notEqual(shared.config.fabric.notebooks.processor, theirs.id);
+  assert.equal(theirs.content, 'theirs');
+  assert.equal(theirs.displayName, 'Copilot_Audit_Log_Processor');
+  assert.ok(other.calls.includes('createNotebook Copilot_Audit_Log_Processor_2'));
+  assert.ok(!other.calls.some((c) => c.startsWith('updateNotebook')));
+  assert.equal(shared.config.fabric.notebookNames?.processor, 'Copilot_Audit_Log_Processor_2');
+  assert.match(ui.text(), /"Copilot_Audit_Log_Processor" is already in the workspace and isn't from this install/);
 
-  const third = fakeFabric();
-  third.add('Notebook', 'Copilot_Audit_Log_Direct_Ingester', 'theirs');
-  const no = fakeCtx({ fabric: third.api, ui: fakeUi({ answers: [false] }).ui });
-  await assert.rejects(ensureNotebooks(no.ctx), /Stopped: Copilot_Audit_Log_Direct_Ingester already exists/);
-  assert.equal(third.calls.length, 0);
-  assert.equal(no.config.fabric.notebooks.auditIngester, undefined);
-  assert.ok(config.fabric.notebooks.dataCheck);
+  other.calls.length = 0;
+  await ensureNotebooks(shared.ctx, { force: true });
+  assert.ok(other.calls.includes('updateNotebook Copilot_Audit_Log_Processor_2'));
+  assert.ok(!other.calls.includes('updateNotebook Copilot_Audit_Log_Processor'));
+});
+
+test('freeName: numbers a clash, with a space for names that have spaces', () => {
+  assert.equal(freeName('ValueLens', []), 'ValueLens');
+  assert.equal(freeName('ValueLens', ['valuelens']), 'ValueLens_2');
+  assert.equal(freeName('ValueLens', ['ValueLens', 'ValueLens_2']), 'ValueLens_3');
+  assert.equal(freeName('ValueLens Model', ['ValueLens Model']), 'ValueLens Model 2');
+});
+
+test('plan: a new Lakehouse needs a name no Lakehouse in the workspace has', () => {
+  const check = validateNewLakehouseName(['ValueLens']);
+  assert.match(String(check(' valuelens ')), /already a Lakehouse called valuelens here\. Analytics Hub only writes to a Lakehouse it creates/);
+  assert.equal(check('ValueLens_2'), true);
+  assert.match(String(check('2bad')), /Start with a letter/);
+});
+
+test('plan: new items get names nothing in the workspace has; a name someone chose stays', async () => {
+  const fabric = fakeFabric();
+  fabric.add('Notebook', 'Copilot_Audit_Log_Processor', null);
+  fabric.add('DataPipeline', 'ValueLens_Pipeline', null);
+  fabric.add('SemanticModel', 'ValueLens Model', null);
+  const ui = fakeUi();
+  const { ctx, config } = fakeCtx({ fabric: fabric.api, ui: ui.ui });
+  config.semanticModel.enabled = true;
+
+  await reserveNames(ctx);
+  assert.equal(fabric.calls.length, 0, 'planning changes nothing');
+  assert.equal(config.fabric.notebookNames?.processor, 'Copilot_Audit_Log_Processor_2');
+  assert.equal(config.fabric.notebookNames?.dataCheck, 'ValueLens_Data_Check');
+  assert.equal(config.fabric.pipelineName, 'ValueLens_Pipeline_2');
+  assert.equal(config.semanticModel.name, 'ValueLens Model 2');
+  assert.match(ui.text(), /already has "Copilot_Audit_Log_Processor", "ValueLens_Pipeline", "ValueLens Model", not from this install/);
+  const review = planReview(ctx);
+  assert.match(String(review.creates.find((i) => i.kind === 'Notebooks')?.detail), /Copilot_Audit_Log_Processor_2/);
+  assert.equal(review.creates.find((i) => i.kind === 'Pipeline')?.name, 'ValueLens_Pipeline_2');
+
+  fabric.items.length = 0;
+  config.semanticModel.name = 'Contoso Model';
+  await reserveNames(ctx);
+  assert.equal(config.fabric.notebookNames?.processor, 'Copilot_Audit_Log_Processor', 'back to the usual name once it is free');
+  assert.equal(config.fabric.pipelineName, 'ValueLens_Pipeline');
+  assert.equal(config.semanticModel.name, 'Contoso Model');
+
+  await ensureNotebooks(ctx);
+  assert.ok(fabric.calls.includes('createNotebook Copilot_Audit_Log_Processor'));
+});
+
+test('lakehouse: never writes to one it did not create', async () => {
+  const fabric = fakeFabric();
+  const theirs = fabric.add('Lakehouse', 'ValueLens', null);
+  const ui = fakeUi();
+  const { ctx, config } = fakeCtx({ fabric: fabric.api, ui: ui.ui });
+  delete config.fabric.lakehouseId;
+  await ensureLakehouse(ctx);
+  assert.deepEqual(fabric.calls, ['createLakehouse ValueLens_2']);
+  assert.notEqual(config.fabric.lakehouseId, theirs.id);
+  assert.equal(config.fabric.lakehouseName, 'ValueLens_2');
+  assert.match(ui.text(), /"ValueLens" is already in the workspace/);
+});
+
+test('pipeline: one with the same name that is not ours is left alone', async () => {
+  const fabric = fakeFabric();
+  const theirs = fabric.add('DataPipeline', 'ValueLens_Pipeline', 'theirs');
+  const ui = fakeUi();
+  const { ctx, config } = fakeCtx({ fabric: fabric.api, ui: ui.ui });
+  await ensureNotebooks(ctx);
+  fabric.calls.length = 0;
+  await ensurePipeline(ctx);
+  assert.deepEqual(ui.asked, []);
+  assert.deepEqual(fabric.calls, ['createPipeline ValueLens_Pipeline_2']);
+  assert.equal(theirs.content, 'theirs');
+  assert.notEqual(config.fabric.pipelineId, theirs.id);
+  assert.equal(config.fabric.pipelineName, 'ValueLens_Pipeline_2');
 });
 
 test('pipeline: created once, left alone on re-run, updated when modules change', async () => {
@@ -90,6 +169,23 @@ test('pipeline: created once, left alone on re-run, updated when modules change'
   assert.deepEqual(fabric.calls, ['updatePipeline ValueLens_Pipeline']);
   assert.equal(config.fabric.pipelineModules, 'core,m365Activity');
   assert.match(ui.text(), /replaces the pipeline definition/);
+});
+
+test('pipeline: rewritten when a deleted notebook comes back with a new ID', async () => {
+  const fabric = fakeFabric();
+  const ui = fakeUi();
+  const { ctx, config } = fakeCtx({ fabric: fabric.api, ui: ui.ui });
+  await ensureNotebooks(ctx);
+  await ensurePipeline(ctx);
+  const old = /** @type {string} */ (config.fabric.notebooks.processor);
+  fabric.items.splice(fabric.items.findIndex((i) => i.id === old), 1);
+
+  await ensureNotebooks(ctx);
+  assert.notEqual(config.fabric.notebooks.processor, old);
+  fabric.calls.length = 0;
+  await ensurePipeline(ctx);
+  assert.deepEqual(fabric.calls, ['updatePipeline ValueLens_Pipeline']);
+  assert.equal(config.fabric.pipelineModules, 'core,orgData,m365Activity');
 });
 
 test('pipeline: declining an update keeps the old module signature', async () => {

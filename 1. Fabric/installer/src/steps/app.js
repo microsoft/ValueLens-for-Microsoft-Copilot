@@ -5,10 +5,10 @@
  * installer download ships the app already built instead; that copy only needs deploying.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { HttpError } from '../http.js';
-import { agentEvaluatorModelDeployed, consumptionModelDeployed } from './fabric.js';
+import { agentEvaluatorModelDeployed, consumptionModelDeployed, createdId, displayNames, freeName, noteRenamed } from './fabric.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
@@ -86,14 +86,98 @@ export function yamlValue(text, key) {
 }
 
 /**
- * The deployment rayfin recorded for a workspace.
+ * The deployment rayfin recorded for a workspace: the active one when it is there, as rayfin
+ * just wrote it.
  * @param {any} deployments  Parsed `rayfin/.deployments.json`.
  * @param {string} workspaceId
  */
 export function findDeployment(deployments, workspaceId) {
   const all = Object.entries(deployments?.deployments ?? {});
-  const hit = all.find(([, d]) => String(/** @type {any} */ (d).fabricWorkspaceId).toLowerCase() === workspaceId.toLowerCase());
+  const inWorkspace = (/** @type {any} */ d) => String(d?.fabricWorkspaceId).toLowerCase() === workspaceId.toLowerCase();
+  const hit = all.find(([key, d]) => key === deployments?.active && inWorkspace(d)) ?? all.find(([, d]) => inWorkspace(d));
   return hit ? { key: hit[0], ...(/** @type {any} */ (hit[1])) } : undefined;
+}
+
+/**
+ * Rayfin's registry key for a workspace name (its `sanitizeWorkspaceName`).
+ * @param {string} name
+ */
+export const deploymentKey = (name) =>
+  name
+    .slice(0, 200)
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+/**
+ * The app's project id (rayfin's default item name) and display name, from `rayfin.yml`.
+ * @param {string | undefined} dir
+ */
+export function appIdentity(dir) {
+  const rayfinYml = dir ? readText(join(dir, 'rayfin', 'rayfin.yml')) : null;
+  return { id: yamlValue(rayfinYml, 'id') ?? 'valuelens', name: yamlValue(rayfinYml, 'name') ?? 'Analytics Hub' };
+}
+
+/**
+ * An app in the workspace that rayfin would take over: one named like the project or the app.
+ * @param {any[]} apps  AppBackend items.
+ * @param {{ id: string, name: string }} identity
+ */
+export const clashingApp = (apps, identity) =>
+  apps.find((a) => [identity.id, identity.name].some((n) => n.toLowerCase() === String(a.displayName).toLowerCase()));
+
+/**
+ * Points rayfin at this install's app item before `rayfin up`. Rayfin reuses any app item named
+ * like the project, so when nothing is recorded this creates the install's own item under a free
+ * name and records it first. A deploy that fails part way then still leaves it recorded.
+ * @param {Ctx} ctx
+ * @param {string} dir
+ * @param {string} ws
+ */
+async function claimAppItem(ctx, dir, ws) {
+  const { ui, config, api } = ctx;
+  const fa = config.fabricApp;
+  const file = join(dir, 'rayfin', '.deployments.json');
+  const registry = readJson(file) ?? {};
+  registry.deployments ??= {};
+  const save = () => {
+    mkdirSync(join(dir, 'rayfin'), { recursive: true });
+    writeFileSync(file, `${JSON.stringify(registry, null, 2)}\n`, 'utf8');
+  };
+  /** @param {string} id */
+  const exists = (id) => api.fabric.getItem(ws, id).then(
+    () => true,
+    (err) => (err instanceof HttpError && err.status === 404 ? false : Promise.reject(err)),
+  );
+  /** @param {string} id */
+  const record = (id) => {
+    const key = deploymentKey(config.fabric.workspaceName ?? '') || ws;
+    registry.deployments[key] = { fabricItemId: id, fabricWorkspaceId: ws, fabricTenantId: ctx.user.tenantId };
+    registry.active = key;
+    save();
+  };
+
+  const recorded = findDeployment(registry, ws);
+  if (fa.itemId && (await exists(fa.itemId))) {
+    if (recorded?.fabricItemId !== fa.itemId) record(fa.itemId);
+    return;
+  }
+  if (recorded?.fabricItemId) {
+    if (await exists(recorded.fabricItemId)) return;
+    delete registry.deployments[recorded.key];
+    if (registry.active === recorded.key) delete registry.active;
+    save();
+  }
+
+  const identity = appIdentity(dir);
+  const apps = await api.fabric.listItems(ws, 'AppBackend');
+  const name = freeName(identity.name, displayNames(apps));
+  const created = await api.fabric.createItem(ws, 'AppBackend', name);
+  record(await createdId(ctx, created, 'AppBackend', name));
+  const clash = clashingApp(apps, identity);
+  if (clash) noteRenamed(ctx, clash.displayName, name);
 }
 
 /**
@@ -356,6 +440,7 @@ export function fabricConfigFile(config, ws, models) {
  */
 async function rayfinUp(ctx, dir, ws) {
   const run = ctx.runner ?? defaultRunner;
+  await claimAppItem(ctx, dir, ws);
   const res = await run(process.execPath, [join(dir, RAYFIN_CLI), 'up', '--tenant', ctx.user.tenantId, '--workspace-id', ws, '--yes'], { cwd: dir, inherit: true });
   if (res.code) throw new Error('"rayfin up" failed. Its output is above.');
   const record = findDeployment(readJson(join(dir, 'rayfin', '.deployments.json')), ws);

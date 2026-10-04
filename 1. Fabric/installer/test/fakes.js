@@ -158,6 +158,17 @@ export function fakeFabric() {
       find(id).displayName = name;
       return null;
     },
+    /** @param {string} _ws @param {string} name */
+    createLakehouse: async (_ws, name) => {
+      calls.push(`createLakehouse ${name}`);
+      return { id: add('Lakehouse', name, null).id };
+    },
+    /** @param {string} _ws @param {string} type @param {string} name */
+    createItem: async (_ws, type, name) => {
+      calls.push(`createItem ${type} ${name}`);
+      const item = add(type, name, null);
+      return { id: item.id, type, displayName: name };
+    },
     /** @param {string} _ws @param {string} name @param {any} def */
     createSemanticModel: async (_ws, name, def) => {
       calls.push(`createSemanticModel ${name}`);

@@ -44,6 +44,10 @@ The Graph permissions are listed in [`/docs/PERMISSIONS.md`](../../docs/PERMISSI
 It keeps your answers in `Documents\Analytics Hub`. Keep that folder. To run the pipeline, check
 status, update, or repair the set-up later, open the exe again.
 
+**Using a workspace that already has things in it?** The installer never changes anything it
+didn't create. If one of its names is taken, its own item gets the next free name, such as
+`ValueLens_2` or `Analytics Hub 2`. The plan shows the names before you approve it.
+
 ## After it finishes
 
 - **Admin consent.** If you couldn't grant it, send the link the installer gives you to an admin.

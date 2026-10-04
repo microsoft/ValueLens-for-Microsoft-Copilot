@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { emptyConfig } from '../src/config.js';
-import { DATA_CLI, deployApp, ensureAppName, ensureFabricApp, FABRIC_CONFIG, fabricConfigFile, findDeployment, nodeVersionOk, PREBUILT_MARKER, PREBUILT_STATIC, profileName, RAYFIN_CLI, yamlValue } from '../src/steps/app.js';
+import { DATA_CLI, deployApp, deploymentKey, ensureAppName, ensureFabricApp, FABRIC_CONFIG, fabricConfigFile, findDeployment, nodeVersionOk, PREBUILT_MARKER, PREBUILT_STATIC, profileName, RAYFIN_CLI, yamlValue } from '../src/steps/app.js';
 import { CONNECTION_SECRET_NAME, connectionName, ensureModelConnection, ensureSemanticModel, refreshModel, rotateModelSecret } from '../src/steps/model.js';
 import { blockedSettings } from '../src/steps/plan.js';
 import { fakeCtx, fakeFabric, fakeGraph, fakePowerBi, fakeUi, httpError, realSources } from './fakes.js';
@@ -53,18 +53,18 @@ test('semantic model: created from the template, left alone on re-run, updated w
   assert.equal(t.fabric.calls.length, 3);
 });
 
-test('semantic model: waits for the SQL endpoint; a same-name model is replaced only with consent', async () => {
-  const t = setup({ answers: [true] });
+test('semantic model: waits for the SQL endpoint; a same-name model that is not ours is left alone', async () => {
+  const t = setup();
   t.fabric.sqlStates.push({ provisioningStatus: 'InProgress' }, { connectionString: null });
-  const existing = t.fabric.add('SemanticModel', 'ValueLens Model', null);
+  const existing = t.fabric.add('SemanticModel', 'ValueLens Model', 'theirs');
   await ensureSemanticModel(t.ctx);
   assert.equal(t.sleeps.length, 2);
-  assert.equal(t.config.semanticModel.id, existing.id);
-  assert.deepEqual(t.fabric.calls, ['updateSemanticModel ValueLens Model']);
-
-  const declined = setup({ answers: [false] });
-  declined.fabric.add('SemanticModel', 'ValueLens Model', null);
-  await assert.rejects(ensureSemanticModel(declined.ctx), /already exists/);
+  assert.deepEqual(t.ui.asked, [], 'never asks to replace it');
+  assert.notEqual(t.config.semanticModel.id, existing.id);
+  assert.equal(t.config.semanticModel.name, 'ValueLens Model 2');
+  assert.deepEqual(t.fabric.calls, ['createSemanticModel ValueLens Model 2']);
+  assert.equal(existing.content, 'theirs');
+  assert.match(t.ui.text(), /"ValueLens Model" is already in the workspace/);
 
   const failed = setup();
   failed.fabric.sqlStates.push({ provisioningStatus: 'Failed' });
@@ -261,10 +261,13 @@ function appSetup(o = {}) {
     if (args[1] === 'up') {
       writeFileSync(join(dir, 'rayfin', '.env'), 'CUSTOMER=1\n');
       if (o.upFails) return { code: 1, output: '' };
-      const item = t.fabric.add('AppBackend', 'valuelens', null);
       const now = existsSync(deploymentsFile) ? JSON.parse(readFileSync(deploymentsFile, 'utf8')) : { deployments: {} };
-      now.deployments['valuelens-ws'] = { fabricWorkspaceId: 'ws-1', fabricItemId: item.id, fabricDeepLink: `https://app.fabric.microsoft.com/groups/ws-1/appbackends/${item.id}`, deployedAt: '2026-06-01T12:00:00Z' };
-      now.active = 'valuelens-ws';
+      // Like rayfin: deploy to the item recorded for the workspace, or make one named like the project.
+      const recorded = findDeployment(now, 'ws-1');
+      const id = recorded?.fabricItemId ?? t.fabric.add('AppBackend', 'valuelens', null).id;
+      const key = recorded?.key ?? 'valuelens-ws';
+      now.deployments[key] = { ...now.deployments[key], fabricWorkspaceId: 'ws-1', fabricItemId: id, fabricDeepLink: `https://app.fabric.microsoft.com/groups/ws-1/appbackends/${id}`, deployedAt: '2026-06-01T12:00:00Z' };
+      now.active = key;
       writeFileSync(deploymentsFile, JSON.stringify(now));
     }
     return { code: 0, output: '' };
@@ -275,7 +278,7 @@ function appSetup(o = {}) {
   return { ...t, dir, runs, deploymentsFile, cleanup };
 }
 
-test('app: deployed to the customer workspace, renamed, and a developer checkout put back as it was', async () => {
+test('app: deployed to the customer workspace under the app name, and a developer checkout put back as it was', async () => {
   const t = appSetup();
   try {
     await deployApp(t.ctx);
@@ -290,7 +293,9 @@ test('app: deployed to the customer workspace, renamed, and a developer checkout
     assert.equal(fa.name, 'Analytics Hub');
     assert.match(String(fa.url), /appbackends\//);
     assert.equal(fa.profile, 'valuelens-ws-1');
-    assert.ok(t.fabric.calls.some((c) => c === 'renameItem valuelens -> Analytics Hub'));
+    assert.ok(t.fabric.calls.includes('createItem AppBackend Analytics Hub'));
+    assert.ok(!t.fabric.calls.some((c) => c.startsWith('renameItem')));
+    assert.deepEqual(t.fabric.items.filter((i) => i.type === 'AppBackend').map((i) => i.id), [fa.itemId]);
     assert.equal(JSON.parse(readFileSync(t.deploymentsFile, 'utf8')).active, 'team');
     assert.equal(readFileSync(join(t.dir, 'rayfin', '.env'), 'utf8'), 'TEAM=1\n');
     assert.equal(yamlValue(readFileSync(join(t.dir, 'fabric.yaml'), 'utf8'), 'activeProfile'), 'msit');
@@ -323,13 +328,64 @@ test('app: an app already deployed is left alone unless asked; a deleted one is 
     assert.ok(!t.fabric.calls.some((c) => c.startsWith('renameItem')));
     assert.match(t.ui.text(), /App Analytics Hub is in place/);
 
-    t.config.fabricApp.itemId = 'gone';
+    t.fabric.items.splice(t.fabric.items.indexOf(item), 1);
     await ensureFabricApp(t.ctx);
     assert.equal(t.runs.length, 4);
-    assert.notEqual(t.config.fabricApp.itemId, 'gone');
+    assert.notEqual(t.config.fabricApp.itemId, item.id);
   } finally {
     t.cleanup();
   }
+});
+
+test('app: an app in the workspace that is not from this install is never taken over', async () => {
+  const t = appSetup();
+  try {
+    const theirs = t.fabric.add('AppBackend', 'valuelens', null);
+    t.config.fabric.workspaceName = 'Team_A  Workspace!';
+    const runner = /** @type {import('../src/steps/app.js').Runner} */ (t.ctx.runner);
+    /** @type {any} */
+    let seen;
+    t.ctx.runner = async (command, args, opts) => {
+      if (args[1] !== 'up') return runner(command, args, opts);
+      seen = JSON.parse(readFileSync(t.deploymentsFile, 'utf8'));
+      // Rayfin deploys to the item recorded for the workspace.
+      const record = findDeployment(seen, 'ws-1');
+      seen.deployments[record.key] = { ...record, fabricDeepLink: `https://app.fabric.microsoft.com/groups/ws-1/appbackends/${record.fabricItemId}` };
+      delete seen.deployments[record.key].key;
+      writeFileSync(t.deploymentsFile, JSON.stringify(seen));
+      return { code: 0, output: '' };
+    };
+    await deployApp(t.ctx);
+    assert.ok(t.fabric.calls.includes('createItem AppBackend Analytics Hub'));
+    assert.ok(!t.fabric.calls.some((c) => c.startsWith('renameItem')), 'their app keeps its name');
+    const ours = t.fabric.items.find((i) => i.type === 'AppBackend' && i.displayName === 'Analytics Hub');
+    assert.equal(seen.active, 'team-a-workspace');
+    assert.equal(seen.deployments['team-a-workspace'].fabricItemId, ours?.id);
+    assert.equal(seen.deployments['team-a-workspace'].fabricTenantId, 'tenant-1');
+    assert.equal(seen.deployments.team.fabricItemId, 'team-app', 'other deployments are kept');
+    assert.equal(t.config.fabricApp.itemId, ours?.id);
+    assert.equal(t.config.fabricApp.name, 'Analytics Hub');
+    assert.notEqual(t.config.fabricApp.itemId, theirs.id);
+    assert.match(t.ui.text(), /"valuelens" is already in the workspace and isn't from this install/);
+
+    t.fabric.add('AppBackend', 'Analytics Hub', null);
+    t.fabric.calls.length = 0;
+    t.config.fabricApp.itemId = undefined;
+    writeFileSync(t.deploymentsFile, JSON.stringify({ deployments: {} }));
+    await deployApp(t.ctx);
+    assert.ok(t.fabric.calls.includes('createItem AppBackend Analytics Hub 2'));
+    assert.equal(t.config.fabricApp.name, 'Analytics Hub 2');
+  } finally {
+    t.cleanup();
+  }
+});
+
+test('app: findDeployment prefers the active deployment for the workspace', () => {
+  const reg = { active: 'b', deployments: { a: { fabricWorkspaceId: 'WS-1', fabricItemId: 'x' }, b: { fabricWorkspaceId: 'ws-1', fabricItemId: 'y' } } };
+  assert.equal(findDeployment(reg, 'ws-1')?.fabricItemId, 'y');
+  assert.equal(findDeployment({ ...reg, active: 'c' }, 'ws-1')?.fabricItemId, 'x');
+  assert.equal(findDeployment(reg, 'ws-2'), undefined);
+  assert.equal(deploymentKey("Keith's  Team_Space (Prod)"), 'keiths-team-space-prod');
 });
 
 test('app: one still called AI in One 2.0 takes the new name without a rebuild; a name the customer chose stays', async () => {
@@ -405,7 +461,7 @@ test('app: needs the model and the app source', async () => {
  * @param {{ upFails?: boolean }} [o]
  */
 function prebuiltSetup(o = {}) {
-  const t = appSetup({ upFails: o.upFails });
+  const t = appSetup(o);
   rmSync(join(t.dir, 'fabric.yaml'));
   rmSync(t.deploymentsFile);
   rmSync(join(t.dir, 'rayfin', '.env'));
@@ -464,12 +520,35 @@ test('app: a newer installer updates the app the last one deployed rather than a
   }
 });
 
+test('app: a first deploy that fails part way keeps the app item it made, so the next run reuses it', async () => {
+  const o = { upFails: true };
+  const t = prebuiltSetup(o);
+  try {
+    await assert.rejects(deployApp(t.ctx), /rayfin up" failed/);
+    const made = t.fabric.items.filter((i) => i.type === 'AppBackend');
+    assert.deepEqual(made.map((i) => i.displayName), ['Analytics Hub']);
+    assert.equal(findDeployment(t.config.fabricApp.rayfin?.deployments, 'ws-1')?.fabricItemId, made[0].id);
+
+    o.upFails = false;
+    t.fresh();
+    t.fabric.calls.length = 0;
+    await deployApp(t.ctx);
+    assert.ok(!t.fabric.calls.some((c) => c.startsWith('createItem')), 'no second app');
+    assert.equal(t.config.fabricApp.itemId, made[0].id);
+    assert.equal(t.fabric.items.filter((i) => i.type === 'AppBackend').length, 1);
+  } finally {
+    t.cleanup();
+  }
+});
+
 test('app: a prebuilt deploy that fails keeps what Rayfin recorded, and needs its deploy tools', async () => {
   const t = prebuiltSetup({ upFails: true });
   try {
-    t.config.fabricApp.rayfin = { deployments: { active: 'x', deployments: { x: { fabricWorkspaceId: 'ws-1', fabricItemId: 'half-made' } } } };
+    const half = t.fabric.add('AppBackend', 'valuelens', null);
+    t.config.fabricApp.rayfin = { deployments: { active: 'x', deployments: { x: { fabricWorkspaceId: 'ws-1', fabricItemId: half.id } } } };
     await assert.rejects(deployApp(t.ctx), /rayfin up" failed/);
-    assert.equal(t.config.fabricApp.rayfin?.deployments.deployments.x.fabricItemId, 'half-made');
+    assert.equal(t.config.fabricApp.rayfin?.deployments.deployments.x.fabricItemId, half.id);
+    assert.ok(!t.fabric.calls.some((c) => c.startsWith('createItem')), 'the half-made app is ours, so it is reused');
     assert.equal(t.config.fabricApp.rayfin?.env, 'CUSTOMER=1\n');
     assert.equal(t.config.fabricApp.itemId, undefined);
 
