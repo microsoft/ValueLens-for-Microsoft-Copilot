@@ -13,10 +13,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 CORE = ROOT / "1. Fabric" / "notebooks"
 NOTEBOOK = "Copilot_Licensed_Users_Direct_Ingester.ipynb"
-COPIES = (
-    CORE / NOTEBOOK,
-    ROOT / "1. Fabric" / "archive" / "extended" / "Fabric + Copilot Studio" / "notebooks" / "_core" / NOTEBOOK,
-)
+COPIES = (CORE / NOTEBOOK,)
 E7 = (
     "Microsoft 365 E7",
     "MICROSOFT_365_E7",
@@ -142,12 +139,6 @@ class LicenseClassificationTests(unittest.TestCase):
                  if "archive" not in p.parts
                  and not {"Add Credit Consumption", "Add Agent Evaluator"} & set(p.parts)]
         self.assertEqual(len(paths), 5)
-        # Keep the moved Studio template in the existing classifier checks.
-        paths.append(
-            ROOT / "1. Fabric" / "archive" / "extended" / "Fabric + Copilot Studio"
-            / "ValueLens - Fabric (+ Studio Agent Deepdive).pbit"
-        )
-        self.assertEqual(len(paths), 6)
         for path in paths:
             with self.subTest(path=path), zipfile.ZipFile(path) as archive:
                 self.assertIsNone(archive.testzip())

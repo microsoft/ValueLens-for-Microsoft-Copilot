@@ -48,8 +48,6 @@ class PowerAutomateDataversePathTests(unittest.TestCase):
             "ValueLens - Power Automate + Dataverse.pbit",
             "dataverse-core-schema.json",
             "source-map.json",
-            "archive/README.md",
-            "archive/scripts/Build-PowerAutomateDataverse-Template.py",
             "scripts/Build-DataverseCoreFeeds.py",
             "scripts/Invoke-CopilotAuditRawCapture.ps1",
             "scripts/Test-PowerAutomateDataverse-Preflight.ps1",

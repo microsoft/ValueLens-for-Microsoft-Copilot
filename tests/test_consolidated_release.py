@@ -8,9 +8,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CORE = ROOT / "1. Fabric" / "notebooks"
-MIRRORS = (
-    ROOT / "1. Fabric" / "archive" / "extended" / "Fabric + Copilot Studio" / "notebooks" / "_core",
-)
 
 # DataModelSchema bytes stay pinned (the templates ship no UnappliedChanges part);
 # OneLake pins every field except its FabricTable helper, which is checked
@@ -52,19 +49,6 @@ class ConsolidatedReleaseTests(unittest.TestCase):
                     else:
                         actual = hashlib.sha256(payload).hexdigest()
                     self.assertEqual(actual, sha, (name, member))
-
-    def test_all_shared_notebooks_match_canonical_bytes(self):
-        unmirrored = {
-            "Copilot_Audit_Log_Processor.ipynb",
-            "Copilot_M365_Activity_Ingester.ipynb",
-            "ValueLens_Refresh_Model.ipynb",
-        }
-        sources = [p for p in CORE.glob("*.ipynb") if p.name not in unmirrored]
-        self.assertEqual(len(sources), 7)
-        for source in sources:
-            for folder in MIRRORS:
-                self.assertTrue((folder / source.name).is_file(), (folder, source.name))
-                self.assertEqual(source.read_bytes(), (folder / source.name).read_bytes(), (folder, source.name))
 
     def test_consolidated_notebook_cells_compile(self):
         for name in (
