@@ -5,40 +5,20 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { createRoot } from 'react-dom/client';
-import { ErrorBoundary } from "react-error-boundary";
-import { useCssTheme } from "@microsoft/fabric-visuals";
-
-import App from './App.tsx';
-import { ErrorFallback } from './ErrorFallback';
-import { useAppTheme } from './hooks/use-theme';
-import { ThemeContext } from './hooks/theme.context';
-import { AuthProvider } from './hooks/use-auth';
-import { bootstrapAuth } from './services/rayfin-auth.service';
-import { AuthGate } from './components/auth-gate.component';
 import { reloadOnStaleBuild } from './lib/reload-on-stale-build';
+import { loadRuntimeConfig } from './lib/runtime-config';
 
 import "./global.css"
 
 reloadOnStaleBuild();
 
-const rayfinAuthService = bootstrapAuth();
+const container = document.getElementById('root')!;
 
-function Root() {
-    const { isDark, toggleTheme } = useAppTheme();
-    const theme = useCssTheme();
-
-    return (
-        <ThemeContext.Provider value={{ isDark, toggleTheme, theme }}>
-            <ErrorBoundary FallbackComponent={ErrorFallback}>
-                <AuthProvider rayfinAuthService={rayfinAuthService}>
-                    <AuthGate>
-                        <App />
-                    </AuthGate>
-                </AuthProvider>
-            </ErrorBoundary>
-        </ThemeContext.Provider>
-    );
-}
-
-createRoot(document.getElementById('root')!).render(<Root />)
+// The app's modules read the config as they load, so they're only imported once it has settled.
+loadRuntimeConfig()
+    .then(() => import('./root'))
+    .then(({ mountApp }) => mountApp(container))
+    .catch((error: unknown) => {
+        console.error(error);
+        container.textContent = "Analytics Hub couldn't start. Refresh the page to try again.";
+    });

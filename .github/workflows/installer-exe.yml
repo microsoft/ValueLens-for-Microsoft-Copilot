@@ -1,0 +1,100 @@
+name: installer-exe
+
+# Builds AnalyticsHubInstaller.exe, the download that runs the Fabric installer without a clone
+# of this repo or a terminal. A tag such as installer-v0.1.0 also drafts a release with it, to
+# publish by hand.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['installer-v*']
+  pull_request:
+    paths:
+      - '1. Fabric/installer/packaging/**'
+      - '.github/workflows/installer-exe.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the installer exe
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Check the tag matches the installer's version
+        if: startsWith(github.ref, 'refs/tags/installer-v')
+        working-directory: '1. Fabric/installer'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($env:TAG -ne "installer-v$version") { throw "Tag $env:TAG doesn't match the installer's version $version." }
+
+      # The lock files may resolve through Microsoft's internal mirror of npm, which runners can't reach.
+      - name: Use the public npm registry
+        working-directory: '1. Fabric/installer'
+        run: node packaging/public-registry.js "../Fabric App/package-lock.json" package-lock.json
+
+      - name: Install the app's dependencies
+        working-directory: '1. Fabric/Fabric App'
+        run: npm ci --no-audit --no-fund
+
+      - name: Install the installer's dependencies
+        working-directory: '1. Fabric/installer'
+        run: npm ci --no-audit --no-fund
+
+      - name: Test the installer
+        working-directory: '1. Fabric/installer'
+        run: npm test
+
+      - name: Type-check the installer
+        working-directory: '1. Fabric/installer'
+        run: npm run typecheck
+
+      - name: Build the exe
+        working-directory: '1. Fabric/installer'
+        run: npm run build:exe -- --release --out "${{ runner.temp }}\exe"
+
+      - name: Smoke-test the exe
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP 'exe\AnalyticsHubInstaller.exe'
+          & $exe --version
+          if ($LASTEXITCODE) { throw "--version failed with exit code $LASTEXITCODE." }
+          $preview = Join-Path $env:RUNNER_TEMP 'preview'
+          & $exe preview --config (Join-Path $env:RUNNER_TEMP 'smoke.json') --out $preview
+          if ($LASTEXITCODE) { throw "preview failed with exit code $LASTEXITCODE." }
+          if (-not (Test-Path (Join-Path $preview 'model.bim'))) { throw 'preview wrote no model.bim.' }
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: AnalyticsHubInstaller
+          path: |
+            ${{ runner.temp }}\exe\AnalyticsHubInstaller.exe
+            ${{ runner.temp }}\exe\AnalyticsHubInstaller.exe.sha256
+          if-no-files-found: error
+
+  release:
+    name: Draft the release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/installer-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: AnalyticsHubInstaller
+      - name: Draft the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" AnalyticsHubInstaller.exe AnalyticsHubInstaller.exe.sha256 \
+            --repo "$GITHUB_REPOSITORY" --draft --generate-notes \
+            --title "Analytics Hub installer ${TAG#installer-v}"

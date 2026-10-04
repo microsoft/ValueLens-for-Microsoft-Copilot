@@ -6,6 +6,7 @@
 import { MODULES, OPTIONAL_MODULES } from './catalog.js';
 import { loadConfig } from './config.js';
 import { connect as realConnect, createCtx, runCommand } from './install.js';
+import { fromExe } from './launch.js';
 import { loadSources } from './sources.js';
 import { describeSchedule, modelDeployed } from './steps/fabric.js';
 
@@ -90,6 +91,7 @@ export function createSession(o) {
     }
     return {
       version: o.version,
+      exe: fromExe(),
       configFile: o.configFile,
       record,
       recordError,

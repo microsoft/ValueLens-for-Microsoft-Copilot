@@ -6,6 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { RayfinClient } from "@microsoft/rayfin-client";
+import { runtimeConfig } from "@/lib/runtime-config";
 import type { ValueLensSchema } from "../../rayfin/data/schema";
 
 let _client: RayfinClient<ValueLensSchema> | undefined;
@@ -15,8 +16,8 @@ let _client: RayfinClient<ValueLensSchema> | undefined;
  */
 export function getRayfinClient(): RayfinClient<ValueLensSchema> {
     if (!_client) {
-        const apiUrl = import.meta.env.VITE_RAYFIN_API_URL;
-        const publishableKey = import.meta.env.VITE_RAYFIN_PUBLISHABLE_KEY;
+        const { rayfin } = runtimeConfig();
+        const { apiUrl, publishableKey } = rayfin;
 
         if (!apiUrl || !publishableKey) {
             throw new Error(`Missing required env vars for creating rayfin client - run 'npx rayfin up'`);
@@ -27,6 +28,7 @@ export function getRayfinClient(): RayfinClient<ValueLensSchema> {
             publishableKey,
             authStorage: true,
             useProxy: false,
+            runtimeConfig: rayfin,
         });
     }
 

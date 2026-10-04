@@ -15,6 +15,7 @@ import { powerBiApi } from './clients/powerbi.js';
 import { POWER_PLATFORM_URL, powerPlatformApi } from './clients/powerplatform.js';
 import { saveConfig } from './config.js';
 import { createClient, defaultSleep } from './http.js';
+import { commandLine } from './launch.js';
 import { ensureConsent, ensureApp, ensureKeyVault, newSecret } from './steps/identity.js';
 import { agentEvaluatorModelWanted, agentEvaluatorSummary, ensureAgentEvaluatorModel, ensureTranscriptAccess } from './steps/agent-evaluator.js';
 import { deployApp, ensureAppName, ensureFabricApp } from './steps/app.js';
@@ -197,9 +198,9 @@ export async function install(ctx, opts) {
   if (ctx.runFirstLoad) {
     step('First load');
     if (!consented) {
-      ui.warn(`Skipped until admin consent is granted. Then run: valuelens-install run --backfill-days ${config.history.days}`);
+      ui.warn(`Skipped until admin consent is granted. Then run: ${commandLine(`run --backfill-days ${config.history.days}`)}`);
     } else if (!vaultReachable) {
-      ui.warn(`Skipped until the private endpoint to ${config.keyVault.name} is approved. Then run: valuelens-install run --backfill-days ${config.history.days}`);
+      ui.warn(`Skipped until the private endpoint to ${config.keyVault.name} is approved. Then run: ${commandLine(`run --backfill-days ${config.history.days}`)}`);
     } else {
       if (modelDeployed(config)) ui.note(`The pipeline refreshes ${joinNames(deployedModels(config).map((m) => m.name))} as its last step.`);
       const result = await runPipeline(ctx, { backfillDays: config.history.days, wait: opts.wait, first: true });
@@ -278,7 +279,7 @@ async function tryDeployApp(ctx, opts = {}) {
     await (opts.force ? deployApp(ctx) : ensureFabricApp(ctx));
   } catch (err) {
     ctx.ui.fail(`The app wasn't deployed: ${/** @type {Error} */ (err).message}`);
-    ctx.ui.info('Fix the problem, then run "valuelens-install deploy-app".');
+    ctx.ui.info(`Fix the problem, then run "${commandLine('deploy-app')}".`);
   }
 }
 

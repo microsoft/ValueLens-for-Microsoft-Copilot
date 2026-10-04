@@ -5,11 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { permissionsFor } from '../src/catalog.js';
-import { parseCli } from '../src/cli.js';
+import { help, parseCli } from '../src/cli.js';
 import { allowsAction, armLocation, parseResourceId, validateVaultName } from '../src/clients/azure.js';
 import { notebookDefinition, notebookJobParameters, scheduleBody } from '../src/clients/fabric.js';
 import { resolveAppRoles } from '../src/clients/graph.js';
 import { emptyConfig, loadConfig, saveConfig } from '../src/config.js';
+import { commandLine, EXE_ENV, fromExe, installerWindow } from '../src/launch.js';
 import { describeSchedule, sameSchedule } from '../src/steps/fabric.js';
 import { addMonths } from '../src/steps/identity.js';
 import { jobIdFrom, utc } from '../src/steps/run.js';
@@ -198,4 +199,18 @@ test('install record round-trips, fills defaults and refuses secrets', () => {
   assert.throws(() => loadConfig(file), /version 2/);
   writeFileSync(file, '{not json');
   assert.throws(() => loadConfig(file), /not valid JSON/);
+});
+
+test('messages name the exe when it started the installer', () => {
+  const exe = { [EXE_ENV]: '1' };
+  assert.equal(fromExe({}), false);
+  assert.equal(fromExe({ [EXE_ENV]: '0' }), false);
+  assert.equal(fromExe(exe), true);
+  assert.equal(commandLine('status', {}), 'valuelens-install status');
+  assert.equal(commandLine('status', exe), 'AnalyticsHubInstaller.exe status');
+  assert.equal(commandLine('', exe), 'AnalyticsHubInstaller.exe');
+  assert.equal(installerWindow({}), 'your terminal');
+  assert.equal(installerWindow(exe), 'the installer window');
+  assert.match(help(), /Usage: (valuelens-install|AnalyticsHubInstaller\.exe) \[command\] \[options\]/);
+  assert.match(help(), /deploy-app\s+Deploy the Analytics Hub app again/);
 });

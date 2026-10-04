@@ -7,10 +7,10 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Moon, Sun } from "lucide-react";
-import { fabricConfig } from "@/fabric.generated";
 import { paletteClass, usePaletteTheme } from "@/hooks/use-palette-theme";
 import { ThemeContext, useThemeContext } from "@/hooks/theme.context";
 import { useIsRefreshing } from "@/lib/refresh-tracker";
+import { runtimeConfig } from "@/lib/runtime-config";
 import { scrollToAnchor } from "@/lib/scroll-to-anchor";
 import { cn } from "@/lib/utils";
 import {
@@ -25,8 +25,8 @@ import {
 } from "./destinations";
 import { FilterBar } from "./filter-bar";
 
-/** Pages whose model `fabric.yaml` doesn't set up are left out of the sidebar. */
-const AVAILABLE = availableDestinations(fabricConfig.semanticModels);
+/** Pages whose model the install didn't set up are left out of the sidebar. */
+const AVAILABLE = availableDestinations(runtimeConfig().semanticModels);
 
 interface AppShellProps {
     active: DestinationId;

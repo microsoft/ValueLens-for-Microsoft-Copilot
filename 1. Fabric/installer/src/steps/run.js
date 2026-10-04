@@ -3,6 +3,7 @@
  * Runs the pipeline and the data check, and reports on them. The data check isn't in the pipeline:
  * it runs after the first load, after `run`, and on `check`.
  */
+import { commandLine } from '../launch.js';
 import { DATA_CHECK_FILE } from '../transform/notebook.js';
 import { firstRunParameters } from '../transform/pipeline.js';
 import { c, formatDuration } from '../ui.js';
@@ -70,7 +71,7 @@ function reportJob(ctx, job, what) {
       return false;
     default:
       if (TERMINAL.has(job?.status)) ui.warn(`${what} ended with status ${job.status}`);
-      else ui.warn(`${what} is still running (${job?.status ?? 'unknown'}). Check later with "valuelens-install status".`);
+      else ui.warn(`${what} is still running (${job?.status ?? 'unknown'}). Check later with "${commandLine('status')}".`);
       return false;
   }
 }
@@ -93,7 +94,7 @@ export async function runPipeline(ctx, opts) {
   }
   ui.ok(opts.backfillDays ? `Started the pipeline with ${opts.backfillDays} days of audit history` : 'Started the pipeline');
   if (!opts.wait) {
-    ui.note('It runs in Fabric. Check on it with "valuelens-install status".');
+    ui.note(`It runs in Fabric. Check on it with "${commandLine('status')}".`);
     return { jobId, status: 'NotStarted' };
   }
   ui.note('The first load usually takes 10 to 40 minutes. You can press Ctrl+C; the run carries on in Fabric.');
@@ -290,12 +291,12 @@ export async function status(ctx) {
       ui.heading(`Last data check${summary.checkedAt ? ` (${String(summary.checkedAt).slice(0, 16).replace('T', ' ')} UTC)` : ''}`);
       if (ranSince(jobs, summary.checkedAt)) {
         ui.warn('The pipeline has run since this check, so these results may be out of date.');
-        ui.note('Run "valuelens-install check" to check the data again.');
+        ui.note(`Run "${commandLine('check')}" to check the data again.`);
       }
       printDataCheck(ctx, summary);
     } else if (f.notebooks.dataCheck && jobs.some((j) => j.status === 'Completed')) {
       ui.heading('Data check');
-      ui.note('It hasn\'t run yet. Run "valuelens-install check" to see what the pipeline loaded.');
+      ui.note(`It hasn't run yet. Run "${commandLine('check')}" to see what the pipeline loaded.`);
     }
   }
 }
@@ -309,6 +310,6 @@ function expiry(ctx, label, expires) {
   if (!expires) return;
   const days = Math.floor((Date.parse(expires) - ctx.now().getTime()) / 86_400_000);
   const msg = `${label} expires ${expires.slice(0, 10)} (${days} days)`;
-  if (days < 30) ctx.ui.warn(`${msg}. Run "valuelens-install rotate-secret".`);
+  if (days < 30) ctx.ui.warn(`${msg}. Run "${commandLine('rotate-secret')}".`);
   else ctx.ui.info(msg);
 }

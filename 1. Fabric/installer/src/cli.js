@@ -6,16 +6,18 @@ import { parseArgs } from 'node:util';
 import { DEFAULT_CONFIG_FILE, loadConfig } from './config.js';
 import { HttpError } from './http.js';
 import { connect, createCtx, preview, runCommand } from './install.js';
+import { commandLine } from './launch.js';
 import { runWizard } from './server.js';
 import { loadSources } from './sources.js';
 import { c, createUi } from './ui.js';
 
 const COMMANDS = ['install', 'update', 'run', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'preview'];
 
-export const HELP = `Sets up Analytics Hub in Microsoft Fabric: the data pipeline, the semantic model and the app.
+/** The `--help` text, naming the command the way it was started. */
+export const help = () => `Sets up Analytics Hub in Microsoft Fabric: the data pipeline, the semantic model and the app.
 
-Usage: valuelens-install [command] [options]
-       valuelens-install --ui [options]
+Usage: ${commandLine('[command] [options]')}
+       ${commandLine('--ui [options]')}
 
 Commands:
   install          Set up Analytics Hub, or repair it from the install record (default)
@@ -23,7 +25,7 @@ Commands:
   run              Run the pipeline now, then the data check
   check            Run the data check again, without the pipeline
   refresh          Refresh the semantic model now
-  deploy-app       Build and deploy the Analytics Hub app again
+  deploy-app       Deploy the Analytics Hub app again
   status           Show recent runs and refreshes, the last data check and when secrets expire
   rotate-secret    Create new client secrets for Key Vault and the model's connection
   preview          Write what would be deployed to a folder, without signing in
@@ -116,7 +118,7 @@ export async function main(argv) {
     const args = parseCli(argv);
     verbose = args.verbose;
     if (args.help) {
-      process.stdout.write(HELP);
+      process.stdout.write(help());
       return 0;
     }
     if (args.version) {

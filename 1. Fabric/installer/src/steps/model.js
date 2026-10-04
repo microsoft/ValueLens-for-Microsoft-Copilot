@@ -6,6 +6,7 @@
 import { enabledModules, MODEL_MODULES } from '../catalog.js';
 import { servicePrincipalCredentials, semanticModelDefinition, sqlConnectionBody } from '../clients/fabric.js';
 import { HttpError } from '../http.js';
+import { commandLine } from '../launch.js';
 import { buildModel, datasourcePath, loadTemplateModel, PBISM } from '../transform/model.js';
 import { formatDuration } from '../ui.js';
 import { byName, createdId } from './fabric.js';
@@ -342,7 +343,7 @@ export async function refreshModel(ctx, opts = {}) {
     if (r?.serviceExceptionJson) ui.info(String(r.serviceExceptionJson).slice(0, 600));
     return { ok: false, status: state };
   }
-  ui.warn('The refresh is still running. Check later with "valuelens-install status".');
+  ui.warn(`The refresh is still running. Check later with "${commandLine('status')}".`);
   return { ok: false, status: state };
 }
 

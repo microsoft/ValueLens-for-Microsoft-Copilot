@@ -99,6 +99,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {string} [profile]
  * @property {string[]} [models]  Model aliases the app was built with. Older records mean just "vl".
  * @property {string} [deployedAt]
+ * @property {{ deployments: any, env?: string }} [rayfin]  Rayfin's `.deployments.json` and `.env` for the prebuilt app, which each installer version unpacks afresh.
  */
 
 export const MODEL_NAME = 'ValueLens Model';

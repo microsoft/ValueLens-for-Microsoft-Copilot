@@ -5,6 +5,8 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { runtimeConfig } from "@/lib/runtime-config";
+
 export interface FabricItemLinkConfig {
     portalUrl?: string;
     workspaceId?: string;
@@ -17,12 +19,13 @@ export interface FabricItemLinkConfig {
 const MSIT_HOSTING = /\.msit\.fabricapps\.net$/i;
 const MSIT_PORTAL = "https://msit.fabric.microsoft.com";
 
-function fromEnv(): FabricItemLinkConfig {
+function fromRuntime(): FabricItemLinkConfig {
+    const { portalUrl, workspaceId, itemId, tenantId } = runtimeConfig().rayfin;
     return {
-        portalUrl: import.meta.env.VITE_FABRIC_PORTAL_URL,
-        workspaceId: import.meta.env.VITE_FABRIC_WORKSPACE_ID,
-        itemId: import.meta.env.VITE_FABRIC_ITEM_ID,
-        tenantId: import.meta.env.VITE_FABRIC_TENANT_ID,
+        portalUrl,
+        workspaceId,
+        itemId,
+        tenantId,
         hostname: typeof window === "undefined" ? undefined : window.location.hostname,
     };
 }
@@ -36,7 +39,7 @@ function fromEnv(): FabricItemLinkConfig {
  * Apps hosted under `*.msit.fabricapps.net` live on Microsoft's internal ring, so their item opens
  * on the internal portal whichever portal the build was given.
  */
-export function fabricItemUrl(config: FabricItemLinkConfig = fromEnv()): string | null {
+export function fabricItemUrl(config: FabricItemLinkConfig = fromRuntime()): string | null {
     const { portalUrl, workspaceId, itemId, tenantId, hostname } = config;
     if (!portalUrl || !workspaceId || !itemId)
         return null;

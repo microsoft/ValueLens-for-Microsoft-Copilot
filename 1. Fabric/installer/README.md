@@ -14,14 +14,18 @@ agent conversations as well. It then runs the first load and checks the data tha
 It keeps its answers and the IDs it creates in `valuelens-install.json`. Run it again with that
 file to repair, change or update the set-up. The file holds no secrets.
 
+The easiest way to run it is to [download `AnalyticsHubInstaller.exe`](#download-and-run) and
+double-click it. It opens in your browser, and you don't need Node.js, a terminal or a copy of this
+repo. From a clone of this repo:
+
 ```text
 cd "1. Fabric/installer"
 npm install
 npx valuelens-install
 ```
 
-**Jump to:** [Before you start](#before-you-start) · [In your browser](#in-your-browser) ·
-[What it creates](#what-it-creates) ·
+**Jump to:** [Before you start](#before-you-start) · [Download and run](#download-and-run) ·
+[In your browser](#in-your-browser) · [What it creates](#what-it-creates) ·
 [Microsoft 365 activity](#microsoft-365-activity) · [Credit consumption](#credit-consumption) ·
 [Agent Evaluator](#agent-evaluator) · [Commands](#commands) · [Good to know](#good-to-know) ·
 [Troubleshooting](#troubleshooting)
@@ -32,7 +36,7 @@ npx valuelens-install
 
 | You need | Why |
 |---|---|
-| **Node.js 20.12 or later** and a clone of this repo | The installer deploys the notebooks and pipeline from this checkout. The Analytics Hub app needs **Node.js 22.13 or later** to build. |
+| **Windows 10 or 11** (64-bit) for `AnalyticsHubInstaller.exe`, or **Node.js 20.12 or later** and a clone of this repo | The exe carries everything it needs, including a ready-built app. From a clone, the installer deploys the notebooks and pipeline from your checkout, and the Analytics Hub app needs **Node.js 22.13 or later** to build. |
 | An **active Fabric capacity** (F2 or larger, or a trial) you can assign workspaces to | It creates the workspace on it. Or pick an existing workspace where you're an Admin or Member. |
 | An **Azure subscription** where you can create a Key Vault (Contributor), or an existing vault you can write secrets to | The client secret lives in Key Vault, never in a notebook. Owner or User Access Administrator lets it use Azure RBAC; otherwise the vault uses access policies. |
 | Permission to **register apps** in Entra | The default user setting is enough, or Application Administrator. You can also use an app you already have. |
@@ -44,6 +48,29 @@ npx valuelens-install
 The permissions it requests are the ones in [`/docs/PERMISSIONS.md`](../../docs/PERMISSIONS.md):
 `AuditLogsQuery.Read.All`, `Reports.Read.All` and `User.Read.All`, plus `CopilotPackages.Read.All`
 and `Application.Read.All` if you add the Agent 365 registry.
+
+## Download and run
+
+1. Download `AnalyticsHubInstaller.exe` from the latest `installer-v…` release on the
+   [releases page](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases). To check
+   the download, compare `Get-FileHash AnalyticsHubInstaller.exe` with the release's
+   `AnalyticsHubInstaller.exe.sha256`.
+2. Double-click it. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
+   The exe isn't code-signed yet.
+3. The first time, it takes about a minute to unpack to `%LOCALAPPDATA%\AnalyticsHub`. Then it
+   opens the installer [in your browser](#in-your-browser). Keep its window open while you use the
+   page.
+
+The exe carries Node.js, the installer, the notebooks, the pipeline, the semantic models and a
+ready-built Analytics Hub app, so it deploys the version it was released with. A newer exe unpacks
+its own copy and removes the old one.
+
+It keeps the install record in `Documents\Analytics Hub`. Keep that folder. To check on Analytics
+Hub, run the pipeline, update or repair the set-up later, open the exe again.
+
+The [commands](#commands) work from the exe too. In a terminal, run for example
+`AnalyticsHubInstaller.exe status` or `AnalyticsHubInstaller.exe run --backfill-days 90`. Relative
+`--config` and `--out` paths are in `Documents\Analytics Hub`.
 
 ## Run it
 
@@ -226,11 +253,11 @@ Studio set up, so it's skipped. The template's Credit Consumption page stays emp
 | Command | What it does |
 |---|---|
 | `install` (default) | Sets everything up, or repairs it from the install record. Re-running only does what is missing. It asks before rebuilding an app that is already deployed. |
-| `update` | Pushes the notebooks, pipeline and semantic models from this checkout over the deployed ones, then refreshes the models. A module that's new in this version and on by default, such as [Microsoft 365 activity](#microsoft-365-activity), is added too. It asks whether to redeploy the app too. Use it after you pull a new version of the repo. |
+| `update` | Pushes the notebooks, pipeline and semantic models from this checkout, or the ones the exe carries, over the deployed ones, then refreshes the models. A module that's new in this version and on by default, such as [Microsoft 365 activity](#microsoft-365-activity), is added too. It asks whether to redeploy the app too. Use it after you pull a new version of the repo or download a newer exe. |
 | `run` | Runs the pipeline now, then the data check. `--backfill-days <n>` reloads that much audit history and rebuilds the curated table. |
 | `check` | Runs the data check again, without the pipeline, and shows the row counts, date ranges and licence matches. |
 | `refresh` | Refreshes the semantic models now and waits for them. |
-| `deploy-app` | Builds and deploys the Analytics Hub app again, for example after a failed deploy or once you have a newer Node.js. |
+| `deploy-app` | Deploys the Analytics Hub app again, for example after a failed deploy. From a clone, it builds the app first, so you can also use it once you have a newer Node.js. |
 | `status` | Shows recent pipeline runs and model refreshes, the last data check, and when the secrets expire. It says when the data check is older than the last pipeline run. |
 | `rotate-secret` | Creates a new client secret and replaces the one in Key Vault. It also gives the model's connection a new secret and removes its old one. |
 | `preview` | Writes the notebooks, pipeline, schedule and `model.bim` it would deploy to `./valuelens-preview`, without signing in. With credit consumption, also `consumption-model.bim`; with the Agent Evaluator, `agent-evaluator-model.bim`. |
@@ -275,7 +302,7 @@ working until it expires.
 **Admin consent without the role.** The installer prints the app's API permissions page. An admin
 opens it and selects **Grant admin consent**. You can wait and choose **Check again**, or carry on.
 If you carry on, the first load is skipped. Once consent is granted, run
-`npx valuelens-install run --backfill-days 90`.
+`npx valuelens-install run --backfill-days 90` (or `AnalyticsHubInstaller.exe run --backfill-days 90`).
 
 **Sign-in.** Browser and device-code sign-in use the Azure CLI's public client, the default for
 the Azure Identity library. Your tenant must allow it, as it does for `az login`. Nothing is
@@ -303,6 +330,8 @@ few more minutes to start.
 
 | Symptom | What to do |
 |---|---|
+| Windows says it protected your PC when you open the exe | Choose **More info**, then **Run anyway**. The exe isn't code-signed yet. |
+| `The installer couldn't start` | If it says the download is damaged, download the exe again. Otherwise delete `%LOCALAPPDATA%\AnalyticsHub` so it unpacks afresh, then open the exe again. |
 | `No active Fabric capacity you can use` | Start a Fabric trial, or ask a capacity admin to make you a Contributor on a capacity. |
 | `No Azure subscription you can use` | Ask for Contributor on a subscription, or on a resource group with an existing vault. |
 | A run fails with `AADSTS7000215` (invalid client secret) | The secret in Key Vault doesn't match the app. Run `rotate-secret`. |
@@ -330,4 +359,20 @@ Run with `--verbose` to see each call and the full error.
 npm test                       # unit tests with fakes, no sign-in
 npm run typecheck              # TypeScript checks over the JSDoc types
 npx valuelens-install preview  # writes ./valuelens-preview (ignored by git)
+npm run build:exe              # builds dist-exe/AnalyticsHubInstaller.exe (Windows, about 10 minutes)
 ```
+
+### Building the exe
+
+`npm run build:exe` builds the [Analytics Hub app](../Fabric%20App/) once, stages it with the
+installer and the notebooks, pipeline and templates it deploys, and zips them with a portable
+Node.js into a small C# launcher, compiled with the `csc` that comes with the .NET Framework. It
+runs on Windows; run `npm ci` here and in the app first. The app reads its model IDs from
+`fabric.config.json` when it loads, so the installer deploys the same build to every tenant.
+`--release` fails rather than warns when something a published download needs is missing;
+`--out <dir>` writes the exe somewhere else.
+
+The [`installer-exe`](../../.github/workflows/installer-exe.yml) workflow builds, tests and
+smoke-tests the exe on pull requests that touch `packaging/`. To publish one, set the version in
+`package.json` and push a tag `installer-v<version>`. The workflow drafts a release with the exe
+and its SHA-256; review it and publish.
