@@ -16,6 +16,19 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-05 — Fabric: one folder for setting up by hand
+
+`1. Fabric` now holds only its README, the installer, the Fabric App and a new
+[`Manual setup`](1.%20Fabric/Manual%20setup/) folder. Everything for setting up by hand moved into
+it: the two report templates, `notebooks/`, `pipelines/`, `flows/` and both add-ons. The add-ons'
+notebooks now sit with the others, in `notebooks/credit-consumption/` and
+`notebooks/agent-evaluator/`, and the Workday overlay moved from `notebooks/optional/` to
+`notebooks/workday-org-data/`. The installer reads the new paths. The published installer exe
+carries its own copy of these files, so it isn't affected. Old links to the moved folders no
+longer work.
+
+The Fabric README's optional extras now say what each one shows and where its data comes from.
+
 ## 2026-10-05 — A leaner repo: simple steps, less clutter
 
 Every path README is now just the steps to follow. The root README is a short path picker, and
@@ -100,7 +113,7 @@ In the Analytics Hub, the Copilot Studio stage has a **Pay-as-you-go billed in A
 cost or credits by product for the same period, with totals, the subscriptions and how the bill
 compares with the export. The Cowork stage notes what Azure billed for Cowork. Billing can lag usage
 by a day or more, and no currency conversion is done. Without the table, both stay hidden. See the
-[data dictionary](1.%20Fabric/Add%20Credit%20Consumption/DATA-DICTIONARY.md#copilot_payg_spend).
+[data dictionary](1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/DATA-DICTIONARY.md#copilot_payg_spend).
 
 ---
 
@@ -144,7 +157,7 @@ runs, even if you don't rebuild the app. A name you gave it yourself is kept. A 
 
 ## 2026-10-03 — Fabric installer: Agent Evaluator
 
-The installer can now set up the [Agent Evaluator](1.%20Fabric/Add%20Agent%20Evaluator/) from
+The installer can now set up the [Agent Evaluator](1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/) from
 [AgentEvaluator-for-Copilot-Studio](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio),
 so the app's Agent Evaluation pages show how Copilot Studio agents perform. It's off by default.
 
@@ -236,7 +249,7 @@ real spend under half a cent as "<$0.01" instead of "$0.00", which read as free.
 billed per 1K, so 212 tokens showed as 0.2 million. The measure now reads the unit from the meter
 name: meters with "1M Token" are per million, other token meters are per thousand, and meters that
 aren't tokens (pages, images, hours) count as zero. `[Foundry Cost per 1M Tokens]` is corrected by
-the same change. Fixed in all four [Consumption Central](1.%20Fabric/Add%20Credit%20Consumption/)
+the same change. Fixed in all four [Consumption Central](1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/)
 templates. The sample data only uses per-1M meters, so its figures don't change.
 
 The [Fabric App](1.%20Fabric/Fabric%20App/) now shows token counts at their own scale (212, 45K, 1.3M)
@@ -245,7 +258,7 @@ instead of in millions, where small counts rounded to 0.0.
 ## 2026-10-02 — Fabric installer: credit consumption
 
 The [installer](1.%20Fabric/installer/#credit-consumption) has a new optional module, *Credit
-consumption*, that sets up [Consumption Central](1.%20Fabric/Add%20Credit%20Consumption/) in the
+consumption*, that sets up [Consumption Central](1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/) in the
 same Lakehouse. It deploys the Azure AI, Copilot Studio and Cowork notebooks into the pipeline. It
 gives the app registration read-only Azure roles on the subscription you choose, and makes the
 upload folders. It also deploys `ValueLens Consumption Model` and adds it to the app, which turns
@@ -547,7 +560,7 @@ is about 1.2 MB (previously 4.7–10.5 MB) because it no longer carries pending 
 
 - **Fabric:** the pipeline runs `Copilot_Agent365_Registry_Ingester` (Graph API) and, only if it
   fails, `Copilot_Agent365_Lander` (admin-centre CSV). See the
-  [pipelines README](1.%20Fabric/pipelines/README.md) for the migration steps.
+  [pipelines README](1.%20Fabric/Manual%20setup/pipelines/README.md) for the migration steps.
 - **Other paths:** [`Get-Agents365Registry.ps1`](3.%20SharePoint/scripts/Get-Agents365Registry.ps1)
   writes the same 48-column registry as the Fabric notebook. `Run-PAX-AIBV.ps1
   -IncludeAgent365Info` runs it after PAX; add `-Agents365Csv` to fall back to the admin-centre
@@ -590,7 +603,7 @@ Agent 365 run. Validate those in your own deployment before switching production
 ## 2026-09-15 — reviewed Fabric notebook set
 
 These notes describe what changed in the notebooks under
-[`1. Fabric/notebooks/`](1.%20Fabric/notebooks/). The guidance you need in order to *run* them
+[`1. Fabric/notebooks/`](1.%20Fabric/Manual%20setup/notebooks/). The guidance you need in order to *run* them
 is in the [Fabric README](1.%20Fabric/README.md) and
 `INGESTION-STRATEGY.md`.
 

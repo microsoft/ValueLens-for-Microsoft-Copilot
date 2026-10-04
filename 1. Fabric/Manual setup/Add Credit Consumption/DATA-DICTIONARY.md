@@ -275,7 +275,7 @@ a perfectly good use of this.
 **Copilot pay-as-you-go as Azure billed it.** Written by `Ingest_Azure_AI`. Power Platform billing
 policies charge Copilot Studio and Cowork credits beyond prepaid capacity to an Azure subscription;
 this is what Cost Management recorded there, a day at a time. The template doesn't read it. The
-[Fabric installer](../installer/README.md#credit-consumption) adds it to `ValueLens Consumption Model`
+[Fabric installer](../../installer/README.md#credit-consumption) adds it to `ValueLens Consumption Model`
 as `CopilotPaygSpend`, and the Analytics Hub's Consumption pages compare it with the exports.
 
 Grain: day × subscription × meter × `ServiceTag` × currency.

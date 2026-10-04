@@ -67,14 +67,16 @@ Choose these in the installer under **What to collect**. Each one has a few step
 To build your own reports, connect Power BI Desktop to `ValueLens Model` in your workspace.
 
 To use a template instead, choose not to deploy the model in the installer's **Power BI** step.
-When it finishes, it shows the values to enter in `ValueLens - Fabric.pbit` (SQL endpoint) or
-`ValueLens - Fabric OneLake.pbit` (OneLake). Publish the report, then
-[add a refresh step to the pipeline](pipelines/README.md#refresh-power-bi-from-the-pipeline).
+When it finishes, it shows the values to enter in
+[`ValueLens - Fabric.pbit`](Manual%20setup/ValueLens%20-%20Fabric.pbit) (SQL endpoint) or
+[`ValueLens - Fabric OneLake.pbit`](Manual%20setup/ValueLens%20-%20Fabric%20OneLake.pbit) (OneLake).
+Publish the report, then
+[add a refresh step to the pipeline](Manual%20setup/pipelines/README.md#refresh-power-bi-from-the-pipeline).
 
 ## Set it up by hand
 
-If you can't use the installer, follow [notebooks](notebooks/README.md), then
-[pipelines](pipelines/README.md).
+If you can't use the installer, follow [Manual setup](Manual%20setup/README.md). It uses the same
+files the installer does.
 
 ## Problems
 

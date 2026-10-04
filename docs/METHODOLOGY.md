@@ -7,7 +7,7 @@ the assumptions.
 It applies to the Power BI template, where all four data paths share one model, and to the
 [Fabric App](../1.%20Fabric/Fabric%20App/). The app reads the same model and adds three pages and a Value
 stage of its own ([§8](#8-fabric-app-only-consumption-agent-evaluation-cost-vs-value-and-work-patterns)). Every rule here is taken from
-`1. Fabric/ValueLens - Fabric.pbit` and the `Copilot_Audit_Log_Processor` notebook. If this page
+`1. Fabric/Manual setup/ValueLens - Fabric.pbit` and the `Copilot_Audit_Log_Processor` notebook. If this page
 and the model ever disagree, the model is right. The template's **📖 Metric Glossary** page
 carries the same caveats inside the report.
 
@@ -550,7 +550,7 @@ reads an optional table the installer adds to the ValueLens model.
 
 ### 8.1 Consumption
 
-Reads a published [Consumption Central](../1.%20Fabric/Add%20Credit%20Consumption/) model and
+Reads a published [Consumption Central](../1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/) model and
 rebuilds its consumption and cost pages.
 
 | Section | Source | How cost is worked out |

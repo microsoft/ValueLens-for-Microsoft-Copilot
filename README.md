@@ -26,8 +26,10 @@ minutes and needs no access to your tenant.
 
 ## Optional add-ons
 
-- **Credit consumption and cost:** the `Add Credit Consumption` folder in each path.
-- **Copilot Studio agent conversations:** [1. Fabric/Add Agent Evaluator](1.%20Fabric/Add%20Agent%20Evaluator/).
+- **Credit consumption and cost:** in Fabric, choose it in the installer. Other paths have an
+  `Add Credit Consumption` folder.
+- **Copilot Studio agent conversations:** in Fabric, choose *Agent Evaluator* in the installer, or
+  [set it up by hand](1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/).
 
 ## Reference
 

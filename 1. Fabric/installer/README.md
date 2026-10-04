@@ -68,7 +68,7 @@ Microsoft 365 admin center, go to **Settings** > **Org settings** > **Services**
 
 ## Credit consumption
 
-Optional. It fills the app's Consumption pages. See [Consumption Central](../Add%20Credit%20Consumption/).
+Optional. It fills the app's Consumption pages. See [Consumption Central](../Manual%20setup/Add%20Credit%20Consumption/).
 
 The installer reads Azure AI and Copilot pay-as-you-go costs for you. Two sources you add yourself:
 
@@ -89,7 +89,7 @@ choose **Repair or change**.
 ## Agent Evaluator
 
 Optional. It fills the app's Agent Evaluation pages from your Copilot Studio conversations. See
-[Agent Evaluator](../Add%20Agent%20Evaluator/).
+[Agent Evaluator](../Manual%20setup/Add%20Agent%20Evaluator/).
 
 If you aren't a System Administrator in an environment you pick, ask one to:
 

@@ -8,7 +8,7 @@ value; this shows how well your agents work. Skip it and nothing in ValueLens ch
 It uses the **same Lakehouse as ValueLens**. Its `agent_*` tables don't overlap with anything
 ValueLens reads or writes, and it reuses ValueLens' `copilot_org_data` table for department views.
 
-> **Using the [Fabric installer](../installer/#agent-evaluator)?** Choose *Agent Evaluator*, pick
+> **Using the [Fabric installer](../../installer/#agent-evaluator)?** Choose *Agent Evaluator*, pick
 > your environments, and it sets up access, the notebook, the pipeline step, the semantic model and
 > the app's Agent Evaluation pages for you.
 
@@ -17,7 +17,7 @@ ValueLens reads or writes, and it reuses ValueLens' `copilot_org_data` table for
 | Item | Purpose |
 |---|---|
 | `Agent Evaluator.pbit` | The report, reading the Lakehouse SQL analytics endpoint. |
-| [`notebooks/Copilot_Agent_Transcript_Parser.ipynb`](notebooks/) | Pulls transcripts from one or more Dataverse environments and writes the `agent_*` tables. |
+| [`Copilot_Agent_Transcript_Parser.ipynb`](../notebooks/agent-evaluator/Copilot_Agent_Transcript_Parser.ipynb) | Pulls transcripts from one or more Dataverse environments and writes the `agent_*` tables. |
 
 ### Why Fabric
 

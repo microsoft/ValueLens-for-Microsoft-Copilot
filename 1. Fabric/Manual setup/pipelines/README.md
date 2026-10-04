@@ -1,6 +1,6 @@
 # Fabric pipeline (set up by hand)
 
-The [installer](../installer/) creates this pipeline for you. Use these steps only if you set up
+The [installer](../../installer/) creates this pipeline for you. Use these steps only if you set up
 Fabric by hand, after the [notebooks](../notebooks/README.md).
 
 ## Set it up
@@ -54,7 +54,7 @@ placeholder. Import the notebook first.
 |---|---|---|---|
 | `EnableOrgDataPull` (on by default) | `Copilot_Org_Data_Direct_Ingester` | `REPLACE_WITH_ORG_DATA_NOTEBOOK_ID` | Nothing. Set it to `false` if you load org data yourself. |
 | `EnableM365Activity` | `Copilot_M365_Activity_Ingester` | `REPLACE_WITH_M365_ACTIVITY_NOTEBOOK_ID` | Turn off concealed names in the Microsoft 365 admin center (**Settings** > **Org settings** > **Services** > **Reports**). |
-| `EnableAgent365` | `Copilot_Agent365_Registry_Ingester` | `REPLACE_WITH_AGENT365_REGISTRY_NOTEBOOK_ID` | Needs an Agent 365 licence and the [extra Graph permissions](../../docs/PERMISSIONS.md). |
+| `EnableAgent365` | `Copilot_Agent365_Registry_Ingester` | `REPLACE_WITH_AGENT365_REGISTRY_NOTEBOOK_ID` | Needs an Agent 365 licence and the [extra Graph permissions](../../../docs/PERMISSIONS.md). |
 | `EnableAgent365` | `Copilot_Agent365_Lander` | `REPLACE_WITH_AGENT365_LANDER_NOTEBOOK_ID` | Runs only if the registry ingester fails. Put the admin center export at `Files/agent365/agents.csv`. |
 | `EnableProductFeedback` | `Copilot_ProductFeedback_Ingester` | `REPLACE_WITH_PRODUCT_FEEDBACK_NOTEBOOK_ID` | Put the export in `Files/product_feedback/`, by hand or with the [flow](../flows/). |
 | `EnableDataverse` | `Copilot_Agent_Transcript_Parser`, from [Add Agent Evaluator](../Add%20Agent%20Evaluator/) | `REPLACE_WITH_TRANSCRIPT_PARSER_NOTEBOOK_ID` | Add the app registration as an application user in Dataverse. |
