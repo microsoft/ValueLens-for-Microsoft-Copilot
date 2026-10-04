@@ -206,16 +206,18 @@ export function createWebUi(opts = {}) {
     },
 
     /**
+     * Options that are ticked and can't be changed are always in the answer, as in the terminal.
      * @template T
      * @param {string} message
      * @param {(Choice<T> & { checked?: boolean })[]} choices
      * @returns {Promise<T[]>}
      */
     async checkbox(message, choices) {
+      const locked = (/** @type {Choice<T> & { checked?: boolean }} */ ch) => !!ch.disabled && !!ch.checked;
       return ask('checkbox', message, { choices: choices.map(choiceView) }, (raw) => {
         if (!Array.isArray(raw)) return { error: 'Choose from the options.' };
-        const picked = [...new Set(raw)].sort((a, b) => a - b);
-        if (picked.some((i) => !Number.isInteger(i) || !choices[i] || choices[i].disabled)) return { error: 'Choose from the options.' };
+        if (raw.some((i) => !Number.isInteger(i) || !choices[i] || (choices[i].disabled && !locked(choices[i])))) return { error: 'Choose from the options.' };
+        const picked = choices.flatMap((ch, i) => (locked(ch) || raw.includes(i) ? [i] : []));
         return {
           value: picked.map((i) => choices[i].value),
           display: picked.length ? picked.map((i) => plainText(choices[i].name)).join(', ') : 'None',

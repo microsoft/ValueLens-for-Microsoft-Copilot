@@ -844,15 +844,17 @@ function renderPrompt(item) {
     const radio = item.kind === 'select';
     const rows = item.choices.map((ch, i) => {
       const off = !!ch.disabled;
-      return h('label', { class: off ? 'opt off' : 'opt' },
+      const locked = !radio && off && !!ch.checked;
+      const note = typeof ch.disabled === 'string' ? ch.disabled : null;
+      return h('label', { class: locked ? 'opt locked' : off ? 'opt off' : 'opt' },
         h('input', {
           type: radio ? 'radio' : 'checkbox', name: titleId, value: i, disabled: off,
           checked: radio ? i === item.default : !!ch.checked, 'aria-describedby': errId,
         }),
         h('span', { class: 'opt-text' },
-          h('span', { class: 'opt-name' }, ch.name),
+          h('span', { class: 'opt-name' }, ch.name, locked && note ? h('span', { class: 'opt-tag' }, note) : null),
           ch.description ? h('span', { class: 'opt-desc' }, ch.description) : null,
-          typeof ch.disabled === 'string' ? h('span', { class: 'opt-desc' }, ch.disabled) : null));
+          !locked && note ? h('span', { class: 'opt-desc' }, note) : null));
     });
     const opts = h('div', { class: 'opts', role: radio ? 'radiogroup' : 'group', 'aria-labelledby': titleId }, rows);
     let filter = null;
@@ -865,7 +867,7 @@ function renderPrompt(item) {
     }
     body = h('div', { class: 'ask-body' }, filter, opts);
     submit = () => {
-      const picked = [...opts.querySelectorAll('input:checked')].map((x) => Number(x.value));
+      const picked = [...opts.querySelectorAll('input:checked:not(:disabled)')].map((x) => Number(x.value));
       if (radio) {
         if (!picked.length) return showError(item, 'Choose one of the options.');
         answer(item, picked[0]);
