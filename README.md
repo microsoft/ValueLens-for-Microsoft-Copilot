@@ -5,6 +5,10 @@ the hours and value they deliver.
 
 ![ValueLens preview](Images/ValueLens-Preview.gif)
 
+**Have Fabric?** [Download the Analytics Hub installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe),
+open it and follow the steps in your browser. Check
+[what you need](1.%20Fabric/README.md#before-you-start) first.
+
 ## Pick a path
 
 Every path gives you the same dashboard. Pick the one that matches what you have, then follow the

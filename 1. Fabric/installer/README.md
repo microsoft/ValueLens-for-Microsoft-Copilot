@@ -21,9 +21,9 @@ The Graph permissions are listed in [`/docs/PERMISSIONS.md`](../../docs/PERMISSI
 
 ## Run it
 
-1. Download `AnalyticsHubInstaller.exe` from the latest `installer-v…` release on the
-   [releases page](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases).
-2. Double-click it. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
+1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe).
+   This link always gets the newest version.
+2. Open it. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
 3. The first time, it takes about a minute to unpack. Then it opens in your browser. Keep its
    window open while you use the page.
 4. Choose **Set up Analytics Hub** and sign in.

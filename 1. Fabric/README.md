@@ -1,7 +1,11 @@
 # 1. Fabric
 
-The recommended path. An installer sets everything up in your tenant and deploys the dashboard as
-an app in Fabric, called **Analytics Hub**. You don't need a terminal or Power BI Desktop.
+The recommended path. One installer sets everything up in your tenant and gives you the dashboard
+as an app in Fabric, called **Analytics Hub**. You don't need a terminal or Power BI Desktop.
+
+[![Download the Analytics Hub installer](https://img.shields.io/badge/Download-Analytics%20Hub%20installer-0078D4?style=for-the-badge)](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe)
+
+For Windows 10 or 11. Check [what you need](#before-you-start) first.
 
 ## Before you start
 
@@ -24,14 +28,14 @@ The full list of roles is in the [installer README](installer/README.md#before-y
 
 ## Install
 
-1. Download `AnalyticsHubInstaller.exe` from the
-   [latest release](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases).
-2. Double-click it. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
-3. The installer opens in your browser. Keep the installer window open until you're done.
-4. Choose **Set up Analytics Hub** and sign in.
-5. Answer the questions. The defaults are fine for most tenants.
-6. Check the plan and approve it. Nothing is created until you do.
-7. Wait for it to finish. It sets everything up, loads the first data and gives you a link to the
+1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe)
+   and open it. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
+2. After about a minute, it opens in your browser. Keep the installer window open until you're
+   done.
+3. Choose **Set up Analytics Hub** and sign in with your work account.
+4. Answer the questions. The defaults suit most organisations.
+5. Check the plan and approve it. Nothing is created until you do.
+6. Wait for it to finish. It sets everything up, loads the first data and gives you a link to the
    app.
 
 If admin consent isn't granted yet, the installer skips the first load. Once an admin has granted
