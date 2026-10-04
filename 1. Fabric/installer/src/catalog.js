@@ -104,7 +104,7 @@ export const OPTIONAL_MODULES = /** @type {const} */ (['orgData', 'm365Activity'
  * @typedef {object} NotebookInfo
  * @property {NotebookKey} key
  * @property {string} file  File name in `dir`.
- * @property {string} [dir]  Folder under `1. Fabric`. Defaults to `notebooks`.
+ * @property {string} [dir]  Folder under `1. Fabric`. Defaults to {@link NOTEBOOKS_DIR}.
  * @property {string} displayName  Item name in the Fabric workspace.
  * @property {ModuleId} module
  * @property {boolean} credentials  Has TENANT_ID / CLIENT_ID / CLIENT_SECRET to fill in.
@@ -116,8 +116,11 @@ export const OPTIONAL_MODULES = /** @type {const} */ (['orgData', 'm365Activity'
  * @property {NotebookPatch[]} [patches]
  */
 
-export const CONSUMPTION_NOTEBOOKS_DIR = 'Add Credit Consumption/notebooks';
-export const AGENT_EVALUATOR_NOTEBOOKS_DIR = 'Add Agent Evaluator/notebooks';
+/** The files for setting Fabric up by hand, which the installer deploys from, under `1. Fabric`. */
+export const SETUP_DIR = 'Manual setup';
+export const NOTEBOOKS_DIR = `${SETUP_DIR}/notebooks`;
+export const CONSUMPTION_NOTEBOOKS_DIR = `${NOTEBOOKS_DIR}/credit-consumption`;
+export const AGENT_EVALUATOR_NOTEBOOKS_DIR = `${NOTEBOOKS_DIR}/agent-evaluator`;
 export const STUDIO_LANDING = 'Files/landing/studio';
 export const VIVA_LANDING = 'Files/landing/viva';
 

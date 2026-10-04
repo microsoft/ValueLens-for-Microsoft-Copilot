@@ -13,7 +13,7 @@ import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-TEMPLATE = ROOT / "1. Fabric" / "ValueLens - Fabric OneLake.pbit"
+TEMPLATE = ROOT / "1. Fabric" / "Manual setup" / "ValueLens - Fabric OneLake.pbit"
 SOURCE = ROOT / "scripts" / "onelake" / "FabricTable.pq"
 PARTS = {
     "DataModelSchema": (("model", "expressions"), "expression"),

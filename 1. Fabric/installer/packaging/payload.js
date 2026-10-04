@@ -9,7 +9,7 @@
  * `f` stands in for `1. Fabric`, which keeps paths short when unpacked under the user's profile.
  */
 import { posix } from 'node:path';
-import { NOTEBOOKS } from '../src/catalog.js';
+import { NOTEBOOKS, NOTEBOOKS_DIR } from '../src/catalog.js';
 import { APP_DIR, PIPELINE_TEMPLATE } from '../src/sources.js';
 import { PREBUILT_STATIC } from '../src/steps/app.js';
 import { AGENT_EVALUATOR_TEMPLATE, CONSUMPTION_TEMPLATE, MODEL_TEMPLATE } from '../src/transform/model.js';
@@ -46,7 +46,7 @@ const slash = (p) => p.replaceAll('\\', '/');
 export function sourceFiles() {
   return [
     PIPELINE_TEMPLATE,
-    ...NOTEBOOKS.map((nb) => posix.join(nb.dir ?? 'notebooks', nb.file)),
+    ...NOTEBOOKS.map((nb) => posix.join(nb.dir ?? NOTEBOOKS_DIR, nb.file)),
     MODEL_TEMPLATE,
     CONSUMPTION_TEMPLATE,
     AGENT_EVALUATOR_TEMPLATE,
