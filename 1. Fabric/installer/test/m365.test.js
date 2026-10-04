@@ -28,9 +28,9 @@ const sources = realSources();
 const template = loadTemplateModel(/** @type {string} */ (sources.modelFile));
 const lake = { server: 'abc.datawarehouse.fabric.microsoft.com', database: 'ValueLens' };
 
-test('catalog: on by default, after org data, deploys its notebook with credentials and needs no new permission', () => {
+test('catalog: on by default, the first extra, deploys its notebook with credentials and needs no new permission', () => {
   assert.equal(defaultModules().m365Activity, true);
-  assert.equal(OPTIONAL_MODULES[1], 'm365Activity');
+  assert.equal(OPTIONAL_MODULES[0], 'm365Activity');
   assert.deepEqual(MODULES.m365Activity.permissions, ['Reports.Read.All']);
   assert.deepEqual(permissionsFor(on), permissionsFor(off));
   const nb = notebooksFor(on).find((n) => n.key === 'm365Activity');

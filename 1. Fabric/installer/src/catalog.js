@@ -25,7 +25,7 @@ export const MODULES = {
   core: {
     id: 'core',
     label: 'Copilot usage and licences',
-    description: 'Audit log, licensed users and the processor that builds the curated table.',
+    description: 'From the Microsoft 365 audit log and your Copilot licences. Shows who uses Copilot, in which apps and how often.',
     required: true,
     defaultOn: true,
     permissions: ['AuditLogsQuery.Read.All', 'Reports.Read.All'],
@@ -33,9 +33,9 @@ export const MODULES = {
   },
   orgData: {
     id: 'orgData',
-    label: 'Org data from Entra',
-    description: 'Department, job title, manager and location for each user.',
-    required: false,
+    label: 'Org data',
+    description: 'From Microsoft Entra ID. Adds each person\'s department, job title, manager and location, so you can compare teams.',
+    required: true,
     defaultOn: true,
     permissions: ['User.Read.All'],
     pipelineParameter: 'EnableOrgDataPull',
@@ -43,7 +43,7 @@ export const MODULES = {
   m365Activity: {
     id: 'm365Activity',
     label: 'Microsoft 365 activity',
-    description: 'Daily Teams, Outlook, SharePoint, OneDrive, Viva Engage and Office app activity for each person, from the Microsoft 365 usage reports.',
+    description: 'From the Microsoft 365 usage reports. Shows how people work across Teams, Outlook, SharePoint, OneDrive, Viva Engage and the Office apps.',
     required: false,
     defaultOn: true,
     permissions: ['Reports.Read.All'],
@@ -52,7 +52,7 @@ export const MODULES = {
   agent365: {
     id: 'agent365',
     label: 'Agent 365 registry',
-    description: 'Agents in your tenant. Needs an Agent 365 licence; falls back to a CSV export.',
+    description: 'From the Agent 365 registry, or its CSV export from the Microsoft 365 admin center. Lists the agents in your tenant and who made them. The registry needs an Agent 365 licence.',
     required: false,
     defaultOn: false,
     permissions: ['CopilotPackages.Read.All', 'Application.Read.All', 'User.Read.All'],
@@ -61,7 +61,7 @@ export const MODULES = {
   productFeedback: {
     id: 'productFeedback',
     label: 'Product feedback',
-    description: 'Reads the feedback CSV export you land in Files/product_feedback. No API.',
+    description: 'From the product feedback export in the Microsoft 365 admin center, which you put in the Lakehouse. Shows what people say about Copilot.',
     required: false,
     defaultOn: false,
     permissions: [],
@@ -70,7 +70,7 @@ export const MODULES = {
   consumption: {
     id: 'consumption',
     label: 'Credit consumption',
-    description: 'Azure AI spend and tokens, plus Copilot Studio and Cowork credits from exports you land in the Lakehouse.',
+    description: 'From Copilot Studio and Copilot Cowork credit exports you put in the Lakehouse, and your Azure costs. Shows credits used and what they cost across Copilot Studio, Cowork and Azure AI.',
     required: false,
     defaultOn: false,
     permissions: [],
@@ -78,8 +78,8 @@ export const MODULES = {
   },
   agentEvaluator: {
     id: 'agentEvaluator',
-    label: 'Copilot Studio transcripts',
-    description: 'Agent conversations from Dataverse: how they ended, what people thought, and where agents fall short.',
+    label: 'Agent Evaluator',
+    description: 'From Copilot Studio conversation transcripts in Dataverse. Shows how well your agents work: how conversations end, what people thought and where agents fall short.',
     required: false,
     defaultOn: false,
     permissions: [],
@@ -90,8 +90,11 @@ export const MODULES = {
 /** Modules that change the ValueLens semantic model. The others have their own model or none. */
 export const MODEL_MODULES = /** @type {const} */ (['core', 'orgData', 'm365Activity', 'agent365', 'productFeedback']);
 
-/** Modules offered under "What to collect", in order. */
-export const OPTIONAL_MODULES = /** @type {const} */ (['orgData', 'm365Activity', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator']);
+/** Always collected: the dashboard is built on them. Shown ticked and locked under "What to collect". */
+export const ESSENTIAL_MODULES = /** @type {const} */ (['core', 'orgData']);
+
+/** Modules a customer can tick under "What to collect", in order. */
+export const OPTIONAL_MODULES = /** @type {const} */ (['m365Activity', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator']);
 
 /** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'm365Activity' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts'} NotebookKey */
 
@@ -287,11 +290,21 @@ export function defaultModules() {
 }
 
 /**
+ * Org data is always on, even in records saved when it could be switched off.
  * @param {Partial<ModuleChoice> | undefined} choice
  * @returns {ModuleChoice}
  */
 export function normaliseModules(choice) {
-  return { ...defaultModules(), ...(choice ?? {}) };
+  return { ...defaultModules(), ...(choice ?? {}), orgData: true };
+}
+
+/**
+ * Names of the data being collected: the essentials, then the ticked extras.
+ * @param {ModuleChoice} modules
+ * @returns {string[]}
+ */
+export function collectedLabels(modules) {
+  return [...ESSENTIAL_MODULES, ...OPTIONAL_MODULES.filter((id) => modules[id])].map((id) => MODULES[id].label);
 }
 
 /**
@@ -325,8 +338,7 @@ export function notebooksFor(modules, opts = {}) {
 
 /**
  * Graph application permissions the app registration needs, de-duplicated and sorted.
- * Org data's User.Read.All is always included: the docs treat it as core, and it
- * lets a customer switch org data on later without another consent.
+ * Org data's User.Read.All is always included, because org data is always collected.
  * @param {ModuleChoice} modules
  * @returns {string[]}
  */

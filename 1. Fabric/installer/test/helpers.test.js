@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { permissionsFor } from '../src/catalog.js';
+import { collectedLabels, ESSENTIAL_MODULES, normaliseModules, OPTIONAL_MODULES, permissionsFor } from '../src/catalog.js';
 import { help, parseCli } from '../src/cli.js';
 import { allowsAction, armLocation, parseResourceId, validateVaultName } from '../src/clients/azure.js';
 import { notebookDefinition, notebookJobParameters, scheduleBody } from '../src/clients/fabric.js';
@@ -70,6 +70,13 @@ test('resolveAppRoles: required permissions must exist, optional ones are report
   assert.deepEqual(withOptional.missing, ['CopilotPackages.Read.All']);
   assert.deepEqual(withOptional.roles, [{ value: 'User.Read.All', id: 'r2' }]);
   assert.throws(() => resolveAppRoles(sp, ['Reports.Read.All']), /no application permission named Reports\.Read\.All/);
+});
+
+test('what to collect: audit log, licensed users and org data are essential; the rest are extras', () => {
+  assert.deepEqual([...ESSENTIAL_MODULES], ['core', 'orgData']);
+  assert.ok(!OPTIONAL_MODULES.some((id) => ESSENTIAL_MODULES.includes(/** @type {any} */ (id))));
+  assert.equal(normaliseModules({ orgData: false }).orgData, true);
+  assert.deepEqual(collectedLabels(normaliseModules({ m365Activity: false, agentEvaluator: true })), ['Copilot usage and licences', 'Org data', 'Agent Evaluator']);
 });
 
 test('permissions follow the chosen modules', () => {
@@ -199,6 +206,9 @@ test('install record round-trips, fills defaults and refuses secrets', () => {
   assert.throws(() => loadConfig(file), /version 2/);
   writeFileSync(file, '{not json');
   assert.throws(() => loadConfig(file), /not valid JSON/);
+
+  writeFileSync(file, JSON.stringify({ version: 1, modules: { orgData: false } }));
+  assert.equal(loadConfig(file).config.modules.orgData, true, 'org data is always collected, even in older records');
 });
 
 test('messages name the exe when it started the installer', () => {

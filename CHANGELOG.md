@@ -16,6 +16,21 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-05 — Analytics Hub installer 0.2.0: tick what to collect
+
+**What to collect** is now a list of tick boxes, and each one says where its data comes from and
+what it shows. Copilot usage, licences and org data are always collected, because the dashboard is
+built on them. Their boxes are ticked and locked. Microsoft 365 activity is ticked. The Agent 365
+registry, product feedback, credit consumption and the Agent Evaluator aren't. Copilot Studio
+transcripts are now called **Agent Evaluator**, after the page they feed. An install record that
+turned org data off turns it back on, so the next update also updates the pipeline.
+
+The installer is also safe in a workspace that already has things in it. It never changes an item
+it didn't create. If one of its names is taken, its own item gets the next free name, such as
+`ValueLens_2`, and the plan shows the names before you approve it.
+
+---
+
 ## 2026-10-05 — Fabric: one folder for setting up by hand
 
 `1. Fabric` now holds only its README, the installer, the Fabric App and a new

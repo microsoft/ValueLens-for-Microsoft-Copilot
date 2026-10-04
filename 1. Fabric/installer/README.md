@@ -29,8 +29,10 @@ The Graph permissions are listed in [`/docs/PERMISSIONS.md`](../../docs/PERMISSI
    window open while you use the page.
 4. Choose **Set up Analytics Hub** and sign in.
 5. Answer the questions:
-   1. **What to collect.** Copilot usage, licences, org data and Microsoft 365 activity are on.
-      The Agent 365 registry, product feedback, credit consumption and the Agent Evaluator are off.
+   1. **What to collect.** Tick the data you want. Each box says where its data comes from and
+      what it shows. Copilot usage, licences and org data are always collected. Microsoft 365
+      activity is ticked. The Agent 365 registry, product feedback, credit consumption and the
+      Agent Evaluator aren't.
    2. **Power BI:** the semantic model and the app (the default), the model only, or neither.
    3. **How much audit history** to load first: 30, 90 or 180 days.
    4. **Capacity, workspace and Lakehouse.**

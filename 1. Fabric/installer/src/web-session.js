@@ -3,7 +3,7 @@
  * Runs installer commands for the browser wizard, one at a time. Signs in once and keeps the
  * sign-in for the next command, the way one terminal run does for its steps.
  */
-import { MODULES, OPTIONAL_MODULES } from './catalog.js';
+import { collectedLabels } from './catalog.js';
 import { loadConfig } from './config.js';
 import { connect as realConnect, createCtx, runCommand } from './install.js';
 import { fromExe } from './launch.js';
@@ -32,7 +32,7 @@ export function describeRecord(config) {
     workspaceUrl: f.workspaceId ? `https://app.fabric.microsoft.com/groups/${f.workspaceId}` : undefined,
     lakehouse: f.lakehouseName,
     schedule: f.scheduleId ? describeSchedule(config.schedule) : undefined,
-    data: ['Copilot usage and licences', ...OPTIONAL_MODULES.filter((m) => config.modules[m]).map((m) => MODULES[m].label)],
+    data: collectedLabels(config.modules),
     model: sm.id ? sm.name : undefined,
     app: fa.itemId ? { name: fa.name ?? 'Analytics Hub', url: fa.url } : undefined,
     secretExpires: config.app.secretExpires?.slice(0, 10),

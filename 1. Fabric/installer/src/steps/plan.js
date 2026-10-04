@@ -4,7 +4,7 @@
  * install can run unattended.
  */
 import { randomBytes } from 'node:crypto';
-import { MODULES, notebooksFor, OPTIONAL_MODULES, permissionsFor } from '../catalog.js';
+import { collectedLabels, ESSENTIAL_MODULES, MODULES, notebooksFor, OPTIONAL_MODULES, permissionsFor } from '../catalog.js';
 import { allowsAction, armLocation, validateVaultName } from '../clients/azure.js';
 import { TRANSCRIPT_ROLE } from '../clients/dataverse.js';
 import { APP_ROLES, CONSENT_ROLES } from '../clients/graph.js';
@@ -188,15 +188,23 @@ async function planPowerBi(ctx, pre) {
     ui.warn(`Building the app needs Node.js ${MIN_NODE.join('.')} or later; this is ${process.versions.node}. Deploying the semantic model only.`);
     ui.note(`Install a newer Node.js, then run "${commandLine('deploy-app')}".`);
   }
-  if (sm.enabled && !config.modules.orgData) {
-    config.modules.orgData = true;
-    ui.note(`Switched on ${MODULES.orgData.label}: the semantic model needs it.`);
-  }
   if (!sm.enabled) return;
   for (const s of blockedSettings(pre.tenantSettings, { app: !!fa.enabled })) {
     ui.warn(`The tenant setting "${s.title}" is off. ${s.effect}`);
     ui.note('A Fabric administrator can switch it on in the admin portal, under Tenant settings.');
   }
+}
+
+/**
+ * The "What to collect" tick boxes: the essentials ticked and locked, then the extras.
+ * @param {import('../catalog.js').ModuleChoice} modules
+ */
+export function collectChoices(modules) {
+  const box = (/** @type {import('../catalog.js').ModuleId} */ id) => ({ name: MODULES[id].label, value: id, description: MODULES[id].description });
+  return [
+    ...ESSENTIAL_MODULES.map((id) => ({ ...box(id), checked: true, disabled: 'Always collected' })),
+    ...OPTIONAL_MODULES.map((id) => ({ ...box(id), checked: modules[id] })),
+  ];
 }
 
 /**
@@ -207,16 +215,11 @@ export async function plan(ctx, pre) {
   const { ui, config, api } = ctx;
 
   ui.heading('What to collect');
-  const picked = await ui.checkbox(
-    'Copilot usage and licences are always included. Add:',
-    OPTIONAL_MODULES.map((id) => ({
-      name: MODULES[id].label,
-      value: id,
-      description: MODULES[id].description,
-      checked: config.modules[id],
-    })),
-  );
-  config.modules = /** @type {import('../catalog.js').ModuleChoice} */ (Object.fromEntries(OPTIONAL_MODULES.map((id) => [id, picked.includes(id)])));
+  const picked = await ui.checkbox('Tick the data you want. The dashboard is built on the first two, so they\'re always collected.', collectChoices(config.modules));
+  config.modules = /** @type {import('../catalog.js').ModuleChoice} */ ({
+    orgData: true,
+    ...Object.fromEntries(OPTIONAL_MODULES.map((id) => [id, picked.includes(id)])),
+  });
 
   await planPowerBi(ctx, pre);
   if (config.modules.consumption) await planConsumption(ctx, pre);
@@ -556,7 +559,7 @@ export function planReview(ctx, pre) {
  */
 export async function confirmPlan(ctx, pre) {
   const { ui, config } = ctx;
-  const mods = ['Copilot usage and licences', ...OPTIONAL_MODULES.filter((m) => config.modules[m]).map((m) => MODULES[m].label)];
+  const mods = collectedLabels(config.modules);
   ui.heading('Ready to set up');
   ui.info(`Data:        ${mods.join(', ')}`);
   ui.info(`Workspace:   ${config.fabric.workspaceName ?? config.fabric.workspaceId} ${config.fabric.workspaceId ? '' : c.dim('(new)')}`);

@@ -5,6 +5,7 @@ import { request } from 'node:http';
 import { test } from 'node:test';
 import { emptyConfig } from '../src/config.js';
 import { startServer } from '../src/server.js';
+import { collectChoices } from '../src/steps/plan.js';
 import { createWebUi, plainText, SECRET_MASK, toSegments } from '../src/web-ui.js';
 import { describeRecord, WEB_COMMANDS } from '../src/web-session.js';
 
@@ -112,6 +113,33 @@ test('web ui: input defaults and validates; checkbox refuses disabled options', 
   ui.answer(box, [2, 0, 2]);
   assert.deepEqual(await picked, ['cc', 'm365']);
   assert.equal(ui.history().at(-1)?.display, 'Credit, M365');
+});
+
+test('what to collect: the essentials are ticked and locked, every extra has a description, and only extras can be unticked', async () => {
+  const config = emptyConfig();
+  const choices = collectChoices(config.modules);
+  assert.deepEqual(choices.map((ch) => [ch.value, ch.checked, 'disabled' in ch ? ch.disabled : false]), [
+    ['core', true, 'Always collected'],
+    ['orgData', true, 'Always collected'],
+    ['m365Activity', true, false],
+    ['agent365', false, false],
+    ['productFeedback', false, false],
+    ['consumption', false, false],
+    ['agentEvaluator', false, false],
+  ]);
+  for (const ch of choices) assert.match(ch.description, /^From .+\. (Shows|Adds|Lists) /, ch.value);
+
+  const ui = createWebUi();
+  const asked = ui.checkbox('Tick the data you want.', choices);
+  const id = ui.history().at(-1)?.id;
+  assert.deepEqual(ui.history().at(-1)?.choices?.slice(0, 2).map((/** @type {any} */ ch) => [ch.checked, ch.disabled]), [[true, 'Always collected'], [true, 'Always collected']]);
+  ui.answer(id, [6]);
+  assert.deepEqual(await asked, ['core', 'orgData', 'agentEvaluator']);
+  assert.equal(ui.history().at(-1)?.display, 'Copilot usage and licences, Org data, Agent Evaluator');
+
+  const again = ui.checkbox('Tick the data you want.', choices);
+  ui.answer(ui.history().at(-1)?.id, [0, 1]);
+  assert.deepEqual(await again, ['core', 'orgData'], 'sending a locked box back is harmless');
 });
 
 test('web ui: a secret never reaches the history or the page', async () => {
