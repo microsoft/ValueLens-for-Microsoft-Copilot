@@ -476,7 +476,7 @@ a { overflow-wrap: anywhere; }
 .tenant { display: flex; flex-direction: column; gap: 4px; }
 .needs { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; max-width: 76ch; }
 .needs li::marker { color: var(--muted-fg); }
-.closed { max-width: 560px; margin: 96px auto; padding: 0 24px; display: flex; flex-direction: column; gap: 12px; }
+.closed { max-width: 560px; margin: 0 auto; padding: 96px 24px; display: flex; flex-direction: column; gap: 12px; }
 
 @media (max-width: 760px) {
   .shell { flex-direction: column; height: auto; min-height: 100vh; overflow: visible; }

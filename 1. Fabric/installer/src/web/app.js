@@ -284,6 +284,9 @@ async function quit() {
     return;
   }
   app.es?.close();
+  // The page below has no rail or main, so the scroll and key handlers must stand down.
+  app.view = 'closed';
+  app.railOpen = false;
   document.body.replaceChildren(
     h('main', { class: 'closed' },
       h('h1', null, 'The installer has stopped'),
