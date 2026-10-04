@@ -36,7 +36,8 @@ The full list of roles is in the [installer README](installer/README.md#before-y
 3. After about a minute, it opens in your browser. Keep the installer window open until you're
    done.
 4. Choose **Set up Analytics Hub** and sign in with your work account.
-5. Answer the questions. The defaults suit most organisations.
+5. Answer the questions. The defaults suit most organisations. Under **What to collect**, tick the
+   data you want.
 6. Check the plan and approve it. Nothing is created until you do.
 7. Wait for it to finish. It sets everything up, loads the first data and gives you a link to the
    app.
@@ -54,7 +55,8 @@ it, open the exe again and choose **Run now**.
 
 ## Optional extras
 
-Choose these in the installer under **What to collect**. Each one has a few steps of its own.
+Copilot usage, licences and org data are always collected. Tick any of these extras in the
+installer under **What to collect**. Each one has a few steps of its own.
 
 | Extra | What it shows | Where the data comes from |
 |---|---|---|
