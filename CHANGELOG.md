@@ -16,6 +16,20 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-05 — Analytics Hub installer: download and double-click
+
+`AnalyticsHubInstaller.exe` runs the installer without Node.js, a terminal or a clone of this repo.
+Download it from the repo's releases and double-click it: it unpacks once to
+`%LOCALAPPDATA%\AnalyticsHub` and opens the installer in your browser. It carries the notebooks,
+pipeline, semantic models and a ready-built Analytics Hub app, and keeps the install record in
+`Documents\Analytics Hub`. The app now reads its model IDs from a `fabric.config.json` deployed
+next to it, so one build serves every tenant; deploys from a clone still use `fabric.yaml`.
+Messages name `AnalyticsHubInstaller.exe` when it started the installer. A new `installer-exe`
+workflow builds and smoke-tests the exe, and drafts a release for each `installer-v*` tag. See
+[Download and run](1.%20Fabric/installer/README.md#download-and-run).
+
+---
+
 ## 2026-10-04 — Fabric installer: now the Analytics Hub installer
 
 The installer now calls itself the Analytics Hub installer in its README and in the descriptions

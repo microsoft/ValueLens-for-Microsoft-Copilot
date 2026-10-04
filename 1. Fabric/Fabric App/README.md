@@ -158,5 +158,13 @@ All three are gitignored, because every customer deploys their own copy. It also
 URL to `allowedRedirectUris` in `rayfin/rayfin.yml`. Keep that edit, and your IDs in
 `fabric.yaml`, out of any pull request to this repo.
 
+**The installer's ready-built copy.** [`AnalyticsHubInstaller.exe`](../installer/README.md#download-and-run)
+carries one build of this app for every tenant, so it can't bake in model IDs. When the app loads,
+it reads them from a `fabric.config.json` deployed next to it, in the shape
+`{ "semanticModels": { "vl": { "workspaceId": "…", "itemId": "…" } } }`, and Rayfin's backend
+from the `rayfin.config.json` that `rayfin up` writes. A deploy from this folder has no
+`fabric.config.json`, so it keeps using `fabric.yaml`. See
+[`src/lib/runtime-config.ts`](src/lib/runtime-config.ts).
+
 Built on the [Fabric apps analytics template](https://learn.microsoft.com/fabric/apps/data-apps-template)
 (React, TypeScript, Vite). [`AGENTS.md`](AGENTS.md) has the build conventions for coding agents.
