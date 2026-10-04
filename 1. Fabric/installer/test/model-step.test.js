@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { emptyConfig } from '../src/config.js';
-import { DATA_CLI, deployApp, ensureAppName, ensureFabricApp, findDeployment, nodeVersionOk, profileName, RAYFIN_CLI, yamlValue } from '../src/steps/app.js';
+import { DATA_CLI, deployApp, ensureAppName, ensureFabricApp, FABRIC_CONFIG, fabricConfigFile, findDeployment, nodeVersionOk, PREBUILT_MARKER, PREBUILT_STATIC, profileName, RAYFIN_CLI, yamlValue } from '../src/steps/app.js';
 import { CONNECTION_SECRET_NAME, connectionName, ensureModelConnection, ensureSemanticModel, refreshModel, rotateModelSecret } from '../src/steps/model.js';
 import { blockedSettings } from '../src/steps/plan.js';
 import { fakeCtx, fakeFabric, fakeGraph, fakePowerBi, fakeUi, httpError, realSources } from './fakes.js';
@@ -262,7 +262,7 @@ function appSetup(o = {}) {
       writeFileSync(join(dir, 'rayfin', '.env'), 'CUSTOMER=1\n');
       if (o.upFails) return { code: 1, output: '' };
       const item = t.fabric.add('AppBackend', 'valuelens', null);
-      const now = JSON.parse(readFileSync(deploymentsFile, 'utf8'));
+      const now = existsSync(deploymentsFile) ? JSON.parse(readFileSync(deploymentsFile, 'utf8')) : { deployments: {} };
       now.deployments['valuelens-ws'] = { fabricWorkspaceId: 'ws-1', fabricItemId: item.id, fabricDeepLink: `https://app.fabric.microsoft.com/groups/ws-1/appbackends/${item.id}`, deployedAt: '2026-06-01T12:00:00Z' };
       now.active = 'valuelens-ws';
       writeFileSync(deploymentsFile, JSON.stringify(now));
@@ -397,4 +397,112 @@ test('app: needs the model and the app source', async () => {
   } finally {
     t.cleanup();
   }
+});
+
+/**
+ * The installer download's prebuilt app: no source, no fabric.yaml, and none of Rayfin's state
+ * from earlier runs, since each installer version unpacks a fresh copy.
+ * @param {{ upFails?: boolean }} [o]
+ */
+function prebuiltSetup(o = {}) {
+  const t = appSetup({ upFails: o.upFails });
+  rmSync(join(t.dir, 'fabric.yaml'));
+  rmSync(t.deploymentsFile);
+  rmSync(join(t.dir, 'rayfin', '.env'));
+  rmSync(join(t.dir, DATA_CLI));
+  writeFileSync(join(t.dir, PREBUILT_MARKER), '{}');
+  mkdirSync(join(t.dir, PREBUILT_STATIC));
+  const fresh = () => {
+    for (const f of [t.deploymentsFile, join(t.dir, 'rayfin', '.env'), join(t.dir, PREBUILT_STATIC, FABRIC_CONFIG)]) rmSync(f, { force: true });
+  };
+  return { ...t, fresh };
+}
+
+test('app: the prebuilt app is deployed as it is, with its models in fabric.config.json', async () => {
+  const t = prebuiltSetup();
+  try {
+    t.config.modules.consumption = true;
+    Object.assign(t.config.consumption.model, { id: 'cc-1', bound: true });
+    await deployApp(t.ctx);
+    assert.deepEqual(t.runs, [`node ${join('<app>', RAYFIN_CLI)} up --tenant tenant-1 --workspace-id ws-1 --yes`]);
+    assert.deepEqual(JSON.parse(readFileSync(join(t.dir, PREBUILT_STATIC, FABRIC_CONFIG), 'utf8')), {
+      semanticModels: {
+        vl: { workspaceId: 'ws-1', itemId: 'model-1' },
+        cc: { workspaceId: 'ws-1', itemId: 'cc-1' },
+      },
+    });
+    const fa = t.config.fabricApp;
+    assert.equal(fa.name, 'Analytics Hub');
+    assert.equal(fa.profile, undefined);
+    assert.deepEqual(fa.models, ['vl', 'cc']);
+    assert.equal(findDeployment(fa.rayfin?.deployments, 'ws-1')?.fabricItemId, fa.itemId);
+    assert.equal(fa.rayfin?.env, 'CUSTOMER=1\n');
+  } finally {
+    t.cleanup();
+  }
+});
+
+test('app: a newer installer updates the app the last one deployed rather than adding another', async () => {
+  const t = prebuiltSetup();
+  try {
+    await deployApp(t.ctx);
+    const first = t.config.fabricApp.itemId;
+    t.fresh();
+
+    /** @type {any} */
+    let seen;
+    const runner = /** @type {import('../src/steps/app.js').Runner} */ (t.ctx.runner);
+    t.ctx.runner = async (command, args, opts) => {
+      if (args[1] === 'up') seen = { deployments: readFileSync(t.deploymentsFile, 'utf8'), env: readFileSync(join(t.dir, 'rayfin', '.env'), 'utf8') };
+      return runner(command, args, opts);
+    };
+    await deployApp(t.ctx);
+    assert.equal(findDeployment(JSON.parse(seen.deployments), 'ws-1')?.fabricItemId, first, 'rayfin sees the item it deployed before');
+    assert.equal(seen.env, 'CUSTOMER=1\n');
+  } finally {
+    t.cleanup();
+  }
+});
+
+test('app: a prebuilt deploy that fails keeps what Rayfin recorded, and needs its deploy tools', async () => {
+  const t = prebuiltSetup({ upFails: true });
+  try {
+    t.config.fabricApp.rayfin = { deployments: { active: 'x', deployments: { x: { fabricWorkspaceId: 'ws-1', fabricItemId: 'half-made' } } } };
+    await assert.rejects(deployApp(t.ctx), /rayfin up" failed/);
+    assert.equal(t.config.fabricApp.rayfin?.deployments.deployments.x.fabricItemId, 'half-made');
+    assert.equal(t.config.fabricApp.rayfin?.env, 'CUSTOMER=1\n');
+    assert.equal(t.config.fabricApp.itemId, undefined);
+
+    rmSync(join(t.dir, RAYFIN_CLI));
+    await assert.rejects(deployApp(t.ctx), /missing its deploy tools/);
+    assert.ok(!t.runs.some((r) => r.startsWith('npm')), 'never builds the prebuilt app');
+  } finally {
+    t.cleanup();
+  }
+});
+
+test('app: a prebuilt app is offered a redeploy, not a rebuild, when its pages change', async () => {
+  const t = prebuiltSetup();
+  try {
+    const item = t.fabric.add('AppBackend', 'Analytics Hub', null);
+    Object.assign(t.config.fabricApp, { itemId: item.id, models: ['vl'] });
+    t.config.modules.consumption = true;
+    Object.assign(t.config.consumption.model, { id: 'cc-1', bound: true });
+    await ensureFabricApp(t.ctx);
+    const asked = t.ui.asked.join('\n');
+    assert.match(asked, /needs redeploying to add the credit consumption pages\. Deploy it again\?/);
+    assert.doesNotMatch(asked, /Build and deploy/);
+    assert.ok(!t.runs.some((r) => r.startsWith('npm')), 'never builds the prebuilt app');
+  } finally {
+    t.cleanup();
+  }
+});
+
+test('app: fabricConfigFile lists only the models the app is built with', () => {
+  const t = setup({ answers: [] });
+  Object.assign(t.config.semanticModel, { id: 'm' });
+  Object.assign(t.config.agentEvaluator.model, { id: 'ae-1' });
+  assert.deepEqual(fabricConfigFile(t.config, 'ws', ['vl', 'ae']), {
+    semanticModels: { vl: { workspaceId: 'ws', itemId: 'm' }, ae: { workspaceId: 'ws', itemId: 'ae-1' } },
+  });
 });
