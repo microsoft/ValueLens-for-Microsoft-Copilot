@@ -164,10 +164,10 @@ test('pipeline: created once, left alone on re-run, updated when modules change'
   await ensurePipeline(ctx);
   assert.deepEqual(fabric.calls, []);
 
-  config.modules.orgData = false;
+  config.modules.m365Activity = false;
   await ensurePipeline(ctx);
   assert.deepEqual(fabric.calls, ['updatePipeline ValueLens_Pipeline']);
-  assert.equal(config.fabric.pipelineModules, 'core,m365Activity');
+  assert.equal(config.fabric.pipelineModules, 'core,orgData');
   assert.match(ui.text(), /replaces the pipeline definition/);
 });
 
