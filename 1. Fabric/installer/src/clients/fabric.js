@@ -156,7 +156,7 @@ export function fabricApi(http) {
     /** @param {string} workspaceId @param {string} displayName @param {any} definition */
     createSemanticModel: (workspaceId, displayName, definition) =>
       http.requestLro('POST', `/workspaces/${workspaceId}/semanticModels`, {
-        body: { displayName, description: 'ValueLens: Copilot usage and value. Deployed by the ValueLens installer.', definition },
+        body: { displayName, description: 'ValueLens: Copilot usage and value. Deployed by the Analytics Hub installer.', definition },
         lroResult: true,
       }),
     /** @param {string} workspaceId @param {string} id @param {any} definition */
@@ -198,7 +198,7 @@ export function fabricApi(http) {
     /** @param {string} workspaceId @param {string} displayName @param {string} ipynb */
     createNotebook: (workspaceId, displayName, ipynb) =>
       http.requestLro('POST', `/workspaces/${workspaceId}/notebooks`, {
-        body: { displayName, description: 'Deployed by the ValueLens installer.', definition: notebookDefinition(ipynb) },
+        body: { displayName, description: 'Deployed by the Analytics Hub installer.', definition: notebookDefinition(ipynb) },
         lroResult: true,
       }),
     /** @param {string} workspaceId @param {string} id @param {string} ipynb */

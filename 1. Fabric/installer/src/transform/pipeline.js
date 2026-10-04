@@ -283,7 +283,7 @@ export function buildPipeline(template, settings) {
   }
 
   filled.properties.description =
-    'Created by the ValueLens installer. Runs the ingesters, then the Audit Log Processor' +
+    'Created by the Analytics Hub installer. Runs the ingesters, then the Audit Log Processor' +
     `${settings.semanticModelId ? ', then refreshes the semantic model' : ''}. ` +
     `${settings.modules.consumption ? `The credit consumption loads run alongside${settings.consumptionModelId ? ' and refresh the consumption model when they all succeed' : ''}. ` : ''}` +
     `${transcripts ? `The Agent Evaluator reads Copilot Studio transcripts alongside${settings.agentEvaluatorModelId ? ' and refreshes its model' : ''}. ` : ''}` +

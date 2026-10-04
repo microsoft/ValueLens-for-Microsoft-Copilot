@@ -252,7 +252,7 @@ export const NOTEBOOKS = [
       },
       {
         find: "raise ValueError(f'No PersonServiceCreditsMetrics CSV files found in {LANDING}')",
-        replace: "notebookutils.notebook.exit(f'No PersonServiceCreditsMetrics CSV files in {LANDING}, so nothing to load.')  # Set by the ValueLens installer",
+        replace: "notebookutils.notebook.exit(f'No PersonServiceCreditsMetrics CSV files in {LANDING}, so nothing to load.')  # Set by the Analytics Hub installer",
       },
     ],
   },

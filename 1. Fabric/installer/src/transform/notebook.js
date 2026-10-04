@@ -20,7 +20,7 @@
  * @property {import('../catalog.js').NotebookPatch[]} [patches]  Text changes to code cells.
  */
 
-export const MARKER = 'Set by the ValueLens installer';
+export const MARKER = 'Set by the Analytics Hub installer';
 
 /** @param {Cell} cell */
 export function cellText(cell) {
