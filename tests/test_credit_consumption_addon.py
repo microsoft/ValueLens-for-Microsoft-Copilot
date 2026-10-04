@@ -8,10 +8,11 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 ADDON = "Add Credit Consumption"
+# Folder that holds each path's add-on folder.
 PBITS = {
     "4. Local CSV": "Consumption Central - Local CSV.pbit",
     "3. SharePoint": "Consumption Central - Viva Direct.pbit",
-    "1. Fabric": "Consumption Central - Fabric.pbit",
+    "1. Fabric/Manual setup": "Consumption Central - Fabric.pbit",
     "2. Power Automate + Dataverse": "Consumption Central - Power Automate + Dataverse.pbit",
 }
 LINK = re.compile(r"\]\(([^)\s]+)\)")
@@ -41,8 +42,8 @@ class CreditConsumptionAddon(unittest.TestCase):
                     self.assertLessEqual(domains, ALLOWED_DOMAINS, (name, member))
 
     def test_fabric_sample_seeder_points_at_shared_sample(self):
-        source = (ROOT / "1. Fabric" / ADDON / "seed_sample_data.py").read_text(encoding="utf-8")
-        self.assertIn('"..", "..", "4. Local CSV", "Add Credit Consumption", "sample-data"', source)
+        source = (ROOT / "1. Fabric" / "Manual setup" / ADDON / "seed_sample_data.py").read_text(encoding="utf-8")
+        self.assertIn('"..", "..", "..", "4. Local CSV", "Add Credit Consumption", "sample-data"', source)
         self.assertTrue((ROOT / "4. Local CSV" / ADDON / "sample-data" / "README.md").is_file())
 
     def test_relative_links_resolve(self):

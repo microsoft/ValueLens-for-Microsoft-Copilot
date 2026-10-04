@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PATHWAY = ROOT / "2. Power Automate + Dataverse"
 SOURCE = ROOT / "3. SharePoint" / "ValueLens - SharePoint.pbit"
-ONELAKE = ROOT / "1. Fabric" / "ValueLens - Fabric OneLake.pbit"
+ONELAKE = ROOT / "1. Fabric" / "Manual setup" / "ValueLens - Fabric OneLake.pbit"
 TEMPLATE = PATHWAY / "ValueLens - Power Automate + Dataverse.pbit"
 BRIDGE = PATHWAY / "scripts" / "Build-DataverseCoreFeeds.py"
 SOURCE_MAP = PATHWAY / "source-map.json"

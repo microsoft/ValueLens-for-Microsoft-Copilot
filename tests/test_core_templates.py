@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = (
     Path("4. Local CSV") / "ValueLens - Local CSV.pbit",
     Path("3. SharePoint") / "ValueLens - SharePoint.pbit",
-    Path("1. Fabric") / "ValueLens - Fabric.pbit",
-    Path("1. Fabric") / "ValueLens - Fabric OneLake.pbit",
+    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
+    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
     Path("2. Power Automate + Dataverse") / "ValueLens - Power Automate + Dataverse.pbit",
 )
 PAGE_COUNT = 16

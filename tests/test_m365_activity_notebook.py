@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 NAME = "Copilot_M365_Activity_Ingester.ipynb"
-NOTEBOOK = json.loads((ROOT / "1. Fabric" / "notebooks" / NAME).read_text(encoding="utf-8"))
+NOTEBOOK = json.loads((ROOT / "1. Fabric" / "Manual setup" / "notebooks" / NAME).read_text(encoding="utf-8"))
 
 
 def cell(marker):
