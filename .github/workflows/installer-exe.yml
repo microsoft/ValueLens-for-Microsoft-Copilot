@@ -96,5 +96,6 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           gh release create "$TAG" AnalyticsHubInstaller.exe AnalyticsHubInstaller.exe.sha256 \
-            --repo "$GITHUB_REPOSITORY" --draft --generate-notes \
+            --repo "$GITHUB_REPOSITORY" --draft \
+            --notes "Download AnalyticsHubInstaller.exe and open it. Steps: https://github.com/$GITHUB_REPOSITORY/tree/main/1.%20Fabric#install" \
             --title "Analytics Hub installer ${TAG#installer-v}"
