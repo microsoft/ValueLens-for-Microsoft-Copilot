@@ -13,6 +13,7 @@ import {
     type FabricAuthOptions,
 } from "@microsoft/rayfin-auth-provider-fabric";
 import { getRayfinClient } from "@/lib/rayfin-client";
+import { runtimeConfig } from "@/lib/runtime-config";
 
 export interface IAuthService {
     /**
@@ -32,27 +33,26 @@ export interface IAuthService {
 }
 
 /**
- * Read `VITE_*` env vars and construct the auth service used by the app.
+ * Construct the auth service used by the app from the Rayfin and Fabric
+ * settings: the deployed `rayfin.config.json`, or the build's `VITE_*` vars
+ * when there isn't one (see {@link runtimeConfig}).
  *
- * Called from `main.tsx` at module init — **before** React mounts. If
- * any required env var is missing this throws synchronously, the SPA
- * never boots, and the user sees the static `<noscript>` fallback in
- * `index.html`. That is intentional: a Fabric-embedded app with no
- * usable Rayfin or Fabric config has nothing to render.
+ * Called from `root.tsx` before React mounts. If any required value is
+ * missing this throws synchronously and the SPA never boots. That is
+ * intentional: a Fabric-embedded app with no usable Rayfin or Fabric config
+ * has nothing to render.
  *
- * Required vars:
- * - `VITE_RAYFIN_API_URL` — Rayfin API base URL (e.g. `http://localhost:5168`)
- * - `VITE_RAYFIN_PUBLISHABLE_KEY` — Rayfin publishable key (`pk-...`)
- * - `VITE_FABRIC_WORKSPACE_ID` — Fabric workspace ID
- * - `VITE_FABRIC_ITEM_ID` — Fabric item ID
- * - `VITE_FABRIC_PORTAL_URL` — Fabric portal base URL
+ * Required values (build-time var in brackets):
+ * - `apiUrl` (`VITE_RAYFIN_API_URL`) — Rayfin API base URL (e.g. `http://localhost:5168`)
+ * - `publishableKey` (`VITE_RAYFIN_PUBLISHABLE_KEY`) — Rayfin publishable key (`pk-...`)
+ * - `workspaceId` (`VITE_FABRIC_WORKSPACE_ID`) — Fabric workspace ID
+ * - `itemId` (`VITE_FABRIC_ITEM_ID`) — Fabric item ID
+ * - `portalUrl` (`VITE_FABRIC_PORTAL_URL`) — Fabric portal base URL
  */
 export function bootstrapAuth(): IAuthService {
     const client = getRayfinClient();
 
-    const workspaceId = import.meta.env.VITE_FABRIC_WORKSPACE_ID;
-    const projectId = import.meta.env.VITE_FABRIC_ITEM_ID;
-    const fabricPortalUrl = import.meta.env.VITE_FABRIC_PORTAL_URL;
+    const { workspaceId, itemId: projectId, portalUrl: fabricPortalUrl } = runtimeConfig().rayfin;
 
     if (
         !workspaceId ||

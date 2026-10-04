@@ -7,7 +7,6 @@
 
 import { useMemo } from "react";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
-import { fabricConfig } from "@/fabric.generated";
 import { useCommercialTerms } from "@/hooks/commercial-terms.context";
 import { useConsumptionSummary, useConsumptionTable } from "@/hooks/use-consumption-query";
 import { useSummaryQuery, useTableQuery, type TableResult } from "@/hooks/use-table-query";
@@ -16,6 +15,7 @@ import { isConnectionConfigured } from "@/lib/connections";
 import { dateBetween, treatAs } from "@/lib/dax-filters";
 import { FILTER_KEYS, type FilterKey } from "@/lib/filters";
 import { readNumber, readText } from "@/lib/summary-row";
+import { runtimeConfig } from "@/lib/runtime-config";
 import {
     consumptionByProduct,
     consumptionDates,
@@ -53,8 +53,8 @@ import {
 /** Costs are tenant-wide, so only the date filter narrows this stage. */
 export const COST_IGNORED_FILTERS: readonly FilterKey[] = FILTER_KEYS.filter((key) => key !== "dateRange");
 
-/** Whether `fabric.yaml` sets up Consumption Central, where the credit costs come from. */
-export const CONSUMPTION_CONFIGURED = isConnectionConfigured(fabricConfig.semanticModels, consumptionConnection);
+/** Whether the install set up Consumption Central, where the credit costs come from. */
+export const CONSUMPTION_CONFIGURED = isConnectionConfigured(runtimeConfig().semanticModels, consumptionConnection);
 
 /**
  * Whether the credit costs can be counted: Consumption Central isn't set up

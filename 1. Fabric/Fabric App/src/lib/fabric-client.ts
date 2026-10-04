@@ -8,7 +8,7 @@
 import { SemanticModelMessageClient } from "@microsoft/fabric-app-data-embed-client";
 import { FabricClient, type FabricClientConfig } from "@microsoft/fabric-app-data";
 import { EmbedFabricApiProxy } from "@microsoft/fabric-app-data-proxy";
-import { fabricConfig } from "@/fabric.generated";
+import { runtimeConfig } from "@/lib/runtime-config";
 
 let _client: FabricClient | undefined;
 let _messageClient: SemanticModelMessageClient | undefined;
@@ -18,7 +18,8 @@ let _messageClient: SemanticModelMessageClient | undefined;
  *
  * The client is built once using:
  * - An EmbedFabricApiProxy that communicates with the Fabric host via postMessage
- * - Connection aliases from `fabric.generated.ts` (managed by `npx fabric-app-data`)
+ * - Connection aliases from the deployed `fabric.config.json`, or `fabric.generated.ts`
+ *   (managed by `npx fabric-app-data`) when there isn't one
  *
  * @internal Used by `useSemanticModelQuery` — prefer the hook over direct client access.
  */
@@ -28,7 +29,7 @@ export function getFabricClient(): FabricClient {
 
     if (!_client) {
         const proxy = new EmbedFabricApiProxy(_messageClient);
-        _client = new FabricClient({ proxy, ...fabricConfig,  } as FabricClientConfig);
+        _client = new FabricClient({ proxy, semanticModels: runtimeConfig().semanticModels } as FabricClientConfig);
     }
     
     return _client;
