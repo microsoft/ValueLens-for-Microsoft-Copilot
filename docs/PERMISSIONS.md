@@ -28,7 +28,7 @@ One app registration covers all three. Put the client secret in **Azure Key Vaul
 The optional **Microsoft 365 activity** notebook (Fabric path, `m365_activity_daily`) reads the
 Microsoft 365 usage reports with the same `Reports.Read.All`, so it needs no extra permission.
 Its activity only matches people if **Display concealed user, group, and site names in all
-reports** is off (Microsoft 365 admin center → Settings → Org settings → Reports).
+reports** is off (Microsoft 365 admin center → Settings → Org settings → Services → Reports).
 
 ---
 
@@ -36,22 +36,15 @@ reports** is off (Microsoft 365 admin center → Settings → Org settings → R
 
 | Source | API? | Automated-pull permission | Manual-export role |
 |---|---|---|---|
-| **Cost consumption** (M365 Admin Center → Copilot → Cost management) | ❌ export-only | Not read by the current templates (the Credit Meter page was retired). The Fabric ingester is archived in [`1. Fabric/archive/notebooks/`](../1.%20Fabric/archive/notebooks/). | Global Administrator or Billing Administrator |
 | **Product feedback** (OCV / M365 Health) | ❌ export-only | None — there is no API. Landed by the Power Automate flow, then ingested. | Global Administrator or Reports Reader |
 | **Agents 365** | ✅ Graph | `CopilotPackages.Read.All` + `Application.Read.All` (+ `User.Read.All` to resolve creators), admin-consented, **and an Agent 365 licence** in the tenant (else `403`). Used by `Copilot_Agent365_Registry_Ingester` (Fabric) and `Get-Agents365Registry.ps1` (every other path). | Global Administrator or Reports Reader (with **AI Admin** in a Frontier-enrolled tenant), for the CSV fallback via the admin centre |
 
-For the two **export-only** sources, the only "permission" to automate landing is the automation's **OneLake write**
+For the **export-only** source, the only "permission" to automate landing is the automation's **OneLake write**
 right (next section) — the data itself must be exported by an admin (or a scheduled portal export) first.
 
-The four `COST-CONSUMPTION` guides and cost flow JSON in [archive/flows](../1.%20Fabric/archive/flows/) are
-**archived reference**, not recommended active deployment instructions. The cost ingester remains,
-but no current template reads its table.
-
-> **Studio add-ons.** Copilot Studio agent-transcript (Dataverse) analytics and PPAC per-agent /
-> per-user message-credit consumption need extra grants (a Dataverse **Application User** with read on
-> the **Conversation Transcript** table; Power Platform admin export). Those are covered in the archived
-> [Fabric + Copilot Studio](../1.%20Fabric/archive/extended/Fabric%20+%20Copilot%20Studio/) build,
-> kept as reference rather than a recommended active deployment.
+> **Add-ons.** [Agent Evaluator](../1.%20Fabric/Add%20Agent%20Evaluator/README.md) needs the app
+> registration as a Dataverse **application user**.
+> [Credit consumption](../1.%20Fabric/Add%20Credit%20Consumption/README.md) lists its own roles.
 
 ---
 
@@ -69,11 +62,9 @@ but no current template reads its table.
 ## Quick "who do I ask?" summary
 
 - **Just the core dashboard:** one Entra app reg (3 Graph perms, admin-consented) + Contributor on the workspace.
-- **+ Cost / Feedback:** an admin exports the feedback CSV (or schedules a portal export) and lands it via its flow — no extra API permission. Cost consumption is no longer read by the templates.
+- **+ Feedback:** an admin exports the feedback CSV and lands it, by hand or with the flow. No extra API permission.
 - **+ Agents 365:** add `CopilotPackages.Read.All` + `Application.Read.All` (+ `User.Read.All`) to the same app reg, and confirm the tenant has an Agent 365 licence.
 
 See the path README you're following for the step-by-step —
 [1](../1.%20Fabric/README.md) · [2](../2.%20Power%20Automate%20+%20Dataverse/README.md) ·
-[3](../3.%20SharePoint/README.md) · [4](../4.%20Local%20CSV/README.md) — and
-[`OPTIONAL-SOURCES.md`](../1.%20Fabric/docs/OPTIONAL-SOURCES.md)
-for how absent sources stay green on the Fabric path.
+[3](../3.%20SharePoint/README.md) · [4](../4.%20Local%20CSV/README.md).

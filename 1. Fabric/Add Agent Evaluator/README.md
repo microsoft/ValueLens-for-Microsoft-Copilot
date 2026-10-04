@@ -73,22 +73,9 @@ Publish to your workspace. Schedule the notebook, then the report's refresh **af
 
 ---
 
-## What ValueLens changed
-
-The notebook is the upstream parser with three additions. Everything else is unchanged.
-
-- **UPN lookup** (new cell *8c*). Transcripts often name the user only by their Entra object ID,
-  and ValueLens' org data is keyed on UPN. The cell looks each ID up in Microsoft Graph and fills
-  `user_upn`, so department breakdowns work. If the lookup fails, the run carries on with the IDs
-  it has. Set `RESOLVE_UPNS = False` to turn it off.
-- **`RESOLVE_UPNS`** setting in the config cell.
-- **Fabric kernel** (`synapse_pyspark`) in the notebook metadata, so it opens as PySpark.
-
-The template is unchanged. Its **Credit Consumption** page reads the upstream credit ingester's
-tables, which aren't included here, so it stays empty. For Copilot Studio credits, use
-[Add Credit Consumption](../Add%20Credit%20Consumption/).
-
----
+## Changes from upstream
 
 Copied from [microsoft/AgentEvaluator-for-Copilot-Studio ↗](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio)
-(MIT) at commit `e37b1ac`. Full documentation and issues live there.
+(MIT) at commit `e37b1ac`, where the full documentation lives. The notebook adds a UPN lookup
+(cell *8c*) so department views work; set `RESOLVE_UPNS = False` to turn it off. The report's
+**Credit Consumption** page stays empty here: use [Add Credit Consumption](../Add%20Credit%20Consumption/).

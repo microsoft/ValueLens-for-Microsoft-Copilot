@@ -1,170 +1,68 @@
-# Fabric App — Analytics Hub, ValueLens as a web app in your Fabric workspace
+# Analytics Hub app
 
-**Preview.** Analytics Hub is the ValueLens dashboard rebuilt as a fast web app. It's hosted as an item in your
-Fabric workspace, and it reads the ValueLens semantic model you've already published. The app
-keeps no copy of your data: every page queries the model live, as the person viewing it, so
-row-level security applies. The only things it saves are the [rates and pack](#rates--packs),
-the [prices](#prices) and the [task times](#task-times) you type in.
+The ValueLens dashboard as a web app in your Fabric workspace. The [installer](../installer/README.md)
+deploys it for you. Use this folder only to deploy it by hand or to change it.
 
-> **You need a published ValueLens model first.** Set up any path, 1 to 4, and publish its
-> template to a Power BI workspace. All five templates share the fields this app queries.
+The app keeps no copy of your data. Each page queries the semantic model live, as the person
+viewing it, so row-level security applies. How each figure is worked out is in the
+[methodology](../../docs/METHODOLOGY.md).
 
-## What's in it
+## Deploy it by hand
 
-| Page | Answers |
-|---|---|
-| **Adoption** | Who started, who stayed, who stuck: activation, adoption, habit formation, trend heatmap |
-| **Leaderboards** | The people and agents doing the most, plus the agent registry with descriptions |
-| **Work patterns** | How people work across Microsoft 365: meetings, email, chat and files, which apps they use, how many of the apps each person uses and on which devices, and how Copilot users' working weeks compare with everyone else's. Organisations with fewer than five active people share one *Smaller groups* row. From the optional [Microsoft 365 activity](../installer/README.md#microsoft-365-activity) data |
-| **Agent Evaluation** | How well Copilot Studio agents answer: how conversations ended, errors, topic health, knowledge sources and feedback comments, from Agent Evaluator. It never shows the conversations themselves |
-| **Readiness** | Who to license next, and who's ready for Cowork. With Microsoft 365 activity, the licence priority score also weighs how many Microsoft 365 workloads each person uses a day |
-| **Consumption** | Credits used and what they cost across Cowork / Work IQ, Copilot Studio and Azure, from Consumption Central, at rates you can set in the app |
-| **Value** | What the work was, and what it was worth: task breakdown, estimated value, and cost vs value, which sets licence and credit costs against that value |
-| **Efficiency** | Whether the right tool is doing the job: Cowork fit, Model fit, and how grading works |
-| **Feedback** | What people say about Copilot |
-| **Assumptions** | The minutes each task would take without Copilot, with the research behind them. You can change them for your organisation |
-| **Appendix** | Glossary, plus Signal → Impact value assumptions |
+You need:
 
-Filters (date, organisation, licence, activity, agent) apply across the ValueLens pages. The
-Consumption page has its own period, service, group and cost-basis choices, taken from the
-Consumption Central report. The Agent Evaluation page has its own date, department and agent
-slicers, and a Group by choice. The Work patterns page takes the date and organisation filters
-only. The app opens in light mode, and a toggle switches it to dark.
+- A published ValueLens semantic model from any path, 1 to 4.
+- A workspace on Fabric capacity (F2 or larger, or a trial). *My workspace* won't work.
+- The tenant settings **Fabric Apps (preview)** and **Semantic Model Execute Queries REST API** turned on.
+- [Node.js 22.13 or later](https://nodejs.org/).
 
-How each figure is worked out, page by page, is in the [methodology](../../docs/METHODOLOGY.md).
+From this folder (`1. Fabric/Fabric App`):
 
-## Prerequisites
-
-- A workspace on **Fabric capacity** (F2 or above, or a trial) to host the app. *My workspace*
-  can't host it. The app adds a small **SQL database** under its item to hold the rates, prices
-  and task times; it uses that capacity too.
-- A **published ValueLens semantic model**, with **Build** permission on it for everyone who'll use the app.
-- *Optional, for the Consumption page:* a **published Consumption Central semantic model**, with
-  the same Build permission.
-- *Optional, for the Agent Evaluation page:* a **published Agent Evaluator semantic model**, with
-  the same Build permission.
-- *Optional, for the Work patterns page:* the `M365 Activity` table in the ValueLens model. The
-  [installer](../installer/README.md#microsoft-365-activity) adds it. Without it, the page says how
-  to switch it on.
-- The Fabric tenant setting **Fabric Apps (preview)** turned on (Admin portal → Tenant settings).
-- The Power BI tenant setting **Dataset Execute Queries REST API** turned on (Admin portal →
-  Integration settings).
-- [Node.js 22.13 or later](https://nodejs.org/) on the machine you deploy from.
-
-## Set up
-
-Run these commands from this folder (`1. Fabric/Fabric App`).
-
-1. **Install.**
-   ```powershell
-   npm install
-   ```
-2. **Point it at your models.** [`fabric.yaml`](fabric.yaml) ships with placeholders. Replace
-   `workspaceId` and `itemId` under `vl` with your ValueLens semantic model's, under `cc` with
-   your Consumption Central model's, and under `ae` with your Agent Evaluator model's.
-   Both IDs are in each model's URL: `app.powerbi.com/groups/<workspaceId>/datasets/<itemId>/…`
-   Without Consumption Central or Agent Evaluator, leave its placeholders or delete its block
-   (`cc` or `ae`). The app then leaves that page out of the sidebar. If a model is set up but holds
-   no data yet, its page says so instead of showing blanks.
-3. **Deploy.** Sign in when prompted. If your account spans tenants, add `--tenant <tenant-id>`.
+1. Run `npm install`.
+2. In [`fabric.yaml`](fabric.yaml), replace `workspaceId` and `itemId` under `vl` with your
+   ValueLens model's IDs. They're in the model's URL:
+   `app.powerbi.com/groups/<workspaceId>/datasets/<itemId>`. Do the same under `cc` for
+   Consumption Central and `ae` for Agent Evaluator, or delete those blocks to hide their pages.
+3. Deploy, and sign in when asked:
    ```powershell
    npx rayfin up --workspace-uri "https://app.fabric.microsoft.com/groups/<workspace-id>"
    ```
-   It builds the app, creates an item called **valuelens** in the workspace, and prints two links.
-   Use the **Fabric portal** link, or open the item from the workspace. The app loads its data
-   through Fabric, so the `…fabricapps.net` hosting URL on its own only offers a link to the item.
-   To show the item as **Analytics Hub** in the workspace, rename it in its settings; later
-   deploys keep the name.
-4. **Share.** Each viewer needs two things:
-   - **The app:** add them to the workspace (Viewer is enough), or share the app's item
-     with *Run and interact* permission. Then send them the Fabric portal link.
-   - **The data:** Build permission on the ValueLens model, and on Consumption Central and Agent
-     Evaluator if you use them. Without it the app opens, but its pages can't load.
+   Add `--tenant <tenant-id>` if your account spans tenants.
+4. Open the **Fabric portal** link it prints. To call the item **Analytics Hub**, rename it in its
+   settings.
+5. Share it. Each person needs:
+   - the app: Viewer on the workspace, or *Run and interact* on the item
+   - the data: **Build** on each model the app reads
 
-   People from another tenant must first be invited as guests in yours, and guest access to
-   Fabric must be allowed in your tenant settings.
+To update it, run `npx rayfin up` again.
 
-To ship changes, run `npx rayfin up` again. It updates the same item.
+## Settings in the app
 
-## Rates & packs
+Anyone who can open the app can change these, and the change applies for everyone. Share the item
+only with people who should.
 
-The Consumption page prices credits at your commercial terms. Open **Rates & packs** at the top
-of the page to set them:
+- **Rates & packs** (Consumption page): your pay-as-you-go rate, prepaid rate and Capacity Pack
+  balance. Leave a box empty to keep the model's value.
+- **Prices** (Value page, Cost vs value): the Copilot licence price ($30 if empty) and, if your
+  model doesn't use $, the exchange rate.
+- **Time per task** (Assumptions page): the minutes each task would take without Copilot.
+  **Use research** puts them back.
 
-| Field | What it changes |
-|---|---|
-| **Pay-as-you-go rate** | $ per credit for Cowork / Work IQ and Copilot Studio beyond any prepaid pack |
-| **Prepaid rate** | $ per credit drawn from a Capacity Pack |
-| **Capacity Pack balance** | Credits Cowork uses before it pays as it goes. Leave it at 0 with no pack |
+The app saves these in a small SQL database under its item. The Power BI report doesn't see them.
 
-Leave a box empty to keep the model's value. That comes from the `commercial_terms` table in
-[Add Credit Consumption](../Add%20Credit%20Consumption/), or from the model's
-parameters if there's no such table. **Save for everyone** stores the values in the app's SQL
-database, so everyone who opens the app sees the same costs. **Use model values** clears them.
-
-- Anyone who can open the app can change the rates. Share the item only with people who should.
-- Azure AI Foundry cost comes straight from your Azure cost export, so these rates don't change it.
-- Neither does **Pay-as-you-go billed in Azure**, on the Copilot Studio stage. It shows what Azure
-  Cost Management charged for Copilot Studio and Cowork credits, so you can check the rates
-  against the bill. It needs a model the [installer](../installer/README.md#credit-consumption)
-  deployed, and stays hidden until the table has rows.
-- The Power BI report keeps the model's rates. Change `commercial_terms` to update both.
-
-## Prices
-
-The **Cost vs value** stage, at the end of the Value page, sets what Copilot cost against the
-estimated value of the work it did. **Scenario**, at the top of the stage, switches between
-conservative, typical and optimistic effort here and on Estimated value. Open **Prices** beside it
-to set:
-
-| Field | What it changes |
-|---|---|
-| **Microsoft 365 Copilot licence** | $ per user per month. Leave it empty to use the $30 US list price |
-| **Exchange rate** | How much of your value's currency $1 buys, for example 0.75 for £. It only appears when the model's currency symbol isn't $. Licences and credits are billed in dollars, so the stage asks for this before it compares |
-
-They're saved with the rates and pack, for everyone, and used only on this stage. Credit costs
-come from the Consumption page at its rates, so they need Consumption Central. Without it, the
-stage sets licences alone against value. How each figure is worked out is in the
-[methodology](../../docs/METHODOLOGY.md#83-cost-vs-value).
-
-## Task times
-
-Every hours and value figure starts from how many minutes each task would take someone without
-Copilot. ValueLens ships researched Conservative, Typical and Optimistic minutes for each task,
-in the model's `Human Time Estimates` table. **Assumptions → Time per task** lists them, with the
-research link and confidence behind each one.
-
-Type over any minutes to match how long the work takes in your organisation. The page shows the
-hours each change gives before you save. **Save for everyone** stores your times in the app's SQL
-database, and every page in the app then uses them. **Use research** puts one task back, and
-**Use research for every task** puts them all back.
-
-- Anyone who can open the app can change the times. Share the item only with people who should.
-- Times must run Conservative ≤ Typical ≤ Optimistic, from 0 to 480 minutes.
-- Cowork hours come from its task-category bands, not these times, so they don't change.
-- The Power BI report keeps the model's times. Change `Human Time Estimates` to update both.
-
-## Change it
+## Change the app
 
 | Task | How |
 |---|---|
-| Preview edits live | `npm run dev`, then open the app item in Fabric with `&devUri=http://localhost:5173` appended to its URL |
-| Test | `npm test` · `npm run lint` |
-| Edit a query | `src/queries/<page>/`, where each visual has a `.dax` query plus a `.ts` definition |
+| Preview live | `npm run dev`, then open the app in Fabric with `&devUri=http://localhost:5173` on the URL |
+| Test | `npm test` and `npm run lint` |
+| Edit a query | `src/queries/<page>/`: a `.dax` query and a `.ts` definition per visual |
 | Edit a page | `src/screens/<page>/` |
 
-`rayfin up` writes local deploy state to `.env.local`, `rayfin/.env` and `rayfin/.deployments.json`.
-All three are gitignored, because every customer deploys their own copy. It also adds your app's
-URL to `allowedRedirectUris` in `rayfin/rayfin.yml`. Keep that edit, and your IDs in
-`fabric.yaml`, out of any pull request to this repo.
+Don't commit your IDs in `fabric.yaml` or the redirect URI that `rayfin up` adds to
+`rayfin/rayfin.yml`. Its local state files are gitignored.
 
-**The installer's ready-built copy.** [`AnalyticsHubInstaller.exe`](../installer/README.md#download-and-run)
-carries one build of this app for every tenant, so it can't bake in model IDs. When the app loads,
-it reads them from a `fabric.config.json` deployed next to it, in the shape
-`{ "semanticModels": { "vl": { "workspaceId": "…", "itemId": "…" } } }`, and Rayfin's backend
-from the `rayfin.config.json` that `rayfin up` writes. A deploy from this folder has no
-`fabric.config.json`, so it keeps using `fabric.yaml`. See
-[`src/lib/runtime-config.ts`](src/lib/runtime-config.ts).
-
-Built on the [Fabric apps analytics template](https://learn.microsoft.com/fabric/apps/data-apps-template)
-(React, TypeScript, Vite). [`AGENTS.md`](AGENTS.md) has the build conventions for coding agents.
+The installer ships one build for every tenant, so it reads the model IDs from a
+`fabric.config.json` deployed next to the app. A deploy from this folder uses `fabric.yaml`
+instead. See [`src/lib/runtime-config.ts`](src/lib/runtime-config.ts).
+[`AGENTS.md`](AGENTS.md) has the conventions for coding agents.

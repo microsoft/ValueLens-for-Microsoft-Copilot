@@ -13,19 +13,17 @@ Because the schema is identical, the report, every measure, and all downstream M
 producer (notebook or script) is "compatible" **iff** the Delta table / CSV it writes exposes the
 exact column names below (casing and spaces matter).
 
-> **Base (No-Studio) build.** This build reads three **core** sources plus a few standard **optional**
-> sources. Copilot Studio agent-transcript analytics (the `agent_*` Dataverse tables) and the PPAC
-> per-agent / per-user message-credit tables are **not** part of this build — they live in the archived
-> [Fabric + Copilot Studio](../1.%20Fabric/archive/extended/Fabric%20+%20Copilot%20Studio/) template,
-> kept as reference rather than a recommended active deployment.
+> Copilot Studio transcripts and credit consumption are add-ons with their own tables: see
+> [Add Agent Evaluator](../1.%20Fabric/Add%20Agent%20Evaluator/README.md) and
+> [Add Credit Consumption](../1.%20Fabric/Add%20Credit%20Consumption/DATA-DICTIONARY.md).
 
 ---
 
 ## Tier model — core vs optional
 
 Optional sources must **degrade to an empty table with the correct columns** when absent, so the
-template never breaks. See [`OPTIONAL-SOURCES.md`](../1.%20Fabric/docs/OPTIONAL-SOURCES.md) for the `EmptyTable` + `try…otherwise` +
-`Enable_*` toggle pattern.
+template never breaks. Each one is wrapped in `try … otherwise` and switched by its `Enable_*`
+parameter.
 
 | # | Dashboard table | Lakehouse Delta name | Tier | Fabric producer | SharePoint producer |
 | --- | --- | --- | --- | --- | --- |
@@ -34,17 +32,10 @@ template never breaks. See [`OPTIONAL-SOURCES.md`](../1.%20Fabric/docs/OPTIONAL-
 | 3 | Chat + Agent Org Data | `copilot_org_data` | **Core** | `Copilot_Org_Data_Direct_Ingester` *(+ optional `notebooks/optional/workday-org-data/` overlay)* | `Get-EntraOrgData*` |
 | 4 | Agents 365 | `agents_365` | *Optional* | `Copilot_Agent365_Registry_Ingester` *(API, primary)* → `Copilot_Agent365_Lander` *(CSV fallback if the API step fails)* | `Get-Agents365Registry.ps1` *(API)*, or an admin centre export via `-Agents365Csv` *(fallback)* → `Agent 365` CSV (also Local CSV and the Dataverse template) |
 | 5 | ProductFeedback | `user_feedback` | *Optional* | `Copilot_ProductFeedback_Ingester` | OCV feedback CSV (`Feedback File`) |
-| 6 | Copilot Cost Consumption | `copilot_cost_consumption` | *Archived — not read by the templates* | `archive/notebooks/Copilot_Cost_Consumption_Ingester` | — (retired with the Credit Meter page) |
 
 > **Delta table names are lower-case** throughout (`copilot_interactions_parsed`,
 > `copilot_interactions_curated`, …). The dashboard table names in column 2 are the *model* names and
 > may contain spaces.
-
-> **Cost consumption (row 6)** is the **Microsoft 365 Admin Center → Copilot → Cost management** export
-> (Cowork / Work IQ credits). The Credit Meter page that read it has been retired from every template,
-> so no template reads it now; the Fabric ingester remains for your own analysis. The **PPAC**
-> message-credit tables (per-agent / per-user) are an archived Studio add-on — see the archived
-> Extended reference above.
 
 > **`Environment` is licensing only** (`Licensed` / `Unlicensed`). Cowork is identified by
 > `Agent Filter = "Cowork"`. Older processor output that still carries `Environment = "Cowork"`
@@ -101,7 +92,7 @@ columns `AppIdentity_Raw`, `AccessedResources_Raw` and `AISystemPlugin_Raw`; the
 keys remain in these complete raw payloads, not dynamically flattened columns. Canonical
 values and resource-row grain do not change. The entire resource array is repeated for
 each exploded row, and the raw plugin array includes elements after the first.
-See [processor settings, privacy and schema transitions](../1.%20Fabric/notebooks/README.md#audit-processor-copilot_audit_log_processor)
+See [settings you might change](../1.%20Fabric/notebooks/README.md#settings-you-might-change)
 before enabling this default-off option.
 
 ```
@@ -335,48 +326,3 @@ Survey Question, Survey Response Option, Additional Metadata,
 Date Submitted Date, Sentiment
 ```
 *(The model should also keep `MissingField.Ignore` on `Table.RenameColumns` so partial OCV exports remain tolerant.)*
-
-### 6. `copilot_cost_consumption` — Copilot credit usage (MAC Cost management export)
-> **Not read by any current template.** The Credit Meter page and its cost tables were retired from
-> every variant, and the `Cost Consumption File` parameter was removed. The ingester is archived
-> (`1. Fabric/archive/notebooks/`); it and the contract below remain for your own analysis.
-
-Produced by the archived `Copilot_Cost_Consumption_Ingester` from the **Microsoft 365 Admin Center → Copilot →
-Cost management** per-user CSV export (export-only; no API). **Auto-detects two export shapes** and maps
-both to one unified contract: the **surface split** (`Cowork`/`WorkIQ`/`Other` credits) and the
-**per-user usage** export (monthly limit / used / % used / sessions). This is the **only**
-customer-pullable place Cowork/WorkIQ credits appear. Header matching is **case-insensitive**.
-
-```
-User_Principal_Name   (text; join key → org PersonId_Normalized / UPN)
-Display_Name          (text; usage export)
-Cowork_Credits        (double; surface export; blank for usage)
-WorkIQ_Credits        (double; surface export; blank for usage)
-Other_Credits         (double; surface export; blank for usage)
-Total_Credits         (double; = Cowork+WorkIQ+Other, or Monthly credits used)
-Monthly_Credit_Limit  (double; usage export — per-user budget)
-Pct_Used              (double 0–1 fraction; usage export)
-Session_Count         (int64; usage export)
-M365_Copilot_Licensed (text; usage export)
-Last_Activity_Date    (date; parses ISO timestamp + en-US M/d/yyyy)
-SourceFile, LoadDate  (lineage)
-```
-Columns absent from a given export load as null. Grain is a **per-user snapshot**. UPN match isn't 100% —
-unmatched users surface under an **"(Unattributed)"** organization bucket. The ingester, the two
-`COST-CONSUMPTION` guides and the cost flow JSON are all **archived reference** under
-`1. Fabric/archive/` (`notebooks/` and `flows/`), not recommended active deployment instructions. See the
-[archived cost guide](../1.%20Fabric/archive/flows/COST-CONSUMPTION.md).
-
----
-
-## Known compatibility findings (historical — all resolved)
-
-Kept for traceability. None of these are open; if you hit one of these symptoms, you are on an old
-template or an old notebook.
-
-| ID | Table | Finding | Fix |
-| --- | --- | --- | --- |
-| A | `user_feedback` | Empty placeholder had 6 cols; `Table.RenameColumns` expects 17 → refresh broke when no feedback.csv | **Fixed** in notebook (full superset). Also add `MissingField.Ignore` in model. |
-| B | `copilot_licensed_users` | Producer writes underscore names; model variant lists only have spaced/camel forms → UPN + licence load null | **Fixed** — underscore variants added to model |
-| C | `agents_365` | Fabric model read a SharePoint URL | **Fixed** — `Copilot_Agent365_Lander` lands `dbo.agents_365`; table now `FabricTable` + `Enable_Agent365` |
-| D | Audit/Licensed/Org core M | Staged from an older snapshot assuming RAW audit JSON (unconditional adds + `Json.Document`) → "field already exists" on pre-flattened producer output | **Fixed** — re-based on the fixed versions (17 `HasColumns` guards, conditional parse) |
