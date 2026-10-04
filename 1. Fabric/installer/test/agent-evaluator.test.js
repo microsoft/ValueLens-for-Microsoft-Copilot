@@ -116,7 +116,7 @@ const ids = {
   refreshModel: 'nb-refresh',
   agentTranscripts: 'nb-ae',
 };
-const modules = { orgData: true, agent365: false, productFeedback: false, consumption: false, agentEvaluator: true };
+const modules = { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: true };
 /** @param {any} doc */
 const names = (doc) => doc.properties.activities.map((/** @type {any} */ a) => a.name);
 
@@ -197,10 +197,10 @@ test('switches: on once an environment is readable; the model only counts once b
   assert.equal(agentEvaluatorModelDeployed(config), false);
   config.agentEvaluator.model.bound = true;
   assert.equal(agentEvaluatorModelDeployed(config), true);
-  assert.equal(pipelineSignature(config), 'core,orgData,agentEvaluator;model=model-1;agentEvaluator;ae=ae-1');
+  assert.equal(pipelineSignature(config), 'core,orgData,m365Activity,agentEvaluator;model=model-1;agentEvaluator;ae=ae-1');
   config.modules.agentEvaluator = false;
   assert.equal(agentEvaluatorOn(config), false);
-  assert.equal(pipelineSignature(config), 'core,orgData;model=model-1');
+  assert.equal(pipelineSignature(config), 'core,orgData,m365Activity;model=model-1');
 });
 
 test('plan: lists enabled environments by name, keeps earlier choices and access, and flags non-admins', async () => {
@@ -370,6 +370,27 @@ test('model: Fabric mode, offline sources stubbed, so only the Lakehouse is read
   for (const fn of ['CommonDataService.Database', 'File.Contents', 'Folder.Files', 'SharePoint.Files', 'Web.Contents']) assert.ok(!text.includes(fn), fn);
   assert.equal(text.split('Sql.Database(').length - 1, 1);
   assert.match(expr('FabricTable'), /Db = Sql\.Database\(#"Fabric SQL Endpoint", #"Lakehouse Name"\),/, 'a source the service can bind');
+});
+
+test('model: before the parser first runs, the empty fallbacks have the columns the model declares', () => {
+  const file = /** @type {string} */ (realSources().agentEvaluatorModelFile);
+  const template = loadTemplateModel(file);
+  const bim = buildAgentEvaluatorModel(template, { server: 's', database: 'd' });
+  /** @param {any} model @param {string} name */
+  const fallback = (model, name) => {
+    const p = model.tables.find((/** @type {any} */ t) => t.name === name).partitions[0];
+    const text = Array.isArray(p.source.expression) ? p.source.expression.join('\n') : String(p.source.expression);
+    const cols = /FabricTable\("[^"]+"\)\s*otherwise\s*EmptyTable\(\{([^}]*)\}\)/.exec(text)?.[1] ?? '';
+    return [...cols.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  };
+  const perf = fallback(bim.model, 'Agent Performance');
+  for (const c of ['ConversationTranscriptId', 'SessionOutcomeExplicit', 'TotalTokenCount', 'ErrorCategory']) assert.ok(perf.includes(c), c);
+  assert.ok(!perf.includes('InteractionDate'), 'columns the query adds itself stay out');
+  assert.equal(new Set(perf).size, perf.length);
+  const sessions = fallback(bim.model, 'Agent Sessions');
+  for (const c of ['session_outcome_explicit', 'is_returning_user']) assert.ok(sessions.includes(c), c);
+  assert.ok(!sessions.includes('user_upn'));
+  for (const t of ['Agent Catalogue', 'Agent Name Map', 'Agent Errors']) assert.deepEqual(fallback(bim.model, t), fallback(template.model, t), `${t} unchanged`);
 });
 
 /** @param {ReturnType<typeof setup>} t */

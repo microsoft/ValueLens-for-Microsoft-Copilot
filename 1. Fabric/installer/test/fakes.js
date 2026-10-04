@@ -286,7 +286,7 @@ export function fakePowerBi() {
 }
 
 /**
- * @param {{ ui?: import('../src/ui.js').Ui, fabric?: any, graph?: any, oneLake?: any, arm?: any, keyVault?: any, powerBi?: any, discovery?: any, dataverse?: (url: string) => any, runner?: import('../src/steps/app.js').Runner, sources?: import('../src/sources.js').Sources, config?: import('../src/config.js').InstallConfig, now?: Date }} [o]
+ * @param {{ ui?: import('../src/ui.js').Ui, fabric?: any, graph?: any, oneLake?: any, arm?: any, keyVault?: any, powerBi?: any, discovery?: any, powerPlatform?: any, dataverse?: (url: string) => any, runner?: import('../src/steps/app.js').Runner, sources?: import('../src/sources.js').Sources, config?: import('../src/config.js').InstallConfig, now?: Date }} [o]
  */
 export function fakeCtx(o = {}) {
   const config = o.config ?? emptyConfig();
@@ -307,7 +307,18 @@ export function fakeCtx(o = {}) {
       save: () => {
         saves++;
       },
-      api: { fabric: o.fabric, graph: o.graph, oneLake: o.oneLake, arm: o.arm, keyVault: o.keyVault, powerBi: o.powerBi, discovery: o.discovery, dataverse: o.dataverse },
+      api: {
+        fabric: o.fabric,
+        graph: o.graph,
+        oneLake: o.oneLake,
+        arm: o.arm,
+        keyVault: o.keyVault,
+        powerBi: o.powerBi,
+        discovery: o.discovery,
+        // No billing policies unless a test adds some.
+        powerPlatform: o.powerPlatform ?? { billingPolicies: async () => [] },
+        dataverse: o.dataverse,
+      },
       user: { id: 'user-1', upn: 'admin@contoso.com', tenantId: 'tenant-1' },
       sources: o.sources ?? realSources(),
       runner: o.runner,

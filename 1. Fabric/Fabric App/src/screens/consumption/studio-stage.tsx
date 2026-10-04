@@ -32,6 +32,7 @@ import {
     type ConsumptionLens,
     type ConsumptionOptions,
 } from "@/queries/consumption";
+import { AzureBilledPanel } from "./azure-billed";
 import { CREDIT_CURRENCY, LENSES, moneyCell, standalone, useConsumptionSummary, useConsumptionTable } from "./data";
 import { ChartPanel, KpiRowState, NoteCard, Panel, RollupGrid, type TreeColumn } from "@/components/report-panels";
 
@@ -238,6 +239,8 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                     ]}
                 />
             </div>
+
+            <AzureBilledPanel lens={lens} extra={extra} />
 
             <div className="grid grid-cols-1 gap-500 md:grid-cols-2">
                 <ChartPanel

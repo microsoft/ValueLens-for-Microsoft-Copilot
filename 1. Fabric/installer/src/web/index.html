@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="referrer" content="no-referrer">
+<title>Analytics Hub installer</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<script type="module" src="/app.js"></script>
+</head>
+<body>
+<!--
+  THESIS: Trust. A customer admin switches Analytics Hub on in their own tenant while someone watches.
+    Every question says what it is for, nothing is created before the plan has been reviewed,
+    and the run ends as a record they can keep.
+  OWN-WORLD: Analytics Hub. Same Fluent 2 tokens, Segoe UI Variable, 248px rail with nested
+    stages, 48px accent tile and 28px title; ValueLens teal, amber and coral for outcomes only.
+  STORY: Home (record or Set up) -> Sign in -> one question at a time -> the plan: what it
+    creates, the access it grants, where it runs and bills -> Go ahead -> steps with timers ->
+    Done, with links and a record to save.
+  FIRST VIEWPORT: the installation's state and the one action that matters next.
+  FORM: stepper rail with a question card (candidate 3, seed f70d1fc2).
+-->
+<div class="shell">
+  <nav id="rail" class="rail" aria-label="Installer"></nav>
+  <main id="main">
+    <div id="link" class="link" role="status" hidden></div>
+    <div id="view"></div>
+  </main>
+</div>
+<div id="live" class="sr" aria-live="polite"></div>
+<noscript><p class="noscript">The installer needs JavaScript. Or run it in the terminal without --ui.</p></noscript>
+</body>
+</html>

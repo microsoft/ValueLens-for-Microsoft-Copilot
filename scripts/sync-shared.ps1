@@ -16,8 +16,9 @@ Run this after editing any file in `1. Fabric/notebooks/`.
 `Copilot_Audit_Log_Processor.ipynb` is deliberately NOT mirrored: it is a
 downstream transform (parsed -> curated), not an ingester, and the add-ons
 inherit it from the base `1. Fabric` build. `ValueLens_Refresh_Model.ipynb`
-is the installer's semantic model refresh and is not mirrored either. Both
-are listed in $excluded below.
+is the installer's semantic model refresh and `Copilot_M365_Activity_Ingester.ipynb`
+feeds the installer's M365 activity module; neither has an add-on equivalent.
+All three are listed in $excluded below.
 
 .PARAMETER Check
 When set, exits 1 if any destination differs from the source. Used by CI.
@@ -42,9 +43,11 @@ $destinations = @(
 # Notebooks in $source that are NOT mirrored into the add-ons. The processor is
 # a downstream transform, not an ingester, so the add-ons inherit it from the
 # base 1. Fabric build rather than shipping their own copy. The refresh notebook
-# belongs to the installer's semantic model and has no add-on equivalent.
+# belongs to the installer's semantic model and the M365 activity ingester to the
+# installer's M365 activity module; neither has an add-on equivalent.
 $excluded = @(
     'Copilot_Audit_Log_Processor.ipynb',
+    'Copilot_M365_Activity_Ingester.ipynb',
     'ValueLens_Refresh_Model.ipynb'
 )
 

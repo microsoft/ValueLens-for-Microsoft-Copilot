@@ -10,7 +10,7 @@ import { activationByOrg } from "@/queries/adoption/activation-by-org";
 import { trendHeatmap } from "@/queries/adoption/trend-heatmap";
 import { modelFitByOrganization } from "@/queries/efficiency/model-fit-by-organization";
 import { licensePriorityByOrg } from "@/queries/licensing/license-priority-by-org";
-import { describeOrgAttribute, orgColumnRef, pickOrgAttributes, withOrgAttribute } from "./org-attribute";
+import { describeOrgAttribute, orgColumnRef, pickOrgAttributes, withIndefiniteArticle, withOrgAttribute } from "./org-attribute";
 
 describe("describeOrgAttribute", () => {
     it.each([
@@ -22,6 +22,25 @@ describe("describeOrgAttribute", () => {
         ["BU", "BU", "BU", "BUs"],
     ])("names %s for display", (column, label, noun, plural) => {
         expect(describeOrgAttribute(column)).toEqual({ column, label, noun, plural });
+    });
+});
+
+describe("withIndefiniteArticle", () => {
+    it.each([
+        ["organization", "an organization"],
+        ["office location", "an office location"],
+        ["department", "a department"],
+        ["cost centre", "a cost centre"],
+        ["business unit", "a business unit"],
+        ["unit", "a unit"],
+        ["user group", "a user group"],
+        ["HR team", "an HR team"],
+        ["BU", "a BU"],
+        ["SBU", "an SBU"],
+        ["UK region", "a UK region"],
+        ["hourly band", "an hourly band"],
+    ])("reads %s as %s", (phrase, expected) => {
+        expect(withIndefiniteArticle(phrase)).toBe(expected);
     });
 });
 

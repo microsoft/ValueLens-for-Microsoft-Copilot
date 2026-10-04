@@ -12,6 +12,7 @@ export const ARCHIVED_PARAMETERS = ['EnableDataverse', 'EnableConsumption'];
 /** Module branches in the template, so they can be dropped when a module is off. */
 const MODULE_BRANCHES = {
   orgData: { activities: ['Conditionally_Run_Org_Data'], parameter: 'EnableOrgDataPull' },
+  m365Activity: { activities: ['Conditionally_Run_M365_Activity'], parameter: 'EnableM365Activity' },
   agent365: { activities: ['Conditionally_Run_Agent365', 'Run_Agent365_CSV_Fallback'], parameter: 'EnableAgent365' },
   productFeedback: { activities: ['Conditionally_Run_Product_Feedback'], parameter: 'EnableProductFeedback' },
 };
@@ -63,7 +64,7 @@ export const CONSUMPTION_ACTIVITIES = /** @type {const} */ ([
   {
     key: 'azureAi',
     name: 'Run_Consumption_Azure_AI',
-    description: 'Azure AI spend from Cost Management and token use from Azure Monitor, for one subscription. Writes azure_ai_spend and azure_ai_tokens.',
+    description: 'Azure AI spend from Cost Management and token use from Azure Monitor for one subscription, plus Copilot pay-as-you-go from each billing policy\'s subscription. Writes azure_ai_spend, azure_ai_tokens and copilot_payg_spend.',
     timeout: '0.01:00:00',
     // New Azure role assignments can take several minutes to apply.
     retries: 2,
@@ -118,7 +119,7 @@ function refreshStep(settings, o) {
 function refreshActivity(activities, settings) {
   const has = (/** @type {string} */ name) => activities.some((a) => a.name === name);
   const dependsOn = [{ activity: 'Run_Audit_Log_Processor', dependencyConditions: ['Succeeded'] }];
-  for (const name of ['Conditionally_Run_Org_Data', 'Conditionally_Run_Product_Feedback']) {
+  for (const name of ['Conditionally_Run_Org_Data', 'Conditionally_Run_M365_Activity', 'Conditionally_Run_Product_Feedback']) {
     if (has(name)) dependsOn.push({ activity: name, dependencyConditions: ['Completed'] });
   }
   return refreshStep(settings, {
@@ -175,7 +176,7 @@ function consumptionRefreshActivity(activities, settings) {
  */
 function agentTranscriptsActivity(settings) {
   const notebookId = settings.notebookIds.agentTranscripts;
-  if (!notebookId) throw new Error('The Agent Evaluator transcript notebook has not been deployed.');
+  if (!notebookId) throw new Error('The Copilot Studio transcript notebook has not been deployed.');
   return {
     name: AGENT_EVALUATOR_ACTIVITY,
     description: 'Reads Copilot Studio conversation transcripts from each chosen Dataverse environment and merges them into agent_sessions, agent_turns and the other agent tables.',

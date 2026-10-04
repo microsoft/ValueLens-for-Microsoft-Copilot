@@ -7,7 +7,7 @@
 /** Microsoft Graph's application ID. Same in every tenant. */
 export const GRAPH_APP_ID = '00000003-0000-0000-c000-000000000000';
 
-/** @typedef {'core' | 'orgData' | 'agent365' | 'productFeedback' | 'consumption' | 'agentEvaluator'} ModuleId */
+/** @typedef {'core' | 'orgData' | 'm365Activity' | 'agent365' | 'productFeedback' | 'consumption' | 'agentEvaluator'} ModuleId */
 
 /**
  * @typedef {object} ModuleInfo
@@ -40,6 +40,15 @@ export const MODULES = {
     permissions: ['User.Read.All'],
     pipelineParameter: 'EnableOrgDataPull',
   },
+  m365Activity: {
+    id: 'm365Activity',
+    label: 'Microsoft 365 activity',
+    description: 'Daily Teams, Outlook, SharePoint, OneDrive, Viva Engage and Office app activity for each person, from the Microsoft 365 usage reports.',
+    required: false,
+    defaultOn: true,
+    permissions: ['Reports.Read.All'],
+    pipelineParameter: 'EnableM365Activity',
+  },
   agent365: {
     id: 'agent365',
     label: 'Agent 365 registry',
@@ -69,8 +78,8 @@ export const MODULES = {
   },
   agentEvaluator: {
     id: 'agentEvaluator',
-    label: 'Agent Evaluator',
-    description: 'Copilot Studio agent conversations from Dataverse: how they ended, what people thought, and where agents fall short.',
+    label: 'Copilot Studio transcripts',
+    description: 'Agent conversations from Dataverse: how they ended, what people thought, and where agents fall short.',
     required: false,
     defaultOn: false,
     permissions: [],
@@ -79,12 +88,12 @@ export const MODULES = {
 };
 
 /** Modules that change the ValueLens semantic model. The others have their own model or none. */
-export const MODEL_MODULES = /** @type {const} */ (['core', 'orgData', 'agent365', 'productFeedback']);
+export const MODEL_MODULES = /** @type {const} */ (['core', 'orgData', 'm365Activity', 'agent365', 'productFeedback']);
 
 /** Modules offered under "What to collect", in order. */
-export const OPTIONAL_MODULES = /** @type {const} */ (['orgData', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator']);
+export const OPTIONAL_MODULES = /** @type {const} */ (['orgData', 'm365Activity', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator']);
 
-/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts'} NotebookKey */
+/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'm365Activity' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts'} NotebookKey */
 
 /**
  * A text change the installer makes to its copy of a notebook. `find` must occur exactly once.
@@ -158,6 +167,15 @@ export const NOTEBOOKS = [
     credentials: true,
     parameters: [],
     placeholder: 'REPLACE_WITH_ORG_DATA_NOTEBOOK_ID',
+  },
+  {
+    key: 'm365Activity',
+    file: 'Copilot_M365_Activity_Ingester.ipynb',
+    displayName: 'Copilot_M365_Activity_Ingester',
+    module: 'm365Activity',
+    credentials: true,
+    parameters: [],
+    placeholder: 'REPLACE_WITH_M365_ACTIVITY_NOTEBOOK_ID',
   },
   {
     key: 'agent365Registry',
@@ -251,12 +269,13 @@ export const NOTEBOOKS = [
   },
 ];
 
-/** @typedef {{ orgData: boolean, agent365: boolean, productFeedback: boolean, consumption: boolean, agentEvaluator: boolean }} ModuleChoice */
+/** @typedef {{ orgData: boolean, m365Activity: boolean, agent365: boolean, productFeedback: boolean, consumption: boolean, agentEvaluator: boolean }} ModuleChoice */
 
 /** @returns {ModuleChoice} */
 export function defaultModules() {
   return {
     orgData: MODULES.orgData.defaultOn,
+    m365Activity: MODULES.m365Activity.defaultOn,
     agent365: MODULES.agent365.defaultOn,
     productFeedback: MODULES.productFeedback.defaultOn,
     consumption: MODULES.consumption.defaultOn,
@@ -280,6 +299,7 @@ export function enabledModules(modules) {
   /** @type {ModuleId[]} */
   const out = ['core'];
   if (modules.orgData) out.push('orgData');
+  if (modules.m365Activity) out.push('m365Activity');
   if (modules.agent365) out.push('agent365');
   if (modules.productFeedback) out.push('productFeedback');
   if (modules.consumption) out.push('consumption');

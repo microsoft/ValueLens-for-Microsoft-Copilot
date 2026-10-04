@@ -77,6 +77,22 @@ export const liveColumns = {
     ],
     studioDaily: ["[Usage Date]", "[Prepaid Credits]", "[PAYG Credits]", "[Credits]", "[Prepaid Cost]", "[PAYG Cost]"],
     studioBreakdown: ["[Breakdown]", "[Item]", "[Credits]", "[Cost]"],
+    // Declared by the DAX: CopilotPaygSpend is new, so no model had it when these were written.
+    studioAzureBilling: [
+        "[Studio Cost]",
+        "[Studio Credits]",
+        "[Cowork Cost]",
+        "[Cowork Credits]",
+        "[Other Cost]",
+        "[Total Cost]",
+        "[Currency]",
+        "[Currencies]",
+        "[Subscriptions]",
+        "[First Date]",
+        "[Last Date]",
+        "[Rows]",
+    ],
+    studioAzureDaily: ["[Usage Date]", "[Product]", "[Product Sort]", "[Cost]", "[Credits]"],
     studioAgents: ["[Agent]", "[Credits Used]", "[Credit Share]", "[Billable Credits]", "[Estimated Cost]"],
     studioUsers: [
         "Group By[Group]",

@@ -9,4 +9,5 @@ export * from "./license-demand-summary";
 export * from "./license-estate-summary";
 export * from "./license-priority-by-org";
 export * from "./license-candidates";
+export * from "./license-candidates-m365";
 export * from "./license-dormancy";

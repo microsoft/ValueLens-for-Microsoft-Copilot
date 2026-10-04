@@ -244,6 +244,27 @@ the app registration genuinely lacks admin-consented `CopilotPackages.Read.All`,
 `Application.Read.All` and `User.Read.All`. A `403` on the catalog means the tenant has no
 Agent 365 licence.
 
+## Optional — Microsoft 365 activity
+
+| Notebook | Output table | Feeds | Gated by |
+|---|---|---|---|
+| `Copilot_M365_Activity_Ingester` | `m365_activity_daily` | Analytics Hub **Work patterns** page and its licence score | `EnableM365Activity` |
+
+Reads six Microsoft 365 usage reports from Graph, one day at a time: Teams, Outlook, SharePoint,
+OneDrive, Viva Engage and the Microsoft 365 apps. It writes one row per person per day they were
+active, with a flag for each workload and app and the day's counts (meetings, call time, emails,
+chats, files). It uses `Reports.Read.All`, which the licensed-users ingester already needs.
+
+- **History.** Microsoft keeps 28 days of daily reports. The first run loads every day still
+  available; later runs add new days and re-read the last `REREAD_DAYS` (4), which Microsoft may
+  still be filling in. Each day is replaced whole, so re-runs never duplicate rows. Set
+  `RETAIN_DAYS` to trim old history.
+- **Concealed names.** If the Microsoft 365 admin center conceals user names in reports, people
+  arrive as random IDs and can't be matched to Copilot use. The notebook warns, and reloads those
+  days once **Settings → Org settings → Reports** has the setting turned off.
+- **Model.** The installer adds an `M365 Activity` table over it to `ValueLens Model`. The Power BI
+  templates don't read it.
+
 ## Optional — product feedback
 
 | Notebook | Output table | Feeds | Gated by |

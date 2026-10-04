@@ -63,6 +63,7 @@ Alternatively, use **Power BI Service → semantic model → Settings → Refres
 | `Run_Audit_Log_Ingester` | 5–15 min (Purview-bound) | Reads Graph audit log API; writes to `dbo.copilot_interactions_parsed`. No dependency on other tables. |
 | `Run_Licensed_Users_Ingester` | <30 sec | Reads Graph reports endpoint; writes to `dbo.copilot_licensed_users`. No dependency on audit log. |
 | `Conditionally_Run_Org_Data` → `Run_Org_Data_Ingester` | <30 sec when enabled | Reads Graph users endpoint; writes to `dbo.copilot_org_data`. **Optional** — gated by the `EnableOrgDataPull` parameter. |
+| `Conditionally_Run_M365_Activity` → `Run_M365_Activity_Ingester` | 2–10 min when enabled | Reads the six daily Microsoft 365 usage reports (Teams, Outlook, SharePoint, OneDrive, Viva Engage, Microsoft 365 apps); writes one row per person per day to `dbo.m365_activity_daily`. **Optional** — gated by `EnableM365Activity`. |
 | `Conditionally_Run_Agent365` → `Run_Agent365_Registry_Ingester` | Minutes; one Graph call per agent | **Primary Agents 365 source.** Reads the Graph Agent 365 registry; writes `dbo.agents_365`. **Optional** — gated by `EnableAgent365`. |
 | `Run_Agent365_CSV_Fallback` | <1 min | Runs the CSV lander (`Files/agent365/agents.csv` → `dbo.agents_365`) **only if the API branch fails**, e.g. `403` in a tenant with no Agent 365 licence. Skipped otherwise. |
 | `Run_Audit_Log_Processor` | Depends on data volume / Spark startup | Reads `copilot_interactions_parsed`, `copilot_licensed_users` and available `agents_365`; writes `copilot_interactions_curated`. Runs only after audit and licensed-user ingestion succeed and the Agents 365 fallback has succeeded or been skipped. |
@@ -96,6 +97,7 @@ Total runtime now includes the downstream processing stage.
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `EnableOrgDataPull` | Boolean | `true` | When `false`, the Org Data Ingester is skipped. Use this for customers who upload Entra/HRIS data manually (e.g. from their internal HRIS system) instead of pulling from Microsoft Graph — common because Graph's `/users` data is often incomplete vs the customer's source-of-truth HRIS. |
+| `EnableM365Activity` | Boolean | `false` | When `true`, runs the M365 Activity Ingester (Microsoft 365 usage reports per person per day). The installer switches it on by default. |
 | `EnableDataverse` | Boolean | `false` | When `true`, runs the Agent Transcript Parser (Copilot Studio transcripts from Dataverse). |
 | `EnableConsumption` | Boolean | `false` | When `true`, runs the Credit Consumption Ingester. **Export-only** — the CSVs must already be in `Files/credit_consumption/`. |
 | `EnableProductFeedback` | Boolean | `false` | When `true`, runs the Product Feedback Ingester. **Export-only** — the CSVs must already be in `Files/product_feedback/`. |
@@ -111,6 +113,7 @@ To switch one on: set its parameter to `true` **and** replace its notebook GUID 
 
 | Toggle | Activity | Notebook | Notebook-ID placeholder | Notes |
 |---|---|---|---|---|
+| `EnableM365Activity` | `Conditionally_Run_M365_Activity` | `Copilot_M365_Activity_Ingester.ipynb` | `REPLACE_WITH_M365_ACTIVITY_NOTEBOOK_ID` | Graph usage reports; needs `Reports.Read.All`, which the core already uses. The first run loads the last 28 days; later runs add new days and re-read recent ones. Turn off **concealed names in reports** in the Microsoft 365 admin center, or the activity can't be matched to people. |
 | `EnableDataverse` | `Conditionally_Run_Dataverse_Transcripts` | `Copilot_Agent_Transcript_Parser.ipynb` | `REPLACE_WITH_TRANSCRIPT_PARSER_NOTEBOOK_ID` | Live Dataverse pull. Needs the app reg as a Dataverse **Application User** (see [`../../docs/PERMISSIONS.md`](../../docs/PERMISSIONS.md)). |
 | `EnableConsumption` | `Conditionally_Run_Credit_Consumption` | `Copilot_Credit_Consumption_Ingester.ipynb` | `REPLACE_WITH_CREDIT_CONSUMPTION_NOTEBOOK_ID` | **Archived [Fabric + Copilot Studio reference](../archive/extended/Fabric%20+%20Copilot%20Studio/)**; the existing branch remains for compatibility. For existing deployments, see the [archived credit setup](../archive/extended/Fabric%20+%20Copilot%20Studio/CREDIT-CONSUMPTION-SETUP.md). |
 | `EnableProductFeedback` | `Conditionally_Run_Product_Feedback` | `Copilot_ProductFeedback_Ingester.ipynb` | `REPLACE_WITH_PRODUCT_FEEDBACK_NOTEBOOK_ID` | **Export-only.** Land the CSV in `Files/product_feedback/` first (manually or via a [flow](../flows/)). |

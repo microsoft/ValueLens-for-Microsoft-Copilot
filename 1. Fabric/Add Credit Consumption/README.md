@@ -52,7 +52,7 @@ Set the workspace and Lakehouse at the top of each notebook, then run it.
 | `Ingest_Studio` | Power Platform admin centre exports in `Files/landing/studio/` | `studio_*` |
 | `Ingest_GitHub_API` | GitHub REST API *(preferred: runs unattended)* | `github_*` |
 | `Ingest_GitHub` | The emailed AI usage report in `Files/landing/github/` | `github_*` |
-| `Ingest_Azure_AI` | Azure Cost Management and Monitor ([setup ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot/blob/main/docs/ADVANCED-SETUP.md#azure-ingestion-in-fabric)) | `azure_ai_spend`, `azure_ai_tokens` |
+| `Ingest_Azure_AI` | Azure Cost Management and Monitor ([setup ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot/blob/main/docs/ADVANCED-SETUP.md#azure-ingestion-in-fabric)) | `azure_ai_spend`, `azure_ai_tokens`, and `copilot_payg_spend` for Copilot Studio and Cowork pay-as-you-go billed in Azure |
 | `Ingest_CommercialTerms` | Your negotiated rates *(optional; the [Fabric App](../../1.%20Fabric/Fabric%20App/README.md#rates--packs) can also take them)* | `commercial_terms` |
 | `Ingest_Org` | Viva attributes, optionally overridden by files in `Files/landing/org/` | `org_attributes` |
 | `Ingest_Viva_Consumption` | *Fallback only.* A Viva CSV export in `Files/landing/viva/` | `viva_credits_weekly`, `viva_spending_policy` |

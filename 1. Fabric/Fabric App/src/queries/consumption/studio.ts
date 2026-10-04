@@ -19,6 +19,10 @@ import {
 } from "../shared";
 import type { ConsumptionLens } from "./cowork";
 import agentsQuery from "./studio-agents.dax?raw";
+import azureBillingQuery from "./studio-azure-billing.dax?raw";
+import azureDailyQuery from "./studio-azure-daily.dax?raw";
+import azureDailyCostSpec from "./studio-azure-daily-cost.json";
+import azureDailyCreditsSpec from "./studio-azure-daily-credits.json";
 import breakdownQuery from "./studio-breakdown.dax?raw";
 import breakdownCostSpec from "./studio-breakdown-cost.json";
 import breakdownCreditsSpec from "./studio-breakdown-credits.json";
@@ -70,6 +74,44 @@ const dailyColumns: ColumnMetadataMap = {
 export function studioDaily(lens: ConsumptionLens = "consumption") {
     const spec = lens === "cost" ? dailyCostSpec : dailyCreditsSpec;
     return { connection, query: dailyQuery, columnMetadata: dailyColumns, vegaLiteSpec: spec as VisualizationSpec };
+}
+
+const azureBillingColumns: ColumnMetadataMap = {
+    "[Studio Cost]": { name: "Studio Cost", displayName: "Copilot Studio", format: FORMAT_MONEY },
+    "[Studio Credits]": { name: "Studio Credits", displayName: "Copilot Studio credits", format: FORMAT_CREDITS },
+    "[Cowork Cost]": { name: "Cowork Cost", displayName: "Cowork", format: FORMAT_MONEY },
+    "[Cowork Credits]": { name: "Cowork Credits", displayName: "Cowork credits", format: FORMAT_CREDITS },
+    "[Other Cost]": { name: "Other Cost", displayName: "Other", format: FORMAT_MONEY },
+    "[Total Cost]": { name: "Total Cost", displayName: "Billed in Azure", format: FORMAT_MONEY },
+    "[Currency]": { name: "Currency", displayName: "Currency" },
+    "[Currencies]": { name: "Currencies", displayName: "Currencies" },
+    "[Subscriptions]": { name: "Subscriptions", displayName: "Subscriptions", format: FORMAT_WHOLE },
+    "[First Date]": { name: "First Date", displayName: "First day" },
+    "[Last Date]": { name: "Last Date", displayName: "Last day" },
+    "[Rows]": { name: "Rows", displayName: "Rows", format: FORMAT_WHOLE },
+};
+
+/**
+ * Copilot pay-as-you-go as Azure billed it, over the Studio period. Older
+ * models have no CopilotPaygSpend table, so the query errors there and the
+ * screen leaves the panel out.
+ */
+export function studioAzureBilling() {
+    return { connection, query: azureBillingQuery, columnMetadata: azureBillingColumns };
+}
+
+const azureDailyColumns: ColumnMetadataMap = {
+    "[Usage Date]": { name: "Usage Date", displayName: "Day" },
+    "[Product]": { name: "Product", displayName: "Product" },
+    "[Product Sort]": { name: "Product Sort" },
+    "[Cost]": { name: "Cost", displayName: "Cost", format: FORMAT_MONEY },
+    "[Credits]": { name: "Credits", displayName: "Credits", format: FORMAT_CREDITS },
+};
+
+/** Each day's pay-as-you-go billed in Azure, by product. */
+export function studioAzureDaily(lens: ConsumptionLens = "consumption") {
+    const spec = lens === "cost" ? azureDailyCostSpec : azureDailyCreditsSpec;
+    return { connection, query: azureDailyQuery, columnMetadata: azureDailyColumns, vegaLiteSpec: spec as VisualizationSpec };
 }
 
 export type StudioBreakdown = "Model" | "Feature";

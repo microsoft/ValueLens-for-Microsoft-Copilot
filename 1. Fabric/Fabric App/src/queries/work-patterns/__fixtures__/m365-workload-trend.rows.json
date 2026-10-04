@@ -1,0 +1,110 @@
+[
+  {
+    "[Week Start]": "2026-09-07T00:00:00",
+    "[Workload]": "Teams",
+    "[People]": 171,
+    "[Share]": 0.9395604395604396
+  },
+  {
+    "[Week Start]": "2026-09-07T00:00:00",
+    "[Workload]": "Email",
+    "[People]": 160,
+    "[Share]": 0.8791208791208791
+  },
+  {
+    "[Week Start]": "2026-09-07T00:00:00",
+    "[Workload]": "SharePoint",
+    "[People]": 111,
+    "[Share]": 0.6098901098901099
+  },
+  {
+    "[Week Start]": "2026-09-07T00:00:00",
+    "[Workload]": "OneDrive",
+    "[People]": 104,
+    "[Share]": 0.5714285714285714
+  },
+  {
+    "[Week Start]": "2026-09-07T00:00:00",
+    "[Workload]": "Office apps",
+    "[People]": 131,
+    "[Share]": 0.7197802197802198
+  },
+  {
+    "[Week Start]": "2026-09-07T00:00:00",
+    "[Workload]": "Viva Engage",
+    "[People]": 22,
+    "[Share]": 0.12087912087912088
+  },
+  {
+    "[Week Start]": "2026-09-14T00:00:00",
+    "[Workload]": "Teams",
+    "[People]": 181,
+    "[Share]": 0.9526315789473684
+  },
+  {
+    "[Week Start]": "2026-09-14T00:00:00",
+    "[Workload]": "Email",
+    "[People]": 171,
+    "[Share]": 0.9
+  },
+  {
+    "[Week Start]": "2026-09-14T00:00:00",
+    "[Workload]": "SharePoint",
+    "[People]": 122,
+    "[Share]": 0.6421052631578947
+  },
+  {
+    "[Week Start]": "2026-09-14T00:00:00",
+    "[Workload]": "OneDrive",
+    "[People]": 110,
+    "[Share]": 0.5789473684210527
+  },
+  {
+    "[Week Start]": "2026-09-14T00:00:00",
+    "[Workload]": "Office apps",
+    "[People]": 141,
+    "[Share]": 0.7421052631578947
+  },
+  {
+    "[Week Start]": "2026-09-14T00:00:00",
+    "[Workload]": "Viva Engage",
+    "[People]": 27,
+    "[Share]": 0.14210526315789473
+  },
+  {
+    "[Week Start]": "2026-09-21T00:00:00",
+    "[Workload]": "Teams",
+    "[People]": 164,
+    "[Share]": 0.9318181818181818
+  },
+  {
+    "[Week Start]": "2026-09-21T00:00:00",
+    "[Workload]": "Email",
+    "[People]": 151,
+    "[Share]": 0.8579545454545454
+  },
+  {
+    "[Week Start]": "2026-09-21T00:00:00",
+    "[Workload]": "SharePoint",
+    "[People]": 106,
+    "[Share]": 0.6022727272727273
+  },
+  {
+    "[Week Start]": "2026-09-21T00:00:00",
+    "[Workload]": "OneDrive",
+    "[People]": 97,
+    "[Share]": 0.5511363636363636
+  },
+  {
+    "[Week Start]": "2026-09-21T00:00:00",
+    "[Workload]": "Office apps",
+    "[People]": 123,
+    "[Share]": 0.6988636363636364
+  },
+  {
+    "[Week Start]": "2026-09-21T00:00:00",
+    "[Workload]": "Viva Engage",
+    "[People]": 19,
+    "[Share]": 0.10795454545454546
+  }
+]

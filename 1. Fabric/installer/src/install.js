@@ -12,11 +12,12 @@ import { fabricApi, scheduleBody } from './clients/fabric.js';
 import { CONSENT_ROLES, graphApi } from './clients/graph.js';
 import { ONELAKE_URL, oneLakeApi } from './clients/onelake.js';
 import { powerBiApi } from './clients/powerbi.js';
+import { POWER_PLATFORM_URL, powerPlatformApi } from './clients/powerplatform.js';
 import { saveConfig } from './config.js';
 import { createClient, defaultSleep } from './http.js';
 import { ensureConsent, ensureApp, ensureKeyVault, newSecret } from './steps/identity.js';
 import { agentEvaluatorModelWanted, agentEvaluatorSummary, ensureAgentEvaluatorModel, ensureTranscriptAccess } from './steps/agent-evaluator.js';
-import { deployApp, ensureFabricApp } from './steps/app.js';
+import { deployApp, ensureAppName, ensureFabricApp } from './steps/app.js';
 import { consumptionModelWanted, consumptionSummary, ensureAzureAiAccess, ensureConsumptionModel, ensureLandingFolders } from './steps/consumption.js';
 import {
   agentEvaluatorModelDeployed,
@@ -49,6 +50,7 @@ import { c } from './ui.js';
  * @property {import('./clients/onelake.js').OneLakeApi} oneLake
  * @property {import('./clients/powerbi.js').PowerBiApi} powerBi
  * @property {import('./clients/dataverse.js').DiscoveryApi} discovery
+ * @property {import('./clients/powerplatform.js').PowerPlatformApi} powerPlatform
  * @property {(url: string) => import('./clients/dataverse.js').DataverseApi} dataverse  A Dataverse environment, by org URL.
  *
  * @typedef {{ id: string, upn: string, tenantId: string, displayName?: string }} User
@@ -90,6 +92,7 @@ export async function connect(opts) {
     oneLake: oneLakeApi(client(ONELAKE_URL, 'storage')),
     powerBi: powerBiApi(client('https://api.powerbi.com/v1.0/myorg', 'powerbi')),
     discovery: discoveryApi(client(DISCOVERY_URL, 'discovery')),
+    powerPlatform: powerPlatformApi(client(POWER_PLATFORM_URL, 'powerPlatform')),
     dataverse: (url) => dataverseApi(client(`${orgUrl(url)}/api/data/v9.2`, dataverseScope(url)), url),
   };
   const claims = decodeJwt(await getToken('graph'));
@@ -134,7 +137,7 @@ export async function install(ctx, opts) {
   const pre = await preflight(ctx);
   await plan(ctx, pre);
   ctx.save();
-  if (!(await confirmPlan(ctx))) {
+  if (!(await confirmPlan(ctx, pre))) {
     ui.warn('Stopped before changing anything. Your answers are saved for next time.');
     return;
   }
@@ -151,9 +154,9 @@ export async function install(ctx, opts) {
     'Workspace and Lakehouse',
     ...(withModel ? ['Semantic model'] : []),
     ...(withConsumption ? ['Credit consumption'] : []),
-    ...(withAgentEvaluator ? ['Agent Evaluator'] : []),
+    ...(withAgentEvaluator ? ['Copilot Studio transcripts'] : []),
     'Notebooks, pipeline and schedule',
-    ...(withApp ? ['ValueLens app'] : []),
+    ...(withApp ? ['Analytics Hub app'] : []),
     ...(ctx.runFirstLoad ? ['First load'] : withModel ? ['Model refresh'] : []),
   ];
   let n = 0;
@@ -179,7 +182,7 @@ export async function install(ctx, opts) {
     await consumptionSteps(ctx);
   }
   if (withAgentEvaluator) {
-    step('Agent Evaluator');
+    step('Copilot Studio transcripts');
     await agentEvaluatorSteps(ctx);
   }
   step('Notebooks, pipeline and schedule');
@@ -187,7 +190,7 @@ export async function install(ctx, opts) {
   await ensurePipeline(ctx);
   await ensureSchedule(ctx);
   if (withApp) {
-    step('ValueLens app');
+    step('Analytics Hub app');
     await tryDeployApp(ctx);
   }
 
@@ -288,7 +291,7 @@ export async function update(ctx, opts = {}) {
   const { ui, config } = ctx;
   if (!config.fabric.workspaceId || !config.fabric.lakehouseId) throw new Error('Nothing is installed yet. Run the installer first.');
   const sm = config.semanticModel;
-  ui.heading('Updating ValueLens');
+  ui.heading('Updating Analytics Hub');
   ui.note(`From ${ctx.sources.dir}`);
   await ensureKeyVault(ctx);
   await ensureApp(ctx);
@@ -305,7 +308,10 @@ export async function update(ctx, opts = {}) {
   await ensureNotebooks(ctx, { force: true });
   await ensurePipeline(ctx, { force: true });
   await ensureSchedule(ctx);
-  if (sm.enabled && config.fabricApp.enabled && (await ui.confirm('Rebuild and redeploy the ValueLens app too?', true))) await tryDeployApp(ctx, { force: true });
+  if (sm.enabled && config.fabricApp.enabled) {
+    if (await ui.confirm('Rebuild and redeploy the Analytics Hub app too?', true)) await tryDeployApp(ctx, { force: true });
+    else await ensureAppName(ctx);
+  }
   if (modelDeployed(config)) {
     ui.note('Updating a model clears its data, so it refreshes now.');
     await refreshModels(ctx, { wait: opts.wait ?? true });
@@ -337,13 +343,50 @@ export async function refresh(ctx, opts) {
 }
 
 /**
- * Builds and deploys the ValueLens app on its own.
+ * Runs one command against a signed-in context.
+ * @param {Ctx} ctx
+ * @param {string} command
+ * @param {{ wait: boolean, backfillDays?: number }} opts
+ * @returns {Promise<boolean>} false when a run or refresh it waited for didn't succeed.
+ */
+export async function runCommand(ctx, command, opts) {
+  switch (command) {
+    case 'install':
+      await install(ctx, opts);
+      return true;
+    case 'update':
+      await update(ctx, opts);
+      return true;
+    case 'run': {
+      const result = await run(ctx, opts);
+      return !opts.wait || !!result.ok;
+    }
+    case 'refresh': {
+      const result = await refresh(ctx, opts);
+      return !opts.wait || result.ok;
+    }
+    case 'deploy-app':
+      await deployAppNow(ctx);
+      return true;
+    case 'status':
+      await status(ctx);
+      return true;
+    case 'rotate-secret':
+      await rotateSecret(ctx);
+      return true;
+    default:
+      throw new Error(`Unknown command "${command}".`);
+  }
+}
+
+/**
+ * Builds and deploys the Analytics Hub app on its own.
  * @param {Ctx} ctx
  */
 export async function deployAppNow(ctx) {
   const { config, ui } = ctx;
-  if (!modelDeployed(config)) throw new Error('The app needs the semantic model. Run the installer and choose "Semantic model and the ValueLens app".');
-  ui.heading('Deploying the ValueLens app');
+  if (!modelDeployed(config)) throw new Error('The app needs the semantic model. Run the installer and choose "Semantic model and the Analytics Hub app".');
+  ui.heading('Deploying the Analytics Hub app');
   await deployApp(ctx);
   if (config.fabricApp.url) ui.info(config.fabricApp.url);
 }
@@ -375,7 +418,7 @@ export async function summary(ctx) {
   const lakehouse = await api.fabric.getLakehouse(ws, lhId).catch(() => null);
   const sql = lakehouse?.properties?.sqlEndpointProperties;
 
-  ui.heading('ValueLens is set up');
+  ui.heading('Analytics Hub is set up');
   ui.info(`Workspace:  ${f.workspaceName}  ${c.dim(`https://app.fabric.microsoft.com/groups/${ws}`)}`);
   ui.info(`Lakehouse:  ${f.lakehouseName}`);
   ui.info(`Pipeline:   ${f.pipelineName ?? PIPELINE_NAME}, ${describeSchedule(config.schedule)}`);

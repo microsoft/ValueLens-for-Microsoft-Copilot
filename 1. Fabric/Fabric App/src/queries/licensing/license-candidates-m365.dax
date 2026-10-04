@@ -1,0 +1,53 @@
+EVALUATE
+VAR _base =
+    ADDCOLUMNS(
+        FILTER(
+            SUMMARIZECOLUMNS(
+                'Chat + Agent Interactions (Audit Logs)'[Audit_UserId],
+                "@Tasks", [Median Unlicensed AI Tasks Per User Per Week],
+                "@Days", [Median Chat + Agent Active Days Per User Per Week (Unlicensed)],
+                "@Sessions", [Observed Unlicensed Sessions per User per Week],
+                "@Observed", [Observed Unlicensed Sessions]
+            ),
+            [@Tasks] > 0 && [@Days] > 0 && [@Observed] > 0
+        ),
+        "@Breadth",
+            CALCULATE(
+                AVERAGE('M365 Activity'[WorkloadsActive]),
+                'M365 Activity'[WorkloadsActive] > 0,
+                TREATAS({ 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId] }, 'M365 Activity'[UPN_Normalized])
+            )
+    )
+VAR _scored =
+    ADDCOLUMNS(
+        _base,
+        "@Score",
+            VAR _volume = MIN(DIVIDE([@Tasks], 30, 0), 1)
+            VAR _days = MIN(DIVIDE([@Days], 5, 0), 1)
+            RETURN
+                ROUND(
+                    IF(
+                        ISBLANK([@Breadth]),
+                        60 * _volume + 40 * _days,
+                        50 * _volume + 30 * _days + 20 * MIN(DIVIDE([@Breadth], 4, 0), 1)
+                    ),
+                    0
+                )
+    )
+VAR _ranked = ADDCOLUMNS(_scored, "@Rank", RANKX(_scored, [@Score], , DESC, DENSE))
+RETURN
+SELECTCOLUMNS(
+    _ranked,
+    "Rank", [@Rank],
+    "User", 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId],
+    "Organization",
+        LOOKUPVALUE(
+            'Chat + Agent Org Data'[Organization],
+            'Chat + Agent Org Data'[PersonId], 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId]
+        ),
+    "Priority Score", [@Score],
+    "Sessions Per Week", [@Sessions],
+    "Active Days Per Week", [@Days],
+    "Workloads Per Day", [@Breadth]
+)
+ORDER BY [Rank], [Priority Score] DESC, [Sessions Per Week] DESC, [User]

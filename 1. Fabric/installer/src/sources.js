@@ -31,7 +31,7 @@ export function loadSources(dir = DEFAULT_SOURCE_DIR) {
   const root = resolve(dir);
   const pipelineFile = join(root, PIPELINE_TEMPLATE);
   if (!existsSync(pipelineFile)) {
-    throw new Error(`No ValueLens pipeline template at ${pipelineFile}. Point --source at the "1. Fabric" folder of the repo.`);
+    throw new Error(`No pipeline template at ${pipelineFile}. Point --source at the "1. Fabric" folder of the repo.`);
   }
   /** @type {any} */
   const notebooks = {};

@@ -1,0 +1,10 @@
+[
+  { "[Usage Date]": "2026-04-14T00:00:00", "[Product]": "Copilot Studio", "[Product Sort]": 1, "[Cost]": 12.4, "[Credits]": 1240 },
+  { "[Usage Date]": "2026-04-14T00:00:00", "[Product]": "Cowork", "[Product Sort]": 2, "[Cost]": 3.1, "[Credits]": 310 },
+  { "[Usage Date]": "2026-04-15T00:00:00", "[Product]": "Copilot Studio", "[Product Sort]": 1, "[Cost]": 18.75, "[Credits]": 1875 },
+  { "[Usage Date]": "2026-04-16T00:00:00", "[Product]": "Copilot Studio", "[Product Sort]": 1, "[Cost]": 9.2, "[Credits]": 920 },
+  { "[Usage Date]": "2026-04-16T00:00:00", "[Product]": "Cowork", "[Product Sort]": 2, "[Cost]": 4.6, "[Credits]": 460 },
+  { "[Usage Date]": "2026-04-17T00:00:00", "[Product]": "Cowork", "[Product Sort]": 2, "[Cost]": 6.05, "[Credits]": 605 },
+  { "[Usage Date]": "2026-04-18T00:00:00", "[Product]": "Copilot Studio", "[Product Sort]": 1, "[Cost]": 21.3, "[Credits]": 2130 },
+  { "[Usage Date]": "2026-04-18T00:00:00", "[Product]": "Cowork", "[Product Sort]": 2, "[Cost]": 2.45, "[Credits]": 245 }
+]

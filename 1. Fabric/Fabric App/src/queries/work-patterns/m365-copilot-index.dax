@@ -1,0 +1,75 @@
+EVALUATE
+VAR _m365 =
+    CALCULATETABLE(VALUES('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0)
+VAR _copilot =
+    FILTER(
+        VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+        'Chat + Agent Interactions (Audit Logs)'[Audit_UserId] <> ""
+    )
+VAR _using = INTERSECT(_m365, _copilot)
+VAR _rest = EXCEPT(_m365, _copilot)
+VAR _weeks = DIVIDE(DISTINCTCOUNT('M365 Activity'[ActivityDate]), 7)
+VAR _usingWeeks = COUNTROWS(_using) * _weeks
+VAR _restWeeks = COUNTROWS(_rest) * _weeks
+VAR _metrics =
+    DATATABLE(
+        "Metric", STRING,
+        "Order", INTEGER,
+        {
+            { "Active days", 1 },
+            { "Meetings", 2 },
+            { "Call and meeting hours", 3 },
+            { "Emails sent", 4 },
+            { "Chat messages", 5 },
+            { "Files viewed or edited", 6 }
+        }
+    )
+VAR _measured =
+    ADDCOLUMNS(
+        _metrics,
+        "@Using",
+            VAR _order = [Order]
+            RETURN
+                DIVIDE(
+                    CALCULATE(
+                        SWITCH(
+                            _order,
+                            1, CALCULATE(COUNTROWS('M365 Activity'), 'M365 Activity'[WorkloadsActive] > 0),
+                            2, SUM('M365 Activity'[TeamsMeetings]),
+                            3, SUM('M365 Activity'[TeamsAudioSeconds]) / 3600,
+                            4, SUM('M365 Activity'[EmailSent]),
+                            5, SUM('M365 Activity'[TeamsChatMessages]) + SUM('M365 Activity'[TeamsPrivateChatMessages]),
+                            6, SUM('M365 Activity'[SharePointFilesViewedOrEdited]) + SUM('M365 Activity'[OneDriveFilesViewedOrEdited])
+                        ),
+                        TREATAS(_using, 'M365 Activity'[UPN_Normalized])
+                    ),
+                    _usingWeeks
+                ),
+        "@Rest",
+            VAR _order = [Order]
+            RETURN
+                DIVIDE(
+                    CALCULATE(
+                        SWITCH(
+                            _order,
+                            1, CALCULATE(COUNTROWS('M365 Activity'), 'M365 Activity'[WorkloadsActive] > 0),
+                            2, SUM('M365 Activity'[TeamsMeetings]),
+                            3, SUM('M365 Activity'[TeamsAudioSeconds]) / 3600,
+                            4, SUM('M365 Activity'[EmailSent]),
+                            5, SUM('M365 Activity'[TeamsChatMessages]) + SUM('M365 Activity'[TeamsPrivateChatMessages]),
+                            6, SUM('M365 Activity'[SharePointFilesViewedOrEdited]) + SUM('M365 Activity'[OneDriveFilesViewedOrEdited])
+                        ),
+                        TREATAS(_rest, 'M365 Activity'[UPN_Normalized])
+                    ),
+                    _restWeeks
+                )
+    )
+RETURN
+SELECTCOLUMNS(
+    FILTER(_measured, [@Using] > 0 && [@Rest] > 0),
+    "Metric", [Metric],
+    "Copilot Users", [@Using],
+    "Others", [@Rest],
+    "Index", DIVIDE([@Using], [@Rest])
+)
+ORDER BY [Index] DESC, [Metric]

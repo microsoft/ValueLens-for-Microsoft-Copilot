@@ -41,8 +41,19 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {string} [azureSubscriptionId]  Where the Azure AI resources are. Empty when Azure AI was left out.
  * @property {string} [azureSubscriptionName]
  * @property {boolean} [azureAccess]  The app has the Azure roles the notebook needs there.
+ * @property {PaygSubscription[]} [paygSubscriptions]  Other subscriptions that billing policies charge Copilot pay-as-you-go to.
+ * @property {string} [deployedPayg]  The pay-as-you-go subscriptions in the deployed Azure AI notebook, comma-separated.
  * @property {boolean} [landing]  The landing folders exist.
  * @property {ModelConfig} model
+ */
+
+/**
+ * An Azure subscription that Power Platform billing policies charge Copilot Studio and Cowork pay-as-you-go to.
+ * @typedef {object} PaygSubscription
+ * @property {string} subscriptionId
+ * @property {string} [name]
+ * @property {string[]} policies  The billing policies' names.
+ * @property {boolean} [access]  The app has Cost Management Reader there.
  */
 
 /**

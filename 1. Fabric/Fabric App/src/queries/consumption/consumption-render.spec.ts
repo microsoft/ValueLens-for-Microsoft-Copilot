@@ -13,11 +13,12 @@ import { compile } from "vega-lite";
 import type { TopLevelSpec } from "vega-lite";
 import { formatValue } from "@microsoft/fabric-visuals-core";
 import type { ColumnMetadataMap } from "@/lib/to-data-table";
-import { consumptionByProduct, coworkWeekly, foundryByModel, foundryDaily, studioBreakdown, studioDaily } from "./index";
+import { consumptionByProduct, coworkWeekly, foundryByModel, foundryDaily, studioAzureDaily, studioBreakdown, studioDaily } from "./index";
 import productRows from "./__fixtures__/consumption-by-product.rows.json";
 import weeklyRows from "./__fixtures__/cowork-weekly.rows.json";
 import modelRows from "./__fixtures__/foundry-by-model.rows.json";
 import foundryDailyRows from "./__fixtures__/foundry-daily.rows.json";
+import azureDailyRows from "./__fixtures__/studio-azure-daily.rows.json";
 import breakdownRows from "./__fixtures__/studio-breakdown.rows.json";
 import studioDailyRows from "./__fixtures__/studio-daily.rows.json";
 
@@ -193,6 +194,21 @@ describe("studio daily renders", () => {
     });
 });
 
+describe("studio azure-billed daily renders", () => {
+    const rows = azureDailyRows as Row[];
+
+    it.each(["consumption", "cost"] as const)("stacks each day's %s by product, Copilot Studio first", async (lens) => {
+        const { vegaLiteSpec, columnMetadata } = studioAzureDaily(lens);
+        const bars = await render(vegaLiteSpec, rows, columnMetadata, "rect");
+        expect(bars).toHaveLength(rows.length);
+        expectFinite(bars);
+        const day = bars.filter((bar) => bar.datum["Usage Date"] === "2026-04-14T00:00:00");
+        const [studio, cowork] = ["Copilot Studio", "Cowork"].map((product) => day.find((bar) => bar.datum.Product === product)!);
+        expect(studio.bounds.y2).toBeGreaterThan(cowork.bounds.y2);
+        expect(cowork.bounds.y2).toBeCloseTo(studio.bounds.y1, 0);
+    });
+});
+
 describe("studio breakdown renders", () => {
     it("ranks the items by the lens's measure", async () => {
         const rows = (breakdownRows as Row[]).filter((row) => row["[Breakdown]"] === "Model");
@@ -238,6 +254,7 @@ describe("cost axes", () => {
         { name: "cost by product", factory: () => consumptionByProduct(), rows: productRows as Row[] },
         { name: "cowork weekly cost", factory: () => coworkWeekly("cost"), rows: weeklyRows as Row[] },
         { name: "studio daily cost", factory: () => studioDaily("cost"), rows: studioDailyRows as Row[] },
+        { name: "studio azure-billed daily cost", factory: () => studioAzureDaily("cost"), rows: azureDailyRows as Row[] },
         {
             name: "studio breakdown cost",
             factory: () => studioBreakdown("cost"),

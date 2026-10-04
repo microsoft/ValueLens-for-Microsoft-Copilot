@@ -1,0 +1,38 @@
+EVALUATE
+VAR _people =
+    CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0)
+VAR _apps =
+    DATATABLE(
+        "App", STRING,
+        "Order", INTEGER,
+        {
+            { "Outlook", 1 },
+            { "Teams", 2 },
+            { "Word", 3 },
+            { "Excel", 4 },
+            { "PowerPoint", 5 },
+            { "OneNote", 6 }
+        }
+    )
+VAR _measured =
+    ADDCOLUMNS(
+        _apps,
+        "@People",
+            SWITCH(
+                [Order],
+                1, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[AppOutlook] = 1),
+                2, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[AppTeams] = 1),
+                3, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[AppWord] = 1),
+                4, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[AppExcel] = 1),
+                5, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[AppPowerPoint] = 1),
+                6, CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[AppOneNote] = 1)
+            )
+    )
+RETURN
+SELECTCOLUMNS(
+    FILTER(_measured, [@People] > 0),
+    "App", [App],
+    "People", [@People],
+    "Reach", DIVIDE([@People], _people)
+)
+ORDER BY [Reach] DESC, [App]

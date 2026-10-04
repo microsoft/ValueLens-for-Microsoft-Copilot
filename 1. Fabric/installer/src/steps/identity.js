@@ -174,7 +174,7 @@ export async function ensureApp(ctx) {
     app.objectId = application.id;
     app.displayName = application.displayName;
     try {
-      if (await api.graph.ensureRequiredAccess(application, roles)) ui.ok('Added the ValueLens permissions to its API permissions');
+      if (await api.graph.ensureRequiredAccess(application, roles)) ui.ok('Added the Analytics Hub permissions to its API permissions');
     } catch (err) {
       if (!isStatus(err, 403)) throw err;
       ui.warn(`You can't edit ${application.displayName}'s API permissions. An admin must add these Graph application permissions: ${roles.map((r) => r.value).join(', ')}.`);

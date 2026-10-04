@@ -1,0 +1,30 @@
+EVALUATE
+VAR _m365 =
+    CALCULATETABLE(VALUES('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0)
+VAR _copilot =
+    FILTER(
+        VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+        'Chat + Agent Interactions (Audit Logs)'[Audit_UserId] <> ""
+    )
+VAR _licensed =
+    CALCULATETABLE(
+        VALUES('Copilot Licensed'[UPN_Normalized]),
+        FILTER(
+            ALL('Copilot Licensed'[Has license]),
+            UPPER(TRIM('Copilot Licensed'[Has license])) IN { "YES", "TRUE", "Y", "1" }
+        )
+    )
+VAR _people = COUNTROWS(_m365)
+VAR _using = COUNTROWS(INTERSECT(_m365, _copilot))
+VAR _licensedPeople = INTERSECT(_m365, _licensed)
+VAR _licensedIdle = COUNTROWS(EXCEPT(_licensedPeople, _copilot))
+RETURN
+ROW(
+    "M365 People", _people,
+    "Copilot People", COALESCE(_using, 0),
+    "Copilot Reach", DIVIDE(COALESCE(_using, 0), _people),
+    "Not Using", COUNTROWS(EXCEPT(_m365, _copilot)),
+    "Licensed People", COUNTROWS(_licensedPeople),
+    "Licensed Not Using", COALESCE(_licensedIdle, 0),
+    "Licensed Idle Share", DIVIDE(COALESCE(_licensedIdle, 0), COUNTROWS(_licensedPeople))
+)

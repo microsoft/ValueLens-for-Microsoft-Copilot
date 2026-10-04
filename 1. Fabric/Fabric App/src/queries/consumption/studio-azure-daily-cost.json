@@ -1,0 +1,39 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [
+    { "filter": "isValid(datum['Cost'])" },
+    { "calculate": "toDate(datum['Usage Date'])", "as": "Day" }
+  ],
+  "mark": { "type": "bar", "width": { "expr": "max(1, 0.7 * (scale('x', 86400000) - scale('x', 0)))" } },
+  "encoding": {
+    "x": {
+      "field": "Day",
+      "type": "temporal",
+      "title": null,
+      "axis": { "labelExpr": "timeFormat(datum.value, '%-d %b')", "labelAngle": 0, "labelOverlap": true, "tickCount": "week", "grid": false }
+    },
+    "y": {
+      "field": "Cost",
+      "type": "quantitative",
+      "stack": "zero",
+      "title": "Cost",
+      "axis": { "format": ",~f", "formatType": "number" }
+    },
+    "color": {
+      "field": "Product",
+      "type": "nominal",
+      "title": null,
+      "sort": { "field": "Product Sort", "op": "min", "order": "ascending" },
+      "legend": { "orient": "top", "direction": "horizontal" }
+    },
+    "order": { "field": "Product Sort", "type": "quantitative" },
+    "tooltip": [
+      { "field": "Day", "type": "temporal", "title": "Day", "format": "%a %d %b %Y" },
+      { "field": "Product", "type": "nominal", "title": "Product" },
+      { "field": "Cost", "type": "quantitative", "title": "Cost", "format": ",.2f" },
+      { "field": "Credits", "type": "quantitative", "title": "Credits", "format": ",.0f" }
+    ]
+  }
+}

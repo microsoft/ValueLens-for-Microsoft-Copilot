@@ -12,6 +12,7 @@ export const SCOPES = {
   storage: 'https://storage.azure.com/.default',
   powerbi: 'https://analysis.windows.net/powerbi/api/.default',
   discovery: 'https://globaldisco.crm.dynamics.com/.default',
+  powerPlatform: 'https://api.powerplatform.com/.default',
 };
 
 /**

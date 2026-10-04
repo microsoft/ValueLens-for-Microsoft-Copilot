@@ -1,0 +1,32 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [{ "calculate": "datum['Apps'] === 0 ? 7 : datum['Apps']", "as": "Order" }],
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Apps Used",
+      "type": "nominal",
+      "title": null,
+      "sort": { "field": "Order", "op": "min", "order": "ascending" },
+      "axis": { "labelLimit": 200 }
+    },
+    "x": {
+      "field": "Share",
+      "type": "quantitative",
+      "title": "Share of active people",
+      "scale": { "domain": [0, 1] },
+      "axis": { "labelExpr": "format(datum.value, '.0%')" }
+    },
+    "opacity": {
+      "condition": { "test": "datum['Apps'] === 0", "value": 0.4 },
+      "value": 1
+    },
+    "tooltip": [
+      { "field": "Apps Used", "type": "nominal", "title": "Apps used" },
+      { "field": "Share", "type": "quantitative", "title": "Share of active people", "format": ".1%" },
+      { "field": "People", "type": "quantitative", "title": "People", "format": ",.0f" }
+    ]
+  }
+}

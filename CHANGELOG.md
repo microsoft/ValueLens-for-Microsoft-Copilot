@@ -16,6 +16,82 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-03 — Fabric installer: in your browser
+
+`npx valuelens-install --ui` runs the installer as a page in your browser instead of the terminal.
+It opens on a home page: set up Analytics Hub, or, once it's installed, run the pipeline, refresh
+the models, check status, update, redeploy the app, create new secrets, or repair the set-up. The
+questions, the plan and each step's progress appear on the page, and nothing is created before you
+approve the plan. You can save the plan, or a record of a finished run, as Markdown. It works on a
+phone-sized window too.
+
+The page is served on `127.0.0.1` only and opens from the link the installer prints; every request
+needs the key in that link. Pasted secrets never reach the page's history or the saved record. The
+terminal mirrors the page and must stay open. See
+[In your browser](1.%20Fabric/installer/README.md#in-your-browser).
+
+---
+
+## 2026-10-03 — Fabric: Copilot pay-as-you-go billed in Azure
+
+The Copilot Studio and Cowork credit figures come from exports that count credits, not what was
+charged. Credits beyond prepaid capacity are billed to the Azure subscription on a Power Platform
+billing policy, and Azure Cost Management records that bill. The Consumption pages now show it.
+
+`Ingest_Azure_AI` reads Copilot pay-as-you-go from the Azure AI subscription and any listed in
+`PAYG_SUBSCRIPTION_IDS`, splits Copilot Studio from Cowork by the tag Azure puts on the charges, and
+writes `copilot_payg_spend`. The installer reads the billing policies to find their subscriptions,
+gives the app registration Cost Management Reader on each one, and adds a `CopilotPaygSpend` table
+to `ValueLens Consumption Model` at deploy time. The Power BI template doesn't change. A
+subscription it can't grant, or billing policies it can't read, are left out with a note, rather
+than failing the run.
+
+In the Analytics Hub, the Copilot Studio stage has a **Pay-as-you-go billed in Azure** panel: daily
+cost or credits by product for the same period, with totals, the subscriptions and how the bill
+compares with the export. The Cowork stage notes what Azure billed for Cowork. Billing can lag usage
+by a day or more, and no currency conversion is done. Without the table, both stay hidden. See the
+[data dictionary](1.%20Fabric/Add%20Credit%20Consumption/DATA-DICTIONARY.md#copilot_payg_spend).
+
+---
+
+## 2026-10-03 — Fabric: Microsoft 365 activity and the Work patterns page
+
+The installer has a new module, **Microsoft 365 activity**, on by default. Its notebook,
+`Copilot_M365_Activity_Ingester`, reads the Microsoft 365 usage reports from Graph (Teams, Outlook,
+SharePoint, OneDrive, Viva Engage and the Microsoft 365 apps) into one row per person per active
+day. It uses `Reports.Read.All`, which the core already has. The installer adds it to the pipeline
+behind `EnableM365Activity`, and adds an `M365 Activity` table to `ValueLens Model` at deploy time.
+The Power BI templates don't change. `update` adds the module to existing installs, and the
+installer's data check reports the activity table's rows and dates after each `run`.
+
+The Analytics Hub app has a new **Work patterns** page: people active, active days, meetings and
+email per week, how far each workload and app reaches, how many of the apps each person uses and on
+which devices, and how Copilot users' working weeks compare with everyone else's, overall and by
+organisation. The page says which days its figures cover, explains how each is worked out, and
+puts organisations with fewer than five active people into one *Smaller groups* row. With the
+activity loaded, Readiness's *Who to
+license next* adds breadth, the Microsoft 365 workloads someone uses a day, to its priority score:
+50 / 30 / 20 for tasks, days and breadth, instead of 60 / 40. People with no Microsoft 365 activity
+keep the 60 / 40 score.
+
+If the tenant conceals user names in reports, the activity can't be matched to people. The
+notebook and the page say so and how to fix it, and the notebook reloads those days once the
+setting is off. See the [methodology](docs/METHODOLOGY.md#84-work-patterns).
+
+---
+
+## 2026-10-03 — Fabric App: renamed Analytics Hub
+
+The [Fabric App](1.%20Fabric/Fabric%20App/) is now called **Analytics Hub**: the browser tab, the
+sidebar title, the page that points visitors to Fabric, and the installer's prompts. The data side
+keeps the ValueLens name: workspace, Lakehouse, models, pipeline and app registration.
+
+The installer renames an app item still called `valuelens` or "AI in One 2.0" the next time it
+runs, even if you don't rebuild the app. A name you gave it yourself is kept. A manual
+`rayfin up` still creates an item called `valuelens`; rename it in the workspace.
+
+---
+
 ## 2026-10-03 — Fabric installer: Agent Evaluator
 
 The installer can now set up the [Agent Evaluator](1.%20Fabric/Add%20Agent%20Evaluator/) from
@@ -30,7 +106,9 @@ history builds past Dataverse's 30 days, and deploys the `ValueLens Agent Evalua
 ValueLens model's connection. The app is rebuilt with the model as its `ae` source.
 
 The parser and template are copied from upstream commit `e37b1ac`. The notebook gains one cell that
-looks up each user's UPN in Entra, so agent sessions join to org data.
+looks up each user's UPN in Entra, so agent sessions join to org data. The installer adjusts the
+template so the service can bind it to the Lakehouse connection, and so it refreshes before the
+parser's first run, when it reads empty tables.
 
 ---
 
