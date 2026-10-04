@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { request } from 'node:http';
 import { test } from 'node:test';
+import { emptyConfig } from '../src/config.js';
 import { startServer } from '../src/server.js';
 import { createWebUi, plainText, SECRET_MASK, toSegments } from '../src/web-ui.js';
+import { describeRecord, WEB_COMMANDS } from '../src/web-session.js';
 
 const SRC = new URL('../src/', import.meta.url);
 
@@ -236,4 +238,17 @@ test('page: the stages and the finish it waits for are headings the installer pr
   const done = list('DONE_HEADINGS');
   assert.ok(done.length >= 2);
   assert.deepEqual(done.filter((s) => !printed.has(s)), []);
+});
+
+test('page: every command has a row; Check the data needs the data check notebook', async () => {
+  const app = await readFile(new URL('web/app.js', SRC), 'utf8');
+  const rows = /const ROW_ORDER = \[([^\]]*)\]/.exec(app)?.[1] ?? '';
+  assert.deepEqual(WEB_COMMANDS.filter((c) => !rows.includes(`'${c}'`)), []);
+
+  const config = emptyConfig();
+  config.fabric.workspaceId = 'ws-1';
+  config.fabric.lakehouseId = 'lh-1';
+  assert.equal(describeRecord(config).can.check, false);
+  config.fabric.notebooks.dataCheck = 'nb-check';
+  assert.equal(describeRecord(config).can.check, true);
 });

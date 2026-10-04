@@ -1,5 +1,8 @@
 // @ts-check
-/** Runs the pipeline and the data check, and reports on them. */
+/**
+ * Runs the pipeline and the data check, and reports on them. The data check isn't in the pipeline:
+ * it runs after the first load, after `run`, and on `check`.
+ */
 import { DATA_CHECK_FILE } from '../transform/notebook.js';
 import { firstRunParameters } from '../transform/pipeline.js';
 import { c, formatDuration } from '../ui.js';
@@ -125,6 +128,28 @@ export async function runDataCheck(ctx) {
   }
   printDataCheck(ctx, summary);
   return summary;
+}
+
+/**
+ * The `check` command: runs the data check on its own, without the pipeline.
+ * @param {Ctx} ctx
+ */
+export async function checkData(ctx) {
+  const f = ctx.config.fabric;
+  if (!f.workspaceId || !f.lakehouseId || !f.notebooks.dataCheck) throw new Error('There is no data check notebook yet. Run the installer first.');
+  ctx.ui.note('It reads each table in the Lakehouse and usually takes a few minutes.');
+  return runDataCheck(ctx);
+}
+
+/**
+ * Whether a pipeline run ended after the data check, so the tables may have changed since.
+ * @param {any[]} jobs
+ * @param {string | undefined} checkedAt
+ */
+export function ranSince(jobs, checkedAt) {
+  const at = Date.parse(checkedAt ?? '');
+  if (Number.isNaN(at)) return false;
+  return jobs.some((j) => (j.status === 'Completed' || j.status === 'Failed') && (utc(j.endTimeUtc)?.getTime() ?? 0) > at);
 }
 
 const TABLE_LABELS = /** @type {const} */ ({
@@ -263,7 +288,14 @@ export async function status(ctx) {
     const summary = await api.oneLake.readJson(f.workspaceId, f.lakehouseId, DATA_CHECK_FILE).catch(() => null);
     if (summary) {
       ui.heading(`Last data check${summary.checkedAt ? ` (${String(summary.checkedAt).slice(0, 16).replace('T', ' ')} UTC)` : ''}`);
+      if (ranSince(jobs, summary.checkedAt)) {
+        ui.warn('The pipeline has run since this check, so these results may be out of date.');
+        ui.note('Run "valuelens-install check" to check the data again.');
+      }
       printDataCheck(ctx, summary);
+    } else if (f.notebooks.dataCheck && jobs.some((j) => j.status === 'Completed')) {
+      ui.heading('Data check');
+      ui.note('It hasn\'t run yet. Run "valuelens-install check" to see what the pipeline loaded.');
     }
   }
 }

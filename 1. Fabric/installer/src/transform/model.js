@@ -158,8 +158,8 @@ export function buildAgentEvaluatorModel(template, settings) {
     const text = Array.isArray(expr.expression) ? expr.expression.join('\n') : String(expr.expression);
     const at = text.indexOf('=>');
     if (at < 0) throw new Error(`"${name}" is not a function.`);
-    expr.expression = `${text.slice(0, at)}=> error "Not used: the ValueLens installer reads Agent Evaluator data from the Lakehouse."`;
-    expr.description = 'Not used: the ValueLens installer reads Agent Evaluator data from the Lakehouse.';
+    expr.expression = `${text.slice(0, at)}=> error "Not used: the Analytics Hub installer reads Agent Evaluator data from the Lakehouse."`;
+    expr.description = 'Not used: the Analytics Hub installer reads Agent Evaluator data from the Lakehouse.';
   }
   // The service can't bind a Sql.Database whose arguments are worked out inside an if/error, so
   // read the parameters directly, as the ValueLens model does.

@@ -10,7 +10,7 @@ import { runWizard } from './server.js';
 import { loadSources } from './sources.js';
 import { c, createUi } from './ui.js';
 
-const COMMANDS = ['install', 'update', 'run', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'preview'];
+const COMMANDS = ['install', 'update', 'run', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'preview'];
 
 export const HELP = `Sets up Analytics Hub in Microsoft Fabric: the data pipeline, the semantic model and the app.
 
@@ -21,6 +21,7 @@ Commands:
   install          Set up Analytics Hub, or repair it from the install record (default)
   update           Push the notebooks, pipeline and semantic model from this checkout to Fabric
   run              Run the pipeline now, then the data check
+  check            Run the data check again, without the pipeline
   refresh          Refresh the semantic model now
   deploy-app       Build and deploy the Analytics Hub app again
   status           Show recent runs and refreshes, the last data check and when secrets expire

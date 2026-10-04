@@ -1,4 +1,4 @@
-# ValueLens Fabric installer
+# Analytics Hub installer
 
 One command that sets up the [Fabric path](../README.md) in your tenant. It asks a few questions,
 shows you the plan, and then creates everything the manual steps would: the app registration, its
@@ -92,8 +92,8 @@ npx valuelens-install --ui --no-open  # prints the link instead
 
 `--ui` runs the same installer as a page in your browser. It opens on a home page. With no install
 record, you set up Analytics Hub from there. With one, the page shows what's installed and lets
-you run the pipeline, refresh the models, check status, update, redeploy the app, create new
-secrets, or repair or change the set-up. `--tenant`, `--device-code`, `--use-az`, `--config` and
+you run the pipeline, refresh the models, check status, check the data, update, redeploy the app,
+create new secrets, or repair or change the set-up. `--tenant`, `--device-code`, `--use-az`, `--config` and
 `--source` work as they do in the terminal. It doesn't take a command, `--yes` or `preview`.
 
 The questions, the plan and each step's progress appear on the page. Nothing is created before
@@ -129,7 +129,9 @@ the page when nothing is running, to stop.
 
 The data check copy is the only notebook the installer adds to. It writes a short summary to
 `Files/valuelens_installer/data_check.json` in the Lakehouse, so the installer can read the
-result back.
+result back. It isn't part of the pipeline, so the scheduled runs don't update it: it runs after
+the first load, after `run`, and when you run `check`. `status` warns when the pipeline has run
+since the last check.
 
 ## Microsoft 365 activity
 
@@ -226,9 +228,10 @@ Studio set up, so it's skipped. The template's Credit Consumption page stays emp
 | `install` (default) | Sets everything up, or repairs it from the install record. Re-running only does what is missing. It asks before rebuilding an app that is already deployed. |
 | `update` | Pushes the notebooks, pipeline and semantic models from this checkout over the deployed ones, then refreshes the models. A module that's new in this version and on by default, such as [Microsoft 365 activity](#microsoft-365-activity), is added too. It asks whether to redeploy the app too. Use it after you pull a new version of the repo. |
 | `run` | Runs the pipeline now, then the data check. `--backfill-days <n>` reloads that much audit history and rebuilds the curated table. |
+| `check` | Runs the data check again, without the pipeline, and shows the row counts, date ranges and licence matches. |
 | `refresh` | Refreshes the semantic models now and waits for them. |
 | `deploy-app` | Builds and deploys the Analytics Hub app again, for example after a failed deploy or once you have a newer Node.js. |
-| `status` | Shows recent pipeline runs and model refreshes, the last data check, and when the secrets expire. |
+| `status` | Shows recent pipeline runs and model refreshes, the last data check, and when the secrets expire. It says when the data check is older than the last pipeline run. |
 | `rotate-secret` | Creates a new client secret and replaces the one in Key Vault. It also gives the model's connection a new secret and removes its old one. |
 | `preview` | Writes the notebooks, pipeline, schedule and `model.bim` it would deploy to `./valuelens-preview`, without signing in. With credit consumption, also `consumption-model.bim`; with the Agent Evaluator, `agent-evaluator-model.bim`. |
 

@@ -224,7 +224,7 @@ export function fakeGraph() {
   const failures = {};
   const api = {
     /** @param {string} _objectId @param {Date} end @param {string} [displayName] */
-    addPassword: async (_objectId, end, displayName = 'ValueLens installer') => {
+    addPassword: async (_objectId, end, displayName = 'Analytics Hub installer') => {
       calls.push(`addPassword ${displayName}`);
       const err = failures.addPassword?.shift();
       if (err) throw err;

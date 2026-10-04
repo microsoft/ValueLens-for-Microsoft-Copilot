@@ -101,7 +101,7 @@ export function graphApi(http) {
       http.post('/applications', {
         displayName,
         signInAudience: 'AzureADMyOrg',
-        notes: 'Created by the ValueLens installer. Reads Copilot audit, usage report and directory data for ValueLens.',
+        notes: 'Created by the Analytics Hub installer. Reads Copilot audit, usage report and directory data for ValueLens.',
         requiredResourceAccess: [{ resourceAppId: GRAPH_APP_ID, resourceAccess: appRoles.map((r) => ({ id: r.id, type: 'Role' })) }],
       }),
     /**
@@ -130,7 +130,7 @@ export function graphApi(http) {
      * @param {string} [displayName]
      * @returns {Promise<{ secretText: string, endDateTime: string, keyId: string }>}
      */
-    addPassword: (applicationObjectId, endDateTime, displayName = 'ValueLens installer') =>
+    addPassword: (applicationObjectId, endDateTime, displayName = 'Analytics Hub installer') =>
       http.post(`/applications/${applicationObjectId}/addPassword`, {
         passwordCredential: { displayName, endDateTime: endDateTime.toISOString() },
       }),
