@@ -17,6 +17,7 @@
   },
   "scripts": {
     "start": "node bin/valuelens-install.js",
+    "build:exe": "node packaging/build-exe.js",
     "test": "node --test",
     "typecheck": "tsc -p jsconfig.json"
   },

@@ -2,3 +2,4 @@ node_modules/
 valuelens-install.json
 *.tmp
 valuelens-preview/
+dist-exe/

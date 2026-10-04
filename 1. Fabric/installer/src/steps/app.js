@@ -1,10 +1,11 @@
 // @ts-check
 /**
  * Builds the ValueLens web app (`1. Fabric/Fabric App`) against the customer's semantic model and
- * deploys it to their workspace as a Fabric App item, using the app's own Rayfin tooling.
+ * deploys it to their workspace as a Fabric App item, using the app's own Rayfin tooling. The
+ * installer download ships the app already built instead; that copy only needs deploying.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { HttpError } from '../http.js';
 import { agentEvaluatorModelDeployed, consumptionModelDeployed } from './fabric.js';
@@ -24,6 +25,15 @@ export const GENERATED = 'src/fabric.generated.ts';
 export const MIN_NODE = /** @type {const} */ ([22, 13]);
 /** Names the app shipped under before, so a redeploy renames an item that still carries one. */
 export const FORMER_APP_NAMES = ['AI in One 2.0'];
+/** Marks an app folder the installer download ships already built. It deploys as it is. */
+export const PREBUILT_MARKER = 'prebuilt.json';
+/** A prebuilt app's static hosting folder, where `rayfin up` also writes `rayfin.config.json`. */
+export const PREBUILT_STATIC = 'public';
+/** The file a prebuilt app reads its semantic models from. */
+export const FABRIC_CONFIG = 'fabric.config.json';
+
+/** @param {string} dir */
+export const isPrebuilt = (dir) => existsSync(join(dir, PREBUILT_MARKER));
 
 /**
  * @typedef {{ cwd: string, inherit?: boolean, shell?: boolean }} RunOptions
@@ -147,9 +157,12 @@ export async function ensureFabricApp(ctx) {
     const item = await api.fabric.getItem(ws, fa.itemId).catch((err) => (err instanceof HttpError && err.status === 404 ? null : Promise.reject(err)));
     if (item) {
       const changed = (fa.models ?? [APP_ALIAS]).join(',') !== appModels(config).join(',');
+      // A prebuilt app reads its models when it loads, so it only needs deploying.
+      const prebuilt = !!ctx.sources.appDir && isPrebuilt(ctx.sources.appDir);
+      const again = prebuilt ? 'Deploy it again?' : 'Build and deploy it again?';
       const question = changed
-        ? `The app "${item.displayName}" needs rebuilding to ${pagesChange(fa.models ?? [APP_ALIAS], appModels(config))}. Build and deploy it again?`
-        : `The app "${item.displayName}" is deployed. Build and deploy it again?`;
+        ? `The app "${item.displayName}" needs ${prebuilt ? 'redeploying' : 'rebuilding'} to ${pagesChange(fa.models ?? [APP_ALIAS], appModels(config))}. ${again}`
+        : `The app "${item.displayName}" is deployed. ${again}`;
       if (!(await ui.confirm(question, changed))) {
         const name = await keepAppName(ctx, ws, item);
         ui.ok(`App ${name} is in place`);
@@ -205,6 +218,36 @@ export async function deployApp(ctx) {
   if (!dir) throw new Error('This checkout has no "1. Fabric/Fabric App" folder to deploy.');
   if (!modelId) throw new Error('The app needs the semantic model. Deploy it first.');
   if (!nodeVersionOk()) throw new Error(`Building the app needs Node.js ${MIN_NODE.join('.')} or later; this is ${process.versions.node}.`);
+
+  const models = appModels(config);
+  const { record, profile } = isPrebuilt(dir) ? await deployPrebuilt(ctx, dir, ws, models) : await buildAndDeploy(ctx, dir, ws, models);
+
+  const item = await api.fabric.getItem(ws, record.fabricItemId).catch(() => null);
+  const name = item ? await nameApp(ctx, ws, record.fabricItemId, item.displayName) : yamlValue(readText(join(dir, 'rayfin', 'rayfin.yml')), 'name');
+  Object.assign(fa, {
+    enabled: true,
+    itemId: record.fabricItemId,
+    name,
+    url: record.fabricDeepLink ?? record.hostingUrl,
+    profile,
+    models,
+    deployedAt: record.deployedAt ?? ctx.now().toISOString(),
+  });
+  ctx.save();
+  ui.ok(`Deployed the app "${name}"`);
+}
+
+/**
+ * Builds the app from source with the customer's models and deploys it.
+ * @param {Ctx} ctx
+ * @param {string} dir
+ * @param {string} ws
+ * @param {string[]} models
+ */
+async function buildAndDeploy(ctx, dir, ws, models) {
+  const { ui, config } = ctx;
+  const fa = config.fabricApp;
+  const modelId = /** @type {string} */ (config.semanticModel.id);
   const run = ctx.runner ?? defaultRunner;
 
   if (!existsSync(join(dir, RAYFIN_CLI)) || !existsSync(join(dir, DATA_CLI))) {
@@ -227,7 +270,6 @@ export async function deployApp(ctx) {
   const restore = !!previous && String(previous.fabricWorkspaceId).toLowerCase() !== ws.toLowerCase();
 
   const profile = profileName(ws);
-  const models = appModels(config);
   await data('add', 'semanticModel', APP_ALIAS, '--workspace', ws, '--item', modelId, '--profile', profile);
   for (const [alias, id] of /** @type {const} */ ([
     [CONSUMPTION_ALIAS, config.consumption.model.id],
@@ -240,15 +282,10 @@ export async function deployApp(ctx) {
     }
   }
 
-  /** @type {any} */
-  let record;
   try {
     await data('use', profile, '-o', GENERATED);
     ui.info('Building and deploying the app. Rayfin may open a browser for you to sign in.');
-    const res = await run(process.execPath, [join(dir, RAYFIN_CLI), 'up', '--tenant', ctx.user.tenantId, '--workspace-id', ws, '--yes'], { cwd: dir, inherit: true });
-    if (res.code) throw new Error('"rayfin up" failed. Its output is above.');
-    record = findDeployment(readJson(deploymentsFile), ws);
-    if (!record?.fabricItemId) throw new Error('The app deployed, but Rayfin didn\'t record the item it created.');
+    return { record: await rayfinUp(ctx, dir, ws), profile };
   } finally {
     if (restore) {
       if (before.profile && before.profile !== profile) await data('use', before.profile, '-o', GENERATED).catch(() => {});
@@ -258,18 +295,79 @@ export async function deployApp(ctx) {
       ui.note(`Put this checkout back on the "${before.deployments.active}" deployment and the "${before.profile}" profile.`);
     }
   }
+}
 
-  const item = await api.fabric.getItem(ws, record.fabricItemId).catch(() => null);
-  const name = item ? await nameApp(ctx, ws, record.fabricItemId, item.displayName) : yamlValue(readText(join(dir, 'rayfin', 'rayfin.yml')), 'name');
-  Object.assign(fa, {
-    enabled: true,
-    itemId: record.fabricItemId,
-    name,
-    url: record.fabricDeepLink ?? record.hostingUrl,
-    profile,
-    models,
-    deployedAt: record.deployedAt ?? ctx.now().toISOString(),
-  });
-  ctx.save();
-  ui.ok(`Deployed the app "${name}"`);
+/**
+ * Deploys the app the installer download ships already built. It reads its models from a
+ * `fabric.config.json` deployed next to it. Each installer version unpacks a fresh copy, so
+ * what Rayfin records about the deployment lives in the install record between runs: without
+ * it, Rayfin would create a second app rather than update the first.
+ * @param {Ctx} ctx
+ * @param {string} dir
+ * @param {string} ws
+ * @param {string[]} models
+ */
+async function deployPrebuilt(ctx, dir, ws, models) {
+  const { ui, config } = ctx;
+  const fa = config.fabricApp;
+  if (!existsSync(join(dir, RAYFIN_CLI))) throw new Error(`The app in ${dir} is missing its deploy tools. Download the installer again.`);
+
+  writeFileSync(join(dir, PREBUILT_STATIC, FABRIC_CONFIG), `${JSON.stringify(fabricConfigFile(config, ws, models), null, 2)}\n`, 'utf8');
+  const deploymentsFile = join(dir, 'rayfin', '.deployments.json');
+  const envFile = join(dir, 'rayfin', '.env');
+  writeOrRemove(deploymentsFile, fa.rayfin?.deployments ? `${JSON.stringify(fa.rayfin.deployments, null, 2)}\n` : null);
+  writeOrRemove(envFile, fa.rayfin?.env ?? null);
+
+  ui.info('Deploying the app. Rayfin may open a browser for you to sign in.');
+  try {
+    return { record: await rayfinUp(ctx, dir, ws), profile: undefined };
+  } finally {
+    // Kept even when the deploy fails part way, so the next run updates any item it created.
+    const deployments = readJson(deploymentsFile);
+    if (deployments) {
+      const env = readText(envFile);
+      fa.rayfin = { deployments, ...(env ? { env } : {}) };
+      ctx.save();
+    }
+  }
+}
+
+/**
+ * The `fabric.config.json` a prebuilt app reads its semantic models from.
+ * @param {import('../config.js').InstallConfig} config
+ * @param {string} ws
+ * @param {string[]} models
+ */
+export function fabricConfigFile(config, ws, models) {
+  /** @type {Record<string, string | undefined>} */
+  const ids = {
+    [APP_ALIAS]: config.semanticModel.id,
+    [CONSUMPTION_ALIAS]: config.consumption.model.id,
+    [EVALUATOR_ALIAS]: config.agentEvaluator.model.id,
+  };
+  return { semanticModels: Object.fromEntries(models.map((alias) => [alias, { workspaceId: ws, itemId: ids[alias] }])) };
+}
+
+/**
+ * Runs `rayfin up` in the app folder and returns the deployment it recorded for the workspace.
+ * @param {Ctx} ctx
+ * @param {string} dir
+ * @param {string} ws
+ */
+async function rayfinUp(ctx, dir, ws) {
+  const run = ctx.runner ?? defaultRunner;
+  const res = await run(process.execPath, [join(dir, RAYFIN_CLI), 'up', '--tenant', ctx.user.tenantId, '--workspace-id', ws, '--yes'], { cwd: dir, inherit: true });
+  if (res.code) throw new Error('"rayfin up" failed. Its output is above.');
+  const record = findDeployment(readJson(join(dir, 'rayfin', '.deployments.json')), ws);
+  if (!record?.fabricItemId) throw new Error('The app deployed, but Rayfin didn\'t record the item it created.');
+  return record;
+}
+
+/**
+ * @param {string} file
+ * @param {string | null} text  `null` removes the file.
+ */
+function writeOrRemove(file, text) {
+  if (text !== null) writeFileSync(file, text, 'utf8');
+  else rmSync(file, { force: true });
 }

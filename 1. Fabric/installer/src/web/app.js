@@ -102,8 +102,13 @@ const NEEDS = [
   'An Azure subscription where you can create a Key Vault, or a vault you can write secrets to.',
   'Permission to register apps in Entra, or an app registration you already have.',
   'A Global Administrator or Privileged Role Administrator to grant admin consent. If that isn\'t you, you get a link to send them.',
-  'Node.js 22.13 or later on this computer to build the Analytics Hub app.',
 ];
+// AnalyticsHubInstaller.exe carries its own Node.js and a ready-built app.
+const NODE_NEED = 'Node.js 22.13 or later on this computer to build the Analytics Hub app.';
+const fromExe = () => !!app.state?.exe;
+const needs = () => (fromExe() ? NEEDS : [...NEEDS, NODE_NEED]);
+const installerName = () => (fromExe() ? 'AnalyticsHubInstaller.exe' : 'valuelens-install');
+const installerWindow = () => (fromExe() ? 'the installer window' : 'your terminal');
 const GLYPH = { ok: 'check', warn: 'warn', fail: 'x' };
 const STATUS_ICON = { done: 'check', failed: 'x', stopped: 'stop', current: 'current', upcoming: 'circle', skipped: 'minus' };
 const STATUS_TEXT = { done: 'done', failed: 'failed', stopped: 'stopped', current: 'in progress', upcoming: 'to do', skipped: 'skipped' };
@@ -247,7 +252,7 @@ async function post(path, body) {
     if (res.status === 401) setConn('closed');
     return { ok: res.ok, status: res.status, body: data };
   } catch {
-    return { ok: false, status: 0, body: { error: 'Can\'t reach the installer. Is it still running in your terminal?' } };
+    return { ok: false, status: 0, body: { error: `Can't reach the installer. Is it still running in ${installerWindow()}?` } };
   }
 }
 
@@ -298,7 +303,9 @@ async function quit() {
     h('main', { class: 'closed' },
       h('h1', null, 'The installer has stopped'),
       h('p', { class: 'lede' }, 'You can close this tab.'),
-      h('p', { class: 'sub' }, 'To open it again, run valuelens-install --ui in your terminal.'),
+      h('p', { class: 'sub' }, fromExe()
+        ? 'To open it again, run AnalyticsHubInstaller.exe.'
+        : 'To open it again, run valuelens-install --ui in your terminal.'),
     ),
   );
 }
@@ -321,7 +328,7 @@ function setConn(conn) {
     icon('warn'),
     h('span', null, conn === 'lost'
       ? 'Lost the link to the installer. Trying again.'
-      : 'This page has lost its link to the installer. If it\'s still running, open the link it printed in your terminal.'),
+      : `This page has lost its link to the installer. If it's still running, open the link it printed in ${installerWindow()}.`),
   );
 }
 
@@ -1038,7 +1045,7 @@ function renderHome() {
     kids.push(h('section', { class: 'panel' }, h('div', { class: 'panel-head' }, h('h2', null, 'Sign in to your tenant')), form));
     kids.push(h('section', { class: 'panel' },
       h('div', { class: 'panel-head' }, h('h2', null, 'Before you start')),
-      h('div', { class: 'panel-body' }, h('ul', { class: 'needs' }, NEEDS.map((n) => h('li', null, n))))));
+      h('div', { class: 'panel-body' }, h('ul', { class: 'needs' }, needs().map((n) => h('li', null, n))))));
     return h('div', { class: 'page' }, kids);
   }
 
@@ -1347,7 +1354,7 @@ function download(name, lines) {
 
 function runFacts(run) {
   const L = [
-    `- Command: \`valuelens-install ${run.command}\``,
+    `- Command: \`${installerName()} ${run.command}\``,
     `- Started: ${new Date(run.startedAt).toLocaleString()}`,
   ];
   if (run.endedAt) L.push(`- Result: ${blurb(run)}, after ${fmt(run.endedAt - run.startedAt)}`);

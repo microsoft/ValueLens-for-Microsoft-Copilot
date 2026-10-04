@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { installerWindow } from './launch.js';
 import { createSession } from './web-session.js';
 import { c } from './ui.js';
 import { createWebUi } from './web-ui.js';
@@ -137,13 +138,13 @@ export async function startServer(o) {
     const method = req.method ?? 'GET';
 
     if (method === 'GET' && url.pathname === '/' && url.searchParams.has('t')) {
-      if (!tokenOk(url.searchParams.get('t') ?? '')) return page(res, 403, 'That link has expired. Use the one the installer printed in your terminal.');
+      if (!tokenOk(url.searchParams.get('t') ?? '')) return page(res, 403, `That link has expired. Use the one the installer printed in ${installerWindow()}.`);
       res.writeHead(303, { ...HEADERS, Location: '/', 'Set-Cookie': `${cookieName()}=${token}; HttpOnly; SameSite=Strict; Path=/` });
       return res.end();
     }
     if (!tokenOk(cookie(req.headers.cookie, cookieName()))) {
-      if (url.pathname === '/') return page(res, 401, 'Open the link the installer printed in your terminal.');
-      return json(res, 401, { error: 'Open the link the installer printed in your terminal.' });
+      if (url.pathname === '/') return page(res, 401, `Open the link the installer printed in ${installerWindow()}.`);
+      return json(res, 401, { error: `Open the link the installer printed in ${installerWindow()}.` });
     }
 
     if (method === 'GET') {

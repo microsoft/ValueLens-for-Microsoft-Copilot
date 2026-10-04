@@ -9,6 +9,7 @@ import { allowsAction, armLocation, validateVaultName } from '../clients/azure.j
 import { TRANSCRIPT_ROLE } from '../clients/dataverse.js';
 import { APP_ROLES, CONSENT_ROLES } from '../clients/graph.js';
 import { HttpError } from '../http.js';
+import { commandLine } from '../launch.js';
 import { c } from '../ui.js';
 import { MIN_NODE, nodeVersionOk } from './app.js';
 import { agentEvaluatorModelWanted, planAgentEvaluator } from './agent-evaluator.js';
@@ -171,7 +172,7 @@ async function planPowerBi(ctx, pre) {
   if (fa.enabled && !nodeVersionOk()) {
     fa.enabled = false;
     ui.warn(`Building the app needs Node.js ${MIN_NODE.join('.')} or later; this is ${process.versions.node}. Deploying the semantic model only.`);
-    ui.note('Install a newer Node.js, then run "valuelens-install deploy-app".');
+    ui.note(`Install a newer Node.js, then run "${commandLine('deploy-app')}".`);
   }
   if (sm.enabled && !config.modules.orgData) {
     config.modules.orgData = true;
