@@ -1,4 +1,4 @@
-# ValueLens Fabric installer
+# Analytics Hub installer
 
 One command that sets up the [Fabric path](../README.md) in your tenant. It asks a few questions,
 shows you the plan, and then creates everything the manual steps would: the app registration, its

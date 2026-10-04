@@ -16,6 +16,15 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-04 — Fabric installer: now the Analytics Hub installer
+
+The installer now calls itself the Analytics Hub installer in its README and in the descriptions
+it gives what it creates: the app registration's notes and client secret, and the semantic model,
+notebooks and pipeline. The command is still `npx valuelens-install`, and the data-side names (the
+Lakehouse, notebooks, pipeline and models) still say ValueLens.
+
+---
+
 ## 2026-10-04 — Fabric installer: check the data again
 
 The data check isn't part of the pipeline, so the scheduled runs never updated it, and `status`
