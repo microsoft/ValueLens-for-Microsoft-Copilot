@@ -56,10 +56,11 @@ it, open the exe again and choose **Run now**.
 
 Choose these in the installer under **What to collect**. Each one has a few steps of its own.
 
-- [Credit consumption](installer/README.md#credit-consumption): what Copilot costs.
-- [Agent Evaluator](installer/README.md#agent-evaluator): how your Copilot Studio agents perform.
-- [Microsoft 365 activity](installer/README.md#microsoft-365-activity) (on by default): how people
-  work across Teams, Outlook and the Office apps.
+| Extra | What it shows | Where the data comes from |
+|---|---|---|
+| [Credit consumption](installer/README.md#credit-consumption) | Credits used and what they cost across Copilot Studio, Copilot Cowork and Azure AI | Copilot Studio exports from the Power Platform admin center, Cowork credits from Viva Insights, and Azure AI and pay-as-you-go costs from Azure |
+| [Agent Evaluator](installer/README.md#agent-evaluator) | How well your Copilot Studio agents work: how conversations end, topics, knowledge, errors and user feedback | Copilot Studio conversation transcripts in Dataverse |
+| [Microsoft 365 activity](installer/README.md#microsoft-365-activity) *(on by default)* | How people work across Teams, Outlook, SharePoint, OneDrive and the Office apps | Microsoft 365 usage reports |
 
 ## Prefer Power BI Desktop?
 
