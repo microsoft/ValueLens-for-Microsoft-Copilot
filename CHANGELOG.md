@@ -16,6 +16,24 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-05 — A leaner repo: simple steps, less clutter
+
+Every path README is now just the steps to follow. The root README is a short path picker, and
+the Fabric README walks through the installer exe. The notebooks, pipeline, flows, add-on and
+Fabric App READMEs cover only the manual steps they're needed for.
+
+Removed: the archived Fabric templates and extended references (`1. Fabric/archive/`), the
+Dataverse path's archive, the Fabric design docs and checker (`1. Fabric/docs/`), the architecture
+diagrams, page screenshots, `scripts/sync-shared.ps1` and its workflow, and two one-off fix
+scripts. The old Power BI templates are kept, flat, in [`archive/`](archive/). The retired credit
+cost table is gone from the [data dictionary](docs/DATA-DICTIONARY.md); its ingester was already
+archived and no template read it.
+
+The pipeline still carries its `EnableConsumption` branch, off by default, so existing pipelines
+keep working.
+
+---
+
 ## 2026-10-05 — Analytics Hub installer: download and double-click
 
 `AnalyticsHubInstaller.exe` runs the installer without Node.js, a terminal or a clone of this repo.
@@ -26,7 +44,7 @@ pipeline, semantic models and a ready-built Analytics Hub app, and keeps the ins
 next to it, so one build serves every tenant; deploys from a clone still use `fabric.yaml`.
 Messages name `AnalyticsHubInstaller.exe` when it started the installer. A new `installer-exe`
 workflow builds and smoke-tests the exe, and drafts a release for each `installer-v*` tag. See
-[Download and run](1.%20Fabric/installer/README.md#download-and-run).
+[Download and run](1.%20Fabric/installer/README.md#run-it).
 
 ---
 
@@ -44,7 +62,7 @@ Lakehouse, notebooks, pipeline and models) still say ValueLens.
 The data check isn't part of the pipeline, so the scheduled runs never updated it, and `status`
 went on showing what the first load found. `status` now says when the pipeline has run since the
 last check, and `npx valuelens-install check` (or **Check the data** in the browser) runs the check
-again on its own, without the pipeline. See [Commands](1.%20Fabric/installer/README.md#commands).
+again on its own, without the pipeline. See [Commands](1.%20Fabric/installer/README.md#without-the-exe).
 
 ---
 
@@ -60,7 +78,7 @@ phone-sized window too.
 The page is served on `127.0.0.1` only and opens from the link the installer prints; every request
 needs the key in that link. Pasted secrets never reach the page's history or the saved record. The
 terminal mirrors the page and must stay open. See
-[In your browser](1.%20Fabric/installer/README.md#in-your-browser).
+[In your browser](1.%20Fabric/installer/README.md#run-it).
 
 ---
 
@@ -543,11 +561,11 @@ is about 1.2 MB (previously 4.7–10.5 MB) because it no longer carries pending 
   `Credit Unit Cost` tables and the `Cost Consumption File` parameter left the SharePoint and
   Dataverse templates.
   `Copilot_Cost_Consumption_Ingester` moved to
-  [`1. Fabric/archive/notebooks/`](1.%20Fabric/archive/notebooks/); seven shared notebooks remain.
+  `1. Fabric/archive/notebooks/`; seven shared notebooks remain.
 - Power Automate + Dataverse: the `SharePoint Agents` table and the `Include SharePoint agent
   inventory` parameter were dropped (no page used them), and `Use SharePoint CSV fallback` now
   defaults to `false`. The template is built from the same project as the other four, so its old
-  builder moved to [`archive/scripts/`](2.%20Power%20Automate%20+%20Dataverse/archive/README.md).
+  builder moved to `archive/scripts/`.
 
 ### Tests
 
@@ -574,7 +592,7 @@ Agent 365 run. Validate those in your own deployment before switching production
 These notes describe what changed in the notebooks under
 [`1. Fabric/notebooks/`](1.%20Fabric/notebooks/). The guidance you need in order to *run* them
 is in the [Fabric README](1.%20Fabric/README.md) and
-[`INGESTION-STRATEGY.md`](1.%20Fabric/docs/INGESTION-STRATEGY.md).
+`INGESTION-STRATEGY.md`.
 
 ### Audit ingester — `Copilot_Audit_Log_Direct_Ingester`
 
@@ -587,8 +605,8 @@ is in the [Fabric README](1.%20Fabric/README.md) and
 - Parsed output still derives `InteractionDate`, `WeekStart` and `MonthStart` from `CreationDate`.
 - Legacy parsed tables missing the stable key columns now fail clearly and require a deliberate
   fresh backfill before incremental resumes. The upgrade procedure is operational guidance and
-  lives in the [Fabric README](1.%20Fabric/README.md#-setup) and
-  [`INGESTION-STRATEGY.md`](1.%20Fabric/docs/INGESTION-STRATEGY.md).
+  lives in the [Fabric README](1.%20Fabric/README.md) and
+  `INGESTION-STRATEGY.md`.
 
 ### Audit processor — `Copilot_Audit_Log_Processor`
 

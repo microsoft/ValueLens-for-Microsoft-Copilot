@@ -1,127 +1,55 @@
-# 2. Power Automate + Dataverse — preview: the same dashboard, Dataverse as the core transport
+# Power Automate + Dataverse setup
 
-**Additional preview pathway, same ValueLens dashboard.** Every template ships the same
-report; this one reads its required interaction and user/licence feeds from Dataverse
-instead of SharePoint CSVs.
-A representative bounded interval has been exercised through live solution import,
-manual collection, scoped snapshot publication and a full Power BI Desktop model
-refresh. This remains a preview, not a production-scale or unattended-refresh certification.
+This preview path is for customers who use a compatible Power Automate `CopilotInteractionLogging` collector and want ValueLens to read curated Dataverse snapshots.
 
-This is **not a flow-only deployment**. Power Automate collects the records;
-a scheduled PowerShell/Python runner uses the existing ValueLens processor to
-prepare them. That preserves the existing classification and value calculations
-rather than approximating them from incomplete audit summaries.
+## You need
 
-```text
-Compatible CopilotInteractionLogging collector package, with local raw-retention extension
-  -> Dataverse: full original audit records
-  -> ValueLens processor bridge <--- Graph users + assigned Copilot licences
-  -> Dataverse: immutable interactions/users snapshot + completed run manifest
-  -> ValueLens - Power Automate + Dataverse.pbit
+- An isolated Power Platform environment with Dataverse, Power Automate premium/Dataverse licensing, enough Dataverse database capacity, and access to a Power BI workspace.
+- An authorized local unmanaged `CopilotInteractionLogging.zip` collector package supplied outside this repository.
+- A deployment user, Entra app, and Dataverse application user with the full least-privilege access in [`../docs/PERMISSIONS.md`](../docs/PERMISSIONS.md).
+- PowerShell 7+, Python 3.10+, Power BI Desktop, and a commercial-cloud Dataverse URL such as `https://contoso.crm.dynamics.com`.
 
-Optional: compatible SharePointAgentLogging -> Dataverse SharePoint-agent inventory (not read by the current report)
+## Setup
+Run the commands from this folder:
+
+```powershell
+Set-Location ".\2. Power Automate + Dataverse\scripts"
 ```
 
-**Jump to:** [Who it's for](#-who-its-for) · [Prerequisites](#-prerequisites) ·
-[Setup](#-setup) · [Dashboard pages](#-dashboard-pages) ·
-[Troubleshooting](#-troubleshooting) · [Related paths & reference](#-related-paths--reference)
+Keep private ZIP files, tokens, secrets, and run data outside the repository.
 
----
-
-## 👤 Who it's for
-
-You want a **Dataverse-backed** pathway — typically because a compatible Power Automate
-collector solution already runs in your tenant and you'd rather keep the audit records there
-than in SharePoint CSVs or a Lakehouse. Expect to run a scheduled Python/PowerShell refresh
-runner alongside it, and to advance the snapshot parameter by hand. This is a **preview**:
-if you want the settled, supported routes, use [1. Fabric](../1.%20Fabric/) or
-[3. SharePoint](../3.%20SharePoint/).
-
----
-
-## 🧩 Collector package compatibility
-
-The local package adapter **extends a separately supplied authorized interaction
-collector package**: it retains the existing audit query, polling, pagination,
-connections and summary writes, then adds full-record retention and gates its
-success counter on that write. It does not copy private flow definitions into
-this repository. Supply an authorized local **unmanaged**
-`CopilotInteractionLogging.zip`; the adapted ZIP and SHA-256 provenance are
-written outside the repository.
-
-The optional SharePoint inventory uses a compatible
-`SharePointAgentLogging` solution and `poc_sharepointagents` contract. Its
-observed file IDs can be joined to decoded `SPO_*` interaction IDs, **never
-agent display names**. Unmatched agents remain unmatched. The current report
-does not read it (see [the optional inventory step](#optional-add-compatible-sharepoint-agent-inventory)).
-
-Existing `poc_copilotinteractions` summaries do not retain the original message
-IDs and all resource detail required by ValueLens. The extension keeps the
-**full original Graph audit record**, not a reconstruction of those summaries.
-Existing history needs a full-payload backfill within available audit retention.
-
-See [NOTICE.md](NOTICE.md) for component-boundary guidance and
-[source-map.json](source-map.json) for required sources, optional sources and
-unsupported signals.
-
----
-
-## ✅ Prerequisites
-
-| Component | Required configuration |
-|---|---|
-| Power Platform | An isolated demo environment with Dataverse, sufficient database capacity, and appropriate Power Automate premium/Dataverse licensing. |
-| Collector | A separately supplied authorized local unmanaged interaction solution and its documented connections/environment variables. Optional separate compatible SharePoint-agent solution. |
-| Audit API | App-only Graph `AuditLogsQuery.Read.All`, admin consent, and available CopilotInteraction audit records. No Agent 365 licence is required for audit collection. |
-| Directory API | App-only Graph `User.Read.All` and `Organization.Read.All` for users and subscribed SKUs. |
-| Dataverse identity | An application user for the runner's Entra app, with privileges to read raw rows and create/read/update the four companion tables. Consent to Graph does **not** grant Dataverse access. |
-| Schema setup | A deployment identity allowed to customize Dataverse tables, columns and alternate keys. Runtime processing does not need those customization privileges. |
-| Runner | PowerShell 7+, Python 3.10+, network access to Graph/Dataverse, and protected local working storage. No Python third-party packages are required. |
-| Power BI | Desktop to configure/publish the template; appropriate service/workspace licence and Dataverse read access for the refresh identity. No on-premises gateway is needed for the cloud sources. |
-
-Use commercial-cloud `https://<org>.crm[region].dynamics.com` environment origins.
-Sovereign-cloud endpoints are not supported by the current runner.
-
----
-
-## 🛠 Setup
-
-Run commands from this pathway's `scripts` directory. Paths below are examples;
-keep private solution packages, deployment settings, credentials and tenant data
-outside the repository.
-
-### 1. Check local prerequisites
+### 1. Check the workstation
 
 ```powershell
 .\Test-PowerAutomateDataverse-Preflight.ps1 `
-  -DataverseUrl 'https://contoso.crm.dynamics.com' -RequirePac
+  -DataverseUrl 'https://contoso.crm.dynamics.com' `
+  -RequirePac
 ```
 
-`pac` is needed for solution import, not for local processor use. Omitting
-`-RequirePac` permits the local checks without the CLI.
+Use `-RequirePac` on the computer that imports the solution. Omit it only for local checks that do not import.
 
-### 2. Provision the four companion tables
+### 2. Create the Dataverse core tables
+
+Dry run first:
 
 ```powershell
-# Dry run: no network calls or credentials.
 python .\Deploy-DataverseCoreSchema.py `
   --dataverse-url 'https://contoso.crm.dynamics.com'
 ```
 
-After approving the target environment and privileges, obtain its Dataverse
-access token securely in process environment variable `DATAVERSE_TOKEN` and
-repeat with `--execute`. The helper creates/verifies the string and memo
-columns and waits for the `poc_rowkey` alternate keys to become active.
-It does not provision app users, assign security roles, grant consent or delete data.
+For the live schema write, set `DATAVERSE_TOKEN` in the process environment, then run:
 
-| Entity set | Contents |
-|---|---|
-| `poc_valuelensrawaudits` | Full original Graph audit records, upserted by lowercase audit ID. |
-| `poc_valuelensinteractions` | Curated interaction rows, isolated by bridge run ID. |
-| `poc_valuelensusers` | Matching curated user/licence rows from the same bridge run. |
-| `poc_valuelensruns` | Completed-run manifests, row counts and column contracts. |
+```powershell
+python .\Deploy-DataverseCoreSchema.py `
+  --dataverse-url 'https://contoso.crm.dynamics.com' `
+  --execute
+```
 
-### 3. Prepare and import the interaction flow
+This creates or verifies `poc_valuelensrawaudits`, `poc_valuelensinteractions`, `poc_valuelensusers`, and `poc_valuelensruns`.
+
+### 3. Prepare and import the collector
+
+Create the raw-retention copy of your unmanaged collector package:
 
 ```powershell
 python .\Prepare-CollectorRawCapture.py `
@@ -129,259 +57,98 @@ python .\Prepare-CollectorRawCapture.py `
   --out-zip 'C:\PrivateSolutions\ValueLens\CopilotInteractionLoggingRaw.zip'
 ```
 
-The adapter refuses managed sources, unsupported flow structures, double-patching
-and outputs inside the repository. It produces an **unmanaged** package and
-provenance JSON; it does not import or activate anything.
+Import `CopilotInteractionLoggingRaw.zip` into the isolated environment with Power Platform solution import or `pac solution import`.
 
-**Use an isolated environment.** Component IDs are deliberately preserved for
-collector-package compatibility. Importing over an existing installation updates
-those same components; changing the solution display name does not create
-independent flows. Do not import into an in-use working environment unless that
-change is explicitly authorized.
+Before import:
 
-After the schema and application-user setup, use Power Platform's solution import
-UI or `pac solution import` to import the adapted package. Generate the import
-settings from that specific package with `pac solution create-settings`, then bind
-its connection references and configure its existing tenant/app/auth/lookback
-environment variables. The settings example in this folder is a **reference
-checklist**, not a PAC deployment settings file.
+1. Generate PAC settings from that exact ZIP with `pac solution create-settings`.
+2. Bind the package connection references.
+3. Set the collector tenant, app, authentication, and lookback environment variables.
+4. Use [`scripts/power-automate-dataverse.settings.json.example`](scripts/power-automate-dataverse.settings.json.example) only as a checklist. It is not a ready PAC settings file.
 
-Keep the flow disabled until connections, authentication and lookback are correct.
-Then run the manual collector/backfill before enabling its daily schedule.
-Existing summary history cannot populate the raw table by itself.
+Keep the flow disabled until the connections and variables are correct. Then run the manual collector/backfill once and confirm the flow run completed before enabling its daily schedule.
 
-### 4. Build and publish a core snapshot
+### 4. Build a Dataverse snapshot
+
+Dry run first:
 
 ```powershell
-# Dry run: no authentication, Graph requests or Dataverse writes.
 .\Invoke-DataverseCoreRefresh.ps1 `
-  -TenantId '<tenant-guid>' -ClientId '<app-client-guid>' `
+  -TenantId '<tenant-guid>' `
+  -ClientId '<app-client-guid>' `
   -EnvironmentUrl 'https://contoso.crm.dynamics.com' `
   -WorkRoot 'C:\ValueLensRuns'
 ```
 
-For an approved live run, supply `AZURE_CLIENT_SECRET` through a secret store into
-the process environment, then add `-Execute`. Do not place the secret in command
-arguments, source files, scheduled-task arguments or chat.
-
-The runner fetches actual Graph user/licence data, reads full retained audits from
-Dataverse, runs the existing `Purview_CopilotInteraction_Processor_v4.0.0.py`, and
-publishes a new snapshot. It emits a **Core Snapshot ID only after success**.
-Its Graph and Dataverse token environment variables are restored afterward.
-
-**For a bounded test or backfill, select a completed collector run and its exact
-UTC interval.** A raw table may also contain partial records from cancelled runs;
-those must not become a supposedly complete snapshot. Add:
-
-```powershell
-  -SourceRunId '<completed-manual-collector-run-id>' `
-  -RawStartUtc '<approved-start-ISO8601-with-Z>' `
-  -RawEndUtc '<approved-end-ISO8601-with-Z>'
-```
-
-These parameters constrain the bridge's input; they do not trigger collection or
-prove the selected collector completed successfully. Check the collector's terminal
-status, all page/write results and record errors first. The snapshot manifest records
-the selected source run, UTC bounds and selected record count for reconciliation.
-Use smaller complete weekly batches when a long lookback exceeds the run limit.
-Do not combine partial windows or describe a representative week as a complete
-90-day backfill. Overlapping collections can update a raw row's source run tag;
-publish a scoped snapshot promptly after its successful collection.
-
-For bounded demo/backfill validation, pin the bridge to a completed collector run
-and its exact audited UTC window:
+For a live run, provide `AZURE_CLIENT_SECRET` through a secret store or process environment, then add `-Execute`:
 
 ```powershell
 .\Invoke-DataverseCoreRefresh.ps1 `
-  -TenantId '<tenant-guid>' -ClientId '<app-client-guid>' `
+  -TenantId '<tenant-guid>' `
+  -ClientId '<app-client-guid>' `
   -EnvironmentUrl 'https://contoso.crm.dynamics.com' `
-  -WorkRoot 'C:\ValueLensRuns' -Execute `
+  -WorkRoot 'C:\ValueLensRuns' `
+  -Execute
+```
+
+The script prints the successful run ID. That value is the Power BI `Core Snapshot ID`.
+
+If retained raw rows include cancelled, partial, or overlapping collector runs, pin the snapshot to one completed collector run and its audited UTC window:
+
+```powershell
+.\Invoke-DataverseCoreRefresh.ps1 `
+  -TenantId '<tenant-guid>' `
+  -ClientId '<app-client-guid>' `
+  -EnvironmentUrl 'https://contoso.crm.dynamics.com' `
+  -WorkRoot 'C:\ValueLensRuns' `
+  -Execute `
   -SourceRunId '<completed-flow-run-id>' `
   -RawStartUtc '2026-07-05T18:51:53.556Z' `
   -RawEndUtc '2026-07-12T18:51:53.556Z'
 ```
 
-The raw filter uses the original audit `CreationTime`, not Dataverse capture
-time, and records the selected source run/window in the completed manifest.
-Use these arguments whenever retained raw rows include incomplete fallback or
-cancelled batches, so partial windows cannot leak into a published snapshot.
+### 5. Open the Power BI template
 
-For an equivalent BYOD directory export or offline audit fixture:
-
-```powershell
-python .\Build-DataverseCoreFeeds.py `
-  --raw-jsonl 'C:\ValueLensRuns\full-audit.jsonl' `
-  --entra 'C:\ValueLensRuns\entra-users.csv' `
-  --out-dir 'C:\ValueLensRuns\offline'
-```
-
-This produces local snapshot files, not cloud writes. For separate licensing
-exports add `--licensing`. For full-payload manual audit backfill without running
-the cloud flow, `Invoke-CopilotAuditRawCapture.ps1` is an alternative collector;
-it writes Dataverse only with `-ExecuteDataverseWrite`.
-
-### 5. Open the new PBIT
+Open `ValueLens - Power Automate + Dataverse.pbit` and set:
 
 | Parameter | Setting |
 |---|---|
-| `Dataverse URL` | The environment origin containing the core tables. |
-| `Core Snapshot ID` | The successful run ID emitted in step 4. |
-| `Use SharePoint CSV fallback` | Leave `false` for the new pathway. |
-| `Copilot Interactions File` / `Org Data File` | Not required in Dataverse mode; used only with explicit CSV fallback. |
-| `Agent 365` *(optional)* | SharePoint URL of `agents_365.csv`, the [`Get-Agents365Registry.ps1`](../3.%20SharePoint/scripts/Get-Agents365Registry.ps1) output (same 48 columns as the Fabric table). Without an Agent 365 licence, upload the Microsoft 365 admin centre **Agents** export instead (`Upload-Rollups-SharePoint.ps1 -Agents365Csv`). Not invented from audit data. |
-| `Feedback File` *(optional)* | SharePoint URL of the admin centre feedback export. |
+| `Dataverse URL` | Your Dataverse environment origin. |
+| `Core Snapshot ID` | The successful run ID from step 4. |
+| `Use SharePoint CSV fallback` | `false`. |
+| `Copilot Interactions File` | Leave blank unless you intentionally use CSV fallback. |
+| `Org Data File` | Leave blank unless you intentionally use CSV fallback. |
+| `Agent 365` | Optional SharePoint URL to `agents_365.csv` from [`Get-Agents365Registry.ps1`](../3.%20SharePoint/scripts/Get-Agents365Registry.ps1) or [`Upload-Rollups-SharePoint.ps1 -Agents365Csv`](../3.%20SharePoint/scripts/Upload-Rollups-SharePoint.ps1). |
+| `Feedback File` | Optional SharePoint URL to the Microsoft 365 admin centre feedback export. |
 
-All three core queries use the **same immutable run ID** and refuse missing,
-incomplete or count-inconsistent snapshots. This prevents combining one run's
-integer user/message keys with another run's dimensions.
+Publish the report. Set organizational credentials for Dataverse, and for SharePoint only if you use optional SharePoint URLs or CSV fallback.
 
-Publish the configured report and set organizational credentials for Dataverse
-(and SharePoint only when optional CSV inputs or fallback are used).
+## Refresh and keep it running
 
-### Optional: add compatible SharePoint-agent inventory
+1. Let the Power Automate collector complete first.
+2. Schedule `Invoke-DataverseCoreRefresh.ps1` after the collector. Use `-Execute`.
+3. Capture the new run ID from the scheduled runner output.
+4. Manually update the Power BI parameter `Core Snapshot ID` to that new run ID.
+5. Refresh the Power BI semantic model.
 
-> **The current report does not read this inventory.** No page used it, so the lean model
-> dropped the `SharePoint Agents` table and the `Include SharePoint agent inventory` parameter.
-> The import below still lands the Dataverse tables for your own analysis.
+For Task Scheduler, run `pwsh.exe -NoProfile -File "C:\ValueLens\2. Power Automate + Dataverse\scripts\Invoke-DataverseCoreRefresh.ps1" -TenantId "<tenant-guid>" -ClientId "<app-client-guid>" -EnvironmentUrl "https://contoso.crm.dynamics.com" -WorkRoot "C:\ValueLensRuns" -Execute`. Store `AZURE_CLIENT_SECRET` for the task account outside the arguments.
 
-```powershell
-# Dry run, validates the explicit managed package.
-.\Invoke-SharePointAgentLogging-Import.ps1 `
-  -EnvironmentUrl 'https://contoso.crm.dynamics.com' `
-  -SolutionZipPath 'C:\PrivateSolutions\SharePointAgentLogging_managed.zip'
-```
+The runner does not update Power BI parameters, trigger Power BI refresh, or delete old snapshots. Do not delete snapshots that reports still use.
 
-For an approved import add `-Execute`; optionally pass a package-generated PAC
-deployment file with `-SettingsFile`. Configure the existing `poc_SP_*`
-environment variables and connections, then run its backfill.
+## Troubleshooting
 
-### Scheduling, security and limits
-
-- Schedule the collector first, then the refresh runner after collection succeeds.
-  **The runner does not update Power BI parameters or trigger a report refresh.**
-  Update `Core Snapshot ID` to the newly completed run, then refresh Power BI.
-  Scheduling the runner alone does not advance the dashboard. This explicit
-  handoff is intentional in the preview.
-- The extra Python processing host and Dataverse database capacity are real
-  dependencies/costs. No host, licences or cloud resources are provisioned by this
-  build. Core publishing currently writes individual rows; benchmark the demo
-  volume before selecting a production cadence.
-- The directory exporter includes basic org fields. Use a complete BYOD export
-  for deeper manager hierarchy. Copilot entitlement is based on assigned verified
-  SKU IDs, not usage or enabled service plans; unknown assignments require review.
-- Raw audit records, resource URLs and user identities are sensitive. Apply
-  least-privilege Dataverse roles and protected runner storage. The added flow
-  actions secure their inputs/outputs; review original flow run-history settings
-  too. No prompt content or tokens should be written to repository files.
-- Payloads above the 1,048,576-character Dataverse memo limit fail rather than
-  truncate. Audit retention bounds available backfill. SharePoint-agent inventory
-  is an observed-file inventory, not a guaranteed current tenant-wide census.
-- Snapshots are immutable and retained. Define retention/cleanup separately;
-  never delete a snapshot still referenced by Power BI. These helpers do not
-  automatically delete raw records or old runs.
-- Agent 365 catalogue, Copilot Studio health and billing/consumption sources remain
-  separate optional evidence. This pathway does not infer those metrics.
-
----
-
-## 📚 Dashboard pages
-
-<details>
-<summary>15 report pages — activation, adoption, habits, agents, tasks, value, model and Cowork fit, readiness &amp; appendices</summary>
-
-| Page | Purpose |
+| Issue | What to do |
 |---|---|
-| **◆ Activation** | Licensed vs unlicensed, active vs inactive users, across teams |
-| **📡 Adoption** | Adoption and reach, and usage trends by tool |
-| **🌱 Habit Formation** | How usage matures into habits over time |
-| **🛡 Agent Registry** | Agent catalogue, tenant builds and observed use; registry detail needs the optional **Agent 365** source |
-| **🔮 Task Breakdown** | What Copilot, agents and Cowork are used for, by task category |
-| **🚀 Estimated Value** | Hours saved and assisted value, by task and function |
-| **🧠 Model Fit** | Which AI models handle which tasks, and whether each session's model suits the work (Good match / Lighter model may do / Try stronger) |
-| **🧭 Cowork Fit** | How well each Cowork task suits Cowork (Strong fit / Fair fit / Worth a look), why, and who might benefit from coaching. Grading is adjustable: Balanced by default, or Strict / Lenient |
-| **🎯 Cowork Readiness** | Where to roll out Cowork next, from observed signals, ranked by organization, then user |
-| **🎯 License Readiness** | Where to roll out Copilot licences next, from observed unlicensed use |
-| **💬 User Feedback** | User satisfaction and sentiment; needs the optional feedback export |
-| **🏅 Leaderboard** | Usage rankings for users, agents and functions |
-| **📈 Trend Heatmap** | Weekly trend of a selected metric |
-| **📘 Appendix: Glossary** | Definitions, evidence limits and guidance |
-| **🧬 Appendix: Signal - Impact Table** | AI tasks performed → human-time estimate → value, with editable assumptions |
+| Preflight says `pac` is missing | Install Power Platform CLI on the import computer, or rerun without `-RequirePac` for local checks only. |
+| Schema deployment fails | Confirm `DATAVERSE_TOKEN`, the commercial-cloud `https://<org>.crm[region].dynamics.com` URL, and the schema customization privileges in [`../docs/PERMISSIONS.md`](../docs/PERMISSIONS.md). |
+| Collector import fails | Regenerate settings from the exact adapted ZIP, bind all connection references, and check the collector environment variables. |
+| Snapshot build cannot read Graph or Dataverse | Check Graph consent, `AZURE_CLIENT_SECRET`, the Dataverse application user, and Dataverse table privileges. |
+| Snapshot includes partial data | Re-run with `-SourceRunId`, `-RawStartUtc`, and `-RawEndUtc` from one completed collector run. |
+| PBIT refuses a snapshot | Use a completed `Core Snapshot ID` from `poc_valuelensruns`; all core tables must have matching row counts for that run. |
+| Dashboard does not change after the schedule runs | Manually advance `Core Snapshot ID` to the new run ID, then refresh Power BI. |
+| Agent catalogue details are blank | Provide an `Agent 365` URL to `agents_365.csv`; audit data alone does not create that catalogue. |
+| A large audit row fails to write | Dataverse memo fields reject payloads above 1,048,576 characters. The helper fails rather than truncates. |
 
-A hidden **⚖ License Allocation** page (expansion candidates and dormancy review) is kept for
-drill-through. Every template ships this same report; only the data connection differs.
-The Tool pills at the top of each page filter on `Agent Filter` (Copilot, Agents, Cowork);
-`Environment` is licensing only (Licensed / Unlicensed).
+## Optional add-on
 
-The curated Dataverse snapshot supplies core interactions and users/licences; it does
-**not** manufacture Agent 365 telemetry, transcript outcomes or billing credits.
-Agent 365 registry detail comes from the optional `Agent 365` CSV
-([`Get-Agents365Registry.ps1`](../3.%20SharePoint/scripts/Get-Agents365Registry.ps1)), which is
-an inventory, not an observability export — see the
-[source contract](../docs/DATA-DICTIONARY.md#4-agents_365) and this path's
-[source map](source-map.json).
-
-The report is the same one every template ships. User Feedback loads empty unless the
-optional `Feedback File` parameter points at a feedback export. There is no Credit Meter /
-cost-consumption input.
-
-</details>
-
----
-
-## 🩺 Troubleshooting
-
-<details>
-<summary><strong>Common symptoms and fixes</strong></summary>
-
-| Symptom | Fix |
-|---|---|
-| The PBIT refuses to load a snapshot | The three core queries require the **same immutable run ID** with consistent row counts. Point `Core Snapshot ID` at a run that completed successfully; missing, incomplete or count-inconsistent snapshots are rejected by design. |
-| Dashboard doesn't move after a scheduled runner run | Expected. The runner does **not** update Power BI parameters or trigger a refresh. Set `Core Snapshot ID` to the newly completed run, then refresh. |
-| A Dataverse write fails on a large record | Payloads above the 1,048,576-character Dataverse memo limit fail rather than truncate. |
-| Snapshot contains partial or duplicated windows | Pin the bridge with `-SourceRunId` / `-RawStartUtc` / `-RawEndUtc` to a **completed** collector run, and check the collector's terminal status and page/write results first. |
-| Agent Registry shows observed use but no catalogue detail | `Agent 365` is blank or its URL is wrong. Upload the registry CSV with `Upload-Rollups-SharePoint.ps1 -Agents365Csv` and point the parameter at `agents_365.csv`. |
-| Graph or Dataverse calls rejected | Consent to Graph does **not** grant Dataverse access. Check the runner's application user and its privileges separately — see [`/docs/PERMISSIONS.md`](../docs/PERMISSIONS.md). |
-| Sovereign-cloud endpoint rejected | Not supported by the current runner. Use a commercial-cloud `https://<org>.crm[region].dynamics.com` origin. |
-
-</details>
-
----
-
-## ➡️ Related paths & reference
-
-| Path | When you'd go there instead |
-|---|---|
-| [1. Fabric](../1.%20Fabric/) | Fabric capacity, Lakehouse ingestion at scale — the recommended route. |
-| [3. SharePoint](../3.%20SharePoint/) | Settled scheduled refresh on Power BI Pro. This path keeps it as an explicit fallback. |
-| [4. Local CSV](../4.%20Local%20CSV/) | You want to see the dashboard working in two minutes, no tenant needed. |
-
-Reference:
-
-- [`Add Credit Consumption/`](Add%20Credit%20Consumption/) — *optional*, the separate Consumption Central report for Copilot credit consumption and cost
-- [`NOTICE.md`](NOTICE.md) — component-boundary guidance
-- [`source-map.json`](source-map.json) — required sources, optional sources, unsupported signals
-- [`/docs/DATA-DICTIONARY.md`](../docs/DATA-DICTIONARY.md) — the shared source contract
-- [`/docs/PERMISSIONS.md`](../docs/PERMISSIONS.md) — least-privilege grants
-
-### Development
-
-The template is built from the same Power BI project (PBIP) as every other
-ValueLens template, so the report and measures stay identical across pathways
-(`tests/test_core_templates.py` enforces this). The earlier generator that derived
-this template from the SharePoint one is retired to
-[`archive/scripts/`](archive/scripts/); it targets the pre-lean model and must not be
-run against the current templates. Repository tests cover source contracts, snapshot
-safety, collector adaptation, directory classification and dry-run helpers. Those
-local checks do not replace a real solution import, authenticated Power Query
-refresh or demo-tenant metric reconciliation.
-
-The representative live validation reconciled original distinct prompt-message IDs,
-curated message IDs and Desktop DAX counts for the same completed interval. Fact
-row count can exceed distinct-message count because of the dashboard's grain.
-Likewise, `Copilot Licensed` contains the directory's licence flags: its total row
-count is **not** the licensed-seat count; filter `Has license = "TRUE"` for that.
-
-Live fixes are retained in the reusable package adapter and the template:
-raw writes use the audit GUID as the Dataverse connector row ID, and failed writes
-stop paging and fail the run. Deployment-scale throughput, full 90-day collection
-and automatic Power BI parameter advancement require separate validation.
+For credit consumption and cost reporting, use the separate [`Add Credit Consumption/`](Add%20Credit%20Consumption/README.md) add-on.
