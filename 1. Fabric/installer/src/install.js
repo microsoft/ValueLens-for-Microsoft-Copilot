@@ -35,7 +35,7 @@ import {
 } from './steps/fabric.js';
 import { ensureModelConnection, ensureSemanticModel, modelUrl, refreshModel, rotateModelSecret } from './steps/model.js';
 import { confirmPlan, plan, preflight } from './steps/plan.js';
-import { runDataCheck, runPipeline, status } from './steps/run.js';
+import { checkData, runDataCheck, runPipeline, status } from './steps/run.js';
 import { prepareNotebook, serialiseNotebook } from './transform/notebook.js';
 import { buildAgentEvaluatorModel, buildConsumptionModel, buildModel, loadTemplateModel } from './transform/model.js';
 import { buildPipeline } from './transform/pipeline.js';
@@ -361,6 +361,8 @@ export async function runCommand(ctx, command, opts) {
       const result = await run(ctx, opts);
       return !opts.wait || !!result.ok;
     }
+    case 'check':
+      return !!(await checkData(ctx));
     case 'refresh': {
       const result = await refresh(ctx, opts);
       return !opts.wait || result.ok;

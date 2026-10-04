@@ -9,6 +9,7 @@ const ICONS = {
   play: 'M7 4.5v15l12-7.5z',
   refresh: 'M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7',
   pulse: 'M3 12h4l3-7 4 14 3-7h4',
+  database: 'M4 6a8 3 0 1 0 16 0a8 3 0 1 0-16 0M4 6v12a8 3 0 0 0 16 0V6M4 12a8 3 0 0 0 16 0',
   upload: 'M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4',
   app: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   key: 'M3 15a4 4 0 1 0 8 0a4 4 0 1 0-8 0M10 12l9-9M16 6l3 3M13.5 8.5l2 2',
@@ -53,6 +54,12 @@ const COMMANDS = {
     row: 'Check status', button: 'Check status',
     desc: 'Recent runs, model refreshes, secret expiry and the last data check. Changes nothing.',
   },
+  check: {
+    title: 'Check the data', short: 'Check data', icon: 'database', section: 'Data check',
+    row: 'Check the data', button: 'Check the data',
+    desc: 'Read the Lakehouse tables again for row counts, date ranges and licence matches, without running the pipeline. Takes a few minutes.',
+    off: 'The data check notebook isn\'t deployed.',
+  },
   update: {
     title: 'Update Analytics Hub', short: 'Update', icon: 'upload', section: 'Update', adopt: true,
     row: 'Update', button: 'Update',
@@ -72,7 +79,7 @@ const COMMANDS = {
     off: 'There is no app registration or Key Vault yet.',
   },
 };
-const ROW_ORDER = ['run', 'refresh', 'status', 'update', 'deploy-app', 'rotate-secret', 'install'];
+const ROW_ORDER = ['run', 'refresh', 'status', 'check', 'update', 'deploy-app', 'rotate-secret', 'install'];
 
 const INSTALL_STAGES = [
   'Sign in', 'Checking your tenant', 'What to collect', 'Power BI', 'Fabric', 'App registration',
