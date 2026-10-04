@@ -4,12 +4,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { PIPELINE_TEMPLATE } from '../src/sources.js';
 import { buildPipeline, findActivity, firstRunParameters } from '../src/transform/pipeline.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const template = JSON.parse(
-  readFileSync(join(here, '..', '..', 'pipelines', 'CopilotAdoptionPipeline.DataPipeline', 'pipeline-content.json'), 'utf8'),
-);
+const template = JSON.parse(readFileSync(join(here, '..', '..', PIPELINE_TEMPLATE), 'utf8'));
 
 const WS = 'f0000000-0000-0000-0000-000000000000';
 const ids = {

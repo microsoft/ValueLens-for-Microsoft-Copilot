@@ -42,9 +42,9 @@ reports** is off (Microsoft 365 admin center → Settings → Org settings → S
 For the **export-only** source, the only "permission" to automate landing is the automation's **OneLake write**
 right (next section) — the data itself must be exported by an admin (or a scheduled portal export) first.
 
-> **Add-ons.** [Agent Evaluator](../1.%20Fabric/Add%20Agent%20Evaluator/README.md) needs the app
+> **Add-ons.** [Agent Evaluator](../1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/README.md) needs the app
 > registration as a Dataverse **application user**.
-> [Credit consumption](../1.%20Fabric/Add%20Credit%20Consumption/README.md) lists its own roles.
+> [Credit consumption](../1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/README.md) lists its own roles.
 
 ---
 

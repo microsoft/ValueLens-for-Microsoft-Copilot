@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { NOTEBOOKS } from '../src/catalog.js';
+import { NOTEBOOKS, NOTEBOOKS_DIR } from '../src/catalog.js';
 import {
   cellText,
   DATA_CHECK_FILE,
@@ -18,7 +18,7 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** @param {string} file @param {string} [dir]  Folder under `1. Fabric`. */
-const load = (file, dir = 'notebooks') => JSON.parse(readFileSync(join(here, '..', '..', dir, file), 'utf8'));
+const load = (file, dir = NOTEBOOKS_DIR) => JSON.parse(readFileSync(join(here, '..', '..', dir, file), 'utf8'));
 
 const TENANT = '11111111-2222-3333-4444-555555555555';
 const CLIENT = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';

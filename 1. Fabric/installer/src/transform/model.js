@@ -4,15 +4,17 @@
  * Fabric: the template's own model, with its source parameters filled in.
  */
 import { readFileSync } from 'node:fs';
+import { SETUP_DIR } from '../catalog.js';
 import { addM365Activity } from './m365.js';
 import { addCopilotPaygSpend } from './payg.js';
 import { readZipEntry } from './zip.js';
 
-export const MODEL_TEMPLATE = 'ValueLens - Fabric.pbit';
+/** The ValueLens report, relative to `1. Fabric`. */
+export const MODEL_TEMPLATE = `${SETUP_DIR}/ValueLens - Fabric.pbit`;
 /** The credit consumption report from Consumption Central, relative to `1. Fabric`. */
-export const CONSUMPTION_TEMPLATE = 'Add Credit Consumption/Consumption Central - Fabric.pbit';
+export const CONSUMPTION_TEMPLATE = `${SETUP_DIR}/Add Credit Consumption/Consumption Central - Fabric.pbit`;
 /** The Agent Evaluator report, vendored from microsoft/AgentEvaluator-for-Copilot-Studio. */
-export const AGENT_EVALUATOR_TEMPLATE = 'Add Agent Evaluator/Agent Evaluator.pbit';
+export const AGENT_EVALUATOR_TEMPLATE = `${SETUP_DIR}/Add Agent Evaluator/Agent Evaluator.pbit`;
 
 /** The table that has an incremental refresh policy. */
 export const AUDIT_TABLE = 'Chat + Agent Interactions (Audit Logs)';

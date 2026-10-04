@@ -9,7 +9,7 @@ You can use the **same Lakehouse as ValueLens**. Its table names and `Files/land
 overlap with anything ValueLens reads or writes. Load only the products you have; the other pages
 stay empty.
 
-> **Using the [Fabric installer](../installer/#credit-consumption)?** Choose *Credit consumption*
+> **Using the [Fabric installer](../../installer/#credit-consumption)?** Choose *Credit consumption*
 > and it sets up the Azure AI, Copilot Studio and Cowork notebooks, the upload folders, the
 > semantic model and the app's Consumption pages for you. You still land the Cowork data
 > ([step 1](#viva-dataflow)) and the Copilot Studio exports yourself; the installer prints how.
@@ -19,7 +19,7 @@ stay empty.
 | Item | Purpose |
 |---|---|
 | `Consumption Central - Fabric.pbit` | The report, reading the Lakehouse SQL analytics endpoint. |
-| [`notebooks/`](notebooks/) | One ingestion notebook per product. Import only the ones you need. |
+| [`../notebooks/credit-consumption/`](../notebooks/credit-consumption/) | One ingestion notebook per product. Import only the ones you need. |
 | [`seed_sample_data.py`](seed_sample_data.py) | Loads the synthetic sample into your Lakehouse. It writes Consumption Central tables only. |
 | [`DATA-DICTIONARY.md`](DATA-DICTIONARY.md) | Every table and column the report expects. |
 
@@ -53,7 +53,7 @@ Set the workspace and Lakehouse at the top of each notebook, then run it.
 | `Ingest_GitHub_API` | GitHub REST API *(preferred: runs unattended)* | `github_*` |
 | `Ingest_GitHub` | The emailed AI usage report in `Files/landing/github/` | `github_*` |
 | `Ingest_Azure_AI` | Azure Cost Management and Monitor ([setup ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot/blob/main/docs/ADVANCED-SETUP.md#azure-ingestion-in-fabric)) | `azure_ai_spend`, `azure_ai_tokens`, and `copilot_payg_spend` for Copilot Studio and Cowork pay-as-you-go billed in Azure |
-| `Ingest_CommercialTerms` | Your negotiated rates *(optional; the [Fabric App](../../1.%20Fabric/Fabric%20App/README.md#settings-in-the-app) can also take them)* | `commercial_terms` |
+| `Ingest_CommercialTerms` | Your negotiated rates *(optional; the [Fabric App](../../Fabric%20App/README.md#settings-in-the-app) can also take them)* | `commercial_terms` |
 | `Ingest_Org` | Viva attributes, optionally overridden by files in `Files/landing/org/` | `org_attributes` |
 | `Ingest_Viva_Consumption` | *Fallback only.* A Viva CSV export in `Files/landing/viva/` | `viva_credits_weekly`, `viva_spending_policy` |
 
@@ -83,7 +83,7 @@ python seed_sample_data.py --workspace <workspace-guid> --lakehouse <lakehouse-g
 ```
 
 Both GUIDs are in the Fabric portal URL when the Lakehouse is open. The script reads the CSVs from
-[`../../4. Local CSV/Add Credit Consumption/sample-data/`](../../4.%20Local%20CSV/Add%20Credit%20Consumption/sample-data/).
+[`../../../4. Local CSV/Add Credit Consumption/sample-data/`](../../../4.%20Local%20CSV/Add%20Credit%20Consumption/sample-data/).
 It writes to the `dbo` schema; add `--schema=` if your Lakehouse was created without schemas.
 
 > **Per-person and department views** need Viva Insights **Identification** turned on

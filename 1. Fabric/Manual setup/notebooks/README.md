@@ -1,11 +1,11 @@
 # Fabric notebooks (set up by hand)
 
-The [installer](../installer/) does all of this for you. Use these steps only if you can't use it.
+The [installer](../../installer/) does all of this for you. Use these steps only if you can't use it.
 
 ## Before you start
 
 1. **Register an app** in Entra. Add the Microsoft Graph application permissions listed in
-   [PERMISSIONS](../../docs/PERMISSIONS.md), grant admin consent, and create a client secret.
+   [PERMISSIONS](../../../docs/PERMISSIONS.md), grant admin consent, and create a client secret.
 2. **Store the secret** in an Azure Key Vault. Anyone who runs the notebooks needs the
    *Key Vault Secrets User* role on it.
 3. **Create a Lakehouse** in your Fabric workspace with **Lakehouse schemas** turned on.
@@ -33,8 +33,8 @@ The [installer](../installer/) does all of this for you. Use these steps only if
    loads 180 days (`BACKFILL_DAYS`). Afterwards, set it back to `'incremental'`.
 5. **Run `Copilot_Audit_Log_Processor`** once the ingesters finish.
 6. **Open the template** in Power BI Desktop and publish it:
-   - `ValueLens - Fabric.pbit`: enter the Lakehouse's **SQL analytics endpoint** and its name.
-   - Or `ValueLens - Fabric OneLake.pbit`: enter the workspace ID and the Lakehouse ID.
+   - [`ValueLens - Fabric.pbit`](../ValueLens%20-%20Fabric.pbit): enter the Lakehouse's **SQL analytics endpoint** and its name.
+   - Or [`ValueLens - Fabric OneLake.pbit`](../ValueLens%20-%20Fabric%20OneLake.pbit): enter the workspace ID and the Lakehouse ID.
 7. **Schedule it** with the [pipeline](../pipelines/README.md).
 
 To check the data, run `ValueLens_Data_Check`. It changes nothing.
@@ -45,11 +45,11 @@ Run these before the processor.
 
 | Notebook | Writes | Before you run it |
 |---|---|---|
-| `Copilot_Agent365_Registry_Ingester` | `agents_365` | Needs an Agent 365 licence and the extra Graph permissions in [PERMISSIONS](../../docs/PERMISSIONS.md). Fill in the first cell. |
+| `Copilot_Agent365_Registry_Ingester` | `agents_365` | Needs an Agent 365 licence and the extra Graph permissions in [PERMISSIONS](../../../docs/PERMISSIONS.md). Fill in the first cell. |
 | `Copilot_Agent365_Lander` | `agents_365` | Use this instead of the registry ingester if you don't have an Agent 365 licence. Export the agent list from the Microsoft 365 admin center to `Files/agent365/agents.csv`. |
 | `Copilot_ProductFeedback_Ingester` | `user_feedback` | Export product feedback from the Microsoft 365 admin center (**Health** > **Product feedback**) to `Files/product_feedback/`. |
 | `Copilot_M365_Activity_Ingester` | `m365_activity_daily` | Fill in the first cell. Only Analytics Hub reads this table; the templates don't. |
-| [Workday org data](optional/workday-org-data/README.md) | `copilot_org_data` | Adds HR columns to the org data. Follow its README. |
+| [Workday org data](workday-org-data/README.md) | `copilot_org_data` | Adds HR columns to the org data. Follow its README. |
 
 ## Settings you might change
 

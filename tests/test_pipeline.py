@@ -6,7 +6,7 @@ from graphlib import TopologicalSorter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PIPELINES = ROOT / "1. Fabric" / "pipelines"
+PIPELINES = ROOT / "1. Fabric" / "Manual setup" / "pipelines"
 PROCESSOR = "Run_Audit_Log_Processor"
 AGENT365 = "Conditionally_Run_Agent365"
 FALLBACK = "Run_Agent365_CSV_Fallback"
@@ -37,7 +37,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(processor["policy"]["timeout"], "0.02:00:00")
         self.assertEqual(processor["policy"]["retry"], 1)
         self.assertTrue(
-            (ROOT / "1. Fabric" / "notebooks" / "Copilot_Audit_Log_Processor.ipynb").is_file()
+            (ROOT / "1. Fabric" / "Manual setup" / "notebooks" / "Copilot_Audit_Log_Processor.ipynb").is_file()
         )
 
     def test_processor_waits_for_all_and_only_its_input_producers_to_succeed(self):
@@ -70,7 +70,7 @@ class PipelineTests(unittest.TestCase):
         self.assertNotIn(AGENT365, dependencies)
         self.assertNotIn(enabled[0]["name"], dependencies)
         for path in ("Copilot_Agent365_Registry_Ingester.ipynb", "Copilot_Agent365_Lander.ipynb"):
-            self.assertTrue((ROOT / "1. Fabric" / "notebooks" / path).is_file(), path)
+            self.assertTrue((ROOT / "1. Fabric" / "Manual setup" / "notebooks" / path).is_file(), path)
 
     def simulate(self, outcomes, enabled):
         """Apply Data Factory's documented dependency and leaf-status rules to the Agent 365 path."""

@@ -165,7 +165,7 @@ test('the refresh notebook is deployed only with a connected model, with its IDs
 });
 
 test('the refresh notebook reloads the audit table in full after a rebuild', () => {
-  const nb = JSON.parse(readFileSync(new URL('../../notebooks/ValueLens_Refresh_Model.ipynb', import.meta.url), 'utf8'));
+  const nb = JSON.parse(readFileSync(new URL('../../Manual setup/notebooks/ValueLens_Refresh_Model.ipynb', import.meta.url), 'utf8'));
   const code = nb.cells.map((/** @type {any} */ c) => [].concat(c.source).join('')).join('\n');
   assert.match(code, /applyRefreshPolicy/);
   assert.match(code, /overwrite/);

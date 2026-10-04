@@ -72,7 +72,7 @@ release with the exe and its SHA-256; review it and publish.
 - Use fabricated fixtures only. Never commit tenant exports, user identities,
   prompts, credentials, private solution packages or populated report files.
   Review notebook outputs and screenshots before attaching them.
-- Edit Fabric notebooks in `1. Fabric/notebooks/`. There are no mirrored copies to keep in sync.
+- Edit Fabric notebooks in `1. Fabric/Manual setup/notebooks/`. There are no mirrored copies to keep in sync.
 - Old templates live, flat, in [`archive/`](archive/). They aren't maintained.
 - **`.pbit` templates are binary packages.** Source/helper changes do not update
   shipped templates automatically: rebuild with the relevant repository generator

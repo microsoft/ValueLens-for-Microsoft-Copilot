@@ -25,10 +25,11 @@ services:
 
 test('packaging: ships every template the installer reads, and they exist', () => {
   const files = sourceFiles();
-  assert.ok(files.includes('pipelines/CopilotAdoptionPipeline.DataPipeline/pipeline-content.json'));
-  assert.ok(files.includes('ValueLens - Fabric.pbit'));
-  assert.ok(files.some((f) => f.startsWith('Add Credit Consumption/notebooks/')));
-  assert.ok(files.some((f) => f.startsWith('Add Agent Evaluator/notebooks/')));
+  assert.ok(files.includes('Manual setup/pipelines/CopilotAdoptionPipeline.DataPipeline/pipeline-content.json'));
+  assert.ok(files.includes('Manual setup/ValueLens - Fabric.pbit'));
+  assert.ok(files.includes('Manual setup/notebooks/Copilot_Audit_Log_Processor.ipynb'));
+  assert.ok(files.some((f) => f.startsWith('Manual setup/notebooks/credit-consumption/')));
+  assert.ok(files.some((f) => f.startsWith('Manual setup/notebooks/agent-evaluator/')));
   assert.ok(files.every((f) => !f.includes('\\')));
   for (const f of files) assert.ok(existsSync(join(DEFAULT_SOURCE_DIR, f)), `${f} is missing`);
 });

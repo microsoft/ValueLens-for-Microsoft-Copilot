@@ -4,14 +4,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { defaultModules, MODULES, notebooksFor, OPTIONAL_MODULES, permissionsFor } from '../src/catalog.js';
+import { defaultModules, MODULES, NOTEBOOKS_DIR, notebooksFor, OPTIONAL_MODULES, permissionsFor } from '../src/catalog.js';
 import { realSources } from './fakes.js';
 import { M365_COLUMNS, M365_RELATIONSHIPS, M365_SOURCE_TABLE, M365_TABLE, stableGuid } from '../src/transform/m365.js';
 import { buildModel, loadTemplateModel } from '../src/transform/model.js';
 import { buildPipeline, findActivity, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const NOTEBOOK = join(here, '..', '..', 'notebooks', 'Copilot_M365_Activity_Ingester.ipynb');
+const NOTEBOOK = join(here, '..', '..', NOTEBOOKS_DIR, 'Copilot_M365_Activity_Ingester.ipynb');
 
 const WS = 'f0000000-0000-0000-0000-000000000000';
 const ids = {

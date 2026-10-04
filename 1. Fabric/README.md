@@ -56,24 +56,27 @@ it, open the exe again and choose **Run now**.
 
 Choose these in the installer under **What to collect**. Each one has a few steps of its own.
 
-- [Credit consumption](installer/README.md#credit-consumption): what Copilot costs.
-- [Agent Evaluator](installer/README.md#agent-evaluator): how your Copilot Studio agents perform.
-- [Microsoft 365 activity](installer/README.md#microsoft-365-activity) (on by default): how people
-  work across Teams, Outlook and the Office apps.
+| Extra | What it shows | Where the data comes from |
+|---|---|---|
+| [Credit consumption](installer/README.md#credit-consumption) | Credits used and what they cost across Copilot Studio, Copilot Cowork and Azure AI | Copilot Studio exports from the Power Platform admin center, Cowork credits from Viva Insights, and Azure AI and pay-as-you-go costs from Azure |
+| [Agent Evaluator](installer/README.md#agent-evaluator) | How well your Copilot Studio agents work: how conversations end, topics, knowledge, errors and user feedback | Copilot Studio conversation transcripts in Dataverse |
+| [Microsoft 365 activity](installer/README.md#microsoft-365-activity) *(on by default)* | How people work across Teams, Outlook, SharePoint, OneDrive and the Office apps | Microsoft 365 usage reports |
 
 ## Prefer Power BI Desktop?
 
 To build your own reports, connect Power BI Desktop to `ValueLens Model` in your workspace.
 
 To use a template instead, choose not to deploy the model in the installer's **Power BI** step.
-When it finishes, it shows the values to enter in `ValueLens - Fabric.pbit` (SQL endpoint) or
-`ValueLens - Fabric OneLake.pbit` (OneLake). Publish the report, then
-[add a refresh step to the pipeline](pipelines/README.md#refresh-power-bi-from-the-pipeline).
+When it finishes, it shows the values to enter in
+[`ValueLens - Fabric.pbit`](Manual%20setup/ValueLens%20-%20Fabric.pbit) (SQL endpoint) or
+[`ValueLens - Fabric OneLake.pbit`](Manual%20setup/ValueLens%20-%20Fabric%20OneLake.pbit) (OneLake).
+Publish the report, then
+[add a refresh step to the pipeline](Manual%20setup/pipelines/README.md#refresh-power-bi-from-the-pipeline).
 
 ## Set it up by hand
 
-If you can't use the installer, follow [notebooks](notebooks/README.md), then
-[pipelines](pipelines/README.md).
+If you can't use the installer, follow [Manual setup](Manual%20setup/README.md). It uses the same
+files the installer does.
 
 ## Problems
 

@@ -14,7 +14,7 @@ import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PROCESSOR = ROOT / "1. Fabric" / "notebooks" / "Copilot_Audit_Log_Processor.ipynb"
+PROCESSOR = ROOT / "1. Fabric" / "Manual setup" / "notebooks" / "Copilot_Audit_Log_Processor.ipynb"
 
 
 def verification():

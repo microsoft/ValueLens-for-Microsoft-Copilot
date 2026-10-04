@@ -3,12 +3,12 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NOTEBOOKS } from './catalog.js';
+import { NOTEBOOKS, NOTEBOOKS_DIR, SETUP_DIR } from './catalog.js';
 import { AGENT_EVALUATOR_TEMPLATE, CONSUMPTION_TEMPLATE, MODEL_TEMPLATE } from './transform/model.js';
 
 /** `1. Fabric`, when the installer runs from inside the repo. */
 export const DEFAULT_SOURCE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-export const PIPELINE_TEMPLATE = join('pipelines', 'CopilotAdoptionPipeline.DataPipeline', 'pipeline-content.json');
+export const PIPELINE_TEMPLATE = join(SETUP_DIR, 'pipelines', 'CopilotAdoptionPipeline.DataPipeline', 'pipeline-content.json');
 /** The ValueLens web app, inside `1. Fabric`. */
 export const APP_DIR = 'Fabric App';
 
@@ -36,7 +36,7 @@ export function loadSources(dir = DEFAULT_SOURCE_DIR) {
   /** @type {any} */
   const notebooks = {};
   for (const nb of NOTEBOOKS) {
-    const file = join(root, nb.dir ?? 'notebooks', nb.file);
+    const file = join(root, nb.dir ?? NOTEBOOKS_DIR, nb.file);
     if (!existsSync(file)) throw new Error(`Missing notebook ${file}.`);
     notebooks[nb.key] = readJson(file);
   }

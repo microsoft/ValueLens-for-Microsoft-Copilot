@@ -11,7 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
-CORE = ROOT / "1. Fabric" / "notebooks"
+CORE = ROOT / "1. Fabric" / "Manual setup" / "notebooks"
 NOTEBOOK = "Copilot_Licensed_Users_Direct_Ingester.ipynb"
 COPIES = (CORE / NOTEBOOK,)
 E7 = (
