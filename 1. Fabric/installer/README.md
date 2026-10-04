@@ -22,7 +22,8 @@ The Graph permissions are listed in [`/docs/PERMISSIONS.md`](../../docs/PERMISSI
 ## Run it
 
 1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe).
-   This link always gets the newest version.
+   This link always gets the newest version. If Edge says it isn't commonly downloaded, choose
+   **…** next to the file, then **Keep**, **Show more** and **Keep anyway**.
 2. Open it. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
 3. The first time, it takes about a minute to unpack. Then it opens in your browser. Keep its
    window open while you use the page.
@@ -110,6 +111,7 @@ the endpoint, someone who manages the vault approves it under **Networking** >
 
 | Problem | What to do |
 |---|---|
+| Edge says the file isn't commonly downloaded | Choose **…** next to the file, then **Keep**, **Show more** and **Keep anyway**. The exe isn't code-signed yet. |
 | Windows says it protected your PC | Choose **More info**, then **Run anyway**. The exe isn't code-signed yet. |
 | `The installer couldn't start` | Download the exe again. If that doesn't help, delete `%LOCALAPPDATA%\AnalyticsHub` and open it again. |
 | `No active Fabric capacity you can use` | Start a Fabric trial, or ask a capacity admin to make you a Contributor on a capacity. |

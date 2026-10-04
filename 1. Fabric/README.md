@@ -28,14 +28,17 @@ The full list of roles is in the [installer README](installer/README.md#before-y
 
 ## Install
 
-1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe)
-   and open it. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
-2. After about a minute, it opens in your browser. Keep the installer window open until you're
+1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe).
+   If Edge says it isn't commonly downloaded, choose **…** next to the file, then **Keep**,
+   **Show more** and **Keep anyway**.
+2. Open it. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
+   These warnings appear because the installer is new and isn't code-signed yet.
+3. After about a minute, it opens in your browser. Keep the installer window open until you're
    done.
-3. Choose **Set up Analytics Hub** and sign in with your work account.
-4. Answer the questions. The defaults suit most organisations.
-5. Check the plan and approve it. Nothing is created until you do.
-6. Wait for it to finish. It sets everything up, loads the first data and gives you a link to the
+4. Choose **Set up Analytics Hub** and sign in with your work account.
+5. Answer the questions. The defaults suit most organisations.
+6. Check the plan and approve it. Nothing is created until you do.
+7. Wait for it to finish. It sets everything up, loads the first data and gives you a link to the
    app.
 
 If admin consent isn't granted yet, the installer skips the first load. Once an admin has granted
