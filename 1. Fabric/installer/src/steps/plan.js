@@ -11,10 +11,11 @@ import { APP_ROLES, CONSENT_ROLES } from '../clients/graph.js';
 import { HttpError } from '../http.js';
 import { commandLine } from '../launch.js';
 import { c } from '../ui.js';
+import { AGENT_EVALUATOR_MODEL_NAME, CONSUMPTION_MODEL_NAME, MODEL_NAME } from '../config.js';
 import { MIN_NODE, nodeVersionOk } from './app.js';
 import { agentEvaluatorModelWanted, planAgentEvaluator } from './agent-evaluator.js';
 import { AZURE_AI_ROLES, consumptionModelWanted, planConsumption } from './consumption.js';
-import { describeSchedule, PIPELINE_NAME } from './fabric.js';
+import { describeSchedule, displayNames, freeName, PIPELINE_NAME } from './fabric.js';
 import { connectionName } from './model.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
@@ -29,6 +30,19 @@ export const isGuid = (v) => GUID.test(v.trim());
 export function validateLakehouseName(v) {
   return /^[A-Za-z][A-Za-z0-9_]{0,122}$/.test(v) ? true : 'Start with a letter; use only letters, digits and underscores.';
 }
+
+/**
+ * A valid Lakehouse name that no Lakehouse in the workspace has: the install only writes to one it creates.
+ * @param {string[]} taken  Lakehouse names already in the workspace.
+ */
+export const validateNewLakehouseName = (taken) => (/** @type {string} */ v) => {
+  const name = v.trim();
+  const ok = validateLakehouseName(name);
+  if (ok !== true) return ok;
+  return taken.some((t) => t.toLowerCase() === name.toLowerCase())
+    ? `There's already a Lakehouse called ${name} here. Analytics Hub only writes to a Lakehouse it creates, so choose another name.`
+    : true;
+};
 
 /** @param {string} v */
 export function validateTime(v) {
@@ -250,8 +264,13 @@ export async function plan(ctx, pre) {
     }
   }
   if (!config.fabric.lakehouseId) {
-    config.fabric.lakehouseName = await ui.input('Lakehouse name', { default: config.fabric.lakehouseName ?? 'ValueLens', validate: validateLakehouseName });
+    const ws = config.fabric.workspaceId;
+    const taken = ws ? displayNames(await api.fabric.listItems(ws, 'Lakehouse')) : [];
+    config.fabric.lakehouseName = (
+      await ui.input('Lakehouse name', { default: freeName(config.fabric.lakehouseName ?? 'ValueLens', taken), validate: validateNewLakehouseName(taken) })
+    ).trim();
   }
+  await reserveNames(ctx);
 
   ui.heading('App registration');
   if (config.app.appId) {
@@ -358,6 +377,59 @@ export function uniqueName(base, taken) {
 }
 
 /**
+ * The name to start from: the default when `name` is the default or a numbered copy of it,
+ * otherwise `name`, which someone chose.
+ * @param {string | undefined} name
+ * @param {string} base
+ */
+const startFrom = (name, base) => (!name || new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[ _]\\d+$`, 'i').test(name) ? base : name);
+
+/**
+ * Picks names for the Fabric items the install will create that no item already in the
+ * workspace has, so the install never touches anything it didn't create.
+ * @param {Ctx} ctx
+ */
+export async function reserveNames(ctx) {
+  const { ui, config, api } = ctx;
+  const f = config.fabric;
+  const sm = config.semanticModel;
+  const cc = config.consumption;
+  const ae = config.agentEvaluator;
+  const ws = f.workspaceId;
+  const list = async (/** @type {string} */ type) => (ws ? displayNames(await api.fabric.listItems(ws, type)) : []);
+  const [notebookNames, pipelineNames, modelNames] = await Promise.all([list('Notebook'), list('DataPipeline'), list('SemanticModel')]);
+  /** @type {string[]} */
+  const renamed = [];
+  /** @param {string} wanted @param {string[]} taken */
+  const pick = (wanted, taken) => {
+    const name = freeName(wanted, taken);
+    if (name !== wanted) renamed.push(wanted);
+    taken.push(name);
+    return name;
+  };
+
+  const notebooks = notebooksFor(config.modules, {
+    semanticModel: !!sm.enabled,
+    azureAi: !!config.modules.consumption && !!cc.azureSubscriptionId,
+    dataverse: !!config.modules.agentEvaluator && ae.environments.length > 0,
+  });
+  f.notebookNames ??= {};
+  for (const nb of notebooks) {
+    if (!f.notebooks[nb.key]) f.notebookNames[nb.key] = pick(startFrom(f.notebookNames[nb.key], nb.displayName), notebookNames);
+  }
+  if (!f.pipelineId) f.pipelineName = pick(startFrom(f.pipelineName, PIPELINE_NAME), pipelineNames);
+  if (sm.enabled && !sm.id) sm.name = pick(startFrom(sm.name, MODEL_NAME), modelNames);
+  if (sm.enabled && consumptionModelWanted(ctx) && !cc.model.id) cc.model.name = pick(startFrom(cc.model.name, CONSUMPTION_MODEL_NAME), modelNames);
+  if (sm.enabled && agentEvaluatorModelWanted(ctx) && !ae.model.id) ae.model.name = pick(startFrom(ae.model.name, AGENT_EVALUATOR_MODEL_NAME), modelNames);
+
+  if (renamed.length) {
+    ui.note(
+      `The workspace already has ${renamed.map((n) => `"${n}"`).join(', ')}, not from this install. They're left as they are; Analytics Hub's own items get the names shown in the plan.`,
+    );
+  }
+}
+
+/**
  * @typedef {{ kind: string, name: string, detail?: string, isNew: boolean }} ReviewItem
  * @typedef {{ who: string, what: string, where: string, detail?: string }} ReviewGrant
  * @typedef {{ what: string, where: string, detail?: string }} ReviewRun
@@ -409,7 +481,7 @@ export function planReview(ctx, pre) {
       kind: 'Notebooks',
       name: `${notebooks.length} notebooks`,
       isNew: notebooks.some((nb) => !f.notebooks[nb.key]),
-      detail: notebooks.map((nb) => nb.displayName).join(', '),
+      detail: notebooks.map((nb) => f.notebookNames?.[nb.key] ?? nb.displayName).join(', '),
     },
     { kind: 'Pipeline', name: f.pipelineName ?? PIPELINE_NAME, isNew: !f.pipelineId, detail: `Runs the notebooks ${describeSchedule(config.schedule)}.` },
   ];

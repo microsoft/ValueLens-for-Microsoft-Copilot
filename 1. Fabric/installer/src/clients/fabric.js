@@ -138,6 +138,9 @@ export function fabricApi(http) {
     getItem: (workspaceId, itemId) => http.get(`/workspaces/${workspaceId}/items/${itemId}`),
     /** @param {string} workspaceId @param {string} itemId @param {string} displayName */
     renameItem: (workspaceId, itemId, displayName) => http.patch(`/workspaces/${workspaceId}/items/${itemId}`, { displayName }),
+    /** An empty item, for types such as AppBackend that rayfin fills in. @param {string} workspaceId @param {string} type @param {string} displayName */
+    createItem: (workspaceId, type, displayName) =>
+      http.requestLro('POST', `/workspaces/${workspaceId}/items`, { body: { type, displayName }, lroResult: true }),
 
     /** @param {string} workspaceId @returns {Promise<any[]>} */
     listRoleAssignments: (workspaceId) => http.list(`/workspaces/${workspaceId}/roleAssignments`),
