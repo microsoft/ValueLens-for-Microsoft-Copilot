@@ -158,7 +158,7 @@ async function planPowerBi(ctx, pre) {
   const canApp = !!sources.appDir;
   const current = sm.enabled === false ? 'none' : fa.enabled === false || !canApp ? 'model' : 'both';
   const choice = await ui.select(
-    'Deploy the Analytics Hub semantic model?',
+    'Deploy the semantic model?',
     [
       ...(canApp ? [{ name: 'Semantic model and the Analytics Hub app (recommended)', value: 'both', description: 'A web app in the workspace, built on the model.' }] : []),
       { name: 'Semantic model only', value: 'model', description: 'Build your own reports on it in Power BI.' },
