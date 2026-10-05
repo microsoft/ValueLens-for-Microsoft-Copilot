@@ -782,65 +782,70 @@ Minutes per unit of work, from the `Human Time Estimates` table. Typical is the 
 App's Assumptions page lists the same bands and lets you replace them there. The table
 also keeps a single `Human Baseline (min)` column from the earlier method; no measure uses it.
 
+Sources are peer-reviewed studies or work from major research institutions. Many measure a related
+task rather than the exact one, so Confidence reflects how directly the source fits. A row with no
+such source says *Provisional estimate*, has no link, and is rated Low. Confidence is shown for
+context only; no measure uses it.
+
 | Behaviour | Low | Typical | High | Grain | Confidence | Source |
 |---|---:|---:|---:|---|---|---|
-| Email Triage | 4 | 10 | 12 | Turn | Medium-High | [Microsoft Research (Iqbal & Horvitz 2007)](https://www.microsoft.com/en-us/research/publication/disruption-and-recovery-of-computing-tasks-field-study-analysis-and-directions/); McKinsey 2023 |
-| Email Thread Summary | 2 | 5 | 9 | Turn | Medium | [Nielsen Norman Group 2023](https://www.nngroup.com/articles/); Microsoft WTI 2024 |
-| Email Summarising | 2 | 4 | 7 | Turn | Medium | Dabbish & Kraut (CMU 2006); [Mark et al. 2012](https://www.ics.uci.edu/~gmark/Home_page/Welcome.html) |
-| Email Drafting | 3 | 8 | 12 | Turn | High | McKinsey 2023; [Brynjolfsson et al. (NBER 2023)](https://www.nber.org/papers/w31161) |
-| Teams Messaging | 4 | 8 | 11 | Turn | Medium | [Microsoft WTI 2023](https://www.microsoft.com/en-us/worklab/work-trend-index); Grammarly 2023 |
-| Meeting Scheduling | 5 | 12 | 17 | Turn | High | [Doodle 2019](https://meetings.doodle.com/the-state-of-meetings-report-2019); HBR 2017 |
-| Meeting Prep | 6 | 15 | 22 | Resource | High | Forrester TEI 2024; [HBR (Rogelberg 2019)](https://hbr.org/2019/01/why-your-meetings-stink-and-what-to-do-about-it) |
-| Video Summarising | 12 | 30 | 44 | Turn | Medium-High | [Microsoft WTI 2024](https://www.microsoft.com/en-us/worklab/work-trend-index); Kaltura 2023 |
-| Document Drafting | 21 | 42 | 42 | Turn | High | [Noy & Zhang (Science 2023)](https://www.science.org/doi/10.1126/science.adh2586); BCG/Harvard 2023 |
-| Document Summarising | 10 | 20 | 35 | Turn | Medium-High | [BCG/Harvard (Dell'Acqua et al. 2023)](https://www.hbs.edu/ris/Publication%20Files/24-013_d9b45b68-9e74-42d6-a1c6-c72fb70c7282.pdf); McKinsey 2023 |
-| Presentation Creation | 21 | 42 | 42 | Turn | Medium-High | [Gartner 2024](https://www.gartner.com/en/topics/generative-ai); BCG 2024 |
-| Presentation Summarising | 6 | 12 | 21 | Turn | Medium | [Forrester TEI 2024](https://www.forrester.com/policies/total-economic-impact/); NNGroup 2020 |
-| Note Taking | 10 | 20 | 35 | Turn | High | [Microsoft Research (Branham & Brush 2015)](https://www.microsoft.com/en-us/research/people/sbrush/) |
-| Image Generation | 21 | 42 | 42 | Turn | Medium | [Adobe 2022](https://business.adobe.com/resources/digital-trends-report.html); Content Marketing Institute 2023 |
-| Image / Media Analysis | 4 | 8 | 14 | Resource | Medium | [W3C WAI](https://www.w3.org/WAI/); DAM Institute 2022 |
-| Code Writing | 24 | 45 | 77 | Turn | High | [GitHub/NBER (Peng et al. 2023) RCT](https://arxiv.org/abs/2302.06590) |
-| Code Analysis | 16 | 30 | 51 | Resource | High | [SmartBear 2023](https://smartbear.com/state-of-software-quality/code-review/); MS Research (Bacchelli & Bird 2013) |
-| Code Analysis (URL) | 8 | 15 | 26 | Turn | Medium | [Stack Overflow 2023](https://survey.stackoverflow.co/); GitHub 2023 |
-| Code Review & PR | 21 | 40 | 69 | Turn | Low | Provisional estimate |
-| Build & Deploy Run | 10 | 25 | 40 | Turn | Low | Provisional estimate |
-| Data Querying | 13 | 30 | 41 | Resource | High | [Forrester TEI 2022](https://www.forrester.com/policies/total-economic-impact/); BCG 2021 |
-| Spreadsheet Analysis | 18 | 40 | 55 | Turn | High | [Deloitte 2023](https://www2.deloitte.com/us/en/insights.html); KPMG 2020 |
-| Spreadsheet Review | 11 | 25 | 34 | Turn | Medium | [Deloitte 2023](https://www2.deloitte.com/us/en/insights.html); KPMG 2020 |
-| Excel Assistance | 13 | 30 | 41 | Turn | Medium | [Deloitte 2023](https://www2.deloitte.com/us/en/insights.html); KPMG 2020 |
-| Web Searching | 10 | 22 | 30 | Resource | High | [McKinsey 2012](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy); IDC 2018 |
-| Enterprise Searching | 8 | 18 | 25 | Resource | High | [IDC 2014](https://www.idc.com/); McKinsey 2012 |
-| PDF Analysis | 16 | 35 | 48 | Resource | Medium | Deloitte 2018; [Thomson Reuters 2019](https://legal.thomsonreuters.com/en/insights) |
-| SharePoint Access | 5 | 12 | 16 | Turn | Medium | Forrester TEI 2022; [AIIM 2019](https://www.aiim.org/) |
-| File Retrieval | 7 | 15 | 21 | Resource | Medium | [IDC 2014](https://www.idc.com/); McKinsey 2012 |
-| People Lookup | 3 | 8 | 8 | Resource | Medium | Gartner 2021; [Microsoft Viva 2022](https://www.microsoft.com/en-us/microsoft-viva) |
-| Knowledge Base | 5 | 12 | 19 | Turn | High | [HDI 2023](https://www.thinkhdi.com/); Gartner 2022 |
-| Multi-source Synthesis | 34 | 75 | 92 | Resource | Low | Provisional, apportioned from the Analysis & Research band |
-| Research & Analysis | 20 | 45 | 62 | Turn | High | BCG 2021; [McKinsey 2023](https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights/the-economic-potential-of-generative-ai-the-next-productivity-frontier) |
-| Data & Reporting | 16 | 35 | 48 | Turn | High | [Forrester TEI 2022](https://www.forrester.com/policies/total-economic-impact/); IDC 2023 |
-| Content Generation | 12 | 25 | 42 | Turn | High | [Grammarly 2023](https://www.grammarly.com/business/learn); Forrester 2022 |
-| Ideation & Creative | 20 | 40 | 42 | Turn | Medium | IDEO; [HBR 2018](https://hbr.org/topic/innovation) |
-| Coaching | 16 | 40 | 40 | Turn | Medium | [ICF 2020](https://coachingfederation.org/research/global-coaching-study); SHRM 2023 |
-| Coaching (URL) | 10 | 25 | 40 | Turn | Medium | [LinkedIn Learning 2023](https://learning.linkedin.com/resources/workplace-learning-report); Deloitte 2022 |
-| Sales & Customer | 14 | 35 | 40 | Turn | High | [Salesforce 2023](https://www.salesforce.com/resources/research-reports/state-of-sales/); Gartner 2022 |
-| IT & Service Desk | 8 | 20 | 32 | Turn | High | [HDI 2023](https://www.thinkhdi.com/library/practices-and-salary-report.aspx); MetricNet 2023 |
-| HR & People | 14 | 35 | 40 | Turn | High | [SHRM 2023](https://www.shrm.org/topics-tools/research); Deloitte 2023 |
-| Compliance & Policy | 10 | 25 | 40 | Turn | Medium | [Deloitte 2022](https://www2.deloitte.com/us/en/pages/regulatory/topics/compliance.html); Thomson Reuters 2023 |
-| Sensitive Content Interaction | 8 | 20 | 32 | Turn | Low | [Deloitte 2023](https://www2.deloitte.com/us/en/insights/topics/risk-management.html); Gartner 2022 |
-| Domain-Specific Agent | 10 | 25 | 40 | Turn | Low | [Deloitte 2022](https://www2.deloitte.com/us/en/insights.html); Gartner 2023 |
-| Cross-Org Agent | 12 | 30 | 40 | Turn | Low | [McKinsey 2022](https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights); Forrester 2023 |
-| Running a Workflow, LOB, Data & Reporting and General Workflow | 6 | 15 | 24 | Turn | High | Forrester TEI 2022; [Gartner 2023](https://www.gartner.com/en/topics/hyperautomation) |
-| Email Workflow | 5 | 12 | 12 | Turn | High | Forrester TEI 2022; [Gartner 2023](https://www.gartner.com/en/topics/hyperautomation) |
-| Meeting Workflow | 6 | 15 | 22 | Turn | High | Forrester TEI 2022; [Gartner 2023](https://www.gartner.com/en/topics/hyperautomation) |
-| Document Workflow | 8 | 15 | 26 | Turn | High | Forrester TEI 2022; [Gartner 2023](https://www.gartner.com/en/topics/hyperautomation) |
-| Coordination Workflow | 6 | 11 | 11 | Turn | High | Forrester TEI 2022; [Gartner 2023](https://www.gartner.com/en/topics/hyperautomation) |
-| Scheduled / Recurring Run | 8 | 20 | 32 | Turn | Low | Provisional estimate |
-| Monitoring & Alerting | 8 | 20 | 32 | Turn | Low | Provisional estimate |
-| Task Management | 6 | 11 | 11 | Turn | Medium | [Atlassian 2022](https://www.atlassian.com/blog/teamwork); Scrum Alliance 2023 |
-| Real-time Collaboration | 6 | 11 | 11 | Turn | Medium | [Microsoft WTI 2023](https://www.microsoft.com/en-us/worklab/work-trend-index); Gartner 2022 |
-| Form / Survey Work | 10 | 25 | 40 | Turn | Medium | [SurveyMonkey 2022](https://www.surveymonkey.com/curiosity/); Qualtrics 2023 |
-| General Assistance | 3 | 8 | 8 | Turn | Low | [Microsoft WTI 2023](https://www.microsoft.com/en-us/worklab/work-trend-index); IDC 2023 |
-| General Chat and Q&A (M365 Chat, Teams, browser) | 3 | 8 | 8 | Turn | Medium | [Microsoft WTI 2023](https://www.microsoft.com/en-us/worklab/work-trend-index); IDC 2018 |
+| Email Triage | 4 | 10 | 12 | Turn | Medium | [Iqbal & Horvitz (CHI 2007, Microsoft Research)](https://doi.org/10.1145/1240624.1240730) |
+| Email Thread Summary | 2 | 5 | 9 | Turn | Medium | [Mark, Iqbal & Czerwinski (CHI 2016, Microsoft Research)](https://doi.org/10.1145/2858036.2858262) |
+| Email Summarising | 2 | 4 | 7 | Turn | Medium | [Dabbish & Kraut (CSCW 2006); Mark et al. (CHI 2012)](https://doi.org/10.1145/1180875.1180941) |
+| Email Drafting | 3 | 8 | 12 | Turn | Medium | [Brynjolfsson, Li & Raymond (NBER 2023)](https://www.nber.org/papers/w31161) |
+| Teams Messaging | 4 | 8 | 11 | Turn | Medium | [Cutrell, Czerwinski & Horvitz (Microsoft Research 2001)](https://www.microsoft.com/en-us/research/publication/effects-of-instant-messaging-interruptions-on-computing-tasks-2/) |
+| Meeting Scheduling | 5 | 12 | 17 | Turn | Medium | [Cranshaw et al. (CHI 2017, Microsoft Research)](https://doi.org/10.1145/3025453.3025780) |
+| Meeting Prep | 6 | 15 | 22 | Resource | Medium | [Rogelberg et al. (J. Applied Psychology 2006)](https://doi.org/10.1037/0021-9010.91.1.83) |
+| Video Summarising | 12 | 30 | 44 | Turn | Low | Provisional estimate |
+| Document Drafting | 21 | 42 | 42 | Turn | High | [Noy & Zhang (Science 2023)](https://www.science.org/doi/10.1126/science.adh2586) |
+| Document Summarising | 10 | 20 | 35 | Turn | Medium-High | [Dell'Acqua et al. (HBS Working Paper 24-013, 2023)](https://aiinstitute.hbs.edu/navigating-the-jagged-technological-frontier/) |
+| Presentation Creation | 21 | 42 | 42 | Turn | Medium | [Dell'Acqua et al. (HBS Working Paper 24-013, 2023)](https://aiinstitute.hbs.edu/navigating-the-jagged-technological-frontier/) |
+| Presentation Summarising | 6 | 12 | 21 | Turn | Medium | [Brysbaert (J. Mem. Lang. 2019)](https://doi.org/10.1016/j.jml.2019.104047) |
+| Note Taking | 10 | 20 | 35 | Turn | Low | Provisional estimate |
+| Image Generation | 21 | 42 | 42 | Turn | Low | Provisional estimate |
+| Image / Media Analysis | 4 | 8 | 14 | Resource | Low | Provisional estimate |
+| Code Writing | 24 | 45 | 77 | Turn | High | [Peng et al. (arXiv 2023, GitHub Copilot RCT)](https://arxiv.org/abs/2302.06590) |
+| Code Analysis | 16 | 30 | 51 | Resource | Medium | [Bacchelli & Bird (ICSE 2013)](https://doi.org/10.1109/ICSE.2013.6606617) |
+| Code Analysis (URL) | 8 | 15 | 26 | Turn | Low | Provisional estimate |
+| Code Review & PR | 21 | 40 | 69 | Turn | Low | [Bacchelli & Bird (ICSE 2013)](https://doi.org/10.1109/ICSE.2013.6606617) |
+| Build & Deploy Run | 10 | 25 | 40 | Turn | Low | Provisional - BVA estimate, not yet source-good-fit |
+| Data Querying | 13 | 30 | 41 | Resource | Low | Provisional estimate |
+| Spreadsheet Analysis | 18 | 40 | 55 | Turn | Low | Provisional estimate |
+| Spreadsheet Review | 11 | 25 | 34 | Turn | Low | Provisional estimate |
+| Excel Assistance | 13 | 30 | 41 | Turn | Low | Provisional estimate |
+| Web Searching | 10 | 22 | 30 | Resource | Medium | [McKinsey Global Institute (2012)](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy) |
+| Enterprise Searching | 8 | 18 | 25 | Resource | Medium | [McKinsey Global Institute (2012)](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy) |
+| PDF Analysis | 16 | 35 | 48 | Resource | Medium | [Brysbaert (J. Mem. Lang. 2019)](https://doi.org/10.1016/j.jml.2019.104047) |
+| SharePoint Access | 5 | 12 | 16 | Turn | Medium | [McKinsey Global Institute (2012)](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy) |
+| File Retrieval | 7 | 15 | 21 | Resource | Medium | [McKinsey Global Institute (2012)](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy) |
+| People Lookup | 3 | 8 | 8 | Resource | Medium | [McKinsey Global Institute (2012)](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy) |
+| Knowledge Base | 5 | 12 | 19 | Turn | Medium | [McKinsey Global Institute (2012)](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy) |
+| Multi-source Synthesis | 34 | 75 | 92 | Resource | Low | Provisional - apportioned from Analysis & Research envelope |
+| Research & Analysis | 20 | 45 | 62 | Turn | Medium | [Noy & Zhang (Science 2023)](https://www.science.org/doi/10.1126/science.adh2586) |
+| Data & Reporting | 16 | 35 | 48 | Turn | Low | Provisional estimate |
+| Content Generation | 12 | 25 | 42 | Turn | Medium-High | [Noy & Zhang (Science 2023)](https://www.science.org/doi/10.1126/science.adh2586) |
+| Ideation & Creative | 20 | 40 | 42 | Turn | Medium | [Diehl & Stroebe (J. Pers. Soc. Psychol. 1987)](https://doi.org/10.1037/0022-3514.53.3.497) |
+| Coaching | 16 | 40 | 40 | Turn | Low | Provisional estimate |
+| Coaching (URL) | 10 | 25 | 40 | Turn | Low | Provisional estimate |
+| Sales & Customer | 14 | 35 | 40 | Turn | Medium | [Brynjolfsson, Li & Raymond (NBER 2023)](https://www.nber.org/papers/w31161) |
+| IT & Service Desk | 8 | 20 | 32 | Turn | Medium-High | [Brynjolfsson, Li & Raymond (NBER 2023)](https://www.nber.org/papers/w31161) |
+| HR & People | 14 | 35 | 40 | Turn | Low | Provisional estimate |
+| Compliance & Policy | 10 | 25 | 40 | Turn | Medium | [Martin et al. (arXiv 2024)](https://arxiv.org/abs/2401.16212) |
+| Sensitive Content Interaction | 8 | 20 | 32 | Turn | Low | Provisional estimate |
+| Domain-Specific Agent | 10 | 25 | 40 | Turn | Low | Provisional estimate |
+| Cross-Org Agent | 12 | 30 | 40 | Turn | Low | Provisional estimate |
+| Running a Workflow, LOB, Data & Reporting and General Workflow | 6 | 15 | 24 | Turn | Low | Provisional estimate |
+| Email Workflow | 5 | 12 | 12 | Turn | Low | Provisional estimate |
+| Meeting Workflow | 6 | 15 | 22 | Turn | Low | Provisional estimate |
+| Document Workflow | 8 | 15 | 26 | Turn | Low | Provisional estimate |
+| Coordination Workflow | 6 | 11 | 11 | Turn | Low | Provisional estimate |
+| Scheduled / Recurring Run | 8 | 20 | 32 | Turn | Low | Provisional - BVA estimate, not yet source-good-fit |
+| Monitoring & Alerting | 8 | 20 | 32 | Turn | Low | Provisional - BVA estimate, not yet source-good-fit |
+| Task Management | 6 | 11 | 11 | Turn | Low | Provisional estimate |
+| Real-time Collaboration | 6 | 11 | 11 | Turn | Medium | [D'Angelo, Di Iorio & Zacchiroli (CSCW 2018)](https://doi.org/10.1145/3274310) |
+| Form / Survey Work | 10 | 25 | 40 | Turn | Low | Provisional estimate |
+| General Assistance | 3 | 8 | 8 | Turn | Low | [Dillon et al. (Microsoft, arXiv 2025)](https://arxiv.org/abs/2504.11443) |
+| General Chat and Q&A (M365 Chat, Teams, browser) | 3 | 8 | 8 | Turn | Medium | [Dillon et al. (Microsoft, arXiv 2025)](https://arxiv.org/abs/2504.11443) |
 
 Where a band repeats its top value, for example Document Drafting at 21 / 42 / 42, its high end is
 capped.

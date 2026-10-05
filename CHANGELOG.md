@@ -16,6 +16,18 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-05 — Task time estimates cite peer-reviewed sources
+
+The `Human Time Estimates` table in all five templates now cites peer-reviewed studies or major
+research institutions, such as Noy & Zhang (*Science* 2023), Brynjolfsson et al. (NBER) and
+Microsoft Research CHI papers, instead of vendor surveys, blogs and landing pages. Links are DOIs
+where one exists. Rows with no credible time study now say *Provisional estimate*, have no link
+and are rated Low. No confidence went up, and no minutes changed, so value and hours-saved figures
+are the same. The Fabric App reads the new sources from the model. Installer users get this in the
+next installer release.
+
+---
+
 ## 2026-10-05 — Analytics Hub installer 0.2.4
 
 The installer bundles the notebooks and templates when it is built, so this release brings
