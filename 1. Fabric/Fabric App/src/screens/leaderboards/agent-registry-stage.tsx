@@ -467,7 +467,7 @@ function AgentLeaderboard() {
     const registered = entries.filter((entry) => entry.inRegistry).length;
 
     return (
-        <div className="grid grid-cols-1 items-start gap-400 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid grid-cols-1 items-start gap-400 2xl:grid-cols-[minmax(0,1fr)_320px]">
             <div
                 ref={gridRef}
                 className="flex h-[600px] min-w-0 flex-col [&_tbody_tr]:cursor-pointer"
