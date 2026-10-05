@@ -16,6 +16,28 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-05 — One name for each task level, and Fabric App review fixes
+
+**Templates, all four paths.** Every page now calls the 12 task groups **Task Category** and the
+detailed tasks **Task Breakdown**. Before, Estimated Value said Category and Task, and the
+Leaderboard said task group and task category. Engagement charts say **Engagement mode**. The
+**🧬 Appendix: Signal → Impact** table adds a plain-English **Description** of each task, and the
+**📖 Metric Glossary** explains App host and why it makes the task mix indicative. Download the
+template again to get these. The installer picks them up in its next release.
+
+**Fabric App.**
+- The filter bar alone picks Licensed, Unlicensed, Agents or Cowork. The pages' own Cohort
+  switches, which could disagree with it, are gone.
+- Work patterns: an org filter no longer inflates active days or drops weeks from the trend.
+- Feedback: feedback with no date stays out of the weekly trend.
+- Consumption: Cowork credits name each person, instead of one "(No value)" row.
+- Value: a return just below 1x shows as a loss, such as 0.97x in red, never as break-even.
+- Adoption: the Activation headline reads as one sentence.
+- Tables fit their headers, date slicers say Date, and the Value task chart's switch reads
+  "Break down by".
+
+---
+
 ## 2026-10-05 — Analytics Hub installer 0.2.3: a busy trial capacity
 
 On a Fabric trial or a small capacity, the first load could fail with `TooManyRequestsForCapacity`.
