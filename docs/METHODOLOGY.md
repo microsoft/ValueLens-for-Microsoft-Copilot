@@ -237,7 +237,9 @@ Each behaviour has a row in the `Human Time Estimates` table, which holds its ta
 band. The model reaches it through the `Behavior Value Map`. Every behaviour the
 processors can produce has a row, so no Copilot or agent row is left without a category.
 The `Behavior Value Map` also gives each behaviour a one-line **Description**, shown beside its use
-case on the **🧬 Appendix: Signal → Impact** page and in the Fabric App.
+case on the **🧬 Appendix: Signal → Impact** page and in the Fabric App. All 48 are listed in
+[`task-descriptions.json`](../1.%20Fabric/Fabric%20App/src/queries/appendix/task-descriptions.json),
+which the Fabric App reads. A test keeps that file and every template the same.
 
 | Task category | Behaviours |
 |---|---|
