@@ -6,7 +6,7 @@ Two-input / two-output preprocessor for the ValueLens
 and AI-in-One Rollup PBIPs.
 
 Output profiles (--profile):
-    aibv  (default) : ValueLens. 50-column fact superset —
+    aibv  (default) : ValueLens. 55-column fact superset —
                       Environment {Licensed, Unlicensed} (licensing only;
                       Cowork is flagged in Agent Filter = Cowork/Agents/blank,
                       as in the Fabric notebook),
@@ -15,6 +15,13 @@ Output profiles (--profile):
                       Behavior_Plausible, Workflow_Action, Delegation_Event_Key,
                       Is_Agent_Activity/Web_Grounded_Signal promoted into the
                       grain for sliceability) + Audit_UserId passthrough.
+                      Agent-linking keys as in the Fabric processor
+                      (Agent_BotId, Agent_EnvironmentId, Prompts_Available,
+                      Exclude_Reason). Copilot Studio runtime records with no
+                      Messages are kept (one placeholder row, Message_isPrompt
+                      FALSE); M365 Copilot twins, test pane, maker evaluation,
+                      agent authoring, autonomous/workflow runs and Fabric
+                      multi-agent records are dropped (DROP_EXCLUDE_REASONS).
     aio             : AI-in-One Dashboard. 36-column fact — 5-value Environment
                       {Autonomous Agent, Cowork, Agents, Licensed M365 Copilot,
                       Unlicensed Chat}. Reproduces the v3.1.0 AIO output
@@ -115,7 +122,7 @@ SCRIPT_VERSION = "4.0.0"
 #                     (36-col fact, 5-value Environment vocabulary). This is
 #                     the contract the AI-in-One dashboard already consumes;
 #                     it must remain byte-identical to v3.1.0.
-#   --profile aibv  : the AIBV-faithful superset (50-col fact, licensing-only
+#   --profile aibv  : the AIBV-faithful superset (55-col fact, licensing-only
 #                     Environment, all offloaded calc cols + grain-promoted
 #                     sliceable flags) built in this v4.0.0 effort.
 #
@@ -203,6 +210,13 @@ _NONGRAIN_ATTRS_AIBV: tuple[str, ...] = _NONGRAIN_ATTRS_AIO + (
     # Microsoft Entra Agent ID (Agent 365) crosswalk key. AIBV-only — the AIO
     # contract above stays frozen at the v3.1.0 set.
     "Agent_EntraId",
+    # Copilot Studio runtime keys (from PlatformAgentId '<environment>_<bot id>'),
+    # whether the record carried any messages, and why a kept record would be
+    # excluded (blank unless DROP_EXCLUDE_REASONS is narrowed).
+    "Agent_BotId",
+    "Agent_EnvironmentId",
+    "Prompts_Available",
+    "Exclude_Reason",
 )
 
 # Final fact CSV schemas. One row per (grain x Message_Id). Message_Id is
@@ -449,7 +463,65 @@ def derive_agent_entra_id(agent_id: Any, agent_title_id: str) -> str:
     if not agent_title_id:
         return ""
     match = _ENTRA_AGENT_ID_RE.fullmatch(agent_title_id.strip())
-    return match.group(0) if match else ""
+    if not match or not match.group(0).replace("-", "").replace("0", ""):
+        # The all-zero GUID marks Fabric multi-agent orchestration, not an agent.
+        return ""
+    return match.group(0)
+
+
+# Copilot Studio runtime records carry PlatformAgentId '<environment id>_<bot id>'.
+_PLATFORM_AGENT_ID_RE = re.compile(
+    r"^(.*)_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+)
+
+
+def derive_bot_and_environment(platform_agent_id: Any) -> tuple[str, str]:
+    """(Agent_BotId, Agent_EnvironmentId) from a Copilot Studio PlatformAgentId."""
+    text = to_text(platform_agent_id).strip()
+    match = _PLATFORM_AGENT_ID_RE.match(text)
+    if match:
+        return match.group(2).lower(), match.group(1)
+    if _ENTRA_AGENT_ID_RE.fullmatch(text):
+        return text.lower(), ""
+    return "", ""
+
+
+def is_copilot_studio_runtime(audit_data: dict[str, Any]) -> bool:
+    return re.sub(r"\s", "", to_text(audit_data.get("AgentPlatform"))).lower() == "copilotstudio"
+
+
+# Records that are not end-user agent usage. Same rules, in the same order, as
+# EXCLUDE_REASON_SQL in the Fabric audit ingester and processor notebooks.
+_EXCLUDE_HOSTS = {
+    "copilot studio": "Copilot Studio test pane",
+    "pva-maker-evaluation": "Maker evaluation",
+    "agentic-builder": "Agent authoring",
+    "autonomous": "Autonomous run",
+    "workflow-agents": "Workflow run",
+}
+# Reasons dropped from the aibv output. Remove one to keep those records.
+DROP_EXCLUDE_REASONS: tuple[str, ...] = (
+    "Copilot Studio test pane",
+    "Maker evaluation",
+    "Agent authoring",
+    "Autonomous run",
+    "Workflow run",
+    "M365 Copilot twin",
+    "Fabric multi-agent",
+)
+
+
+def classify_exclude_reason(app_host: Any, prompts_available: Any, agent_id: Any) -> str:
+    host = to_text(app_host).strip().lower()
+    if host in _EXCLUDE_HOSTS:
+        return _EXCLUDE_HOSTS[host]
+    prompts = to_text(prompts_available).strip().upper() or "TRUE"
+    if prompts == "FALSE" and host == "m365copilot":
+        return "M365 Copilot twin"
+    agent = to_text(agent_id).strip().lower()
+    if agent and not agent.replace("-", "").replace("0", ""):
+        return "Fabric multi-agent"
+    return ""
 
 
 def first_dict_item(items: list[Any]) -> dict[str, Any]:
@@ -1570,6 +1642,7 @@ def explode_record(
     user_key_map: dict[str, int],
     thread_key_map: dict[str, int],
     profile: str,
+    exclusion_counts: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
     creation_time_raw = audit_data.get("CreationTime")
     creation_time_raw_str = to_text(creation_time_raw).strip()
@@ -1586,9 +1659,30 @@ def explode_record(
     if not isinstance(ced, dict):
         return []
 
+    is_aibv = profile != "aio"
     prompts = prompt_messages(ced)
-    if not prompts:
+    # aibv: a Copilot Studio runtime record with no messages (Copilot Studio
+    # agents in Teams and other channels log no prompt text) is still one agent
+    # interaction. It is emitted as one placeholder message with
+    # Message_isPrompt FALSE. AIO keeps the v3.1.0 prompt-only behaviour.
+    prompts_available = "TRUE" if get_array(ced, "Messages") else "FALSE"
+    placeholder_message = (
+        is_aibv and not prompts and prompts_available == "FALSE"
+        and is_copilot_studio_runtime(audit_data)
+    )
+    if not prompts and not placeholder_message:
         return []
+    exclude_reason = ""
+    if is_aibv:
+        exclude_reason = classify_exclude_reason(ced.get("AppHost"), prompts_available, agent_id)
+        if exclude_reason in DROP_EXCLUDE_REASONS:
+            if exclusion_counts is not None:
+                exclusion_counts[exclude_reason] = exclusion_counts.get(exclude_reason, 0) + 1
+            return []
+    if placeholder_message:
+        record_id = to_text(audit_data.get("Id")).strip() or "|".join(
+            (creation_time_raw_str, agent_id, to_text(audit_data.get("UserId"))))
+        prompts = [{"Id": "none:" + record_id, "isPrompt": False}]
 
     resources = resource_rows(ced)
     real_resource_count = sum(1 for item in get_array(ced, "AccessedResources") if isinstance(item, dict))
@@ -1611,8 +1705,12 @@ def explode_record(
             user_key_map[audit_user_id_norm] = user_key
     else:
         user_key = ""
-    # ThreadId INT surrogate.
+    # ThreadId INT surrogate. Records without a ThreadId (Copilot Studio
+    # runtime records) fall back to the conversation id (aibv only).
     thread_id_raw = to_text(ced.get("ThreadId"))
+    if not thread_id_raw.strip() and is_aibv:
+        thread_id_raw = (to_text(ced.get("ConversationId")).strip()
+                         or to_text(audit_data.get("ConversationId")).strip())
     if thread_id_raw:
         thread_key = thread_key_map.get(thread_id_raw)
         if thread_key is None:
@@ -1637,8 +1735,6 @@ def explode_record(
     ai_model = compute_ai_model(model_name_str)
     user_month_key = compute_user_month_key(audit_user_id_raw, month_start_str)
 
-    is_aibv = profile != "aio"
-
     # Per-record constants hoisted out of the (prompt x resource) inner loop.
     # All grain values are pre-stringified via to_text() exactly once so the
     # rollup loop can use the tuple directly as the dict key.
@@ -1646,6 +1742,7 @@ def explode_record(
     thread_key_text = to_text(thread_key)
     agent_title_id = derive_agent_title_id(agent_id)
     agent_entra_id = derive_agent_entra_id(agent_id, agent_title_id)
+    agent_bot_id, agent_environment_id = derive_bot_and_environment(audit_data.get("PlatformAgentId"))
     aisystem_plugin_name_str = to_text(first_plugin.get("Name")) if first_plugin else ""
     in_entra = (audit_user_id_norm in user_lookup) if audit_user_id_norm else True
     # AIBV-only per-record constants.
@@ -1676,7 +1773,7 @@ def explode_record(
         "ModelTransparencyDetails_ModelName": model_name_str,
         "Agent_TitleID": agent_title_id,
         "Agent_EntraId": agent_entra_id,
-        "Message_isPrompt": "TRUE",
+        "Message_isPrompt": "FALSE" if placeholder_message else "TRUE",
         # Behavior_Source / Value_Outcome injected per-resource below.
         "Behavior_Source": "",
         "Value_Outcome": "",
@@ -1698,6 +1795,11 @@ def explode_record(
             "Human_Baseline_Min": "",
             "Behavior_Plausible": "",
             "Delegation_Event_Key": "",
+            # Copilot Studio runtime keys + record flags.
+            "Agent_BotId": agent_bot_id,
+            "Agent_EnvironmentId": agent_environment_id,
+            "Prompts_Available": prompts_available,
+            "Exclude_Reason": exclude_reason,
         })
 
     # Output schema: list of tuples
@@ -2123,6 +2225,7 @@ def run_processor(
     rollup: dict[tuple[Any, ...], dict[str, Any]] = {}
     mid_to_int: dict[str, int] = {}
     unmatched: set[str] = set()
+    exclusion_counts: dict[str, int] = {}
 
     with open(purview_csv, "r", encoding="utf-8-sig", newline="") as fin:
         reader = csv.DictReader(fin)
@@ -2146,7 +2249,8 @@ def run_processor(
                 continue
 
             try:
-                rows = explode_record(audit_data, user_lookup, user_key_map, thread_key_map, profile)
+                rows = explode_record(audit_data, user_lookup, user_key_map, thread_key_map, profile,
+                                      exclusion_counts)
             except Exception:
                 stats["errors"] += 1
                 continue
@@ -2161,15 +2265,20 @@ def run_processor(
                     mid_to_int[message_id_str] = mid_int
                 rollup[(grain_key, mid_int)] = nongrain
 
+    stats["excluded_records"] = sum(exclusion_counts.values())
+    stats["excluded_by_reason"] = dict(sorted(exclusion_counts.items()))
+
     if not quiet:
         print(f"  Input records:         {stats['input_records']:,}")
         print(f"  Skipped (non-Copilot): {stats['skipped_non_copilot']:,}")
+        for reason, count in stats["excluded_by_reason"].items():
+            print(f"  Excluded ({reason}): {count:,}")
         print(f"  Raw prompt rows:       {stats['output_rows']:,}")
         print(f"  Errors:                {stats['errors']:,}")
         print()
         print("Writing rolled-up fact CSV...")
 
-    # Profile-specific output schema (AIO = v3.1.0 36-col; AIBV = 50-col superset).
+    # Profile-specific output schema (AIO = v3.1.0 36-col; AIBV = 55-col superset).
     grain_keys, nongrain_attrs_sel, fact_header = schema_for(profile)
     with open(fact_out_csv, "w", encoding="utf-8", newline="") as fout:
         writer = csv.writer(fout, lineterminator="\n")
@@ -2279,7 +2388,7 @@ def main() -> None:
         default="aibv",
         help=(
             "Output profile. 'aibv' (default) = ValueLens "
-            "superset (50-col fact, Licensed/Unlicensed Environment). 'aio' = AI-in-One "
+            "superset (55-col fact, Licensed/Unlicensed Environment). 'aio' = AI-in-One "
             "Dashboard (36-col fact, 5-value Environment) — reproduces the "
             "v3.1.0 AIO output exactly."
         ),

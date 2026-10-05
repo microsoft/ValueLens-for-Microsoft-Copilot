@@ -34,8 +34,13 @@ python "Purview_CopilotInteraction_Processor_v4.0.0.py" \
     --profile    aibv
 ```
 
-`--profile aibv` is the ValueLens output (50-column fact superset, all the calculated columns
-pre-computed). `--profile aio` produces the leaner AI-in-One shape instead.
+`--profile aibv` is the ValueLens output (55-column fact superset, all the calculated columns
+pre-computed). It applies the same audit fixes as the Fabric processor: Copilot Studio runtime
+records with no messages are kept, and M365 Copilot "twins", test-pane, maker-evaluation,
+agent-authoring, autonomous/workflow-run and Fabric multi-agent records are dropped (counted in
+the run summary). It also emits the agent-linking keys `Agent_BotId`, `Agent_EnvironmentId`,
+`Prompts_Available` and `Exclude_Reason` — see [`docs/METHODOLOGY.md`](../../docs/METHODOLOGY.md).
+`--profile aio` produces the leaner AI-in-One shape instead, unchanged.
 
 `--help` lists everything, including `--out-dir` and `--with-aggregates`.
 

@@ -66,15 +66,63 @@ flowchart LR
 | Step | What happens |
 |---|---|
 | **1. Collect** | On Fabric, `Copilot_Audit_Log_Direct_Ingester` calls the Microsoft Graph audit log query API (`security/auditLog/queries`) for `copilotInteraction` records each week. The other paths export the same records; see each path's README. |
-| **2. Flatten** | Each record carries a list of messages and a list of accessed resources. Responses are dropped. Each prompt is paired with every resource the interaction accessed, so there is **one row per prompt × resource**; a prompt with no resources keeps one row. On the reference data that averages 2.65 rows per prompt. |
-| **3. De-duplicate** | Each row's ID is a SHA-256 hash of its record, message and resource keys. Duplicate IDs are dropped, so re-running a week never double-counts. |
+| **2. Flatten** | Each record carries a list of messages and a list of accessed resources. Responses are dropped. Each prompt is paired with every resource the interaction accessed, so there is **one row per prompt × resource**; a prompt with no resources keeps one row. On the reference data that averages 2.65 rows per prompt. A Copilot Studio agent used in Teams or another channel logs a runtime record with **no messages**; it is kept as one row that is not a prompt (`Message_isPrompt` FALSE), so its user still counts. Records that are not end-user agent usage are dropped ([§2.1](#21-which-audit-records-count)). |
+| **3. De-duplicate** | Each row's ID is a SHA-256 hash of its record, message and resource keys. Duplicate IDs are dropped, so re-running a week never double-counts. Each run also re-queries the trailing `LOOKBACK_DAYS` (default 7) to pick up records that Purview logs late. |
 | **4. Date** | `InteractionDate`, `WeekStart` (Monday) and `MonthStart`, all from the record's UTC timestamp. |
 | **5. Licence** | The user ID is lower-cased and trimmed, then matched to the licensed-users table. `Has license` of YES, TRUE, Y or 1 gives **M365 Copilot Licensed**; anything else, including no match, gives **Unlicensed**. |
-| **6. Link agents** | Each agent row is linked to the Agent 365 registry by Entra app ID, then Title ID, then normalised name. The first match wins. |
+| **6. Link agents** | Each agent row is linked to the Agent 365 registry by Title ID, then Copilot Studio Bot Id, then Entra agent ID. The first match wins. Agents are never matched by name ([§2.2](#22-how-agents-are-linked-to-the-registry)). |
 | **7. Classify** | The rules in [§3](#3-how-each-interaction-is-classified). On Fabric the `Copilot_Audit_Log_Processor` notebook runs them in Spark and writes `copilot_interactions_curated`. The other paths run [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../4.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py), which classifies agents less finely ([§3.2](#paths-2-3-and-4)). |
 | **8. Model** | The model reads the curated rows without reclassifying them. It joins org data (organisation, department, location) on the normalised person ID, and computes the measures. On Fabric, refresh is incremental by `CreationDate`. |
 
 Table and column contracts are in the [data dictionary](DATA-DICTIONARY.md).
+
+### 2.1 Which audit records count
+
+Some `CopilotInteraction` records are not someone using an agent. The ingesters flag them in
+`Exclude_Reason`, and the processors drop every reason listed in `DROP_EXCLUDE_REASONS`
+(all of them by default). The first rule that fits wins:
+
+| `Exclude_Reason` | Rule | Why it is dropped |
+|---|---|---|
+| Copilot Studio test pane | App host is "Copilot Studio" | A maker testing the agent |
+| Maker evaluation | App host is "pva-maker-evaluation" | An automated evaluation run |
+| Agent authoring | App host is "agentic-builder" | Building the agent, not using it |
+| Autonomous run | App host is "autonomous" | No person in the loop |
+| Workflow run | App host is "workflow-agents" | No person in the loop |
+| M365 Copilot twin | A Copilot Studio runtime record with no messages, logged with app host "m365copilot" | Microsoft 365 Copilot logs the same turn again with its messages, so it would count twice |
+| Fabric multi-agent | The agent ID is all zeros | An internal Fabric orchestration record |
+
+To report autonomous agent activity, remove "Autonomous run" and "Workflow run" from
+`DROP_EXCLUDE_REASONS`. Rows a previous run already wrote are removed when their reason is listed.
+
+### 2.2 How agents are linked to the registry
+
+The audit log identifies an agent in several ways, and rarely by the registry's Title ID alone. The
+processor tries each key in turn and stops at the first that matches a registry row:
+
+1. **Title ID**, parsed from the agent ID (`T_…`, `P_…`, `CopilotStudio.Declarative.…`, or a Title ID
+   inside a schema name).
+2. **Copilot Studio Bot Id**, parsed from `PlatformAgentId` on runtime records
+   (`<environment id>_<bot id>`), matched to the registry's `Bot Id`.
+3. **Entra agent ID**, the GUID Agent 365 stamps into the audit `AgentId`, matched to the registry's
+   `Entra Agent ID` (`agentIdentityId`).
+
+Agents are **never matched by name**: names are not unique, and two agents called "HR Helper" would
+merge. On one large tenant name matching linked only about 1.3% more rows, and a direct Title ID
+match linked 55%. A row with a key that matches nothing has `Agent_LinkMethod` "Unlinked"; a row
+with no key has none.
+
+**One agent, two Title IDs.** Publishing a Copilot Studio agent to the organisation (LOB) and sharing
+it creates two registry entries with different Title IDs. When both carry the same Bot Id or Entra
+agent ID they are one agent: both copies link to the LOB Title ID (or, for two Shared copies, the
+most recently updated), so the agent's distinct users are counted once. `Agent_MatchedTitleID` keeps
+the Title ID that actually matched. Agent Builder agents and Microsoft agents are never merged,
+because their copies can be different agents.
+
+The Local CSV processor (Path 4, also run by the Power Automate path) drops the same records and
+keeps the same runtime records. The SharePoint path processes audit data with the PAX script's own
+copy of that processor, which does so only once PAX takes the same change. On all three paths agent
+linking runs in the template, not the processor.
 
 ---
 
@@ -277,6 +325,11 @@ doesn't split workflows, and doesn't apply the name keywords to agent rows. So o
 these paths agent chats with no matching resource stay General Chat, and workflows stay Running a
 Workflow. Both still get a task category.
 
+Its default `--profile aibv` output drops the same records as the Fabric processor
+([§2.1](#21-which-audit-records-count)), keeps Copilot Studio runtime records with no messages, and
+writes the agent keys (`Agent_TitleID`, `Agent_EntraId`, `Agent_BotId`, `Agent_EnvironmentId`) and
+`Exclude_Reason`, so the template can link agents.
+
 #### Where each level shows
 
 | Level | Where |
@@ -424,7 +477,8 @@ user) by organisation over time.
 
 - **People** are ranked by sessions within their organisation, per cohort. Security Copilot's
   automated sessions are excluded, because they would top every list.
-- **Agents** are ranked by users and sessions, with their registry descriptions.
+- **Agents** are ranked by users and sessions, with their registry descriptions. The LOB and Shared
+  copies of one Copilot Studio agent are one agent here ([§2.2](#22-how-agents-are-linked-to-the-registry)).
 
 ### Agent Registry: what agents exist, and are they used?
 
@@ -708,6 +762,12 @@ more workloads a day scores full marks for it.
   matched on the model name.
 - **Dates are UTC.** Days and weeks can shift by one for people far from UTC.
 - **Feedback categories use English keywords.** Other languages mostly land in General.
+- **Agent user counts can differ from the agent builder's own view.** Copilot Studio analytics also
+  counts test-pane, evaluation and autonomous runs, which are dropped here ([§2.1](#21-which-audit-records-count)),
+  and an agent whose audit records carry no key the registry knows stays unlinked ([§2.2](#22-how-agents-are-linked-to-the-registry)).
+- **Registry usage fields can be up to a week old.** The registry ingester re-fetches an agent's
+  detail (usage, Bot Id, sharing) only when the agent is new or changed, or its cached detail is
+  older than `FULL_REFRESH_DAYS` (default 7). `Detail As Of` on each `agents_365` row shows when.
 
 ---
 
