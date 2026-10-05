@@ -135,12 +135,12 @@ export function TasksStage() {
             )}
 
             <div className="flex flex-col gap-300">
-                <div className="flex flex-wrap items-center justify-between gap-300">
-                    <p className="max-w-[68ch] text-[length:var(--text-300)] leading-300 text-muted-foreground">
-                        {breakdown.subtitle}.
-                    </p>
+                <div className="flex flex-wrap items-center gap-300">
+                    <span aria-hidden="true" className="text-[length:var(--text-300)] leading-300 font-semibold text-foreground">
+                        Break down by
+                    </span>
                     <SegmentedControl
-                        label="Breakdown"
+                        label="Break down by"
                         options={taskDimensions}
                         value={dimension}
                         onChange={setDimension}
