@@ -18,7 +18,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {{ frequency: 'daily' | 'weekly', time: string, weekday: string, timeZone: string }} schedule
  * @property {{ appId?: string, objectId?: string, servicePrincipalId?: string, displayName?: string, secretExpires?: string, existing?: boolean }} app
  * @property {{ subscriptionId?: string, resourceGroup?: string, name?: string, id?: string, uri?: string, location?: string, secretName: string, existing?: boolean, rbac?: boolean, private?: boolean, secretSetAt?: string }} keyVault
- * @property {{ capacityId?: string, workspaceId?: string, workspaceName?: string, lakehouseId?: string, lakehouseName?: string, notebooks: Partial<Record<import('./catalog.js').NotebookKey, string>>, notebookNames?: Partial<Record<import('./catalog.js').NotebookKey, string>>, pipelineId?: string, pipelineName?: string, pipelineModules?: string, scheduleId?: string, vaultEndpointId?: string }} fabric
+ * @property {{ capacityId?: string, workspaceId?: string, workspaceName?: string, lakehouseId?: string, lakehouseName?: string, notebooks: Partial<Record<import('./catalog.js').NotebookKey, string>>, notebookNames?: Partial<Record<import('./catalog.js').NotebookKey, string>>, pipelineId?: string, pipelineName?: string, pipelineModules?: string, pipelineVersion?: number, scheduleId?: string, vaultEndpointId?: string }} fabric
  * @property {{ jobId?: string, status?: string, startedAt?: string, finishedAt?: string }} [firstRun]
  * @property {SemanticModelConfig} semanticModel
  * @property {FabricAppConfig} fabricApp

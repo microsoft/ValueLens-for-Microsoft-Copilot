@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/pipeline/definition/pipeline/1.0.0/schema.json",
   "properties": {
-    "description": "Orchestrates ingestion followed by the Audit Log Processor, which writes copilot_interactions_curated before semantic-model refresh. Core: Audit log + Licensed Users always run; Org Data is optional via EnableOrgDataPull. The processor waits for audit log, licensed users and the Agents 365 branch (Graph API first, CSV fallback if the API step fails) to succeed. Optional sources (M365 activity, Dataverse transcripts, credit consumption, product feedback, Agents 365) are opt-in via their Enable* parameters (default false). Export-only sources (consumption, feedback) require their CSVs to be landed first (manually or via the flows in flows/). Semantic-model refresh is scheduled separately after pipeline success. See docs/PERMISSIONS.md for roles.",
+    "description": "Orchestrates ingestion followed by the Audit Log Processor, which writes copilot_interactions_curated before semantic-model refresh. Core: Audit log + Licensed Users always run; Org Data is optional via EnableOrgDataPull. The processor waits for audit log, licensed users and the Agents 365 branch (Graph API first, CSV fallback if the API step fails) to succeed. Optional sources (M365 activity, Dataverse transcripts, credit consumption, product feedback, Agents 365) are opt-in via their Enable* parameters (default false). Export-only sources (consumption, feedback) require their CSVs to be landed first (manually or via the flows in flows/). Semantic-model refresh is scheduled separately after pipeline success. The loads run in two lanes so a trial or small capacity isn't overloaded: lane 1 loads the audit log, then runs the processor; lane 2 runs the other loads one after another, and a load that fails there doesn't stop the next. Each load retries up to 3 times, 5 minutes apart. See docs/PERMISSIONS.md for roles.",
     "activities": [
       {
         "name": "Run_Audit_Log_Ingester",
@@ -10,8 +10,8 @@
         "dependsOn": [],
         "policy": {
           "timeout": "0.02:00:00",
-          "retry": 1,
-          "retryIntervalInSeconds": 60,
+          "retry": 2,
+          "retryIntervalInSeconds": 300,
           "secureOutput": false,
           "secureInput": false
         },
@@ -28,8 +28,8 @@
         "dependsOn": [],
         "policy": {
           "timeout": "0.00:15:00",
-          "retry": 2,
-          "retryIntervalInSeconds": 60,
+          "retry": 3,
+          "retryIntervalInSeconds": 300,
           "secureOutput": false,
           "secureInput": false
         },
@@ -59,8 +59,8 @@
         ],
         "policy": {
           "timeout": "0.02:00:00",
-          "retry": 1,
-          "retryIntervalInSeconds": 60,
+          "retry": 2,
+          "retryIntervalInSeconds": 300,
           "secureOutput": false,
           "secureInput": false
         },
@@ -74,7 +74,12 @@
         "name": "Conditionally_Run_Org_Data",
         "description": "Wraps the Org Data Ingester in an IfCondition so it only runs when EnableOrgDataPull = true. Customers who upload Entra/HRIS data manually can set this to false to skip the Graph pull.",
         "type": "IfCondition",
-        "dependsOn": [],
+        "dependsOn": [
+          {
+            "activity": "Run_Agent365_CSV_Fallback",
+            "dependencyConditions": ["Completed", "Skipped"]
+          }
+        ],
         "typeProperties": {
           "expression": {
             "value": "@pipeline().parameters.EnableOrgDataPull",
@@ -88,8 +93,8 @@
               "dependsOn": [],
               "policy": {
                 "timeout": "0.00:15:00",
-                "retry": 2,
-                "retryIntervalInSeconds": 60,
+                "retry": 3,
+                "retryIntervalInSeconds": 300,
                 "secureOutput": false,
                 "secureInput": false
               },
@@ -107,7 +112,12 @@
         "name": "Conditionally_Run_M365_Activity",
         "description": "Optional. Runs the M365 Activity Ingester (Microsoft Graph usage reports for Teams, Outlook, SharePoint, OneDrive, Viva Engage and Microsoft 365 apps -> m365_activity_daily Delta table) only when EnableM365Activity = true. Needs Reports.Read.All, which the audit log ingester already uses. Loads the days not yet in the table and re-reads the most recent ones.",
         "type": "IfCondition",
-        "dependsOn": [],
+        "dependsOn": [
+          {
+            "activity": "Conditionally_Run_Org_Data",
+            "dependencyConditions": ["Completed"]
+          }
+        ],
         "typeProperties": {
           "expression": {
             "value": "@pipeline().parameters.EnableM365Activity",
@@ -122,7 +132,7 @@
               "policy": {
                 "timeout": "0.01:00:00",
                 "retry": 2,
-                "retryIntervalInSeconds": 60,
+                "retryIntervalInSeconds": 300,
                 "secureOutput": false,
                 "secureInput": false
               },
@@ -140,7 +150,12 @@
         "name": "Conditionally_Run_Dataverse_Transcripts",
         "description": "Optional. Runs the Agent Transcript Parser (Dataverse conversationtranscripts -> agent_* Delta tables) only when EnableDataverse = true. Needs an app reg added as a Dataverse Application User with Read on Conversation Transcript (see docs/PERMISSIONS.md).",
         "type": "IfCondition",
-        "dependsOn": [],
+        "dependsOn": [
+          {
+            "activity": "Conditionally_Run_Product_Feedback",
+            "dependencyConditions": ["Completed"]
+          }
+        ],
         "typeProperties": {
           "expression": {
             "value": "@pipeline().parameters.EnableDataverse",
@@ -153,8 +168,8 @@
               "dependsOn": [],
               "policy": {
                 "timeout": "0.02:00:00",
-                "retry": 1,
-                "retryIntervalInSeconds": 60,
+                "retry": 2,
+                "retryIntervalInSeconds": 300,
                 "secureOutput": false,
                 "secureInput": false
               },
@@ -172,7 +187,12 @@
         "name": "Conditionally_Run_Credit_Consumption",
         "description": "Optional. Runs the Credit Consumption Ingester (reads exported CSVs already in Files/credit_consumption/ -> credit_consumption_* Delta tables) only when EnableConsumption = true. Export-only source: the CSVs must already be landed (manually or via the Power Automate flow in flows/).",
         "type": "IfCondition",
-        "dependsOn": [],
+        "dependsOn": [
+          {
+            "activity": "Conditionally_Run_Dataverse_Transcripts",
+            "dependencyConditions": ["Completed"]
+          }
+        ],
         "typeProperties": {
           "expression": {
             "value": "@pipeline().parameters.EnableConsumption",
@@ -185,8 +205,8 @@
               "dependsOn": [],
               "policy": {
                 "timeout": "0.00:15:00",
-                "retry": 2,
-                "retryIntervalInSeconds": 60,
+                "retry": 3,
+                "retryIntervalInSeconds": 300,
                 "secureOutput": false,
                 "secureInput": false
               },
@@ -204,7 +224,12 @@
         "name": "Conditionally_Run_Product_Feedback",
         "description": "Optional. Runs the Product Feedback Ingester (reads exported CSVs already in Files/product_feedback/ -> user_feedback Delta table) only when EnableProductFeedback = true. Export-only source: the CSVs must already be landed (manually or via the Power Automate flow in flows/).",
         "type": "IfCondition",
-        "dependsOn": [],
+        "dependsOn": [
+          {
+            "activity": "Conditionally_Run_M365_Activity",
+            "dependencyConditions": ["Completed"]
+          }
+        ],
         "typeProperties": {
           "expression": {
             "value": "@pipeline().parameters.EnableProductFeedback",
@@ -217,8 +242,8 @@
               "dependsOn": [],
               "policy": {
                 "timeout": "0.00:15:00",
-                "retry": 2,
-                "retryIntervalInSeconds": 60,
+                "retry": 3,
+                "retryIntervalInSeconds": 300,
                 "secureOutput": false,
                 "secureInput": false
               },
@@ -236,7 +261,12 @@
         "name": "Conditionally_Run_Agent365",
         "description": "Optional. When EnableAgent365 = true, runs the Agent 365 Registry Ingester (Graph API -> agents_365 Delta table), the primary source. Needs an Agent 365 licence and admin-consented CopilotPackages.Read.All + Application.Read.All + User.Read.All. If it fails (for example 403 with no Agent 365 licence), Run_Agent365_CSV_Fallback lands the exported CSV instead.",
         "type": "IfCondition",
-        "dependsOn": [],
+        "dependsOn": [
+          {
+            "activity": "Run_Licensed_Users_Ingester",
+            "dependencyConditions": ["Completed"]
+          }
+        ],
         "typeProperties": {
           "expression": {
             "value": "@pipeline().parameters.EnableAgent365",
@@ -276,8 +306,8 @@
         ],
         "policy": {
           "timeout": "0.00:15:00",
-          "retry": 2,
-          "retryIntervalInSeconds": 60,
+          "retry": 3,
+          "retryIntervalInSeconds": 300,
           "secureOutput": false,
           "secureInput": false
         },
