@@ -25,6 +25,11 @@ Deployment instructions do **not** live here. They live in the path READMEs:
   Agents as well as Cowork, since none of them have a seat to measure against. The app says so,
   and shows a message instead of a trend when the dates cover fewer than two months.
 
+**Consumption Central add-on, all four paths.** Models named from Azure meters are spelled the
+way OpenAI writes them: GPT-4o, o4-mini, GPT-5.4, GPT-4.1 and GPT-5, not "Gpt 4O", "O4 Mini" and a
+bare "5.4". Other meters, such as Pay As You Go Copilot Credit, keep their names. The app's Cost
+by model and Foundry resources views show the new names even before the template is updated.
+
 **Fabric App.**
 - **Feedback** counts only feedback dated inside the Calendar, as its weekly trend always did.
   Feedback sent outside the report's dates no longer inflates the totals, satisfaction, topics
