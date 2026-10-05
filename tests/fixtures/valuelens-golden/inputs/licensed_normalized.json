@@ -1,0 +1,26 @@
+{
+ "columns": [
+  [
+   "UPN_Normalized",
+   "string"
+  ],
+  [
+   "Has license",
+   "string"
+  ]
+ ],
+ "rows": [
+  [
+   "licensed@example.invalid",
+   "Yes"
+  ],
+  [
+   "licensed@example.invalid",
+   "Yes"
+  ],
+  [
+   "unlicensed@example.invalid",
+   "No"
+  ]
+ ]
+}

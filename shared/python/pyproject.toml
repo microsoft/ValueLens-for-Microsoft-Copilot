@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "valuelens-core"
+version = "0.1.0"
+description = "ValueLens shared processing logic (DuckDB port of the Fabric notebooks)"
+requires-python = ">=3.10"
+dependencies = ["duckdb>=1.1"]
+
+[tool.setuptools.packages.find]
+include = ["valuelens_core*"]

@@ -1,0 +1,152 @@
+{
+ "columns": [
+  [
+   "Title ID",
+   "string"
+  ],
+  [
+   "Entra Agent ID",
+   "string"
+  ],
+  [
+   "Agent name",
+   "string"
+  ],
+  [
+   "Agent description",
+   "string"
+  ],
+  [
+   "Custom actions",
+   "string"
+  ],
+  [
+   "Can use code interpreter",
+   "string"
+  ],
+  [
+   "Can generate images using user prompt",
+   "string"
+  ],
+  [
+   "Can read Sharepoint sites and files",
+   "string"
+  ],
+  [
+   "Agent type (A365)",
+   "string"
+  ]
+ ],
+ "rows": [
+  [
+   "T_coach",
+   null,
+   "Coach Bot",
+   "Career coaching",
+   null,
+   "No",
+   "No",
+   "No",
+   "Declarative"
+  ],
+  [
+   "T_sales",
+   null,
+   "Sales Helper",
+   null,
+   null,
+   "No",
+   "No",
+   "No",
+   "Declarative"
+  ],
+  [
+   "T_mystery",
+   "0f8fad5b-d9cb-469f-a165-70867728950e",
+   "Mystery Agent",
+   "Helps you brainstorm ideas",
+   null,
+   "No",
+   "No",
+   "No",
+   "Declarative"
+  ],
+  [
+   "T_coder",
+   null,
+   "Coder Agent",
+   "General helper",
+   null,
+   "Yes",
+   "No",
+   "No",
+   "Declarative"
+  ],
+  [
+   "T_painter",
+   null,
+   " painter agent ",
+   "General helper",
+   null,
+   "No",
+   "Yes",
+   "No",
+   "Declarative"
+  ],
+  [
+   "T_files",
+   null,
+   "Files Agent",
+   "General helper",
+   null,
+   "No",
+   "No",
+   "Yes",
+   "Declarative"
+  ],
+  [
+   "T_plain",
+   "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+   "Plain Agent",
+   "Nothing in particular",
+   "Look up tickets",
+   "No",
+   "No",
+   "No",
+   "Autonomous"
+  ],
+  [
+   "T_kb",
+   null,
+   "Unused Agent",
+   "Product handbook",
+   null,
+   "No",
+   "No",
+   "No",
+   "Declarative"
+  ],
+  [
+   "",
+   null,
+   "Blank Title",
+   null,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  [
+   "T_coach",
+   null,
+   "Coach Bot",
+   "Career coaching",
+   null,
+   "No",
+   "No",
+   "No",
+   "Declarative"
+  ]
+ ]
+}

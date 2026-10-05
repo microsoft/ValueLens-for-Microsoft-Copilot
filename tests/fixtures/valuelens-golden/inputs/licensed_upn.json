@@ -1,0 +1,68 @@
+{
+ "columns": [
+  [
+   "User Principal Name",
+   "string"
+  ],
+  [
+   "Has license",
+   "string"
+  ],
+  [
+   "Department",
+   "string"
+  ]
+ ],
+ "rows": [
+  [
+   " Power@example.invalid ",
+   "Yes",
+   "Sales"
+  ],
+  [
+   "power@example.invalid",
+   "Yes",
+   "Sales"
+  ],
+  [
+   "agentic@example.invalid",
+   "TRUE",
+   "Ops"
+  ],
+  [
+   "habit@example.invalid",
+   "1",
+   "Ops"
+  ],
+  [
+   "develop@example.invalid",
+   "y",
+   "HR"
+  ],
+  [
+   "beginner@example.invalid",
+   "Yes",
+   "HR"
+  ],
+  [
+   "unlicensed@example.invalid",
+   "No",
+   "Finance"
+  ],
+  [
+   "mixedcase@example.invalid",
+   "Yes",
+   "Finance"
+  ],
+  [
+   "",
+   "Yes",
+   "Blank"
+  ],
+  [
+   null,
+   "Yes",
+   "Null"
+  ]
+ ]
+}
