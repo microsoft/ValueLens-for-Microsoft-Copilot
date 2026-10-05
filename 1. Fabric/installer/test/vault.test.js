@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { isPrivateVault, keyVaultApi, networkBlocked } from '../src/clients/azure.js';
 import { createClient, HttpError } from '../src/http.js';
-import { endpointName, endpointRequest, ensureVaultEndpoint } from '../src/steps/fabric.js';
+import { endpointName, endpointRequest, ensureVaultEndpoint, fromWorkspace } from '../src/steps/fabric.js';
 import { newSecret } from '../src/steps/identity.js';
 import { runsFabric } from '../src/steps/plan.js';
 import { createUi } from '../src/ui.js';
@@ -156,7 +156,7 @@ test('new secret: without write access none is made; a failed write takes it off
   assert.deepEqual(failing.calls, ['arm.permissions', 'addPassword', 'arm.setSecret valuelens-client-secret', 'removePassword key-1']);
 });
 
-/** @param {{ approvable?: boolean }} [o] */
+/** @param {{ approvable?: boolean, earlierInstall?: boolean }} [o] */
 function fakeEndpointApis(o = {}) {
   /** @type {string[]} */
   const calls = [];
@@ -171,17 +171,30 @@ function fakeEndpointApis(o = {}) {
         privateLinkServiceConnectionState: { status: 'Pending', description: 'Another team' },
       },
     },
+    // Another workspace that reads the vault: Fabric gives its endpoint the same name, with its own workspace ID in front.
+    ...(o.earlierInstall
+      ? [
+          {
+            id: `${VAULT_ID}/privateEndpointConnections/ws-0.valuelens-kv-test-conn`,
+            name: 'ws-0.valuelens-kv-test-conn',
+            properties: {
+              privateEndpoint: { id: '/subscriptions/fabric/resourceGroups/managed/providers/Microsoft.Network/privateEndpoints/ws-0.valuelens-kv-test' },
+              privateLinkServiceConnectionState: { status: 'Approved', description: 'Approved by the ValueLens installer.' },
+            },
+          },
+        ]
+      : []),
   ];
   const state = (/** @type {string} */ name) => connections.find((c) => c.id.endsWith(name)).properties.privateLinkServiceConnectionState;
   const fabric = {
     listPrivateEndpoints: async () => (endpoint ? [structuredClone(endpoint)] : []),
-    createPrivateEndpoint: async (/** @type {string} */ _ws, /** @type {any} */ body) => {
+    createPrivateEndpoint: async (/** @type {string} */ ws, /** @type {any} */ body) => {
       calls.push(`createPrivateEndpoint ${body.name} ${body.targetSubresourceType}`);
       endpoint = { id: 'mpe-1', name: body.name, targetPrivateLinkResourceId: body.targetPrivateLinkResourceId, provisioningState: 'Provisioning' };
       connections.push({
         id: `${VAULT_ID}/privateEndpointConnections/pec-1`,
         properties: {
-          privateEndpoint: { id: '/subscriptions/fabric/resourceGroups/managed/providers/Microsoft.Network/privateEndpoints/mpe' },
+          privateEndpoint: { id: `/subscriptions/fabric/resourceGroups/managed/providers/Microsoft.Network/privateEndpoints/${ws}.${body.name}` },
           privateLinkServiceConnectionState: { status: 'Pending', description: body.requestMessage },
         },
       });
@@ -200,10 +213,11 @@ function fakeEndpointApis(o = {}) {
       return false;
     },
     listPrivateEndpointConnections: async () => structuredClone(connections),
-    approvePrivateEndpointConnection: async (/** @type {string} */ id) => {
+    approvePrivateEndpointConnection: async (/** @type {string} */ id, /** @type {string} */ description) => {
       calls.push(`approve ${id.split('/').pop()}`);
       if (o.approvable === false) throw new HttpError('returned 403', { status: 403, method: 'PUT', url: id });
-      connections.find((c) => c.id === id).properties.privateLinkServiceConnectionState.status = 'Approved';
+      // Like the vault, approval replaces the request message.
+      connections.find((c) => c.id === id).properties.privateLinkServiceConnectionState = { status: 'Approved', description };
     },
   };
   return { fabric, arm, calls, state };
@@ -236,6 +250,29 @@ test('private vault: the workspace gets a managed private endpoint, approved on 
 
   const open = fakeCtx();
   assert.equal(await ensureVaultEndpoint(open.ctx), true, 'a public vault needs no endpoint');
+});
+
+test('private vault: another workspace\'s approved endpoint with the same name is not taken for this one', async () => {
+  const apis = fakeEndpointApis({ earlierInstall: true });
+  const { ctx } = endpointCtx(apis);
+  assert.equal(await ensureVaultEndpoint(ctx), true);
+  assert.deepEqual(apis.calls.filter((c) => c.startsWith('approve')), ['approve pec-1']);
+  assert.deepEqual(apis.state('pec-1'), { status: 'Approved', description: 'Approved by the Analytics Hub installer for Fabric workspace ws-1.' });
+  assert.deepEqual(apis.state('ws-0.valuelens-kv-test-conn'), { status: 'Approved', description: 'Approved by the ValueLens installer.' }, 'the other workspace\'s is left alone');
+});
+
+test('a vault connection belongs to the workspace whose ID it carries, before and after approval', () => {
+  const ws = '2b9f7c1e-0d4a-4e8b-9c3f-5a6d7e8f9a0b';
+  const peId = (/** @type {string} */ w) => `/subscriptions/fabric/resourceGroups/managed/providers/Microsoft.Network/privateEndpoints/${w}.${endpointName('kv-test')}`;
+  const conn = (/** @type {string} */ w, /** @type {string} */ status, /** @type {string} */ description) => ({
+    name: `${w}.${endpointName('kv-test')}-conn`,
+    properties: { privateEndpoint: { id: peId(w) }, privateLinkServiceConnectionState: { status, description } },
+  });
+  assert.equal(fromWorkspace(conn(ws, 'Pending', endpointRequest(ws)), ws), true);
+  assert.equal(fromWorkspace(conn(ws, 'Approved', 'Approved in the portal.'), ws), true, 'approval replaces the request message');
+  assert.equal(fromWorkspace(conn(ws, 'Pending', endpointRequest(ws)), ws.toUpperCase()), true);
+  assert.equal(fromWorkspace(conn('7d1c2b3a-4e5f-4a6b-8c7d-9e0f1a2b3c4d', 'Approved', 'Approved by the ValueLens installer.'), ws), false);
+  assert.equal(fromWorkspace({ properties: { privateLinkServiceConnectionState: { status: 'Pending', description: 'Another team' } } }, ws), false);
 });
 
 test('private vault: someone who may not approve gets a link, and the first load can wait', async () => {
