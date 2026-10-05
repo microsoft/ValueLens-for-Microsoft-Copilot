@@ -184,6 +184,21 @@ export function armApi(http) {
         throw err;
       }
     },
+    /**
+     * A secret's content type, or null if there is no such secret. Resource Manager never returns the value.
+     * @param {string} vaultId
+     * @param {string} name
+     * @returns {Promise<{ contentType?: string } | null>}
+     */
+    async secretInfo(vaultId, name) {
+      try {
+        const res = await http.get(`${vaultId}/secrets/${name}`, { query: { 'api-version': KEY_VAULT_API } });
+        return { contentType: res?.properties?.contentType };
+      } catch (err) {
+        if (err instanceof HttpError && err.status === 404) return null;
+        throw err;
+      }
+    },
 
     /** @param {string} vaultId @returns {Promise<any[]>} */
     listPrivateEndpointConnections: (vaultId) => http.list(`${vaultId}/privateEndpointConnections`, { query: { 'api-version': KEY_VAULT_API } }),
@@ -282,6 +297,21 @@ export function keyVaultApi(http) {
         return true;
       } catch (err) {
         if (err instanceof HttpError && err.status === 404) return false;
+        throw err;
+      }
+    },
+    /**
+     * A secret's content type, or null if there is no such secret. The value in the reply is dropped.
+     * @param {string} vaultUri
+     * @param {string} name
+     * @returns {Promise<{ contentType?: string } | null>}
+     */
+    async secretInfo(vaultUri, name) {
+      try {
+        const res = await http.get(`${vaultUri.replace(/\/$/, '')}/secrets/${name}`, { query: { 'api-version': '7.4' } });
+        return { contentType: res?.contentType };
+      } catch (err) {
+        if (err instanceof HttpError && err.status === 404) return null;
         throw err;
       }
     },

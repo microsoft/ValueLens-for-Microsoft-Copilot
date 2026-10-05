@@ -215,7 +215,7 @@ export async function ensureApp(ctx) {
 }
 
 /** @param {Ctx} ctx */
-async function ensureSecret(ctx) {
+export async function ensureSecret(ctx) {
   const { ui, config } = ctx;
   const { app, keyVault: kv } = config;
 
@@ -231,6 +231,10 @@ async function ensureSecret(ctx) {
     ctx.pendingSecret = await ui.secret(`Client secret value for ${app.displayName ?? app.appId}. It goes straight to Key Vault.`);
   }
   if (ctx.pendingSecret) {
+    if (claimsName(ctx)) {
+      await checkSecretAccess(ctx);
+      await claimSecretName(ctx);
+    }
     await writeSecret(ctx, ctx.pendingSecret, { contentType: `Client secret for ${app.appId}` });
     delete ctx.pendingSecret;
     kv.secretSetAt = ctx.now().toISOString();
@@ -271,6 +275,45 @@ const secretExists = (ctx) =>
     (uri) => ctx.api.keyVault.secretExists(uri, ctx.config.keyVault.secretName),
     (id) => ctx.api.arm.secretExists(id, ctx.config.keyVault.secretName),
   );
+
+/** @param {Ctx} ctx @param {string} name */
+const secretInfo = (ctx, name) =>
+  onVault(
+    ctx,
+    (uri) => ctx.api.keyVault.secretInfo(uri, name),
+    (id) => ctx.api.arm.secretInfo(id, name),
+  );
+
+/**
+ * True when the secret name still needs checking: a vault this install didn't make,
+ * and no secret written to it yet.
+ * @param {Ctx} ctx
+ */
+const claimsName = (ctx) => Boolean(ctx.config.keyVault.existing && !ctx.config.keyVault.secretSetAt);
+
+/**
+ * In a vault shared with another install, the default name may already hold that install's
+ * secret. Anything not labelled as this app's secret is left alone and a free name is used.
+ * @param {Ctx} ctx
+ */
+async function claimSecretName(ctx) {
+  const { ui, config } = ctx;
+  const kv = config.keyVault;
+  const ours = `Client secret for ${config.app.appId}`;
+  const base = kv.secretName;
+  for (let i = 1; i <= 50; i++) {
+    const name = i === 1 ? base : `${base.slice(0, 120)}-${i}`;
+    const info = await secretInfo(ctx, name);
+    if (info && info.contentType !== ours) continue;
+    if (name !== base) {
+      kv.secretName = name;
+      ctx.save();
+      ui.warn(`${kv.name} already has a secret called ${base} that isn't this app's, so it stays as it is. This install uses ${name}.`);
+    }
+    return;
+  }
+  throw new Error(`${kv.name} has no free secret name starting ${base}. Choose another secret name and run the installer again.`);
+}
 
 /**
  * @param {Ctx} ctx
@@ -321,6 +364,7 @@ export async function newSecret(ctx) {
   }
   const objectId = /** @type {string} */ (app.objectId);
   await checkSecretAccess(ctx);
+  if (claimsName(ctx)) await claimSecretName(ctx);
   const credential = await api.graph.addPassword(objectId, addMonths(ctx.now(), SECRET_LIFETIME_MONTHS));
   try {
     await writeSecret(ctx, credential.secretText, {
