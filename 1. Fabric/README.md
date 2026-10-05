@@ -7,7 +7,7 @@ as an app in Fabric, called **Analytics Hub**. You don't need a terminal or Powe
 
 For Windows 10 or 11. Check [what you need](#before-you-start) first.
 
-## Watch the setup
+## For manual setup (not using the Installer)
 
 A full walkthrough of the Fabric setup, from a fresh app registration to a saved, self-refreshing Power BI report.
 
