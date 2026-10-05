@@ -96,7 +96,7 @@ describe("feedback query contract", () => {
     });
 
     it("keeps week labels level and hides the ones that would overlap", () => {
-        const spec = feedbackTrend().vegaLiteSpec as { encoding: { x: { axis: Record<string, unknown> } } };
+        const spec = feedbackTrend().vegaLiteSpec as unknown as { encoding: { x: { axis: Record<string, unknown> } } };
         expect(spec.encoding.x.axis).toMatchObject({ labelAngle: 0, labelOverlap: true });
     });
 });
