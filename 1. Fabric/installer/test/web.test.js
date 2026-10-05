@@ -4,10 +4,12 @@ import { readdir, readFile } from 'node:fs/promises';
 import { request } from 'node:http';
 import { test } from 'node:test';
 import { emptyConfig } from '../src/config.js';
-import { startServer } from '../src/server.js';
+import { memoApi, rewindable } from '../src/install.js';
+import { mirror, startServer } from '../src/server.js';
 import { collectChoices } from '../src/steps/plan.js';
 import { createWebUi, plainText, SECRET_MASK, toSegments } from '../src/web-ui.js';
 import { describeRecord, WEB_COMMANDS } from '../src/web-session.js';
+import { fakeCtx } from './fakes.js';
 
 const SRC = new URL('../src/', import.meta.url);
 
@@ -53,6 +55,27 @@ async function serve(session = {}) {
       headers: { Cookie: cookie, Origin: `http://127.0.0.1:${server.port}`, 'Content-Type': 'application/json', ...headers },
     });
   return { ui, server, cookie, post };
+}
+
+const tick = () => new Promise((r) => setImmediate(r));
+
+/** The newest event. @param {{ history: () => import('../src/web-ui.js').UiEvent[] }} ui */
+const latest = (ui) => /** @type {import('../src/web-ui.js').UiEvent} */ (ui.history().at(-1));
+
+/**
+ * Asks the questions again each time Back stops them, as rewindable() does in the installer.
+ * @template T
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+async function untilDone(fn) {
+  for (;;) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (/** @type {Error} */ (err).name !== 'GoBack') throw err;
+    }
+  }
 }
 
 test('web ui: colours become styled runs and plain text drops them', () => {
@@ -165,6 +188,137 @@ test('web ui: cancel stops at the open question, as Ctrl+C does', async () => {
   assert.equal(ui.history().at(-1)?.cancelled, true);
 });
 
+test('web ui: Back asks again from the start, gives the earlier answers again and opens the last one as it was', async () => {
+  const ui = createWebUi();
+  ui.heading('Before');
+  ui.begin();
+  /** @type {{ id: string }[]} */
+  let offered = [];
+  const done = untilDone(async () => {
+    // New objects each time, as a fresh API call gives.
+    offered = [{ id: 'a' }, { id: 'b' }];
+    const ws = await ui.select('Workspace', offered.map((v) => ({ name: v.id.toUpperCase(), value: v })));
+    const name = await ui.input('Lakehouse name', { default: 'ValueLens' });
+    const extras = await ui.checkbox('Extras', [{ name: 'Credit', value: 'cc' }, { name: 'M365', value: 'm365' }]);
+    const go = await ui.confirm('Go ahead?', true);
+    return { ws, name, extras, go };
+  });
+
+  assert.equal('back' in latest(ui), false, 'nothing to go back to from the first question');
+  assert.equal(ui.back(), false);
+  ui.answer(latest(ui).id, 1);
+  await tick();
+  assert.deepEqual([latest(ui).message, latest(ui).back], ['Lakehouse name', true]);
+  ui.answer(latest(ui).id, 'Lake1');
+  await tick();
+  ui.answer(latest(ui).id, [1]);
+  await tick();
+  assert.deepEqual([latest(ui).message, latest(ui).back], ['Go ahead?', true]);
+
+  assert.equal(ui.back(), true);
+  await tick();
+  assert.deepEqual(ui.history().map((e) => [e.type, e.message ?? e.title ?? '', !!e.replayed]), [
+    ['heading', 'Before', false],
+    ['rewind', '', false],
+    ['prompt', 'Workspace', true],
+    ['answered', '', true],
+    ['prompt', 'Lakehouse name', true],
+    ['answered', '', true],
+    ['prompt', 'Extras', false],
+  ]);
+  assert.equal(ui.history()[1].to, ui.history()[0].seq, 'the page drops what came after begin()');
+  assert.deepEqual(latest(ui).choices.map((/** @type {any} */ ch) => ch.checked), [false, true], 'opens with the boxes that were ticked');
+  assert.equal(latest(ui).back, true);
+
+  assert.equal(ui.back(), true);
+  await tick();
+  assert.deepEqual([latest(ui).message, latest(ui).default], ['Lakehouse name', 'Lake1']);
+  ui.answer(latest(ui).id, 'Lake2');
+  await tick();
+  assert.equal(latest(ui).choices.some((/** @type {any} */ ch) => 'checked' in ch), false, 'after a new answer the rest are asked fresh');
+  ui.answer(latest(ui).id, [0]);
+  await tick();
+  ui.answer(latest(ui).id, true);
+  const result = await done;
+  assert.deepEqual(result, { ws: { id: 'b' }, name: 'Lake2', extras: ['cc'], go: true });
+  assert.equal(result.ws, offered[1], 'a choice given again is the one offered this time');
+  assert.equal(ui.back(), false, 'no question is open');
+
+  ui.end();
+  const next = ui.input('Next');
+  ui.answer(latest(ui).id, 'y');
+  await next;
+  const later = ui.input('Later');
+  assert.equal(ui.back(), false, 'no going back past end()');
+  ui.cancel();
+  await assert.rejects(later, { name: 'ExitPromptError' });
+});
+
+test('web ui: Back gives a secret again from memory and never shows it; back at it, an empty answer keeps it', async () => {
+  const ui = createWebUi();
+  const seen = /** @type {string[]} */ ([]);
+  ui.subscribe((e) => seen.push(JSON.stringify(e)));
+  ui.begin();
+  const done = untilDone(async () => ({
+    clientId: await ui.input('Client ID'),
+    secret: await ui.secret('Client secret'),
+    name: await ui.input('Name'),
+    go: await ui.confirm('Go ahead?', true),
+  }));
+  ui.answer(latest(ui).id, 'c1');
+  await tick();
+  ui.answer(latest(ui).id, 'first-s3cr3t');
+  await tick();
+  ui.answer(latest(ui).id, 'n1');
+  await tick();
+
+  assert.equal(ui.back(), true);
+  await tick();
+  assert.deepEqual([latest(ui).message, latest(ui).default], ['Name', 'n1'], 'Back from Go ahead goes past the secret');
+  assert.equal(ui.history().find((e) => e.kind === 'secret')?.replayed, true);
+
+  assert.equal(ui.back(), true);
+  await tick();
+  const asked = latest(ui);
+  assert.deepEqual([asked.kind, asked.keep, asked.back], ['secret', true, true]);
+  assert.equal(ui.answer(asked.id, '  ').error, 'Required', 'only an empty answer keeps it');
+  ui.answer(asked.id, '');
+  await tick();
+  assert.deepEqual([latest(ui).message, 'default' in latest(ui)], ['Name', false], 'after a new answer the rest are asked fresh');
+  ui.answer(latest(ui).id, 'n2');
+  await tick();
+  ui.answer(latest(ui).id, true);
+  assert.deepEqual(await done, { clientId: 'c1', secret: 'first-s3cr3t', name: 'n2', go: true });
+  assert.doesNotMatch(JSON.stringify(ui.history()), /s3cr3t/);
+  assert.doesNotMatch(seen.join(''), /s3cr3t/);
+  ui.end();
+});
+
+test('web ui: back at a secret, a new one replaces it, and that is the one an empty answer keeps after', async () => {
+  const ui = createWebUi();
+  ui.begin();
+  const done = untilDone(async () => ({ secret: await ui.secret('Client secret'), name: await ui.input('Name') }));
+  ui.answer(latest(ui).id, 'first-s3cr3t');
+  await tick();
+
+  assert.equal(ui.back(), true);
+  await tick();
+  assert.equal(latest(ui).keep, true);
+  ui.answer(latest(ui).id, 'second-s3cr3t');
+  await tick();
+  assert.equal(latest(ui).message, 'Name');
+
+  assert.equal(ui.back(), true);
+  await tick();
+  assert.equal(latest(ui).keep, true);
+  ui.answer(latest(ui).id, '');
+  await tick();
+  ui.answer(latest(ui).id, 'n1');
+  assert.deepEqual(await done, { secret: 'second-s3cr3t', name: 'n1' });
+  assert.doesNotMatch(JSON.stringify(ui.history()), /s3cr3t/);
+  ui.end();
+});
+
 test('server: only the printed link opens it, and every call needs its cookie', async () => {
   const { server, cookie } = await serve();
   try {
@@ -246,6 +400,175 @@ test('server: start passes through; quit waits for a running command', async () 
   } finally {
     server.close();
   }
+});
+
+test('server: Back works once there is an earlier question', async () => {
+  const { ui, server, post } = await serve();
+  try {
+    ui.begin();
+    const first = ui.input('Workspace name');
+    const refused = await post('/api/back', {});
+    assert.equal(refused.status, 409);
+    assert.equal(JSON.parse(refused.body).error, 'There\'s no earlier question to go back to.');
+    ui.answer(latest(ui).id, 'Analytics');
+    assert.equal(await first, 'Analytics');
+    const second = ui.input('Lakehouse name');
+    const stopped = assert.rejects(second, { name: 'GoBack' });
+    assert.equal((await post('/api/back', {})).status, 200);
+    await stopped;
+    assert.equal(latest(ui).type, 'rewind');
+  } finally {
+    ui.end();
+    server.close();
+    await server.done;
+  }
+});
+
+test('terminal: after Back it shows the question the user went back to, not the answers given again', async () => {
+  const ui = createWebUi();
+  /** @type {string[]} */
+  const out = [];
+  ui.subscribe(mirror((s) => out.push(plainText(s))));
+  ui.begin();
+  const done = untilDone(async () => {
+    ui.heading('Fabric');
+    const ws = await ui.input('Workspace name');
+    const lh = await ui.input('Lakehouse name');
+    return { ws, lh, go: await ui.confirm('Go ahead?', true) };
+  });
+  ui.answer(latest(ui).id, 'Analytics');
+  await tick();
+  ui.answer(latest(ui).id, 'Lake');
+  await tick();
+  assert.equal(ui.back(), true);
+  await tick();
+  ui.answer(latest(ui).id, 'Lake2');
+  await tick();
+  ui.answer(latest(ui).id, true);
+  assert.deepEqual(await done, { ws: 'Analytics', lh: 'Lake2', go: true });
+  ui.end();
+  assert.deepEqual(out.join('').split('\n').filter((l) => l.trim()), [
+    'Fabric',
+    '? Workspace name (answer in the browser)',
+    '  → Analytics',
+    '? Lakehouse name (answer in the browser)',
+    '  → Lake',
+    '? Go ahead? (answer in the browser)',
+    '  ← Back',
+    '? Lakehouse name (answer in the browser)',
+    '  → Lake2',
+    '? Go ahead? (answer in the browser)',
+    '  → Yes',
+  ]);
+});
+
+test('rewindable: Back puts the config back and reuses the API calls; the terminal just runs', async () => {
+  const ui = createWebUi();
+  let lists = 0;
+  const fabric = {
+    listWorkspaces: async () => {
+      lists++;
+      return [{ id: 'w1', displayName: 'One', type: 'Workspace' }, { id: 'w2', displayName: 'Two', type: 'Workspace' }];
+    },
+  };
+  const { ctx, config } = fakeCtx({ ui: /** @type {any} */ (ui), fabric, sources: /** @type {any} */ ({}) });
+  const real = ctx.api;
+  const done = rewindable(ctx, async () => {
+    const workspaces = await ctx.api.fabric.listWorkspaces();
+    config.fabric.workspaceId = await ui.select('Workspace', workspaces.map((w) => ({ name: w.displayName, value: w.id })));
+    config.fabric.lakehouseName = await ui.input('Lakehouse name', { default: config.fabric.lakehouseName });
+    ctx.pendingSecret = 'pasted';
+    return ui.confirm('Go ahead?', true);
+  });
+  await tick();
+  assert.notEqual(ctx.api, real);
+  ui.answer(latest(ui).id, 1);
+  await tick();
+  ui.answer(latest(ui).id, 'Lake1');
+  await tick();
+  assert.deepEqual([config.fabric.lakehouseName, ctx.pendingSecret], ['Lake1', 'pasted']);
+
+  assert.equal(ui.back(), true);
+  await tick();
+  assert.deepEqual([latest(ui).message, latest(ui).default], ['Lakehouse name', 'Lake1']);
+  assert.equal(config.fabric.lakehouseName, 'ValueLens', 'the config is as it was before the questions');
+  assert.equal(ctx.pendingSecret, undefined);
+  assert.equal(config.fabric.workspaceId, 'w2', 'the answer given again is in the config');
+  assert.equal(lists, 1, 'the workspaces are listed once');
+
+  ui.answer(latest(ui).id, 'Lake2');
+  await tick();
+  ui.answer(latest(ui).id, true);
+  assert.equal(await done, true);
+  assert.equal(ctx.api, real);
+  assert.equal(ctx.config, config, 'put back in place, so save() still writes it');
+  assert.deepEqual([config.fabric.lakehouseName, ctx.pendingSecret], ['Lake2', 'pasted']);
+
+  const plain = fakeCtx({ sources: /** @type {any} */ ({}) });
+  const plainApi = plain.ctx.api;
+  assert.equal(await rewindable(plain.ctx, async () => plain.ctx.api === plainApi), true, 'the terminal can\'t go back, so nothing changes');
+
+  const ui2 = createWebUi();
+  const other = fakeCtx({ ui: /** @type {any} */ (ui2), sources: /** @type {any} */ ({}) });
+  const otherApi = other.ctx.api;
+  const failing = rewindable(other.ctx, async () => {
+    await ui2.input('Workspace name');
+    throw new Error('boom');
+  });
+  await tick();
+  ui2.answer(latest(ui2).id, 'x');
+  await assert.rejects(failing, /boom/);
+  assert.equal(other.ctx.api, otherApi);
+  const next = ui2.input('Next');
+  ui2.answer(latest(ui2).id, 'y');
+  await next;
+  const after = ui2.input('After');
+  assert.equal(ui2.back(), false, 'recording stopped with the error');
+  ui2.cancel();
+  await assert.rejects(after, { name: 'ExitPromptError' });
+});
+
+test('memoApi: the same call is made once, each caller gets its own copy, and a failure is not kept', async () => {
+  /** @type {string[]} */
+  const calls = [];
+  let fail = true;
+  const real = /** @type {any} */ ({
+    fabric: {
+      listItems: async (/** @type {string} */ ws, /** @type {string} */ type) => {
+        calls.push(`listItems ${ws} ${type}`);
+        return [{ id: `${ws}-1`, type }];
+      },
+      flaky: async () => {
+        calls.push('flaky');
+        if (fail) {
+          fail = false;
+          throw new Error('throttled');
+        }
+        return 'ok';
+      },
+      count: () => calls.length,
+      each: async (/** @type {() => void} */ fn) => {
+        calls.push('each');
+        fn();
+      },
+    },
+    dataverse: (/** @type {string} */ url) => ({ url }),
+  });
+  const api = /** @type {any} */ (memoApi(real));
+
+  const first = await api.fabric.listItems('ws', 'Lakehouse');
+  first[0].id = 'changed';
+  assert.deepEqual(await api.fabric.listItems('ws', 'Lakehouse'), [{ id: 'ws-1', type: 'Lakehouse' }]);
+  await api.fabric.listItems('ws', 'Notebook');
+  assert.deepEqual(calls, ['listItems ws Lakehouse', 'listItems ws Notebook']);
+
+  await assert.rejects(api.fabric.flaky(), /throttled/);
+  assert.equal(await api.fabric.flaky(), 'ok');
+  assert.equal(api.fabric.count(), 4, 'an answer that isn\'t a promise comes straight back');
+  await api.fabric.each(() => {});
+  await api.fabric.each(() => {});
+  assert.equal(calls.filter((x) => x === 'each').length, 2, 'a call given a function is never kept');
+  assert.equal(api.dataverse, real.dataverse);
 });
 
 test('page: the stages and the finish it waits for are headings the installer prints', async () => {

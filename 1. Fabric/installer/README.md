@@ -35,13 +35,19 @@ The Graph permissions are listed in [`/docs/PERMISSIONS.md`](../../docs/PERMISSI
       Agent Evaluator aren't.
    2. **Power BI:** the semantic model and the app (the default), the model only, or neither.
    3. **How much audit history** to load first: 30, 90 or 180 days.
-   4. **Capacity, workspace and Lakehouse.**
+   4. **Capacity, workspace and Lakehouse.** Spaces and hyphens in the Lakehouse name become
+      underscores, because Fabric doesn't allow them.
    5. **App registration:** create one, or use your own.
    6. **Key Vault:** create one, or pick one you have.
    7. **Schedule:** daily or weekly, and the time (UTC).
    8. **Whether to run the first load** now.
 6. Check the plan and approve it. Nothing is created until you do.
 7. When it finishes, open the link to the app.
+
+**Want to change an answer?** Choose **Back**, on any question or on the plan. It opens the
+previous question with your answer filled in, and the questions after it are asked again. If you
+go back to the client secret, leave the box empty to keep the one you pasted. If you go back
+further, you'll be asked for it again.
 
 It keeps your answers in `Documents\Analytics Hub`. Keep that folder. To run the pipeline, check
 status, update, or repair the set-up later, open the exe again.

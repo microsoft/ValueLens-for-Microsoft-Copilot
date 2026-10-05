@@ -16,6 +16,19 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-05 — Analytics Hub installer 0.2.1: Back, and Lakehouse names with spaces
+
+Every question now has a **Back** button, and so does the plan. Back opens the previous question
+with your answer filled in, and the questions after it are asked again. Going back reuses what the
+installer already looked up in your tenant, so it's quick. If you go back to the client secret, an
+empty box keeps the one you pasted. If you go back further, you'll be asked for it again. The
+secret still isn't saved in the install record or shown on the page.
+
+The Lakehouse name now takes spaces and hyphens. Fabric doesn't allow them, so they become
+underscores, and the installer says so: `My Lakehouse` becomes `My_Lakehouse`.
+
+---
+
 ## 2026-10-05 — Analytics Hub installer 0.2.0: tick what to collect
 
 **What to collect** is now a list of tick boxes, and each one says where its data comes from and

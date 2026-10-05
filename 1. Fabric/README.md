@@ -37,7 +37,7 @@ The full list of roles is in the [installer README](installer/README.md#before-y
    done.
 4. Choose **Set up Analytics Hub** and sign in with your work account.
 5. Answer the questions. The defaults suit most organisations. Under **What to collect**, tick the
-   data you want.
+   data you want. **Back** takes you to the previous question, with your answer filled in.
 6. Check the plan and approve it. Nothing is created until you do.
 7. Wait for it to finish. It sets everything up, loads the first data and gives you a link to the
    app.
