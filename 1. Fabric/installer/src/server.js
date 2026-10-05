@@ -181,6 +181,10 @@ export async function startServer(o) {
       }
       case '/api/cancel':
         return json(res, 200, { ok: ui.cancel() });
+      case '/api/back': {
+        const ok = ui.back();
+        return ok ? json(res, 200, { ok: true }) : json(res, 409, { error: 'There\'s no earlier question to go back to.' });
+      }
       case '/api/quit':
         if (session.running) return json(res, 409, { error: `"${session.running}" is still running.` });
         json(res, 200, { ok: true });
@@ -235,14 +239,24 @@ export function openBrowser(url, platform = process.platform) {
 }
 
 /**
- * Echoes the wizard to the terminal, so it keeps a plain record too.
+ * Echoes the wizard to the terminal, so it keeps a plain record too. After Back, the answers
+ * given again aren't echoed: only the question the user is taken back to.
  * @param {(s: string) => void} write
  */
 export function mirror(write) {
   const line = (/** @type {string} */ s = '') => write(`${s}\n`);
   const SYMBOL = { ok: c.green('✓'), warn: c.yellow('!'), fail: c.red('✗') };
+  let replaying = false;
   /** @param {import('./web-ui.js').UiEvent} e */
   return (e) => {
+    if (e.type === 'rewind') {
+      line(`  ${c.dim('← Back')}`);
+      replaying = true;
+      return;
+    }
+    if (e.replayed) return;
+    if (replaying && (e.type === 'prompt' || e.type === 'command')) replaying = false;
+    if (replaying) return;
     switch (e.type) {
       case 'command':
         if (e.state === 'running') line(`\n${c.bold(`▶ ${e.command}`)}`);

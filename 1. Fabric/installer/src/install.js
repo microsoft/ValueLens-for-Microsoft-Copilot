@@ -129,6 +129,97 @@ async function canConsent(ctx) {
 }
 
 /**
+ * The same clients, except that a call made again with the same arguments gets the first call's
+ * answer. Going back runs the plan's questions again from the start: this keeps that quick, and
+ * keeps the lists the same as the first time. A call that fails isn't kept.
+ * @param {Apis} api
+ * @returns {Apis}
+ */
+export function memoApi(api) {
+  /** @type {Map<string, Promise<unknown>>} */
+  const seen = new Map();
+  const copy = (/** @type {unknown} */ v) => {
+    try {
+      return structuredClone(v);
+    } catch {
+      return v;
+    }
+  };
+  /** @param {string} client @param {string} name @param {unknown[]} args */
+  const keyOf = (client, name, args) => {
+    if (args.some((a) => typeof a === 'function')) return undefined;
+    try {
+      return `${client}.${name}(${JSON.stringify(args)})`;
+    } catch {
+      return undefined;
+    }
+  };
+  /** @param {string} client @param {object} target */
+  const wrap = (client, target) =>
+    new Proxy(target, {
+      get(t, name, receiver) {
+        const fn = Reflect.get(t, name, receiver);
+        if (typeof fn !== 'function' || typeof name !== 'string') return fn;
+        return (/** @type {unknown[]} */ ...args) => {
+          const key = keyOf(client, name, args);
+          if (key === undefined) return fn.apply(t, args);
+          let p = seen.get(key);
+          if (!p) {
+            const result = fn.apply(t, args);
+            if (!result || typeof result.then !== 'function') return result;
+            const mine = Promise.resolve(result);
+            seen.set(key, mine);
+            mine.catch(() => {
+              if (seen.get(key) === mine) seen.delete(key);
+            });
+            p = mine;
+          }
+          return p.then(copy);
+        };
+      },
+    });
+  return /** @type {Apis} */ (Object.fromEntries(Object.entries(api).map(([client, v]) => [client, v && typeof v === 'object' ? wrap(client, v) : v])));
+}
+
+/**
+ * Runs the questions in `fn`, and runs them again from the start each time the user goes back.
+ * The web UI gives the earlier answers again by itself, so it stops at the question before the
+ * one the user was on. The config and the answers kept on `ctx` are put back first, and the API
+ * calls are reused. The terminal can't go back, so there `fn` just runs.
+ * @template T
+ * @param {Ctx} ctx
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+export async function rewindable(ctx, fn) {
+  const ui = /** @type {{ begin?: () => void, end?: () => void }} */ (/** @type {unknown} */ (ctx.ui));
+  if (!ui.begin || !ui.end) return fn();
+  // save() writes this object, so it's put back in place rather than replaced.
+  const config = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (ctx.config));
+  const snapshot = structuredClone(config);
+  const { pendingSecret, runFirstLoad } = ctx;
+  const real = ctx.api;
+  ctx.api = memoApi(real);
+  ui.begin();
+  try {
+    for (;;) {
+      try {
+        return await fn();
+      } catch (err) {
+        if (/** @type {Error | undefined} */ (err)?.name !== 'GoBack') throw err;
+        for (const key of Object.keys(config)) delete config[key];
+        Object.assign(config, structuredClone(snapshot));
+        ctx.pendingSecret = pendingSecret;
+        ctx.runFirstLoad = runFirstLoad;
+      }
+    }
+  } finally {
+    ctx.api = real;
+    ui.end();
+  }
+}
+
+/**
  * Full set-up, or a repair when the install record already has IDs.
  * @param {Ctx} ctx
  * @param {{ wait: boolean }} opts
@@ -136,9 +227,12 @@ async function canConsent(ctx) {
 export async function install(ctx, opts) {
   const { ui, config } = ctx;
   const pre = await preflight(ctx);
-  await plan(ctx, pre);
-  ctx.save();
-  if (!(await confirmPlan(ctx, pre))) {
+  const go = await rewindable(ctx, async () => {
+    await plan(ctx, pre);
+    ctx.save();
+    return confirmPlan(ctx, pre);
+  });
+  if (!go) {
     ui.warn('Stopped before changing anything. Your answers are saved for next time.');
     return;
   }

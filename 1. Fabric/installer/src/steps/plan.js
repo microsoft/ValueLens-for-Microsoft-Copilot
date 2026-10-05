@@ -28,15 +28,22 @@ export const isGuid = (v) => GUID.test(v.trim());
 
 /** Fabric item names for a Lakehouse: letter first, then letters, digits, underscores. @param {string} v */
 export function validateLakehouseName(v) {
-  return /^[A-Za-z][A-Za-z0-9_]{0,122}$/.test(v) ? true : 'Start with a letter; use only letters, digits and underscores.';
+  if (v.length > 123) return 'Use 123 characters or fewer.';
+  return /^[A-Za-z][A-Za-z0-9_]*$/.test(v) ? true : 'Start with a letter, then use only letters, numbers and underscores. That\'s a Fabric rule for Lakehouse names.';
 }
+
+/**
+ * The name to give the Lakehouse. Fabric won't take spaces or hyphens, so they become underscores.
+ * @param {string} v
+ */
+export const lakehouseNameFrom = (v) => v.trim().replace(/[\s-]+/g, '_');
 
 /**
  * A valid Lakehouse name that no Lakehouse in the workspace has: the install only writes to one it creates.
  * @param {string[]} taken  Lakehouse names already in the workspace.
  */
 export const validateNewLakehouseName = (taken) => (/** @type {string} */ v) => {
-  const name = v.trim();
+  const name = lakehouseNameFrom(v);
   const ok = validateLakehouseName(name);
   if (ok !== true) return ok;
   return taken.some((t) => t.toLowerCase() === name.toLowerCase())
@@ -269,9 +276,9 @@ export async function plan(ctx, pre) {
   if (!config.fabric.lakehouseId) {
     const ws = config.fabric.workspaceId;
     const taken = ws ? displayNames(await api.fabric.listItems(ws, 'Lakehouse')) : [];
-    config.fabric.lakehouseName = (
-      await ui.input('Lakehouse name', { default: freeName(config.fabric.lakehouseName ?? 'ValueLens', taken), validate: validateNewLakehouseName(taken) })
-    ).trim();
+    const typed = await ui.input('Lakehouse name', { default: freeName(config.fabric.lakehouseName ?? 'ValueLens', taken), validate: validateNewLakehouseName(taken) });
+    config.fabric.lakehouseName = lakehouseNameFrom(typed);
+    if (config.fabric.lakehouseName !== typed.trim()) ui.note(`Fabric doesn't allow spaces or hyphens in Lakehouse names, so it'll be called ${config.fabric.lakehouseName}.`);
   }
   await reserveNames(ctx);
 

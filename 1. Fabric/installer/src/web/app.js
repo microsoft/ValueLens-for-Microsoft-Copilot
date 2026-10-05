@@ -28,6 +28,7 @@ const ICONS = {
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   download: 'M12 4v11M7.5 10.5 12 15l4.5-4.5M4 20h16',
   down: 'M12 5v14M6 13l6 6 6-6',
+  back: 'M19 12H5M11 6l-6 6 6 6',
   link: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
 };
 
@@ -124,6 +125,7 @@ const app = {
   view: 'home',
   follow: true,
   replay: false,
+  rewinding: false,
   lastSeq: 0,
   conn: 'ok',
   method: null,
@@ -364,6 +366,7 @@ function createRun(e) {
     command: cmd, title, startedAt: e.at, endedAt: 0, state: 'running', error: '', phase: 'signin',
     stages: cmd === 'install' ? INSTALL_STAGES.map((t) => newStage(t)) : [newStage('Sign in'), newStage(COMMANDS[cmd].section)],
     cur: null, child: null, doneTitle: '', signedIn: false, user: null, prompts: new Map(), progress: new Map(), adopted: false,
+    events: [e],
   };
   buildRunDom(run);
   enter(run, run.stages[0], e.at);
@@ -435,9 +438,39 @@ const result = (run) => (run.state === 'done' && run.command === 'install' && ru
 function onEvent(e) {
   if (typeof e?.seq !== 'number' || e.seq <= app.lastSeq) return;
   app.lastSeq = e.seq;
-  app.replay = Date.now() - e.at > 1500;
+  // After Back, everything up to the question the user went back to is drawn at once.
+  if (app.rewinding && ((e.type === 'prompt' && !e.replayed) || e.type === 'command')) app.rewinding = false;
+  app.replay = Date.now() - e.at > 1500 || app.rewinding || !!e.replayed;
   if (e.type === 'command') return onCommand(e);
+  if (e.type === 'rewind') return onRewind(e);
+  app.run?.events.push(e);
   if (e.type === 'signin') return onSignin(e);
+  apply(e);
+}
+
+/** Back: the installer dropped what came after `e.to`, so the run is drawn again from what came before. */
+function onRewind(e) {
+  const old = app.run;
+  if (!old || old.state !== 'running') return;
+  const kept = old.events.filter((x) => x.seq <= e.to);
+  if (!kept.length) return;
+  app.replay = true;
+  const run = createRun(kept[0]);
+  run.title = old.title;
+  app.run = run;
+  app.openPrompt = null;
+  for (const x of kept.slice(1)) {
+    run.events.push(x);
+    if (x.type === 'signin') onSignin(x);
+    else apply(x);
+  }
+  if (old.root.isConnected) old.root.replaceWith(run.root);
+  app.rewinding = true;
+  setFollow(true);
+  schedule();
+}
+
+function apply(e) {
   const run = app.run;
   if (!run) return;
   switch (e.type) {
@@ -474,13 +507,13 @@ function onEvent(e) {
       ensureRoot(run, e.at);
       const stage = target(run);
       const decide = e.kind === 'confirm' && stage.items.some((it) => it.t === 'review');
-      const item = { t: 'prompt', id: e.id, kind: e.kind, message: e.message, choices: e.choices ?? [], default: e.default, error: '', decide };
+      const item = { t: 'prompt', id: e.id, kind: e.kind, message: e.message, choices: e.choices ?? [], default: e.default, error: '', decide, back: !!e.back, keep: !!e.keep };
       run.prompts.set(e.id, item);
       app.openPrompt = item;
       add(run, item);
       if (!app.replay) {
         announce(`Question: ${e.message}`);
-        if (!decide) app.focusEl = item.el.querySelector('input:checked, input:not([type=radio]):not([type=checkbox]), input, button');
+        if (!decide) app.focusEl = focusTarget(item.el);
       }
       paintJump();
       return;
@@ -833,6 +866,30 @@ async function answer(item, value) {
   if (!r.ok) showError(item, r.body?.error ?? 'That answer wasn\'t accepted.');
 }
 
+/** On success the installer asks again from the question before, and the page is drawn again. */
+async function goBack(item) {
+  if (item.busy) return;
+  showError(item, '');
+  setBusy(item, true);
+  const r = await post('/api/back');
+  if (r.ok) return;
+  setBusy(item, false);
+  showError(item, r.body?.error ?? 'Couldn\'t go back.');
+}
+
+function backButton(item) {
+  return item.back ? h('button', { type: 'button', class: 'btn quiet', onclick: () => goBack(item) }, icon('back'), 'Back') : null;
+}
+
+/** Where a new question puts the cursor: the filter, the chosen option, the first option or box, else the default button, never Back. */
+function focusTarget(el) {
+  for (const sel of ['input.filter', 'input[type=radio]:checked', 'input:not(:disabled)', 'button.primary', 'button:not(.quiet)']) {
+    const hit = el.querySelector(sel);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 function renderPrompt(item) {
   const titleId = `q${item.id}`;
   const errId = `err${item.id}`;
@@ -884,12 +941,14 @@ function renderPrompt(item) {
       value: secret ? null : item.default ?? '', autocomplete: secret ? 'new-password' : 'off', spellcheck: 'false',
     });
     body = h('div', { class: 'ask-body' }, input,
-      secret ? h('p', { class: 'hint', id: `h${item.id}` }, 'Hidden as you type. It isn\'t saved in the install record or shown on this page again.') : null);
+      secret ? h('p', { class: 'hint', id: `h${item.id}` }, item.keep
+        ? 'Leave it empty to keep the secret you already pasted, or paste a new one. It isn\'t saved in the install record or shown on this page again.'
+        : 'Hidden as you type. It isn\'t saved in the install record or shown on this page again.') : null);
     submit = () => answer(item, input.value);
   }
 
   const form = h('form', { class: 'ask', 'aria-labelledby': titleId, novalidate: true },
-    h('h2', { id: titleId }, item.message), body, errorEl(item), h('div', { class: 'actions' }, buttons, stopButton()));
+    h('h2', { id: titleId }, item.message), body, errorEl(item), h('div', { class: 'actions' }, backButton(item), buttons, stopButton()));
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
     submit();
@@ -901,6 +960,7 @@ function renderDecide(item) {
   return h('div', { class: 'decide', role: 'group', 'aria-label': item.message },
     h('p', null, h('strong', null, 'Nothing has been created yet. '), 'Go ahead to create what\'s listed above, or stop here and keep your answers for next time.'),
     h('div', { class: 'actions' },
+      backButton(item),
       h('button', { type: 'button', class: 'btn primary', onclick: () => answer(item, true) }, 'Go ahead'),
       h('button', { type: 'button', class: 'btn', onclick: () => answer(item, false) }, 'Not now'),
       h('button', { type: 'button', class: 'btn quiet', onclick: () => savePlan(app.run) }, icon('download'), 'Save this plan')),

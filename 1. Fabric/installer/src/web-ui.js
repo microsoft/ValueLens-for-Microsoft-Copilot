@@ -10,7 +10,9 @@
  * @typedef {{ text: string, bold?: boolean, dim?: boolean, colour?: Colour }} Segment
  * @typedef {{ type: string, seq: number, at: number, [key: string]: any }} UiEvent
  * @typedef {{ value?: any, display?: string, error?: string }} Parsed
- * @typedef {{ parse: (raw: unknown) => Parsed, resolve: (v: any) => void, reject: (e: Error) => void }} Pending
+ * @typedef {{ kind: string, message: string, parse: (raw: unknown) => Parsed, resolve: (v: any) => void, reject: (e: Error) => void }} Pending
+ * @typedef {{ kind: string, message: string, value: any }} Recorded  An answer given since begin(). Held in memory only.
+ * @typedef {{ toRaw: (value: any) => unknown, prefill: (value: any) => Record<string, any> }} Memory  How a recorded answer is given again, or shown as the starting answer.
  */
 
 // eslint-disable-next-line no-control-regex
@@ -57,6 +59,12 @@ export function toSegments(s) {
 /** @param {string} s */
 export const plainText = (s) => s.replace(SGR, '').replace(OTHER_ESCAPES, '');
 
+/** @param {unknown} a @param {unknown} b */
+const sameValue = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+/** @type {Memory} */
+const AS_TYPED = { toRaw: (v) => v, prefill: (v) => ({ default: v }) };
+
 /**
  * @template T
  * @typedef {import('./ui.js').Choice<T>} Choice
@@ -75,6 +83,18 @@ export function createWebUi(opts = {}) {
   const pending = new Map();
   let seq = 0;
   let ids = 0;
+  // Going back. Between begin() and end() every answer is recorded. Back asks the questions
+  // again from the start: each recorded answer is given again, up to the question before the
+  // open one, which opens with the answer it had. A secret is recorded too, so it isn't pasted
+  // twice, but it stays here: events only carry its mask.
+  let recording = false;
+  let mark = 0;
+  /** @type {Recorded[]} */
+  let answers = [];
+  /** @type {Recorded[]} */
+  let replay = [];
+  /** @type {Recorded | null} */
+  let recall = null;
 
   /**
    * @param {{ type: string, [key: string]: any }} event
@@ -97,13 +117,35 @@ export function createWebUi(opts = {}) {
    * @param {string} message
    * @param {Record<string, any>} extra
    * @param {(raw: unknown) => Parsed} parse
+   * @param {Memory} [memory]  Without one, a recorded answer can't be given again.
    * @returns {Promise<any>}
    */
-  function ask(kind, message, extra, parse) {
+  function ask(kind, message, extra, parse, memory) {
     const id = ++ids;
+    const text = plainText(message);
+    const same = (/** @type {Recorded | null | undefined} */ r) => !!r && r.kind === kind && r.message === text;
+    let shown = extra;
+    if (replay.length) {
+      const head = replay[0];
+      const r = same(head) && memory ? parse(memory.toRaw(head.value)) : null;
+      if (r && r.error === undefined) {
+        replay.shift();
+        emit({ type: 'prompt', id, kind, message: text, ...extra, replayed: true });
+        emit({ type: 'answered', id, display: r.display, replayed: true });
+        answers.push({ kind, message: text, value: r.value });
+        return Promise.resolve(r.value);
+      }
+      // The questions changed, so the answers left may not fit them.
+      replay = [];
+      recall = null;
+    }
+    if (recall) {
+      if (same(recall) && memory) shown = { ...extra, ...memory.prefill(recall.value) };
+      recall = null;
+    }
     return new Promise((resolve, reject) => {
-      pending.set(id, { parse, resolve, reject });
-      emit({ type: 'prompt', id, kind, message: plainText(message), ...extra });
+      pending.set(id, { kind, message: text, parse, resolve, reject });
+      emit({ type: 'prompt', id, kind, message: text, ...shown, ...(recording && answers.length ? { back: true } : {}) });
     });
   }
 
@@ -162,12 +204,13 @@ export function createWebUi(opts = {}) {
         emit({ type: 'auto', message: plainText(message), display: plainText(open[0].name) });
         return open[0].value;
       }
+      const at = (/** @type {unknown} */ v) => choices.findIndex((ch) => !ch.disabled && sameValue(ch.value, v));
       const preferred = choices.findIndex((ch) => !ch.disabled && ch.value === defaultValue);
       return ask('select', message, { choices: choices.map(choiceView), default: preferred >= 0 ? preferred : choices.findIndex((ch) => !ch.disabled) }, (raw) => {
         const ch = Number.isInteger(raw) ? choices[/** @type {number} */ (raw)] : undefined;
         if (!ch || ch.disabled) return { error: 'Choose one of the options.' };
         return { value: ch.value, display: plainText(ch.name) };
-      });
+      }, { toRaw: at, prefill: (v) => (at(v) >= 0 ? { default: at(v) } : {}) });
     },
 
     /**
@@ -178,7 +221,7 @@ export function createWebUi(opts = {}) {
     async confirm(message, defaultValue) {
       return ask('confirm', message, { default: defaultValue }, (raw) =>
         typeof raw === 'boolean' ? { value: raw, display: raw ? 'Yes' : 'No' } : { error: 'Answer yes or no.' },
-      );
+      AS_TYPED);
     },
 
     /**
@@ -193,16 +236,28 @@ export function createWebUi(opts = {}) {
         const verdict = o.validate ? o.validate(value) : true;
         if (verdict !== true) return { error: verdict };
         return { value, display: value };
-      });
+      }, AS_TYPED);
     },
 
     /**
-     * Never recorded: the history and the page only see a mask.
+     * The history and the page only ever see a mask. Going back gives the secret again from
+     * memory, and back at this question an empty answer keeps it.
      * @param {string} message
      * @returns {Promise<string>}
      */
     async secret(message) {
-      return ask('secret', message, {}, (raw) => (typeof raw === 'string' && raw.trim() ? { value: raw, display: SECRET_MASK } : { error: 'Required' }));
+      /** @type {string | undefined} */
+      let kept;
+      return ask('secret', message, {}, (raw) => {
+        if (raw === '' && kept !== undefined) return { value: kept, display: SECRET_MASK };
+        return typeof raw === 'string' && raw.trim() ? { value: raw, display: SECRET_MASK } : { error: 'Required' };
+      }, {
+        toRaw: (v) => v,
+        prefill: (v) => {
+          kept = v;
+          return { keep: true };
+        },
+      });
     },
 
     /**
@@ -214,6 +269,7 @@ export function createWebUi(opts = {}) {
      */
     async checkbox(message, choices) {
       const locked = (/** @type {Choice<T> & { checked?: boolean }} */ ch) => !!ch.disabled && !!ch.checked;
+      const has = (/** @type {unknown} */ v, /** @type {T} */ value) => Array.isArray(v) && v.some((x) => sameValue(x, value));
       return ask('checkbox', message, { choices: choices.map(choiceView) }, (raw) => {
         if (!Array.isArray(raw)) return { error: 'Choose from the options.' };
         if (raw.some((i) => !Number.isInteger(i) || !choices[i] || (choices[i].disabled && !locked(choices[i])))) return { error: 'Choose from the options.' };
@@ -222,6 +278,12 @@ export function createWebUi(opts = {}) {
           value: picked.map((i) => choices[i].value),
           display: picked.length ? picked.map((i) => plainText(choices[i].name)).join(', ') : 'None',
         };
+      }, {
+        toRaw: (v) => {
+          const at = Array.isArray(v) ? v.map((x) => choices.findIndex((ch) => sameValue(ch.value, x))) : [-1];
+          return at.every((i) => i >= 0) ? at : null;
+        },
+        prefill: (v) => ({ choices: choices.map((ch) => choiceView({ ...ch, checked: locked(ch) || has(v, ch.value) })) }),
       });
     },
 
@@ -269,8 +331,49 @@ export function createWebUi(opts = {}) {
       }
       pending.delete(id);
       emit({ type: 'answered', id, display: r.display });
+      if (recording) answers.push({ kind: p.kind, message: p.message, value: r.value });
       p.resolve(r.value);
       return { ok: true };
+    },
+
+    /** Records the answers from here, so Back can go through them. */
+    begin() {
+      recording = true;
+      mark = seq;
+      answers = [];
+      replay = [];
+      recall = null;
+    },
+
+    /** Stops recording. There's no going back past this point. */
+    end() {
+      recording = false;
+      answers = [];
+      replay = [];
+      recall = null;
+    },
+
+    /**
+     * Back to the question before the open one. The open question fails with a GoBack error,
+     * so the caller can ask again from begin(). The events since then are dropped, and the
+     * page is told to drop them too.
+     */
+    back() {
+      if (!recording || !answers.length || !pending.size) return false;
+      replay = answers.slice(0, -1);
+      recall = answers[answers.length - 1];
+      answers = [];
+      const cut = history.findIndex((e) => e.seq > mark);
+      if (cut >= 0) history.splice(cut);
+      const open = [...pending.values()];
+      pending.clear();
+      emit({ type: 'rewind', to: mark });
+      for (const p of open) {
+        const err = new Error('Back');
+        err.name = 'GoBack';
+        p.reject(err);
+      }
+      return true;
     },
 
     /** Stops at the open question, the way Ctrl+C does in the terminal. */
