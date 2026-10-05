@@ -6,7 +6,7 @@ import { emptyConfig } from '../src/config.js';
 import { runCommand } from '../src/install.js';
 import { ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, freeName } from '../src/steps/fabric.js';
 import { ensureConsent } from '../src/steps/identity.js';
-import { planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
+import { lakehouseNameFrom, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
 import { printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
 import { DATA_CHECK_FILE } from '../src/transform/notebook.js';
 import { fakeCtx, fakeFabric, fakeUi } from './fakes.js';
@@ -83,6 +83,15 @@ test('plan: a new Lakehouse needs a name no Lakehouse in the workspace has', () 
   assert.match(String(check(' valuelens ')), /already a Lakehouse called valuelens here\. Analytics Hub only writes to a Lakehouse it creates/);
   assert.equal(check('ValueLens_2'), true);
   assert.match(String(check('2bad')), /Start with a letter/);
+});
+
+test('plan: spaces and hyphens in a Lakehouse name become underscores', () => {
+  assert.equal(lakehouseNameFrom('My Lakehouse'), 'My_Lakehouse');
+  assert.equal(lakehouseNameFrom(' my-lake  house '), 'my_lake_house');
+  assert.equal(validateNewLakehouseName([])('My Lakehouse'), true);
+  const check = validateNewLakehouseName(['My_Lakehouse']);
+  assert.match(String(check('my lakehouse')), /already a Lakehouse called my_lakehouse here/);
+  assert.match(String(check('My Lake!')), /only letters, numbers and underscores/);
 });
 
 test('plan: new items get names nothing in the workspace has; a name someone chose stays', async () => {
