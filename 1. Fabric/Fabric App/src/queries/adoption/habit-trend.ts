@@ -54,6 +54,11 @@ export function habitTrend(params?: HabitTrendParams) {
     return { connection, query, columnMetadata, vegaLiteSpec: vegaLiteSpec as unknown as VisualizationSpec };
 }
 
+/** How many distinct months a habit trend result covers. A mix needs two to show movement. */
+export function habitTrendMonths(rows: readonly (readonly unknown[])[]): number {
+    return new Set(rows.map((row) => row[0]).filter((month) => month !== null && month !== undefined)).size;
+}
+
 /** Narrow view of the spec covering only the parts this factory rewrites. */
 interface MutableSpec {
     encoding: {
