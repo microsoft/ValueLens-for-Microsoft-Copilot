@@ -34,6 +34,8 @@ by model and Foundry resources views show the new names even before the template
 - **Feedback** counts only feedback dated inside the Calendar, as its weekly trend always did.
   Feedback sent outside the report's dates no longer inflates the totals, satisfaction, topics
   and surfaces.
+- **Cowork fit** with License set to Unlicensed says Cowork needs a Copilot license, the same as
+  the Cowork leaderboard does, rather than suggesting there's no Cowork activity yet.
 
 ## 2026-10-05 — One name for each task level, and Fabric App review fixes
 
