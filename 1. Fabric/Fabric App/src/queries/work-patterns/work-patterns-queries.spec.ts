@@ -104,6 +104,27 @@ describe("work patterns query contract", () => {
         expect(m365WorkloadTrend().query).toContain("[@Days] = 7");
     });
 
+    it.each([
+        { name: "m365Summary", factory: m365Summary },
+        { name: "m365WorkloadTrend", factory: m365WorkloadTrend },
+        { name: "m365WorkloadReach", factory: m365WorkloadReach },
+        { name: "m365Platforms", factory: m365Platforms },
+        { name: "m365CopilotIndex", factory: m365CopilotIndex },
+        { name: "m365ByOrg", factory: m365ByOrg },
+    ])("$name counts days across everyone, so an org filter doesn't drop its people's days off", ({ factory }) => {
+        const query = factory().query;
+        expect(query).toContain(
+            "CALCULATE(DISTINCTCOUNT('M365 Activity'[ActivityDate]), REMOVEFILTERS('Chat + Agent Org Data'))",
+        );
+        expect(query).not.toMatch(/(?<!CALCULATE\()DISTINCTCOUNT\('M365 Activity'\[ActivityDate\]\)/);
+    });
+
+    it("dates the coverage note across everyone, matching the days it counts", () => {
+        const query = m365Summary().query;
+        expect(query).toContain("CALCULATE(MIN('M365 Activity'[ActivityDate]), REMOVEFILTERS('Chat + Agent Org Data'))");
+        expect(query).toContain("CALCULATE(MAX('M365 Activity'[ActivityDate]), REMOVEFILTERS('Chat + Agent Org Data'))");
+    });
+
     it("counts Copilot use from the audit log and licenses the way the report does", () => {
         const query = m365CopilotSummary().query;
         expect(query).toContain("'Chat + Agent Interactions (Audit Logs)'[Audit_UserId]");
@@ -120,6 +141,7 @@ describe("work patterns query contract", () => {
         const rebound = withOrgAttribute(m365ByOrg(), describeOrgAttribute("Department"));
         expect(rebound.query).toContain("'Chat + Agent Org Data'[Department]");
         expect(rebound.query).not.toContain("'Chat + Agent Org Data'[Organization]");
+        expect(rebound.query).toContain("REMOVEFILTERS('Chat + Agent Org Data')");
         expect(rebound.columnMetadata["[Organization]"].displayName).toBe("Department");
     });
 
