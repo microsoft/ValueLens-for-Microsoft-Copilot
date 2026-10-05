@@ -147,11 +147,11 @@ class OneLakeSourceTests(unittest.TestCase):
         source = table["partitions"][0]["source"]
         self.assertEqual(source["type"], "calculated")
         rows = glossary_rows(source["expression"])
-        self.assertEqual(len(rows), 99)
+        self.assertEqual(len(rows), 103)
         columns = {column["name"]: column for column in table["columns"]}
         self.assertEqual(set(columns), {name for name, _ in HEADERS})
         for label, order, label_index, order_index, count in (
-            ("Metric", "MetricOrder", 2, 5, 99),
+            ("Metric", "MetricOrder", 2, 5, 103),
             ("Page", "PageOrder", 0, 4, 15),
         ):
             self.assertEqual(columns[label]["sortByColumn"], order)
@@ -167,14 +167,14 @@ class OneLakeSourceTests(unittest.TestCase):
             document = json.loads(archive.read("DataModelSchema").decode("utf-16-le"))
         table = next(table for table in document["model"]["tables"] if table["name"] == GLOSSARY)
         rows = glossary_rows(table["partitions"][0]["source"]["expression"])
-        # Baselines from the Task Category / Task Breakdown release package: all
-        # non-MetricOrder values in row order, and the minimum order for each casefolded label.
+        # Baselines from the App host glossary release package: all non-MetricOrder
+        # values in row order, and the minimum order for each casefolded label.
         self.assertEqual(content_hash([row[:5] for row in rows]),
-                         "5357cb005a5c69e2777a22d60f8b2d442228a3edd2928a71803ceafe8fafa2c0")
+                         "5f928844fcd9e6e1176e36c0c4a69f0bcb98d363b8c87bc1739419713cf98d73")
         groups = sort_groups(rows, 2, 5)
         self.assertTrue(all(len(values) == 1 for values in groups.values()))
         self.assertEqual(content_hash(sorted((label, min(values)) for label, values in groups.items())),
-                         "e7dd2a19a897ff096dafd68076ac99684405e8e20513bf6a8c30586834580d1b")
+                         "99d2ee48b02cc3bc55fbe423e8d8f80612e47a03aafd8c96529ce72e7b391a39")
 
     def test_glossary_parser_handles_escaped_strings_comments_and_case_variants(self):
         header = "DATATABLE(" + "".join(f'"{name}", {dtype},' for name, dtype in HEADERS)
