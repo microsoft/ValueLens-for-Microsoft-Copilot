@@ -30,9 +30,9 @@ export const liveColumns = {
         "[Licensed Rate]",
         "[Unlicensed Rate]",
         "[Agent Rate]",
-        "[Top Value Outcome]",
         "[Licensed Utilisation]",
     ],
+    topOutcome: ["[Top Value Outcome]"],
     taskBreakdown: ["[Dimension]", "[Category]", "[Tasks]", "[Share]"],
     surfaceUsage: [
         "[Lens]",

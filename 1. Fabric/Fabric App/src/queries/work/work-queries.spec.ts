@@ -18,6 +18,7 @@ import {
     surfaceUsage,
     taskBreakdown,
     taskDimensions,
+    topOutcome,
     workCohorts,
     workSummary,
     type WorkCohort,
@@ -26,6 +27,7 @@ import { liveColumns } from "./live-columns.fixture";
 
 const modules = [
     { name: "workSummary", factory: () => workSummary(), columns: liveColumns.workSummary },
+    { name: "topOutcome", factory: () => topOutcome(), columns: liveColumns.topOutcome },
     { name: "taskBreakdown", factory: () => taskBreakdown(), columns: liveColumns.taskBreakdown },
     {
         name: "surfaceUsage",
