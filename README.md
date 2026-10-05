@@ -7,7 +7,7 @@ the hours and value they deliver.
 
 ## Watch first
 
-**Demo: what the dashboard measures, page by page** *(2m 8s)*
+**Demo: what the dashboard measures, page by page** *(2m 4s)*
 
 https://github.com/user-attachments/assets/2aa65c5d-2a20-4d51-9f1d-072c712fb4f3
 
