@@ -7,11 +7,13 @@
 
 import { describe, expect, it } from "vitest";
 import { toDataTable } from "@/lib/to-data-table";
-import { glossary, signalImpact, withTaskDescriptions } from "./index";
+import { glossary, signalImpact, withAppGlossaryEntries, withTaskDescriptions } from "./index";
 import { liveColumns } from "./live-columns.fixture";
 import glossaryRows from "./__fixtures__/glossary.rows.json";
 import signalRows from "./__fixtures__/signal-impact.rows.json";
 import taskDescriptions from "./task-descriptions.json";
+import appGlossary from "./app-glossary.json";
+import { toGlossaryPages } from "@/lib/glossary";
 
 const modules = [
     { name: "glossary", factory: glossary, columns: liveColumns.glossary, rows: glossaryRows },
@@ -116,5 +118,48 @@ describe("signal impact task descriptions", () => {
     it("leaves a task with no description blank", () => {
         expect(withTaskDescriptions({ columns: [{ name: "AI Tasks" }], rows: [["Not a real task"]] }).rows[0][1]).toBeNull();
         expect(withTaskDescriptions({ columns: [{ name: "Signal" }], rows: [["Email sent"]] }).rows[0][1]).toBeNull();
+    });
+});
+
+describe("app glossary entries", () => {
+    const rows = glossaryRows as Record<string, unknown>[];
+    const merged = withAppGlossaryEntries(rows);
+    const page = toGlossaryPages(merged).find((candidate) => candidate.page === appGlossary.page);
+
+    it("keeps the model's rows and adds the app host entries after its last metric", () => {
+        expect(merged.slice(0, rows.length)).toEqual(rows);
+        const metrics = page?.entries.map((entry) => entry.metric) ?? [];
+        expect(metrics.slice(-appGlossary.entries.length)).toEqual(appGlossary.entries.map((entry) => entry.metric));
+        expect(metrics).toContain("App host");
+    });
+
+    it("explains the app host signal, Cowork and the task category fallback", () => {
+        const text = appGlossary.entries.map((entry) => entry.description).join(" ");
+        for (const term of ["Teams", "Word", "Outlook", "Copilot Studio", "Cowork", "\"cowork\"", "Task Breakdown", "Task Category", "open file"]) {
+            expect(text).toContain(term);
+        }
+    });
+
+    it("joins the model's page with its order and description", () => {
+        const added = merged.slice(rows.length);
+        const modelRow = rows.find((row) => row["[Page]"] === appGlossary.page);
+        for (const row of added) {
+            expect(row["[Page Order]"]).toBe(modelRow?.["[Page Order]"]);
+            expect(row["[Page Description]"]).toBe(modelRow?.["[Page Description]"]);
+        }
+    });
+
+    it("skips an entry the model already defines", () => {
+        const withHost = [...rows, { ...rows.at(-1), "[Page]": appGlossary.page, "[Metric]": "App host" }];
+        const added = withAppGlossaryEntries(withHost).slice(withHost.length);
+        expect(added.map((row) => row["[Metric]"])).not.toContain("App host");
+        expect(added).toHaveLength(appGlossary.entries.length - 1);
+    });
+
+    it("still shows the entries when the model has no such page", () => {
+        const pages = toGlossaryPages(withAppGlossaryEntries([]));
+        expect(pages).toHaveLength(1);
+        expect(pages[0]).toMatchObject({ page: appGlossary.page, description: appGlossary.pageDescription });
+        expect(pages[0].entries).toHaveLength(appGlossary.entries.length);
     });
 });
