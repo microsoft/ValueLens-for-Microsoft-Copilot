@@ -90,6 +90,8 @@ export function coworkWindowCost() {
 
 const GROUP_COLUMN = "Group ByGroup";
 const PERSON_COLUMN = "OrgDisplayName";
+const SIGN_IN_COLUMN = "OrgUserPrincipalName";
+const BILLING_NAME_COLUMN = "Billing Name";
 
 /** The grid's first column: the group on group rows, the person on leaf rows. */
 export const COWORK_LABEL_COLUMN = "Who";
@@ -106,6 +108,7 @@ export const COWORK_GROUP_FIELDS = [
 const byGroupColumns: ColumnMetadataMap = {
     "Group By[Group]": { name: GROUP_COLUMN, displayName: "Group" },
     "Org[DisplayName]": { name: PERSON_COLUMN, displayName: "Person" },
+    "Org[UserPrincipalName]": { name: SIGN_IN_COLUMN, displayName: "Sign-in name" },
     "[Is Grand Total]": { name: "Is Grand Total" },
     "[Is Group Total]": { name: "Is Group Total" },
     "[Users]": { name: "Users", displayName: "Users", format: FORMAT_WHOLE },
@@ -115,6 +118,7 @@ const byGroupColumns: ColumnMetadataMap = {
     "[PAYG Cost]": { name: "PAYG Cost", displayName: "Pay-as-you-go", format: FORMAT_MONEY },
     "[Total Cost]": { name: "Total Cost", displayName: "Total cost", format: FORMAT_MONEY },
     "[Policy]": { name: "Policy", displayName: "Policy" },
+    "[Billing Name]": { name: BILLING_NAME_COLUMN },
 };
 
 /**
@@ -126,10 +130,19 @@ export function coworkByGroup() {
     return { connection, query: byGroupQuery, columnMetadata: byGroupColumns };
 }
 
+function named(value: unknown): string | undefined {
+    return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+}
+
 export function toCoworkGroupTree(table: DataTable): RollupTree {
     return toRollupTree(table, {
         group: GROUP_COLUMN,
-        leaf: PERSON_COLUMN,
+        leaf: SIGN_IN_COLUMN,
+        // The org data's name first, then the billing export's, then the
+        // sign-in name itself. A row with no sign-in name is everyone the org
+        // data does not list, so one billing name would mislabel it.
+        leafLabel: (signIn, cell) =>
+            named(signIn) ? (named(cell(PERSON_COLUMN)) ?? named(cell(BILLING_NAME_COLUMN))) : undefined,
         grandTotalFlag: "Is Grand Total",
         groupTotalFlag: "Is Group Total",
         label: COWORK_LABEL_COLUMN,

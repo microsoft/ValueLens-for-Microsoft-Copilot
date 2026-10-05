@@ -26,6 +26,11 @@ export interface RollupTreeOptions {
     fields: readonly string[];
     /** Names a group; return `undefined` to fall back to the raw value. */
     groupLabel?: (value: unknown, cell: CellReader) => string | undefined;
+    /**
+     * Names a leaf; return `undefined` to fall back to the raw value. The raw
+     * value still keys the row, so leaves that share a name stay apart.
+     */
+    leafLabel?: (value: unknown, cell: CellReader) => string | undefined;
     /** Stands in for a blank group or leaf value. */
     blankLabel?: string;
 }
@@ -83,9 +88,11 @@ export function toRollupTree(table: DataTable, options: RollupTreeOptions): Roll
             groups.set(group, { _id: `${GROUP_PREFIX}${group}`, [options.label]: group, ...fields(cell) });
             continue;
         }
-        const leaf = text(cell(options.leaf)) ?? blank;
+        const leafValue = cell(options.leaf);
+        const key = text(leafValue) ?? blank;
+        const leaf = options.leafLabel?.(leafValue, cell) ?? key;
         const list = leaves.get(group) ?? [];
-        list.push({ _id: `leaf:${group}/${leaf}`, [options.label]: leaf, ...fields(cell) });
+        list.push({ _id: `leaf:${group}/${key}`, [options.label]: leaf, ...fields(cell) });
         leaves.set(group, list);
         if (!groups.has(group)) groups.set(group, { _id: `${GROUP_PREFIX}${group}`, [options.label]: group });
     }
