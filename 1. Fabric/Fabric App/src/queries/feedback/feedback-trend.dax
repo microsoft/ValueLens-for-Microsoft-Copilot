@@ -11,7 +11,7 @@ VAR _daily =
     )
 VAR _weeks =
     GROUPBY(
-        FILTER(_daily, [@Total] > 0),
+        FILTER(_daily, [@Total] > 0 && NOT ISBLANK('Calendar'[Date])),
         [@WeekStart],
         "@Total", SUMX(CURRENTGROUP(), [@Total]),
         "@Up", SUMX(CURRENTGROUP(), [@Up]),

@@ -14,7 +14,7 @@
       "type": "ordinal",
       "title": null,
       "sort": { "field": "Week Order", "op": "min", "order": "ascending" },
-      "axis": { "labelAngle": 0 }
+      "axis": { "labelAngle": 0, "labelOverlap": true }
     },
     "y": {
       "field": "Signed Count",
