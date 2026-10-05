@@ -45,7 +45,7 @@ export function EvaluationBar({ options, selection, onChange }: EvaluationBarPro
             className="sticky top-0 z-10 -mx-700 -mb-200 flex flex-wrap items-center gap-x-400 gap-y-200 border-b border-border bg-background px-700 py-300"
         >
             <ChoiceMenu
-                label="Dates"
+                label="Date"
                 allLabel={DATE_PRESET_LABELS.all}
                 choices={presets}
                 value={selection.preset === "all" ? undefined : selection.preset}
