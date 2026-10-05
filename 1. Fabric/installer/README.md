@@ -131,6 +131,7 @@ the endpoint, someone who manages the vault approves it under **Networking** >
 | A run fails with `AADSTS7000215` | The secret doesn't match the app. Choose **Create new secrets**. |
 | A run fails with `Forbidden` from Graph | Admin consent is missing or still applying. Choose **Repair or change**, then **Run now**. |
 | A run fails reading the secret | The person the run uses can't read it. See **Someone else takes over the pipeline?** above. |
+| A run says Fabric's capacity was too busy (`TooManyRequestsForCapacity`) | Nothing is lost. Wait a few minutes, then choose **Run now** again. It happens most on trials and small capacities. |
 | `Fabric couldn't set up the model's connection` | Turn on *Service principals can call Fabric public APIs*, then choose **Repair or change**. |
 | `Couldn't connect ValueLens Model to …` | Open the link it shows. Under **Gateway and cloud connections**, pick `ValueLens SQL …`. Then choose **I've connected it myself**. |
 | A model refresh fails with `Login failed` | The connection's secret expired. Choose **Create new secrets**. |

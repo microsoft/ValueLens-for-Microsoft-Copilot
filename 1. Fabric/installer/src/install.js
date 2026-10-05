@@ -36,7 +36,7 @@ import {
 } from './steps/fabric.js';
 import { ensureModelConnection, ensureSemanticModel, modelUrl, refreshModel, rotateModelSecret } from './steps/model.js';
 import { confirmPlan, plan, preflight } from './steps/plan.js';
-import { checkData, runDataCheck, runPipeline, status } from './steps/run.js';
+import { checkData, chooseLoad, runDataCheck, runPipeline, status } from './steps/run.js';
 import { prepareNotebook, serialiseNotebook } from './transform/notebook.js';
 import { buildAgentEvaluatorModel, buildConsumptionModel, buildModel, loadTemplateModel } from './transform/model.js';
 import { buildPipeline } from './transform/pipeline.js';
@@ -298,7 +298,7 @@ export async function install(ctx, opts) {
     } else {
       if (modelDeployed(config)) ui.note(`The pipeline refreshes ${joinNames(deployedModels(config).map((m) => m.name))} as its last step.`);
       const result = await runPipeline(ctx, { backfillDays: config.history.days, wait: opts.wait, first: true });
-      if (result.ok) await runDataCheck(ctx);
+      if (result.status === 'Completed') await runDataCheck(ctx);
     }
   } else if (withModel) {
     step('Model refresh');
@@ -415,12 +415,13 @@ export async function update(ctx, opts = {}) {
 }
 
 /**
+ * Starts the pipeline: the first load until one has loaded the history, then the usual run.
  * @param {Ctx} ctx
  * @param {{ backfillDays?: number, wait: boolean }} opts
  */
 export async function run(ctx, opts) {
-  const result = await runPipeline(ctx, opts);
-  if (result.ok) await runDataCheck(ctx);
+  const result = await runPipeline(ctx, await chooseLoad(ctx, opts));
+  if (result.status === 'Completed') await runDataCheck(ctx);
   return result;
 }
 

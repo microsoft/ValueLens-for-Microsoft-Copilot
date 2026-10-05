@@ -5,8 +5,9 @@
  */
 import { commandLine } from '../launch.js';
 import { DATA_CHECK_FILE } from '../transform/notebook.js';
-import { firstRunParameters } from '../transform/pipeline.js';
+import { AGENT365_FALLBACK, AGENT365_REGISTRY, AGENT_EVALUATOR_ACTIVITY, firstRunParameters, REFRESH_ACTIVITY } from '../transform/pipeline.js';
 import { c, formatDuration } from '../ui.js';
+import { agentEvaluatorOn, modelDeployed } from './fabric.js';
 import { modelRefreshes } from './model.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
@@ -51,12 +52,31 @@ export async function waitForJob(ctx, url, label, opts = {}) {
   return job;
 }
 
+/** What Fabric says when a capacity is too busy to start another notebook. */
+export const CAPACITY_BUSY = /TooManyRequestsForCapacity|(?:code|status)[\s:'"=-]{0,6}430\b/i;
+
+/**
+ * Whether an error is Fabric turning work away because the capacity is busy.
+ * @param {{ errorCode?: unknown, message?: unknown } | null | undefined} e
+ */
+export const capacityBusy = (e) => !!e && (String(e.errorCode ?? '') === '430' || CAPACITY_BUSY.test(`${e.errorCode ?? ''} ${e.message ?? ''}`));
+
+/**
+ * @param {Ctx} ctx
+ * @param {string} again  The command that starts the work again.
+ */
+function busyNote(ctx, again) {
+  ctx.ui.note('Fabric\'s capacity was too busy to start a notebook. Nothing is lost.');
+  ctx.ui.note(`Wait a few minutes, then run "${commandLine(again)}" again.`);
+}
+
 /**
  * @param {Ctx} ctx
  * @param {any} job
  * @param {string} what
+ * @param {string} [again]  The command to suggest when a busy capacity turned the job away.
  */
-function reportJob(ctx, job, what) {
+function reportJob(ctx, job, what, again) {
   const { ui } = ctx;
   const start = utc(job?.startTimeUtc);
   const end = utc(job?.endTimeUtc);
@@ -68,6 +88,7 @@ function reportJob(ctx, job, what) {
     case 'Failed':
       ui.fail(`${what} failed${took}`);
       if (job.failureReason?.message) ui.info(String(job.failureReason.message).slice(0, 1200));
+      if (again && capacityBusy(job.failureReason)) busyNote(ctx, again);
       return false;
     default:
       if (TERMINAL.has(job?.status)) ui.warn(`${what} ended with status ${job.status}`);
@@ -77,34 +98,155 @@ function reportJob(ctx, job, what) {
 }
 
 /**
+ * @typedef {object} RunResult
+ * @property {string} [jobId]
+ * @property {string} [status]  The job's status. NotStarted when it didn't wait.
+ * @property {boolean} [ok]  The run completed and none of its loads failed.
+ * @property {string[]} [failed]  The activities that failed.
+ */
+
+/** A run that started longer ago than this is stuck, not running. */
+const STUCK_MS = 24 * 3_600_000;
+
+/**
  * Starts the pipeline. With `backfillDays` it reloads that much audit history and rebuilds the curated table.
+ * It doesn't start a run while another is going: two at once overload a small capacity.
  * @param {Ctx} ctx
  * @param {{ backfillDays?: number, wait?: boolean, first?: boolean }} opts
+ * @returns {Promise<RunResult>}
  */
 export async function runPipeline(ctx, opts) {
   const { ui, config, api } = ctx;
   const f = config.fabric;
   if (!f.workspaceId || !f.pipelineId) throw new Error('There is no pipeline yet. Run the installer first.');
-  const parameters = opts.backfillDays ? firstRunParameters(opts.backfillDays) : undefined;
+  const running = (await api.fabric.listJobs(f.workspaceId, f.pipelineId).catch(() => [])).find((j) => {
+    const started = utc(j.startTimeUtc);
+    return (j.status === 'InProgress' || j.status === 'NotStarted') && !(started && ctx.now().getTime() - started.getTime() > STUCK_MS);
+  });
+  if (running) {
+    ui.warn('The pipeline is already running, so this didn\'t start another.');
+    ui.note(`Check on it with "${commandLine('status')}". Once it has finished, run "${commandLine('run')}" to start a new run.`);
+    return { jobId: running.id, status: running.status, ok: false };
+  }
+  const days = opts.backfillDays;
+  const parameters = days ? firstRunParameters(days) : undefined;
+  const startedAt = ctx.now().toISOString();
   const url = await api.fabric.runJob(f.workspaceId, f.pipelineId, 'Pipeline', parameters ? { parameters } : undefined);
   const jobId = jobIdFrom(url);
   if (opts.first) {
-    config.firstRun = { jobId, status: 'NotStarted', startedAt: ctx.now().toISOString() };
+    config.firstRun = { jobId, status: 'NotStarted', startedAt };
     ctx.save();
   }
-  ui.ok(opts.backfillDays ? `Started the pipeline with ${opts.backfillDays} days of audit history` : 'Started the pipeline');
+  if (!days) ui.ok('Started the pipeline');
+  else if (opts.first) ui.ok(`Started the first load: ${days} days of audit history`);
+  else ui.ok(`Started the pipeline with ${days} days of audit history`);
   if (!opts.wait) {
     ui.note(`It runs in Fabric. Check on it with "${commandLine('status')}".`);
     return { jobId, status: 'NotStarted' };
   }
-  ui.note('The first load usually takes 10 to 40 minutes. You can press Ctrl+C; the run carries on in Fabric.');
+  ui.note(`${days ? 'Loading the history usually takes 10 to 40 minutes, longer on a trial or small capacity. ' : ''}You can press Ctrl+C; the run carries on in Fabric.`);
   const job = await waitForJob(ctx, url, 'Pipeline');
   const ok = reportJob(ctx, job, 'Pipeline');
+  const failed = TERMINAL.has(job?.status) ? failedLoads(await activityRuns(ctx, jobId, { startTimeUtc: job.startTimeUtc ?? startedAt, endTimeUtc: job.endTimeUtc })) : [];
+  for (const r of failed) ui.warn(`${loadLabel(r.activityName)} failed`);
+  if (capacityBusy(job?.failureReason) || failed.some((r) => capacityBusy(r.error))) busyNote(ctx, 'run');
+  else if (failed.length || job?.status === 'Failed') {
+    ui.note(`To see why, open ${f.pipelineName ?? 'the pipeline'} in Fabric and look at its latest run. Then run "${commandLine('run')}" again.`);
+  }
   if (opts.first) {
     config.firstRun = { ...config.firstRun, status: job?.status, finishedAt: TERMINAL.has(job?.status) ? ctx.now().toISOString() : undefined };
     ctx.save();
   }
-  return { jobId, status: job?.status, ok };
+  return { jobId, status: job?.status, ok: ok && !failed.length, failed: failed.map((r) => r.activityName) };
+}
+
+/**
+ * The last attempt of each activity in one pipeline run, or null when Fabric can't say.
+ * @param {Ctx} ctx
+ * @param {string} jobId
+ * @param {{ startTimeUtc?: string | null, endTimeUtc?: string | null }} job
+ * @returns {Promise<Map<string, any> | null>}
+ */
+async function activityRuns(ctx, jobId, job) {
+  const start = utc(job.startTimeUtc) ?? ctx.now();
+  const end = utc(job.endTimeUtc) ?? ctx.now();
+  const at = (/** @type {any} */ r) => utc(r.activityRunStart)?.getTime() || 0;
+  try {
+    const runs = await ctx.api.fabric.queryActivityRuns(
+      /** @type {string} */ (ctx.config.fabric.workspaceId),
+      jobId,
+      new Date(start.getTime() - 3_600_000),
+      new Date(end.getTime() + 3_600_000),
+    );
+    return new Map([...runs].sort((a, b) => at(a) - at(b)).map((r) => [r.activityName, r]));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The loads that failed in a run. An IfCondition fails along with the load inside it, so only the load
+ * is listed. Without an Agent 365 licence the Agent 365 load always fails; when its fallback worked, that's fine.
+ * @param {Map<string, any> | null} runs
+ * @returns {any[]}
+ */
+export function failedLoads(runs) {
+  if (!runs) return [];
+  const fallbackWorked = runs.get(AGENT365_FALLBACK)?.status === 'Succeeded';
+  return [...runs.values()].filter(
+    (r) => r.status === 'Failed' && r.activityType !== 'IfCondition' && !(fallbackWorked && r.activityName === AGENT365_REGISTRY),
+  );
+}
+
+/** "Run_Org_Data_Ingester" reads "Org Data Ingester". @param {string} name */
+export const loadLabel = (name) => name.replace(/^Run_/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
+
+/**
+ * Whether a run loaded the history: the audit log and its processor succeeded, and so did the model
+ * refresh and the transcripts when they are installed.
+ * @param {import('../config.js').InstallConfig} config
+ * @param {Map<string, any>} runs
+ */
+function loadedBy(config, runs) {
+  const needed = ['Run_Audit_Log_Ingester', 'Run_Audit_Log_Processor'];
+  if (modelDeployed(config)) needed.push(REFRESH_ACTIVITY);
+  if (agentEvaluatorOn(config)) needed.push(AGENT_EVALUATOR_ACTIVITY);
+  return needed.every((name) => runs.get(name)?.status === 'Succeeded');
+}
+
+/**
+ * Whether the history has loaded. A first load that failed only in other loads did load it, so it is
+ * marked completed. Installs from before the installer tracked the first load count any completed run.
+ * @param {Ctx} ctx
+ */
+export async function historyLoaded(ctx) {
+  const { config, api } = ctx;
+  const f = config.fabric;
+  if (!f.workspaceId || !f.pipelineId) return false;
+  const first = config.firstRun;
+  if (first?.status === 'Completed') return true;
+  if (first?.jobId) {
+    const runs = await activityRuns(ctx, first.jobId, { startTimeUtc: first.startedAt, endTimeUtc: first.finishedAt });
+    if (!runs || !loadedBy(config, runs)) return false;
+    config.firstRun = { ...first, status: 'Completed' };
+    ctx.save();
+    return true;
+  }
+  return (await api.fabric.listJobs(f.workspaceId, f.pipelineId).catch(() => [])).some((j) => j.status === 'Completed');
+}
+
+/**
+ * What `run` starts: the first load, with the history, until a run has loaded it; then the usual
+ * incremental run. Asking for history days always loads that much.
+ * @param {Ctx} ctx
+ * @param {{ backfillDays?: number, wait: boolean }} opts
+ * @returns {Promise<{ backfillDays?: number, wait: boolean, first?: boolean }>}
+ */
+export async function chooseLoad(ctx, opts) {
+  const loaded = await historyLoaded(ctx);
+  if (opts.backfillDays) return { ...opts, first: !loaded };
+  if (loaded) return opts;
+  return { ...opts, backfillDays: ctx.config.history.days, first: true };
 }
 
 /**
@@ -121,7 +263,7 @@ export async function runDataCheck(ctx) {
   }
   const url = await api.fabric.runJob(f.workspaceId, notebookId, 'RunNotebook');
   const job = await waitForJob(ctx, url, 'Data check', { pollMs: 15_000, timeoutMs: 45 * 60_000 });
-  if (!reportJob(ctx, job, 'Data check')) return null;
+  if (!reportJob(ctx, job, 'Data check', 'check')) return null;
   const summary = await api.oneLake.readJson(f.workspaceId, f.lakehouseId, DATA_CHECK_FILE).catch(() => null);
   if (!summary) {
     ui.note('Open ValueLens_Data_Check in Fabric to see its results.');
@@ -253,6 +395,12 @@ export async function status(ctx) {
       ui.fail(line);
       if (job.failureReason?.message) ui.note(String(job.failureReason.message).slice(0, 400));
     } else ui.info(line);
+  }
+  const latest = jobs[0];
+  if (latest && TERMINAL.has(latest.status)) {
+    const failed = failedLoads(await activityRuns(ctx, latest.id, latest));
+    for (const r of failed) ui.warn(`${loadLabel(r.activityName)} failed in the latest run`);
+    if (capacityBusy(latest.failureReason) || failed.some((r) => capacityBusy(r.error))) busyNote(ctx, 'run');
   }
 
   if (config.firstRun?.jobId && !TERMINAL.has(config.firstRun.status ?? '')) {

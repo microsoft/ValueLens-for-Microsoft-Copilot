@@ -7,8 +7,9 @@ import { runCommand } from '../src/install.js';
 import { ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, freeName } from '../src/steps/fabric.js';
 import { ensureConsent } from '../src/steps/identity.js';
 import { lakehouseNameFrom, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
-import { printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
+import { capacityBusy, chooseLoad, historyLoaded, printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
 import { DATA_CHECK_FILE } from '../src/transform/notebook.js';
+import { PIPELINE_CHANGE, PIPELINE_VERSION, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
 import { fakeCtx, fakeFabric, fakeUi } from './fakes.js';
 
 const defaultNotebooks = notebooksFor(emptyConfig().modules);
@@ -209,6 +210,28 @@ test('pipeline: declining an update keeps the old module signature', async () =>
   await ensurePipeline(ctx, { force: true });
   assert.deepEqual(fabric.calls, []);
   assert.equal(config.fabric.pipelineModules, 'core');
+  assert.equal(config.fabric.pipelineVersion, undefined, 'so the next run offers the update again');
+});
+
+test('pipeline: one an older installer built is updated to run in lanes', async () => {
+  const fabric = fakeFabric();
+  const ui = fakeUi();
+  const { ctx, config } = fakeCtx({ fabric: fabric.api, ui: ui.ui });
+  await ensureNotebooks(ctx);
+  await ensurePipeline(ctx);
+  assert.equal(config.fabric.pipelineVersion, PIPELINE_VERSION);
+  assert.ok(!ui.text().includes(PIPELINE_CHANGE), 'a new pipeline needs no explanation');
+
+  delete config.fabric.pipelineVersion;
+  fabric.calls.length = 0;
+  await ensurePipeline(ctx);
+  assert.deepEqual(fabric.calls, ['updatePipeline ValueLens_Pipeline']);
+  assert.ok(ui.text().includes(PIPELINE_CHANGE));
+  assert.equal(config.fabric.pipelineVersion, PIPELINE_VERSION);
+
+  fabric.calls.length = 0;
+  await ensurePipeline(ctx);
+  assert.deepEqual(fabric.calls, [], 'nothing to do once it is up to date');
 });
 
 test('schedule: created, unchanged on re-run, updated when the time changes, adopted if one exists', async () => {
@@ -344,6 +367,198 @@ test('a failed run says why; --no-wait returns straight away', async () => {
   const later = await runPipeline(ctx, { wait: false });
   assert.equal(later.status, 'NotStarted');
   assert.equal(fabric.calls.at(-1), 'runJob Pipeline');
+});
+
+/** What Fabric says when a trial capacity can't start another notebook. */
+const BUSY =
+  "Notebook execution failed at Notebook service with http status code - '430', please check the Run logs on Notebook, additional details - 'Error name - Exception, Error value - Failed to create Livy session for executing notebook. Error: [TooManyRequestsForCapacity] This spark job can't be run because you have hit a spark compute or API rate limit.'";
+
+/**
+ * An activity run, as Fabric lists it.
+ * @param {string} activityName
+ * @param {string} status
+ * @param {string} [activityRunStart]
+ * @param {any} [more]
+ */
+const activity = (activityName, status, activityRunStart = '2026-06-01T12:00:00Z', more = {}) => ({
+  activityName,
+  activityType: activityName.startsWith('Conditionally_') ? 'IfCondition' : 'TridentNotebook',
+  status,
+  activityRunStart,
+  ...more,
+});
+
+test('capacityBusy spots a busy capacity, and nothing else', () => {
+  assert.equal(capacityBusy({ errorCode: '430' }), true);
+  assert.equal(capacityBusy({ errorCode: 'RequestExecutionFailed', message: BUSY }), true);
+  assert.equal(capacityBusy({ message: 'TooManyRequestsForCapacity' }), true);
+  assert.equal(capacityBusy({ message: 'HTTP status code: 430' }), true);
+  assert.equal(capacityBusy({ message: 'Read 430 rows' }), false);
+  assert.equal(capacityBusy({ errorCode: '4301', message: 'code 4301' }), false);
+  assert.equal(capacityBusy({ errorCode: 'X', message: 'AADSTS7000215: Invalid client secret' }), false);
+  assert.equal(capacityBusy(null), false);
+});
+
+test('a run that completed with a failed load says which, and still checks the data', async () => {
+  const fabric = fakeFabric();
+  fabric.jobs.push({ status: 'Completed', startTimeUtc: '2026-06-01T12:00:00', endTimeUtc: '2026-06-01T12:30:00' }, { status: 'Completed' });
+  fabric.activityRuns['job-1'] = [
+    activity('Run_Audit_Log_Ingester', 'Succeeded'),
+    activity('Conditionally_Run_Org_Data', 'Failed', '2026-06-01T12:05:00Z'),
+    activity('Run_Org_Data_Ingester', 'Failed', '2026-06-01T12:05:05Z', { error: { errorCode: '2011', message: 'Forbidden' } }),
+    activity('Conditionally_Run_M365_Activity', 'Succeeded', '2026-06-01T12:10:00Z'),
+  ];
+  const oneLake = { readJson: async () => ({ checkedAt: '2026-06-01T12:40:00+00:00', tables: { licensed: { rows: 5 } } }) };
+  const ui = fakeUi();
+  const { ctx, config } = fakeCtx({ fabric: fabric.api, oneLake, ui: ui.ui });
+  config.fabric.pipelineId = 'pipe-1';
+  config.fabric.pipelineName = 'ValueLens_Pipeline';
+  config.fabric.notebooks.dataCheck = 'nb-check';
+  config.firstRun = { jobId: 'job-0', status: 'Completed' };
+
+  assert.equal(await runCommand(ctx, 'run', { wait: true }), false);
+  const text = ui.text();
+  assert.match(text, /✓ Pipeline finished in 30m/);
+  assert.match(text, /! Org Data Ingester failed/);
+  assert.doesNotMatch(text, /Conditionally/);
+  assert.match(text, /To see why, open ValueLens_Pipeline in Fabric/);
+  assert.deepEqual(fabric.calls, ['runJob Pipeline', 'runJob RunNotebook'], 'the data check still runs');
+  assert.match(text, /✓ Licensed users: 5 rows/);
+});
+
+test('a run a busy capacity turned away says to wait and run it again', async () => {
+  const fabric = fakeFabric();
+  fabric.jobs.push({ status: 'Failed', failureReason: { errorCode: 'RequestExecutionFailed', message: BUSY } });
+  fabric.activityRuns['job-1'] = [
+    activity('Run_Audit_Log_Ingester', 'Failed', '2026-06-01T12:00:00Z', { error: { errorCode: '430', message: BUSY } }),
+    activity('Run_Licensed_Users_Ingester', 'Succeeded'),
+  ];
+  const ui = fakeUi();
+  const { ctx, config } = fakeCtx({ fabric: fabric.api, ui: ui.ui });
+  config.fabric.pipelineId = 'pipe-1';
+
+  const result = await runPipeline(ctx, { wait: true });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.failed, ['Run_Audit_Log_Ingester']);
+  const text = ui.text();
+  assert.match(text, /! Audit Log Ingester failed/);
+  assert.match(text, /capacity was too busy to start a notebook\. Nothing is lost\./);
+  assert.equal(text.split('too busy').length, 2, 'said once');
+  assert.match(text, /Wait a few minutes, then run "valuelens-install run" again\./);
+  assert.doesNotMatch(text, /To see why/);
+});
+
+test("run doesn't start a second run while one is going, but ignores one stuck for over a day", async () => {
+  const fabric = fakeFabric();
+  fabric.jobList.push({ id: 'j-running', status: 'InProgress', startTimeUtc: '2026-06-01T11:30:00' });
+  const ui = fakeUi();
+  const { ctx, config } = fakeCtx({ fabric: fabric.api, ui: ui.ui });
+  config.fabric.pipelineId = 'pipe-1';
+
+  const result = await runPipeline(ctx, { backfillDays: 90, wait: true, first: true });
+  assert.deepEqual(result, { jobId: 'j-running', status: 'InProgress', ok: false });
+  assert.deepEqual(fabric.calls, []);
+  assert.equal(config.firstRun, undefined);
+  assert.match(ui.text(), /already running, so this didn't start another/);
+
+  fabric.jobList[0].startTimeUtc = '2026-05-30T11:30:00';
+  fabric.jobs.push({ status: 'Completed' });
+  assert.equal((await runPipeline(ctx, { wait: true })).ok, true);
+  assert.deepEqual(fabric.calls, ['runJob Pipeline']);
+});
+
+test('run loads the history until a run has loaded it, then runs as usual', async () => {
+  const fabric = fakeFabric();
+  const { ctx, config } = fakeCtx({ fabric: fabric.api });
+  config.fabric.pipelineId = 'pipe-1';
+  const wait = { wait: true };
+
+  assert.deepEqual(await chooseLoad(ctx, wait), { wait: true, backfillDays: 90, first: true }, 'nothing has run yet');
+
+  config.firstRun = { jobId: 'job-9', status: 'Completed' };
+  assert.deepEqual(await chooseLoad(ctx, wait), { wait: true });
+  assert.deepEqual(await chooseLoad(ctx, { wait: true, backfillDays: 30 }), { wait: true, backfillDays: 30, first: false }, 'asking for days reloads them');
+
+  // A first load where only another load failed did load the history.
+  config.firstRun = { jobId: 'job-9', status: 'Failed' };
+  fabric.activityRuns['job-9'] = [activity('Run_Audit_Log_Ingester', 'Succeeded'), activity('Run_Audit_Log_Processor', 'Succeeded'), activity('Run_Org_Data_Ingester', 'Failed')];
+  assert.deepEqual(await chooseLoad(ctx, wait), { wait: true });
+  assert.equal(config.firstRun?.status, 'Completed', 'and is marked so');
+
+  // It must also have refreshed the model and read the transcripts, when they are installed.
+  config.firstRun = { jobId: 'job-9', status: 'Failed' };
+  Object.assign(config.semanticModel, { enabled: true, id: 'model-1', bound: true });
+  assert.equal(await historyLoaded(ctx), false);
+  fabric.activityRuns['job-9'].push(activity(REFRESH_ACTIVITY, 'Succeeded'));
+  config.modules.agentEvaluator = true;
+  config.agentEvaluator.environments = [{ url: 'https://org.crm.dynamics.com', access: true }];
+  assert.deepEqual(await chooseLoad(ctx, wait), { wait: true, backfillDays: 90, first: true }, 'the transcripts are missing');
+  assert.deepEqual(await chooseLoad(ctx, { wait: true, backfillDays: 30 }), { wait: true, backfillDays: 30, first: true });
+  fabric.activityRuns['job-9'].push(activity('Run_Agent_Evaluator_Transcripts', 'Succeeded'));
+  assert.equal(await historyLoaded(ctx), true);
+
+  // Installs from before the installer tracked the first load count any completed run.
+  delete config.firstRun;
+  assert.equal(await historyLoaded(ctx), false);
+  fabric.jobList.push({ id: 'old', status: 'Completed' });
+  assert.equal(await historyLoaded(ctx), true);
+});
+
+test("run starts the first load again when the last one didn't load the history", async () => {
+  const fabric = fakeFabric();
+  fabric.jobs.push({ status: 'Completed' });
+  fabric.activityRuns['job-0'] = [activity('Run_Audit_Log_Ingester', 'Failed', undefined, { error: { errorCode: '430', message: BUSY } })];
+  const ui = fakeUi();
+  const { ctx, config } = fakeCtx({ fabric: fabric.api, ui: ui.ui });
+  config.fabric.pipelineId = 'pipe-1';
+  config.firstRun = { jobId: 'job-0', status: 'Failed' };
+
+  await runCommand(ctx, 'run', { wait: true });
+  assert.match(fabric.calls[0], /"AuditMode":"backfill"/);
+  assert.match(fabric.calls[0], /"BackfillDays":90/);
+  assert.match(ui.text(), /Started the first load: 90 days of audit history/);
+  assert.equal(config.firstRun?.jobId, 'job-1');
+  assert.equal(config.firstRun?.status, 'Completed');
+});
+
+test('status names the loads that failed in the latest run, unless a retry or the fallback covered them', async () => {
+  const fabric = fakeFabric();
+  fabric.jobList.push(
+    { id: 'j-1', status: 'Completed', startTimeUtc: '2026-06-01T02:00:00', endTimeUtc: '2026-06-01T02:40:00', invokeType: 'Scheduled' },
+    { id: 'j-2', status: 'Completed', startTimeUtc: '2026-06-02T02:00:00', endTimeUtc: '2026-06-02T02:40:00', invokeType: 'Scheduled' },
+  );
+  const busy = { errorCode: '430', message: BUSY };
+  fabric.activityRuns['j-1'] = [activity('Run_Org_Data_Ingester', 'Failed')];
+  fabric.activityRuns['j-2'] = [
+    // Fabric lists a retried load's attempts in any order; the last one counts.
+    activity('Run_Licensed_Users_Ingester', 'Succeeded', '2026-06-02T02:06:00Z'),
+    activity('Run_Licensed_Users_Ingester', 'Failed', '2026-06-02T02:00:05Z', { error: busy }),
+    activity('Conditionally_Run_Agent365', 'Failed', '2026-06-02T02:07:00Z'),
+    activity('Run_Agent365_Registry_Ingester', 'Failed', '2026-06-02T02:07:05Z'),
+    activity('Run_Agent365_CSV_Fallback', 'Succeeded', '2026-06-02T02:09:00Z'),
+    activity('Conditionally_Run_M365_Activity', 'Failed', '2026-06-02T02:12:00Z'),
+    activity('Run_M365_Activity_Ingester', 'Failed', '2026-06-02T02:12:05Z', { error: busy }),
+  ];
+  const run = async () => {
+    const ui = fakeUi();
+    const { ctx, config } = fakeCtx({ fabric: fabric.api, oneLake: { readJson: async () => null }, ui: ui.ui });
+    config.fabric.pipelineId = 'pipe-1';
+    await status(ctx);
+    return ui.text();
+  };
+
+  let text = await run();
+  assert.match(text, /! M365 Activity Ingester failed in the latest run/);
+  assert.doesNotMatch(text, /Licensed Users Ingester failed/, 'its retry worked');
+  assert.doesNotMatch(text, /Agent365 Registry Ingester failed/, 'the fallback stood in');
+  assert.doesNotMatch(text, /Org Data Ingester failed/, 'that was an earlier run');
+  assert.doesNotMatch(text, /Conditionally/);
+  assert.match(text, /capacity was too busy to start a notebook/);
+
+  fabric.activityRuns['j-2'][4].status = 'Failed';
+  text = await run();
+  assert.match(text, /! Agent365 Registry Ingester failed in the latest run/);
+  assert.match(text, /! Agent365 CSV Fallback failed in the latest run/);
 });
 
 test('data check runs the notebook and prints the summary it saved', async () => {

@@ -40,10 +40,10 @@ test('catalog: on by default, the first extra, deploys its notebook with credent
   assert.ok(!notebooksFor(off).some((n) => n.key === 'm365Activity'));
 });
 
-test('pipeline: the M365 branch runs in parallel when on and is removed when off', () => {
+test('pipeline: the M365 branch runs in lane 2 after the org data when on, and is removed when off', () => {
   const doc = buildPipeline(sources.pipeline, { workspaceId: WS, notebookIds: ids, modules: on });
   const branch = findActivity(doc.properties.activities, 'Conditionally_Run_M365_Activity');
-  assert.deepEqual(branch.dependsOn, []);
+  assert.deepEqual(branch.dependsOn, [{ activity: 'Conditionally_Run_Org_Data', dependencyConditions: ['Completed'] }]);
   assert.equal(findActivity(doc.properties.activities, 'Run_M365_Activity_Ingester').typeProperties.notebookId, 'nb-m');
   assert.equal(doc.properties.parameters.EnableM365Activity.defaultValue, true);
 

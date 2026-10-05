@@ -8,7 +8,7 @@ import { parseResourceId } from '../clients/azure.js';
 import { scheduleBody } from '../clients/fabric.js';
 import { HttpError } from '../http.js';
 import { MARKER, prepareNotebook, pyString, serialiseNotebook } from '../transform/notebook.js';
-import { buildPipeline } from '../transform/pipeline.js';
+import { buildPipeline, PIPELINE_CHANGE, PIPELINE_VERSION } from '../transform/pipeline.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
@@ -506,7 +506,8 @@ export async function ensurePipeline(ctx, opts = {}) {
     f.pipelineId = await createdId(ctx, created, 'DataPipeline', name);
     ui.ok(`Created pipeline ${name}`);
     f.pipelineName = name;
-  } else if (opts.force || f.pipelineModules !== signature) {
+  } else if (opts.force || f.pipelineModules !== signature || f.pipelineVersion !== PIPELINE_VERSION) {
+    if (f.pipelineVersion !== PIPELINE_VERSION) ui.note(PIPELINE_CHANGE);
     ui.note('This replaces the pipeline definition, including any activities you added to it yourself.');
     if (await ui.confirm(`Update ${f.pipelineName ?? PIPELINE_NAME}?`, true)) {
       await api.fabric.updatePipeline(ws, f.pipelineId, definition);
@@ -519,6 +520,7 @@ export async function ensurePipeline(ctx, opts = {}) {
     ui.ok(`Pipeline ${f.pipelineName ?? PIPELINE_NAME} is in place`);
   }
   f.pipelineModules = signature;
+  f.pipelineVersion = PIPELINE_VERSION;
   ctx.save();
 }
 

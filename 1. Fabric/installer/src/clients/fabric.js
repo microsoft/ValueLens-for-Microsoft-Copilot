@@ -242,6 +242,23 @@ export function fabricApi(http) {
     jobUrl: (workspaceId, itemId, jobId) => `/workspaces/${workspaceId}/items/${itemId}/jobs/instances/${jobId}`,
     /** @param {string} workspaceId @param {string} itemId */
     listJobs: (workspaceId, itemId) => http.list(`/workspaces/${workspaceId}/items/${itemId}/jobs/instances`),
+    /**
+     * The activity runs of one pipeline run. A retried activity can appear once per attempt.
+     * @param {string} workspaceId
+     * @param {string} jobId
+     * @param {Date} after
+     * @param {Date} before
+     * @returns {Promise<any[]>}
+     */
+    async queryActivityRuns(workspaceId, jobId, after, before) {
+      const res = await http.post(`/workspaces/${workspaceId}/datapipelines/pipelineruns/${jobId}/queryactivityruns`, {
+        filters: [],
+        orderBy: [{ orderBy: 'ActivityRunStart', order: 'ASC' }],
+        lastUpdatedAfter: after.toISOString(),
+        lastUpdatedBefore: before.toISOString(),
+      });
+      return Array.isArray(res) ? res : (res?.value ?? []);
+    },
 
     /** @param {string} workspaceId @param {string} itemId */
     listSchedules: (workspaceId, itemId) => http.list(`/workspaces/${workspaceId}/items/${itemId}/jobs/Pipeline/schedules`),

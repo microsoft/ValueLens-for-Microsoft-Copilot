@@ -108,7 +108,7 @@ const modules = { orgData: true, m365Activity: false, agent365: false, productFe
 /** @param {any} doc */
 const names = (doc) => doc.properties.activities.map((/** @type {any} */ a) => a.name);
 
-test('pipeline: consumption loads run alongside the audit load, then refresh their own model', () => {
+test('pipeline: consumption loads run one after another in lane 2, then refresh their own model', () => {
   const doc = buildPipeline(realSources().pipeline, { workspaceId: 'ws-1', notebookIds: ids, modules, semanticModelId: 'model-1', azureAi: true, consumptionModelId: 'cc-1' });
   const all = names(doc);
   for (const n of ['Run_Consumption_Azure_AI', 'Run_Consumption_Studio', 'Run_Consumption_Viva', REFRESH_ACTIVITY, CONSUMPTION_REFRESH_ACTIVITY]) assert.ok(all.includes(n), n);
@@ -116,10 +116,13 @@ test('pipeline: consumption loads run alongside the audit load, then refresh the
   assert.equal(doc.properties.parameters.EnableConsumption, undefined);
 
   const azure = findActivity(doc.properties.activities, 'Run_Consumption_Azure_AI');
-  assert.deepEqual(azure.dependsOn, []);
+  assert.deepEqual(azure.dependsOn, [{ activity: 'Conditionally_Run_Org_Data', dependencyConditions: ['Completed'] }]);
+  assert.deepEqual(findActivity(doc.properties.activities, 'Run_Consumption_Studio').dependsOn, [{ activity: 'Run_Consumption_Azure_AI', dependencyConditions: ['Completed'] }]);
+  assert.deepEqual(findActivity(doc.properties.activities, 'Run_Consumption_Viva').dependsOn, [{ activity: 'Run_Consumption_Studio', dependencyConditions: ['Completed'] }]);
   assert.equal(azure.typeProperties.notebookId, 'nb-azure');
   assert.equal(azure.policy.retry, 2, 'new Azure roles take a while to apply');
-  assert.equal(findActivity(doc.properties.activities, 'Run_Consumption_Studio').policy.retry, 1);
+  assert.equal(azure.policy.retryIntervalInSeconds, 300);
+  assert.equal(findActivity(doc.properties.activities, 'Run_Consumption_Studio').policy.retry, 3);
 
   const ccRefresh = findActivity(doc.properties.activities, CONSUMPTION_REFRESH_ACTIVITY);
   assert.deepEqual(ccRefresh.dependsOn, [
