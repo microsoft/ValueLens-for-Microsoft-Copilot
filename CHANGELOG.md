@@ -16,6 +16,21 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-05 — Analytics Hub installer 0.2.3: a busy trial capacity
+
+On a Fabric trial or a small capacity, the first load could fail with `TooManyRequestsForCapacity`.
+The pipeline started about six notebooks at once, and Fabric turned some of them away. The pipeline
+now runs its notebooks in two lanes, so no more than two run at the same time. If a notebook still
+fails, the pipeline waits five minutes and tries it again. If Fabric is still too busy after that,
+the installer says so in plain words: nothing is lost, wait a few minutes and choose **Run now**
+again.
+
+If this happened to you, download the installer again, open it and choose **Repair or change**. It
+offers to update the pipeline and to run the first load again. Until the first load succeeds,
+**Run now** runs it again, with the audit history you picked.
+
+---
+
 ## 2026-10-05 — Analytics Hub installer 0.2.2: a Key Vault that another workspace already reads
 
 If you picked a Key Vault that blocks public access, and another Analytics Hub workspace already
