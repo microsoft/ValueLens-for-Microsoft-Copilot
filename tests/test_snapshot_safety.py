@@ -367,9 +367,14 @@ class FakeRequests:
 class FakeClock:
     def __init__(self):
         self.now = 1_000.0
+        self.slept = []
 
     def time(self):
         return self.now
+
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.now += seconds
 
 
 class Agent365TokenRefreshTests(unittest.TestCase):
@@ -386,9 +391,9 @@ class Agent365TokenRefreshTests(unittest.TestCase):
         ns = extract(
             self.NOTEBOOK,
             2,
-            functions=("_get_graph_token", "graph_headers", "graph_request"),
-            assigns=("_TOKEN_CACHE",),
-            import_names=set(),
+            functions=("_get_graph_token", "graph_headers", "_retry_delay", "graph_request"),
+            assigns=("_TOKEN_CACHE", "_TOKEN_LOCK", "RETRY_STATUSES", "MAX_RETRIES"),
+            import_names={"threading", "random"},
         )
         fake = FakeRequests(token_lifetime=token_lifetime, statuses=statuses)
         clock = FakeClock()

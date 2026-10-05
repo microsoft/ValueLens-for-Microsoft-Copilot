@@ -63,16 +63,29 @@ AISystemPlugin_Id, AISystemPlugin_Name, ModelTransparencyDetails_ModelName,
 AccessedResource_Type, AccessedResource_Action, AccessedResource_SiteUrl, AccessedResource_SensitivityLabelId,
 Message_Id, Message_isPrompt, Resource_Count,
 InteractionDate, WeekStart, MonthStart,
-Agent_TitleID, Agent_EntraId
+Agent_TitleID, Agent_EntraId,
+AgentPlatform, PlatformAgentId, ConversationId, Prompts_Available,
+Agent_BotId, Agent_EnvironmentId, Exclude_Reason
 ```
 
-> **Agent identifiers (two keys, used together).** `Agent_TitleID` is parsed from the legacy
+> **Agent identifiers (three keys).** `Agent_TitleID` is parsed from the legacy
 > `CopilotStudio.Declarative.{title}` / `T_`/`P_` forms. `Agent_EntraId` captures the **Microsoft
 > Entra Agent ID** GUID that **Agent 365** now stamps into the audit `AgentId` instead of the
-> declarative string. When agents are registered/recreated under Entra Agent ID, `Agent_TitleID`
-> would otherwise land NULL and drop out of the Agents join — `Agent_EntraId` keeps them resolvable
-> via the registry crosswalk. The two are populated mutually exclusively per row (legacy → TitleID,
-> Entra → EntraId), so old and new agents both join cleanly during a mixed migration.
+> declarative string (an all-zero GUID is treated as no ID). The two are populated mutually
+> exclusively per row. `Agent_BotId` and `Agent_EnvironmentId` are parsed from `PlatformAgentId` on
+> Copilot Studio runtime records (`AgentPlatform` "CopilotStudio"), which usually carry no Title ID.
+
+> **Runtime records with no messages.** A Copilot Studio agent used in Teams or another channel logs
+> a record with no `Messages`. It is kept as one row with `Prompts_Available` FALSE,
+> `Message_isPrompt` FALSE and a `message:none` `Message_Id`, so the user still counts. Every other
+> record without messages is still dropped. `ConversationId` falls back to the record's
+> `ConversationId` when it has no `ThreadId`.
+
+> **`Exclude_Reason`** flags records that are not end-user agent usage: Copilot Studio test pane,
+> maker evaluation, agent authoring, autonomous and workflow runs, the M365 Copilot twin of a
+> runtime record, and Fabric multi-agent records. They stay in `_parsed`; the processor drops every
+> reason in `DROP_EXCLUDE_REASONS` (all of them by default). The rules are in
+> [METHODOLOGY §2.1](METHODOLOGY.md#21-which-audit-records-count).
 
 ### 1b. `copilot_interactions_curated` — the table the Fabric model actually reads
 `Copilot_Audit_Log_Processor` reads `copilot_interactions_parsed` (joining `copilot_licensed_users`
@@ -109,6 +122,14 @@ User_Stage_Maturity, User_Stage
 Breakdown**, and the 12 groups it rolls up to (the model's `Task Breakdown Group` column) as **Task
 Category**. Each task's plain-English description comes from the static `Behavior Value Map` table
 inside the `.pbit`, not from this table.
+
+It also carries the agent link: `Agent_LinkID` (the registry Title ID the row belongs to, the
+relationship key to `agents_365`), `Agent_MatchedTitleID` (the Title ID that actually matched,
+before LOB/Shared copies are merged) and `Agent_LinkMethod` (`Title ID`, `Bot Id`,
+`Entra Agent ID`, `Schema GUID`, `Unlinked`, or null when the row names no agent key). The raw keys
+`Agent_TitleID`, `Agent_EntraId`, `Agent_BotId`, `Agent_EnvironmentId`, `AgentPlatform`,
+`PlatformAgentId`, `Prompts_Available` and `Exclude_Reason` pass through. See
+[agent identity resolution](#agent-identity-resolution).
 
 > **`Behavior_Category` is the join key for the value model.** It relates to the static
 > `Human Time Estimates` table inside the `.pbit`, which holds the per-behaviour
@@ -196,6 +217,22 @@ shipped pipeline runs the Ingester **first** and the Lander **only if the Ingest
 (`Run_Agent365_CSV_Fallback`, e.g. no Agent 365 licence). Read via `FabricTable("agents_365")`, wrapped with `Enable_Agent365`. The Fabric
 model is now **100% Lakehouse-sourced**.
 
+**Incremental pull.** The ingester lists every agent on every run, but calls the per-agent detail
+endpoint (Bot Id, usage, sharing, element types) only for agents that are new, whose
+`lastModifiedDateTime` changed, that have no cache entry, or whose cached detail is older than
+`FULL_REFRESH_DAYS` (default 7). Detail calls run in parallel (`DETAIL_WORKERS`, default 8) and retry
+on 429, 503 and 504. `DETAIL_MODE = "full"` forces a full refresh. It keeps three tables:
+
+| Table | Holds |
+|---|---|
+| `agents_365` | Today's registry, one row per agent, with **`Detail As Of`** (when that agent's detail was last fetched) |
+| `agents_365_detail_cache` | The last detail response and resolved creator per agent. Written only after a successful run; agents gone from the list are dropped |
+| `agents_365_history` | Every version of every agent, merged on Title ID and `Last updated`, so registry changes can be traced |
+
+For a cached agent, today's list fields override the cached detail; freshly fetched detail
+overrides the list. Usage fields (`Active Users`, `Total sessions` and similar) can therefore be up
+to `FULL_REFRESH_DAYS` old; check `Detail As Of`.
+
 **Local CSV, SharePoint and Dataverse templates** read the same contract from a CSV set in the
 `Agent 365` parameter (blank = the page loads empty). Produce it with
 [`Get-Agents365Registry.ps1`](../3.%20SharePoint/scripts/Get-Agents365Registry.ps1), which calls the
@@ -206,6 +243,12 @@ same value rules; a parity test runs one mocked Graph response through both. `Ru
 Query only reads and types the file. A hidden staging query (`Agents 365 Staging`) reads it once;
 both the `Agents 365` table and the interactions query's `Agent_LinkID` resolution use it, so they
 always agree. The PAX 28-column catalogue and the admin centre export are still accepted.
+
+The script also keeps a detail cache next to the CSV (`<csv>.detailcache.jsonl`) and, like the
+ingester, fetches detail only for new or changed agents, or those whose cached detail is older than
+`-FullDetailRefreshDays` (default 7; 0 fetches every agent). It honours `Retry-After` on 429 and 5xx
+responses, caches each agent's resolved creator, and writes the cache only after the CSV. The CSV
+keeps its 48 columns; it has no `Detail As Of` column.
 
 #### ⚠️ Two different Agent 365 exports — registry vs observability
 
@@ -234,33 +277,42 @@ with) the registry export. `Agent Activity Status` falls back to audit-log-deriv
 > Adding a column to the Agents 365 model? Add it to the guard's `__expected` list in the query too,
 > or it will be unstable on any source that doesn't emit it.
 
-#### Agent identity resolution (3-key bridge: Entra → Title ID → Name)
+#### Agent identity resolution
 
 The interactions fact joins the Agents dimension through a **resolved key** (`Agent_LinkID`) rather
-than the raw `Agent_TitleID`. This is necessary because the **audit log and the MAC Agents export use
-different identifier namespaces** — the audit `AgentId` is an `SPO_…` blob, a built-in name
-(`WordDraftingAgent`), or an **Entra Agent ID GUID** (Agent 365), while the export keys on `T_…`
-Title IDs. On real tenant data the raw `Agent_TitleID → Title ID` join matches **0%**; resolving the
-shared **display name** lifts that to ~**84% of distinct agents** (the unmatched remainder are mostly
-Microsoft first-party agents that legitimately have no registry row).
+than the raw `Agent_TitleID`. The audit log and the registry use different identifiers: the audit
+`AgentId` can be a `T_…` Title ID, an `SPO_…` blob, a built-in name (`WordDraftingAgent`), an
+**Entra Agent ID GUID** (Agent 365), or, on Copilot Studio runtime records, a Bot Id in
+`PlatformAgentId`. On one large tenant **55%** of agent rows matched a registry Title ID directly;
+most of the rest are Microsoft first-party agents with no registry row.
 
-Resolution is done in Power Query (no DAX circular-dependency risk; mirrors the existing license merge),
-as a **priority chain** that always lands on a real registry `Title ID` or null:
+**Fabric (`Copilot_Audit_Log_Processor`).** Resolution runs in Spark, as a priority chain that
+always lands on a real registry `Title ID` or null, and never uses the agent's name:
 
-1. **Entra Agent ID** — `Agent_EntraId → agents_365[Entra Agent ID]` (future Agent 365 agents).
-2. **Direct Title ID** — `Agent_TitleID` only when it already *is* a registry Title ID.
-3. **Normalised name** — `lower(trim(AgentName)) → agents_365[Agent name]` (the high-yield fallback).
+1. **Title ID** — `Agent_TitleID → agents_365[Title ID]`.
+2. **Bot Id** — `Agent_BotId → agents_365[Bot Id]` (Copilot Studio runtime records).
+3. **Entra agent ID** — `Agent_EntraId → agents_365[Entra Agent ID]` (`agentIdentityId`).
+4. **Schema GUID** — a Title ID found inside a Copilot Studio schema name.
 
-`Agent_LinkID = COALESCE(EntraTitle, DirectTitle, NameTitle)`. All three lookup maps are deduped and
-null-guarded, so the 1.2M-row fact never fans out. The relationship is
-**`Chat + Agent Interactions[Agent_LinkID] → agents_365[Title ID]`** (replaces the old `Agent_TitleID`
-relationship; cross-filter direction unchanged).
+A key is used only when it maps to one registry agent. When a Copilot Studio agent has an LOB and a
+Shared copy (two Title IDs) that share a Bot Id or Entra agent ID, both resolve to one
+`Agent_LinkID`: the LOB Title ID, or for Shared-only copies the most recently updated one. Distinct
+users are therefore counted once across the copies. Agent Builder and Microsoft agents are never
+merged. `Agent_MatchedTitleID` keeps the Title ID that matched. Matching by name was removed:
+names are not unique, and it linked only about 1.3% more rows.
 
-**Zero-touch identity detection.** `agents_365` is given an add-if-missing **`Entra Agent ID`** column
+**Local CSV, SharePoint and Dataverse templates.** Resolution is still done in Power Query, in this
+order: `Agent_EntraId → Entra Agent ID`, then a direct Title ID, then the normalised agent name.
+These templates have not yet moved to the Fabric rules above, so they can still merge two agents
+that share a name.
+
+All lookup maps are deduped and null-guarded, so the fact never fans out. The relationship is
+**`Chat + Agent Interactions[Agent_LinkID] → agents_365[Title ID]`**.
+
+**Zero-touch identity detection (templates).** `agents_365` is given an add-if-missing **`Entra Agent ID`** column
 that **auto-detects** the GUID from whatever the export provides — it picks the first present of
 `Entra Agent ID → EntraAgentId → Agent ID → Bot Id` (and common variants). The customer never has to
-create or populate a column by hand; a non-matching GUID simply does not join (no false links). Until
-an export carries Entra GUIDs, custom agents still resolve by name.
+create or populate a column by hand; a non-matching GUID simply does not join (no false links).
 
 #### Agent creator attribution (`Agent creator UPN` / `Agent creator source`)
 

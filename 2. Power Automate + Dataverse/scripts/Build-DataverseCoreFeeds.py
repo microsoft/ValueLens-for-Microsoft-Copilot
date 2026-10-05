@@ -176,8 +176,13 @@ def extract_audit_payload(record: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(ced, dict):
         raise PathwayError("Full raw audit payload is missing CopilotEventData")
     messages = ced.get("Messages")
+    copilot_studio_runtime = re.sub(r"\s", "", str(audit.get("AgentPlatform") or "")).lower() == "copilotstudio"
     if not isinstance(messages, list) or not messages:
-        raise PathwayError("Full raw audit payload is missing CopilotEventData.Messages")
+        # Copilot Studio agents in Teams and other channels log runtime records with
+        # no messages. The processor keeps them as one non-prompt interaction.
+        if not (copilot_studio_runtime and messages in (None, [])):
+            raise PathwayError("Full raw audit payload is missing CopilotEventData.Messages")
+        messages = []
     # Mirror the canonical processor's semantics: only isPrompt messages become
     # facts. Response-only audit records are valid and must not be rejected. We
     # never fabricate Message Ids, but a prompt message that already carries an Id
