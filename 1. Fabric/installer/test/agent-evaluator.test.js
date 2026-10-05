@@ -155,12 +155,12 @@ test('transcript notebook: Dataverse, merge, every chosen environment, the app\'
   assert.equal(nb.metadata.dependencies.lakehouse.default_lakehouse, 'lh-1');
 });
 
-test('pipeline: transcripts run alongside the audit load, then refresh their own model', () => {
+test('pipeline: transcripts run at the end of lane 2, then refresh their own model', () => {
   const doc = buildPipeline(realSources().pipeline, { workspaceId: 'ws-1', notebookIds: ids, modules, semanticModelId: 'model-1', agentTranscripts: true, agentEvaluatorModelId: 'ae-1' });
   const run = findActivity(doc.properties.activities, AGENT_EVALUATOR_ACTIVITY);
-  assert.deepEqual(run.dependsOn, []);
+  assert.deepEqual(run.dependsOn, [{ activity: 'Conditionally_Run_Org_Data', dependencyConditions: ['Completed'] }]);
   assert.equal(run.typeProperties.notebookId, 'nb-ae');
-  assert.equal(run.policy.retry, 1);
+  assert.equal(run.policy.retry, 2);
   const days = run.typeProperties.parameters.LOOKBACK_DAYS;
   assert.equal(days.type, 'int');
   assert.equal(days.value.type, 'Expression');
@@ -173,7 +173,7 @@ test('pipeline: transcripts run alongside the audit load, then refresh their own
   ]);
   assert.equal(refresh.typeProperties.parameters.SEMANTIC_MODEL_ID.value, 'ae-1');
   assert.equal(refresh.typeProperties.parameters.WRITE_MODE.value, 'merge');
-  assert.match(doc.properties.description, /Agent Evaluator reads Copilot Studio transcripts alongside and refreshes its model/);
+  assert.match(doc.properties.description, /reads Copilot Studio transcripts at the end of lane 2, then refreshes its model/);
 
   const noModel = buildPipeline(realSources().pipeline, { workspaceId: 'ws-1', notebookIds: ids, modules, agentTranscripts: true });
   assert.ok(names(noModel).includes(AGENT_EVALUATOR_ACTIVITY));

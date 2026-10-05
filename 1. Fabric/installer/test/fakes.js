@@ -70,6 +70,10 @@ export function fakeFabric() {
   const calls = [];
   /** @type {any[]} */
   const jobs = [];
+  /** Job instances listJobs returns. @type {any[]} */
+  const jobList = [];
+  /** Activity runs queryActivityRuns returns, by job id. @type {Record<string, any[]>} */
+  const activityRuns = {};
   /** @type {any[]} */
   const roles = [];
   /** @type {{ id: string, displayName: string, body?: any }[]} */
@@ -139,7 +143,9 @@ export function fakeFabric() {
       return `https://api.fabric.microsoft.com/v1/workspaces/${ws}/items/${id}/jobs/instances/job-${++n}`;
     },
     getJob: async () => jobs.shift(),
-    listJobs: async () => [],
+    listJobs: async () => structuredClone(jobList),
+    /** @param {string} _ws @param {string} jobId */
+    queryActivityRuns: async (_ws, jobId) => structuredClone(activityRuns[jobId] ?? []),
     /** @param {string} _ws @param {string} id */
     getLakehouse: async (_ws, id) => ({
       id,
@@ -217,7 +223,7 @@ export function fakeFabric() {
       return null;
     },
   };
-  return { api, items, schedules, calls, jobs, roles, connections, failures, sqlStates, add };
+  return { api, items, schedules, calls, jobs, jobList, activityRuns, roles, connections, failures, sqlStates, add };
 }
 
 /** @param {number} [status] @param {string} [message] */
