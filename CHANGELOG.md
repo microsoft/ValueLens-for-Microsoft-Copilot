@@ -36,6 +36,13 @@ by model and Foundry resources views show the new names even before the template
   and surfaces.
 - **Cowork fit** with License set to Unlicensed says Cowork needs a Copilot license, the same as
   the Cowork leaderboard does, rather than suggesting there's no Cowork activity yet.
+- **Agent registry** keeps its side panel below the table until the window is extra wide, so the
+  table's columns aren't squeezed on a laptop screen.
+
+**Agent Evaluator add-on.** **Knowledge Answered Rate** is now a share of knowledge searches, the
+complement of **Knowledge Gap Rate**, so the two add up to 100%. It used to divide by every
+session, so the Knowledge Gap focus card understated how often searches found an answer. The
+card's content gap is now the Gap Rate itself.
 
 ## 2026-10-05 — One name for each task level, and Fabric App review fixes
 
