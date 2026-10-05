@@ -16,7 +16,7 @@ steps in its README.
 
 | Path | You need | Setup |
 |---|---|---|
-| **[1. Fabric](1.%20Fabric/)** (recommended) | Fabric capacity (F2 or larger, or a trial) | Double-click an installer. It sets up everything and deploys the dashboard as an app. |
+| **[1. Fabric](1.%20Fabric/)** (recommended) | Fabric capacity (F2 or larger, or a trial) | Double-click an installer. It sets up everything and deploys the dashboard as an app. **[🎥 Watch the setup](1.%20Fabric/README.md#watch-the-setup)** |
 | **[2. Power Automate + Dataverse](2.%20Power%20Automate%20+%20Dataverse/)** (preview) | Power Automate premium and Dataverse | Import a collector solution and run a refresh script. |
 | **[3. SharePoint](3.%20SharePoint/)** | Power BI Pro | App registration, a SharePoint library and a scheduled export. |
 | **[4. Local CSV](4.%20Local%20CSV/)** | Power BI Desktop | Open the template. Sample data is included. |
