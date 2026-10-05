@@ -35,8 +35,8 @@ const views: readonly { id: View; label: string }[] = [
 ];
 
 const details: readonly { id: Detail; label: string }[] = [
-    { id: "categories", label: "Categories" },
-    { id: "tasks", label: "All tasks" },
+    { id: "categories", label: "Task Categories" },
+    { id: "tasks", label: "Task Breakdown" },
 ];
 
 const MEASURES = [ACTIVITY_SHARE_COLUMN, HOURS_PER_WEEK_COLUMN, VALUE_PER_WEEK_COLUMN] as const;
@@ -81,9 +81,10 @@ interface TaskValueBreakdownProps {
 }
 
 /**
- * The report's Copilot Value Table and its Time Saved alternative: each task
- * category, drilling down to the tasks inside it, with activity share, weekly
- * expert-equivalent hours and weekly assisted value, shaded lightly by size.
+ * The report's Copilot Value Table and its Time Saved alternative: each Task
+ * Category, drilling down to the Task Breakdown inside it, with activity
+ * share, weekly expert-equivalent hours and weekly assisted value, shaded
+ * lightly by size.
  */
 export function TaskValueBreakdown({ extra, currencySymbol, assumption }: TaskValueBreakdownProps) {
     const [view, setView] = useState<View>("table");
@@ -101,7 +102,7 @@ export function TaskValueBreakdown({ extra, currencySymbol, assumption }: TaskVa
     );
 
     // The grid owns its expansion state and only reads `_expanded` on mount,
-    // so "All tasks" remounts it, and a new result does too.
+    // so "Task Breakdown" remounts it, and a new result does too.
     const gridKey = `${detail}|${tree?.rows.map((row) => row._id).join("|") ?? ""}`;
     const rows = useMemo(
         () => tree?.rows.map((row) => (row._children ? { ...row, _expanded: detail === "tasks" } : row)),
@@ -146,7 +147,7 @@ export function TaskValueBreakdown({ extra, currencySymbol, assumption }: TaskVa
         () => [
             {
                 id: TASK_LABEL_COLUMN,
-                header: "Category / task",
+                header: "Task Category / Task Breakdown",
                 minWidth: 260,
                 cellRenderer: (value, row): ReactNode =>
                     isGroup(row) ? <span className="font-semibold">{String(value ?? "")}</span> : String(value ?? ""),
@@ -158,7 +159,7 @@ export function TaskValueBreakdown({ extra, currencySymbol, assumption }: TaskVa
                     width: measure === ACTIVITY_SHARE_COLUMN ? 140 : 184,
                     numericStyling: true,
                     cellRenderer: heatRenderer({
-                        // Categories and tasks sit on different scales, so each level heats against its peers.
+                        // Task Categories and their Task Breakdown sit on different scales, so each level heats against its peers.
                         domain: (row) => (isGroup(row) ? domains[measure].group : domains[measure].task),
                         format: formatter(measure, currencySymbol),
                     }),
@@ -189,8 +190,8 @@ export function TaskValueBreakdown({ extra, currencySymbol, assumption }: TaskVa
         <div className="flex flex-col gap-200">
             <div className="flex flex-wrap items-end justify-between gap-200">
                 <p className="max-w-[60ch] text-[length:var(--text-200)] leading-200 text-muted-foreground">
-                    Tasks come from rule-based categories, so they won’t line up with the AI-inferred categories in
-                    Copilot Analytics.
+                    Task Category and Task Breakdown come from rule-based labels, so they won’t line up with the
+                    AI-inferred categories in Copilot Analytics.
                 </p>
                 <div className="flex flex-wrap items-center gap-200">
                     {view === "table" && (
@@ -209,7 +210,7 @@ export function TaskValueBreakdown({ extra, currencySymbol, assumption }: TaskVa
                     <QueryEmpty
                         className="h-full"
                         title="No value to break down"
-                        description="No recorded work carries both a task category and an estimated value for this slice."
+                        description="No recorded work carries both a Task Category and an estimated value for this slice."
                     />
                 ) : view === "table" ? (
                     <DataGrid
@@ -222,7 +223,7 @@ export function TaskValueBreakdown({ extra, currencySymbol, assumption }: TaskVa
                         theme={theme}
                         header={{
                             title: "Where the value comes from",
-                            subtitle: `Each category, then the tasks inside it. ${assumption}.`,
+                            subtitle: `Each Task Category, then its Task Breakdown. ${assumption}.`,
                         }}
                     />
                 ) : (
@@ -232,8 +233,8 @@ export function TaskValueBreakdown({ extra, currencySymbol, assumption }: TaskVa
                         capabilities={source.capabilities}
                         theme={theme}
                         header={{
-                            title: "Time saved by task",
-                            subtitle: `Expert-equivalent hours per week, coloured by category. ${assumption}.`,
+                            title: "Time saved by Task Breakdown",
+                            subtitle: `Expert-equivalent hours per week, coloured by Task Category. ${assumption}.`,
                         }}
                     />
                 )}

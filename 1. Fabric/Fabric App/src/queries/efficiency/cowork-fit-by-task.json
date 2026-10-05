@@ -27,7 +27,7 @@
     },
     "order": { "field": "Grade Order", "type": "quantitative", "sort": "ascending" },
     "tooltip": [
-      { "field": "Task", "type": "nominal", "title": "Task" },
+      { "field": "Task", "type": "nominal", "title": "Task Breakdown" },
       { "field": "Grade", "type": "nominal", "title": "Fit" },
       { "field": "Share", "type": "quantitative", "title": "Share of the task", "format": ".0%" },
       { "field": "Sessions", "type": "quantitative", "title": "Graded sessions", "format": ",.0f" }

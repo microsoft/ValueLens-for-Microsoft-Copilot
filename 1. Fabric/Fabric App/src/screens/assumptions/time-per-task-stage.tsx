@@ -357,8 +357,8 @@ export function TimePerTaskStage() {
             </label>
             {categories.length > 1 && (
                 <ChoiceMenu
-                    label="Category"
-                    allLabel="All categories"
+                    label="Task Category"
+                    allLabel="All task categories"
                     choices={categories}
                     value={selected}
                     onChange={setCategory}
@@ -458,7 +458,7 @@ export function TimePerTaskStage() {
                                 <thead className={cn(SMALL, "sticky top-0 z-[1] bg-background text-muted-foreground")}>
                                     <tr>
                                         <th scope="col" className={cn(HEAD, "pr-300 pl-300")}>
-                                            Task
+                                            Task Breakdown
                                         </th>
                                         {BANDS.map(({ band, label }) => (
                                             <th key={band} scope="col" className={cn(HEAD, "w-[96px] px-200 text-right")}>
@@ -543,8 +543,8 @@ export function TimePerTaskStage() {
                         <p className={cn(SMALL, "max-w-[85ch] text-muted-foreground")}>
                             {changed && <>{changed} </>}
                             Anyone who can open this app can change these, for everyone. The Power BI report keeps the
-                            research figures. Hours cover all the activity ValueLens holds; Cowork's come from its own task
-                            categories, so they aren't counted here and don't change.
+                            research figures. Hours cover all the activity ValueLens holds; Cowork's come from its own Task
+                            Breakdown, so they aren't counted here and don't change.
                         </p>
                         <button
                             type="button"

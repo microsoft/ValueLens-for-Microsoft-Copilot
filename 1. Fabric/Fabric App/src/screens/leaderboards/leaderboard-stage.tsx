@@ -203,8 +203,8 @@ function isShapedFor(table: QueryTable, metadata: ColumnMetadataMap): boolean {
 
 /**
  * One cohort's sessions as a tree: by org group then person, or by where the
- * sessions happened then what was done there — for Cowork, by task group
- * then category — with the report's footnote beside it.
+ * sessions happened then what was done there — for Cowork, by Task Category
+ * then Task Breakdown — with the report's footnote beside it.
  */
 function LeaderboardBreakdown({ cohort, view }: { cohort: LeaderboardCohort; view: Breakdown }) {
     const { theme } = useThemeContext();

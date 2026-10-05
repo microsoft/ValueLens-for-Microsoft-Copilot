@@ -21,20 +21,24 @@ const columnMetadata: ColumnMetadataMap = {
 /** The three lenses the query stacks into one result, keyed by `Dimension`. */
 export type TaskDimension = "behaviour" | "action" | "outcome";
 
-const lenses: Record<TaskDimension, { dimension: string; label: string; subtitle: string }> = {
+const lenses: Record<TaskDimension, { dimension: string; label: string; title: string; subtitle: string }> = {
     behaviour: {
+        // The query's own name for this lens; people see the label.
         dimension: "Behaviour",
-        label: "Behaviour",
-        subtitle: "The shape of the request people made",
+        label: "Task Breakdown",
+        title: "Tasks by Task Breakdown",
+        subtitle: "The detailed task each request was read as",
     },
     action: {
         dimension: "Workflow action",
         label: "Workflow action",
+        title: "Tasks by workflow action",
         subtitle: "What Copilot was asked to do with the content",
     },
     outcome: {
         dimension: "Value outcome",
         label: "Value outcome",
+        title: "Tasks by value outcome",
         subtitle: "The benefit the task was classified as delivering",
     },
 };

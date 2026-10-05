@@ -36,24 +36,24 @@ interface TaskLevels {
 const APP_ACTIVITY: TaskLevels = {
     group: "AppHost",
     leaf: "Behavior_Enriched_Full",
-    heading: "App / surface / activity",
-    path: "App / surface → activity",
+    heading: "App / surface / Task Breakdown",
+    path: "App / surface → Task Breakdown",
     groupNoun: "app or surface",
     groupPlural: "apps and surfaces",
-    leafNoun: "activity",
-    leafPlural: "activities",
+    leafNoun: "Task Breakdown",
+    leafPlural: "Task Breakdown",
 };
 
 /** Cowork happens in one surface, so the report groups its sessions by what the work was instead. */
 const TASK_GROUP_CATEGORY: TaskLevels = {
     group: "Task Breakdown Group",
     leaf: "Task Breakdown Category",
-    heading: "Task group / category",
-    path: "Task group → task category",
-    groupNoun: "task group",
-    groupPlural: "task groups",
-    leafNoun: "task category",
-    leafPlural: "task categories",
+    heading: "Task Category / Task Breakdown",
+    path: "Task Category → Task Breakdown",
+    groupNoun: "Task Category",
+    groupPlural: "Task Categories",
+    leafNoun: "Task Breakdown",
+    leafPlural: "Task Breakdown",
 };
 
 function taskLevels(cohort: LeaderboardCohort): TaskLevels {
@@ -62,9 +62,9 @@ function taskLevels(cohort: LeaderboardCohort): TaskLevels {
 
 /**
  * The report's right-hand Leaderboard table for one cohort: each app or
- * surface, then the activities done there — or, for Cowork, each task group
- * then its categories — with active users, sessions and sessions per user
- * per week.
+ * surface, then its Task Breakdown — or, for Cowork, each Task Category then
+ * its Task Breakdown — with active users, sessions and sessions per user per
+ * week.
  */
 export function leaderboardTasks(cohort: LeaderboardCohort = "all") {
     const levels = taskLevels(cohort);

@@ -17,7 +17,7 @@ import spec from "./cowork-fit-by-task.json";
 export const COWORK_GRADE_DOMAIN = ["Strong fit", "Fair fit", "Worth a look"] as const;
 
 const columnMetadata: ColumnMetadataMap = {
-    "[Task]": { name: "Task", displayName: "Task" },
+    "[Task]": { name: "Task", displayName: "Task Breakdown" },
     "[Grade]": { name: "Grade", displayName: "Fit" },
     "[Grade Order]": { name: "Grade Order", displayName: "Fit order", format: FORMAT_WHOLE },
     "[Share]": { name: "Share", displayName: "Share of the task", format: FORMAT_PERCENT },
@@ -26,9 +26,9 @@ const columnMetadata: ColumnMetadataMap = {
 };
 
 /**
- * The report's "what work goes to Cowork" chart: each Cowork task category
- * split by grade, as a share of that category's graded sessions. Sessions too
- * light to grade are left out, as they are from every share.
+ * The report's "what work goes to Cowork" chart: each Cowork Task Breakdown
+ * split by grade, as a share of its graded sessions. Sessions too light to
+ * grade are left out, as they are from every share.
  */
 export function coworkFitByTask() {
     return { connection, query, columnMetadata, vegaLiteSpec: spec as VisualizationSpec };

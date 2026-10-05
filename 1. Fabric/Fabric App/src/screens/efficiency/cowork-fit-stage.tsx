@@ -55,7 +55,7 @@ function distinctCount(values: readonly unknown[]): number {
     return new Set(values).size;
 }
 
-/** The report's "what goes to Cowork" chart: each task category split by grade. */
+/** The report's "what goes to Cowork" chart: each Task Breakdown split by grade. */
 function FitByTaskChart() {
     const { theme } = useThemeContext();
     const outcomeColors = useOutcomeColors();
@@ -85,8 +85,8 @@ function FitByTaskChart() {
             ) : table.rows.length === 0 ? (
                 <QueryEmpty
                     className="h-full"
-                    title="No task categories to grade"
-                    description="No graded Cowork session in this selection carries a task category."
+                    title="No tasks to grade"
+                    description="No graded Cowork session in this selection carries a Task Breakdown."
                 />
             ) : (
                 <VegaVisual
@@ -96,7 +96,7 @@ function FitByTaskChart() {
                     capabilities={NO_STACK_LABELS}
                     header={{
                         title: "What goes to Cowork",
-                        subtitle: "Each task category's graded sessions, by fit. Longest-running categories first.",
+                        subtitle: "Graded sessions for each Task Breakdown, by fit. Busiest first.",
                     }}
                 />
             )}

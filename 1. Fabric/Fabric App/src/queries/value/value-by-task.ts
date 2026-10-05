@@ -21,11 +21,11 @@ export const VALUE_PER_WEEK_COLUMN = "AI Assisted Value Per Week";
 const GRAND_TOTAL_FLAG = "Is Grand Total";
 const GROUP_TOTAL_FLAG = "Is Group Total";
 
-/** The grid's first column: the category on group rows, the task on leaf rows. */
+/** The grid's first column: the Task Category on group rows, the Task Breakdown on leaf rows. */
 export const TASK_LABEL_COLUMN = "Task";
 
 // Every task stays on screen (16 on the demo model, past the default scroll
-// threshold of 15) and every category name stays whole in the legend.
+// threshold of 15) and every Task Category name stays whole in the legend.
 const capabilities: VegaVisualCapabilities = {
     disableCategoricalScroll: true,
     disableLegendTruncation: true,
@@ -34,11 +34,11 @@ const capabilities: VegaVisualCapabilities = {
 const columnMetadata: ColumnMetadataMap = {
     "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": {
         name: TASK_GROUP_COLUMN,
-        displayName: "Category",
+        displayName: "Task Category",
     },
     "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": {
         name: TASK_CATEGORY_COLUMN,
-        displayName: "Task",
+        displayName: "Task Breakdown",
     },
     "[Is Grand Total]": { name: GRAND_TOTAL_FLAG },
     "[Is Group Total]": { name: GROUP_TOTAL_FLAG },
@@ -56,20 +56,20 @@ const columnMetadata: ColumnMetadataMap = {
 };
 
 /**
- * The report's Copilot Value Table: each task category, drilling down to the
- * rule-based tasks inside it, with activity share, expert-equivalent hours
- * per week and assisted value per week.
+ * The report's Copilot Value Table: each Task Category, drilling down to the
+ * rule-based Task Breakdown inside it, with activity share, expert-equivalent
+ * hours per week and assisted value per week.
  *
- * Category and total rows come from the model's own rollup rather than being
- * summed here: value per week is not additive across tasks, so a sum would
- * disagree with the report.
+ * Task Category and total rows come from the model's own rollup rather than
+ * being summed here: value per week is not additive across tasks, so a sum
+ * would disagree with the report.
  */
 export function valueByTask() {
     return { connection, query, columnMetadata, capabilities, vegaLiteSpec: spec as VisualizationSpec };
 }
 
 export interface ValueTaskTree {
-    /** Category rows, each holding its tasks as `_children`. */
+    /** Task Category rows, each holding its Task Breakdown rows as `_children`. */
     rows: Row[];
     /** The model's grand-total row, shaped for `DataGrid` `grandTotals.data`. */
     total: DataTable | undefined;
@@ -84,9 +84,9 @@ function text(value: unknown): string | undefined {
 }
 
 /**
- * Folds the rollup result into category rows with their tasks nested inside.
- * Categories with no task rows (a blank task column) keep their measures but
- * are not expandable.
+ * Folds the rollup result into Task Category rows with their Task Breakdown
+ * rows nested inside. A Task Category with no Task Breakdown rows (a blank
+ * column) keeps its measures but is not expandable.
  */
 export function toValueTaskTree(table: DataTable): ValueTaskTree {
     const index = new Map(table.columns.map((column, i) => [column.name, i]));
@@ -128,8 +128,8 @@ export function toValueTaskTree(table: DataTable): ValueTaskTree {
         i === undefined ? undefined : table.columns[i],
     );
     const taskColumns = [
-        { name: TASK_GROUP_COLUMN, displayName: "Category" },
-        { name: TASK_CATEGORY_COLUMN, displayName: "Task" },
+        { name: TASK_GROUP_COLUMN, displayName: "Task Category" },
+        { name: TASK_CATEGORY_COLUMN, displayName: "Task Breakdown" },
         ...MEASURES.map((name, i) => measureColumns[i] ?? { name }),
     ];
 

@@ -137,11 +137,11 @@
   },
   {
     "[Page]": "Activity",
-    "[Metric]": "Behavior classification",
-    "[Description]": "Activity categories inferred by the ingestion/model logic, not independent verification of completed business tasks.",
+    "[Metric]": "Task classification",
+    "[Description]": "Task Category and Task Breakdown are inferred by the ingestion and model logic - not independent verification of completed business tasks.",
     "[Page Order]": 4,
     "[Metric Order]": 400,
-    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred behavior as delivered outcomes."
+    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred tasks as delivered outcomes."
   },
   {
     "[Page]": "Activity",
@@ -149,7 +149,7 @@
     "[Description]": "Prompt-flagged audit activity rows under the current filters.",
     "[Page Order]": 4,
     "[Metric Order]": 401,
-    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred behavior as delivered outcomes."
+    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred tasks as delivered outcomes."
   },
   {
     "[Page]": "Activity",
@@ -157,15 +157,15 @@
     "[Description]": "Observed sessions are available beside task totals or in relevant chart tooltips.",
     "[Page Order]": 4,
     "[Metric Order]": 402,
-    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred behavior as delivered outcomes."
+    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred tasks as delivered outcomes."
   },
   {
     "[Page]": "Activity",
     "[Metric]": "Which breakdown dimension is used",
-    "[Description]": "The breakdown dimension. Behaviour for every cohort that reports one; the Cowork task category for Cowork, which does not - the feed tags all Cowork 'General Chat', so grouping on behaviour drew a single 100% block. Roughly half of Cowork still reads 'General assistance / Other' because those prompts attach no typed material.",
+    "[Description]": "The breakdown dimension. Task Breakdown is the classified task for Copilot and Agents, and the Cowork task for Cowork - the feed tags all Cowork 'General Chat', so grouping Cowork on the classified task drew a single 100% block. Roughly half of Cowork still reads 'General assistance / Other' because those prompts attach no typed material.",
     "[Page Order]": 4,
     "[Metric Order]": 403,
-    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred behavior as delivered outcomes."
+    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred tasks as delivered outcomes."
   },
   {
     "[Page]": "Activity",
@@ -173,7 +173,7 @@
     "[Description]": "The estate's four-rung ladder - Asking, Finding, Consuming, Producing. Taken verbatim from the feed for every cohort that reports one. Cowork does not report one, so it is derived from the material each prompt touched: markdown artefact = Producing, document or mail item = Consuming, chat messages only = Finding, nothing attached = Asking.",
     "[Page Order]": 4,
     "[Metric Order]": 404,
-    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred behavior as delivered outcomes."
+    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred tasks as delivered outcomes."
   },
   {
     "[Page]": "Activity",
@@ -181,7 +181,7 @@
     "[Description]": "Each engagement rung as a percentage of all prompt activity in the current selection, so the four rungs add to 100%. The denominator is every prompt in scope, not just those on the same rung - if all four bars read 100% the denominator is being filtered by the rung as well as the numerator.",
     "[Page Order]": 4,
     "[Metric Order]": 405,
-    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred behavior as delivered outcomes."
+    "[Page Description]": "Explore what was observed and how it was classified, without treating inferred tasks as delivered outcomes."
   },
   {
     "[Page]": "License Prioritisation",
@@ -242,7 +242,7 @@
   {
     "[Page]": "Usage Efficiency",
     "[Metric]": "Wrong-app tasks",
-    "[Description]": "Tasks done in an app that does not normally carry that behaviour. Best fit is decided on volume, so a small surface such as Cowork can only ever appear as poor fit.",
+    "[Description]": "Tasks done in an app that does not normally carry that kind of task. Best fit is decided on volume, so a small surface such as Cowork can only ever appear as poor fit.",
     "[Page Order]": 6,
     "[Metric Order]": 603,
     "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
@@ -250,7 +250,7 @@
   {
     "[Page]": "Usage Efficiency",
     "[Metric]": "Best-fit app",
-    "[Description]": "The app carrying 40% or more of a behaviour's tasks in your own data. Behaviours with no dominant app are not judged rather than guessed.",
+    "[Description]": "The app carrying 40% or more of a task's volume in your own data. Tasks with no dominant app are not judged rather than guessed.",
     "[Page Order]": 6,
     "[Metric Order]": 604,
     "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
@@ -361,8 +361,8 @@
   },
   {
     "[Page]": "Usage Efficiency",
-    "[Metric]": "What the work was",
-    "[Description]": "Each Cowork prompt is mapped to a Cowork Methodology v4 task category - Analysis & Research, Document & content creation, Email, Communication and so on - read from the material it attached. The source feed tags every Cowork prompt General Chat, a bucket defined as no signals matched, so this is derived here instead.",
+    "[Metric]": "Task Breakdown (Cowork)",
+    "[Description]": "Each Cowork prompt is mapped to a Cowork task (Cowork Methodology v4) - Analysis & Research, Document & content creation, Email, Communication and so on - read from the material it attached. The source feed tags every Cowork prompt General Chat, a bucket defined as no signals matched, so this is derived here instead.",
     "[Page Order]": 6,
     "[Metric Order]": 617,
     "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
@@ -393,8 +393,8 @@
   },
   {
     "[Page]": "Usage Efficiency",
-    "[Metric]": "Cowork Hours (Task Category Basis)",
-    "[Description]": "Cowork human-equivalent hours priced from the task category its attached material shows, at that category's researched per-turn rate from Human Time Estimates. Replaces the General Chat fallback rate (8 min/turn) the feed forces on every Cowork prompt.",
+    "[Metric]": "Expert equivalent hours (Cowork)",
+    "[Description]": "Cowork human-equivalent hours priced from the Cowork task its attached material shows, at that task's researched per-turn rate from Human Time Estimates. Replaces the General Chat fallback rate (8 min/turn) the feed forces on every Cowork prompt.",
     "[Page Order]": 6,
     "[Metric Order]": 621,
     "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
@@ -402,7 +402,7 @@
   {
     "[Page]": "Usage Efficiency",
     "[Metric]": "Could have used",
-    "[Description]": "The cheaper surface for work already judged a simple ask, with evidence: how many comparable Copilot Chat prompts the estate already runs in the same task category. Blank on High and Medium fit, and blank when no comparable Copilot volume exists, so the table never invents an alternative.",
+    "[Description]": "The cheaper surface for work already judged a simple ask, with evidence: how many comparable Copilot Chat prompts the estate already runs on the same task. Blank on High and Medium fit, and blank when no comparable Copilot volume exists, so the table never invents an alternative.",
     "[Page Order]": 6,
     "[Metric Order]": 622,
     "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
@@ -418,7 +418,7 @@
   {
     "[Page]": "Usage Efficiency",
     "[Metric]": "Decided by",
-    "[Description]": "The test inside the fit grade that decided most sessions in the row, with the share it covers. Reads 3+ items, 2+ types or 6+ items on high fit; 2+ types or 3+ items, 1 type on medium; 1-2 items, 1 type or No sources on simple asks. It is counted from the graded sessions, not inferred, and it is why the same task category can be high fit in one row and a simple ask in another - the difference is always the material the session worked across.",
+    "[Description]": "The test inside the fit grade that decided most sessions in the row, with the share it covers. Reads 3+ items, 2+ types or 6+ items on high fit; 2+ types or 3+ items, 1 type on medium; 1-2 items, 1 type or No sources on simple asks. It is counted from the graded sessions, not inferred, and it is why the same task can be high fit in one row and a simple ask in another - the difference is always the material the session worked across.",
     "[Page Order]": 6,
     "[Metric Order]": 624,
     "[Page Description]": "Separate two efficiency questions - was the work billed to the right tool, and was the model heavier than the task needed."
@@ -569,8 +569,8 @@
   },
   {
     "[Page]": "Value",
-    "[Metric]": "Work-pattern category",
-    "[Description]": "The parent grouping in the Value Table. The estate's 12-bucket, tool-agnostic taxonomy - Email, Data & Analysis, Document Creation, Collaboration & Workflows and so on. It is reached through the behaviour each row was classified as, which Cowork does not report: every Cowork row carries the feed's single fallback behaviour, so all of it previously grouped under General Chat & Q&A regardless of what the work actually was. Cowork is now placed by its own task category instead, using the material the prompt touched - mail items to Email, spreadsheets and data files to Data & Analysis, documents and decks to Document Creation, chat messages to Collaboration & Workflows. No new buckets were added. Cowork prompts that attach no typed material remain under General Chat & Q&A, because that is an absence of evidence rather than a category.",
+    "[Metric]": "Task Category",
+    "[Description]": "The parent grouping in the Value Table: 12 tool-agnostic groups - Email, Data & Analysis, Document Creation, Collaboration & Workflows and so on. Each row reaches its Task Category through its Task Breakdown. Cowork is placed by the material the prompt touched - mail items to Email, spreadsheets and data files to Data & Analysis, documents and decks to Document Creation, chat messages to Collaboration & Workflows. Cowork prompts that attach no material stay in General Chat & Q&A, because that is an absence of evidence rather than a category.",
     "[Page Order]": 8,
     "[Metric Order]": 708,
     "[Page Description]": "Treat time and financial value as modeled scenarios based on explicit assumptions."
@@ -698,7 +698,7 @@
   {
     "[Page]": "Heatmap",
     "[Metric]": "Kinds of work per user",
-    "[Description]": "Average number of distinct task categories each person uses AI for. Counts Task Breakdown Category, not the raw feed behaviour - the feed gives every Cowork row one behaviour, which pinned this at exactly 1.0 for the Cowork cohort. Copilot and Agents are unaffected.",
+    "[Description]": "Average number of distinct tasks (Task Breakdown) each person uses AI for. Cowork is counted by its own Cowork tasks - the feed gives every Cowork row the same label, which pinned this at exactly 1.0 for the Cowork cohort. Copilot and Agents are unaffected.",
     "[Page Order]": 11,
     "[Metric Order]": 1002,
     "[Page Description]": "Compare the selected metric across the existing date and organizational dimensions."
@@ -749,15 +749,15 @@
     "[Description]": "Observed source activity with its original grain and coverage limitations.",
     "[Page Order]": 14,
     "[Metric Order]": 1300,
-    "[Page Description]": "Trace how observed signals become inferred behavior and modeled value."
+    "[Page Description]": "Trace how observed signals become inferred tasks and modeled value."
   },
   {
     "[Page]": "Appendix: Signal - Impact Table",
-    "[Metric]": "Behavior",
-    "[Description]": "An inferred classification of the signal, not independently verified task completion.",
+    "[Metric]": "Task Breakdown",
+    "[Description]": "The task inferred from the signal - not independently verified task completion.",
     "[Page Order]": 14,
     "[Metric Order]": 1301,
-    "[Page Description]": "Trace how observed signals become inferred behavior and modeled value."
+    "[Page Description]": "Trace how observed signals become inferred tasks and modeled value."
   },
   {
     "[Page]": "Appendix: Signal - Impact Table",
@@ -765,22 +765,22 @@
     "[Description]": "A modeled interpretation based on assumptions; validate against business evidence before treating it as realized benefit.",
     "[Page Order]": 14,
     "[Metric Order]": 1302,
-    "[Page Description]": "Trace how observed signals become inferred behavior and modeled value."
+    "[Page Description]": "Trace how observed signals become inferred tasks and modeled value."
   },
   {
     "[Page]": "Appendix: Signal - Impact Table",
-    "[Metric]": "Which behavior field prices the work",
-    "[Description]": "Only Behavior_Enriched_Full is joined to the Behavior Value Map and Human Time Estimates, so it alone determines the minutes behind every hours and value figure. Behavior_Category and Behavior_Enriched are display groupings; they slice the same rows but do not set the baseline.",
+    "[Metric]": "Which task field prices the work",
+    "[Description]": "Only Behavior_Enriched_Full - the Task Breakdown for Copilot and Agents - is joined to the Behavior Value Map and Human Time Estimates, so it alone sets the minutes behind their hours and value figures. Cowork is priced from its own Cowork task instead. Behavior_Category and Behavior_Enriched are display groupings; they slice the same rows but do not set the baseline.",
     "[Page Order]": 14,
     "[Metric Order]": 1303,
-    "[Page Description]": "Trace how observed signals become inferred behavior and modeled value."
+    "[Page Description]": "Trace how observed signals become inferred tasks and modeled value."
   },
   {
     "[Page]": "Appendix: Signal - Impact Table",
     "[Metric]": "Classification basis",
-    "[Description]": "Behavior is inferred largely from the host application rather than the action performed, so creation-heavy work is under-represented relative to summarising and review. Treat behavior mix as indicative, not as a measured task census.",
+    "[Description]": "Task Breakdown is inferred largely from the host application rather than the action performed, so creation-heavy work is under-represented relative to summarising and review. Treat the task mix as indicative, not as a measured task census.",
     "[Page Order]": 14,
     "[Metric Order]": 1304,
-    "[Page Description]": "Trace how observed signals become inferred behavior and modeled value."
+    "[Page Description]": "Trace how observed signals become inferred tasks and modeled value."
   }
 ]
