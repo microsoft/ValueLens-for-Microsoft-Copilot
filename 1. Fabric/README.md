@@ -7,6 +7,14 @@ as an app in Fabric, called **Analytics Hub**. You don't need a terminal or Powe
 
 For Windows 10 or 11. Check [what you need](#before-you-start) first.
 
+## Watch the setup
+
+A full walkthrough of the Fabric setup, from a fresh app registration to a saved, self-refreshing Power BI report.
+
+<video src="https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/installer-v0.2.2/ValueLens_Fabric_Setup.mp4" controls width="100%"></video>
+
+> If the player doesn't load, [download the walkthrough](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/installer-v0.2.2/ValueLens_Fabric_Setup.mp4).
+
 ## Before you start
 
 You need:
