@@ -25,6 +25,11 @@ Deployment instructions do **not** live here. They live in the path READMEs:
   Agents as well as Cowork, since none of them have a seat to measure against. The app says so,
   and shows a message instead of a trend when the dates cover fewer than two months.
 
+**Fabric App.**
+- **Feedback** counts only feedback dated inside the Calendar, as its weekly trend always did.
+  Feedback sent outside the report's dates no longer inflates the totals, satisfaction, topics
+  and surfaces.
+
 ## 2026-10-05 — One name for each task level, and Fabric App review fixes
 
 **Templates, all four paths.** Every page now calls the 12 task groups **Task Category** and the
