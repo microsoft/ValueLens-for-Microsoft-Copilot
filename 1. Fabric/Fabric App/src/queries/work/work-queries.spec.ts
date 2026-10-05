@@ -189,6 +189,11 @@ describe("work spec field references", () => {
         }
     });
 
+    it("names the detailed-task lens Task Breakdown", () => {
+        expect(taskDimensions.map(({ label }) => label)).toEqual(["Task Breakdown", "Workflow action", "Value outcome"]);
+        expect(taskBreakdown().title).toBe("Tasks by Task Breakdown");
+    });
+
     it("does not let one variant's spec changes leak into the next", () => {
         surfaceUsage({ lens: "model", cohort: "agents" });
         const followUp = JSON.stringify(surfaceUsage({ lens: "surface" }).vegaLiteSpec);
@@ -223,7 +228,7 @@ describe("leaderboard queries", () => {
         );
     });
 
-    it("breaks Cowork down by what the work was, and every other cohort by app and activity", () => {
+    it("breaks Cowork down by what the work was, and every other cohort by app and Task Breakdown", () => {
         for (const { id } of leaderboardCohorts) {
             const levels =
                 id === "cowork" ? ["Task Breakdown Group", "Task Breakdown Category"] : ["AppHost", "Behavior_Enriched_Full"];
@@ -233,6 +238,13 @@ describe("leaderboard queries", () => {
             );
             expect(leaderboardTasks(id).query, `cohort "${id}"`).toMatch(rollup);
         }
+    });
+
+    it("names Cowork's levels Task Category then Task Breakdown, and every cohort's leaves Task Breakdown", () => {
+        for (const { id } of leaderboardCohorts) {
+            expect(leaderboardTasks(id).levels.leafNoun, `cohort "${id}"`).toBe("Task Breakdown");
+        }
+        expect(leaderboardTasks("cowork").levels.groupNoun).toBe("Task Category");
     });
 
     it("names every cohort's cards in the summary", () => {

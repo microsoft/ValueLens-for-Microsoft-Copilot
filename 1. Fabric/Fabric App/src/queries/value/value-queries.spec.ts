@@ -146,7 +146,7 @@ describe("value grids", () => {
         expect(available).toContain(ORGANIZATION_COLUMN);
     });
 
-    it("drills from the model's task category to the task, not the Work stage category field", () => {
+    it("drills from the model's Task Category to its Task Breakdown, not the Work stage category field", () => {
         const { columnMetadata } = valueByTask();
         expect(Object.keys(columnMetadata)).toContain(
             "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]",
@@ -159,6 +159,16 @@ describe("value grids", () => {
 
     it("takes category and total rows from the model's rollup", () => {
         expect(valueByTask().query).toContain("ROLLUPADDISSUBTOTAL");
+    });
+
+    it("labels the two task levels Task Category and Task Breakdown", () => {
+        const { columnMetadata } = valueByTask();
+        expect(columnMetadata["Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]"]?.displayName).toBe(
+            "Task Category",
+        );
+        expect(columnMetadata["Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]"]?.displayName).toBe(
+            "Task Breakdown",
+        );
     });
 });
 
@@ -208,5 +218,11 @@ describe("value task tree", () => {
         expect(tree.tasks.columns.map((column) => column.name)).toContain(
             "Chat + Agent Interactions (Audit Logs)Task Breakdown Category",
         );
+    });
+
+    it("labels the time-saved chart's levels Task Category and Task Breakdown", () => {
+        const labels = new Map(tree.tasks.columns.map((column) => [column.name, column.displayName]));
+        expect(labels.get("Chat + Agent Interactions (Audit Logs)Task Breakdown Group")).toBe("Task Category");
+        expect(labels.get("Chat + Agent Interactions (Audit Logs)Task Breakdown Category")).toBe("Task Breakdown");
     });
 });
