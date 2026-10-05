@@ -16,6 +16,19 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-05 — Analytics Hub installer 0.2.2: a Key Vault that another workspace already reads
+
+If you picked a Key Vault that blocks public access, and another Analytics Hub workspace already
+reads it, the installer mistook that workspace's approved connection for its own. It never approved
+the new one, waited 20 minutes, and stopped at **Workspace and Lakehouse** with "Waiting for Fabric
+to see the approval for more than 20 minutes". It now finds its own connection by the workspace ID
+and approves it.
+
+If this happened to you, download the installer again, open it and choose **Repair or change**. It
+approves the waiting connection and carries on.
+
+---
+
 ## 2026-10-05 — Analytics Hub installer 0.2.1: Back, and Lakehouse names with spaces
 
 Every question now has a **Back** button, and so does the plan. Back opens the previous question
