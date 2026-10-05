@@ -8,7 +8,7 @@ VAR _copilot =
     )
 VAR _using = INTERSECT(_m365, _copilot)
 VAR _rest = EXCEPT(_m365, _copilot)
-VAR _weeks = DIVIDE(DISTINCTCOUNT('M365 Activity'[ActivityDate]), 7)
+VAR _weeks = DIVIDE(CALCULATE(DISTINCTCOUNT('M365 Activity'[ActivityDate]), REMOVEFILTERS('Chat + Agent Org Data')), 7)
 VAR _usingWeeks = COUNTROWS(_using) * _weeks
 VAR _restWeeks = COUNTROWS(_rest) * _weeks
 VAR _metrics =

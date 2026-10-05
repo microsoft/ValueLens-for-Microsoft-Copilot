@@ -2,14 +2,16 @@ EVALUATE
 VAR _people =
     CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0)
 VAR _personDays = CALCULATE(COUNTROWS('M365 Activity'), 'M365 Activity'[WorkloadsActive] > 0)
-VAR _days = DISTINCTCOUNT('M365 Activity'[ActivityDate])
+VAR _days = CALCULATE(DISTINCTCOUNT('M365 Activity'[ActivityDate]), REMOVEFILTERS('Chat + Agent Org Data'))
+VAR _first = CALCULATE(MIN('M365 Activity'[ActivityDate]), REMOVEFILTERS('Chat + Agent Org Data'))
+VAR _last = CALCULATE(MAX('M365 Activity'[ActivityDate]), REMOVEFILTERS('Chat + Agent Org Data'))
 VAR _personWeeks = _people * DIVIDE(_days, 7)
 RETURN
 ROW(
     "People Active", _people,
     "Days Loaded", _days,
-    "First Date", FORMAT(MIN('M365 Activity'[ActivityDate]), "yyyy-MM-dd"),
-    "Last Date", FORMAT(MAX('M365 Activity'[ActivityDate]), "yyyy-MM-dd"),
+    "First Date", FORMAT(_first, "yyyy-MM-dd"),
+    "Last Date", FORMAT(_last, "yyyy-MM-dd"),
     "Active Days Per Week", DIVIDE(_personDays, _personWeeks),
     "Workloads Per Active Day",
         CALCULATE(AVERAGE('M365 Activity'[WorkloadsActive]), 'M365 Activity'[WorkloadsActive] > 0),
