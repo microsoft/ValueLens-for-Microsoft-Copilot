@@ -18,6 +18,7 @@ import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import type { FilterKey } from "@/lib/filters";
 import { rowChartHeight } from "@/lib/chart-height";
+import { plainText } from "@/lib/model-text";
 import { withIndefiniteArticle, withOrgAttribute } from "@/lib/org-attribute";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
@@ -116,7 +117,7 @@ export function ActivationStage() {
     );
 
     const selected = cohorts.find((entry) => entry.id === cohort) ?? cohorts[0];
-    const headline = readText(summaryRow, selected.headlineColumn);
+    const headline = plainText(readText(summaryRow, selected.headlineColumn));
 
     return (
         <Section

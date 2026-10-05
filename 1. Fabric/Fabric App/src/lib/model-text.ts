@@ -57,12 +57,14 @@ export function humanizeIdentifiers(text: string): string {
 
 /**
  * A narrative measure as plain prose: thumbs become words before the other
- * emoji are dropped, so "326 👍 / 154 👎" still says which is which.
+ * emoji are dropped, so "326 👍 / 154 👎" still says which is which, and the
+ * " | " a Power BI card puts between two clauses becomes a semicolon.
  */
 export function plainText(text: string | undefined): string | undefined {
     if (!text) return undefined;
     const spoken = text.replace(/\s*👍\u{FE0F}?/gu, " thumbs up").replace(/\s*👎\u{FE0F}?/gu, " thumbs down");
-    const plain = humanizeIdentifiers(withoutEmoji(spoken));
+    const joined = spoken.replace(/([.!?])\s+\|\s+/g, "$1 ").replace(/\s+\|\s+/g, "; ");
+    const plain = humanizeIdentifiers(withoutEmoji(joined));
     return plain === "" ? undefined : plain;
 }
 
