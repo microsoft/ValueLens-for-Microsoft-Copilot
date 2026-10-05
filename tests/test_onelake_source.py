@@ -167,14 +167,14 @@ class OneLakeSourceTests(unittest.TestCase):
             document = json.loads(archive.read("DataModelSchema").decode("utf-16-le"))
         table = next(table for table in document["model"]["tables"] if table["name"] == GLOSSARY)
         rows = glossary_rows(table["partitions"][0]["source"]["expression"])
-        # Baselines from the fit-grading release package: all non-MetricOrder values in
-        # row order, and the minimum order for each casefolded label.
+        # Baselines from the Task Category / Task Breakdown release package: all
+        # non-MetricOrder values in row order, and the minimum order for each casefolded label.
         self.assertEqual(content_hash([row[:5] for row in rows]),
-                         "7724402fea866159ee18eb8b5c45c5e70f2efecd76d7cc1da6bfbead4be2638f")
+                         "5357cb005a5c69e2777a22d60f8b2d442228a3edd2928a71803ceafe8fafa2c0")
         groups = sort_groups(rows, 2, 5)
         self.assertTrue(all(len(values) == 1 for values in groups.values()))
         self.assertEqual(content_hash(sorted((label, min(values)) for label, values in groups.items())),
-                         "5ac2ca08e8bf2ee4994d428e558e72631a48469ad719c767be1ee8bc3b1d1e0b")
+                         "e7dd2a19a897ff096dafd68076ac99684405e8e20513bf6a8c30586834580d1b")
 
     def test_glossary_parser_handles_escaped_strings_comments_and_case_variants(self):
         header = "DATATABLE(" + "".join(f'"{name}", {dtype},' for name, dtype in HEADERS)
