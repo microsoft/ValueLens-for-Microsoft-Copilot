@@ -44,6 +44,10 @@ complement of **Knowledge Gap Rate**, so the two add up to 100%. It used to divi
 session, so the Knowledge Gap focus card understated how often searches found an answer. The
 card's content gap is now the Gap Rate itself.
 
+**Fabric installer.** In a Key Vault you already have, the installer no longer overwrites another
+install's client secret. If the secret name is taken by a secret that isn't this app's, it is
+left alone and the new secret goes in the next free name, such as `valuelens-client-secret-2`.
+
 ## 2026-10-05 — One name for each task level, and Fabric App review fixes
 
 **Templates, all four paths.** Every page now calls the 12 task groups **Task Category** and the
