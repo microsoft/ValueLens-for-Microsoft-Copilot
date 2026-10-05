@@ -16,6 +16,18 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-05 — Analytics Hub installer 0.2.4
+
+The installer bundles the notebooks and templates when it is built, so this release brings
+everything merged since 0.2.3 to installer users: the plain-English task descriptions and App host
+in the glossary, one name for each task level, the review fixes below, agents linked even when they have no name, and an incremental Agent 365
+registry pull. It also stops the installer overwriting another install's client secret in a Key
+Vault you already have.
+
+To update, download the installer again, open it and choose **Repair or change**.
+
+---
+
 ## 2026-10-05 — Analytics Hub review fixes
 
 **Templates, all four paths, and the Fabric App.**
