@@ -2,6 +2,7 @@
   {
     "Group By[Group]": null,
     "Org[DisplayName]": null,
+    "Org[UserPrincipalName]": null,
     "[Is Grand Total]": true,
     "[Is Group Total]": true,
     "[Users]": 150,
@@ -10,11 +11,13 @@
     "[Prepaid Cost]": 1850,
     "[PAYG Cost]": 4235.818,
     "[Total Cost]": 6085.818,
-    "[Policy]": "3 policies"
+    "[Policy]": "3 policies",
+    "[Billing Name]": "user0160"
   },
   {
     "Group By[Group]": "IT",
     "Org[DisplayName]": null,
+    "Org[UserPrincipalName]": null,
     "[Is Grand Total]": false,
     "[Is Group Total]": true,
     "[Users]": 26,
@@ -23,11 +26,13 @@
     "[Prepaid Cost]": 1258.3182000000002,
     "[PAYG Cost]": 0,
     "[Total Cost]": 1258.3182000000002,
-    "[Policy]": "3 policies"
+    "[Policy]": "3 policies",
+    "[Billing Name]": "user0074"
   },
   {
     "Group By[Group]": "Sales",
     "Org[DisplayName]": null,
+    "Org[UserPrincipalName]": null,
     "[Is Grand Total]": false,
     "[Is Group Total]": true,
     "[Users]": 30,
@@ -36,11 +41,13 @@
     "[Prepaid Cost]": 1131.1714,
     "[PAYG Cost]": 0,
     "[Total Cost]": 1131.1714,
-    "[Policy]": "3 policies"
+    "[Policy]": "3 policies",
+    "[Billing Name]": "user0073"
   },
   {
     "Group By[Group]": "Finance",
     "Org[DisplayName]": null,
+    "Org[UserPrincipalName]": null,
     "[Is Grand Total]": false,
     "[Is Group Total]": true,
     "[Users]": 24,
@@ -49,11 +56,13 @@
     "[Prepaid Cost]": 1011.1064,
     "[PAYG Cost]": 0,
     "[Total Cost]": 1011.1064,
-    "[Policy]": "3 policies"
+    "[Policy]": "3 policies",
+    "[Billing Name]": "user0160"
   },
   {
     "Group By[Group]": "HR",
     "Org[DisplayName]": null,
+    "Org[UserPrincipalName]": null,
     "[Is Grand Total]": false,
     "[Is Group Total]": true,
     "[Users]": 24,
@@ -62,11 +71,13 @@
     "[Prepaid Cost]": 720.3308000000001,
     "[PAYG Cost]": 0,
     "[Total Cost]": 720.3308000000001,
-    "[Policy]": "3 policies"
+    "[Policy]": "3 policies",
+    "[Billing Name]": "user0053"
   },
   {
     "Group By[Group]": "Marketing",
     "Org[DisplayName]": null,
+    "Org[UserPrincipalName]": null,
     "[Is Grand Total]": false,
     "[Is Group Total]": true,
     "[Users]": 25,
@@ -75,11 +86,13 @@
     "[Prepaid Cost]": 592.5698,
     "[PAYG Cost]": 0,
     "[Total Cost]": 592.5698,
-    "[Policy]": "3 policies"
+    "[Policy]": "3 policies",
+    "[Billing Name]": "user0147"
   },
   {
     "Group By[Group]": "Legal",
     "Org[DisplayName]": null,
+    "Org[UserPrincipalName]": null,
     "[Is Grand Total]": false,
     "[Is Group Total]": true,
     "[Users]": 21,
@@ -88,11 +101,13 @@
     "[Prepaid Cost]": 543.5744,
     "[PAYG Cost]": 0,
     "[Total Cost]": 543.5744,
-    "[Policy]": "3 policies"
+    "[Policy]": "3 policies",
+    "[Billing Name]": "user0132"
   },
   {
     "Group By[Group]": "IT",
     "Org[DisplayName]": "User 0068",
+    "Org[UserPrincipalName]": "user0068@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -101,11 +116,13 @@
     "[Prepaid Cost]": 539.349,
     "[PAYG Cost]": 0,
     "[Total Cost]": 539.349,
-    "[Policy]": "Member Services – Frontline"
+    "[Policy]": "Member Services – Frontline",
+    "[Billing Name]": "user0068"
   },
   {
     "Group By[Group]": "Finance",
     "Org[DisplayName]": "User 0010",
+    "Org[UserPrincipalName]": "user0010@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -114,11 +131,13 @@
     "[Prepaid Cost]": 298.5974,
     "[PAYG Cost]": 0,
     "[Total Cost]": 298.5974,
-    "[Policy]": "Member Services – Leadership"
+    "[Policy]": "Member Services – Leadership",
+    "[Billing Name]": "user0010"
   },
   {
     "Group By[Group]": "Sales",
     "Org[DisplayName]": "User 0001",
+    "Org[UserPrincipalName]": "user0001@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -127,11 +146,13 @@
     "[Prepaid Cost]": 271.7354,
     "[PAYG Cost]": 0,
     "[Total Cost]": 271.7354,
-    "[Policy]": "Member Services – Standard"
+    "[Policy]": "Member Services – Standard",
+    "[Billing Name]": "user0001"
   },
   {
     "Group By[Group]": "Sales",
     "Org[DisplayName]": "User 0067",
+    "Org[UserPrincipalName]": "user0067@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -140,11 +161,13 @@
     "[Prepaid Cost]": 214.25220000000002,
     "[PAYG Cost]": 0,
     "[Total Cost]": 214.25220000000002,
-    "[Policy]": "Member Services – Standard"
+    "[Policy]": "Member Services – Standard",
+    "[Billing Name]": "user0067"
   },
   {
     "Group By[Group]": "Finance",
     "Org[DisplayName]": "User 0004",
+    "Org[UserPrincipalName]": "user0004@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -153,11 +176,13 @@
     "[Prepaid Cost]": 174.84720000000002,
     "[PAYG Cost]": 0,
     "[Total Cost]": 174.84720000000002,
-    "[Policy]": "Member Services – Standard"
+    "[Policy]": "Member Services – Standard",
+    "[Billing Name]": "user0004"
   },
   {
     "Group By[Group]": "IT",
     "Org[DisplayName]": "User 0074",
+    "Org[UserPrincipalName]": "user0074@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -166,11 +191,13 @@
     "[Prepaid Cost]": 168.4536,
     "[PAYG Cost]": 0,
     "[Total Cost]": 168.4536,
-    "[Policy]": "Member Services – Leadership"
+    "[Policy]": "Member Services – Leadership",
+    "[Billing Name]": "user0074"
   },
   {
     "Group By[Group]": "Legal",
     "Org[DisplayName]": "User 0054",
+    "Org[UserPrincipalName]": "user0054@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -179,11 +206,13 @@
     "[Prepaid Cost]": 128.5306,
     "[PAYG Cost]": 0,
     "[Total Cost]": 128.5306,
-    "[Policy]": "Member Services – Standard"
+    "[Policy]": "Member Services – Standard",
+    "[Billing Name]": "user0054"
   },
   {
     "Group By[Group]": "HR",
     "Org[DisplayName]": "User 0011",
+    "Org[UserPrincipalName]": "user0011@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -192,11 +221,13 @@
     "[Prepaid Cost]": 124.84540000000001,
     "[PAYG Cost]": 0,
     "[Total Cost]": 124.84540000000001,
-    "[Policy]": "Member Services – Standard"
+    "[Policy]": "Member Services – Standard",
+    "[Billing Name]": "user0011"
   },
   {
     "Group By[Group]": "Sales",
     "Org[DisplayName]": "User 0073",
+    "Org[UserPrincipalName]": "user0073@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -205,11 +236,13 @@
     "[Prepaid Cost]": 120.6496,
     "[PAYG Cost]": 0,
     "[Total Cost]": 120.6496,
-    "[Policy]": "Member Services – Leadership"
+    "[Policy]": "Member Services – Leadership",
+    "[Billing Name]": "user0073"
   },
   {
     "Group By[Group]": "IT",
     "Org[DisplayName]": "User 0008",
+    "Org[UserPrincipalName]": "user0008@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -218,11 +251,13 @@
     "[Prepaid Cost]": 103.5408,
     "[PAYG Cost]": 0,
     "[Total Cost]": 103.5408,
-    "[Policy]": "Member Services – Leadership"
+    "[Policy]": "Member Services – Leadership",
+    "[Billing Name]": "user0008"
   },
   {
     "Group By[Group]": "Finance",
     "Org[DisplayName]": "User 0160",
+    "Org[UserPrincipalName]": "user0160@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -231,11 +266,13 @@
     "[Prepaid Cost]": 77.6186,
     "[PAYG Cost]": 0,
     "[Total Cost]": 77.6186,
-    "[Policy]": "Member Services – Standard"
+    "[Policy]": "Member Services – Standard",
+    "[Billing Name]": "user0160"
   },
   {
     "Group By[Group]": "Marketing",
     "Org[DisplayName]": "User 0069",
+    "Org[UserPrincipalName]": "user0069@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -244,11 +281,13 @@
     "[Prepaid Cost]": 72.80120000000001,
     "[PAYG Cost]": 0,
     "[Total Cost]": 72.80120000000001,
-    "[Policy]": "Member Services – Standard"
+    "[Policy]": "Member Services – Standard",
+    "[Billing Name]": "user0069"
   },
   {
     "Group By[Group]": "Legal",
     "Org[DisplayName]": "User 0132",
+    "Org[UserPrincipalName]": "user0132@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -257,11 +296,13 @@
     "[Prepaid Cost]": 71.151,
     "[PAYG Cost]": 0,
     "[Total Cost]": 71.151,
-    "[Policy]": "Member Services – Frontline"
+    "[Policy]": "Member Services – Frontline",
+    "[Billing Name]": "user0132"
   },
   {
     "Group By[Group]": "Legal",
     "Org[DisplayName]": "User 0060",
+    "Org[UserPrincipalName]": "user0060@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -270,11 +311,13 @@
     "[Prepaid Cost]": 63.529,
     "[PAYG Cost]": 0,
     "[Total Cost]": 63.529,
-    "[Policy]": "Member Services – Frontline"
+    "[Policy]": "Member Services – Frontline",
+    "[Billing Name]": "user0060"
   },
   {
     "Group By[Group]": "Marketing",
     "Org[DisplayName]": "User 0039",
+    "Org[UserPrincipalName]": "user0039@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -283,11 +326,13 @@
     "[Prepaid Cost]": 62.330200000000005,
     "[PAYG Cost]": 0,
     "[Total Cost]": 62.330200000000005,
-    "[Policy]": "Member Services – Frontline"
+    "[Policy]": "Member Services – Frontline",
+    "[Billing Name]": "user0039"
   },
   {
     "Group By[Group]": "Marketing",
     "Org[DisplayName]": "User 0147",
+    "Org[UserPrincipalName]": "user0147@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -296,11 +341,13 @@
     "[Prepaid Cost]": 61.7456,
     "[PAYG Cost]": 0,
     "[Total Cost]": 61.7456,
-    "[Policy]": "Member Services – Leadership"
+    "[Policy]": "Member Services – Leadership",
+    "[Billing Name]": "user0147"
   },
   {
     "Group By[Group]": "HR",
     "Org[DisplayName]": "User 0053",
+    "Org[UserPrincipalName]": "user0053@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -309,11 +356,13 @@
     "[Prepaid Cost]": 61.6124,
     "[PAYG Cost]": 0,
     "[Total Cost]": 61.6124,
-    "[Policy]": "Member Services – Leadership"
+    "[Policy]": "Member Services – Leadership",
+    "[Billing Name]": "user0053"
   },
   {
     "Group By[Group]": "HR",
     "Org[DisplayName]": "User 0017",
+    "Org[UserPrincipalName]": "user0017@contoso.com",
     "[Is Grand Total]": false,
     "[Is Group Total]": false,
     "[Users]": 1,
@@ -322,6 +371,7 @@
     "[Prepaid Cost]": 57.2316,
     "[PAYG Cost]": 0,
     "[Total Cost]": 57.2316,
-    "[Policy]": "Member Services – Standard"
+    "[Policy]": "Member Services – Standard",
+    "[Billing Name]": "user0017"
   }
 ]

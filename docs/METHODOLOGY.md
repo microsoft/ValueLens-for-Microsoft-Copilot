@@ -94,7 +94,8 @@ is a separate dimension, so you can combine the two, for example "Unlicensed × 
 ### 3.2 From signal to task category
 
 Each Copilot and agent interaction is classified at two levels: a behaviour, and the task category
-that groups it. Cowork prompts are categorised separately; that method is being revised and isn't
+that groups it. The report and the Fabric App call them **Task Breakdown** and **Task Category**.
+Cowork prompts are categorised separately; that method is being revised and isn't
 documented here yet.
 
 | Level | Column | Values | What it says |
@@ -183,6 +184,10 @@ Research). Failing that, the open file and then the app host decide:
 | Power BI or data warehousing | Data Querying | Data & Analysis |
 | Nothing matched | General Chat | General Chat & Q&A |
 
+The app host fills in whenever the resource doesn't say, so many behaviours come from the host
+application rather than the action. Creation-heavy work is under-counted next to summarising and
+review, so treat the task mix as indicative. The **📖 Metric Glossary** explains this under App host.
+
 #### Step 2: agent keywords
 
 Agent rows rarely carry a useful resource, so most reach step 1's General Chat. When
@@ -231,6 +236,8 @@ All seven results are in the Collaboration & Workflows task category.
 Each behaviour has a row in the `Human Time Estimates` table, which holds its task category and time
 band. The model reaches it through the `Behavior Value Map`. Every behaviour the
 processors can produce has a row, so no Copilot or agent row is left without a category.
+The `Behavior Value Map` also gives each behaviour a one-line **Description**, shown beside its use
+case on the **🧬 Appendix: Signal → Impact** page and in the Fabric App.
 
 | Task category | Behaviours |
 |---|---|
@@ -277,9 +284,9 @@ Workflow. Both still get a task category.
 | Behaviour | Task Breakdown's behaviour view, the Leaderboard's activity table for Copilot and agents, and the time bands ([§5.2](#52-copilot-and-agents-behaviour-basis)) |
 | Task category | Estimated Value by task, Model Fit by task, and the **🧬 Appendix: Signal → Impact** page |
 
-Under each task category, the detail rows (`Task Breakdown Category`) show the behaviour. The pages label the two levels
-differently: Estimated Value calls them Category and Task, and the Leaderboard calls them task group
-and task category.
+Under each task category, the detail rows (`Task Breakdown Category`) show the behaviour. Every page
+labels the two levels the same way: **Task Category** for the 12 groups and **Task Breakdown** for
+the behaviour.
 
 ### 3.3 Other derived columns
 

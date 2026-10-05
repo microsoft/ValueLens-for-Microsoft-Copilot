@@ -7,6 +7,7 @@
 
 export * from "./cohorts";
 export * from "./work-summary";
+export * from "./top-outcome";
 export * from "./task-breakdown";
 export * from "./surface-usage";
 export * from "./leaderboard-cohorts";

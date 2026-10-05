@@ -12,7 +12,7 @@ import query from "./m365-by-org.dax?raw";
 const columnMetadata: ColumnMetadataMap = {
     "[Organization]": { name: "Organization", displayName: "Organization" },
     "[Pooled Groups]": { name: "Pooled Groups", displayName: "Groups pooled", format: FORMAT_WHOLE },
-    "[People Active]": { name: "People Active", displayName: "Active on Microsoft 365", format: FORMAT_WHOLE },
+    "[People Active]": { name: "People Active", displayName: "People active", format: FORMAT_WHOLE },
     "[Copilot Users]": { name: "Copilot Users", displayName: "Using Copilot", format: FORMAT_WHOLE },
     "[Copilot Reach]": { name: "Copilot Reach", displayName: "Copilot reach", format: FORMAT_PERCENT },
     "[Active Days Per Week]": { name: "Active Days Per Week", displayName: "Active days per week", format: FORMAT_RATE },

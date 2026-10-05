@@ -26,7 +26,6 @@ const columnMetadata: ColumnMetadataMap = {
     "[Licensed Rate]": { name: "Licensed Rate", displayName: "Tasks per licensed user", format: FORMAT_RATE },
     "[Unlicensed Rate]": { name: "Unlicensed Rate", displayName: "Tasks per unlicensed user", format: FORMAT_RATE },
     "[Agent Rate]": { name: "Agent Rate", displayName: "Tasks per agent user", format: FORMAT_RATE },
-    "[Top Value Outcome]": { name: "Top Value Outcome", displayName: "Most common benefit" },
     "[Licensed Utilisation]": {
         name: "Licensed Utilisation",
         displayName: "% of licences active",
@@ -35,7 +34,7 @@ const columnMetadata: ColumnMetadataMap = {
 };
 
 /**
- * Every headline figure on the Work destination, for all four cohorts, in a
+ * Every cohort's headline figures on the Work destination, side by side, in a
  * single round trip.
  */
 export function workSummary() {

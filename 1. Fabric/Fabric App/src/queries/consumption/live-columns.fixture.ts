@@ -46,6 +46,7 @@ export const liveColumns = {
     coworkByGroup: [
         "Group By[Group]",
         "Org[DisplayName]",
+        "Org[UserPrincipalName]",
         "[Is Grand Total]",
         "[Is Group Total]",
         "[Users]",
@@ -55,6 +56,7 @@ export const liveColumns = {
         "[PAYG Cost]",
         "[Total Cost]",
         "[Policy]",
+        "[Billing Name]",
     ],
     studioCreditsSummary: [
         "[Credits Consumed]",

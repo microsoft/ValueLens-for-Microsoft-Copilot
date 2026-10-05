@@ -162,7 +162,7 @@ export function OverviewStage() {
             description="Where credit spend is going: each product's credits and cost over the same dates."
             actions={
                 presetOptions.length > 1 ? (
-                    <SegmentedControl label="Dates" options={presetOptions} value={preset} onChange={setPreset} />
+                    <SegmentedControl label="Date" options={presetOptions} value={preset} onChange={setPreset} />
                 ) : undefined
             }
         >

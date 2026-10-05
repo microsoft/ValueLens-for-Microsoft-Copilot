@@ -41,5 +41,9 @@ export function formatKpi(value: number | undefined, format: KpiFormat, options:
     // A real spend under half a cent would round to 0.00 and read as free.
     if (format === "money" && value > 0 && value < 0.005) return `<${prefix}${formatters.money.format(0.01)}`;
     const shown = format === "millions" ? value * 1_000_000 : value;
+    // A loss must not round up to break-even: 0.96× would print as 1.0×.
+    if (format === "multiple" && value >= 0 && value < 1 && Math.round(value * 10) >= 10) {
+        return `${prefix}${formatters.rate.format(Math.floor(value * 100) / 100)}×`;
+    }
     return `${prefix}${formatters[format].format(shown)}${format === "multiple" ? "×" : ""}`;
 }

@@ -5,30 +5,43 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { VegaVisual } from "@microsoft/fabric-visuals";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
-import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { toDataTable } from "@/lib/to-data-table";
-import { surfaceUsage, workCohorts, type WorkCohort } from "@/queries/work";
+import { surfaceUsage } from "@/queries/work";
+
+const surface = surfaceUsage({ lens: "surface" });
+const model = surfaceUsage({ lens: "model" });
+
+const charts = [
+    {
+        id: "surface",
+        spec: surface.vegaLiteSpec,
+        title: "Tasks by app",
+        subtitle: "Which surface the request came from",
+    },
+    {
+        id: "model",
+        spec: model.vegaLiteSpec,
+        title: "Tasks by model",
+        subtitle: "Which model answered the request",
+    },
+];
 
 /**
  * The second half of the Value destination's task breakdown: where the work
  * happens and which model answers it.
  *
  * The report draws eight bar charts here — two lenses times four cohorts, each
- * on its own bookmark. One query carries all eight, so both the lens split and
- * the cohort toggle are rebinds rather than refetches.
+ * on its own bookmark. Here the filter bar's License and Activity pick the
+ * cohort, and one query carries both lenses.
  */
 export function SurfacesStage() {
-    const [cohort, setCohort] = useState<WorkCohort>("all");
     const { theme } = useThemeContext();
-
-    const surface = useMemo(() => surfaceUsage({ lens: "surface", cohort }), [cohort]);
-    const model = useMemo(() => surfaceUsage({ lens: "model", cohort }), [cohort]);
 
     const result = useFilteredQuery({ connection: surface.connection, query: surface.query });
 
@@ -37,31 +50,13 @@ export function SurfacesStage() {
             result.data?.status === "success"
                 ? toDataTable(result.data.table, surface.columnMetadata)
                 : undefined,
-        [result.data, surface.columnMetadata],
+        [result.data],
     );
-
-    const charts = [
-        {
-            id: "surface",
-            spec: surface.vegaLiteSpec,
-            title: "Tasks by app",
-            subtitle: "Which surface the request came from",
-        },
-        {
-            id: "model",
-            spec: model.vegaLiteSpec,
-            title: "Tasks by model",
-            subtitle: "Which model answered the request",
-        },
-    ];
 
     return (
         <Section
             title="Surfaces & models"
             description="Where Copilot is being used from, and what is answering. Together these say whether adoption is concentrated in one app or spread across the suite."
-            actions={
-                <SegmentedControl label="Cohort" options={workCohorts} value={cohort} onChange={setCohort} />
-            }
         >
             <div className="grid gap-300 lg:grid-cols-2">
                 {charts.map((chart) => (
@@ -78,7 +73,7 @@ export function SurfacesStage() {
                             <QueryEmpty
                                 className="h-full"
                                 title="No usage recorded"
-                                description="No rows carry an app or model value for this period."
+                                description="No rows carry an app or model value in this selection."
                             />
                         ) : (
                             <VegaVisual

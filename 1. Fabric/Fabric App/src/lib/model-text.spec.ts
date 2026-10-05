@@ -45,6 +45,13 @@ describe("plainText", () => {
         expect(plainText(undefined)).toBeUndefined();
         expect(plainText("🟢")).toBeUndefined();
     });
+
+    it("joins clauses a card separates with a pipe", () => {
+        expect(plainText("151 active users of 170 roster users | 108 licensed, 43 unlicensed observed in audit.")).toBe(
+            "151 active users of 170 roster users; 108 licensed, 43 unlicensed observed in audit.",
+        );
+        expect(plainText("Coverage is healthy. | No gaps found.")).toBe("Coverage is healthy. No gaps found.");
+    });
 });
 
 describe("parseVerdict", () => {

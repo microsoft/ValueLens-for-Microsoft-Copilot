@@ -93,7 +93,7 @@ function definition(cohort: LeaderboardCohort): CohortDefinition {
     return found;
 }
 
-/** The cohorts in the order the Leaderboard toggle presents them. */
+/** The five leaderboard cohorts, in reading order. */
 export const leaderboardCohorts: { id: LeaderboardCohort; label: string }[] = definitions.map(({ id, label }) => ({
     id,
     label,

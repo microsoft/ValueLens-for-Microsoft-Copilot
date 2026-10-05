@@ -8,15 +8,18 @@
 import { useMemo, useState } from "react";
 import { VegaVisual } from "@microsoft/fabric-visuals";
 import { stageAnchor } from "@/components/destinations";
+import { FilterNote } from "@/components/filter-note";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
+import { useFilterContext } from "@/hooks/filter.context";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
+import { selectedCohort, unshownActivity, type FilterKey } from "@/lib/filters";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
-import { taskBreakdown, taskDimensions, workSummary, type TaskDimension } from "@/queries/work";
+import { taskBreakdown, taskDimensions, topOutcome, workSummary, type TaskDimension } from "@/queries/work";
 
 /** Which summary columns each cohort card reads. */
 const cards = [
@@ -32,19 +35,32 @@ const cards = [
     { id: "agents", label: "Agents", tasks: "[Agent Tasks]", users: "[Agent Users]", rate: "[Agent Rate]" },
 ] as const;
 
+/** Each card is already one cohort, so these filters pick the card to highlight instead. */
+const COHORT_FILTERS: FilterKey[] = ["licence", "audience"];
+const PICKABLE = ["licensed", "unlicensed", "agents"] as const;
+
 /**
  * The Value destination's task breakdown: how much got done, and what kind of
  * work it was.
  *
  * Power BI spends thirty-nine visuals across the Activity page on this. Here
- * it is two queries — one row of headline figures covering all four cohorts,
- * and one breakdown carrying all three lenses at once.
+ * it is three queries — one row of headline figures with every cohort side by
+ * side, the most common benefit for the selected group, and one breakdown
+ * carrying all three lenses at once.
  */
 export function TasksStage() {
     const [dimension, setDimension] = useState<TaskDimension>("behaviour");
     const { theme } = useThemeContext();
+    const { filters, applicable } = useFilterContext();
+    const cohort = selectedCohort(filters, applicable, PICKABLE);
+    const highlighted = cards.find((card) => card.id === cohort) ?? cards[0];
+    const unshown = unshownActivity(filters, applicable, PICKABLE);
+    const cohortReason = unshown
+        ? `${unshown} has no card of its own, so ${highlighted.label} is highlighted.`
+        : `every group is shown side by side, so ${highlighted.label} is highlighted.`;
 
-    const summary = useFilteredQuery(workSummary());
+    const summary = useFilteredQuery(workSummary(), { ignore: COHORT_FILTERS });
+    const outcome = useFilteredQuery(topOutcome());
     const breakdown = useMemo(() => taskBreakdown({ dimension }), [dimension]);
     const breakdownResult = useFilteredQuery({
         connection: breakdown.connection,
@@ -64,7 +80,10 @@ export function TasksStage() {
         [breakdownResult.data, breakdown.columnMetadata],
     );
 
-    const topOutcome = readText(summaryRow, "[Top Value Outcome]");
+    const benefit = useMemo(
+        () => (outcome.data?.status === "success" ? readText(toSummaryRow(outcome.data.table), "[Top Value Outcome]") : undefined),
+        [outcome.data],
+    );
 
     return (
         <Section
@@ -72,6 +91,7 @@ export function TasksStage() {
             title="Task breakdown"
             description="How much work Copilot was asked to do, by whom, and what kind of work it was."
         >
+            <FilterNote ignored={COHORT_FILTERS} scope="to the cards" reason={cohortReason} />
             {summary.data?.status === "error" ? (
                 <QueryError message={summary.data.error.message} onRetry={summary.refetch} />
             ) : summary.isLoading || !summary.data ? (
@@ -92,7 +112,7 @@ export function TasksStage() {
                             key={card.id}
                             label={card.label}
                             value={readNumber(summaryRow, card.tasks)}
-                            emphasis={card.id === "all"}
+                            emphasis={card.id === highlighted.id}
                             detail={
                                 <div className="flex flex-col gap-100">
                                     <KpiStat label="Active users" value={readNumber(summaryRow, card.users)} />
@@ -108,19 +128,19 @@ export function TasksStage() {
                 </div>
             )}
 
-            {topOutcome && (
+            {benefit && (
                 <p className="border-l-2 border-primary pl-400 text-[length:var(--text-400)] leading-400 text-foreground">
-                    The benefit people report most often is {topOutcome.toLowerCase()}.
+                    The benefit people report most often is {benefit.toLowerCase()}.
                 </p>
             )}
 
             <div className="flex flex-col gap-300">
-                <div className="flex flex-wrap items-center justify-between gap-300">
-                    <p className="max-w-[68ch] text-[length:var(--text-300)] leading-300 text-muted-foreground">
-                        {breakdown.subtitle}.
-                    </p>
+                <div className="flex flex-wrap items-center gap-300">
+                    <span aria-hidden="true" className="text-[length:var(--text-300)] leading-300 font-semibold text-foreground">
+                        Break down by
+                    </span>
                     <SegmentedControl
-                        label="Breakdown"
+                        label="Break down by"
                         options={taskDimensions}
                         value={dimension}
                         onChange={setDimension}

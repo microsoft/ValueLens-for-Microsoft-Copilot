@@ -50,7 +50,7 @@ function topicColumns(badColor: string): TreeColumn[] {
         { id: "Resolved", header: "Resolved", width: 104, format: formatCell("percent") },
         { id: "Failing", header: "Failing", width: 96, format: formatCell("whole"), heat: true, heatColor: badColor },
         { id: "Friction", header: "Friction", width: 96, format: formatCell("whole") },
-        { id: "Knowledge Gaps", header: "Knowledge gaps", width: 136, format: formatCell("whole") },
+        { id: "Knowledge Gaps", header: "Knowledge gaps", width: 144, format: formatCell("whole") },
         { id: "Turns To Resolve", header: "Turns to resolve", width: 140, format: formatCell("decimal") },
         { id: "CSAT", header: "Satisfaction", width: 116, format: formatCell("percent") },
     ];

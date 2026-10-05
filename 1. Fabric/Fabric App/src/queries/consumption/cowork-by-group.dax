@@ -30,7 +30,9 @@ EVALUATE
 SUMMARIZECOLUMNS(
     ROLLUPADDISSUBTOTAL(
         'Group By'[Group], "Is Grand Total",
-        'Org'[DisplayName], "Is Group Total"
+        // The sign-in name keeps people apart, so a blank or shared display
+        // name cannot fold several people into one row.
+        ROLLUPGROUP('Org'[DisplayName], 'Org'[UserPrincipalName]), "Is Group Total"
     ),
     "Users", [User Count],
     "Credits Used", [Cowork Total Credits Used],
@@ -38,7 +40,9 @@ SUMMARIZECOLUMNS(
     "Prepaid Cost", [Cowork Prepaid Cost],
     "PAYG Cost", [Cowork PAYG Cost],
     "Total Cost", [Cowork Total Cost],
-    "Policy", [ValueLens Cowork Policy Name]
+    "Policy", [ValueLens Cowork Policy Name],
+    // The billing export's own name, for people the org data has no name for.
+    "Billing Name", MAX('CoworkBilling'[DisplayName])
 )
 ORDER BY
     [Is Grand Total] DESC,

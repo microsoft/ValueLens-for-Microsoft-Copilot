@@ -105,6 +105,11 @@ UserMonthKey, Delegation_Event_Key, ActivityDate, Agent Last Used Date,
 User_Stage_Maturity, User_Stage
 ```
 
+**Names in the report.** The report and the Fabric App show `Behavior_Enriched_Full` as **Task
+Breakdown**, and the 12 groups it rolls up to (the model's `Task Breakdown Group` column) as **Task
+Category**. Each task's plain-English description comes from the static `Behavior Value Map` table
+inside the `.pbit`, not from this table.
+
 > **`Behavior_Category` is the join key for the value model.** It relates to the static
 > `Human Time Estimates` table inside the `.pbit`, which holds the per-behaviour
 > `Human Baseline (min)` figures. `Estimated Hours Saved` resolves those at query time via

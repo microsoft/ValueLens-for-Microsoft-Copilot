@@ -5,7 +5,7 @@ VAR _copilot =
         VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
         'Chat + Agent Interactions (Audit Logs)'[Audit_UserId] <> ""
     )
-VAR _weeks = DIVIDE(DISTINCTCOUNT('M365 Activity'[ActivityDate]), 7)
+VAR _weeks = DIVIDE(CALCULATE(DISTINCTCOUNT('M365 Activity'[ActivityDate]), REMOVEFILTERS('Chat + Agent Org Data')), 7)
 VAR _orgs =
     FILTER(
         ADDCOLUMNS(

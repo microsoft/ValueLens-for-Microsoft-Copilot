@@ -80,20 +80,22 @@ function orgColumns(org: OrgAttribute, table: DataTable | undefined): GridColumn
             },
         },
         { id: "Pooled Groups", header: "Groups pooled", hidden: true },
-        { id: "People Active", header: "Active on Microsoft 365", numericStyling: true },
-        { id: "Copilot Users", header: "Using Copilot", numericStyling: true },
+        // Short headers, each wide enough for its sort arrow; the subtitle says the last three are per person, per week.
+        { id: "People Active", header: "People active", width: 124, numericStyling: true },
+        { id: "Copilot Users", header: "Using Copilot", width: 128, numericStyling: true },
         {
             id: "Copilot Reach",
             header: "Copilot reach",
+            width: 124,
             numericStyling: true,
             cellRenderer: heatRenderer({
                 domain: columnHeat(table, "Copilot Reach"),
                 format: columnFormat(table, "Copilot Reach"),
             }),
         },
-        { id: "Active Days Per Week", header: "Active days per week", numericStyling: true },
-        { id: "Meetings Per Week", header: "Meetings per week", numericStyling: true },
-        { id: "Emails Sent Per Week", header: "Emails sent per week", numericStyling: true },
+        { id: "Active Days Per Week", header: "Active days", width: 116, numericStyling: true },
+        { id: "Meetings Per Week", header: "Meetings", width: 104, numericStyling: true },
+        { id: "Emails Sent Per Week", header: "Emails sent", width: 112, numericStyling: true },
     ];
 }
 
@@ -261,8 +263,8 @@ function CopilotComparison() {
                         theme={theme}
                         header={{
                             title: `Copilot reach by ${org.noun}`,
-                            subtitle: `${formatKpi(groupCount, "whole")} ${groupCount === 1 ? org.noun : org.plural}, with their Microsoft 365 week per person${
-                                hasPool ? `. Those under ${SMALL_GROUP_MIN_PEOPLE} active people share one row.` : ""
+                            subtitle: `${formatKpi(groupCount, "whole")} ${groupCount === 1 ? org.noun : org.plural}. Active days, meetings and emails sent are per person, per week.${
+                                hasPool ? ` Those under ${SMALL_GROUP_MIN_PEOPLE} active people share one row.` : ""
                             }`,
                         }}
                     />

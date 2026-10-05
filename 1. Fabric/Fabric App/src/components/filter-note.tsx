@@ -18,9 +18,18 @@ function joinLabels(keys: readonly FilterKey[], orgLabel: string): string {
 /**
  * Says which of the filter bar's active filters a stage leaves out, and why,
  * so a number that doesn't move when a filter changes never looks broken.
- * Renders nothing when none of `ignored` is active on this destination.
+ * `scope` names the part they skip when the rest of the stage still follows
+ * them. Renders nothing when none of `ignored` is active on this destination.
  */
-export function FilterNote({ ignored, reason }: { ignored: readonly FilterKey[]; reason: string }) {
+export function FilterNote({
+    ignored,
+    reason,
+    scope = "here",
+}: {
+    ignored: readonly FilterKey[];
+    reason: string;
+    scope?: string;
+}) {
     const { filters, applicable, orgAttribute } = useFilterContext();
     const skipped = ignored.filter((key) => applicable.includes(key) && isFilterActive(filters, key));
     if (skipped.length === 0) return null;
@@ -29,7 +38,7 @@ export function FilterNote({ ignored, reason }: { ignored: readonly FilterKey[];
         <p className="flex items-start gap-200 text-[length:var(--text-200)] leading-200 text-muted-foreground">
             <Info className="icon-size-200 mt-[2px] shrink-0" aria-hidden="true" />
             <span>
-                {joinLabels(skipped, orgAttribute.label)} {skipped.length > 1 ? "filters don't" : "filter doesn't"} apply here: {reason}
+                {joinLabels(skipped, orgAttribute.label)} {skipped.length > 1 ? "filters don't" : "filter doesn't"} apply {scope}: {reason}
             </span>
         </p>
     );

@@ -10,6 +10,7 @@ import { Check, Info, LoaderCircle, X } from "lucide-react";
 import { useFilterContext } from "@/hooks/filter.context";
 import {
     availablePresets,
+    AUDIENCE_LABELS,
     AUDIENCE_VALUES,
     DATE_PRESET_LABELS,
     defaultFilters,
@@ -34,13 +35,6 @@ const LICENCE_OPTIONS: { id: Licence; label: string }[] = [
     { id: "licensed", label: "Licensed" },
     { id: "unlicensed", label: "Unlicensed" },
 ];
-
-const AUDIENCE_LABELS: Record<Audience, string> = {
-    all: "All",
-    copilot: "Copilot chat",
-    agents: "Agents",
-    cowork: "Cowork",
-};
 
 function DateFilter() {
     const { filters, setFilters, options } = useFilterContext();

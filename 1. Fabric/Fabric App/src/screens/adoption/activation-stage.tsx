@@ -5,29 +5,34 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { VegaVisual } from "@microsoft/fabric-visuals";
 import { stageAnchor } from "@/components/destinations";
 import { FilterNote } from "@/components/filter-note";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
-import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
-import { useOrgAttribute } from "@/hooks/filter.context";
+import { useFilterContext, useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
-import type { FilterKey } from "@/lib/filters";
+import { selectedCohort, unshownActivity, type FilterKey } from "@/lib/filters";
 import { rowChartHeight } from "@/lib/chart-height";
+import { plainText } from "@/lib/model-text";
 import { withIndefiniteArticle, withOrgAttribute } from "@/lib/org-attribute";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import { activationByOrg, activationSummary, type ActivationCohort } from "@/queries/adoption";
 
-/** The cohort cards already split licensed, unlicensed and agent use, so those filters would only blank cards out. */
+/**
+ * The cohort cards already split licensed, unlicensed and agent use, so these
+ * filters pick the card to highlight and chart rather than blank the others out.
+ */
 const COHORT_FILTERS: FilterKey[] = ["licence", "audience"];
 /** Activation counts people who haven't used anything yet, so narrowing to an agent would call everyone else inactive. */
 const AGENT_FILTERS: FilterKey[] = ["agentTypes", "agentNames"];
 const IGNORED: FilterKey[] = [...COHORT_FILTERS, ...AGENT_FILTERS];
+/** The cards License and Activity can pick; every other selection highlights Everyone. */
+const PICKABLE = ["licensed", "unlicensed", "agents"] as const;
 
 /** The four cohorts the Activation page reports on, in reading order. */
 const cohorts: {
@@ -94,7 +99,8 @@ const cohorts: {
  * per-organization split that all four cohorts share.
  */
 export function ActivationStage() {
-    const [cohort, setCohort] = useState<ActivationCohort>("all");
+    const { filters, applicable } = useFilterContext();
+    const cohort: ActivationCohort = selectedCohort(filters, applicable, PICKABLE);
     const { theme } = useThemeContext();
     const org = useOrgAttribute();
 
@@ -116,21 +122,19 @@ export function ActivationStage() {
     );
 
     const selected = cohorts.find((entry) => entry.id === cohort) ?? cohorts[0];
-    const headline = readText(summaryRow, selected.headlineColumn);
+    const headline = plainText(readText(summaryRow, selected.headlineColumn));
+    const unmatched = unshownActivity(filters, applicable, PICKABLE);
+    const cohortReason = unmatched
+        ? `${unmatched} has no activation figure of its own, so ${selected.label} is highlighted and charted below.`
+        : `activation is shown for every group side by side, so ${selected.label} is highlighted and charted below.`;
 
     return (
         <Section
             id={stageAnchor("activation")}
             title="Activation"
             description="How much of the population has picked Copilot up at all — before asking how often or how deeply."
-            actions={
-                <SegmentedControl label="Cohort" options={cohorts} value={cohort} onChange={setCohort} />
-            }
         >
-            <FilterNote
-                ignored={COHORT_FILTERS}
-                reason="activation is shown for each cohort side by side — pick one with the cohort switch."
-            />
+            <FilterNote ignored={COHORT_FILTERS} reason={cohortReason} />
             <FilterNote
                 ignored={AGENT_FILTERS}
                 reason="activation counts everyone, including people who haven't used an agent yet."

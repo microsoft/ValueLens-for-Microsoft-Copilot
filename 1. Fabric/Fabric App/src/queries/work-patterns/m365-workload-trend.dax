@@ -3,7 +3,7 @@ VAR _weeks =
     FILTER(
         ADDCOLUMNS(
             VALUES('M365 Activity'[WeekStart]),
-            "@Days", CALCULATE(DISTINCTCOUNT('M365 Activity'[ActivityDate])),
+            "@Days", CALCULATE(DISTINCTCOUNT('M365 Activity'[ActivityDate]), REMOVEFILTERS('Chat + Agent Org Data')),
             "@People",
                 CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0)
         ),
