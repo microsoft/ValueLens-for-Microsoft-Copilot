@@ -15,6 +15,7 @@ import {
     presetRange,
     selectedCohort,
     summariseSelection,
+    unlicensedOnly,
     unshownActivity,
     type FilterKey,
     type FilterState,
@@ -156,5 +157,16 @@ describe("unshownActivity", () => {
         expect(unshownActivity(activity("agents"), BOTH, SHOWN)).toBeUndefined();
         expect(unshownActivity(activity("cowork"), BOTH, [...SHOWN, "cowork"])).toBeUndefined();
         expect(unshownActivity(activity("copilot"), ["licence"], SHOWN)).toBeUndefined();
+    });
+});
+
+describe("unlicensedOnly", () => {
+    const licence = (value: FilterState["licence"]) => ({ ...defaultFilters, licence: value });
+
+    it("is true only when License picks unlicensed people on a stage that offers it", () => {
+        expect(unlicensedOnly(licence("unlicensed"), ["licence"])).toBe(true);
+        expect(unlicensedOnly(licence("licensed"), ["licence"])).toBe(false);
+        expect(unlicensedOnly(licence("all"), ["licence"])).toBe(false);
+        expect(unlicensedOnly(licence("unlicensed"), ["audience"])).toBe(false);
     });
 });
