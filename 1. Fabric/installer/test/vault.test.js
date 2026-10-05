@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { isPrivateVault, keyVaultApi, networkBlocked } from '../src/clients/azure.js';
 import { createClient, HttpError } from '../src/http.js';
 import { endpointName, endpointRequest, ensureVaultEndpoint, fromWorkspace } from '../src/steps/fabric.js';
-import { newSecret } from '../src/steps/identity.js';
+import { ensureSecret, newSecret } from '../src/steps/identity.js';
 import { runsFabric } from '../src/steps/plan.js';
 import { createUi } from '../src/ui.js';
 import { fakeCtx, fakeUi } from './fakes.js';
@@ -81,10 +81,13 @@ test('Key Vault waits out a new role assignment but fails fast on a network bloc
   assert.deepEqual(fresh.calls, ['GET /secrets/s', 'GET /secrets/s']);
 });
 
-/** @param {{ blocked?: boolean, canWriteArm?: boolean, armFails?: boolean }} [o] */
+/** @param {{ blocked?: boolean, canWriteArm?: boolean, armFails?: boolean, existing?: Record<string, string | undefined> }} [o] */
 function fakeSecretApis(o = {}) {
   /** @type {string[]} */
   const calls = [];
+  const existing = o.existing ?? {};
+  /** @param {string} name */
+  const info = (name) => (name in existing ? { contentType: existing[name] } : null);
   const graph = {
     addPassword: async () => {
       calls.push('addPassword');
@@ -103,6 +106,11 @@ function fakeSecretApis(o = {}) {
       calls.push(`kv.setSecret ${name}`);
       if (o.blocked) throw httpError(403, NETWORK_403);
     },
+    secretInfo: async (/** @type {string} */ _uri, /** @type {string} */ name) => {
+      calls.push(`kv.secretInfo ${name}`);
+      if (o.blocked) throw httpError(403, NETWORK_403);
+      return info(name);
+    },
   };
   const arm = {
     permissions: async () => {
@@ -113,15 +121,19 @@ function fakeSecretApis(o = {}) {
       calls.push(`arm.setSecret ${name}`);
       if (o.armFails) throw new Error('boom');
     },
+    secretInfo: async (/** @type {string} */ _id, /** @type {string} */ name) => {
+      calls.push(`arm.secretInfo ${name}`);
+      return info(name);
+    },
   };
   return { graph, keyVault, arm, calls };
 }
 
-/** @param {ReturnType<typeof fakeSecretApis>} apis @param {{ private?: boolean, ui?: any }} [o] */
+/** @param {ReturnType<typeof fakeSecretApis>} apis @param {{ private?: boolean, ui?: any, existing?: boolean }} [o] */
 function secretCtx(apis, o = {}) {
   const made = fakeCtx({ graph: apis.graph, keyVault: apis.keyVault, arm: apis.arm, ui: o.ui });
   made.config.app.objectId = 'obj-1';
-  Object.assign(made.config.keyVault, { id: VAULT_ID, name: 'kv-test', private: o.private });
+  Object.assign(made.config.keyVault, { id: VAULT_ID, name: 'kv-test', private: o.private, existing: o.existing });
   return made;
 }
 
@@ -154,6 +166,58 @@ test('new secret: without write access none is made; a failed write takes it off
   const failing = fakeSecretApis({ armFails: true });
   await assert.rejects(newSecret(secretCtx(failing, { private: true }).ctx), /removed from the app again/);
   assert.deepEqual(failing.calls, ['arm.permissions', 'addPassword', 'arm.setSecret valuelens-client-secret', 'removePassword key-1']);
+});
+
+test('secret name: an existing vault keeps another install\'s secret and the new one takes a free name', async () => {
+  const apis = fakeSecretApis({
+    existing: { 'valuelens-client-secret': 'Client secret for other-app', 'valuelens-client-secret-2': undefined },
+  });
+  const ui = fakeUi();
+  const { ctx, config } = secretCtx(apis, { existing: true, ui: ui.ui });
+  await newSecret(ctx);
+  assert.deepEqual(apis.calls, [
+    'kv.waitForAccess',
+    'kv.secretInfo valuelens-client-secret',
+    'kv.secretInfo valuelens-client-secret-2',
+    'kv.secretInfo valuelens-client-secret-3',
+    'addPassword',
+    'kv.setSecret valuelens-client-secret-3',
+  ]);
+  assert.equal(config.keyVault.secretName, 'valuelens-client-secret-3');
+  assert.match(ui.text(), /isn't this app's/);
+});
+
+test('secret name: this app\'s own secret, a new vault, or one already written are reused without a check', async () => {
+  const own = fakeSecretApis({ existing: { 'valuelens-client-secret': 'Client secret for app-1' } });
+  await newSecret(secretCtx(own, { existing: true }).ctx);
+  assert.deepEqual(own.calls, ['kv.waitForAccess', 'kv.secretInfo valuelens-client-secret', 'addPassword', 'kv.setSecret valuelens-client-secret']);
+
+  const foreign = { existing: { 'valuelens-client-secret': 'Client secret for other-app' } };
+  const fresh = fakeSecretApis(foreign);
+  await newSecret(secretCtx(fresh).ctx);
+  assert.deepEqual(fresh.calls, ['kv.waitForAccess', 'addPassword', 'kv.setSecret valuelens-client-secret']);
+
+  const rotated = fakeSecretApis(foreign);
+  const made = secretCtx(rotated, { existing: true });
+  made.config.keyVault.secretSetAt = '2026-10-01T00:00:00Z';
+  await newSecret(made.ctx);
+  assert.deepEqual(rotated.calls, ['kv.waitForAccess', 'addPassword', 'kv.setSecret valuelens-client-secret']);
+});
+
+test('secret name: a pasted secret for an existing app is checked too, through Resource Manager on a private vault', async () => {
+  const apis = fakeSecretApis({ existing: { 'valuelens-client-secret': undefined } });
+  const { ctx, config } = secretCtx(apis, { existing: true, private: true });
+  ctx.pendingSecret = 'pasted';
+  await ensureSecret(ctx);
+  assert.deepEqual(apis.calls, [
+    'arm.permissions',
+    'arm.secretInfo valuelens-client-secret',
+    'arm.secretInfo valuelens-client-secret-2',
+    'arm.setSecret valuelens-client-secret-2',
+  ]);
+  assert.equal(config.keyVault.secretName, 'valuelens-client-secret-2');
+  assert.equal(ctx.pendingSecret, undefined);
+  assert.ok(config.keyVault.secretSetAt);
 });
 
 /** @param {{ approvable?: boolean, earlierInstall?: boolean }} [o] */
