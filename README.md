@@ -7,9 +7,9 @@ the hours and value they deliver.
 
 ## Watch first
 
-**Demo: what the dashboard measures, page by page** *(1m 49s)*
+**Demo: what the dashboard measures, page by page** *(2m 8s)*
 
-https://github.com/user-attachments/assets/a037e428-f966-4fdf-bf44-7a1d04155a63
+https://github.com/user-attachments/assets/2aa65c5d-2a20-4d51-9f1d-072c712fb4f3
 
 > Prefer to download it? [Get the demo video](media/ValueLens-Demo.mp4).
 
