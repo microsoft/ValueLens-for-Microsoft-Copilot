@@ -31,11 +31,20 @@ minutes and needs no access to your tenant.
 - **Copilot Studio agent conversations:** in Fabric, choose *Agent Evaluator* in the installer, or
   [set it up by hand](1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/).
 
+## Report interpretation guide
+
+A page-by-page guide to reading the ValueLens report — 15 report pages, with the key questions each one answers. Built for both internal teams and external customers.
+
+[![ValueLens Report Interpretation Guide](Images/Report-Interpretation-Guide-Cover.png)](docs/ValueLens-Report-Interpretation-Guide.pdf)
+
+**[📖 Open the Report Interpretation Guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf)**
+
 ## Reference
 
 - [How the value is calculated](docs/METHODOLOGY.md)
 - [Permissions](docs/PERMISSIONS.md)
 - [Data dictionary](docs/DATA-DICTIONARY.md)
+- [Report interpretation guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf)
 - [What changed](CHANGELOG.md)
 
 ## Help
