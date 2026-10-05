@@ -11,9 +11,9 @@ For Windows 10 or 11. Check [what you need](#before-you-start) first.
 
 A full walkthrough of the Fabric setup, from a fresh app registration to a saved, self-refreshing Power BI report.
 
-<video src="https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/installer-v0.2.2/ValueLens_Fabric_Setup.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/c834bed3-49fa-4f6a-bc7a-01bded2fd53e
 
-> If the player doesn't load, [download the walkthrough](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/installer-v0.2.2/ValueLens_Fabric_Setup.mp4).
+> Prefer to download it? [Get the walkthrough video](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/installer-v0.2.2/ValueLens_Fabric_Setup.mp4).
 
 ## Before you start
 
