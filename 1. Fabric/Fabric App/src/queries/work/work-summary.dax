@@ -12,6 +12,5 @@ ROW(
     "Licensed Rate", DIVIDE([Copilot AI Tasks], [Active Licensed Users]),
     "Unlicensed Rate", DIVIDE([Unlicensed AI Tasks], [Active Unlicensed Users]),
     "Agent Rate", DIVIDE([Agent AI Tasks], [Active Agent Users]),
-    "Top Value Outcome", [Top Value Outcome],
     "Licensed Utilisation", [% Active Licensed Users]
 )

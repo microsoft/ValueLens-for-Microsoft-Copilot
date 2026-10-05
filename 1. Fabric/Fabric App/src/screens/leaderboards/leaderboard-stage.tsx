@@ -16,11 +16,12 @@ import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states"
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { TreeFrame } from "@/components/tree-frame";
-import { useOrgAttribute } from "@/hooks/filter.context";
+import { useFilterContext, useOrgAttribute } from "@/hooks/filter.context";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { useRowToggles } from "@/hooks/use-row-toggles";
 import { gridHeight } from "@/lib/chart-height";
+import { selectedCohort } from "@/lib/filters";
 import { formatKpi, type KpiFormat } from "@/lib/format-kpi";
 import { heatDomain, heatRenderer } from "@/lib/heat";
 import { isGroupRow, visibleRowCount, type RollupTree } from "@/lib/rollup-tree";
@@ -30,7 +31,6 @@ import { toDataTable, type ColumnMetadataMap } from "@/lib/to-data-table";
 import { formatCell, textCell, totalsRow, TREE_GRID, withExpansion } from "@/lib/tree-grid";
 import {
     LEADERBOARD_LABEL_COLUMN,
-    leaderboardCohorts,
     leaderboardPeople,
     leaderboardSummary,
     leaderboardSummaryColumns,
@@ -78,9 +78,8 @@ const SESSIONS_NOUN: Record<LeaderboardCohort, string> = {
     cowork: "Cowork sessions",
 };
 
-function cohortLabel(cohort: LeaderboardCohort): string {
-    return leaderboardCohorts.find((entry) => entry.id === cohort)?.label ?? cohort;
-}
+/** The groups the License and Activity filters can rank on their own. */
+const RANKED_COHORTS = ["licensed", "unlicensed", "agents", "cowork"] as const;
 
 function extraStat(extra: CardExtra | undefined, row: SummaryRow | undefined): ReactNode {
     return extra ? <KpiStat label={extra.label} value={readNumber(row, extra.column)} format={extra.format} /> : undefined;
@@ -209,7 +208,6 @@ function isShapedFor(table: QueryTable, metadata: ColumnMetadataMap): boolean {
 function LeaderboardBreakdown({ cohort, view }: { cohort: LeaderboardCohort; view: Breakdown }) {
     const { theme } = useThemeContext();
     const org = useOrgAttribute();
-    const label = cohortLabel(cohort);
 
     const source: BreakdownSource = useMemo(() => {
         if (view === "people") {
@@ -218,7 +216,7 @@ function LeaderboardBreakdown({ cohort, view }: { cohort: LeaderboardCohort; vie
                 ...leaderboardPeople(cohort, org),
                 toTree: (table) => toLeaderboardPeopleTree(table, blankLabel),
                 heading: `${org.label} / user`,
-                title: `${label} · ${org.label} → user`,
+                title: `${org.label} → user`,
                 subtitle: (groups) =>
                     `${formatKpi(groups, "whole")} ${groups === 1 ? org.noun : org.plural}, busiest first. Open one to rank its people.`,
                 peopleLeaves: true,
@@ -232,14 +230,14 @@ function LeaderboardBreakdown({ cohort, view }: { cohort: LeaderboardCohort; vie
             ...tasks,
             toTree: (table) => toLeaderboardTaskTree(table, levels),
             heading: levels.heading,
-            title: `${label} · ${levels.path}`,
+            title: levels.path,
             subtitle: (groups) =>
                 `${formatKpi(groups, "whole")} ${groups === 1 ? levels.groupNoun : levels.groupPlural}, busiest first. Open one to see its ${levels.leafPlural}.`,
             peopleLeaves: false,
             emptyTitle: "No sessions to break down",
             emptyDescription: `No ${SESSIONS_NOUN[cohort]} in this selection record a ${levels.groupNoun}.`,
         };
-    }, [cohort, view, org, label]);
+    }, [cohort, view, org]);
 
     const result = useFilteredQuery({ connection: source.connection, query: source.query });
     const tree = useMemo(() => {
@@ -342,12 +340,13 @@ function LeaderboardBreakdown({ cohort, view }: { cohort: LeaderboardCohort; vie
  * Leaderboard page: who uses Copilot most and for what, ranked by sessions.
  *
  * The report shows each cohort on its own bookmark, with the people table
- * and the app-and-activity table side by side. Here the cohort toggle swaps
- * the cards and the table together, and one table flips between the two
- * breakdowns so each gets the full width.
+ * and the app-and-activity table side by side. Here the filter bar's License
+ * and Activity pick the cohort, which swaps the cards and the table together,
+ * and one table flips between the two breakdowns so each gets the full width.
  */
 export function LeaderboardStage() {
-    const [cohort, setCohort] = useState<LeaderboardCohort>("all");
+    const { filters, applicable } = useFilterContext();
+    const cohort: LeaderboardCohort = selectedCohort(filters, applicable, RANKED_COHORTS);
     const [view, setView] = useState<Breakdown>("people");
 
     const summary = useFilteredQuery(leaderboardSummary());
@@ -362,13 +361,14 @@ export function LeaderboardStage() {
     const extras = CARD_EXTRAS[cohort];
     const isEmpty =
         summary.data?.status === "success" && !summary.isLoading && users === undefined && sessions === undefined;
+    // Cowork runs only under a Copilot license, so this pairing is empty by definition rather than by the data.
+    const unlicensedCowork = cohort === "cowork" && applicable.includes("licence") && filters.licence === "unlicensed";
 
     return (
         <Section
             id={stageAnchor("leaderboard")}
             title="Leaderboard"
-            description="Who uses Copilot most, and for what, ranked by sessions. Pick a cohort, then break its sessions down by user or by task."
-            actions={<SegmentedControl label="Cohort" options={leaderboardCohorts} value={cohort} onChange={setCohort} />}
+            description="Who uses Copilot most, and for what, ranked by sessions. Use License and Activity in the filter bar to rank one group, then break its sessions down by user or by task."
         >
             {summary.data?.status === "error" ? (
                 <QueryError message={summary.data.error.message} onRetry={summary.refetch} />
@@ -378,13 +378,18 @@ export function LeaderboardStage() {
                         <QueryLoading key={i} />
                     ))}
                 </div>
+            ) : isEmpty && unlicensedCowork ? (
+                <QueryEmpty
+                    title="No Cowork sessions for unlicensed people"
+                    description="Cowork needs a Copilot license, so unlicensed people have no Cowork sessions. Set License to All or Licensed."
+                />
             ) : isEmpty ? (
                 <QueryEmpty
                     title={`No ${SESSIONS_NOUN[cohort]} in this selection`}
                     description={
                         cohort === "cowork"
                             ? "Cowork sessions are ranked here as soon as the audit log records them. If you expected some, widen the dates or clear a filter."
-                            : "Nobody in this cohort used Copilot in the selected period. Widen the dates or clear a filter."
+                            : "No one matching the filters used Copilot in the selected period. Widen the dates or clear a filter."
                     }
                 />
             ) : (
