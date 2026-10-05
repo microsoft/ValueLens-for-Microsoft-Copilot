@@ -18,6 +18,13 @@ const columnMetadata: ColumnMetadataMap = {
 };
 
 /**
+ * Keeps feedback dated on the Calendar, as the weekly trend does. Without it,
+ * feedback submitted outside the Calendar's dates lands on the blank Calendar
+ * row and is counted in the totals but never in the trend.
+ */
+export const FEEDBACK_ON_CALENDAR = "FILTER(ALL('Calendar'[Date]), NOT ISBLANK('Calendar'[Date]))";
+
+/**
  * The one-row feedback headline, including the model's own narrative.
  *
  * The report spreads these figures across cards and narrative text; the app
