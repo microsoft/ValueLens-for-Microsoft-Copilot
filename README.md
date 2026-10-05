@@ -9,6 +9,8 @@ the hours and value they deliver.
 open it and follow the steps in your browser. Check
 [what you need](1.%20Fabric/README.md#before-you-start) first.
 
+**New here?** Read the [📖 Report Interpretation Guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf) — a page-by-page walkthrough of every report page.
+
 ## Pick a path
 
 Every path gives you the same dashboard. Pick the one that matches what you have, then follow the
@@ -24,13 +26,6 @@ steps in its README.
 **Just want a look?** Use [4. Local CSV](4.%20Local%20CSV/) with its sample data. It takes two
 minutes and needs no access to your tenant.
 
-## Optional add-ons
-
-- **Credit consumption and cost:** in Fabric, choose it in the installer. Other paths have an
-  `Add Credit Consumption` folder.
-- **Copilot Studio agent conversations:** in Fabric, choose *Agent Evaluator* in the installer, or
-  [set it up by hand](1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/).
-
 ## Report interpretation guide
 
 A page-by-page guide to reading the ValueLens report — 15 report pages, with the key questions each one answers. Built for both internal teams and external customers.
@@ -38,6 +33,13 @@ A page-by-page guide to reading the ValueLens report — 15 report pages, with t
 [![ValueLens Report Interpretation Guide](Images/Report-Interpretation-Guide-Cover.png)](docs/ValueLens-Report-Interpretation-Guide.pdf)
 
 **[📖 Open the Report Interpretation Guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf)**
+
+## Optional add-ons
+
+- **Credit consumption and cost:** in Fabric, choose it in the installer. Other paths have an
+  `Add Credit Consumption` folder.
+- **Copilot Studio agent conversations:** in Fabric, choose *Agent Evaluator* in the installer, or
+  [set it up by hand](1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/).
 
 ## Reference
 
