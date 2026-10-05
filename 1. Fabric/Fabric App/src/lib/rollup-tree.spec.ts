@@ -81,6 +81,21 @@ describe("toRollupTree", () => {
         expect((tree.rows[0]._children as { Label: string }[])[0].Label).toBe("Unassigned");
         expect(tree.rows[1]._children).toBeUndefined();
     });
+
+    it("names leaves apart from the value that keys them", () => {
+        const tree = toRollupTree(
+            table([
+                ["Strong fit", 0, null, false, true, 5],
+                ["Strong fit", 0, "a@contoso.com", false, false, 3],
+                ["Strong fit", 0, "b@contoso.com", false, false, 2],
+                ["Strong fit", 0, "c@contoso.com", false, false, 1],
+            ]),
+            { ...options, leafLabel: (value) => (value === "c@contoso.com" ? undefined : "Alex Wilber") },
+        );
+        const leaves = tree.rows[0]._children as { _id: string; Label: string }[];
+        expect(leaves.map((row) => row.Label)).toEqual(["Alex Wilber", "Alex Wilber", "c@contoso.com"]);
+        expect(new Set(leaves.map((row) => row._id)).size).toBe(3);
+    });
 });
 
 describe("visibleRowCount", () => {
