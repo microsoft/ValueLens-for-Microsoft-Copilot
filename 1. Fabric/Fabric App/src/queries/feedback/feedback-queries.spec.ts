@@ -90,6 +90,15 @@ describe("feedback query contract", () => {
         expect(FEEDBACK_SURFACE_MIN_COUNT).toBe(5);
         expect(feedbackSurface().query).toContain("[@Total] >= 5");
     });
+
+    it("leaves feedback with no calendar date out of the weekly trend", () => {
+        expect(feedbackTrend().query).toContain("NOT ISBLANK('Calendar'[Date])");
+    });
+
+    it("keeps week labels level and hides the ones that would overlap", () => {
+        const spec = feedbackTrend().vegaLiteSpec as { encoding: { x: { axis: Record<string, unknown> } } };
+        expect(spec.encoding.x.axis).toMatchObject({ labelAngle: 0, labelOverlap: true });
+    });
 });
 
 describe("feedback spec field references", () => {
