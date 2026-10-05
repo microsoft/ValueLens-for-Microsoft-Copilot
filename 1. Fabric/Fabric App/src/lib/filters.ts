@@ -137,6 +137,15 @@ export function unshownActivity(
     return (cohorts as readonly string[]).includes(state.audience) ? undefined : AUDIENCE_LABELS[state.audience];
 }
 
+/**
+ * Whether the License filter picks unlicensed people on a stage that offers it.
+ * Cowork runs only under a Copilot license, so Cowork views are empty by
+ * definition then, rather than because of the data.
+ */
+export function unlicensedOnly(state: FilterState, applicable: readonly FilterKey[]): boolean {
+    return applicable.includes("licence") && state.licence === "unlicensed";
+}
+
 /** Whether a filter narrows the data at all. */
 export function isFilterActive(state: FilterState, key: FilterKey): boolean {
     switch (key) {
