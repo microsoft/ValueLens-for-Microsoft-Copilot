@@ -44,7 +44,7 @@ type ModelFitView = "task" | "organization" | "person";
 /** The report's Model Fit View buttons, with the middle one following the Group by choice. */
 function viewOptions(orgLabel: string): readonly { id: ModelFitView; label: string }[] {
     return [
-        { id: "task", label: "Task" },
+        { id: "task", label: "Task Category" },
         { id: "organization", label: orgLabel },
         { id: "person", label: "User" },
     ];
@@ -202,7 +202,7 @@ export function ModelFitStage() {
     // The model leaves the reason blank when nothing is over- or under-specified.
     const showReason = hasAnyText(verdictTable, "Main Reason");
     const views = useMemo(() => viewOptions(org.label), [org.label]);
-    const segmentLabel = view === "person" ? "User" : view === "organization" ? org.label : "Task";
+    const segmentLabel = view === "person" ? "User" : view === "organization" ? org.label : "Task Category";
     // Mirrors the report's mm_table: verdict, main model and reason, then judged coverage and the three shares.
     const verdictColumns: GridColumnDef[] = useMemo(
         () => [

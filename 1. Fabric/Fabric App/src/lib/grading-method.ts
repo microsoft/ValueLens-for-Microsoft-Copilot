@@ -223,7 +223,7 @@ export const RESEARCH_GROUPS: readonly ResearchGroup[] = [
                 url: "https://arxiv.org/abs/2507.07935",
                 finding:
                     "Maps 200,000 anonymised Bing Copilot conversations to the work activities they serve; most occupations have an information-work component.",
-                use: "Supports reading Copilot use by the work it serves, as the task categories do.",
+                use: "Supports reading Copilot use by the work it serves, as Task Category and Task Breakdown do.",
             },
         ],
     },

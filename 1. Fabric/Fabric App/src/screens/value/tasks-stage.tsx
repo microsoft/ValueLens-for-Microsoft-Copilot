@@ -148,7 +148,7 @@ export function TasksStage() {
                             data={breakdownTable}
                             theme={theme}
                             header={{
-                                title: `Tasks by ${breakdown.label.toLowerCase()}`,
+                                title: breakdown.title,
                                 subtitle: breakdown.subtitle,
                             }}
                         />

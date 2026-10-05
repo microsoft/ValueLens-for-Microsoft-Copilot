@@ -57,7 +57,7 @@ function formatWholeCell(value: unknown): string {
  *
  * The numbers are estimates of what the recorded work would have cost at the
  * chosen hourly rate, not booked savings. Value is read first in total, then
- * by task group, agent and organization so the assumptions stay visible.
+ * by Task Category, agent and organization so the assumptions stay visible.
  */
 export function EstimatedValueStage() {
     const { rate, setRate, scenario, setScenario } = useValueAssumptions();

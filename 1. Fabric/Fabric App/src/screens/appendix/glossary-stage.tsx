@@ -16,7 +16,7 @@ import { GLOSSARY_PAGE_HOME, highlightParts, searchGlossary, toGlossaryPages, ty
 import { scrollToAnchor } from "@/lib/scroll-to-anchor";
 import { toRecords } from "@/lib/summary-row";
 import { cn } from "@/lib/utils";
-import { glossary } from "@/queries/appendix";
+import { glossary, withAppGlossaryEntries } from "@/queries/appendix";
 
 function pageAnchor(page: string): string {
     return `glossary-${page.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
@@ -112,7 +112,7 @@ export function GlossaryStage() {
     const searchId = useId();
 
     const pages = useMemo(
-        () => (result.data?.status === "success" ? toGlossaryPages(toRecords(result.data.table)) : undefined),
+        () => (result.data?.status === "success" ? toGlossaryPages(withAppGlossaryEntries(toRecords(result.data.table))) : undefined),
         [result.data],
     );
     const visible = useMemo(() => (pages ? searchGlossary(pages, deferredTerm) : []), [pages, deferredTerm]);

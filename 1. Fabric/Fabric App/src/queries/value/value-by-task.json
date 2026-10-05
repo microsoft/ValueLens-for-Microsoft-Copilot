@@ -21,12 +21,12 @@
     "color": {
       "field": "Chat + Agent Interactions (Audit Logs)Task Breakdown Group",
       "type": "nominal",
-      "title": "Category",
+      "title": "Task Category",
       "legend": { "orient": "top", "direction": "horizontal", "symbolLimit": 20, "columns": 3, "labelLimit": 260 }
     },
     "tooltip": [
-      { "field": "Chat + Agent Interactions (Audit Logs)Task Breakdown Category", "type": "nominal", "title": "Task" },
-      { "field": "Chat + Agent Interactions (Audit Logs)Task Breakdown Group", "type": "nominal", "title": "Category" },
+      { "field": "Chat + Agent Interactions (Audit Logs)Task Breakdown Category", "type": "nominal", "title": "Task Breakdown" },
+      { "field": "Chat + Agent Interactions (Audit Logs)Task Breakdown Group", "type": "nominal", "title": "Task Category" },
       { "field": "Expert Equivalent Hours Per Week", "type": "quantitative", "title": "Hours per week", "format": ",.1f" },
       { "field": "AI Assisted Value Per Week", "type": "quantitative", "title": "Value per week", "format": ",.0f" },
       { "field": "Activity Share", "type": "quantitative", "title": "Activity share", "format": ".1%" }
