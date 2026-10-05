@@ -206,16 +206,17 @@ export function ModelFitStage() {
     // Mirrors the report's mm_table: verdict, main model and reason, then judged coverage and the three shares.
     const verdictColumns: GridColumnDef[] = useMemo(
         () => [
-            { id: "Verdict", header: "Verdict", width: 196, cellRenderer: (value) => verdictCell(value) },
-            // A fixed width keeps the name visible; the grid scrolls sideways on narrow screens.
-            { id: "Segment", header: segmentLabel, width: 232 },
-            { id: "Main Model", header: "Main model", width: 176 },
-            ...(showReason ? [{ id: "Main Reason", header: "Main reason", width: 184 }] : []),
-            { id: "Sessions", header: "Sessions", width: 100, numericStyling: true },
+            { id: "Verdict", header: "Verdict", width: 176, cellRenderer: (value) => verdictCell(value) },
+            // Fixed widths keep names and headers whole; together they fit the widest content
+            // frame (about 1,290 px) and the grid scrolls sideways on smaller screens.
+            { id: "Segment", header: segmentLabel, width: 224 },
+            { id: "Main Model", header: "Main model", width: 136 },
+            ...(showReason ? [{ id: "Main Reason", header: "Main reason", width: 152 }] : []),
+            { id: "Sessions", header: "Sessions", width: 96, numericStyling: true },
             shareColumn("Judged Share", "Judged", 92),
-            shareColumn("Well-matched Share", "Good match", 116),
-            shareColumn("Over-specified Share", "Lighter model may do", 168, palette.negative),
-            shareColumn("Under-specified Share", "Try stronger", 124, palette.caution),
+            shareColumn("Well-matched Share", "Good match", 120),
+            shareColumn("Over-specified Share", "Lighter model may do", 172, palette.negative),
+            shareColumn("Under-specified Share", "Try stronger", 116, palette.caution),
             { id: "Judged Sessions", header: "Judged sessions", hidden: true },
         ],
         [palette, segmentLabel, showReason],

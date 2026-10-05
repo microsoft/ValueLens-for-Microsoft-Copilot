@@ -40,15 +40,15 @@ const NO_STACK_LABELS = { disableStackedDataLabels: true };
 
 const CONSUMPTION_COLUMNS: readonly TreeColumn[] = [
     { id: "Users", header: "Users", width: 80, format: formatCell("whole"), groupOnly: true },
-    { id: "Credits Used", header: "Credits used", width: 116, format: formatCell("whole"), heat: true },
-    { id: "Allowance Used", header: "Allowance used", width: 124, format: formatCell("percent") },
-    { id: "Policy", header: "Policy", width: 150 },
+    { id: "Credits Used", header: "Credits used", width: 120, format: formatCell("whole"), heat: true },
+    { id: "Allowance Used", header: "Allowance used", width: 136, format: formatCell("percent") },
+    { id: "Policy", header: "Policy", width: 140 },
 ];
 
 const COST_COLUMNS: readonly TreeColumn[] = [
-    { id: "Credits Used", header: "Credits used", width: 116, format: formatCell("whole") },
+    { id: "Credits Used", header: "Credits used", width: 120, format: formatCell("whole") },
     { id: "Prepaid Cost", header: "Prepaid", width: 108, format: money },
-    { id: "PAYG Cost", header: "Pay-as-you-go", width: 124, format: money },
+    { id: "PAYG Cost", header: "Pay-as-you-go", width: 132, format: money },
     { id: "Total Cost", header: "Total cost", width: 116, format: money, heat: true },
 ];
 

@@ -270,10 +270,11 @@ export function CostVsValueStage() {
     const productColumns: GridColumnDef[] = useMemo(
         () => [
             { id: "Cost Line", header: "Cost", minWidth: 220 },
+            // Each width fits its header beside the sort arrow, even with a three-letter currency code; the two text columns share the rest.
             {
                 id: "Cost",
                 header: `Cost (${symbol || "currency"})`,
-                width: 132,
+                width: 108,
                 numericStyling: true,
                 cellRenderer: amountCell(symbol, "currency"),
             },
@@ -281,7 +282,7 @@ export function CostVsValueStage() {
             {
                 id: "Value",
                 header: `Estimated value (${symbol || "currency"})`,
-                width: 172,
+                width: 168,
                 numericStyling: true,
                 cellRenderer: amountCell(symbol, "currency"),
             },
@@ -294,7 +295,7 @@ export function CostVsValueStage() {
 
     const agentColumns: GridColumnDef[] = useMemo(
         () => [
-            { id: "Pair", header: "Agent", width: 280 },
+            { id: "Pair", header: "Agent", minWidth: 220 },
             { id: "Share", header: "Share of credits", width: 136, numericStyling: true, cellRenderer: percentCell },
             {
                 id: "Cost",

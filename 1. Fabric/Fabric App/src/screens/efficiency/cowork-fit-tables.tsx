@@ -86,7 +86,8 @@ export function WorkShapeTable({ ignore }: CoworkTableProps) {
             {
                 id: WORK_LABEL_COLUMN,
                 header: "Grade / how it was done",
-                width: 260,
+                // Each width fits its header beside the sort arrow; Decided by takes the rest, so the table fits a laptop screen.
+                width: 184,
                 cellRenderer: (value, row): ReactNode => {
                     if (!isGroupRow(row)) return textCell(value);
                     const grade = workWeightGrade(value);
@@ -98,13 +99,13 @@ export function WorkShapeTable({ ignore }: CoworkTableProps) {
                     );
                 },
             },
-            { id: "Sessions", header: "Sessions", width: 104, numericStyling: true, cellRenderer: formatCell("whole") },
-            { id: "Decided By", header: "Decided by", width: 300 },
-            { id: "Could Have Used", header: "Could have used", width: 208 },
+            { id: "Sessions", header: "Sessions", width: 96, numericStyling: true, cellRenderer: formatCell("whole") },
+            { id: "Decided By", header: "Decided by", minWidth: 240 },
+            { id: "Could Have Used", header: "Could have used", width: 168 },
             {
                 id: "Share Of Work",
                 header: "% of work",
-                width: 112,
+                width: 108,
                 numericStyling: true,
                 cellRenderer: heatRenderer({
                     // Grades and the shapes inside them sit on different scales, so each level heats against its peers.
@@ -195,19 +196,19 @@ export function PeopleTable({ ignore }: CoworkTableProps) {
             {
                 id: PEOPLE_LABEL_COLUMN,
                 header: `${org.label} / person`,
-                width: 280,
+                minWidth: 240,
                 cellRenderer: (value, row): ReactNode =>
                     isGroupRow(row) ? <span className="font-semibold">{textCell(value)}</span> : textCell(value),
             },
             {
                 id: "People",
                 header: "People",
-                width: 96,
+                width: 88,
                 numericStyling: true,
                 // A person row would only ever say 1.
                 cellRenderer: (value, row) => (isGroupRow(row) ? formatCell("whole")(value) : null),
             },
-            { id: "Sessions", header: "Graded sessions", width: 136, numericStyling: true, cellRenderer: formatCell("whole") },
+            { id: "Sessions", header: "Graded sessions", width: 140, numericStyling: true, cellRenderer: formatCell("whole") },
             {
                 id: "Mix",
                 header: "Mix",

@@ -5,7 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
 import { stageAnchor } from "@/components/destinations";
 import { KpiCard } from "@/components/kpi-card";
@@ -35,6 +35,15 @@ import { TaskValueBreakdown } from "./task-value-breakdown";
 const scenarios = SCENARIOS.map((id) => ({ id, label: id }));
 
 const clampRate = (value: number): number => Math.min(1000, Math.max(0, value));
+
+const TABLE_MAX_HEIGHT = 520;
+
+// Stacked, each grid fits its own list; side by side, both take the row's height.
+const TABLE_FRAME = "flex h-[var(--table-height)] flex-col 2xl:h-[var(--row-height)]";
+
+function tableFrameStyle(tableHeight: number, rowHeight: number): CSSProperties {
+    return { "--table-height": `${tableHeight}px`, "--row-height": `${rowHeight}px` } as CSSProperties;
+}
 
 function asNumber(value: unknown): number | undefined {
     return typeof value === "number" && Number.isFinite(value) ? value : undefined;
@@ -103,11 +112,12 @@ export function EstimatedValueStage() {
     );
 
     const currencySymbol = readText(summaryRow, "[Currency Symbol]") ?? "";
-    // Both grids fill the same row, so size them to the longer list.
-    const tablesHeight =
-        agentTable && organizationTable
-            ? gridHeight(Math.max(agentTable.rows.length, organizationTable.rows.length), { max: 520 })
-            : undefined;
+    const agentHeight = agentTable ? gridHeight(agentTable.rows.length, { max: TABLE_MAX_HEIGHT }) : TABLE_MAX_HEIGHT;
+    const organizationHeight = organizationTable
+        ? gridHeight(organizationTable.rows.length, { max: TABLE_MAX_HEIGHT })
+        : TABLE_MAX_HEIGHT;
+    // Side by side, both grids fill the same row, so size them to the longer list.
+    const tablesHeight = Math.max(agentHeight, organizationHeight);
     const assumption = `At ${currencySymbol}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort`;
 
     const commitRate = () => {
@@ -130,10 +140,11 @@ export function EstimatedValueStage() {
     const agentColumns: GridColumnDef[] = useMemo(
         () => [
             { id: AGENT_NAME_COLUMN, header: "Agent", minWidth: 220 },
+            // Each width fits its header beside the sort arrow, leaving the name the rest.
             {
                 id: "Active Agent Users",
                 header: "Users",
-                width: 88,
+                width: 84,
                 numericStyling: true,
                 cellRenderer: formatWholeCell,
             },
@@ -147,14 +158,14 @@ export function EstimatedValueStage() {
             {
                 id: "Expert Equivalent Hours",
                 header: "Hours",
-                width: 88,
+                width: 84,
                 numericStyling: true,
                 cellRenderer: formatHoursCell,
             },
             {
                 id: "AI Assisted Value",
                 header: `Value (${currencySymbol || "currency"})`,
-                width: 140,
+                width: 112,
                 numericStyling: true,
                 cellRenderer: heatRenderer({
                     domain: columnHeat(agentTable, "AI Assisted Value"),
@@ -171,21 +182,21 @@ export function EstimatedValueStage() {
             {
                 id: "Active Users",
                 header: "Active users",
-                width: 132,
+                width: 120,
                 numericStyling: true,
                 cellRenderer: formatWholeCell,
             },
             {
                 id: "Expert Equivalent Hours Per Week",
                 header: "Hours per week",
-                width: 152,
+                width: 136,
                 numericStyling: true,
                 cellRenderer: formatHoursCell,
             },
             {
                 id: "AI Assisted Value",
                 header: `Value (${currencySymbol || "currency"})`,
-                width: 140,
+                width: 112,
                 numericStyling: true,
                 cellRenderer: heatRenderer({
                     domain: columnHeat(organizationTable, "AI Assisted Value"),
@@ -277,8 +288,8 @@ export function EstimatedValueStage() {
 
             <TaskValueBreakdown extra={extra} currencySymbol={currencySymbol} assumption={assumption} />
 
-            <div className="grid gap-300 xl:grid-cols-2">
-                <div className="flex h-[520px] flex-col" style={tablesHeight ? { height: tablesHeight } : undefined}>
+            <div className="grid gap-300 2xl:grid-cols-2">
+                <div className={TABLE_FRAME} style={tableFrameStyle(agentHeight, tablesHeight)}>
                     {agentResult.data?.status === "error" ? (
                         <QueryError
                             className="h-full"
@@ -307,7 +318,7 @@ export function EstimatedValueStage() {
                     )}
                 </div>
 
-                <div className="flex h-[520px] flex-col" style={tablesHeight ? { height: tablesHeight } : undefined}>
+                <div className={TABLE_FRAME} style={tableFrameStyle(organizationHeight, tablesHeight)}>
                     {organizationResult.data?.status === "error" ? (
                         <QueryError
                             className="h-full"
