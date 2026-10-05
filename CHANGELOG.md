@@ -16,6 +16,38 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-05 — Analytics Hub review fixes
+
+**Templates, all four paths, and the Fabric App.**
+- **🌱 Habit Formation** follows the date filter. Stages use the most recent complete month in
+  the selected dates, capped at the last complete month in the data. Before, they always used the
+  last complete month, whatever dates were picked. Inactive is now blank for Unlicensed users and
+  Agents as well as Cowork, since none of them have a seat to measure against. The app says so,
+  and shows a message instead of a trend when the dates cover fewer than two months.
+
+**Consumption Central add-on, all four paths.** Models named from Azure meters are spelled the
+way OpenAI writes them: GPT-4o, o4-mini, GPT-5.4, GPT-4.1 and GPT-5, not "Gpt 4O", "O4 Mini" and a
+bare "5.4". Other meters, such as Pay As You Go Copilot Credit, keep their names. The app's Cost
+by model and Foundry resources views show the new names even before the template is updated.
+
+**Fabric App.**
+- **Feedback** counts only feedback dated inside the Calendar, as its weekly trend always did.
+  Feedback sent outside the report's dates no longer inflates the totals, satisfaction, topics
+  and surfaces.
+- **Cowork fit** with License set to Unlicensed says Cowork needs a Copilot license, the same as
+  the Cowork leaderboard does, rather than suggesting there's no Cowork activity yet.
+- **Agent registry** keeps its side panel below the table until the window is extra wide, so the
+  table's columns aren't squeezed on a laptop screen.
+
+**Agent Evaluator add-on.** **Knowledge Answered Rate** is now a share of knowledge searches, the
+complement of **Knowledge Gap Rate**, so the two add up to 100%. It used to divide by every
+session, so the Knowledge Gap focus card understated how often searches found an answer. The
+card's content gap is now the Gap Rate itself.
+
+**Fabric installer.** In a Key Vault you already have, the installer no longer overwrites another
+install's client secret. If the secret name is taken by a secret that isn't this app's, it is
+left alone and the new secret goes in the next free name, such as `valuelens-client-secret-2`.
+
 ## 2026-10-05 — One name for each task level, and Fabric App review fixes
 
 **Templates, all four paths.** Every page now calls the 12 task groups **Task Category** and the

@@ -6,7 +6,9 @@
 //-----------------------------------------------------------------------
 
 import { describe, expect, it } from "vitest";
+import { applyDaxFilters, dateBetween } from "@/lib/dax-filters";
 import {
+    FEEDBACK_ON_CALENDAR,
     FEEDBACK_SURFACE_MIN_COUNT,
     feedbackCategory,
     feedbackComments,
@@ -128,5 +130,15 @@ describe("feedback category labels", () => {
         for (const row of categoryRows as Record<string, unknown>[]) {
             expect([...String(row["[Category]"])].every((char) => char.charCodeAt(0) < 128)).toBe(true);
         }
+    });
+});
+
+describe("FEEDBACK_ON_CALENDAR", () => {
+    it("drops the blank Calendar row and sits alongside the date filter", () => {
+        expect(FEEDBACK_ON_CALENDAR).toBe("FILTER(ALL('Calendar'[Date]), NOT ISBLANK('Calendar'[Date]))");
+        const bar = dateBetween("'Calendar'[Date]", "2026-05-08", "2026-07-06");
+        const query = applyDaxFilters(feedbackSummary().query, [bar, FEEDBACK_ON_CALENDAR]);
+        expect(query).toContain(bar);
+        expect(query).toContain(FEEDBACK_ON_CALENDAR);
     });
 });

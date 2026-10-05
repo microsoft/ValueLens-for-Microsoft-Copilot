@@ -15,6 +15,7 @@ import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
 import { gridHeight, rowChartHeight } from "@/lib/chart-height";
 import { columnHeat, heatRenderer } from "@/lib/heat";
+import { withModelNames } from "@/lib/model-name";
 import { readNumber, readText } from "@/lib/summary-row";
 import { formatCell } from "@/lib/tree-grid";
 import {
@@ -41,6 +42,12 @@ const BY_ITEM_CHART = { perRow: 40, chrome: 130, min: 240 };
 
 function itemChartHeight(result: TableResult): number {
     return rowChartHeight(result.table?.rows.length ?? 5, BY_ITEM_CHART);
+}
+
+/** Models loaded before the template spelled them the OpenAI way still read "Gpt 4O". */
+function useModelNames(result: TableResult, column: string): TableResult {
+    const table = useMemo(() => withModelNames(result.table, column), [result.table, column]);
+    return table === result.table ? result : { ...result, table };
 }
 
 interface ResourceGridProps {
@@ -99,8 +106,8 @@ function FoundryView({ currency }: { currency: string | undefined }) {
     const dailySource = foundryDaily();
     const daily = useConsumptionTable(dailySource);
     const byModelSource = foundryByModel();
-    const byModel = useConsumptionTable(byModelSource);
-    const resources = useConsumptionTable(foundryResources());
+    const byModel = useModelNames(useConsumptionTable(byModelSource), "Item");
+    const resources = useModelNames(useConsumptionTable(foundryResources()), "Model");
     const row = summary.row;
     const days = readNumber(row, "[Days Observed]");
 

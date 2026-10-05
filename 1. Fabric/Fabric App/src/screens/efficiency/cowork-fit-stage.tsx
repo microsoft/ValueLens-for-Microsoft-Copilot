@@ -14,12 +14,13 @@ import { GradeMark } from "@/components/grade-mark";
 import { KpiCard } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
+import { useFilterContext } from "@/hooks/filter.context";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { useOutcomeColors } from "@/hooks/use-palette-theme";
 import { rowChartHeight } from "@/lib/chart-height";
 import { outcomePalette, withColorScale } from "@/lib/color-scale";
-import type { FilterKey } from "@/lib/filters";
+import { type FilterKey, unlicensedOnly } from "@/lib/filters";
 import { parseFitNotice } from "@/lib/fit-notice";
 import { scrollToAnchor } from "@/lib/scroll-to-anchor";
 import { readNumber, readText, toSummaryRow, type SummaryRow } from "@/lib/summary-row";
@@ -158,7 +159,9 @@ function FitRules({ notice }: { notice: string | undefined }) {
  * notice, instead of a page of empty figures.
  */
 export function CoworkFitStage() {
+    const { filters, applicable } = useFilterContext();
     const summary = useFilteredQuery(coworkFitSummary(), { ignore: COWORK_ONLY });
+    const unlicensed = unlicensedOnly(filters, applicable);
 
     const row = useMemo(
         () => (summary.data?.status === "success" ? toSummaryRow(summary.data.table) : undefined),
@@ -176,7 +179,12 @@ export function CoworkFitStage() {
             description="Whether the work people hand to Cowork suits it. Each session is graded by what it touched: many apps and sources suit Cowork; chat with nothing attached is worth a look."
         >
             <FilterNote ignored={COWORK_ONLY} reason="Cowork fit always reads every Cowork session." />
-            {summary.data?.status === "error" ? (
+            {unlicensed ? (
+                <QueryEmpty
+                    title="No Cowork sessions for unlicensed people"
+                    description="Cowork needs a Copilot license, so unlicensed people have no Cowork sessions to grade. Set License to All or Licensed."
+                />
+            ) : summary.data?.status === "error" ? (
                 <QueryError message={summary.data.error.message} onRetry={summary.refetch} />
             ) : summary.isLoading || !summary.data ? (
                 <div className="grid gap-300 md:grid-cols-3 xl:grid-cols-6">

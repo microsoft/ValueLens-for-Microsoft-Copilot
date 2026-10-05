@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import type { FilterKey, FilterState } from "@/lib/filters";
 import type { ColumnMetadataMap } from "@/lib/to-data-table";
 import { connection, FORMAT_PERCENT, FORMAT_WHOLE } from "../shared";
 import query from "./habit-summary.dax?raw";
@@ -36,8 +37,8 @@ export type HabitStage = (typeof habitStages)[number];
 
 /**
  * What puts someone in each stage. Stages count the distinct days a person
- * had at least one Copilot or agent interaction in the last complete
- * calendar month; Inactive is licensed people with none.
+ * had at least one Copilot or agent interaction in the most recent complete
+ * month the selected dates reach; Inactive is licensed people with none.
  */
 export const habitThresholds: Record<HabitStage, { rule: string; meaning: string }> = {
     Power: { rule: "16 or more active days", meaning: "Nearly every working day" },
@@ -50,4 +51,19 @@ export const habitThresholds: Record<HabitStage, { rule: string; meaning: string
 /** Counts and shares for all five habit stages in the most recent month. */
 export function habitSummary() {
     return { connection, query, columnMetadata };
+}
+
+/**
+ * The group the filter bar narrows to when Inactive can't be measured, or
+ * `undefined` when it can. Only Copilot has a seat list, so there is no
+ * licensed base to be idle against for unlicensed users, agents or Cowork;
+ * the model blanks Inactive for the same three.
+ */
+export function inactiveNotMeasuredFor(state: FilterState, applicable: readonly FilterKey[]): string | undefined {
+    if (applicable.includes("audience")) {
+        if (state.audience === "cowork") return "Cowork";
+        if (state.audience === "agents") return "Agents";
+    }
+    if (applicable.includes("licence") && state.licence === "unlicensed") return "unlicensed users";
+    return undefined;
 }

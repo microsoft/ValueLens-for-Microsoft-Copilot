@@ -21,7 +21,7 @@ import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { useRowToggles } from "@/hooks/use-row-toggles";
 import { gridHeight } from "@/lib/chart-height";
-import { selectedCohort } from "@/lib/filters";
+import { selectedCohort, unlicensedOnly } from "@/lib/filters";
 import { formatKpi, type KpiFormat } from "@/lib/format-kpi";
 import { heatDomain, heatRenderer } from "@/lib/heat";
 import { isGroupRow, visibleRowCount, type RollupTree } from "@/lib/rollup-tree";
@@ -361,8 +361,7 @@ export function LeaderboardStage() {
     const extras = CARD_EXTRAS[cohort];
     const isEmpty =
         summary.data?.status === "success" && !summary.isLoading && users === undefined && sessions === undefined;
-    // Cowork runs only under a Copilot license, so this pairing is empty by definition rather than by the data.
-    const unlicensedCowork = cohort === "cowork" && applicable.includes("licence") && filters.licence === "unlicensed";
+    const unlicensedCowork = cohort === "cowork" && unlicensedOnly(filters, applicable);
 
     return (
         <Section
