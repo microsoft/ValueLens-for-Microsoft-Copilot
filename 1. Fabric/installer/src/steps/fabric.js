@@ -142,6 +142,18 @@ export const endpointName = (vaultName) => `valuelens-${vaultName}`.slice(0, 64)
  */
 export const endpointRequest = (workspaceId) => `Analytics Hub: Fabric workspace ${workspaceId} reads the app secret.`;
 
+/**
+ * Whether a private endpoint connection on the vault comes from this workspace. Fabric names
+ * the endpoint "<workspace ID>.<endpoint name>", and the description carries the workspace ID.
+ * The endpoint name alone is the same for every workspace that reads the vault.
+ * @param {any} conn
+ * @param {string} workspaceId
+ */
+export const fromWorkspace = (conn, workspaceId) =>
+  [conn.name, conn.properties?.privateEndpoint?.id, conn.properties?.privateLinkServiceConnectionState?.description].some((s) =>
+    String(s ?? '').toLowerCase().includes(workspaceId.toLowerCase()),
+  );
+
 /** @param {string | undefined} a @param {string | undefined} b */
 const sameResource = (a, b) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
 
@@ -168,22 +180,18 @@ async function pollEndpoint(ctx, endpoint, done, waiting) {
  * Approves the workspace's request on the vault. Returns true once the vault shows it
  * approved, false if the request hasn't arrived or the user may not approve it.
  * @param {Ctx} ctx
- * @param {any} endpoint
  */
-async function approveOnVault(ctx, endpoint) {
+async function approveOnVault(ctx) {
   const { ui, api, config } = ctx;
   const kv = config.keyVault;
   const ws = /** @type {string} */ (config.fabric.workspaceId);
-  const ours = (/** @type {any} */ conn) =>
-    String(conn.properties?.privateLinkServiceConnectionState?.description ?? '').includes(ws) ||
-    String(conn.properties?.privateEndpoint?.id ?? '').toLowerCase().includes(String(endpoint.name).toLowerCase());
   for (let i = 0; i < 8; i++) {
-    const mine = (await api.arm.listPrivateEndpointConnections(/** @type {string} */ (kv.id))).filter(ours);
+    const mine = (await api.arm.listPrivateEndpointConnections(/** @type {string} */ (kv.id))).filter((conn) => fromWorkspace(conn, ws));
     if (mine.some((conn) => conn.properties?.privateLinkServiceConnectionState?.status === 'Approved')) return true;
     const pending = mine.filter((conn) => conn.properties?.privateLinkServiceConnectionState?.status === 'Pending');
     if (pending.length) {
       try {
-        for (const conn of pending) await api.arm.approvePrivateEndpointConnection(conn.id, 'Approved by the Analytics Hub installer.');
+        for (const conn of pending) await api.arm.approvePrivateEndpointConnection(conn.id, `Approved by the Analytics Hub installer for Fabric workspace ${ws}.`);
       } catch (err) {
         if (err instanceof HttpError && err.status === 403) return false;
         throw err;
@@ -246,7 +254,7 @@ export async function ensureVaultEndpoint(ctx) {
     if (status === 'Rejected' || status === 'Disconnected') {
       throw new Error(`The private endpoint to ${kv.name} was ${status.toLowerCase()}. Delete it under the workspace's Network security settings, then run the installer again.`);
     }
-    if (await approveOnVault(ctx, endpoint)) {
+    if (await approveOnVault(ctx)) {
       endpoint = await pollEndpoint(ctx, endpoint, (e) => e.connectionState?.status !== 'Pending', 'Waiting for Fabric to see the approval');
       continue;
     }
