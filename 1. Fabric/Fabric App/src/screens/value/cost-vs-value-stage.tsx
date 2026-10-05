@@ -36,8 +36,8 @@ function asNumber(value: unknown): number | undefined {
 function returnCell(value: unknown) {
     const ratio = asNumber(value);
     if (ratio === undefined) return null;
-    // Red only when the figure shown, to one decimal, is below 1×.
-    const below = Math.round(ratio * 10) < 10;
+    // Red whenever cost outruns value; formatKpi keeps any such figure below 1.0×.
+    const below = ratio < 1;
     return <span className={below ? "text-destructive" : undefined}>{formatKpi(ratio, "multiple")}</span>;
 }
 
