@@ -453,7 +453,8 @@ user per week, expert-equivalent hours per week, and the top value outcome.
 
 ### Habit Formation: has it become a habit?
 
-Each person's active days in the **last complete calendar month** place them in one stage:
+Each person's active days in the **most recent complete calendar month in the selected dates**
+place them in one stage:
 
 | Stage | Active days | Roughly |
 |---|---|---|
@@ -465,7 +466,9 @@ Each person's active days in the **last complete calendar month** place them in 
 
 - If the data ends on a month-end, that month counts as complete. Otherwise the previous month is
   used, so a part month never pushes people down a stage.
-- Inactive needs a seat, so it is blank in the Cowork cohort, which has no seat inventory.
+- A date filter moves the month: the stage uses the last month the selected dates touch, capped at
+  the last complete month. If the dates end before any complete month, the page shows no stage.
+- Inactive needs a seat, so it is not measured for Unlicensed users, Agents or Cowork.
 - The trend repeats the rule for each complete month.
 - **These cut-offs are an inherited working mapping, not a validated benchmark.** No external
   study is behind them. Use them to compare groups and track movement, not as absolute targets.

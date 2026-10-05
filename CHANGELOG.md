@@ -16,6 +16,15 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-05 — Analytics Hub review fixes
+
+**Templates, all four paths, and the Fabric App.**
+- **🌱 Habit Formation** follows the date filter. Stages use the most recent complete month in
+  the selected dates, capped at the last complete month in the data. Before, they always used the
+  last complete month, whatever dates were picked. Inactive is now blank for Unlicensed users and
+  Agents as well as Cowork, since none of them have a seat to measure against. The app says so,
+  and shows a message instead of a trend when the dates cover fewer than two months.
+
 ## 2026-10-05 — One name for each task level, and Fabric App review fixes
 
 **Templates, all four paths.** Every page now calls the 12 task groups **Task Category** and the
