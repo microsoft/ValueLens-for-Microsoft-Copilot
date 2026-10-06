@@ -448,9 +448,10 @@ test('a run that completed with a failed load says which, and still checks the d
   assert.equal(await runCommand(ctx, 'run', { wait: true }), false);
   const text = ui.text();
   assert.match(text, /✓ Pipeline finished in 30m/);
-  assert.match(text, /! Org Data Ingester failed/);
+  assert.match(text, /✗ Org data \(Entra ID\): failed/);
+  assert.match(text, /couldn't sign in/);
+  assert.match(text, /then run "valuelens-install rerun-failed"\./);
   assert.doesNotMatch(text, /Conditionally/);
-  assert.match(text, /To see why, open AnalyticsHub_Pipeline in Fabric/);
   assert.deepEqual(fabric.calls, ['runJob Pipeline', 'runJob RunNotebook'], 'the data check still runs');
   assert.match(text, /✓ Licensed users: 5 rows/);
 });
@@ -470,11 +471,10 @@ test('a run a busy capacity turned away says to wait and run it again', async ()
   assert.equal(result.ok, false);
   assert.deepEqual(result.failed, ['Run_Audit_Log_Ingester']);
   const text = ui.text();
-  assert.match(text, /! Audit Log Ingester failed/);
-  assert.match(text, /capacity was too busy to start a notebook\. Nothing is lost\./);
+  assert.match(text, /✗ Copilot audit log: failed/);
+  assert.match(text, /capacity was too busy to start it\.\n.*Nothing is lost\. Run "valuelens-install rerun-failed" once the capacity is quieter/);
   assert.equal(text.split('too busy').length, 2, 'said once');
-  assert.match(text, /Wait a few minutes, then run "valuelens-install run" again\./);
-  assert.doesNotMatch(text, /To see why/);
+  assert.match(text, /✓ Licensed users/);
 });
 
 test("run doesn't start a second run while one is going, but ignores one stuck for over a day", async () => {
@@ -577,17 +577,19 @@ test('status names the loads that failed in the latest run, unless a retry or th
   };
 
   let text = await run();
-  assert.match(text, /! M365 Activity Ingester failed in the latest run/);
-  assert.doesNotMatch(text, /Licensed Users Ingester failed/, 'its retry worked');
-  assert.doesNotMatch(text, /Agent365 Registry Ingester failed/, 'the fallback stood in');
-  assert.doesNotMatch(text, /Org Data Ingester failed/, 'that was an earlier run');
+  assert.match(text, /Latest run, by source/);
+  assert.match(text, /✗ Microsoft 365 activity: failed/);
+  assert.match(text, /✓ Licensed users \(2 attempts\)/, 'its retry worked');
+  assert.match(text, /✓ Agent 365 \(export\)/);
+  assert.doesNotMatch(text, /Agent 365 \(API\)/, 'the fallback stood in');
+  assert.doesNotMatch(text, /Org data/, 'that was an earlier run');
   assert.doesNotMatch(text, /Conditionally/);
-  assert.match(text, /capacity was too busy to start a notebook/);
+  assert.match(text, /capacity was too busy to start it/);
 
   fabric.activityRuns['j-2'][4].status = 'Failed';
   text = await run();
-  assert.match(text, /! Agent365 Registry Ingester failed in the latest run/);
-  assert.match(text, /! Agent365 CSV Fallback failed in the latest run/);
+  assert.match(text, /✗ Agent 365 \(API\): failed/);
+  assert.match(text, /✗ Agent 365 \(export\): failed/);
 });
 
 test('data check runs the notebook and prints the summary it saved', async () => {
