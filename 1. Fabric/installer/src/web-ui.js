@@ -192,6 +192,10 @@ export function createWebUi(opts = {}) {
     review: (plan) => {
       emit({ type: 'review', plan });
     },
+    /** @param {import('./loads.js').LoadCard[]} cards */
+    loads: (cards) => {
+      emit({ type: 'loads', cards });
+    },
 
     /**
      * @template T

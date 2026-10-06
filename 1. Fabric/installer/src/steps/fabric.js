@@ -6,6 +6,7 @@
 import { createHash } from 'node:crypto';
 import { enabledModules, notebooksFor } from '../catalog.js';
 import { routedSources, routerSignaturesJson, routerWanted } from '../uploads.js';
+import { statusConfigJson } from '../loads.js';
 import { parseResourceId } from '../clients/azure.js';
 import { scheduleBody } from '../clients/fabric.js';
 import { HttpError } from '../http.js';
@@ -304,6 +305,7 @@ export function notebookSettings(ctx, nb) {
   // Merge upserts each run's window, so environments and days accumulate without duplicates.
   if (nb.key === 'agentTranscripts') values = { SOURCE_MODE: 'dataverse', WRITE_MODE: 'merge', RAW_TABLE: '' };
   if (nb.key === 'uploadRouter') values = routerValues(config);
+  if (nb.key === 'loadStatus') values = { STATUS_JSON: statusConfigJson() };
   return {
     ...(nb.credentials
       ? {
@@ -524,15 +526,14 @@ export const agentEvaluatorModelDeployed = (config) =>
   !!(config.modules.agentEvaluator && modelDeployed(config) && config.agentEvaluator?.model?.id && config.agentEvaluator.model.bound);
 
 /**
- * @param {Ctx} ctx
- * @param {{ force?: boolean }} [opts]
+ * What the pipeline is built from, for this install.
+ * @param {import('../config.js').InstallConfig} config
+ * @returns {import('../transform/pipeline.js').PipelineSettings}
  */
-export async function ensurePipeline(ctx, opts = {}) {
-  const { ui, config, api, sources } = ctx;
+export function pipelineSettings(config) {
   const f = config.fabric;
-  const ws = /** @type {string} */ (f.workspaceId);
-  const definition = buildPipeline(sources.pipeline, {
-    workspaceId: ws,
+  return {
+    workspaceId: /** @type {string} */ (f.workspaceId),
     notebookIds: f.notebooks,
     modules: config.modules,
     backfillDays: config.history.days,
@@ -545,7 +546,49 @@ export async function ensurePipeline(ctx, opts = {}) {
     workday: workdayOn(config),
     agent365Csv: agent365Csv(config),
     coworkDataflowId: coworkDataflowOn(config) ? config.consumption.dataflowId : undefined,
-  });
+  };
+}
+
+/** Where the setting that lets pipeline notebooks share a Spark session lives. */
+export const HIGH_CONCURRENCY_PATH =
+  'Workspace settings > Data Engineering/Science > Spark settings > High concurrency > "For pipeline running multiple notebooks"';
+
+/**
+ * Lets the pipeline's notebooks share one Spark session, so a run starts a session once instead
+ * of once per notebook. That is what used to fill a small capacity (error 430).
+ * @param {Ctx} ctx
+ */
+export async function ensureSparkSettings(ctx) {
+  const { ui, config, api } = ctx;
+  const ws = /** @type {string} */ (config.fabric.workspaceId);
+  try {
+    const settings = await api.fabric.getSparkSettings(ws);
+    if (settings?.highConcurrency?.notebookPipelineRunEnabled === true) {
+      ui.ok('Pipeline notebooks share one Spark session');
+      return;
+    }
+    await api.fabric.updateSparkSettings(ws, { highConcurrency: { notebookPipelineRunEnabled: true } });
+    ui.ok('Turned on high concurrency for pipelines, so the pipeline\'s notebooks share one Spark session');
+  } catch (err) {
+    if (!(err instanceof HttpError)) throw err;
+    ui.warn(
+      err.status === 403
+        ? 'Couldn\'t turn on high concurrency for pipelines: that needs the workspace Admin role.'
+        : `Couldn't turn on high concurrency for pipelines: ${err.message}`,
+    );
+    ui.note(`Each notebook will start its own Spark session, which can fill a small capacity. A workspace admin can turn it on: ${HIGH_CONCURRENCY_PATH}.`);
+  }
+}
+
+/**
+ * @param {Ctx} ctx
+ * @param {{ force?: boolean }} [opts]
+ */
+export async function ensurePipeline(ctx, opts = {}) {
+  const { ui, config, api, sources } = ctx;
+  const f = config.fabric;
+  const ws = /** @type {string} */ (f.workspaceId);
+  const definition = buildPipeline(sources.pipeline, pipelineSettings(config));
   const signature = pipelineSignature(config);
   const items = await api.fabric.listItems(ws, 'DataPipeline');
 

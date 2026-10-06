@@ -44,6 +44,12 @@ const COMMANDS = {
     desc: 'Start the pipeline, wait for it, then run the data check.',
     off: 'There is no pipeline yet.',
   },
+  'rerun-failed': {
+    title: 'Rerun failed loads', short: 'Rerun failed', icon: 'refresh', section: 'Rerun',
+    row: 'Rerun failed loads', button: 'Rerun failed',
+    desc: 'Run again only the loads that failed in the latest pipeline run, and the steps that waited for them, one at a time.',
+    off: 'There is no pipeline yet.',
+  },
   refresh: {
     title: 'Refresh the models', short: 'Refresh', icon: 'refresh', section: 'Model refresh',
     row: 'Refresh the models', button: 'Refresh',
@@ -86,7 +92,7 @@ const COMMANDS = {
     off: 'No source is set to Upload CSV. Choose Repair or change set-up to change that.',
   },
 };
-const ROW_ORDER = ['run', 'refresh', 'status', 'upload', 'check', 'update', 'deploy-app', 'rotate-secret', 'install'];
+const ROW_ORDER = ['run', 'rerun-failed', 'refresh', 'status', 'upload', 'check', 'update', 'deploy-app', 'rotate-secret', 'install'];
 
 const INSTALL_STAGES = [
   'Sign in', 'Checking your tenant', 'Data sources', 'Power BI', 'Fabric', 'App registration',
@@ -527,6 +533,11 @@ function apply(e) {
       add(run, { t: 'review', plan: e.plan });
       return;
     }
+    case 'loads':
+      ensureRoot(run, e.at);
+      add(run, { t: 'loads', cards: e.cards ?? [] });
+      run.failedLoads = (e.cards ?? []).some((card) => card.state === 'failed');
+      return;
     case 'auto':
       ensureRoot(run, e.at);
       add(run, { t: 'qa', message: e.message, display: e.display, auto: true });
@@ -819,9 +830,27 @@ function renderItem(it) {
       return it.done ? null : h('div', { class: 'signin' }, h('span', { class: 'spin', 'aria-hidden': 'true' }), h('span', null, WAITING[it.method] ?? 'Signing in.'));
     case 'review':
       return renderReview(it.plan);
+    case 'loads':
+      return renderLoads(it.cards);
     default:
       return null;
   }
+}
+
+const LOAD_GLYPH = { ok: 'check', failed: 'x', skipped: 'minus', running: 'clock' };
+const LOAD_STATE = { ok: 'loaded', failed: 'failed', skipped: 'didn\'t run', running: 'still running' };
+
+/** One card per source: whether it loaded, why not and what to do. */
+function renderLoads(cards) {
+  return h('ul', { class: 'loads', 'aria-label': 'Loads by source' },
+    cards.map((card) => h('li', { class: `load ${card.state}` },
+      h('span', { class: 'gl' }, icon(LOAD_GLYPH[card.state] ?? 'circle')),
+      h('div', null,
+        h('span', { class: 'load-name' }, card.name),
+        ' ',
+        h('span', { class: 'load-state' }, LOAD_STATE[card.state] ?? card.state, card.attempts ? `, ${card.attempts} attempts` : ''),
+        card.reason ? h('p', null, card.reason) : null,
+        (card.fix ?? []).length ? h('p', { class: 'load-fix' }, card.fix.join('\n')) : null))));
 }
 
 function renderProgress(it) {
@@ -1114,11 +1143,14 @@ function renderOutcome(run) {
     ]],
     cancelled: ['', 'Stopped', [install && !built ? 'Nothing was created.' : 'Nothing after this point ran.']],
   }[r] ?? ['', 'Finished', []];
+  const rerun = run.failedLoads && app.state?.record?.can?.['rerun-failed'];
   return h('section', { class: `outcome ${copy[0]}`.trim(), 'aria-labelledby': 'outcome-title' },
     h('h2', { id: 'outcome-title' }, copy[1]),
     copy[2].filter(Boolean).map((p) => h('p', null, p)),
+    rerun ? h('p', null, 'Some loads failed. Rerun failed runs just those again, and the steps that waited for them.') : null,
     h('div', { class: 'actions' },
-      h('button', { type: 'button', class: 'btn primary', onclick: () => saveRecord(run) }, icon('download'), 'Save a record'),
+      rerun ? h('button', { type: 'button', class: 'btn primary', onclick: () => start('rerun-failed') }, icon('refresh'), 'Rerun failed') : null,
+      h('button', { type: 'button', class: rerun ? 'btn' : 'btn primary', onclick: () => saveRecord(run) }, icon('download'), 'Save a record'),
       h('button', { type: 'button', class: 'btn', onclick: () => show('home') }, 'Back to home')));
 }
 
@@ -1491,6 +1523,12 @@ function itemMarkdown(it, depth) {
       return [`- ${it.label}: ${it.status || 'started'}${it.ms != null ? ` (${fmt(it.ms)})` : ''}`];
     case 'review':
       return ['', ...reviewMarkdown(it.plan), ''];
+    case 'loads':
+      return it.cards.flatMap((card) => [
+        `- ${{ ok: '✓', failed: '✗', skipped: '⚠', running: '…' }[card.state] ?? ''} ${card.name}: ${LOAD_STATE[card.state] ?? card.state}${card.attempts ? ` (${card.attempts} attempts)` : ''}`,
+        ...(card.reason ? [`  - ${card.reason}`] : []),
+        ...(card.fix ?? []).map((f) => `  - ${f.trim()}`),
+      ]);
     default:
       return [];
   }

@@ -240,7 +240,7 @@ export function fabricApi(http) {
      * Starts a job and returns the URL to poll.
      * @param {string} workspaceId
      * @param {string} itemId
-     * @param {'Pipeline' | 'RunNotebook'} jobType
+     * @param {'Pipeline' | 'RunNotebook' | 'Refresh'} jobType  Refresh runs a Dataflow.
      * @param {any} [executionData]
      */
     async runJob(workspaceId, itemId, jobType, executionData) {
@@ -267,14 +267,42 @@ export function fabricApi(http) {
      * @returns {Promise<any[]>}
      */
     async queryActivityRuns(workspaceId, jobId, after, before) {
-      const res = await http.post(`/workspaces/${workspaceId}/datapipelines/pipelineruns/${jobId}/queryactivityruns`, {
-        filters: [],
-        orderBy: [{ orderBy: 'ActivityRunStart', order: 'ASC' }],
-        lastUpdatedAfter: after.toISOString(),
-        lastUpdatedBefore: before.toISOString(),
-      });
-      return Array.isArray(res) ? res : (res?.value ?? []);
+      /** @type {any[]} */
+      const out = [];
+      /** @type {string | undefined} */
+      let continuationToken;
+      for (let page = 0; page < 50; page++) {
+        const res = await http.post(`/workspaces/${workspaceId}/datapipelines/pipelineruns/${jobId}/queryactivityruns`, {
+          filters: [],
+          orderBy: [{ orderBy: 'ActivityRunStart', order: 'ASC' }],
+          lastUpdatedAfter: after.toISOString(),
+          lastUpdatedBefore: before.toISOString(),
+          ...(continuationToken ? { continuationToken } : {}),
+        });
+        out.push(...(Array.isArray(res) ? res : (res?.value ?? [])));
+        continuationToken = Array.isArray(res) ? undefined : res?.continuationToken;
+        if (!continuationToken) break;
+      }
+      return out;
     },
+
+    /**
+     * The pipeline's saved definition, parsed from `pipeline-content.json`.
+     * @param {string} workspaceId
+     * @param {string} id
+     * @returns {Promise<any>}
+     */
+    async getPipelineDefinition(workspaceId, id) {
+      const res = await http.requestLro('POST', `/workspaces/${workspaceId}/dataPipelines/${id}/getDefinition`, { lroResult: true });
+      const part = res?.definition?.parts?.find((/** @type {any} */ p) => p.path === 'pipeline-content.json');
+      if (!part?.payload) throw new Error('Fabric returned the pipeline without its definition.');
+      return JSON.parse(Buffer.from(part.payload, 'base64').toString('utf8'));
+    },
+
+    /** Spark settings of a workspace. Needs workspace Admin. @param {string} workspaceId */
+    getSparkSettings: (workspaceId) => http.get(`/workspaces/${workspaceId}/spark/settings`),
+    /** @param {string} workspaceId @param {any} body  Only the settings to change. */
+    updateSparkSettings: (workspaceId, body) => http.patch(`/workspaces/${workspaceId}/spark/settings`, body),
 
     /** @param {string} workspaceId @param {string} itemId */
     listSchedules: (workspaceId, itemId) => http.list(`/workspaces/${workspaceId}/items/${itemId}/jobs/Pipeline/schedules`),
