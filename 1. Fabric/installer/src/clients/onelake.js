@@ -1,5 +1,5 @@
 // @ts-check
-/** Reads small files from, and makes folders in, a Lakehouse through the OneLake (ADLS Gen2) endpoint. */
+/** Reads and writes small files, and makes folders, in a Lakehouse through the OneLake (ADLS Gen2) endpoint. */
 import { HttpError } from '../http.js';
 
 export const ONELAKE_URL = 'https://onelake.dfs.fabric.microsoft.com';
@@ -41,6 +41,24 @@ export function oneLakeApi(http) {
         if (err instanceof HttpError && err.status === 409) return false;
         throw err;
       }
+    },
+
+    /**
+     * Writes a file, replacing any file already at that path.
+     * @param {string} workspaceId
+     * @param {string} lakehouseId
+     * @param {string} path  Relative to the Lakehouse root, e.g. Files/analytics_hub_uploads/x.csv.
+     * @param {Uint8Array} data
+     */
+    async writeFile(workspaceId, lakehouseId, path, data) {
+      const target = url(workspaceId, lakehouseId, path);
+      await http.put(target, undefined, { query: { resource: 'file' }, headers });
+      const CHUNK = 32 * 1024 * 1024;
+      for (let position = 0; position < data.length; position += CHUNK) {
+        const part = data.subarray(position, Math.min(position + CHUNK, data.length));
+        await http.patch(target, part, { query: { action: 'append', position }, headers: { ...headers, 'Content-Type': 'application/octet-stream' } });
+      }
+      await http.patch(target, undefined, { query: { action: 'flush', position: data.length }, headers });
     },
   };
 }

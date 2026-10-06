@@ -17,6 +17,8 @@ import { agentEvaluatorModelWanted, planAgentEvaluator } from './agent-evaluator
 import { AZURE_AI_ROLES, consumptionModelWanted, planConsumption } from './consumption.js';
 import { describeSchedule, displayNames, freeName, PIPELINE_NAME } from './fabric.js';
 import { connectionName } from './model.js';
+import { planDataSources } from './data-sources.js';
+import { DATA_SOURCES, modulesFromSources, routerWanted, UPLOAD_DIR } from '../uploads.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
@@ -221,15 +223,11 @@ export function collectChoices(modules) {
 export async function plan(ctx, pre) {
   const { ui, config, api } = ctx;
 
-  ui.heading('What to collect');
-  const picked = await ui.checkbox('Tick the data you want. The dashboard is built on the first two, so they\'re always collected.', collectChoices(config.modules));
-  config.modules = /** @type {import('../catalog.js').ModuleChoice} */ ({
-    orgData: true,
-    ...Object.fromEntries(OPTIONAL_MODULES.map((id) => [id, picked.includes(id)])),
-  });
+  await planDataSources(ctx);
 
   await planPowerBi(ctx, pre);
   if (config.modules.consumption) await planConsumption(ctx, pre);
+  config.modules = modulesFromSources(config.dataSources);
   if (config.modules.agentEvaluator) await planAgentEvaluator(ctx);
 
   if (config.firstRun?.status !== 'Completed') {
@@ -422,6 +420,7 @@ export async function reserveNames(ctx) {
     semanticModel: !!sm.enabled,
     azureAi: !!config.modules.consumption && !!cc.azureSubscriptionId,
     dataverse: !!config.modules.agentEvaluator && ae.environments.length > 0,
+    dataSources: config.dataSources,
   });
   f.notebookNames ??= {};
   for (const nb of notebooks) {
@@ -464,7 +463,7 @@ export function planReview(ctx, pre) {
   const appName = config.app.appId ? config.app.displayName ?? config.app.appId : APP_NAME;
   const withAzureAi = !!config.modules.consumption && !!cc.azureSubscriptionId;
   const withTranscripts = !!config.modules.agentEvaluator && ae.environments.length > 0;
-  const notebooks = notebooksFor(config.modules, { semanticModel: !!sm.enabled, azureAi: withAzureAi, dataverse: withTranscripts });
+  const notebooks = notebooksFor(config.modules, { semanticModel: !!sm.enabled, azureAi: withAzureAi, dataverse: withTranscripts, dataSources: config.dataSources });
 
   /** @type {ReviewItem[]} */
   const creates = [
@@ -495,6 +494,15 @@ export function planReview(ctx, pre) {
     },
     { kind: 'Pipeline', name: f.pipelineName ?? PIPELINE_NAME, isNew: !f.pipelineId, detail: `Runs the notebooks ${describeSchedule(config.schedule)}.` },
   ];
+  if (routerWanted(config.dataSources)) {
+    const n = ctx.pendingUploads?.length ?? 0;
+    creates.push({
+      kind: 'Folder',
+      name: UPLOAD_DIR,
+      isNew: !config.uploads.folders,
+      detail: `Drop exports here; each run loads them.${n ? ` ${n} file${n === 1 ? '' : 's'} uploaded now.` : ''}`,
+    });
+  }
   if (sm.enabled) {
     creates.push({ kind: 'Semantic model', name: sm.name, isNew: !sm.id });
     if (consumptionModelWanted(ctx)) creates.push({ kind: 'Semantic model', name: cc.model.name, isNew: !cc.model.id });
@@ -513,7 +521,7 @@ export function planReview(ctx, pre) {
   const grants = [
     {
       who: appWho,
-      what: `Microsoft Graph application permissions: ${permissionsFor(config.modules).join(', ')}`,
+      what: `Microsoft Graph application permissions: ${permissionsFor(config.modules, config.dataSources).join(', ')}`,
       where: 'Your tenant, through admin consent',
       detail: pre && !pre.canConsent ? 'You can\'t grant it yourself. You get a link for a Global Administrator or Privileged Role Administrator to approve.' : undefined,
     },
@@ -569,6 +577,10 @@ export async function confirmPlan(ctx, pre) {
   const mods = collectedLabels(config.modules);
   ui.heading('Ready to set up');
   ui.info(`Data:        ${mods.join(', ')}`);
+  const exports = DATA_SOURCES.filter((s) => config.dataSources[s.id] === 'csv').map((s) => s.label);
+  if (exports.length) ui.info(`Exports:     ${exports.join(', ')} ${c.dim(`(dropped in ${UPLOAD_DIR})`)}`);
+  const uploads = ctx.pendingUploads ?? [];
+  if (uploads.length) ui.info(`Uploading:   ${uploads.map((u) => u.name).join(', ')}`);
   ui.info(`Workspace:   ${config.fabric.workspaceName ?? config.fabric.workspaceId} ${config.fabric.workspaceId ? '' : c.dim('(new)')}`);
   ui.info(`Lakehouse:   ${config.fabric.lakehouseName}`);
   ui.info(`App:         ${config.app.appId ? config.app.appId : `${APP_NAME} ${c.dim('(new)')}`}`);

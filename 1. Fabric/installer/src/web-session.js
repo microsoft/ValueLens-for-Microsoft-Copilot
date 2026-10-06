@@ -9,8 +9,9 @@ import { connect as realConnect, createCtx, runCommand } from './install.js';
 import { fromExe } from './launch.js';
 import { loadSources } from './sources.js';
 import { describeSchedule, modelDeployed } from './steps/fabric.js';
+import { routerWanted } from './uploads.js';
 
-export const WEB_COMMANDS = ['install', 'update', 'run', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret'];
+export const WEB_COMMANDS = ['install', 'update', 'run', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'upload'];
 const METHODS = ['browser', 'device-code', 'azure-cli'];
 
 /** @typedef {'browser' | 'device-code' | 'azure-cli'} Method */
@@ -45,6 +46,7 @@ export function describeRecord(config) {
       'deploy-app': modelDeployed(config),
       status: true,
       'rotate-secret': !!(config.app.appId && config.keyVault.uri),
+      upload: installed && !!f.notebooks.uploadRouter && routerWanted(config.dataSources),
     },
   };
 }

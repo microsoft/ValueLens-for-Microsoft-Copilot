@@ -51,9 +51,19 @@ export async function planConsumption(ctx, pre) {
   }
 
   const subs = pre.subscriptions;
+  if (config.dataSources.azureAi === 'skip') {
+    if (cc.azureSubscriptionId) cc.azureAccess = false;
+    cc.azureSubscriptionId = '';
+    cc.azureSubscriptionName = undefined;
+    cc.paygSubscriptions = [];
+    return;
+  }
   if (!subs.length) {
     if (cc.azureSubscriptionId) ui.ok(`Azure AI: ${cc.azureSubscriptionName ?? cc.azureSubscriptionId}`);
-    else ui.note('No Azure subscription to read Azure AI costs from, so Azure AI is left out.');
+    else {
+      ui.note('No Azure subscription to read Azure AI costs from, so Azure AI is left out.');
+      config.dataSources.azureAi = 'skip';
+    }
     return;
   }
 
@@ -88,6 +98,7 @@ export async function planConsumption(ctx, pre) {
   if (choice !== cc.azureSubscriptionId) cc.azureAccess = false;
   // '' remembers that Azure AI was left out on purpose.
   cc.azureSubscriptionId = choice;
+  if (!choice) config.dataSources.azureAi = 'skip';
   cc.azureSubscriptionName = choice ? subs.find((s) => s.subscriptionId === choice)?.displayName : undefined;
   if (policies) planPayg(ctx, billed, subs);
   else if (cc.paygSubscriptions) cc.paygSubscriptions = cc.paygSubscriptions.filter((p) => p.subscriptionId.toLowerCase() !== choice.toLowerCase());

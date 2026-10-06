@@ -36,6 +36,8 @@ import {
 } from './steps/fabric.js';
 import { ensureModelConnection, ensureSemanticModel, modelUrl, refreshModel, rotateModelSecret } from './steps/model.js';
 import { confirmPlan, plan, preflight } from './steps/plan.js';
+import { dataSourcesSummary, ensureUploads, uploadCommand } from './steps/data-sources.js';
+import { routerWanted } from './uploads.js';
 import { checkData, chooseLoad, runDataCheck, runPipeline, status } from './steps/run.js';
 import { prepareNotebook, serialiseNotebook } from './transform/notebook.js';
 import { buildAgentEvaluatorModel, buildConsumptionModel, buildModel, loadTemplateModel } from './transform/model.js';
@@ -69,6 +71,9 @@ import { c } from './ui.js';
  * @property {boolean} [runFirstLoad]
  * @property {{ sp: any, roles: { id: string, value: string }[] }} [graphRoles]
  * @property {import('./steps/app.js').Runner} [runner]  Runs the app's build tools; tests replace it.
+ * @property {import('./staging.js').PendingUpload[]} [pendingUploads]  Exports to upload to the drop folder during the install.
+ * @property {string[]} [csvFiles]  Exports named with --csv.
+ * @property {string} [configFile]  The install record's path.
  */
 
 /**
@@ -119,6 +124,7 @@ export function createCtx(o) {
     sources: o.sources,
     sleep: o.sleep ?? defaultSleep,
     now: o.now ?? (() => new Date()),
+    configFile: o.file,
   };
 }
 
@@ -197,7 +203,7 @@ export async function rewindable(ctx, fn) {
   // save() writes this object, so it's put back in place rather than replaced.
   const config = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (ctx.config));
   const snapshot = structuredClone(config);
-  const { pendingSecret, runFirstLoad } = ctx;
+  const { pendingSecret, runFirstLoad, pendingUploads } = ctx;
   const real = ctx.api;
   ctx.api = memoApi(real);
   ui.begin();
@@ -211,6 +217,7 @@ export async function rewindable(ctx, fn) {
         Object.assign(config, structuredClone(snapshot));
         ctx.pendingSecret = pendingSecret;
         ctx.runFirstLoad = runFirstLoad;
+        ctx.pendingUploads = pendingUploads;
       }
     }
   } finally {
@@ -242,6 +249,7 @@ export async function install(ctx, opts) {
   const withApp = withModel && !!config.fabricApp.enabled;
   const withConsumption = !!config.modules.consumption;
   const withAgentEvaluator = !!config.modules.agentEvaluator;
+  const withUploads = routerWanted(config.dataSources) || !!ctx.pendingUploads?.length || !!config.uploads.feedbackFlow;
   const titles = [
     'Key Vault',
     'App registration',
@@ -250,6 +258,7 @@ export async function install(ctx, opts) {
     ...(withModel ? ['Semantic model'] : []),
     ...(withConsumption ? ['Credit consumption'] : []),
     ...(withAgentEvaluator ? ['Copilot Studio transcripts'] : []),
+    ...(withUploads ? ['Data uploads'] : []),
     'Notebooks, pipeline and schedule',
     ...(withApp ? ['Analytics Hub app'] : []),
     ...(ctx.runFirstLoad ? ['First load'] : withModel ? ['Model refresh'] : []),
@@ -279,6 +288,10 @@ export async function install(ctx, opts) {
   if (withAgentEvaluator) {
     step('Copilot Studio transcripts');
     await agentEvaluatorSteps(ctx);
+  }
+  if (withUploads) {
+    step('Data uploads');
+    await ensureUploads(ctx);
   }
   step('Notebooks, pipeline and schedule');
   await ensureNotebooks(ctx);
@@ -400,6 +413,7 @@ export async function update(ctx, opts = {}) {
   }
   if (config.modules.consumption) await consumptionSteps(ctx, { force: true });
   if (config.modules.agentEvaluator) await agentEvaluatorSteps(ctx, { force: true });
+  if (routerWanted(config.dataSources)) await ensureUploads(ctx);
   await ensureNotebooks(ctx, { force: true });
   await ensurePipeline(ctx, { force: true });
   await ensureSchedule(ctx);
@@ -442,7 +456,7 @@ export async function refresh(ctx, opts) {
  * Runs one command against a signed-in context.
  * @param {Ctx} ctx
  * @param {string} command
- * @param {{ wait: boolean, backfillDays?: number }} opts
+ * @param {{ wait: boolean, backfillDays?: number, files?: string[], run?: boolean }} opts
  * @returns {Promise<boolean>} false when a run or refresh it waited for didn't succeed.
  */
 export async function runCommand(ctx, command, opts) {
@@ -472,6 +486,8 @@ export async function runCommand(ctx, command, opts) {
     case 'rotate-secret':
       await rotateSecret(ctx);
       return true;
+    case 'upload':
+      return uploadCommand(ctx, { files: opts.files ?? [], run: opts.run, wait: opts.wait }, (c2, o) => run(c2, o));
     default:
       throw new Error(`Unknown command "${command}".`);
   }
@@ -538,6 +554,7 @@ export async function summary(ctx) {
     ui.info(`3. Keep ${c.bold('valuelens-install.json')}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);
     if (config.modules.consumption) consumptionSummary(ctx);
     if (config.modules.agentEvaluator) agentEvaluatorSummary(ctx);
+    dataSourcesSummary(ctx);
     return;
   }
 
@@ -559,6 +576,7 @@ export async function summary(ctx) {
   ui.info(`4. Keep ${c.bold('valuelens-install.json')}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);
   if (config.modules.consumption) consumptionSummary(ctx);
   if (config.modules.agentEvaluator) agentEvaluatorSummary(ctx);
+  dataSourcesSummary(ctx);
 }
 
 /**
@@ -600,7 +618,7 @@ export function preview(o) {
 
   mkdirSync(join(out, 'notebooks'), { recursive: true });
   let n = 10;
-  for (const nb of notebooksFor(config.modules, { semanticModel: withModel, azureAi: withAzureAi, dataverse: withTranscripts })) {
+  for (const nb of notebooksFor(config.modules, { semanticModel: withModel, azureAi: withAzureAi, dataverse: withTranscripts, dataSources: config.dataSources })) {
     const prepared = prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb));
     writeFileSync(join(out, 'notebooks', `${nb.displayName}.ipynb`), serialiseNotebook(prepared), 'utf8');
     ctx.config.fabric.notebooks[nb.key] = ctx.config.fabric.notebooks[nb.key] ?? fake(n++);
@@ -620,7 +638,7 @@ export function preview(o) {
   writeFileSync(join(out, 'schedule.json'), `${JSON.stringify(scheduleBody(config.schedule, o.now), null, 2)}\n`, 'utf8');
   writeFileSync(
     join(out, 'graph-permissions.txt'),
-    `Microsoft Graph application permissions for the app registration:\n${permissionsFor(config.modules).map((p) => `  ${p}\n`).join('')}`,
+    `Microsoft Graph application permissions for the app registration:\n${permissionsFor(config.modules, config.dataSources).map((p) => `  ${p}\n`).join('')}`,
     'utf8',
   );
   if (withModel) {

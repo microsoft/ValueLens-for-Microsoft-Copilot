@@ -10,7 +10,7 @@
  */
 import { posix } from 'node:path';
 import { NOTEBOOKS, NOTEBOOKS_DIR } from '../src/catalog.js';
-import { APP_DIR, PIPELINE_TEMPLATE } from '../src/sources.js';
+import { APP_DIR, FEEDBACK_FLOW_TEMPLATE, PIPELINE_TEMPLATE } from '../src/sources.js';
 import { PREBUILT_STATIC } from '../src/steps/app.js';
 import { AGENT_EVALUATOR_TEMPLATE, CONSUMPTION_TEMPLATE, MODEL_TEMPLATE } from '../src/transform/model.js';
 
@@ -50,6 +50,7 @@ export function sourceFiles() {
     MODEL_TEMPLATE,
     CONSUMPTION_TEMPLATE,
     AGENT_EVALUATOR_TEMPLATE,
+    FEEDBACK_FLOW_TEMPLATE,
   ].map(slash);
 }
 

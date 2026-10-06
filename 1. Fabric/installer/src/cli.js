@@ -10,8 +10,9 @@ import { commandLine } from './launch.js';
 import { runWizard } from './server.js';
 import { loadSources } from './sources.js';
 import { c, createUi } from './ui.js';
+import { DATA_SOURCE_IDS, modulesFromSources, parseDataFlags } from './uploads.js';
 
-const COMMANDS = ['install', 'update', 'run', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'preview'];
+const COMMANDS = ['install', 'update', 'run', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'upload', 'preview'];
 
 /** The `--help` text, naming the command the way it was started. */
 export const help = () => `Sets up Analytics Hub in Microsoft Fabric: the data pipeline, the semantic model and the app.
@@ -28,6 +29,7 @@ Commands:
   deploy-app       Deploy the Analytics Hub app again
   status           Show recent runs and refreshes, the last data check and when secrets expire
   rotate-secret    Create new client secrets for Key Vault and the model's connection
+  upload [files]   Upload CSV exports to the drop folder (Files/analytics_hub_uploads)
   preview          Write what would be deployed to a folder, without signing in
 
 Options:
@@ -41,6 +43,13 @@ Options:
   --use-az             Use the account you are signed in to with the Azure CLI
   --backfill-days <n>  With run: reload n days of audit history and rebuild the curated table
   --out <dir>          With preview: where to write (default ./valuelens-preview)
+  --data <id=mode>     With install: how a source arrives, api, csv or skip. Repeat it or use
+                       commas, e.g. --data productFeedback=csv,agent365=api. Sources:
+                       ${DATA_SOURCE_IDS.join(', ')}
+  --csv <file>         With install: an export to upload during the install. Repeat for more.
+  --feedback-flow      With install: write the product feedback email flow to import into
+                       Power Automate (needs productFeedback=csv)
+  --run                With upload: run the pipeline straight after, to load the files now
   --yes                Take saved answers and defaults without asking
   --no-wait            Don't wait for the first load or a refresh to finish
   --verbose            Print each API call
@@ -69,16 +78,27 @@ export function parseCli(argv) {
       ui: { type: 'boolean' },
       'no-open': { type: 'boolean' },
       verbose: { type: 'boolean' },
+      data: { type: 'string', multiple: true },
+      csv: { type: 'string', multiple: true },
+      'feedback-flow': { type: 'boolean' },
+      run: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
     },
   });
-  if (positionals.length > 1) throw new Error(`Unexpected argument: ${positionals[1]}`);
   const command = values['dry-run'] ? 'preview' : positionals[0] ?? 'install';
+  const files = command === 'upload' ? positionals.slice(1) : [];
+  if (command !== 'upload' && positionals.length > 1) throw new Error(`Unexpected argument: ${positionals[1]}`);
   if (!COMMANDS.includes(command)) throw new Error(`Unknown command "${command}". Try --help.`);
+  if (values.run && command !== 'upload') throw new Error('--run goes with upload.');
+  if ((values.data?.length || values.csv?.length || values['feedback-flow']) && !['install', 'preview'].includes(command)) {
+    throw new Error('--data, --csv and --feedback-flow go with install. To add exports later, use upload.');
+  }
+  const dataSources = parseDataFlags(values.data ?? []);
   if (values['device-code'] && values['use-az']) throw new Error('Choose one of --device-code and --use-az.');
   if (values.ui && (positionals.length || values['dry-run'])) throw new Error('--ui opens a home page where you choose what to do. Leave out the command.');
   if (values.ui && values.yes) throw new Error('Choose one of --ui and --yes.');
+  if (values.ui && (values.data?.length || values.csv?.length || values['feedback-flow'])) throw new Error('With --ui, choose data sources and exports on the Data sources page.');
   /** @type {number | undefined} */
   let backfillDays;
   if (values['backfill-days'] !== undefined) {
@@ -98,6 +118,11 @@ export function parseCli(argv) {
     ui: !!values.ui,
     open: !values['no-open'],
     verbose: !!values.verbose,
+    dataSources,
+    csvFiles: values.csv ?? [],
+    feedbackFlow: values['feedback-flow'],
+    files,
+    run: values.run,
     help: !!values.help,
     version: !!values.version,
   };
@@ -106,6 +131,20 @@ export function parseCli(argv) {
 export function version() {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   return String(pkg.version);
+}
+
+/**
+ * Applies --data and --feedback-flow to the install record's answers. The Data sources screen
+ * then opens with them, and --yes takes them as they are.
+ * @param {import('./config.js').InstallConfig} config
+ * @param {{ dataSources: Partial<import('./uploads.js').DataSourceModes>, feedbackFlow?: boolean }} args
+ */
+export function applyDataFlags(config, args) {
+  if (Object.keys(args.dataSources).length) {
+    config.dataSources = { ...config.dataSources, ...args.dataSources };
+    config.modules = modulesFromSources(config.dataSources);
+  }
+  if (args.feedbackFlow !== undefined) config.uploads.feedbackFlow = args.feedbackFlow;
 }
 
 /**
@@ -133,6 +172,7 @@ export async function main(argv) {
     const ui = createUi({ yes: args.yes });
     const { config, existed } = loadConfig(args.configFile);
     const sources = loadSources(args.sourceDir);
+    applyDataFlags(config, args);
 
     ui.line(c.bold(`Analytics Hub installer ${version()}`));
     if (args.command === 'preview') {
@@ -150,7 +190,8 @@ export async function main(argv) {
       debug,
     });
     const ctx = createCtx({ ui, config, file: args.configFile, api, user, sources });
-    const ok = await runCommand(ctx, args.command, { wait: args.wait, backfillDays: args.backfillDays });
+    ctx.csvFiles = args.csvFiles;
+    const ok = await runCommand(ctx, args.command, { wait: args.wait, backfillDays: args.backfillDays, files: args.files, run: args.run });
     return ok ? 0 : 1;
   } catch (err) {
     const e = /** @type {any} */ (err);
