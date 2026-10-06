@@ -11,7 +11,7 @@ import { loadSources } from './sources.js';
 import { describeSchedule, modelDeployed } from './steps/fabric.js';
 import { routerWanted } from './uploads.js';
 
-export const WEB_COMMANDS = ['install', 'update', 'run', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'upload'];
+export const WEB_COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'upload'];
 const METHODS = ['browser', 'device-code', 'azure-cli'];
 
 /** @typedef {'browser' | 'device-code' | 'azure-cli'} Method */
@@ -41,6 +41,7 @@ export function describeRecord(config) {
     can: {
       update: installed,
       run: installed && !!f.pipelineId,
+      'rerun-failed': installed && !!f.pipelineId,
       check: installed && !!f.notebooks.dataCheck,
       refresh: !!sm.id,
       'deploy-app': modelDeployed(config),

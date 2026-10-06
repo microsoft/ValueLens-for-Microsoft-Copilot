@@ -62,6 +62,21 @@ export function createUi(opts = {}) {
      * @param {import('./steps/plan.js').PlanReview} _plan
      */
     review: (_plan) => {},
+    /**
+     * How each source's load went: a tick, a cross or a warning per source, then why and what to do.
+     * @param {import('./loads.js').LoadCard[]} cards
+     */
+    loads: (cards) => {
+      for (const card of cards) {
+        const tries = card.attempts ? c.dim(` (${card.attempts} attempts)`) : '';
+        if (card.state === 'ok') line(`  ${c.green('✓')} ${card.name}${tries}`);
+        else if (card.state === 'failed') line(`  ${c.red('✗')} ${card.name}: failed${tries}`);
+        else if (card.state === 'skipped') line(`  ${c.yellow('!')} ${card.name}: skipped`);
+        else line(`  ${c.yellow('!')} ${card.name}: still running`);
+        if (card.reason) line(`    ${card.reason}`);
+        for (const fix of card.fix) line(`    ${c.dim(fix)}`);
+      }
+    },
 
     /**
      * @template T

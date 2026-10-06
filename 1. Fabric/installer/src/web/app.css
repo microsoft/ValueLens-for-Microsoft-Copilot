@@ -277,6 +277,17 @@ a { overflow-wrap: anywhere; }
 .ln.fail { background: var(--fail-tint); }
 .ln.fail .gl { color: var(--fail); }
 .ln.note { color: var(--muted-fg); }
+.loads { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-width: calc(76ch + 20px); }
+.load { display: flex; gap: 8px; align-items: flex-start; padding: 6px 10px; margin-left: -10px; border-radius: 4px; overflow-wrap: anywhere; }
+.load p { margin: 2px 0 0; }
+.load .load-state { color: var(--muted-fg); font-weight: 400; }
+.load-name { font-weight: 600; }
+.load-fix { color: var(--muted-fg); white-space: pre-wrap; }
+.load.ok .gl { color: var(--ok); }
+.load.failed { background: var(--fail-tint); }
+.load.failed .gl { color: var(--fail); }
+.load.skipped, .load.running { background: var(--warn-tint); }
+.load.skipped .gl, .load.running .gl { color: var(--warn); }
 .kv-row { display: grid; grid-template-columns: minmax(120px, 180px) 1fr; gap: 16px; max-width: 76ch; overflow-wrap: anywhere; }
 .kv-row .k { color: var(--muted-fg); }
 .subhead { font-size: 14px; line-height: 20px; font-weight: 600; margin-top: 12px; }

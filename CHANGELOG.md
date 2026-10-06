@@ -16,6 +16,34 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-06 — Analytics Hub installer: fewer busy-capacity failures, and clearer ones
+
+- **One Spark session per run.** The pipeline's notebooks now share a high-concurrency Spark
+  session, instead of each starting its own. Small capacities are much less often too busy to
+  start them (`TooManyRequestsForCapacity`). The installer turns the workspace setting on; that
+  needs the workspace Admin role, and without it the installer warns and carries on.
+- **A card for each source.** After a run, the installer says which sources loaded, failed,
+  were skipped or are still running. A failure says why in plain words, such as a busy capacity,
+  a sign-in problem, a timeout or a missing export, and what to do.
+- **`dbo.load_log`.** A new last pipeline step, `AnalyticsHub_Load_Status`, records the same
+  thing in the Lakehouse, one row per source per run. It fails the run when a load failed, so
+  Fabric's run history and alerts show it.
+- **Rerun failed loads.** A new command and button runs only the loads that failed, and the
+  steps and refreshes after them. It waits and tries again while the capacity is busy, and so
+  does the data check after a run.
+- **The model refresh waits for the SQL endpoint.** `AnalyticsHub_Refresh_Model` now asks the
+  Lakehouse SQL endpoints to sync before it refreshes the model. Before, a refresh straight after
+  a load could fail with *Table '…' is not in database*. If it still happens, the card says so
+  and suggests a rerun.
+- **An empty Copilot interactions table says why.** When the audit log only held test or admin
+  activity, such as Copilot Studio test runs (*Maker evaluation*), the Audit Log Processor leaves
+  all of it out and the table is empty. The data check now counts what was left out and why,
+  instead of just reporting 0 rows.
+
+Installer users get this in the next installer release.
+
+---
+
 ## 2026-10-06 — Analytics Hub installer: a Viva Insights Dataflow, Power Automate flows and new names
 
 - **Cowork credits** can come straight from a Viva Insights query. Choose **Connected (Dataflow)**

@@ -338,6 +338,14 @@ export function mirror(write) {
       case 'auto':
         line(`${c.green('✔')} ${e.message} ${c.cyan(e.display)}`);
         break;
+      case 'loads':
+        for (const card of /** @type {import('./loads.js').LoadCard[]} */ (e.cards)) {
+          const kind = card.state === 'ok' ? 'ok' : card.state === 'failed' ? 'fail' : 'warn';
+          line(`  ${SYMBOL[kind]} ${card.name}${card.state === 'ok' ? '' : `: ${card.state === 'running' ? 'still running' : card.state}`}`);
+          if (card.reason) line(`    ${card.reason}`);
+          for (const fix of card.fix) line(`    ${c.dim(fix)}`);
+        }
+        break;
     }
   };
 }

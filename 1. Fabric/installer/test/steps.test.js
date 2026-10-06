@@ -8,7 +8,7 @@ import { ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, freeN
 import { ensureConsent } from '../src/steps/identity.js';
 import { connectionName } from '../src/steps/model.js';
 import { APP_NAME, lakehouseNameFrom, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
-import { capacityBusy, chooseLoad, historyLoaded, printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
+import { BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, chooseLoad, historyLoaded, printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
 import { DATA_CHECK_FILE } from '../src/transform/notebook.js';
 import { PIPELINE_CHANGE, PIPELINE_VERSION, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
 import { fakeCtx, fakeFabric, fakeUi } from './fakes.js';
@@ -448,9 +448,10 @@ test('a run that completed with a failed load says which, and still checks the d
   assert.equal(await runCommand(ctx, 'run', { wait: true }), false);
   const text = ui.text();
   assert.match(text, /✓ Pipeline finished in 30m/);
-  assert.match(text, /! Org Data Ingester failed/);
+  assert.match(text, /✗ Org data \(Entra ID\): failed/);
+  assert.match(text, /couldn't sign in/);
+  assert.match(text, /then run "valuelens-install rerun-failed"\./);
   assert.doesNotMatch(text, /Conditionally/);
-  assert.match(text, /To see why, open AnalyticsHub_Pipeline in Fabric/);
   assert.deepEqual(fabric.calls, ['runJob Pipeline', 'runJob RunNotebook'], 'the data check still runs');
   assert.match(text, /✓ Licensed users: 5 rows/);
 });
@@ -470,11 +471,10 @@ test('a run a busy capacity turned away says to wait and run it again', async ()
   assert.equal(result.ok, false);
   assert.deepEqual(result.failed, ['Run_Audit_Log_Ingester']);
   const text = ui.text();
-  assert.match(text, /! Audit Log Ingester failed/);
-  assert.match(text, /capacity was too busy to start a notebook\. Nothing is lost\./);
+  assert.match(text, /✗ Copilot audit log: failed/);
+  assert.match(text, /capacity was too busy to start it\.\n.*Nothing is lost\. Run "valuelens-install rerun-failed" once the capacity is quieter/);
   assert.equal(text.split('too busy').length, 2, 'said once');
-  assert.match(text, /Wait a few minutes, then run "valuelens-install run" again\./);
-  assert.doesNotMatch(text, /To see why/);
+  assert.match(text, /✓ Licensed users/);
 });
 
 test("run doesn't start a second run while one is going, but ignores one stuck for over a day", async () => {
@@ -577,17 +577,19 @@ test('status names the loads that failed in the latest run, unless a retry or th
   };
 
   let text = await run();
-  assert.match(text, /! M365 Activity Ingester failed in the latest run/);
-  assert.doesNotMatch(text, /Licensed Users Ingester failed/, 'its retry worked');
-  assert.doesNotMatch(text, /Agent365 Registry Ingester failed/, 'the fallback stood in');
-  assert.doesNotMatch(text, /Org Data Ingester failed/, 'that was an earlier run');
+  assert.match(text, /Latest run, by source/);
+  assert.match(text, /✗ Microsoft 365 activity: failed/);
+  assert.match(text, /✓ Licensed users \(2 attempts\)/, 'its retry worked');
+  assert.match(text, /✓ Agent 365 \(export\)/);
+  assert.doesNotMatch(text, /Agent 365 \(API\)/, 'the fallback stood in');
+  assert.doesNotMatch(text, /Org data/, 'that was an earlier run');
   assert.doesNotMatch(text, /Conditionally/);
-  assert.match(text, /capacity was too busy to start a notebook/);
+  assert.match(text, /capacity was too busy to start it/);
 
   fabric.activityRuns['j-2'][4].status = 'Failed';
   text = await run();
-  assert.match(text, /! Agent365 Registry Ingester failed in the latest run/);
-  assert.match(text, /! Agent365 CSV Fallback failed in the latest run/);
+  assert.match(text, /✗ Agent 365 \(API\): failed/);
+  assert.match(text, /✗ Agent 365 \(export\): failed/);
 });
 
 test('data check runs the notebook and prints the summary it saved', async () => {
@@ -624,6 +626,31 @@ test('data check runs the notebook and prints the summary it saved', async () =>
   assert.match(text, /! Org data: 0 rows/);
   assert.match(text, /✓ Microsoft 365 activity: 118 rows, 2026-09-06 to 2026-09-29/);
   assert.match(text, /Agents: not loaded/);
+});
+
+test('data check waits and tries again while the pipeline\'s session holds the capacity', async () => {
+  const fabric = fakeFabric();
+  const busy = { status: 'Failed', failureReason: { errorCode: 'RequestExecutionFailed', message: BUSY } };
+  fabric.jobs.push(busy, { status: 'Completed' });
+  const oneLake = { readJson: async () => ({ checkedAt: '2026-06-01T12:30:00+00:00', tables: { licensed: { rows: 5 } } }) };
+  const ui = fakeUi();
+  const { ctx, config, sleeps } = fakeCtx({ fabric: fabric.api, oneLake, ui: ui.ui });
+  config.fabric.notebooks.dataCheck = 'nb-check';
+  assert.ok(await runDataCheck(ctx));
+  assert.deepEqual(fabric.calls, ['runJob RunNotebook', 'runJob RunNotebook']);
+  assert.ok(sleeps.includes(BUSY_WAIT_MS));
+  assert.match(ui.text(), /Data check: Fabric's capacity is still busy\. Trying again in 5 minutes\./);
+
+  const again = fakeFabric();
+  for (let i = 0; i <= BUSY_RETRIES; i++) again.jobs.push(busy);
+  const ui2 = fakeUi();
+  const t = fakeCtx({ fabric: again.api, oneLake, ui: ui2.ui });
+  t.config.fabric.notebooks.dataCheck = 'nb-check';
+  assert.equal(await runDataCheck(t.ctx), null);
+  assert.equal(again.calls.length, BUSY_RETRIES + 1);
+  const text = ui2.text();
+  assert.match(text, /Fabric's capacity was too busy to start a notebook\. Nothing is lost\./);
+  assert.doesNotMatch(text, /Livy session/, 'the raw error is left out when the reason is a busy capacity');
 });
 
 test('check runs the data check on its own, and needs its notebook', async () => {
@@ -698,6 +725,26 @@ test('printDataCheck flags missing core tables', () => {
   assert.match(ui.text(), /! Copilot interactions: no table yet/);
   assert.match(ui.text(), /Microsoft 365 activity: not loaded/);
   assert.doesNotMatch(ui.text(), /! Microsoft 365 activity/);
+});
+
+test('printDataCheck explains an audit table emptied by test activity', () => {
+  const ui = fakeUi();
+  const { ctx } = fakeCtx({ ui: ui.ui });
+  printDataCheck(ctx, {
+    tables: { audit: { table: 'dbo.copilot_interactions_curated', rows: 0 } },
+    auditExcluded: { parsed: 1230, reasons: { 'Maker evaluation': 1200, 'Other filters': 30 } },
+  });
+  assert.match(ui.text(), /! Copilot interactions: 0 rows/);
+  assert.match(ui.text(), /1,230 audit records were found, but all were test or admin activity/);
+  assert.match(ui.text(), /Maker evaluation: 1,200, Other filters: 30/);
+});
+
+test('printDataCheck says when the audit log had no Copilot activity at all', () => {
+  const ui = fakeUi();
+  const { ctx } = fakeCtx({ ui: ui.ui });
+  printDataCheck(ctx, { tables: { audit: { rows: 0 } }, auditExcluded: null });
+  assert.match(ui.text(), /No Copilot activity was found in the audit log yet/);
+  assert.doesNotMatch(ui.text(), /test or admin activity/);
 });
 
 test('printDataCheck explains hidden user names in the licence roster', () => {
