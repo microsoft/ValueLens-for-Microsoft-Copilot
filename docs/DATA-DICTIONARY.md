@@ -87,6 +87,11 @@ Agent_BotId, Agent_EnvironmentId, Exclude_Reason
 > reason in `DROP_EXCLUDE_REASONS` (all of them by default). The rules are in
 > [METHODOLOGY §2.1](METHODOLOGY.md#21-which-audit-records-count).
 
+> **`AppHost`** is the Microsoft 365 surface the interaction happened in, such as Word, Outlook,
+> Microsoft365Chat or Cowork. It records where Copilot was used, not what the person did. What each
+> value means, and which values set a task, are classified by what they touched or are excluded, is in
+> [METHODOLOGY §3.5](METHODOLOGY.md#35-app-host-reference).
+
 ### 1b. `copilot_interactions_curated` — the table the Fabric model actually reads
 `Copilot_Audit_Log_Processor` reads `copilot_interactions_parsed` (joining `copilot_licensed_users`
 and `agents_365`) and writes **`copilot_interactions_curated`**. This — not the `_parsed` table — is
