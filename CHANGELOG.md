@@ -16,6 +16,29 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-06 — Analytics Hub installer: a Viva Insights Dataflow, Power Automate flows and new names
+
+- **Cowork credits** can come straight from a Viva Insights query. Choose **Connected (Dataflow)**
+  and give the partition and query IDs. The installer creates the Dataflow Gen2
+  `AnalyticsHub_Cowork_Credits`, and the pipeline refreshes it before each Viva load. The CSV
+  export is still the fallback. `Ingest_Viva_Consumption` reads both, and the Dataflow wins for
+  weeks both cover.
+- **Copilot Studio credits** can come from the Power Platform licensing API. An optional flow,
+  `Analytics Hub - Copilot Studio credits`, saves the last ten days by agent each day.
+  `Ingest_Studio` loads them into the new `studio_agent_daily` table, and fills the tenant and
+  agent views for days and months no export covers. It only sees environments with credits
+  allocated, and exports still add per-user figures.
+- **The product feedback flow** is now created for you in Power Automate, turned off, instead of
+  written to a file to import. Both flows read the app's secret from Key Vault; you sign in to
+  their connections and turn them on.
+- **New names.** A new install calls its items Analytics Hub: `Analytics Hub Model`,
+  `AnalyticsHub_Pipeline`, `Analytics Hub SQL …` and `Analytics Hub Data Collector`. Existing
+  installs keep their names.
+
+Installer users get this in the next installer release.
+
+---
+
 ## 2026-10-05 — Task time estimates cite peer-reviewed sources
 
 The `Human Time Estimates` table in all five templates now cites peer-reviewed studies or major

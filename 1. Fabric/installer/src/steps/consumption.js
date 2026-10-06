@@ -8,9 +8,11 @@ import { STUDIO_LANDING, VIVA_LANDING } from '../catalog.js';
 import { ROLES } from '../clients/azure.js';
 import { semanticModelDefinition } from '../clients/fabric.js';
 import { HttpError } from '../http.js';
+import { COWORK_DATAFLOW_TABLE, coworkDataflowDefinition, isVivaId } from '../transform/dataflow.js';
 import { buildConsumptionModel, loadTemplateModel, PBISM } from '../transform/model.js';
 import { c } from '../ui.js';
-import { azureAiOn } from './fabric.js';
+import { UPLOAD_DIR } from '../uploads.js';
+import { azureAiOn, coworkDataflowOn, createdId, displayNames, freeName, noteRenamed } from './fabric.js';
 import { bindModel, deployModel, modelUrl, waitForSqlEndpoint } from './model.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
@@ -26,6 +28,110 @@ export const AZURE_AI_ROLES = [
 export const MAX_SUBSCRIPTIONS_TO_SEARCH = 25;
 
 const DATAFLOW_GUIDE = 'https://learn.microsoft.com/viva/insights/advanced/analyst/export-query-data-microsoft-fabric';
+
+/** The Dataflow that reads Cowork credits from Viva Insights. */
+export const COWORK_DATAFLOW_NAME = 'AnalyticsHub_Cowork_Credits';
+
+/**
+ * How to give the Cowork Dataflow its sign-ins. The editor's preview uses the user's own sign-in, so
+ * rows can show there while every refresh still fails until the connections are saved with the Dataflow.
+ * @param {import('../config.js').InstallConfig} config
+ * @returns {string[]}
+ */
+export function coworkSignInSteps(config) {
+  const name = config.consumption?.dataflowName ?? COWORK_DATAFLOW_NAME;
+  return [
+    `Open ${name} in ${config.fabric.workspaceName ?? 'the workspace'} and choose Edit dataflow. Under Home > Manage connections,`,
+    `sign in to Viva Insights and to ${config.fabric.lakehouseName ?? 'the Lakehouse'} (Edit on any without a connection). Then choose`,
+    'Save, wait until it says the Dataflow is published, and choose Refresh now. Rows in the preview alone are not enough.',
+  ];
+}
+
+/**
+ * Asks for the Viva Insights query the Cowork credits Dataflow reads. Without one, Cowork
+ * credits come from the CSV export instead.
+ * @param {Ctx} ctx
+ */
+export async function planCowork(ctx) {
+  const { ui, config } = ctx;
+  const cc = config.consumption;
+  if (config.dataSources.coworkCredits !== 'api') return;
+  ui.note('A Dataflow reads Cowork credits from a Viva Insights query. In Viva Insights > Analysis, build a query with the Copilot credit metrics and turn on Auto-refresh; then, in Analysis results, choose the link icon to copy its partition and query IDs.');
+  ui.note(`Guide: ${DATAFLOW_GUIDE}`);
+  const guid = 'It looks like 00000000-0000-0000-0000-000000000000.';
+  const partition = (await ui.input('Viva Insights partition ID. Leave blank to upload the CSV export instead.', {
+    default: cc.vivaPartition ?? '',
+    validate: (v) => !v.trim() || isVivaId(v) || guid,
+  })).trim();
+  if (!partition) {
+    config.dataSources.coworkCredits = 'csv';
+    ui.note(`Cowork credits come from the Consumption Dashboard's CSV export. Drop it in ${UPLOAD_DIR}.`);
+    return;
+  }
+  const query = (await ui.input('Viva Insights query ID', { default: cc.vivaQuery ?? '', validate: (v) => isVivaId(v) || guid })).trim();
+  cc.vivaPartition = partition;
+  cc.vivaQuery = query;
+}
+
+/**
+ * Creates the Dataflow that reads Cowork credits from Viva Insights, or points it at a new query.
+ * Once it exists its definition is only replaced when the query changes, so the sign-ins the
+ * user added to it are kept. If it can't be made, Cowork credits come from the CSV export.
+ * @param {Ctx} ctx
+ */
+export async function ensureCoworkDataflow(ctx) {
+  const { ui, config, api } = ctx;
+  const cc = config.consumption;
+  if (config.dataSources.coworkCredits !== 'api') return;
+  const ws = /** @type {string} */ (config.fabric.workspaceId);
+  const lh = /** @type {string} */ (config.fabric.lakehouseId);
+  const toCsv = (/** @type {string} */ why) => {
+    ui.warn(`${why} Cowork credits come from the CSV export for now.`);
+    ui.info(`Drop the Consumption Dashboard's export in ${config.fabric.lakehouseName} > ${UPLOAD_DIR}, or run the installer again to retry.`);
+    config.dataSources.coworkCredits = 'csv';
+    ctx.save();
+  };
+  if (!isVivaId(cc.vivaPartition) || !isVivaId(cc.vivaQuery)) return toCsv('The Dataflow needs the Viva Insights partition and query IDs.');
+
+  const signature = `${cc.vivaPartition};${cc.vivaQuery};${lh}`.toLowerCase();
+  let name = cc.dataflowName ?? COWORK_DATAFLOW_NAME;
+  try {
+    const items = await api.fabric.listItems(ws, 'Dataflow');
+    if (cc.dataflowId && !items.some((i) => i.id === cc.dataflowId)) {
+      ui.warn(`${name} was deleted. Creating it again.`);
+      delete cc.dataflowId;
+      delete cc.dataflowSignature;
+    }
+    if (!cc.dataflowId) {
+      const wanted = name;
+      name = freeName(wanted, displayNames(items));
+      noteRenamed(ctx, wanted, name);
+      const created = await api.fabric.createDataflow(ws, name, 'Cowork Copilot credits from Viva Insights, for Analytics Hub. The pipeline refreshes it before loading them.');
+      cc.dataflowId = await createdId(ctx, created, 'Dataflow', name);
+      cc.dataflowName = name;
+      ctx.save();
+      ui.ok(`Created Dataflow ${name}`);
+    }
+    if (cc.dataflowSignature === signature) {
+      ui.ok(`Dataflow ${name} reads Viva Insights query ${cc.vivaQuery}`);
+      return;
+    }
+    await api.fabric.updateDataflow(ws, cc.dataflowId, coworkDataflowDefinition(name, {
+      partitionId: /** @type {string} */ (cc.vivaPartition),
+      queryId: /** @type {string} */ (cc.vivaQuery),
+      workspaceId: ws,
+      lakehouseId: lh,
+    }));
+    cc.dataflowSignature = signature;
+    ctx.save();
+    ui.ok(`Dataflow ${name} reads Viva Insights query ${cc.vivaQuery} into ${COWORK_DATAFLOW_TABLE}`);
+    for (const line of coworkSignInSteps(config)) ui.info(line);
+  } catch (err) {
+    // A Dataflow that exists but never got its definition would only fail on every run.
+    if (!cc.dataflowSignature) toCsv(`Couldn't set up the Cowork credits Dataflow (${/** @type {Error} */ (err).message}).`);
+    else ui.warn(`Couldn't update Dataflow ${name} (${/** @type {Error} */ (err).message}). It still reads the last query it was given.`);
+  }
+}
 
 /**
  * The Consumption model is deployed: credit consumption is on, the ValueLens model (whose
@@ -317,19 +423,27 @@ export function consumptionSummary(ctx) {
   }
   if (cc.model.id) ui.info(`Model:      ${cc.model.name}  ${c.dim(modelUrl(ws, cc.model.id))}`);
 
-  ui.info(c.bold('Copilot Studio credits') + c.dim('  (no API for these; upload the exports)'));
-  ui.info('  1. Power Platform admin center > Licensing > Products > Copilot Studio. On the Summary,');
-  ui.info('     Environments and Agents tabs, download the EntitlementConsumption*_MCSMessages*.csv files.');
-  ui.info(`  2. Upload them to ${lakehouse} > ${STUDIO_LANDING}. Replace them each month: every run`);
-  ui.info('     counts the files there as the current month.');
+  const ds = config.dataSources;
+  if (ds.studioCredits !== 'skip') {
+    const flow = !!config.uploads.studioFlow && !!(config.uploads.flowIds?.studio || config.uploads.flowFiles?.studio);
+    ui.info(c.bold('Copilot Studio credits') + c.dim(flow ? '  (a daily flow reads the environment and agent figures)' : '  (upload the exports)'));
+    if (flow) ui.info('  The flow saves the last ten days\' credits by agent each day. Exports still add per-user figures and the exact prepaid split.');
+    ui.info('  1. Power Platform admin center > Licensing > Products > Copilot Studio. On the Summary,');
+    ui.info('     Environments and Agents tabs, download the EntitlementConsumption*_MCSMessages*.csv files.');
+    ui.info(`  2. Drop them in ${lakehouse} > ${UPLOAD_DIR}. Each export counts as the month it is loaded in.`);
+  }
 
-  ui.info(c.bold('Cowork credits') + c.dim('  (a Dataflow keeps these up to date)'));
-  ui.info('  1. Viva Insights > Analysis: build a query with the Copilot credit metrics and turn on');
-  ui.info('     Auto-refresh. In Analysis results, choose the link icon and copy the Partition and Query IDs.');
-  ui.info('  2. In this workspace: New item > Dataflow Gen2 > Get data > Viva Insights. Paste both IDs and');
-  ui.info('     leave Query name blank. Under Advanced options: Schema type Pivoted, Data granularity Row-level data.');
-  ui.info(`  3. Set the destination to ${lakehouse}, table viva_credits_weekly. Schedule it before the pipeline,`);
-  ui.info('     on a Tuesday or later, after Viva\'s weekend refresh.');
-  ui.note(`     Guide: ${DATAFLOW_GUIDE}`);
-  ui.note(`     Or upload the Consumption Dashboard's CSV export to ${VIVA_LANDING} instead.`);
+  if (coworkDataflowOn(config)) {
+    ui.info(c.bold('Cowork credits') + c.dim(`  (Dataflow ${cc.dataflowName ?? COWORK_DATAFLOW_NAME}, refreshed by the pipeline)`));
+    coworkSignInSteps(config).forEach((line, i) => ui.info(`${i ? '     ' : '  1. '}${line}`));
+    ui.info('     Until then, each pipeline run notes that the refresh failed.');
+    ui.info('  2. Keep the Viva Insights query on Auto-refresh. The pipeline refreshes the Dataflow before each Viva load.');
+    ui.note(`     Guide: ${DATAFLOW_GUIDE}`);
+    ui.note(`     Exports of earlier weeks can still go in ${UPLOAD_DIR}: the Dataflow wins for the weeks it covers.`);
+  } else if (ds.coworkCredits === 'csv') {
+    ui.info(c.bold('Cowork credits') + c.dim('  (upload the export)'));
+    ui.info('  1. Viva Insights > Copilot > Consumption Dashboard: download the CSV export.');
+    ui.info(`  2. Drop it in ${lakehouse} > ${UPLOAD_DIR}.`);
+    ui.note('     To read it straight from a Viva Insights query instead, run the installer again and choose Connected (Dataflow).');
+  }
 }

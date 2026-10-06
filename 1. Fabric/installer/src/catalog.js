@@ -166,7 +166,7 @@ export const NOTEBOOKS = [
   {
     key: 'dataCheck',
     file: 'ValueLens_Data_Check.ipynb',
-    displayName: 'ValueLens_Data_Check',
+    displayName: 'AnalyticsHub_Data_Check',
     module: 'core',
     credentials: false,
     parameters: [],
@@ -266,7 +266,7 @@ export const NOTEBOOKS = [
   {
     key: 'refreshModel',
     file: 'ValueLens_Refresh_Model.ipynb',
-    displayName: 'ValueLens_Refresh_Model',
+    displayName: 'AnalyticsHub_Refresh_Model',
     module: 'core',
     credentials: false,
     parameters: ['WORKSPACE_ID', 'SEMANTIC_MODEL_ID', 'WRITE_MODE'],
@@ -303,17 +303,6 @@ export const NOTEBOOKS = [
     credentials: false,
     parameters: [],
     placeholder: null,
-    // Cowork data usually arrives through a Dataflow, so an empty landing folder is normal.
-    patches: [
-      {
-        find: 'for f in notebookutils.fs.ls(LANDING)\n',
-        replace: 'for f in (notebookutils.fs.ls(LANDING) if notebookutils.fs.exists(LANDING) else [])\n',
-      },
-      {
-        find: "raise ValueError(f'No PersonServiceCreditsMetrics CSV files found in {LANDING}')",
-        replace: "notebookutils.notebook.exit(f'No PersonServiceCreditsMetrics CSV files in {LANDING}, so nothing to load.')  # Set by the Analytics Hub installer",
-      },
-    ],
   },
   {
     key: 'agentTranscripts',

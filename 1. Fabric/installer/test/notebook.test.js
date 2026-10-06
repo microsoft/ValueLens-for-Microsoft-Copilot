@@ -125,15 +125,34 @@ test('credentials must be given together', () => {
 
 const consumption = (/** @type {string} */ key) => /** @type {import('../src/catalog.js').NotebookInfo} */ (NOTEBOOKS.find((n) => n.key === key));
 
-test('Viva consumption: an empty landing folder ends the notebook quietly', () => {
+test('Viva consumption: reads the Dataflow table and CSVs, and ends quietly with neither', () => {
   const info = consumption('vivaConsumption');
-  const source = load(info.file, info.dir);
-  const nb = prepareNotebook(source, { patches: info.patches, lakehouse: LAKEHOUSE });
+  assert.equal(info.patches, undefined);
+  const nb = prepareNotebook(load(info.file, info.dir), { lakehouse: LAKEHOUSE });
   const all = nb.cells.map(cellText).join('\n');
-  assert.match(all, /notebookutils\.fs\.ls\(LANDING\) if notebookutils\.fs\.exists\(LANDING\) else \[\]/);
-  assert.match(all, /notebookutils\.notebook\.exit\(f'No PersonServiceCreditsMetrics CSV files in \{LANDING\}/);
+  assert.match(all, /DATAFLOW_TABLE = "viva_credits_dataflow"/);
+  assert.match(all, /spark\.catalog\.tableExists\(DATAFLOW_TABLE\)/);
+  assert.match(all, /if not notebookutils\.fs\.exists\(LANDING\):\n\s+return \[\]/);
+  assert.match(all, /notebookutils\.notebook\.exit\(f'No Viva consumption in \{LANDING\} or \{DATAFLOW_TABLE\}/);
+  assert.match(all, /pol_files = landed\('spendingpolicymetadata'\)\nif pol_files:/);
   assert.doesNotMatch(all, /raise ValueError\(f'No PersonServiceCreditsMetrics/);
   assert.equal(nb.metadata.dependencies.lakehouse.default_lakehouse, LAKEHOUSE.id);
+});
+
+test('Studio consumption: licensing API files fill studio_agent_daily and never replace an export', () => {
+  const info = consumption('studioConsumption');
+  const nb = prepareNotebook(load(info.file, info.dir), { lakehouse: LAKEHOUSE });
+  const all = nb.cells.map(cellText).join('\n');
+  assert.match(all, /PAT_API_AGENT = \("StudioApiAgentDaily\*\.csv",\)/);
+  assert.match(all, /PAT_API_ENTITLEMENT = \("StudioApiEntitlement\*\.csv",\)/);
+  assert.match(all, /TBL_AGENT_DAILY = "studio_agent_daily"/);
+  assert.match(all, /api_raw = read\(\*PAT_API_AGENT, api=True\)\nif api_raw is None:\n\s+print\("no licensing API files - skipping"\)/);
+  // Environment names come from the entitlement snapshot when the resources call has none.
+  assert.match(all, /rows\.join\(names, "environment_id", "left"\)/);
+  // Months and days an export covers keep the export's figures.
+  assert.match(all, /an export covers this month, so the API figures aren't used/);
+  assert.match(all, /tenant_api\.join\(exported, \["usage_date", "environment_id"\], "left_anti"\)/);
+  assert.match(all, /no entitlement snapshot - treating every credit as prepaid/);
 });
 
 test('a patch that no longer matches exactly once is an error', () => {

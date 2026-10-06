@@ -52,6 +52,7 @@ const BINDINGS = {
  * @property {boolean} [uploadRouter]  Runs the upload router first in lane 2, so uploaded CSVs reach their loads.
  * @property {boolean} [workday]  Enriches org data from the uploaded Workday export after the Entra ID load.
  * @property {boolean} [agent365Csv]  Agent 365 comes from its admin center export: the lander replaces the registry load.
+ * @property {string} [coworkDataflowId]  Refreshes this Dataflow, which pulls Cowork credits from Viva Insights, before the Viva load.
  */
 
 export const REFRESH_ACTIVITY = 'Refresh_Semantic_Model';
@@ -93,6 +94,7 @@ export const AGENT365_FALLBACK = 'Run_Agent365_CSV_Fallback';
 export const AGENT365_LANDER = 'Run_Agent365_Lander';
 export const UPLOAD_ROUTER_ACTIVITY = 'Run_Upload_Router';
 export const WORKDAY_ACTIVITY = 'Run_Org_Data_Workday';
+export const COWORK_DATAFLOW_ACTIVITY = 'Refresh_Cowork_Credits';
 
 /** Bump when the pipeline's layout changes, so re-running the installer updates a pipeline an older version built. */
 export const PIPELINE_VERSION = 3;
@@ -115,7 +117,9 @@ export const LANE_ORDER = [
   'Conditionally_Run_M365_Activity',
   'Conditionally_Run_Product_Feedback',
   ...ARCHIVED_ACTIVITIES,
-  ...CONSUMPTION_ACTIVITIES.map((a) => a.name),
+  ...CONSUMPTION_ACTIVITIES.slice(0, 2).map((a) => a.name),
+  COWORK_DATAFLOW_ACTIVITY,
+  ...CONSUMPTION_ACTIVITIES.slice(2).map((a) => a.name),
   CONSUMPTION_REFRESH_ACTIVITY,
   AGENT_EVALUATOR_ACTIVITY,
   AGENT_EVALUATOR_REFRESH_ACTIVITY,
@@ -178,7 +182,7 @@ function* notebookActivities(activities) {
 }
 
 /**
- * A step that runs ValueLens_Refresh_Model against one model.
+ * A step that runs the Refresh Model notebook against one model.
  * @param {PipelineSettings} settings
  * @param {{ name: string, description: string, modelId: string, dependsOn: any[], writeMode: any }} o
  */
@@ -241,6 +245,28 @@ function consumptionActivities(settings) {
       typeProperties: { notebookId, workspaceId: settings.workspaceId, parameters: {} },
     };
   });
+}
+
+/**
+ * Refreshes the Cowork credits Dataflow just before the Viva load reads its table. It doesn't
+ * retry: a refresh that fails, such as when the Viva Insights sign-in has lapsed, leaves the last
+ * table in place, and the Viva load still runs because lane 2 waits on Completed.
+ * @param {PipelineSettings} settings
+ */
+function coworkDataflowActivity(settings) {
+  return {
+    name: COWORK_DATAFLOW_ACTIVITY,
+    description: 'Refreshes the Dataflow that reads Cowork credits from the Viva Insights query into viva_credits_dataflow.',
+    type: 'RefreshDataflow',
+    dependsOn: [],
+    policy: { timeout: '0.02:00:00', retry: 0, retryIntervalInSeconds: 30, secureOutput: false, secureInput: false },
+    typeProperties: {
+      workspaceId: settings.workspaceId,
+      dataflowId: settings.coworkDataflowId,
+      notifyOption: 'NoNotification',
+      dataflowType: 'DataflowFabric',
+    },
+  };
 }
 
 /**
@@ -435,6 +461,7 @@ export function buildPipeline(template, settings) {
   if (settings.semanticModelId) filled.properties.activities.push(refreshActivity(filled.properties.activities, settings));
   if (settings.modules.consumption) {
     filled.properties.activities.push(...consumptionActivities(settings));
+    if (settings.coworkDataflowId) filled.properties.activities.push(coworkDataflowActivity(settings));
     if (settings.consumptionModelId) filled.properties.activities.push(consumptionRefreshActivity(filled.properties.activities, settings));
   }
   const transcripts = !!(settings.modules.agentEvaluator && settings.agentTranscripts);

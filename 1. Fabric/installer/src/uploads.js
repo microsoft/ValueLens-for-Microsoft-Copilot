@@ -32,6 +32,8 @@ export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
  * @property {boolean} [locked]  The dashboard is built on it, so it can't be skipped.
  * @property {{ where: string, url: string, files: string }} [export]  Where the admin downloads the CSV.
  * @property {string} [page]  The dashboard page that stays dormant when it is skipped.
+ * @property {Partial<Record<SourceMode, string>>} [modeLabels]  Overrides MODE_LABELS, e.g. "Connected (Dataflow)".
+ * @property {Partial<Record<SourceMode, string>>} [hints]  What the mode does, shown under the card.
  */
 
 /** @type {DataSourceInfo[]} */
@@ -101,10 +103,11 @@ export const DATA_SOURCES = [
   {
     id: 'studioCredits',
     label: 'Copilot Studio credits',
-    description: 'Copilot Studio credits by environment, agent and user. There is no API for them.',
+    description: 'Copilot Studio credits by environment, agent and user. A Power Automate flow can keep the environment and agent figures up to date.',
     modes: ['csv', 'skip'],
     defaultMode: 'skip',
     page: 'Consumption Central',
+    hints: { csv: 'Upload the exports, and optionally let a daily Power Automate flow read the Power Platform licensing API for you. Per-user figures are export only.' },
     export: {
       where: 'Power Platform admin center > Licensing > Products > Copilot Studio. Download the Summary, Environments and Agents exports (EntitlementConsumption*_MCSMessages*.csv).',
       url: 'https://admin.powerplatform.microsoft.com/',
@@ -114,10 +117,14 @@ export const DATA_SOURCES = [
   {
     id: 'coworkCredits',
     label: 'Copilot Cowork credits',
-    description: 'Cowork credits by person, from Viva Insights. A Dataflow can keep these up to date instead.',
-    modes: ['csv', 'skip'],
+    description: 'Cowork credits by person, from Viva Insights.',
+    modes: ['api', 'csv', 'skip'],
     defaultMode: 'skip',
     page: 'Consumption Central',
+    modeLabels: { api: 'Connected (Dataflow)' },
+    hints: {
+      api: 'The installer creates a Dataflow Gen2 that reads your Viva Insights Copilot consumption query on every run. You give the partition and query IDs, then sign in to the Dataflow once.',
+    },
     export: {
       where: 'Viva Insights > Copilot Consumption Dashboard > Export (PersonServiceCreditsMetrics and SpendingPolicyMetadata CSVs).',
       url: 'https://learn.microsoft.com/viva/insights/advanced/analyst/export-query-data-microsoft-fabric',
@@ -147,6 +154,16 @@ export const MODE_LABELS = /** @type {Record<SourceMode, string>} */ ({ api: 'Co
 
 /** @param {DataSourceId} id */
 export const dataSource = (id) => /** @type {DataSourceInfo} */ (DATA_SOURCES.find((s) => s.id === id));
+
+/**
+ * What a mode is called on this source's card.
+ * @param {DataSourceInfo | DataSourceId} source
+ * @param {SourceMode} mode
+ */
+export function modeLabel(source, mode) {
+  const s = typeof source === 'string' ? dataSource(source) : source;
+  return s?.modeLabels?.[mode] ?? MODE_LABELS[mode];
+}
 
 /**
  * How a recognised file is stored for its ingester.
@@ -209,6 +226,24 @@ export const UPLOAD_KINDS = [
     groups: [['userid'], ['useremail'], ['creditsused'], ['billablecreditused']],
     dir: 'Files/landing/studio',
     name: 'EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_{stamp}.csv',
+    policy: 'replaceKind',
+  },
+  // Written each day by the Analytics Hub Copilot Studio credits flow from the licensing API. Each
+  // file restates the last ten days, so only the newest is kept; the notebook merges by day.
+  {
+    kind: 'studioAgentDaily',
+    source: 'studioCredits',
+    groups: [['usagedate'], ['agentid'], ['agentname'], ['billedcredit'], ['nonbilledcredit'], ['channel']],
+    dir: 'Files/landing/studio',
+    name: 'StudioApiAgentDaily_{stamp}.csv',
+    policy: 'replaceKind',
+  },
+  {
+    kind: 'studioEntitlement',
+    source: 'studioCredits',
+    groups: [['snapshotdate'], ['environmentid'], ['environmentallocated'], ['tenantprepaidconsumed'], ['tenantpaygconsumed']],
+    dir: 'Files/landing/studio',
+    name: 'StudioApiEntitlement_{stamp}.csv',
     policy: 'replaceKind',
   },
   {
@@ -321,7 +356,7 @@ export function detectSource(headers, enabled) {
 }
 
 function expectedHint() {
-  return 'Expected one of: product feedback, Agent 365 agents, Copilot Studio credits, Cowork credits or a Workday report.';
+  return 'Expected one of: product feedback, Agent 365 agents, Copilot Studio credits (including the Analytics Hub flow\'s files), Cowork credits or a Workday report.';
 }
 
 /**
@@ -411,7 +446,7 @@ export function routerSignaturesJson(ds) {
  * @property {DataSourceId} id
  * @property {string} label
  * @property {string} description
- * @property {{ value: SourceMode, label: string }[]} modes
+ * @property {{ value: SourceMode, label: string, hint?: string }[]} modes
  * @property {SourceMode} mode
  * @property {boolean} locked
  * @property {boolean} uploadable  A CSV can be uploaded for it.
@@ -429,7 +464,7 @@ export function sourceCards(ds) {
     id: s.id,
     label: s.label,
     description: s.description,
-    modes: s.modes.map((m) => ({ value: m, label: MODE_LABELS[m] })),
+    modes: s.modes.map((m) => ({ value: m, label: modeLabel(s, m), ...(s.hints?.[m] ? { hint: s.hints[m] } : {}) })),
     mode: s.modes.includes(ds[s.id]) ? ds[s.id] : s.defaultMode,
     locked: !!s.locked,
     uploadable: UPLOADABLE_SOURCES.includes(s.id),
@@ -452,7 +487,7 @@ export function parseModes(raw, current) {
     const v = given[s.id];
     if (v === undefined) continue;
     if (s.locked && v !== current[s.id]) return { error: `${s.label} can't be changed.` };
-    if (!s.modes.includes(/** @type {SourceMode} */ (v))) return { error: `${s.label} can be ${s.modes.map((m) => MODE_LABELS[m]).join(' or ')}.` };
+    if (!s.modes.includes(/** @type {SourceMode} */ (v))) return { error: `${s.label} can be ${s.modes.map((m) => modeLabel(s, m)).join(' or ')}.` };
     modes[s.id] = /** @type {SourceMode} */ (v);
   }
   return { modes };
@@ -462,7 +497,7 @@ export function parseModes(raw, current) {
  * One line per source for a summary: "Product feedback: Upload CSV".
  * @param {DataSourceModes} ds
  */
-export const describeSources = (ds) => DATA_SOURCES.filter((s) => !s.locked).map((s) => `${s.label}: ${MODE_LABELS[ds[s.id]]}`);
+export const describeSources = (ds) => DATA_SOURCES.filter((s) => !s.locked).map((s) => `${s.label}: ${modeLabel(s, ds[s.id])}`);
 
 /**
  * A name for an upload that won't collide with an earlier one: a UTC stamp, then the original

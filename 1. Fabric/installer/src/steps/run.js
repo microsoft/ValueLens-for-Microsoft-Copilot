@@ -5,8 +5,9 @@
  */
 import { commandLine } from '../launch.js';
 import { DATA_CHECK_FILE } from '../transform/notebook.js';
-import { AGENT365_FALLBACK, AGENT365_REGISTRY, AGENT_EVALUATOR_ACTIVITY, firstRunParameters, REFRESH_ACTIVITY } from '../transform/pipeline.js';
+import { AGENT365_FALLBACK, AGENT365_REGISTRY, AGENT_EVALUATOR_ACTIVITY, COWORK_DATAFLOW_ACTIVITY, firstRunParameters, REFRESH_ACTIVITY } from '../transform/pipeline.js';
 import { c, formatDuration } from '../ui.js';
+import { coworkSignInSteps } from './consumption.js';
 import { agentEvaluatorOn, modelDeployed } from './fabric.js';
 import { modelRefreshes } from './model.js';
 
@@ -149,6 +150,7 @@ export async function runPipeline(ctx, opts) {
   const ok = reportJob(ctx, job, 'Pipeline');
   const failed = TERMINAL.has(job?.status) ? failedLoads(await activityRuns(ctx, jobId, { startTimeUtc: job.startTimeUtc ?? startedAt, endTimeUtc: job.endTimeUtc })) : [];
   for (const r of failed) ui.warn(`${loadLabel(r.activityName)} failed`);
+  coworkFix(ctx, failed);
   if (capacityBusy(job?.failureReason) || failed.some((r) => capacityBusy(r.error))) busyNote(ctx, 'run');
   else if (failed.length || job?.status === 'Failed') {
     ui.note(`To see why, open ${f.pipelineName ?? 'the pipeline'} in Fabric and look at its latest run. Then run "${commandLine('run')}" again.`);
@@ -202,6 +204,17 @@ export function failedLoads(runs) {
 export const loadLabel = (name) => name.replace(/^Run_/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
 
 /**
+ * A Cowork Dataflow refresh fails in seconds, with no detail, until its connections are saved.
+ * @param {Ctx} ctx
+ * @param {any[]} failed
+ */
+function coworkFix(ctx, failed) {
+  if (!failed.some((r) => r.activityName === COWORK_DATAFLOW_ACTIVITY)) return;
+  ctx.ui.note('The Cowork credits Dataflow usually fails like this until it has its sign-ins:');
+  for (const line of coworkSignInSteps(ctx.config)) ctx.ui.note(`  ${line}`);
+}
+
+/**
  * Whether a run loaded the history: the audit log and its processor succeeded, and so did the model
  * refresh and the transcripts when they are installed.
  * @param {import('../config.js').InstallConfig} config
@@ -249,8 +262,11 @@ export async function chooseLoad(ctx, opts) {
   return { ...opts, backfillDays: ctx.config.history.days, first: true };
 }
 
+/** @param {import('../config.js').InstallConfig} config */
+const dataCheckName = (config) => config.fabric.notebookNames?.dataCheck ?? 'the data check notebook';
+
 /**
- * Runs ValueLens_Data_Check and reads back the summary it leaves in the Lakehouse.
+ * Runs the data check notebook and reads back the summary it leaves in the Lakehouse.
  * @param {Ctx} ctx
  */
 export async function runDataCheck(ctx) {
@@ -266,7 +282,7 @@ export async function runDataCheck(ctx) {
   if (!reportJob(ctx, job, 'Data check', 'check')) return null;
   const summary = await api.oneLake.readJson(f.workspaceId, f.lakehouseId, DATA_CHECK_FILE).catch(() => null);
   if (!summary) {
-    ui.note('Open ValueLens_Data_Check in Fabric to see its results.');
+    ui.note(`Open ${dataCheckName(config)} in Fabric to see its results.`);
     return null;
   }
   printDataCheck(ctx, summary);
@@ -330,7 +346,7 @@ export function printDataCheck(ctx, summary) {
  * @param {{ licensed?: number, audit?: number, matched?: number, masked?: number } | null | undefined} identity
  */
 function printIdentityMatch(ctx, identity) {
-  const { ui } = ctx;
+  const { ui, config } = ctx;
   if (!identity) return;
   const licensed = Number(identity.licensed ?? 0);
   const audit = Number(identity.audit ?? 0);
@@ -344,7 +360,7 @@ function printIdentityMatch(ctx, identity) {
     ui.note('"Display concealed user, group, and site names in all reports". The next pipeline run picks it up.');
   } else if (!matched) {
     ui.warn(`Licensed users: none of the ${n(audit)} people using Copilot match a licensed user`);
-    ui.note('Open ValueLens_Data_Check in Fabric to compare the user names in both tables.');
+    ui.note(`Open ${dataCheckName(config)} in Fabric to compare the user names in both tables.`);
   } else {
     ui.ok(`Licensed users: ${n(matched)} of ${n(audit)} people using Copilot have a licence`);
   }
@@ -400,6 +416,7 @@ export async function status(ctx) {
   if (latest && TERMINAL.has(latest.status)) {
     const failed = failedLoads(await activityRuns(ctx, latest.id, latest));
     for (const r of failed) ui.warn(`${loadLabel(r.activityName)} failed in the latest run`);
+    coworkFix(ctx, failed);
     if (capacityBusy(latest.failureReason) || failed.some((r) => capacityBusy(r.error))) busyNote(ctx, 'run');
   }
 

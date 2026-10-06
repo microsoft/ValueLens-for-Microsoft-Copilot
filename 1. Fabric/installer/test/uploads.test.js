@@ -10,7 +10,7 @@ import { applyDataFlags, parseCli } from '../src/cli.js';
 import { emptyConfig } from '../src/config.js';
 import { startServer } from '../src/server.js';
 import { checkStaged, clearStaged, inspectFile, sizeOk, stageUpload } from '../src/staging.js';
-import { checkCsvFiles, ensureUploads, feedbackFlow, planDataSources, uploadCommand, uploadFiles } from '../src/steps/data-sources.js';
+import { checkCsvFiles, ensureUploads, planDataSources, uploadCommand, uploadFiles } from '../src/steps/data-sources.js';
 import { buildPipeline, UPLOAD_ROUTER_ACTIVITY } from '../src/transform/pipeline.js';
 import {
   DATA_SOURCES,
@@ -42,6 +42,8 @@ const HEADERS = {
   studioTenant: 'Billing plan id,Environment id,Capacity type,Prepaid consumed quantity,Usage date',
   studioAgent: 'Agent id,Agent name,Billed credit,Non billed credit,Channel',
   studioUser: 'User id,User email,Credits used,Billable credit used',
+  studioAgentDaily: 'Usage date,Agent id,Agent name,Billed credit,Non billed credit,Channel,Environment id',
+  studioEntitlement: 'Snapshot date,Environment id,Environment allocated,Tenant prepaid consumed,Tenant PAYG consumed',
   vivaCredits: 'ServiceId,ServiceName,SpendingPolicyId,MetricDate,TotalCopilotCreditsUsed',
   vivaPolicy: 'SpendingPolicyId,Name,PlanLimit,UserLimit,IncludedServices',
   workday: 'Primary Work Email,Cost Center,Level',
@@ -257,15 +259,6 @@ test('planDataSources: skipping product feedback turns off the email flow; an ex
   const { ctx: ctx2 } = fakeCtx({ ui: fakeUi().ui });
   ctx2.csvFiles = [csvFile('wd.csv', HEADERS.workday)];
   await assert.rejects(planDataSources(ctx2), /--csv: wd.csv: .*set to Skip/);
-});
-
-test('feedbackFlow: the template is filled with the install and the drop folder; the secret stays out', () => {
-  const template = JSON.parse(readFileSync(new URL('../../Manual setup/flows/Copilot_ProductFeedback_Email_to_OneLake.json', import.meta.url), 'utf8'));
-  const flow = feedbackFlow(template, { workspaceName: 'WS', lakehouseName: 'LH', tenantId: 't', clientId: 'c' });
-  const p = flow.definition.parameters;
-  assert.deepEqual([p.OneLakeWorkspace.defaultValue, p.OneLakeLakehouse.defaultValue, p.TargetFolder.defaultValue, p.TenantId.defaultValue, p.ClientId.defaultValue], ['WS', 'LH', UPLOAD_DIR, 't', 'c']);
-  assert.equal(p.ClientSecret.defaultValue, template.definition.parameters.ClientSecret.defaultValue);
-  assert.notEqual(template.definition.parameters.TargetFolder.defaultValue, UPLOAD_DIR, 'the template itself is untouched');
 });
 
 test('uploadCommand: needs an install that loads exports; uploads, then runs when asked', async () => {
