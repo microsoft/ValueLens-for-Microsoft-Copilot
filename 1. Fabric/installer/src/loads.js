@@ -60,6 +60,12 @@ export const REASONS = [
     fix: `Nothing is lost. ${RERUN} once the capacity is quieter, such as outside working hours. If it keeps happening, ask your Fabric admin for a larger capacity.`,
   },
   {
+    kind: 'notSynced',
+    pattern: 'is not in (?:the )?database|SQL (?:analytics )?endpoint (?:to|has not|hasn.t) (?:sync|caught up)',
+    text: 'The model refreshed before the Lakehouse\'s SQL endpoint had caught up with the new tables.',
+    fix: `Nothing is lost. Wait a couple of minutes, then ${RERUN}.`,
+  },
+  {
     kind: 'signIn',
     pattern: 'AADSTS\\d+|\\b401\\b|\\b403\\b|Unauthori[sz]ed|Forbidden|invalid_client|consent|credential|sign.?in',
     text: 'It couldn\'t sign in, or wasn\'t allowed to read the data.',
@@ -79,7 +85,7 @@ export const REASONS = [
   },
 ];
 
-/** @typedef {'capacity' | 'signIn' | 'timeout' | 'noData' | 'other'} ReasonKind */
+/** @typedef {'capacity' | 'notSynced' | 'signIn' | 'timeout' | 'noData' | 'other'} ReasonKind */
 
 /**
  * @param {{ errorCode?: unknown, message?: unknown } | null | undefined} error
