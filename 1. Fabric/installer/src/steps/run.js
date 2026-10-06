@@ -5,8 +5,9 @@
  */
 import { commandLine } from '../launch.js';
 import { DATA_CHECK_FILE } from '../transform/notebook.js';
-import { AGENT365_FALLBACK, AGENT365_REGISTRY, AGENT_EVALUATOR_ACTIVITY, firstRunParameters, REFRESH_ACTIVITY } from '../transform/pipeline.js';
+import { AGENT365_FALLBACK, AGENT365_REGISTRY, AGENT_EVALUATOR_ACTIVITY, COWORK_DATAFLOW_ACTIVITY, firstRunParameters, REFRESH_ACTIVITY } from '../transform/pipeline.js';
 import { c, formatDuration } from '../ui.js';
+import { coworkSignInSteps } from './consumption.js';
 import { agentEvaluatorOn, modelDeployed } from './fabric.js';
 import { modelRefreshes } from './model.js';
 
@@ -149,6 +150,7 @@ export async function runPipeline(ctx, opts) {
   const ok = reportJob(ctx, job, 'Pipeline');
   const failed = TERMINAL.has(job?.status) ? failedLoads(await activityRuns(ctx, jobId, { startTimeUtc: job.startTimeUtc ?? startedAt, endTimeUtc: job.endTimeUtc })) : [];
   for (const r of failed) ui.warn(`${loadLabel(r.activityName)} failed`);
+  coworkFix(ctx, failed);
   if (capacityBusy(job?.failureReason) || failed.some((r) => capacityBusy(r.error))) busyNote(ctx, 'run');
   else if (failed.length || job?.status === 'Failed') {
     ui.note(`To see why, open ${f.pipelineName ?? 'the pipeline'} in Fabric and look at its latest run. Then run "${commandLine('run')}" again.`);
@@ -200,6 +202,17 @@ export function failedLoads(runs) {
 
 /** "Run_Org_Data_Ingester" reads "Org Data Ingester". @param {string} name */
 export const loadLabel = (name) => name.replace(/^Run_/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
+
+/**
+ * A Cowork Dataflow refresh fails in seconds, with no detail, until its connections are saved.
+ * @param {Ctx} ctx
+ * @param {any[]} failed
+ */
+function coworkFix(ctx, failed) {
+  if (!failed.some((r) => r.activityName === COWORK_DATAFLOW_ACTIVITY)) return;
+  ctx.ui.note('The Cowork credits Dataflow usually fails like this until it has its sign-ins:');
+  for (const line of coworkSignInSteps(ctx.config)) ctx.ui.note(`  ${line}`);
+}
 
 /**
  * Whether a run loaded the history: the audit log and its processor succeeded, and so did the model
@@ -403,6 +416,7 @@ export async function status(ctx) {
   if (latest && TERMINAL.has(latest.status)) {
     const failed = failedLoads(await activityRuns(ctx, latest.id, latest));
     for (const r of failed) ui.warn(`${loadLabel(r.activityName)} failed in the latest run`);
+    coworkFix(ctx, failed);
     if (capacityBusy(latest.failureReason) || failed.some((r) => capacityBusy(r.error))) busyNote(ctx, 'run');
   }
 
