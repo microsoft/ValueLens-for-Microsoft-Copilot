@@ -17,15 +17,14 @@ import {
   buildPipeline,
 } from '../transform/pipeline.js';
 import { pipelineSettings } from './fabric.js';
-import { activityRuns, capacityBusy, jobIdFrom, loadedBy, reportLoads, TERMINAL, utc, waitForJob } from './run.js';
+import { activityRuns, BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, jobIdFrom, loadedBy, reportLoads, TERMINAL, utc, waitForJob } from './run.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
 /** Steps that only reread what others loaded, so they run again when one of those reruns. */
 const REFRESHES = new Set([REFRESH_ACTIVITY, CONSUMPTION_REFRESH_ACTIVITY, AGENT_EVALUATOR_REFRESH_ACTIVITY]);
 /** Times a step turned away by a busy capacity is tried again, and how long to wait first. */
-export const BUSY_RETRIES = 2;
-export const BUSY_WAIT_MS = 5 * 60_000;
+export { BUSY_RETRIES, BUSY_WAIT_MS };
 const STUCK_MS = 24 * 3_600_000;
 
 /**
