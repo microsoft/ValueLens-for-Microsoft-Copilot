@@ -434,7 +434,7 @@ tests/fixtures/valuelens-golden/
 | Teams manifest and package builder | `5. Azure/teams` (vendored into the installer) | Done: built by the installer; SSO through the web app registration |
 | Installer Azure target: wizard choice, preflight, what-if, ARM deploy, app registrations, Graph roles, Power BI model, migrate, `run`, `status`, `refresh`, `update`, `rotate-secret`, `uninstall` | `1. Fabric/installer/src/azure`, `src/steps/azure` | Done: 218 tests pass |
 | CI: installer, web, ARM drift, and image builds (pushed to GHCR on `installer-v*` tags) | `.github/workflows/tests.yml`, `azure-images.yml` | Done |
-| End-to-end deployment to a real tenant and the 101-query parity check | Contoso demo tenant | **In progress.** Deployed end to end in private networking mode (see below). Parity tool: `5. Azure/tools/parity.mjs` |
+| End-to-end deployment to a real tenant and the 101-query parity check | Contoso demo tenant | **Done for core.** Deployed end to end in private networking mode: migrate, a 30-day first load, publish to SQL, and a Power BI refresh through the VNet data gateway. Parity (`5. Azure/tools/parity.mjs`) against the Fabric install: 25 match and 29 empty on both sides. The 7 diffs are Agent 365 registry data (Phase 2) and a one-day difference in the M365 activity report window. 35 queries target the separate consumption and Agent Evaluator models and 5 are templates. The demo tenant has very little Copilot activity, so re-run parity on a busier tenant before GA |
 | Private networking (VNet, private endpoints, VNet data gateway) | `5. Azure/infra/modules/network.bicep`, `src/steps/azure` | Done: pulled forward from Phase 2 because MCAPS policy forces public access off |
 | Phase 2 modules (Agent 365, feedback, credit consumption, Agent Evaluator, Workday) | | Not started |
 
@@ -455,4 +455,5 @@ they can be.
 | Migrate job: `Login timeout expired` over the private endpoint | The SQL Redirect policy hangs at login. Use Proxy in private mode |
 | A failed migration didn't stop setup | Install now stops before the first load and prints the logs command |
 | Run job: `DirectoryIsNotEmpty` deleting from ADLS Gen2 | Skip `hdi_isfolder` directory placeholders when listing |
-| First load is slow: the Audit Search API throttles query creation (429) | Expected. Bounded concurrency with backoff, and the window manifest resumes failed windows on the next run |
+| First load is slow: the Audit Search API throttles query creation (429) | Expected. Bounded concurrency with backoff, and the window manifest resumes failed windows on the next run. On Contoso, 85 of 90 windows finished on the first run (about 50 minutes) and the rest on the second |
+| Refresh polling failed with `Reading refresh status failed (202)` | The enhanced refresh details endpoint returns 202 while a refresh runs. Treat 202 like 200 |

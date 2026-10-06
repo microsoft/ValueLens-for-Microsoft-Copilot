@@ -53,7 +53,8 @@ class Refresher:
     def _status(self, url, refresh_id, enhanced):
         if enhanced:
             r = self.api.get(f"{url}/{refresh_id}", scope=POWERBI, timeout=60)
-            if r.status_code == 200:
+            # The enhanced refresh details endpoint answers 202 while the refresh is still in progress.
+            if r.status_code in (200, 202):
                 d = r.json()
                 return d.get("extendedStatus") or d.get("status"), d
         else:

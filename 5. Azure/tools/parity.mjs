@@ -6,7 +6,7 @@
 //
 // Auth: an access token for https://analysis.windows.net/powerbi/api from POWERBI_TOKEN, or `az account get-access-token`.
 // Queries with __PLACEHOLDER__ templates are filled in by app code at runtime, so they are reported as skipped.
-import { execFileSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,8 +28,9 @@ function args() {
 
 function token() {
   if (process.env.POWERBI_TOKEN) return process.env.POWERBI_TOKEN;
-  return execFileSync('az', ['account', 'get-access-token', '--resource', 'https://analysis.windows.net/powerbi/api', '--query', 'accessToken', '-o', 'tsv'],
-    { encoding: 'utf8', shell: process.platform === 'win32' }).trim();
+  // A fixed command line: az is a .cmd on Windows, so it needs a shell there.
+  return execSync('az account get-access-token --resource https://analysis.windows.net/powerbi/api --query accessToken -o tsv',
+    { encoding: 'utf8' }).trim();
 }
 
 function files(dir) {

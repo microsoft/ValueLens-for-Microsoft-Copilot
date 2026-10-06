@@ -420,7 +420,9 @@ def test_refresh_enhanced_waits_out_busy_then_polls():
             return Resp(202, headers={"Location": f"{REFRESHES}/rid-9", "RequestId": "req"})
         assert url == f"{REFRESHES}/rid-9"
         state["polls"] += 1
-        return Resp(200, {"extendedStatus": "Completed" if state["polls"] > 2 else "InProgress"})
+        if state["polls"] <= 2:  # Power BI answers 202 while the refresh is in progress
+            return Resp(202, {"status": "Unknown", "extendedStatus": "NotStarted" if state["polls"] == 1 else "InProgress"})
+        return Resp(200, {"extendedStatus": "Completed"})
 
     r, session = _refresher(handler)
     r.refresh(WS, DS)
