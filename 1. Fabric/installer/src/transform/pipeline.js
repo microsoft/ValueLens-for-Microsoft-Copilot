@@ -97,10 +97,15 @@ export const WORKDAY_ACTIVITY = 'Run_Org_Data_Workday';
 export const COWORK_DATAFLOW_ACTIVITY = 'Refresh_Cowork_Credits';
 
 /** Bump when the pipeline's layout changes, so re-running the installer updates a pipeline an older version built. */
-export const PIPELINE_VERSION = 3;
+export const PIPELINE_VERSION = 4;
 /** What this version changed, for people whose pipeline an older version built. */
 export const PIPELINE_CHANGE =
-  'This version runs the loads in two lanes so a trial or small capacity isn\'t overloaded, and first routes any CSV exports dropped in Files/analytics_hub_uploads to the load that reads them.';
+  'This version runs every notebook in one shared Spark session, so a trial or small capacity turns fewer loads away, and ends with a step that records how each load went in dbo.load_log.';
+
+/** Notebooks with the same tag share one high-concurrency Spark session (letters, digits and underscores only). */
+export const SESSION_TAG = 'analytics_hub';
+/** Last step: records each load's outcome in dbo.load_log and fails the run when a load failed. */
+export const STATUS_ACTIVITY = 'Record_Load_Status';
 
 /**
  * Lane 2: every step except the audit log, its processor and the semantic model refresh, one after
@@ -168,6 +173,42 @@ export function applyRetries(activities) {
   for (const a of notebookActivities(activities)) {
     if (a.name !== AGENT365_REGISTRY) a.policy = { ...a.policy, ...retryPolicy(a.policy?.timeout) };
   }
+}
+
+/**
+ * Every notebook, including those in IfCondition branches, joins one high-concurrency session.
+ * Fabric starts a new session for the sixth notebook, or when the Lakehouse or Spark settings differ.
+ * @param {any[]} activities
+ */
+export function applySessionTag(activities) {
+  for (const a of notebookActivities(activities)) a.typeProperties = { ...a.typeProperties, sessionTag: SESSION_TAG };
+}
+
+/**
+ * The status step waits for every activity nothing else waits for, whether it succeeded, failed or
+ * was skipped. Being the only last step, its result is the run's result.
+ * @param {any[]} activities  Top-level activities.
+ * @param {PipelineSettings} settings
+ */
+function statusActivity(activities, settings) {
+  const waitedOn = new Set(activities.flatMap((a) => (a.dependsOn ?? []).map((/** @type {any} */ d) => d.activity)));
+  return {
+    name: STATUS_ACTIVITY,
+    description: 'Records how each load went in dbo.load_log, in plain words, and fails the run when a load failed so the failure is visible in the run history.',
+    type: 'TridentNotebook',
+    dependsOn: activities
+      .filter((a) => !waitedOn.has(a.name))
+      .map((a) => ({ activity: a.name, dependencyConditions: ['Completed', 'Skipped'] })),
+    policy: { timeout: '0.00:20:00', retry: 0, retryIntervalInSeconds: 60, secureOutput: false, secureInput: false },
+    typeProperties: {
+      notebookId: settings.notebookIds.loadStatus,
+      workspaceId: settings.workspaceId,
+      parameters: {
+        PIPELINE_RUN_ID: { value: { value: '@pipeline().RunId', type: 'Expression' }, type: 'string' },
+        PIPELINE_TRIGGER_TIME: { value: { value: '@string(pipeline().TriggerTime)', type: 'Expression' }, type: 'string' },
+      },
+    },
+  };
 }
 
 /**
@@ -470,14 +511,19 @@ export function buildPipeline(template, settings) {
     if (settings.agentEvaluatorModelId) filled.properties.activities.push(agentEvaluatorRefreshActivity(filled.properties.activities, settings));
   }
   chainLanes(filled.properties.activities);
+  const status = !!settings.notebookIds.loadStatus;
+  if (status) filled.properties.activities.push(statusActivity(filled.properties.activities, settings));
+  applySessionTag(filled.properties.activities);
 
   filled.properties.description =
     'Created by the Analytics Hub installer. The loads run in two lanes rather than all at once, so a trial or small capacity isn\'t overloaded. ' +
+    'Every notebook shares one Spark session (high concurrency for pipelines must be on in the workspace\'s Spark settings). ' +
     `Lane 1 loads the audit log, then runs the Audit Log Processor${settings.semanticModelId ? ', then refreshes the semantic model' : ''}. ` +
     'Lane 2 runs the other loads one after another; a load that fails doesn\'t stop the next. ' +
     `${settings.uploadRouter ? 'Lane 2 starts by routing any CSV exports dropped in Files/analytics_hub_uploads to the loads that read them. ' : ''}` +
     `${settings.modules.consumption ? `The credit consumption loads run in lane 2${settings.consumptionModelId ? ' and refresh the consumption model when they all succeed' : ''}. ` : ''}` +
     `${transcripts ? `The Agent Evaluator reads Copilot Studio transcripts at the end of lane 2${settings.agentEvaluatorModelId ? ', then refreshes its model' : ''}. ` : ''}` +
+    `${status ? `${STATUS_ACTIVITY} runs last: it writes each load's outcome to dbo.load_log and fails the run if any load failed. ` : ''}` +
     `Each load retries up to 3 times, ${RETRY_INTERVAL_SECONDS / 60} minutes apart. ` +
     'Scheduled runs use the parameter defaults (incremental audit load, merge into the curated table). ' +
     'The first run overrides them with AuditMode=backfill and ProcessorWriteMode=overwrite. ' +

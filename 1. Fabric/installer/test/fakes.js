@@ -87,6 +87,8 @@ export function fakeFabric() {
   const failures = {};
   /** SQL endpoint states getLakehouse returns, in order; then a ready endpoint. @type {any[]} */
   const sqlStates = [];
+  /** The workspace's Spark settings. @type {{ highConcurrency: Record<string, boolean> }} */
+  const spark = { highConcurrency: { notebookInteractiveRunEnabled: true, notebookPipelineRunEnabled: false } };
   const fail = (/** @type {string} */ method) => {
     const err = failures[method]?.shift();
     if (err) throw err;
@@ -139,6 +141,24 @@ export function fakeFabric() {
     updatePipeline: async (_ws, id, def) => {
       calls.push(`updatePipeline ${find(id).displayName}`);
       find(id).content = def;
+      return null;
+    },
+    /** @param {string} _ws @param {string} id */
+    getPipelineDefinition: async (_ws, id) => {
+      fail('getPipelineDefinition');
+      const item = items.find((i) => i.id === id);
+      if (!item?.content) throw notFound();
+      return structuredClone(item.content);
+    },
+    getSparkSettings: async () => {
+      fail('getSparkSettings');
+      return structuredClone(spark);
+    },
+    /** @param {string} _ws @param {any} body */
+    updateSparkSettings: async (_ws, body) => {
+      calls.push(`updateSparkSettings ${JSON.stringify(body)}`);
+      fail('updateSparkSettings');
+      spark.highConcurrency = { ...spark.highConcurrency, ...body.highConcurrency };
       return null;
     },
     listSchedules: async () => schedules.map((s) => structuredClone(s)),
@@ -247,7 +267,7 @@ export function fakeFabric() {
       return null;
     },
   };
-  return { api, items, schedules, calls, jobs, jobList, activityRuns, roles, connections, failures, sqlStates, add };
+  return { api, items, schedules, calls, jobs, jobList, activityRuns, roles, connections, failures, sqlStates, spark, add };
 }
 
 /** @param {number} [status] @param {string} [message] */

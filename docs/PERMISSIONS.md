@@ -55,6 +55,8 @@ right (next section) — the data itself must be exported by an admin (or a sche
 | What | Role / requirement |
 |---|---|
 | Run the notebooks / pipeline, write Delta to the Lakehouse | **Contributor** or **Member** on the Fabric workspace |
+| Let the pipeline's notebooks share one Spark session (the installer turns this on) | **Admin** on the Fabric workspace, to change the workspace Spark setting *High concurrency for pipeline running multiple notebooks*. Without it the installer warns and carries on, and each notebook starts its own session |
+| Record each run's load status in `dbo.load_log` | Nothing extra. The `AnalyticsHub_Load_Status` notebook reads the run it belongs to through the Fabric API, as the person the pipeline runs as (**Contributor** or **Member**) |
 | Land export-only files via the Power Automate flows | The flow's identity (app reg or workspace identity) as **Member/Contributor** on the workspace; tenant setting **“Service principals can use Fabric APIs”** enabled |
 | Installer-created flows (product feedback, Copilot Studio credits) | The installing person: **Environment Maker** (or System Administrator) in the chosen Power Platform environment. The flow owner: a **Power Automate Premium** licence (HTTP with Microsoft Entra ID is premium). The app registration gets **Contributor** on the workspace from the installer, and the flow reads its secret through an **Azure Key Vault** connection, so the person who signs in to it needs **Key Vault Secrets User** on the vault |
 | Installer-created Cowork credits Dataflow | The installing person as **Contributor** or **Member** on the workspace. Whoever signs in to the Dataflow needs Viva Insights **Insights Analyst** |

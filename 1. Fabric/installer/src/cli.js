@@ -14,7 +14,7 @@ import { isVivaId } from './transform/dataflow.js';
 import { c, createUi } from './ui.js';
 import { DATA_SOURCE_IDS, modulesFromSources, parseDataFlags } from './uploads.js';
 
-const COMMANDS = ['install', 'update', 'run', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'upload', 'preview'];
+const COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'upload', 'preview'];
 
 /** The `--help` text, naming the command the way it was started. */
 export const help = () => `Sets up Analytics Hub in Microsoft Fabric: the data pipeline, the semantic model and the app.
@@ -26,6 +26,7 @@ Commands:
   install          Set up Analytics Hub, or repair it from the install record (default)
   update           Push the notebooks, pipeline and semantic model from this checkout to Fabric
   run              Run the pipeline now, then the data check
+  rerun-failed     Run again only the loads that failed in the latest pipeline run
   check            Run the data check again, without the pipeline
   refresh          Refresh the semantic model now
   deploy-app       Deploy the Analytics Hub app again
