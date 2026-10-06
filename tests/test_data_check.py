@@ -146,5 +146,53 @@ class MaskedUserNameTests(unittest.TestCase):
         self.assertIn("hint = _masked_hint(masked, nl)", self.source)
 
 
+class ExcludedAuditTests(unittest.TestCase):
+    """An empty curated table can mean every parsed record was test activity."""
+
+    @classmethod
+    def setUpClass(cls):
+        notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+        sources = ["".join(cell["source"]) for cell in notebook["cells"]]
+        cls.config = sources[1]
+        cls.source = next(text for text in sources if "def _excluded_summary(" in text)
+        body = [
+            node for node in ast.parse(cls.source).body
+            if isinstance(node, ast.FunctionDef) and node.name in ("_excluded_summary", "_excluded_message")
+        ]
+        namespace = {}
+        exec(compile(ast.Module(body=body, type_ignores=[]), str(NOTEBOOK), "exec"), namespace)
+        cls.summarize = staticmethod(namespace["_excluded_summary"])
+        cls.message = staticmethod(namespace["_excluded_message"])
+
+    def test_counts_reasons_most_common_first_and_names_blank_reasons(self):
+        summary = self.summarize({"Maker evaluation": 30, None: 2, "  ": 1, "Autonomous run": 5})
+        self.assertEqual(summary["parsed"], 38)
+        self.assertEqual(list(summary["reasons"].items()),
+                         [("Maker evaluation", 30), ("Autonomous run", 5), ("Other filters", 3)])
+
+    def test_nothing_parsed_returns_none(self):
+        self.assertIsNone(self.summarize({}))
+        self.assertIsNone(self.summarize({"Maker evaluation": 0}))
+
+    def test_message_explains_test_activity_and_how_to_keep_it(self):
+        message = self.message({"parsed": 30, "reasons": {"Maker evaluation": 30}})
+        self.assertIn("30 audit records were found", message)
+        self.assertIn("Maker evaluation: 30", message)
+        self.assertIn("DROP_EXCLUDE_REASONS", message)
+
+    def test_message_without_parsed_rows_points_at_the_window(self):
+        message = self.message(None)
+        self.assertIn("NO AUDIT ROWS", message)
+        self.assertIn("window", message)
+        self.assertNotIn("test or admin activity", message)
+
+    def test_empty_audit_reads_the_parsed_table_and_exposes_the_summary(self):
+        self.assertIn("PARSED_TABLE   = 'copilot_interactions_parsed'", self.config)
+        self.assertIn("audit_excluded = None", self.source)
+        self.assertIn("pt = _resolve(PARSED_TABLE)", self.source)
+        self.assertIn("audit_excluded = _excluded_summary(counts)", self.source)
+        self.assertIn("print(_excluded_message(audit_excluded))", self.source)
+
+
 if __name__ == "__main__":
     unittest.main()
