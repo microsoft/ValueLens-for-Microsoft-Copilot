@@ -66,6 +66,7 @@ export class QueryService {
       body: JSON.stringify({ queries: [{ query }], serializerSettings: { includeNulls: true } })
     });
     const text = await upstream.text();
+    if (!upstream.ok) console.warn(`executeQueries ${itemId} returned ${upstream.status}: ${text.slice(0, 300)}`);
     const contentType = upstream.headers?.get?.('content-type') || 'application/json';
     const retryAfter = upstream.headers?.get?.('retry-after');
     if (!contentType.toLowerCase().includes('json')) {

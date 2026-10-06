@@ -389,6 +389,8 @@ export function fakeAzureGraph() {
   const applications = [];
   /** @type {any[]} */
   const servicePrincipals = [];
+  /** @type {any[]} */
+  const roleAssignments = [];
   const graphSp = { id: 'graph-sp', appId: '00000003-0000-0000-c000-000000000000', appRoles: [
     { id: 'r-audit', value: 'AuditLogsQuery.Read.All' },
     { id: 'r-reports', value: 'Reports.Read.All' },
@@ -412,7 +414,7 @@ export function fakeAzureGraph() {
       app.identifierUris = [`api://${body.fqdn}/${body.clientId}`];
       app.spa = { redirectUris: [`https://${body.fqdn}/`, `https://${body.fqdn}/?host=teams&auth=popup`] };
       app.api = { oauth2PermissionScopes: [{ id: 'scope-access', value: 'access_as_user' }], preAuthorizedApplications: body.teamsClientIds.map((id) => ({ appId: id })) };
-      app.appRoles = [{ value: 'AnalyticsHub.User' }, { value: 'AnalyticsHub.Admin' }];
+      app.appRoles = [{ id: 'role-user', value: 'AnalyticsHub.User' }, { id: 'role-admin', value: 'AnalyticsHub.Admin' }];
       return 'scope-access';
     },
     createApplication: async (/** @type {string} */ name) => {
@@ -435,9 +437,11 @@ export function fakeAzureGraph() {
     removePassword: async (/** @type {string} */ _id, /** @type {string} */ keyId) => {
       calls.push(`removePassword ${keyId}`);
     },
-    assignPrincipalToAppRole: async (/** @type {string} */ principal, /** @type {string} */ _resource, /** @type {string} */ role) => {
+    assignPrincipalToAppRole: async (/** @type {string} */ principal, /** @type {string} */ resource, /** @type {string} */ role) => {
       calls.push(`assign ${principal} ${role}`);
+      roleAssignments.push({ principalId: principal, resourceId: resource, appRoleId: role });
     },
+    appRoleAssignedTo: async (/** @type {string} */ resource) => roleAssignments.filter((a) => a.resourceId === resource),
     grantOauth2Permission: async (/** @type {any} */ g) => {
       calls.push(`oauth ${g.scope}`);
     },

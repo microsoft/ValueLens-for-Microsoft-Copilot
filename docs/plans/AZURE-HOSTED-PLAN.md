@@ -457,3 +457,4 @@ they can be.
 | Run job: `DirectoryIsNotEmpty` deleting from ADLS Gen2 | Skip `hdi_isfolder` directory placeholders when listing |
 | First load is slow: the Audit Search API throttles query creation (429) | Expected. Bounded concurrency with backoff, and the window manifest resumes failed windows on the next run. On Contoso, 85 of 90 windows finished on the first run (about 50 minutes) and the rest on the second |
 | Refresh polling failed with `Reading refresh status failed (202)` | The enhanced refresh details endpoint returns 202 while a refresh runs. Treat 202 like 200 |
+| The app opened but every chart stayed empty ("Filter choices didn't load") | The installer created the `AnalyticsHub.*` app roles but assigned them to nobody, so `/api/query` returned 403. It now gives the installing user `AnalyticsHub.Admin` and points at Enterprise applications for everyone else. The web API now logs 403s, 5xx errors and Power BI failures |

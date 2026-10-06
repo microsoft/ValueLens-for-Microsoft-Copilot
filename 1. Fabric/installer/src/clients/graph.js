@@ -257,6 +257,9 @@ export function graphApi(http) {
     /** @param {string} principalId @param {string} resourceId @param {string} appRoleId */
     assignPrincipalToAppRole: (principalId, resourceId, appRoleId) =>
       http.post(`/servicePrincipals/${resourceId}/appRoleAssignedTo`, { principalId, resourceId, appRoleId }, replicationRetry),
+
+    /** Users, groups and apps assigned to this service principal's app roles. @param {string} resourceId */
+    appRoleAssignedTo: (resourceId) => http.list(`/servicePrincipals/${resourceId}/appRoleAssignedTo`),
   };
 }
 

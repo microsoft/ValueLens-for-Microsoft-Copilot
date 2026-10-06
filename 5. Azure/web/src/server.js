@@ -55,6 +55,8 @@ export function createServer(deps = {}) {
       return sendJson(res, 404, { error: { code: 'NotFound', message: 'Not found.' } });
     } catch (error) {
       const status = error.statusCode || 500;
+      if (status >= 500) console.error(`${req.method} ${req.url} failed:`, error);
+      else if (status === 403) console.warn(`${req.method} ${req.url} 403: ${error.message}`);
       return sendJson(res, status, { error: { code: status === 401 ? 'Unauthorized' : status === 403 ? 'Forbidden' : 'ServerError', message: status === 500 ? 'Internal server error.' : error.message } });
     }
   });

@@ -485,6 +485,37 @@ async function ensureAzureWebApp(ctx) {
     const action = `Grant delegated consent on ${apiPermissionsUrl(/** @type {string} */ (az.webApp.clientId))}`;
     az.status.pendingAdminActions = [...new Set([...(az.status.pendingAdminActions ?? []), action])];
   }
+  await ensureInstallerIsAdmin(ctx, sp.id);
+}
+
+/**
+ * The web API only answers users holding AnalyticsHub.User or AnalyticsHub.Admin, so give the person
+ * installing the Admin role. Everyone else is assigned in Entra (Enterprise applications > Users and groups).
+ * @param {Ctx} ctx @param {string} spId
+ */
+async function ensureInstallerIsAdmin(ctx, spId) {
+  const { config, api, user, ui } = ctx;
+  const az = /** @type {import('../../config.js').AzureConfig} */ (config.azure);
+  const usersUrl = `https://portal.azure.com/#view/Microsoft_AAD_IAM/ManagedAppMenuBlade/~/Users/objectId/${spId}/appId/${az.webApp?.clientId}`;
+  try {
+    // Role IDs are generated when the app is first patched, so read them back rather than trusting the local object.
+    const app = await api.graph.findApplication(/** @type {string} */ (az.webApp?.clientId));
+    const roles = /** @type {any[]} */ (app?.appRoles ?? []);
+    const admin = roles.find((r) => r.value === 'AnalyticsHub.Admin');
+    if (!admin?.id) throw new Error('the AnalyticsHub.Admin app role is missing');
+    const assigned = /** @type {any[]} */ (await api.graph.appRoleAssignedTo(spId));
+    const roleIds = new Set(roles.map((r) => r.id));
+    if (!assigned.some((a) => a.principalId === user.id && roleIds.has(a.appRoleId))) {
+      try {
+        await api.graph.assignPrincipalToAppRole(user.id, spId, admin.id);
+      } catch (err) {
+        if (!(err instanceof HttpError && /already exists/i.test(err.message))) throw err;
+      }
+      ui.ok(`Gave ${user.upn} the Analytics Hub Admin role. Assign other users or groups at ${usersUrl}`);
+    }
+  } catch (err) {
+    ui.warn(`Couldn't give you the Analytics Hub Admin role (${err instanceof Error ? err.message.split('\n')[0] : err}). Without a role the app's charts stay empty. Assign it at ${usersUrl}`);
+  }
 }
 
 /** @param {Ctx} ctx */

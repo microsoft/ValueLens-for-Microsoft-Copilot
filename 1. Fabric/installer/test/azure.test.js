@@ -142,10 +142,14 @@ test('Azure apply is idempotent enough against fakes and records key outputs', a
   assert.equal(config.azure?.powerBi?.datasetId, config.semanticModel.id);
   assert.equal(config.azure?.webApp?.appIdUri, 'api://vlens.example.com/00000000-0000-4000-8000-000000000001');
   assert.ok(config.azure?.graphRoles?.assigned.includes('Reports.Read.All'));
+  const webSp = `sp-${config.azure?.webApp?.clientId}`;
+  assert.equal(graph.calls.filter((c) => c === 'assign user-1 role-admin').length, 1, 'the installer gets the Admin app role');
 
   const webAppsBefore = graph.applications.filter((a) => a.displayName === 'Analytics Hub (Azure)').length;
   await installAzure(ctx, { wait: true });
   assert.equal(graph.applications.filter((a) => a.displayName === 'Analytics Hub (Azure)').length, webAppsBefore, 'web app is reused');
+  assert.equal(graph.calls.filter((c) => c === 'assign user-1 role-admin').length, 1, 'the role is not assigned twice');
+  assert.equal(config.azure?.webApp?.servicePrincipalId, webSp);
 });
 
 test('a failed migration stops the install before the first load', async () => {
