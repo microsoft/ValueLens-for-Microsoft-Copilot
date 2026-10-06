@@ -55,6 +55,11 @@ export function fakeUi(opts = {}) {
       asked.push(message);
       return answers.length ? answers.shift() : choices.filter((ch) => ch.checked).map((ch) => ch.value);
     },
+    /** @param {string} message @param {import('../src/uploads.js').SourceCard[]} cards */
+    async sources(message, cards) {
+      asked.push(message);
+      return answers.length ? answers.shift() : { modes: Object.fromEntries(cards.map((card) => [card.id, card.mode])), files: [] };
+    },
   };
   return { ui: /** @type {import('../src/ui.js').Ui} */ (/** @type {unknown} */ (ui)), out, asked, text: () => out.join('') };
 }
