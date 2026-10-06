@@ -512,3 +512,29 @@ def test_full_local_pipeline_collect_to_publish(tmp_path, monkeypatch):
     results = pub.publish(conn, store, jobs_main.publish_targets(s))
     assert results[0]["rows"] == 2
     assert conn.execute("SELECT count(*) FROM copilot_licensed_users").fetchone() == (2,)
+
+
+def test_adls_store_skips_hns_directory_markers(tmp_path):
+    from valuelens_jobs.storage import AdlsStore
+
+    deleted = []
+
+    class Container:
+        def list_blobs(self, name_starts_with, include=None):
+            assert include == ["metadata"]
+            return [
+                SimpleNamespace(name="copilot_licensed_users", metadata={"hdi_isfolder": "true"}),
+                SimpleNamespace(name="copilot_licensed_users/part-0.parquet", metadata={}),
+                SimpleNamespace(name="copilot_licensed_users/part-1.parquet", metadata=None),
+                SimpleNamespace(name="copilot_licensed_users_old/part-0.parquet", metadata={}),
+            ]
+
+        def delete_blob(self, name):
+            deleted.append(name)
+
+    service = SimpleNamespace(get_container_client=lambda name: Container())
+    store = AdlsStore("acct", root=tmp_path, service=service)
+    assert store.list("raw/copilot_licensed_users") == [
+        "raw/copilot_licensed_users/part-0.parquet", "raw/copilot_licensed_users/part-1.parquet"]
+    store.remove([r for r in store.list("raw/copilot_licensed_users") if not r.endswith("part-0.parquet")])
+    assert deleted == ["copilot_licensed_users/part-1.parquet"]

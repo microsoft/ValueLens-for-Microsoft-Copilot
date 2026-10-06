@@ -432,7 +432,27 @@ tests/fixtures/valuelens-golden/
 | Web API: `/app.config.json`, `/api/query` (OBO `executeQueries` with a model allowlist), settings | `5. Azure/web` | Done: 10 tests |
 | App seams: runtime host detection, MSAL sign-in, `HttpFabricProxy`, `SettingsStore` | `1. Fabric/Fabric App` | Done: the Fabric build is unchanged; 1,664 tests pass |
 | Teams manifest and package builder | `5. Azure/teams` (vendored into the installer) | Done: built by the installer; SSO through the web app registration |
-| Installer Azure target: wizard choice, preflight, what-if, ARM deploy, app registrations, Graph roles, Power BI model, migrate, `run`, `status`, `refresh`, `update`, `rotate-secret`, `uninstall` | `1. Fabric/installer/src/azure`, `src/steps/azure` | Done: 206 tests pass |
+| Installer Azure target: wizard choice, preflight, what-if, ARM deploy, app registrations, Graph roles, Power BI model, migrate, `run`, `status`, `refresh`, `update`, `rotate-secret`, `uninstall` | `1. Fabric/installer/src/azure`, `src/steps/azure` | Done: 218 tests pass |
 | CI: installer, web, ARM drift, and image builds (pushed to GHCR on `installer-v*` tags) | `.github/workflows/tests.yml`, `azure-images.yml` | Done |
-| End-to-end deployment to a real tenant and the 101-query parity check | | **Next.** This is the Phase 1 exit criterion |
-| Phase 2 modules (Agent 365, feedback, credit consumption, Agent Evaluator, Workday) and private networking | | Not started |
+| End-to-end deployment to a real tenant and the 101-query parity check | Contoso demo tenant | **In progress.** Deployed end to end in private networking mode (see below). Parity tool: `5. Azure/tools/parity.mjs` |
+| Private networking (VNet, private endpoints, VNet data gateway) | `5. Azure/infra/modules/network.bicep`, `src/steps/azure` | Done: pulled forward from Phase 2 because MCAPS policy forces public access off |
+| Phase 2 modules (Agent 365, feedback, credit consumption, Agent Evaluator, Workday) | | Not started |
+
+### 10.1 Findings from the first real deployment (Contoso, MCAPS subscription)
+
+Each of these was a bug or a gap that the fakes didn't catch. All are fixed and covered by tests where
+they can be.
+
+| Finding | Fix |
+|---|---|
+| Policy `DenyPublicEndpointEnabled` forces public access off on SQL and Storage | Private networking mode: VNet, private endpoints and DNS, a VNet-integrated Container Apps environment, and an automated Power BI VNet data gateway on a Fabric capacity |
+| SQL can't be created in uksouth, northeurope or westeurope on this subscription | `azure.sqlLocation` plus a SQL capability preflight. A private endpoint in uksouth reaches SQL in ukwest |
+| VNet-integrated Container Apps environment needs `Microsoft.Network/AllowBringYourOwnPublicIpAddress` | The preflight registers the feature, which is approved automatically |
+| Fabric `assignToCapacity` returns 202 with no operation header | Poll the workspace until `capacityId` matches and assignment isn't `InProgress` |
+| Gateway connection creation hits SQL 40613 (serverless resume) and AADSTS7000215 (new secret not replicated yet) | `whileSqlResumes` retry around the gateway calls. The previous reader secret is retired once the new one is bound |
+| Re-runs failed on an existing delegated grant and an existing workspace member | Idempotent `oauth2PermissionGrants` (list, then patch) and ignore `AddingAlreadyExists` |
+| Migrate job: ODBC driver library couldn't load | Pin the base image to `python:3.12-slim-bookworm`, install `libgssapi-krb5-2` explicitly, and check with `ldd` at build time |
+| Migrate job: `Login timeout expired` over the private endpoint | The SQL Redirect policy hangs at login. Use Proxy in private mode |
+| A failed migration didn't stop setup | Install now stops before the first load and prints the logs command |
+| Run job: `DirectoryIsNotEmpty` deleting from ADLS Gen2 | Skip `hdi_isfolder` directory placeholders when listing |
+| First load is slow: the Audit Search API throttles query creation (429) | Expected. Bounded concurrency with backoff, and the window manifest resumes failed windows on the next run |

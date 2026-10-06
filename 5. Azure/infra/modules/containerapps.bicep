@@ -1,5 +1,6 @@
 // Container Apps environment (consumption), the scheduled run job, the manual migrate
-// job and the Analytics Hub web app. Images are public on GHCR, so no registry is needed.
+// job and the Analytics Hub web app. Images are public on GHCR unless registryServer names a
+// private registry, which is then pulled from with the managed identity.
 param location string
 param tags object
 param environmentName string
@@ -27,6 +28,9 @@ param powerBiWorkspaceId string
 param semanticModels string
 param sqlReaderName string
 param sqlReaderClientId string = ''
+param registryServer string = ''
+@description('Subnet delegated to Microsoft.App/environments (private networking). Empty = no VNet.')
+param infrastructureSubnetId string = ''
 
 resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: logAnalyticsName
@@ -45,6 +49,8 @@ resource env 'Microsoft.App/managedEnvironments@2024-03-01' = {
       }
     }
     workloadProfiles: [{ name: 'Consumption', workloadProfileType: 'Consumption' }]
+    // Private mode: jobs reach SQL and Storage through private endpoints; web ingress stays public.
+    vnetConfiguration: empty(infrastructureSubnetId) ? null : { infrastructureSubnetId: infrastructureSubnetId, internal: false }
   }
 }
 
@@ -64,6 +70,7 @@ var jobEnv = concat(commonEnv, [
   { name: 'VALUELENS_SQL_READER_NAME', value: sqlReaderName }
   { name: 'VALUELENS_SQL_READER_CLIENT_ID', value: sqlReaderClientId }
 ])
+var registries = empty(registryServer) ? [] : [{ server: registryServer, identity: identityId }]
 var identity = {
   type: 'UserAssigned'
   userAssignedIdentities: { '${identityId}': {} }
@@ -79,6 +86,7 @@ resource runJob 'Microsoft.App/jobs@2024-03-01' = {
     workloadProfileName: 'Consumption'
     configuration: {
       triggerType: 'Schedule'
+      registries: registries
       replicaTimeout: 14400
       replicaRetryLimit: 1
       scheduleTriggerConfig: { cronExpression: runSchedule, parallelism: 1, replicaCompletionCount: 1 }
@@ -105,6 +113,7 @@ resource migrateJob 'Microsoft.App/jobs@2024-03-01' = {
     workloadProfileName: 'Consumption'
     configuration: {
       triggerType: 'Manual'
+      registries: registries
       replicaTimeout: 1800
       replicaRetryLimit: 0
       manualTriggerConfig: { parallelism: 1, replicaCompletionCount: 1 }
@@ -131,6 +140,7 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = if (deployWeb) {
     workloadProfileName: 'Consumption'
     configuration: {
       ingress: { external: true, targetPort: 8080, transport: 'auto', allowInsecure: false }
+      registries: registries
     }
     template: {
       containers: [{

@@ -48,6 +48,42 @@ shown as coming soon and cannot be selected. Re-runs are incremental and use the
 resource with `valuelens-install-id` and stops rather than modifying untagged resources with colliding
 names.
 
+### Networking
+
+The wizard asks how the app, jobs and Power BI reach Azure SQL and Storage:
+
+- **Public endpoints** (default). SQL allows Azure services and Power BI connects to it directly.
+- **Private networking**. Choose this where Azure Policy keeps public network access off (common on
+  managed and MCAPS subscriptions; the installer says so when what-if hits `DenyPublicEndpointEnabled`).
+  It adds a VNet, private endpoints and private DNS zones for SQL and Storage (blob, dfs, table), a
+  VNet-integrated Container Apps environment, and a Power BI **VNet data gateway** that the model's SQL
+  connection runs through. SQL uses the Proxy connection policy, so everything stays on port 1433.
+  - It needs an active Fabric (F or trial) or Power BI Premium capacity to host the gateway. The
+    Power BI workspace is assigned to it.
+  - The preflight registers the `Microsoft.Network/AllowBringYourOwnPublicIpAddress` subscription
+    feature, which VNet-integrated Container Apps environments need. It's approved automatically.
+  - It adds about $30–40 a month (four private endpoints and DNS zones). The gateway uses capacity units
+    while refreshing.
+  - Networking can't be changed in place. Uninstall and install again to switch.
+
+### Regions and images
+
+- `azure.sqlLocation` puts Azure SQL in a different region from everything else. Some subscriptions
+  can't create SQL in busy regions (for example uksouth, northeurope or westeurope on MCAPS). The
+  preflight checks SQL capability and points at this setting. The private endpoint can be in another
+  region from the server.
+- `azure.images` overrides where the jobs and web images come from, for air-gapped tenants or testing
+  an unreleased build: `{ "registry": "myacr.azurecr.io/valuelens", "registryResourceId": "<ACR
+  resource ID>", "tag": "dev-abc123" }`. With `registryResourceId` set, the managed identity is granted
+  AcrPull. Build into your registry from the repo root with
+  `az acr build -r myacr -t valuelens/valuelens-jobs:<tag> -f "5. Azure/jobs/Dockerfile" .` (and the
+  same for `valuelens-web` with `5. Azure/web/Dockerfile`). If the upload fails on long `node_modules`
+  paths, build from a folder that holds only the paths the Dockerfile copies.
+
+If the database migration job fails, setup stops before the first load and prints the
+`az containerapp job logs show` command for its logs. Fix the cause and run install again; finished
+steps are skipped.
+
 Azure commands:
 
 - `run` starts the Container Apps run job.

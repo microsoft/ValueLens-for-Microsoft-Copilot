@@ -6,6 +6,9 @@ targetScope = 'resourceGroup'
 @description('Azure region for all resources.')
 param location string = resourceGroup().location
 
+@description('Region for Azure SQL only. Some regions stop accepting new SQL servers (RegionDoesNotAllowProvisioning); the installer lets you pick another. Empty = location.')
+param sqlLocation string = ''
+
 @description('Short lowercase prefix used in resource names.')
 @minLength(2)
 @maxLength(10)
@@ -20,6 +23,9 @@ param tags object = {}
 @description('Container image registry and tag for the jobs and web images.')
 param imageRegistry string = 'ghcr.io/microsoft'
 param imageTag string
+
+@description('Optional resource ID of a private Azure Container Registry holding the images. The managed identity gets AcrPull on it and pulls with that identity. Empty = public registry.')
+param imageRegistryResourceId string = ''
 
 @description('Cron schedule (UTC) for the daily collect/process/publish run.')
 param runSchedule string = '0 3 * * *'
@@ -41,6 +47,9 @@ param sqlUseFreeLimit bool = false
 
 @allowed(['Enabled', 'Disabled'])
 param publicNetworkAccess string = 'Enabled'
+
+@description('Private networking only: address space of the VNet (at least a /22).')
+param vnetAddressPrefix string = '10.60.0.0/22'
 
 @description('Deploy the Analytics Hub web app (SPA + /api).')
 param deployWeb bool = true
@@ -67,14 +76,18 @@ param sqlReaderName string = ''
 param sqlReaderClientId string = ''
 
 var allTags = union(tags, { 'valuelens-install-id': installId, 'valuelens-component': 'analytics-hub' })
+var privateNetworking = publicNetworkAccess == 'Disabled'
 var suffix = substring(uniqueString(resourceGroup().id, installId), 0, 6)
 var names = {
   identity: 'id-${namePrefix}-collector-${suffix}'
   logs: 'log-${namePrefix}-${suffix}'
   storage: toLower(take('st${replace(namePrefix, '-', '')}${suffix}', 24))
-  sqlServer: 'sql-${namePrefix}-${suffix}'
+  // A separate SQL region gets its own name: a failed create in the first region keeps the old name reserved.
+  sqlServer: empty(sqlLocation) ? 'sql-${namePrefix}-${suffix}' : 'sql-${namePrefix}-${substring(uniqueString(resourceGroup().id, installId, sqlLocation), 0, 6)}'
   sqlDatabase: 'valuelens'
-  environment: 'cae-${namePrefix}-${suffix}'
+  // Container Apps environment networking can't change after creation, so private mode gets its own environment.
+  environment: privateNetworking ? 'cae-${namePrefix}-${suffix}-vnet' : 'cae-${namePrefix}-${suffix}'
+  vnet: 'vnet-${namePrefix}-${suffix}'
   runJob: 'job-${namePrefix}-run'
   migrateJob: 'job-${namePrefix}-migrate'
   web: 'ca-${namePrefix}-web'
@@ -104,7 +117,7 @@ module storage 'modules/storage.bicep' = {
 module sql 'modules/sql.bicep' = {
   name: 'vl-sql'
   params: {
-    location: location
+    location: empty(sqlLocation) ? location : sqlLocation
     serverName: names.sqlServer
     databaseName: names.sqlDatabase
     tags: allTags
@@ -119,9 +132,35 @@ module sql 'modules/sql.bicep' = {
   }
 }
 
+var privateRegistry = !empty(imageRegistryResourceId)
+
+module network 'modules/network.bicep' = if (privateNetworking) {
+  name: 'vl-network'
+  params: {
+    location: location
+    tags: allTags
+    vnetName: names.vnet
+    addressPrefix: vnetAddressPrefix
+    sqlServerId: sql.outputs.serverId
+    storageAccountId: storage.outputs.id
+  }
+}
+
+module acrPull 'modules/acrpull.bicep' = if (privateRegistry) {
+  name: 'vl-acrpull-${suffix}'
+  scope: resourceGroup(split(imageRegistryResourceId, '/')[2], split(imageRegistryResourceId, '/')[4])
+  params: {
+    registryName: last(split(imageRegistryResourceId, '/'))
+    principalId: identity.outputs.principalId
+  }
+}
+
 module apps 'modules/containerapps.bicep' = {
   name: 'vl-containerapps'
+  dependsOn: [acrPull]
   params: {
+    infrastructureSubnetId: privateNetworking ? network!.outputs.appsSubnetId : ''
+    registryServer: privateRegistry ? split(imageRegistry, '/')[0] : ''
     location: location
     tags: allTags
     environmentName: names.environment
@@ -164,3 +203,5 @@ output webUrl string = apps.outputs.webUrl
 output webFqdn string = apps.outputs.webFqdn
 output environmentName string = names.environment
 output webName string = deployWeb ? names.web : ''
+output vnetName string = privateNetworking ? names.vnet : ''
+output gatewaySubnetName string = privateNetworking ? network!.outputs.gatewaySubnetName : ''

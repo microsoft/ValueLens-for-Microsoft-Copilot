@@ -17,6 +17,11 @@ export function powerBiApi(http) {
     /** @param {string} gatewayId @param {string} datasourceId @param {any} body */
     updateDatasource: (gatewayId, datasourceId, body) => http.patch(`/gateways/${gatewayId}/datasources/${datasourceId}`, body),
     /**
+     * Points a dataset at a gateway connection (VNet data gateway in private mode).
+     * @param {string} workspaceId @param {string} datasetId @param {{ gatewayObjectId: string, datasourceObjectIds: string[] }} body
+     */
+    bindToGateway: (workspaceId, datasetId, body) => http.post(`/groups/${workspaceId}/datasets/${datasetId}/Default.BindToGateway`, body),
+    /**
      * Starts an enhanced refresh and returns its request ID.
      * @param {string} workspaceId
      * @param {string} datasetId

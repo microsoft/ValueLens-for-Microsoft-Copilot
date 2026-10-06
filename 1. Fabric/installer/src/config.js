@@ -113,6 +113,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {string} [resourceGroup]
  * @property {boolean} [createdResourceGroup]
  * @property {string} [location]
+ * @property {string} [sqlLocation] Region for Azure SQL when it differs from location (regional SQL capacity).
  * @property {string} [namePrefix]
  * @property {string} [installId]
  * @property {Record<string, string>} [tags]
@@ -121,11 +122,15 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {'new' | 'existing'} [workspaceMode]
  * @property {string} [workspaceName]
  * @property {string} [imageTag]
+ * @property {{ registry?: string, registryResourceId?: string, tag?: string }} [images] Optional image source override:
+ *   a private registry (e.g. `myacr.azurecr.io/valuelens`), its ARM resource ID for AcrPull, and a pinned tag.
  * @property {any[]} [deployments]
  * @property {Record<string, any>} [outputs]
  * @property {{ clientId?: string, objectId?: string, servicePrincipalId?: string, created?: boolean, appIdUri?: string }} [webApp]
  * @property {{ clientId?: string, objectId?: string, servicePrincipalId?: string, secretKeyId?: string, secretExpiry?: string, created?: boolean }} [sqlReader]
- * @property {{ workspaceId?: string, createdWorkspace?: boolean, datasetId?: string }} [powerBi]
+ * @property {{ workspaceId?: string, createdWorkspace?: boolean, datasetId?: string, capacityId?: string, gatewayId?: string, createdGateway?: boolean, connectionId?: string }} [powerBi]
+ *   `capacityId` hosts the workspace (semantic model definition APIs need a Fabric/Premium capacity) and, in private
+ *   networking mode, the VNet data gateway `gatewayId` whose SQL connection `connectionId` the model is bound to.
  * @property {{ assigned: string[], pending: string[] }} [graphRoles]
  * @property {string} [teamsPackage]
  * @property {{ whatIf?: any[], pendingAdminActions?: string[], lastRun?: any, lastMigrate?: any }} [status]

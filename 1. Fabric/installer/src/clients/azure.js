@@ -77,8 +77,35 @@ export function parseResourceId(id) {
   return { subscriptionId: m[1], resourceGroup: m[2], type: m[3], name: m[4] };
 }
 
-/** @param {import('../http.js').HttpClient} http */
-export function armApi(http) {
+/**
+ * Polls an ARM deployment until it finishes. The deployment PUT answers 200/201 while it is still
+ * running, so the generic 202 long-running-operation handling doesn't wait for it.
+ * @param {() => Promise<any>} get  Reads the deployment.
+ * @param {any} first  The PUT response.
+ * @param {{ sleep?: (ms: number) => Promise<void>, pollMs?: number, timeoutMs?: number }} [opts]
+ */
+export async function waitForDeployment(get, first, opts = {}) {
+  const sleep = opts.sleep ?? ((/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)));
+  const deadline = Date.now() + (opts.timeoutMs ?? 60 * 60_000);
+  let d = first;
+  for (;;) {
+    const state = String(d?.properties?.provisioningState ?? 'Succeeded');
+    if (state === 'Succeeded') return d;
+    if (state === 'Failed' || state === 'Canceled') {
+      const e = d?.properties?.error;
+      const detail = (e?.details ?? []).map((/** @type {any} */ x) => `${x.code}: ${x.message}`).join('; ');
+      const err = new Error(`ARM deployment ${d?.name ?? ''} ${state.toLowerCase()}: ${e?.code ?? ''} ${e?.message ?? ''}${detail ? ` (${detail})` : ''}`.trim());
+      /** @type {any} */ (err).body = { error: e };
+      throw err;
+    }
+    if (Date.now() > deadline) throw new Error(`ARM deployment ${d?.name ?? ''} is still ${state} after the timeout.`);
+    await sleep(opts.pollMs ?? 10_000);
+    d = await get();
+  }
+}
+
+/** @param {import('../http.js').HttpClient} http @param {{ sleep?: (ms: number) => Promise<void>, pollMs?: number }} [opts] */
+export function armApi(http, opts = {}) {
   return {
     listSubscriptions: () => http.list('/subscriptions', { query: { 'api-version': SUBSCRIPTIONS_API } }),
 
@@ -97,6 +124,15 @@ export function armApi(http) {
         throw err;
       }
     },
+
+    /**
+     * Whether this subscription may create Azure SQL servers in a region. Restricted regions
+     * come back with status "Visible" and a reason; ARM would only fail mid-deploy.
+     * @param {string} subscriptionId @param {string} location
+     * @returns {Promise<{ status?: string, reason?: string }>}
+     */
+    sqlCapability: (subscriptionId, location) =>
+      http.get(`/subscriptions/${subscriptionId}/providers/Microsoft.Sql/locations/${location}/capabilities`, { query: { 'api-version': '2023-08-01-preview', include: 'supportedEditions' } }),
 
     /** @param {string} scope  e.g. /subscriptions/{id} */
     permissions: (scope) => http.list(`${scope}/providers/Microsoft.Authorization/permissions`, { query: { 'api-version': AUTHORIZATION_API } }),
@@ -117,6 +153,27 @@ export function armApi(http) {
         if (s.registrationState === 'Registered') return true;
       }
       throw new Error(`Timed out registering the ${namespace} resource provider.`);
+    },
+
+    /**
+     * Registers a subscription feature flag, then re-registers its provider so the change takes effect.
+     * @param {string} subscriptionId @param {string} namespace @param {string} name
+     */
+    async ensureFeature(subscriptionId, namespace, name) {
+      const path = `/subscriptions/${subscriptionId}/providers/Microsoft.Features/providers/${namespace}/features/${name}`;
+      const q = { query: { 'api-version': '2021-07-01' } };
+      const f = await http.get(path, q);
+      if (f.properties?.state === 'Registered') return false;
+      await http.post(`${path}/register`, undefined, q);
+      for (let i = 0; i < 60; i++) {
+        const s = await http.get(path, q);
+        if (s.properties?.state === 'Registered') {
+          await http.post(`/subscriptions/${subscriptionId}/providers/${namespace}/register`, undefined, { query: { 'api-version': RESOURCES_API } });
+          return true;
+        }
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+      throw new Error(`Timed out registering the ${namespace}/${name} feature.`);
     },
 
     /** @param {string} subscriptionId @param {string} name @param {string} location */
@@ -158,12 +215,11 @@ export function armApi(http) {
      * Creates or updates an ARM template deployment.
      * @param {string} subscriptionId @param {string} resourceGroup @param {string} name @param {any} deployment
      */
-    deployTemplate: (subscriptionId, resourceGroup, name, deployment) =>
-      http.requestLro('PUT', `/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}/providers/Microsoft.Resources/deployments/${name}`, {
-        query: { 'api-version': DEPLOYMENTS_API },
-        body: deployment,
-        lroResult: true,
-      }),
+    deployTemplate: async (subscriptionId, resourceGroup, name, deployment) => {
+      const path = `/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}/providers/Microsoft.Resources/deployments/${name}`;
+      const first = await http.requestLro('PUT', path, { query: { 'api-version': DEPLOYMENTS_API }, body: deployment, lroResult: true });
+      return waitForDeployment(() => http.get(path, { query: { 'api-version': DEPLOYMENTS_API } }), first, opts);
+    },
 
     /** @param {string} subscriptionId @param {string} resourceGroup @param {string} serverName @param {string} databaseName */
     async getSqlDatabase(subscriptionId, resourceGroup, serverName, databaseName) {

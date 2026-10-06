@@ -108,20 +108,20 @@ export function graphApi(http) {
         displayName,
         signInAudience: 'AzureADMyOrg',
         notes: 'Created by the Analytics Hub installer. Reads Copilot audit, usage report and directory data for ValueLens.',
-        requiredResourceAccess: [{ resourceAppId: GRAPH_APP_ID, resourceAccess: appRoles.map((r) => ({ id: r.id, type: 'Role' })) }],
+        requiredResourceAccess: appRoles.length ? [{ resourceAppId: GRAPH_APP_ID, resourceAccess: appRoles.map((r) => ({ id: r.id, type: 'Role' })) }] : [],
       }),
     /**
      * Creates the Azure-hosted web application registration.
      * @param {{ displayName: string, fqdn: string, pbiScopeId: string, graphUserReadScopeId: string, teamsClientIds: string[] }} o
      */
     createAzureWebApplication(o) {
-      const clientIdPlaceholder = '00000000-0000-0000-0000-000000000000';
       const scopeId = crypto.randomUUID();
+      // No identifierUris here: tenant policy needs the URI to contain the app ID, so
+      // updateAzureWebApplication sets api://<fqdn>/<appId> once the app ID exists.
       return http.post('/applications', {
         displayName: o.displayName,
         signInAudience: 'AzureADMyOrg',
         spa: { redirectUris: [`https://${o.fqdn}/`, `https://${o.fqdn}/?host=teams&auth=popup`] },
-        identifierUris: [`api://${o.fqdn}/${clientIdPlaceholder}`],
         api: {
           oauth2PermissionScopes: [
             {
@@ -243,11 +243,16 @@ export function graphApi(http) {
       http.post(`/servicePrincipals/${resourceId}/appRoleAssignedTo`, { principalId, resourceId, appRoleId }, replicationRetry),
 
     /**
-     * Admin consent for a delegated scope for all users.
+     * Admin consent for a delegated scope for all users. Reuses an existing grant, adding the scope if it's missing.
      * @param {{ clientId: string, resourceId: string, scope: string }} o
      */
-    grantOauth2Permission: (o) =>
-      http.post('/oauth2PermissionGrants', { clientId: o.clientId, consentType: 'AllPrincipals', resourceId: o.resourceId, scope: o.scope }, replicationRetry),
+    async grantOauth2Permission(o) {
+      const existing = /** @type {any[]} */ (await http.list('/oauth2PermissionGrants', { query: { $filter: `clientId eq '${o.clientId}' and resourceId eq '${o.resourceId}'` } }).catch(() => [])).find((g) => g.consentType === 'AllPrincipals');
+      if (!existing) return http.post('/oauth2PermissionGrants', { clientId: o.clientId, consentType: 'AllPrincipals', resourceId: o.resourceId, scope: o.scope }, replicationRetry);
+      const scopes = String(existing.scope ?? '').split(' ').filter(Boolean);
+      if (scopes.includes(o.scope)) return existing;
+      return http.patch(`/oauth2PermissionGrants/${existing.id}`, { scope: [...scopes, o.scope].join(' ') });
+    },
 
     /** @param {string} principalId @param {string} resourceId @param {string} appRoleId */
     assignPrincipalToAppRole: (principalId, resourceId, appRoleId) =>

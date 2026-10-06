@@ -82,9 +82,11 @@ class AdlsStore(LocalStore):
 
     def list(self, prefix: str) -> list[str]:
         container, name = self._split(prefix)
-        names = self._container(container).list_blobs(name_starts_with=name)
+        # Hierarchical-namespace accounts also list directories, as empty blobs marked hdi_isfolder.
+        names = self._container(container).list_blobs(name_starts_with=name, include=["metadata"])
         return sorted(f"{container}/{b.name}" for b in names
-                      if b.name == name or not name or b.name.startswith(name.rstrip("/") + "/"))
+                      if (b.metadata or {}).get("hdi_isfolder") != "true"
+                      and (b.name == name or not name or b.name.startswith(name.rstrip("/") + "/")))
 
     def pull(self, prefix: str) -> list[str]:
         rels = self.list(prefix)

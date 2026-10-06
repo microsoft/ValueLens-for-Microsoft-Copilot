@@ -118,9 +118,20 @@ export function fabricApi(http) {
     /** @param {string} displayName @param {string} capacityId */
     createWorkspace: (displayName, capacityId) =>
       http.post('/workspaces', { displayName, capacityId, description: 'ValueLens: Copilot usage and value data.' }),
-    /** @param {string} workspaceId @param {string} capacityId */
-    assignToCapacity: (workspaceId, capacityId) =>
-      http.requestLro('POST', `/workspaces/${workspaceId}/assignToCapacity`, { body: { capacityId } }),
+    /**
+     * Fabric answers 202 without an operation to follow, so poll the workspace until the assignment finishes.
+     * @param {string} workspaceId @param {string} capacityId
+     */
+    async assignToCapacity(workspaceId, capacityId) {
+      await http.post(`/workspaces/${workspaceId}/assignToCapacity`, { capacityId });
+      for (let i = 0; i < 60; i++) {
+        const ws = await http.get(`/workspaces/${workspaceId}`);
+        if (ws?.capacityAssignmentProgress === 'Failed') throw new Error(`Assigning the workspace to capacity ${capacityId} failed.`);
+        if (ws?.capacityId?.toLowerCase() === capacityId.toLowerCase() && ws?.capacityAssignmentProgress !== 'InProgress') return null;
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+      throw new Error('Timed out assigning the workspace to the capacity.');
+    },
 
     /** @param {string} workspaceId @returns {Promise<any[]>} */
     listPrivateEndpoints: (workspaceId) => http.list(`/workspaces/${workspaceId}/managedPrivateEndpoints`),
@@ -188,6 +199,15 @@ export function fabricApi(http) {
     createConnection: (body) => http.post('/connections', body),
     /** @param {string} id @param {any} body */
     updateConnection: (id, body) => http.patch(`/connections/${id}`, body),
+    /** @param {string} id */
+    deleteConnection: (id) => http.del(`/connections/${id}`),
+
+    /** @returns {Promise<any[]>} */
+    listGateways: () => http.list('/gateways'),
+    /** @param {any} body */
+    createGateway: (body) => http.post('/gateways', body),
+    /** @param {string} id */
+    deleteGateway: (id) => http.del(`/gateways/${id}`),
 
     /** @param {string} workspaceId @param {string} id */
     getLakehouse: (workspaceId, id) => http.get(`/workspaces/${workspaceId}/lakehouses/${id}`),

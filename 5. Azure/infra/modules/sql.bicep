@@ -41,6 +41,15 @@ resource allowAzure 'Microsoft.Sql/servers/firewallRules@2023-08-01-preview' = i
   properties: { startIpAddress: '0.0.0.0', endIpAddress: '0.0.0.0' }
 }
 
+// Over the private endpoint, the default (Redirect) policy hands the client off to ports 11000-11999 on
+// the backend node, which hangs at login (seen with the endpoint and server in different regions).
+// Proxy keeps everything on 1433 through the private endpoint.
+resource connectionPolicy 'Microsoft.Sql/servers/connectionPolicies@2023-08-01-preview' = if (publicNetworkAccess == 'Disabled') {
+  parent: server
+  name: 'default'
+  properties: { connectionType: 'Proxy' }
+}
+
 resource db 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
   parent: server
   name: databaseName

@@ -80,6 +80,10 @@ export function fakeFabric() {
   const roles = [];
   /** @type {{ id: string, displayName: string, body?: any }[]} */
   const connections = [];
+  /** @type {any[]} */
+  const gateways = [];
+  /** @type {Record<string, string>} */
+  const workspaceCapacities = {};
   /** Errors to throw, in order, the next times a method is called. @type {Record<string, Error[]>} */
   const failures = {};
   /** SQL endpoint states getLakehouse returns, in order; then a ready endpoint. @type {any[]} */
@@ -216,6 +220,33 @@ export function fakeFabric() {
       Object.assign(/** @type {any} */ (connections.find((x) => x.id === id)), { body });
       return null;
     },
+    /** @param {string} id */
+    deleteConnection: async (id) => {
+      calls.push(`deleteConnection ${id}`);
+      connections.splice(connections.findIndex((x) => x.id === id), 1);
+    },
+    listCapacities: async () => [{ id: 'cap-f', displayName: 'Trial', sku: 'FTL64', region: 'West US 3', state: 'Active' }, { id: 'cap-ppu', displayName: 'PPU', sku: 'PP3', region: 'West US 3', state: 'Active' }],
+    /** @param {string} id */
+    getWorkspace: async (id) => ({ id, capacityId: workspaceCapacities[id] }),
+    /** @param {string} id @param {string} capacityId */
+    assignToCapacity: async (id, capacityId) => {
+      calls.push(`assignToCapacity ${id} ${capacityId}`);
+      workspaceCapacities[id] = capacityId;
+    },
+    listGateways: async () => structuredClone(gateways),
+    /** @param {any} body */
+    createGateway: async (body) => {
+      calls.push(`createGateway ${body.displayName} ${body.virtualNetworkAzureResource.virtualNetworkName}/${body.virtualNetworkAzureResource.subnetName}`);
+      fail('createGateway');
+      const g = { id: `gateway-${++n}`, ...body };
+      gateways.push(g);
+      return g;
+    },
+    /** @param {string} id */
+    deleteGateway: async (id) => {
+      calls.push(`deleteGateway ${id}`);
+      gateways.splice(gateways.findIndex((g) => g.id === id), 1);
+    },
     /** @param {string} _ws @param {string} id @param {any} binding */
     bindConnection: async (_ws, id, binding) => {
       calls.push(`bindConnection ${find(id).displayName} ${binding.id} ${binding.path}`);
@@ -223,7 +254,7 @@ export function fakeFabric() {
       return null;
     },
   };
-  return { api, items, schedules, calls, jobs, roles, connections, failures, sqlStates, add };
+  return { api, items, schedules, calls, jobs, roles, connections, gateways, workspaceCapacities, failures, sqlStates, add };
 }
 
 /** @param {number} [status] @param {string} [message] */
@@ -268,6 +299,8 @@ export function fakeArm() {
   const resources = [];
   /** @type {Record<string, any>} */
   const groups = {};
+  /** @type {Set<string>} */
+  const restrictedSqlRegions = new Set();
   /** @type {any[]} */
   const executions = [];
   /** @type {Record<string, Error[]>} */
@@ -279,6 +312,10 @@ export function fakeArm() {
   const api = {
     listSubscriptions: async () => [{ subscriptionId: 'sub-1', displayName: 'Sub', state: 'Enabled' }],
     listLocations: async () => [{ name: 'uksouth', displayName: 'UK South' }],
+    sqlCapability: async (/** @type {string} */ _sub, /** @type {string} */ location) => {
+      calls.push(`sqlCapability ${location}`);
+      return restrictedSqlRegions.has(location) ? { status: 'Visible', reason: 'Subscriptions are restricted from provisioning in this region.' } : { status: 'Available' };
+    },
     listResourceGroups: async () => Object.values(groups),
     getResourceGroup: async (/** @type {string} */ _sub, /** @type {string} */ name) => groups[name] ?? null,
     ensureResourceGroup: async (/** @type {string} */ _sub, /** @type {string} */ name, /** @type {string} */ location, /** @type {any} */ tags = {}) => {
@@ -288,6 +325,10 @@ export function fakeArm() {
     },
     ensureProvider: async (/** @type {string} */ _sub, /** @type {string} */ ns) => {
       calls.push(`ensureProvider ${ns}`);
+      return false;
+    },
+    ensureFeature: async (/** @type {string} */ _sub, /** @type {string} */ ns, /** @type {string} */ name) => {
+      calls.push(`ensureFeature ${ns}/${name}`);
       return false;
     },
     validateDeployment: async () => {
@@ -300,12 +341,14 @@ export function fakeArm() {
       return { properties: { changes: [{ changeType: 'Create', resourceType: 'Microsoft.App/jobs', resourceId: '/x/run' }] } };
     },
     listResources: async () => resources,
-    deployTemplate: async (/** @type {string} */ _sub, /** @type {string} */ _rg, /** @type {string} */ name) => {
+    deployTemplate: async (/** @type {string} */ _sub, /** @type {string} */ _rg, /** @type {string} */ name, /** @type {any} */ deployment) => {
       calls.push(`deployTemplate ${name}`);
+      const priv = deployment?.properties?.parameters?.publicNetworkAccess?.value === 'Disabled';
       return {
         name,
         properties: {
           outputs: {
+            ...(priv ? { vnetName: { value: 'vnet-vlens-abc' }, gatewaySubnetName: { value: 'snet-powerbi-gateway' }, environmentName: { value: 'cae-vlens-abc-vnet' } } : {}),
             identityPrincipalId: { value: 'mi-sp' },
             identityClientId: { value: 'mi-client' },
             sqlServerFqdn: { value: 'vlens-sql.database.windows.net' },
@@ -334,7 +377,7 @@ export function fakeArm() {
       calls.push(`deleteResource ${id}`);
     },
   };
-  return { api, calls, resources, groups, executions, failures };
+  return { api, calls, resources, groups, executions, failures, restrictedSqlRegions };
 }
 
 /** Rich Graph fake for Azure app registration work. */
@@ -389,6 +432,9 @@ export function fakeAzureGraph() {
       return fic;
     },
     addPassword: async (/** @type {string} */ _id, /** @type {Date} */ end) => ({ keyId: `key-${++n}`, secretText: `secret-${n}`, endDateTime: end.toISOString() }),
+    removePassword: async (/** @type {string} */ _id, /** @type {string} */ keyId) => {
+      calls.push(`removePassword ${keyId}`);
+    },
     assignPrincipalToAppRole: async (/** @type {string} */ principal, /** @type {string} */ _resource, /** @type {string} */ role) => {
       calls.push(`assign ${principal} ${role}`);
     },
@@ -430,6 +476,9 @@ export function fakePowerBi() {
     },
     updateDatasource: async (/** @type {string} */ gw, /** @type {string} */ ds, /** @type {any} */ body) => {
       calls.push(`updateDatasource ${gw} ${ds} ${body.credentialDetails.credentialType}`);
+    },
+    bindToGateway: async (/** @type {string} */ _ws, /** @type {string} */ dataset, /** @type {any} */ body) => {
+      calls.push(`bindToGateway ${dataset} ${body.gatewayObjectId} ${body.datasourceObjectIds.join(',')}`);
     },
     /** @param {string} _ws @param {string} id @param {any} body */
     refresh: async (_ws, id, body) => {
