@@ -56,6 +56,7 @@ pass-through guarded by `Table.HasColumns`, so missing optional columns are tole
 ```
 CreationDate, AgentId, AgentName,
 AppIdentity_AppId, AppIdentity_DisplayName, AppIdentity_PublisherId,
+AppIdentity_Text, Agent_TargetPlatformId, Agent_TargetName, Agent_PlatformType,
 ApplicationName, ClientRegion,
 Audit_UserId, Audit_UserId_Normalized, Workload,
 AppHost, ThreadId, SensitivityLabelId, Context_Type,
@@ -74,6 +75,13 @@ Agent_BotId, Agent_EnvironmentId, Exclude_Reason
 > declarative string (an all-zero GUID is treated as no ID). The two are populated mutually
 > exclusively per row. `Agent_BotId` and `Agent_EnvironmentId` are parsed from `PlatformAgentId` on
 > Copilot Studio runtime records (`AgentPlatform` "CopilotStudio"), which usually carry no Title ID.
+
+> **Agent-type inputs.** `AppIdentity_Text` is the raw `AppIdentity` value. Microsoft documents it as
+> a `workload.appGroup.appName` string (for example `Copilot.Studio.<AppId>` or
+> `MicrosoftAgent.Researcher.P_<id>`); when the record holds an object instead, its `DisplayName` is
+> used. `Agent_TargetPlatformId`, `Agent_TargetName` (falling back to `CopilotEventData.AgentName`) and
+> `Agent_PlatformType` come from `CopilotEventData`. The processor uses all four only to compute the
+> [agent type columns](#agent-type-and-publisher); linking does not use them.
 
 > **Runtime records with no messages.** A Copilot Studio agent used in Teams or another channel logs
 > a record with no `Messages`. It is kept as one row with `Prompts_Available` FALSE,
@@ -99,7 +107,7 @@ what the Fabric template's `Chat + Agent Interactions (Audit Logs)` partition bi
 same shape the template's Power Query used to produce, but computed once in Spark and V-Ordered on
 disk so the shipped Import templates can read a flat fact table quickly.
 
-**Schema:** additive canonical shaping plus the 26 enrichment columns below, **not**
+**Schema:** additive canonical shaping plus the 32 enrichment columns below, **not**
 a verbatim copy of every parsed column. By default the processor consumes/drops
 `AppIdentity`, `AccessedResources`, `AISystemPlugin` and `Audit_UserId_Normalized`,
 and removes internal join/enrichment helpers.
@@ -120,7 +128,9 @@ Value_Outcome, Usage_Mode, Expertise_Role, Efficiency_Breakdown,
 Web_Grounded_Signal, Behavior_Plausible, Workflow_Action,
 Is_Agent_Activity, Agent Filter, Grounding Source, Agent_Surface, Execution_Trigger,
 UserMonthKey, Delegation_Event_Key, ActivityDate, Agent Last Used Date,
-User_Stage_Maturity, User_Stage
+User_Stage_Maturity, User_Stage,
+Agent_Key, Agent_Type, Agent_Type_Basis, Agent_Publisher, Agent_Is_Published,
+Agent_Consolidated_Name
 ```
 
 **Names in the report.** The report and the Fabric App show `Behavior_Enriched_Full` as **Task
@@ -142,7 +152,7 @@ before LOB/Shared copies are merged) and `Agent_LinkMethod` (`Title ID`, `Bot Id
 > `RELATED` — the baselines are **not** materialised into this Delta table.
 >
 > Use `WRITE_MODE = "overwrite"` for the first backfill, then `"merge"` for daily runs. The notebook
-> asserts all 26 columns are present before writing, so a partial enrichment fails loudly rather than
+> asserts all 32 columns are present before writing, so a partial enrichment fails loudly rather than
 > silently shipping an incomplete fact table.
 
 ### 2. `copilot_licensed_users` — licensed user list
@@ -318,6 +328,31 @@ All lookup maps are deduped and null-guarded, so the fact never fans out. The re
 that **auto-detects** the GUID from whatever the export provides — it picks the first present of
 `Entra Agent ID → EntraAgentId → Agent ID → Bot Id` (and common variants). The customer never has to
 create or populate a column by hand; a non-matching GUID simply does not join (no false links).
+
+#### Agent type and publisher
+
+**Fabric only for now.** `Copilot_Audit_Log_Processor` adds six columns that say what kind of agent
+each row used and who published it. This covers the Microsoft first-party agents that never link
+to `agents_365`. They are additive: `Agent_LinkID` and `Agent_Surface` are unchanged.
+
+| Column | Meaning |
+|---|---|
+| `Agent_Key` | The agent: agent ID, else agent name, else `AppIdentity`. Blank for rows with no agent. |
+| `Agent_Type` | The category, from the first matching rule in [METHODOLOGY §3.3](METHODOLOGY.md#agent-type-classification). |
+| `Agent_Type_Basis` | How firm the category is: `documented`, `observed`, `inferred` (agent-ID prefix convention Microsoft does not document) or `override`. |
+| `Agent_Publisher` | `Microsoft`, `Your organisation`, `User-shared`, `Agent Store`, `Connected app` or `Unknown`. |
+| `Agent_Is_Published` | TRUE / FALSE, or blank when the audit log cannot tell (Agent Builder, Copilot Studio, connected apps, unclassified). |
+| `Agent_Consolidated_Name` | One name per Microsoft first-party agent (every Researcher row shows `Researcher`, whatever its ID or host). Other agents keep their own name. |
+
+**Optional overrides.** Create a Lakehouse table `agent_type_overrides` with columns `key` and
+`Agent_Type` to correct a category. `key` is an agent ID, agent name or `AppIdentity` (matched
+case-insensitively, in that order); the row's `Agent_Type_Basis` becomes `override`. A category
+that is not one of the built-in names gets `Agent_Publisher` `Unknown`. The processor skips the
+step when the table does not exist (`AGENT_TYPE_OVERRIDES_TABLE` in the config cell).
+
+The Fabric model loads all six columns. It drops the four raw inputs (`AppIdentity_Text`,
+`Agent_TargetPlatformId`, `Agent_TargetName`, `Agent_PlatformType`). Re-run the processor before
+refreshing an updated template, so the curated table has the new columns.
 
 #### Agent creator attribution (`Agent creator UPN` / `Agent creator source`)
 
