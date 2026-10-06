@@ -97,7 +97,7 @@ export const ESSENTIAL_MODULES = /** @type {const} */ (['core', 'orgData']);
 /** Modules the Data sources screen can switch on, in order. */
 export const OPTIONAL_MODULES = /** @type {const} */ (['m365Activity', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator']);
 
-/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'm365Activity' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts' | 'uploadRouter' | 'workdayLander'} NotebookKey */
+/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'm365Activity' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts' | 'uploadRouter' | 'workdayLander' | 'loadStatus'} NotebookKey */
 
 /**
  * A text change the installer makes to its copy of a notebook. `find` must occur exactly once.
@@ -204,6 +204,15 @@ export const NOTEBOOKS = [
     parameters: [],
     placeholder: null,
     uploads: true,
+  },
+  {
+    key: 'loadStatus',
+    file: 'AnalyticsHub_Load_Status.ipynb',
+    displayName: 'AnalyticsHub_Load_Status',
+    module: 'core',
+    credentials: false,
+    parameters: ['PIPELINE_RUN_ID', 'PIPELINE_TRIGGER_TIME'],
+    placeholder: null,
   },
   {
     key: 'm365Activity',

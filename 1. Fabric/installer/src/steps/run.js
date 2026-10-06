@@ -4,14 +4,16 @@
  * it runs after the first load, after `run`, and on `check`.
  */
 import { commandLine } from '../launch.js';
+import { failedCards, fillRerun, loadCards, RERUN } from '../loads.js';
 import { DATA_CHECK_FILE } from '../transform/notebook.js';
-import { AGENT365_FALLBACK, AGENT365_REGISTRY, AGENT_EVALUATOR_ACTIVITY, COWORK_DATAFLOW_ACTIVITY, firstRunParameters, REFRESH_ACTIVITY } from '../transform/pipeline.js';
+import { AGENT_EVALUATOR_ACTIVITY, COWORK_DATAFLOW_ACTIVITY, firstRunParameters, REFRESH_ACTIVITY } from '../transform/pipeline.js';
 import { c, formatDuration } from '../ui.js';
 import { coworkSignInSteps } from './consumption.js';
 import { agentEvaluatorOn, modelDeployed } from './fabric.js';
 import { modelRefreshes } from './model.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
+/** @typedef {import('../loads.js').LoadCard} LoadCard */
 
 /** Job states after which Fabric does no more work. */
 export const TERMINAL = new Set(['Completed', 'Failed', 'Cancelled', 'Deduped', 'Duplicate', 'NotFound', 'OwnerUserMissing', 'DeadLettered']);
@@ -148,28 +150,61 @@ export async function runPipeline(ctx, opts) {
   ui.note(`${days ? 'Loading the history usually takes 10 to 40 minutes, longer on a trial or small capacity. ' : ''}You can press Ctrl+C; the run carries on in Fabric.`);
   const job = await waitForJob(ctx, url, 'Pipeline');
   const ok = reportJob(ctx, job, 'Pipeline');
-  const failed = TERMINAL.has(job?.status) ? failedLoads(await activityRuns(ctx, jobId, { startTimeUtc: job.startTimeUtc ?? startedAt, endTimeUtc: job.endTimeUtc })) : [];
-  for (const r of failed) ui.warn(`${loadLabel(r.activityName)} failed`);
-  coworkFix(ctx, failed);
-  if (capacityBusy(job?.failureReason) || failed.some((r) => capacityBusy(r.error))) busyNote(ctx, 'run');
-  else if (failed.length || job?.status === 'Failed') {
+  const runs = TERMINAL.has(job?.status) ? await activityRuns(ctx, jobId, { startTimeUtc: job.startTimeUtc ?? startedAt, endTimeUtc: job.endTimeUtc }) : null;
+  const failed = runs ? failedCards(await reportLoads(ctx, runs)) : [];
+  if (!failed.length && capacityBusy(job?.failureReason)) busyNote(ctx, 'run');
+  else if (!failed.length && job?.status === 'Failed') {
     ui.note(`To see why, open ${f.pipelineName ?? 'the pipeline'} in Fabric and look at its latest run. Then run "${commandLine('run')}" again.`);
   }
   if (opts.first) {
     config.firstRun = { ...config.firstRun, status: job?.status, finishedAt: TERMINAL.has(job?.status) ? ctx.now().toISOString() : undefined };
     ctx.save();
   }
-  return { jobId, status: job?.status, ok: ok && !failed.length, failed: failed.map((r) => r.activityName) };
+  return { jobId, status: job?.status, ok: ok && !failed.length, failed: failed.map((r) => r.activity) };
 }
 
 /**
- * The last attempt of each activity in one pipeline run, or null when Fabric can't say.
+ * The pipeline's activities as saved in Fabric, or undefined when Fabric can't say.
+ * @param {Ctx} ctx
+ * @returns {Promise<any[] | undefined>}
+ */
+export async function pipelineActivities(ctx) {
+  const f = ctx.config.fabric;
+  if (!f.workspaceId || !f.pipelineId) return undefined;
+  const doc = await ctx.api.fabric.getPipelineDefinition(f.workspaceId, f.pipelineId).catch(() => null);
+  return Array.isArray(doc?.properties?.activities) ? doc.properties.activities : undefined;
+}
+
+/**
+ * Shows one card per source: whether it loaded and, if not, why and what to do.
+ * @param {Ctx} ctx
+ * @param {Map<string, any> | null} runs
+ * @param {any[]} [activities]  The definition; fetched when not given.
+ * @returns {Promise<LoadCard[]>}
+ */
+export async function reportLoads(ctx, runs, activities) {
+  if (!runs) return [];
+  const cards = loadCards(runs, activities ?? (await pipelineActivities(ctx)));
+  const rerun = `run "${commandLine('rerun-failed')}"`;
+  for (const card of cards) {
+    if (card.activity === COWORK_DATAFLOW_ACTIVITY && card.state === 'failed' && card.kind !== 'capacity') {
+      card.fix = ['The Cowork credits Dataflow usually fails until it has its sign-ins:', ...coworkSignInSteps(ctx.config).map((l) => `  ${l}`), `Then ${RERUN}.`];
+    }
+    card.fix = card.fix.map((t) => fillRerun(t, rerun));
+  }
+  if (cards.length) ctx.ui.loads(cards);
+  return cards;
+}
+
+/**
+ * The last attempt of each activity in one pipeline run, with how many attempts it took, or null
+ * when Fabric can't say.
  * @param {Ctx} ctx
  * @param {string} jobId
  * @param {{ startTimeUtc?: string | null, endTimeUtc?: string | null }} job
  * @returns {Promise<Map<string, any> | null>}
  */
-async function activityRuns(ctx, jobId, job) {
+export async function activityRuns(ctx, jobId, job) {
   const start = utc(job.startTimeUtc) ?? ctx.now();
   const end = utc(job.endTimeUtc) ?? ctx.now();
   const at = (/** @type {any} */ r) => utc(r.activityRunStart)?.getTime() || 0;
@@ -180,38 +215,15 @@ async function activityRuns(ctx, jobId, job) {
       new Date(start.getTime() - 3_600_000),
       new Date(end.getTime() + 3_600_000),
     );
-    return new Map([...runs].sort((a, b) => at(a) - at(b)).map((r) => [r.activityName, r]));
+    /** @type {Map<string, any>} */
+    const last = new Map();
+    for (const r of [...runs].sort((a, b) => at(a) - at(b))) {
+      last.set(r.activityName, { ...r, attempts: (last.get(r.activityName)?.attempts ?? 0) + 1 });
+    }
+    return last;
   } catch {
     return null;
   }
-}
-
-/**
- * The loads that failed in a run. An IfCondition fails along with the load inside it, so only the load
- * is listed. Without an Agent 365 licence the Agent 365 load always fails; when its fallback worked, that's fine.
- * @param {Map<string, any> | null} runs
- * @returns {any[]}
- */
-export function failedLoads(runs) {
-  if (!runs) return [];
-  const fallbackWorked = runs.get(AGENT365_FALLBACK)?.status === 'Succeeded';
-  return [...runs.values()].filter(
-    (r) => r.status === 'Failed' && r.activityType !== 'IfCondition' && !(fallbackWorked && r.activityName === AGENT365_REGISTRY),
-  );
-}
-
-/** "Run_Org_Data_Ingester" reads "Org Data Ingester". @param {string} name */
-export const loadLabel = (name) => name.replace(/^Run_/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
-
-/**
- * A Cowork Dataflow refresh fails in seconds, with no detail, until its connections are saved.
- * @param {Ctx} ctx
- * @param {any[]} failed
- */
-function coworkFix(ctx, failed) {
-  if (!failed.some((r) => r.activityName === COWORK_DATAFLOW_ACTIVITY)) return;
-  ctx.ui.note('The Cowork credits Dataflow usually fails like this until it has its sign-ins:');
-  for (const line of coworkSignInSteps(ctx.config)) ctx.ui.note(`  ${line}`);
 }
 
 /**
@@ -220,7 +232,7 @@ function coworkFix(ctx, failed) {
  * @param {import('../config.js').InstallConfig} config
  * @param {Map<string, any>} runs
  */
-function loadedBy(config, runs) {
+export function loadedBy(config, runs) {
   const needed = ['Run_Audit_Log_Ingester', 'Run_Audit_Log_Processor'];
   if (modelDeployed(config)) needed.push(REFRESH_ACTIVITY);
   if (agentEvaluatorOn(config)) needed.push(AGENT_EVALUATOR_ACTIVITY);
@@ -414,10 +426,12 @@ export async function status(ctx) {
   }
   const latest = jobs[0];
   if (latest && TERMINAL.has(latest.status)) {
-    const failed = failedLoads(await activityRuns(ctx, latest.id, latest));
-    for (const r of failed) ui.warn(`${loadLabel(r.activityName)} failed in the latest run`);
-    coworkFix(ctx, failed);
-    if (capacityBusy(latest.failureReason) || failed.some((r) => capacityBusy(r.error))) busyNote(ctx, 'run');
+    const runs = await activityRuns(ctx, latest.id, latest);
+    if (runs?.size) {
+      ui.heading('Latest run, by source');
+      const failed = failedCards(await reportLoads(ctx, runs));
+      if (!failed.length && capacityBusy(latest.failureReason)) busyNote(ctx, 'run');
+    } else if (capacityBusy(latest.failureReason)) busyNote(ctx, 'run');
   }
 
   if (config.firstRun?.jobId && !TERMINAL.has(config.firstRun.status ?? '')) {

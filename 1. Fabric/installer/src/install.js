@@ -28,6 +28,7 @@ import {
   ensureLakehouse,
   ensureNotebooks,
   ensurePipeline,
+  ensureSparkSettings,
   ensureSchedule,
   ensureVaultEndpoint,
   ensureWorkspace,
@@ -41,6 +42,7 @@ import { dataSourcesSummary, ensureUploads, uploadCommand } from './steps/data-s
 import { ensureFlows, FLOW_FILES, flowDefinitions, flowsSummary, flowsWanted } from './steps/flows.js';
 import { routerWanted } from './uploads.js';
 import { checkData, chooseLoad, runDataCheck, runPipeline, status } from './steps/run.js';
+import { rerunFailed } from './steps/rerun.js';
 import { prepareNotebook, serialiseNotebook } from './transform/notebook.js';
 import { buildAgentEvaluatorModel, buildConsumptionModel, buildModel, loadTemplateModel } from './transform/model.js';
 import { buildPipeline } from './transform/pipeline.js';
@@ -298,6 +300,7 @@ export async function install(ctx, opts) {
   }
   step('Notebooks, pipeline and schedule');
   await ensureNotebooks(ctx);
+  await ensureSparkSettings(ctx);
   await ensurePipeline(ctx);
   await ensureSchedule(ctx);
   if (withApp) {
@@ -420,6 +423,7 @@ export async function update(ctx, opts = {}) {
   if (routerWanted(config.dataSources)) await ensureUploads(ctx);
   await ensureFlows(ctx);
   await ensureNotebooks(ctx, { force: true });
+  await ensureSparkSettings(ctx);
   await ensurePipeline(ctx, { force: true });
   await ensureSchedule(ctx);
   if (sm.enabled && config.fabricApp.enabled) {
@@ -476,6 +480,8 @@ export async function runCommand(ctx, command, opts) {
       const result = await run(ctx, opts);
       return !opts.wait || !!result.ok;
     }
+    case 'rerun-failed':
+      return !(await rerunFailed(ctx)).failed.length;
     case 'check':
       return !!(await checkData(ctx));
     case 'refresh': {

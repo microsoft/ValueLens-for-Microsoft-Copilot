@@ -51,6 +51,7 @@ Run these before the processor.
 | `Copilot_M365_Activity_Ingester` | `m365_activity_daily` | Fill in the first cell. Only Analytics Hub reads this table; the templates don't. |
 | [Workday org data](workday-org-data/README.md) | `copilot_org_data` | Adds HR columns to the org data. Follow its README. |
 | `AnalyticsHub_Upload_Router` | `analytics_hub_upload_log` | Run it first. It reads any export dropped in `Files/analytics_hub_uploads`, recognises it from its headers, moves it to the folder its notebook reads, and archives it to `_processed`. Set `ENABLED_SOURCES` to the sources you use. The installer sets this up for you. |
+| `AnalyticsHub_Load_Status` | `load_log` | The pipeline's last step, run whatever happened before it. It writes one row per source with its status and, for a failure, the reason in plain words. It fails when a load failed, so the run shows as failed. Run by hand, it does nothing: it needs the pipeline's run ID. |
 
 ## Settings you might change
 
