@@ -727,6 +727,26 @@ test('printDataCheck flags missing core tables', () => {
   assert.doesNotMatch(ui.text(), /! Microsoft 365 activity/);
 });
 
+test('printDataCheck explains an audit table emptied by test activity', () => {
+  const ui = fakeUi();
+  const { ctx } = fakeCtx({ ui: ui.ui });
+  printDataCheck(ctx, {
+    tables: { audit: { table: 'dbo.copilot_interactions_curated', rows: 0 } },
+    auditExcluded: { parsed: 1230, reasons: { 'Maker evaluation': 1200, 'Other filters': 30 } },
+  });
+  assert.match(ui.text(), /! Copilot interactions: 0 rows/);
+  assert.match(ui.text(), /1,230 audit records were found, but all were test or admin activity/);
+  assert.match(ui.text(), /Maker evaluation: 1,200, Other filters: 30/);
+});
+
+test('printDataCheck says when the audit log had no Copilot activity at all', () => {
+  const ui = fakeUi();
+  const { ctx } = fakeCtx({ ui: ui.ui });
+  printDataCheck(ctx, { tables: { audit: { rows: 0 } }, auditExcluded: null });
+  assert.match(ui.text(), /No Copilot activity was found in the audit log yet/);
+  assert.doesNotMatch(ui.text(), /test or admin activity/);
+});
+
 test('printDataCheck explains hidden user names in the licence roster', () => {
   const ui = fakeUi();
   const { ctx } = fakeCtx({ ui: ui.ui });
