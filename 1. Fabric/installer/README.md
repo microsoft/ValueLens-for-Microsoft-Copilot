@@ -79,6 +79,28 @@ app registration. An install from an earlier version keeps the names it already 
 - **Secrets expire after 12 months.** **Check status** warns you 30 days before. Choose
   **Create new secrets**.
 
+## Load status and reruns
+
+**One Spark session.** The pipeline's notebooks share one Spark session, up to five at a time,
+instead of each starting its own. This keeps a small capacity from being too busy to start them
+(`TooManyRequestsForCapacity`). The installer turns on the workspace setting it needs: *High
+concurrency for pipeline running multiple notebooks*. That needs the workspace **Admin** role. If
+you're a Member, it warns you, and the notebooks start their own sessions as before. A workspace
+admin can turn it on under **Workspace settings** > **Data Engineering/Science** >
+**Spark settings** > **High concurrency**.
+
+**What loaded.** After a run, the installer shows a card for each source: loaded, failed, skipped,
+or still running. A failed card says why in plain words, such as *Fabric's capacity was too busy
+to start it*, and what to do about it. The last pipeline step, `AnalyticsHub_Load_Status`, writes
+the same thing to the Lakehouse table `dbo.load_log`, one row per source per run. If any load
+failed, that step fails too, so the run shows as failed in Fabric and in its alert emails. A failed
+Agent 365 API load doesn't count when the Agent 365 export loaded instead.
+
+**Rerun only what failed.** Choose **Rerun failed loads**, or run `rerun-failed`. It runs the
+failed loads again, then the steps that depend on them, and refreshes the model. Loads that worked
+aren't run again. If the capacity is still busy, it waits five minutes and tries again, twice. It
+won't start while a pipeline run is still going.
+
 ## Data sources and exports
 
 | Source | Connected (API) | Upload CSV: where to export it | Fills |
@@ -156,6 +178,7 @@ export's figures are used.
 | Create the Copilot Studio credits flow | `install --data studioCredits=csv --studio-flow --flow-environment https://contoso.crm.dynamics.com` |
 | Read Cowork credits with a Dataflow | `install --data coworkCredits=api --viva-partition <id> --viva-query <id>` |
 | Upload exports later, then load them now | `upload feedback.csv agents.csv --run` |
+| Run only the loads that failed last time | `rerun-failed` |
 
 Source IDs for `--data`: `workday`, `m365Activity`, `agent365`, `productFeedback`,
 `studioCredits`, `coworkCredits`, `azureAi`, `agentEvaluator`. Modes: `api`, `csv` or `skip`.
@@ -233,7 +256,9 @@ the endpoint, someone who manages the vault approves it under **Networking** >
 | A run fails with `AADSTS7000215` | The secret doesn't match the app. Choose **Create new secrets**. |
 | A run fails with `Forbidden` from Graph | Admin consent is missing or still applying. Choose **Repair or change**, then **Run now**. |
 | A run fails reading the secret | The person the run uses can't read it. See **Someone else takes over the pipeline?** above. |
-| A run says Fabric's capacity was too busy (`TooManyRequestsForCapacity`) | Nothing is lost. Wait a few minutes, then choose **Run now** again. It happens most on trials and small capacities. |
+| A run says Fabric's capacity was too busy (`TooManyRequestsForCapacity`) | Nothing is lost. Wait a few minutes, then choose **Rerun failed loads**. It happens most on trials and small capacities, and less once the notebooks share one Spark session. See [Load status and reruns](#load-status-and-reruns). |
+| `Couldn't turn on high concurrency for pipelines` | You need the workspace Admin role to change it. Ask a workspace admin to turn it on, or carry on: the notebooks start their own Spark sessions. See [Load status and reruns](#load-status-and-reruns). |
+| A run failed and you want to know which source | Its cards say. Or query `dbo.load_log` in the Lakehouse for the run: each row has the source, its status and the reason. |
 | `Fabric couldn't set up the model's connection` | Turn on *Service principals can call Fabric public APIs*, then choose **Repair or change**. |
 | `Couldn't connect Analytics Hub Model to …` | Open the link it shows. Under **Gateway and cloud connections**, pick `Analytics Hub SQL …` (`ValueLens SQL …` on earlier installs). Then choose **I've connected it myself**. |
 | A run notes that `Refresh_Cowork_Credits` failed | Most often the Dataflow has no saved connections. The refresh then fails within seconds with "Job instance failed without detail error", even if the editor's preview shows rows. Open `AnalyticsHub_Cowork_Credits`, choose **Edit dataflow** > **Home** > **Manage connections**, and sign in to Viva Insights and the Lakehouse. Then choose **Save**, wait until it's published, and choose **Refresh now**. Otherwise the Viva Insights query may have stopped refreshing. The rest of the run carries on either way. |
