@@ -360,8 +360,27 @@ export function printDataCheck(ctx, summary) {
     const rows = Number(t.rows ?? 0).toLocaleString('en-GB');
     const range = t.from && t.to ? `, ${String(t.from).slice(0, 10)} to ${String(t.to).slice(0, 10)}` : '';
     (t.rows ? ui.ok : ui.warn)(`${label}: ${rows} rows${range}`);
+    if (key === 'audit' && !t.rows) printAuditExcluded(ctx, summary?.auditExcluded);
   }
   printIdentityMatch(ctx, summary?.identity);
+}
+
+/**
+ * Explains an empty audit table when the processor left out every record as test or admin activity.
+ * @param {Ctx} ctx
+ * @param {{ parsed?: number, reasons?: Record<string, number> } | null | undefined} excluded
+ */
+function printAuditExcluded(ctx, excluded) {
+  const { ui } = ctx;
+  const parsed = Number(excluded?.parsed ?? 0);
+  if (!parsed) {
+    ui.note('No Copilot activity was found in the audit log yet. It appears after people use Copilot and the pipeline runs again.');
+    return;
+  }
+  const n = (/** @type {number} */ v) => v.toLocaleString('en-GB');
+  const reasons = Object.entries(excluded?.reasons ?? {}).map(([r, c]) => `${r}: ${n(Number(c))}`).join(', ');
+  ui.note(`${n(parsed)} audit records were found, but all were test or admin activity that the dashboard leaves out (${reasons}).`);
+  ui.note('Activity by people appears after they use Copilot and the pipeline runs again.');
 }
 
 /**
