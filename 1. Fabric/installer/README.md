@@ -99,7 +99,12 @@ Agent 365 API load doesn't count when the Agent 365 export loaded instead.
 **Rerun only what failed.** Choose **Rerun failed loads**, or run `rerun-failed`. It runs the
 failed loads again, then the steps that depend on them, and refreshes the model. Loads that worked
 aren't run again. If the capacity is still busy, it waits five minutes and tries again, twice. It
-won't start while a pipeline run is still going.
+won't start while a pipeline run is still going. The data check after a run does the same: the
+pipeline's Spark session can hold the capacity for a few minutes after the run ends.
+
+**The model sees new tables.** Before refreshing the model, `AnalyticsHub_Refresh_Model` asks the
+Lakehouse SQL endpoints to sync. Otherwise a refresh straight after a load can fail with
+*Table '…' is not in database*.
 
 ## Data sources and exports
 

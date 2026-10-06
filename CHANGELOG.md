@@ -29,7 +29,8 @@ Deployment instructions do **not** live here. They live in the path READMEs:
   thing in the Lakehouse, one row per source per run. It fails the run when a load failed, so
   Fabric's run history and alerts show it.
 - **Rerun failed loads.** A new command and button runs only the loads that failed, and the
-  steps and refreshes after them. It waits and tries again while the capacity is busy.
+  steps and refreshes after them. It waits and tries again while the capacity is busy, and so
+  does the data check after a run.
 - **The model refresh waits for the SQL endpoint.** `AnalyticsHub_Refresh_Model` now asks the
   Lakehouse SQL endpoints to sync before it refreshes the model. Before, a refresh straight after
   a load could fail with *Table '…' is not in database*. If it still happens, the card says so
