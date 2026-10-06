@@ -20,3 +20,28 @@ export function scrollToAnchor(id: string): void {
     element.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
     element.focus({ preventScroll: true });
 }
+
+/**
+ * {@link scrollToAnchor} for an anchor that may not be on the page yet, such
+ * as a stage on a destination that is still loading: it scrolls as soon as the
+ * anchor appears, or gives up after `timeout` ms. Returns a function that stops
+ * waiting, for when the reader moves on first.
+ */
+export function scrollToAnchorWhenReady(id: string, timeout = 5000): () => void {
+    if (document.getElementById(id)) {
+        scrollToAnchor(id);
+        return () => {};
+    }
+    const observer = new MutationObserver(() => {
+        if (!document.getElementById(id)) return;
+        stop();
+        scrollToAnchor(id);
+    });
+    const timer = window.setTimeout(stop, timeout);
+    function stop() {
+        observer.disconnect();
+        window.clearTimeout(timer);
+    }
+    observer.observe(document.body, { childList: true, subtree: true });
+    return stop;
+}

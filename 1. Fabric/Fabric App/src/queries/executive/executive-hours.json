@@ -1,0 +1,76 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [
+    { "calculate": "timeFormat(toDate(datum['Month Start']), '%b %Y')", "as": "Month" },
+    { "calculate": "1", "as": "Emphasis" },
+    { "fold": ["Copilot Hours", "Agent Hours", "Cowork Hours"], "as": ["Series", "Value"] },
+    { "filter": "isValid(datum.Value) && datum.Value > 0" },
+    {
+      "calculate": "datum.Series === 'Copilot Hours' ? 'Copilot Chat and apps' : datum.Series === 'Agent Hours' ? 'Agents' : 'Cowork'",
+      "as": "Source"
+    },
+    { "calculate": "indexof(['Copilot Hours', 'Agent Hours', 'Cowork Hours'], datum.Series)", "as": "Rank" }
+  ],
+  "encoding": {
+    "x": {
+      "field": "Month",
+      "type": "ordinal",
+      "title": null,
+      "sort": null,
+      "scale": { "paddingInner": 0.45, "paddingOuter": 0.25 },
+      "axis": { "labelAngle": 0, "ticks": false }
+    }
+  },
+  "layer": [
+    {
+      "mark": { "type": "bar" },
+      "encoding": {
+        "y": {
+          "aggregate": "sum",
+          "field": "Value",
+          "type": "quantitative",
+          "title": null,
+          "stack": "zero",
+          "axis": { "labelExpr": "format(datum.value, '~s')", "minExtent": 48, "tickCount": 4 }
+        },
+        "color": {
+          "field": "Source",
+          "type": "nominal",
+          "title": null,
+          "sort": null,
+          "scale": {
+            "domain": ["Copilot Chat and apps", "Agents", "Cowork"],
+            "range": ["#4f73b8", "#f1963a", "#8783ff"]
+          },
+          "legend": { "orient": "top", "direction": "horizontal", "symbolType": "square", "symbolLimit": 10, "labelLimit": 240 }
+        },
+        "order": { "field": "Rank", "type": "quantitative", "sort": "ascending" },
+        "opacity": { "field": "Emphasis", "type": "quantitative", "scale": null, "legend": null },
+        "tooltip": [
+          { "field": "Month", "type": "ordinal", "title": "Month" },
+          { "field": "Source", "type": "nominal", "title": "Source" },
+          { "field": "Value", "type": "quantitative", "aggregate": "sum", "title": "Expert-equivalent hours", "format": ",.0f" }
+        ]
+      }
+    },
+    {
+      "transform": [
+        {
+          "aggregate": [
+            { "op": "sum", "field": "Value", "as": "Total" },
+            { "op": "max", "field": "Emphasis", "as": "Emphasis" }
+          ],
+          "groupby": ["Month"]
+        }
+      ],
+      "mark": { "type": "text", "baseline": "bottom", "dy": -4, "fontWeight": 600 },
+      "encoding": {
+        "y": { "field": "Total", "type": "quantitative", "title": null },
+        "text": { "field": "Total", "type": "quantitative", "format": ",.0f" },
+        "opacity": { "field": "Emphasis", "type": "quantitative", "scale": null, "legend": null }
+      }
+    }
+  ]
+}

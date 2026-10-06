@@ -1,0 +1,14 @@
+EVALUATE
+// The last day Consumption Central has Copilot Studio or Cowork credits for.
+// 'Reporting Date' runs on past the data, so its own last date says nothing
+// about how fresh the credits are.
+ROW(
+    "Last Date",
+        MAXX(
+            FILTER(
+                ALL('Reporting Date'[Date]),
+                NOT ISBLANK([Reporting Studio Credits]) || NOT ISBLANK([Reporting Cowork Credits])
+            ),
+            'Reporting Date'[Date]
+        )
+)

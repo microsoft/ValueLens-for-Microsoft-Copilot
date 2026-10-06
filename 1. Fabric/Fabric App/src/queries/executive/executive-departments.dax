@@ -1,0 +1,69 @@
+DEFINE
+    // The same kinds of work as the summary's: General Chat and General
+    // Assistance never count, and Security Copilot's automated sessions are
+    // left out (EXCLUDED_KINDS in executive/skills.ts lists the same names).
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Skills In Use] =
+        CALCULATE(
+            DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category]),
+            KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Is Prompt Row] = TRUE()),
+            KEEPFILTERS(
+                FILTER(
+                    ALL('Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category]),
+                    LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category])) > 0
+                        && NOT 'Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category]
+                            IN { "General Chat", "General Assistance", "General assistance / Other" }
+                )
+            ),
+            KEEPFILTERS(
+                FILTER(
+                    ALL('Chat + Agent Interactions (Audit Logs)'[AppHost]),
+                    NOT CONTAINSSTRING('Chat + Agent Interactions (Audit Logs)'[AppHost], "SecurityCopilot")
+                )
+            )
+        )
+    // Everyone with a task counts, so someone who only chatted scores 0.
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Skills Per Person] =
+        AVERAGEX(
+            FILTER(
+                VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Audit_UserId])) > 0 && CALCULATE([AI Tasks]) > 0
+            ),
+            [ValueLens Skills In Use] + 0
+        )
+    // Months the date filter spans, from the tenant's first to last day of activity inside it.
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Months In Range] =
+        VAR _first =
+            CALCULATE(
+                MIN('Chat + Agent Interactions (Audit Logs)'[ActivityDate]),
+                ALLEXCEPT('Chat + Agent Interactions (Audit Logs)', 'Chat + Agent Interactions (Audit Logs)'[ActivityDate]),
+                VALUES('Calendar'[Date])
+            )
+        VAR _last =
+            CALCULATE(
+                MAX('Chat + Agent Interactions (Audit Logs)'[ActivityDate]),
+                ALLEXCEPT('Chat + Agent Interactions (Audit Logs)', 'Chat + Agent Interactions (Audit Logs)'[ActivityDate]),
+                VALUES('Calendar'[Date])
+            )
+        RETURN DIVIDE(INT(_last - _first) + 1, 365.25 / 12)
+
+EVALUATE
+// Each department's seats, how many are in use, the habit rate, breadth and
+// hours, then hours per licensed seat a month so departments of different
+// sizes compare fairly.
+VAR _rows =
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Org Data'[Organization],
+            "Licensed Seats", [Licensed Users (Filter-Aware)],
+            "Seats In Use Pct", [% Active Licensed Users],
+            "Habit Pct", [Habitual Users %, Last Month] + [Power Users %, Last Month],
+            "Skills Per Person", [ValueLens Skills Per Person],
+            "Hours", CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Typical"),
+            "People", [All Active Users]
+        ),
+        LEN(TRIM('Chat + Agent Org Data'[Organization])) > 0 && ([Licensed Seats] > 0 || [Hours] > 0)
+    )
+VAR _months = [ValueLens Months In Range]
+RETURN
+    ADDCOLUMNS(_rows, "Hours Per Seat Month", DIVIDE([Hours], [Licensed Seats] * _months))
+ORDER BY [Hours Per Seat Month] DESC

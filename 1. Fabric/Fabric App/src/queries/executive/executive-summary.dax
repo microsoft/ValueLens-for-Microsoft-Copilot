@@ -1,0 +1,140 @@
+DEFINE
+    // A kind of work is a [Task Breakdown Category] on a prompt row. General
+    // chat and general assistance say nothing about how broadly Copilot is
+    // used, so they never count (EXCLUDED_KINDS in executive/skills.ts lists
+    // the same names). As on the Leaderboards, Security Copilot's automated
+    // sessions are left out.
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Skills In Use] =
+        CALCULATE(
+            DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category]),
+            KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Is Prompt Row] = TRUE()),
+            KEEPFILTERS(
+                FILTER(
+                    ALL('Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category]),
+                    LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category])) > 0
+                        && NOT 'Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category]
+                            IN { "General Chat", "General Assistance", "General assistance / Other" }
+                )
+            ),
+            KEEPFILTERS(
+                FILTER(
+                    ALL('Chat + Agent Interactions (Audit Logs)'[AppHost]),
+                    NOT CONTAINSSTRING('Chat + Agent Interactions (Audit Logs)'[AppHost], "SecurityCopilot")
+                )
+            )
+        )
+    // Everyone with a task counts, so someone who only chatted scores 0.
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Skills Per Person] =
+        AVERAGEX(
+            FILTER(
+                VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Audit_UserId])) > 0 && CALCULATE([AI Tasks]) > 0
+            ),
+            [ValueLens Skills In Use] + 0
+        )
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Broad Users %] =
+        VAR _people =
+            FILTER(
+                VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Audit_UserId])) > 0 && CALCULATE([AI Tasks]) > 0
+            )
+        RETURN DIVIDE(COUNTROWS(FILTER(_people, [ValueLens Skills In Use] >= 5)), COUNTROWS(_people))
+    // The catalogue: every behaviour ValueLens recognises, and every Cowork task category seen.
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Skills Available] =
+        VAR _kinds =
+            DISTINCT(
+                UNION(
+                    SELECTCOLUMNS(ALL('Behavior Value Map'[Behavior]), "Kind", 'Behavior Value Map'[Behavior]),
+                    SELECTCOLUMNS(
+                        CALCULATETABLE(VALUES('Chat + Agent Interactions (Audit Logs)'[Cowork Task Category]), REMOVEFILTERS()),
+                        "Kind", 'Chat + Agent Interactions (Audit Logs)'[Cowork Task Category]
+                    )
+                )
+            )
+        RETURN
+            COUNTROWS(
+                FILTER(
+                    _kinds,
+                    LEN(TRIM([Kind])) > 0
+                        && NOT [Kind] IN { "General Chat", "General Assistance", "General assistance / Other" }
+                )
+            )
+    // The agent (or agents, on a tie, one per line) with the most active agent users, as on the Leaderboards.
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Agent With Most Users] =
+        VAR _agents =
+            FILTER(
+                ADDCOLUMNS(
+                    VALUES('Chat + Agent Interactions (Audit Logs)'[AgentName]),
+                    "@Users", [Active Agent Users]
+                ),
+                LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[AgentName])) > 0 && [@Users] > 0
+            )
+        VAR _most = MAXX(_agents, [@Users])
+        RETURN
+            CONCATENATEX(
+                FILTER(_agents, [@Users] = _most),
+                'Chat + Agent Interactions (Audit Logs)'[AgentName], UNICHAR(10),
+                'Chat + Agent Interactions (Audit Logs)'[AgentName], ASC
+            )
+
+EVALUATE
+// As on the Leaderboards, Security Copilot's automated sessions are left out of the agent figures.
+VAR _noSecurityCopilot =
+    FILTER(
+        ALL('Chat + Agent Interactions (Audit Logs)'[AppHost]),
+        NOT CONTAINSSTRING('Chat + Agent Interactions (Audit Logs)'[AppHost], "SecurityCopilot")
+    )
+RETURN
+    ROW(
+        "Hours", CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Typical"),
+        "Hours Conservative", CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Conservative"),
+        "Hours Optimistic", CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Optimistic"),
+        "Tasks", [AI Tasks],
+        "People", [All Active Users],
+        "Weeks",
+            CALCULATE(
+                DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[WeekStart]),
+                ALLEXCEPT('Chat + Agent Interactions (Audit Logs)', 'Chat + Agent Interactions (Audit Logs)'[WeekStart]),
+                VALUES('Calendar'[Date])
+            ),
+        "Skills Per Person", [ValueLens Skills Per Person],
+        "Skills In Use", [ValueLens Skills In Use],
+        "Skills Available", [ValueLens Skills Available],
+        "Broad Users Pct", [ValueLens Broad Users %],
+        "Licensed Seats", [Licensed Users (Filter-Aware)],
+        "Seats In Use", [Active Licensed Users],
+        "Seats In Use Pct", [% Active Licensed Users],
+        "Unlicensed Users", [Active Unlicensed Users],
+        "Habit Month", [Last Full Month Start],
+        "Habitual Pct", [Habitual Users %, Last Month],
+        "Power Pct", [Power Users %, Last Month],
+        "Agent Users", CALCULATE([Active Agent Users], KEEPFILTERS(_noSecurityCopilot)),
+        "Agent Hours",
+            CALCULATE(
+                [Expert Equivalent Hours],
+                'Effort Scenario'[Scenario] = "Typical",
+                KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)] = "Agents")
+            ),
+        "Agents In Use",
+            CALCULATE(
+                COUNTROWS(
+                    FILTER(
+                        VALUES('Chat + Agent Interactions (Audit Logs)'[AgentName]),
+                        LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[AgentName])) > 0 && [Active Agent Users] > 0
+                    )
+                ),
+                KEEPFILTERS(_noSecurityCopilot)
+            ),
+        "Agent With Most Users", CALCULATE([ValueLens Agent With Most Users], KEEPFILTERS(_noSecurityCopilot)),
+        "Satisfaction", 'ProductFeedback'[Satisfaction Rate],
+        "Feedback", 'ProductFeedback'[Total Feedback],
+        "People With Organization",
+            COUNTROWS(
+                FILTER(
+                    VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                    LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Audit_UserId])) > 0
+                        && CALCULATE([AI Tasks]) > 0
+                        && LEN(TRIM(CALCULATE(MAX('Chat + Agent Org Data'[Organization])))) > 0
+                )
+            )
+    )

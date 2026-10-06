@@ -45,6 +45,10 @@ describe("availableDestinations", () => {
         expect(ids(valuelensOnly)).toContain("appendix");
     });
 
+    it("opens on the Executive summary, which needs only the ValueLens model", () => {
+        expect(ids(valuelensOnly)[0]).toBe("executive");
+    });
+
     it("shows each optional page once its model is set up", () => {
         const withEvaluator = { ...valuelensOnly, ae: { workspaceId: WORKSPACE, itemId: ITEM } };
         expect(ids(withEvaluator)).toContain("agent-evaluation");
