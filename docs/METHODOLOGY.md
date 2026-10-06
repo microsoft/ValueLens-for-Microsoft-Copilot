@@ -579,7 +579,10 @@ score = 60 × min(median tasks per active week ÷ 30, 1) + 40 × min(median acti
 
 ### User Feedback: what do people say?
 
-From the optional Product Feedback export.
+From the optional Product Feedback export (Microsoft 365 admin center > Health > Product feedback).
+There is no API for it. On Fabric, each export dropped in `Files/analytics_hub_uploads` is
+recognised by its Feedback Id, Date Submitted (UTC) and Feedback Type columns, added to the
+history, and de-duplicated by Feedback Id. With no export, the page stays empty.
 
 - **Satisfaction:** thumbs up ÷ all feedback items.
 - **Category:** keyword rules over the prompt and comment text, where the first match wins. For

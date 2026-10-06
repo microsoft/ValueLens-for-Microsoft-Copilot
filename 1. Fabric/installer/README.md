@@ -29,10 +29,11 @@ The Graph permissions are listed in [`/docs/PERMISSIONS.md`](../../docs/PERMISSI
    window open while you use the page.
 4. Choose **Set up Analytics Hub** and sign in.
 5. Answer the questions:
-   1. **What to collect.** Tick the data you want. Each box says where its data comes from and
-      what it shows. Copilot usage, licences and org data are always collected. Microsoft 365
-      activity is ticked. The Agent 365 registry, product feedback, credit consumption and the
-      Agent Evaluator aren't.
+   1. **Data sources.** Each source has a card: **Connected (API)**, **Upload CSV** or **Skip**.
+      Copilot usage, licences and org data are always connected. Microsoft 365 activity is
+      connected by default; the rest are skipped until you choose otherwise. A CSV card says
+      where to export the file, and you can pick the exports to upload now. See
+      [Data sources and exports](#data-sources-and-exports).
    2. **Power BI:** the semantic model and the app (the default), the model only, or neither.
    3. **How much audit history** to load first: 30, 90 or 180 days.
    4. **Capacity, workspace and Lakehouse.** Spaces and hyphens in the Lakehouse name become
@@ -70,6 +71,61 @@ didn't create. If one of its names is taken, its own item gets the next free nam
 - **Secrets expire after 12 months.** **Check status** warns you 30 days before. Choose
   **Create new secrets**.
 
+## Data sources and exports
+
+| Source | Connected (API) | Upload CSV: where to export it | Fills |
+|---|---|---|---|
+| Copilot usage and licences | Always | | Every page |
+| Org data (Entra ID) | Always | | Organisation filters |
+| Workday org data | | Workday: a report of active workers with **Primary Work Email** | Organisation filters |
+| Microsoft 365 activity | Yes | | M365 activity |
+| Agent 365 registry | Needs an Agent 365 licence | Microsoft 365 admin center > **Agents** > **All agents** > **Export** | Agents |
+| Product feedback | No API | Microsoft 365 admin center > **Health** > **Product feedback** > **Export** | User Feedback |
+| Copilot Studio credits | No API | Power Platform admin center > **Licensing** > **Products** > **Copilot Studio** (Summary, Environments and Agents) | Consumption Central |
+| Copilot Cowork credits | | Viva Insights > Copilot Consumption Dashboard > **Export** | Consumption Central |
+| Azure AI costs | Yes | | Consumption Central |
+| Agent Evaluator | Yes | | Agent Evaluator |
+
+A skipped source leaves its table empty and its page blank. Nothing fails. To turn one on later,
+choose **Repair or change**.
+
+**Adding exports.** Every export goes to one folder in the Lakehouse, `Files/analytics_hub_uploads`.
+Drop files there as downloaded: no renaming and no subfolders. Each pipeline run starts by
+recognising each file from its column headers, handing it to the notebook that loads it, and
+moving it to `_processed`. A file it doesn't recognise, or one for a skipped source, goes to
+`_unrecognised`; the reason is in the `analytics_hub_upload_log` table. Ways to add a file:
+
+- **In the installer.** Choose **Upload exports**, or pick files on the Data sources screen.
+- **In Fabric.** Open the Lakehouse, choose **…** next to the folder, then **Upload** > **Upload files**.
+- **[OneLake File Explorer](https://learn.microsoft.com/fabric/onelake/onelake-file-explorer)**,
+  which shows the folder in Windows Explorer.
+
+The installer uploads files up to 200 MB. Use Fabric or OneLake File Explorer for bigger ones.
+Your account needs Contributor or Member on the workspace to write there.
+
+**A SharePoint or OneDrive folder instead (optional).** In the Lakehouse, open
+`analytics_hub_uploads`, choose **New shortcut** > **OneDrive (SharePoint)**, pick your folder and
+name the shortcut `sharepoint`. Files there are read where they are, loaded once each, and left in
+place. Shortcuts need the Fabric tenant setting for OneDrive and SharePoint shortcuts. Without it,
+use the Lakehouse folder.
+
+**Product feedback by email (optional).** If you have Power Automate premium, the installer can
+write a ready-filled copy of the [product feedback flow](../Manual%20setup/flows/README.md) next to
+your answers. Import it, connect Outlook, and set its client secret. The flow saves each emailed
+export to the same folder. The app registration needs Contributor on the workspace.
+
+### Commands
+
+| To | Run |
+|---|---|
+| Choose sources without the questions | `install --data productFeedback=csv,agent365=api --yes` |
+| Upload exports during the install | `install --data productFeedback=csv --csv feedback.csv` |
+| Write the product feedback email flow | `install --data productFeedback=csv --feedback-flow` |
+| Upload exports later, then load them now | `upload feedback.csv agents.csv --run` |
+
+Source IDs for `--data`: `workday`, `m365Activity`, `agent365`, `productFeedback`,
+`studioCredits`, `coworkCredits`, `azureAi`, `agentEvaluator`. Modes: `api`, `csv` or `skip`.
+
 ## Microsoft 365 activity
 
 On by default. It fills the app's **Work patterns** page.
@@ -86,13 +142,13 @@ The installer reads Azure AI and Copilot pay-as-you-go costs for you. Two source
 
 - **Copilot Studio credits.** In the Power Platform admin center, go to **Licensing** >
   **Products** > **Copilot Studio**. Download the `EntitlementConsumption…_MCSMessages…csv` files
-  from the Summary, Environments and Agents tabs. Upload them to `Files/landing/studio` in the
-  Lakehouse. Replace them each month.
-- **Cowork credits.** Build a Viva Insights query with the Copilot credit metrics and turn on
-  auto-refresh. Create a Dataflow Gen2 in the workspace that loads it into `viva_credits_weekly`,
-  following the [Viva Insights guide](https://learn.microsoft.com/viva/insights/advanced/analyst/export-query-data-microsoft-fabric)
-  (Schema type *Pivoted*, Data granularity *Row-level data*). Or upload the Consumption
-  Dashboard's CSV export to `Files/landing/viva`.
+  from the Summary, Environments and Agents tabs, and add them as [exports](#data-sources-and-exports).
+  Do it each month; a new file replaces the last one of the same kind.
+- **Cowork credits.** Add the Viva Insights Consumption Dashboard's CSV export as an
+  [export](#data-sources-and-exports). Or build a Viva Insights query with the Copilot credit
+  metrics, turn on auto-refresh, and create a Dataflow Gen2 in the workspace that loads it into
+  `viva_credits_weekly`, following the [Viva Insights guide](https://learn.microsoft.com/viva/insights/advanced/analyst/export-query-data-microsoft-fabric)
+  (Schema type *Pivoted*, Data granularity *Row-level data*).
 
 If you can't assign Azure roles, ask an Owner or User Access Administrator to give the app
 registration Reader, Cost Management Reader and Monitoring Reader on the subscription. Then
@@ -139,6 +195,8 @@ the endpoint, someone who manages the vault approves it under **Networking** >
 | `You can't assign Azure roles in …` | See [Credit consumption](#credit-consumption). |
 | `You can't add … to …, so its transcripts are skipped` | See [Agent Evaluator](#agent-evaluator). |
 | Work patterns says the reports hide user names | See [Microsoft 365 activity](#microsoft-365-activity). |
+| An export isn't recognised, or is `set to Skip` | Check it's the export the card names, unedited. Or set its source to **Upload CSV** with **Repair or change**. Files the pipeline couldn't place are in `analytics_hub_uploads/_unrecognised`. |
+| A page is blank | Its source is skipped, or no export has arrived yet. See [Data sources and exports](#data-sources-and-exports). |
 
 ## Without the exe
 
@@ -151,5 +209,5 @@ npx valuelens-install --ui
 ```
 
 Leave out `--ui` to answer the questions in the terminal. Other commands: `run`, `check`,
-`refresh`, `status`, `update`, `deploy-app`, `rotate-secret` and `preview`. Add `--help` for
+`refresh`, `status`, `update`, `deploy-app`, `rotate-secret`, `upload` and `preview`. Add `--help` for
 options. The exe takes the same commands, for example `AnalyticsHubInstaller.exe status`.
