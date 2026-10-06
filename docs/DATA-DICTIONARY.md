@@ -331,9 +331,9 @@ create or populate a column by hand; a non-matching GUID simply does not join (n
 
 #### Agent type and publisher
 
-**Fabric only for now.** `Copilot_Audit_Log_Processor` adds six columns that say what kind of agent
-each row used and who published it. This covers the Microsoft first-party agents that never link
-to `agents_365`. They are additive: `Agent_LinkID` and `Agent_Surface` are unchanged.
+`Copilot_Audit_Log_Processor` (Fabric) and the Local CSV processor add six columns that say what
+kind of agent each row used and who published it. This covers the Microsoft first-party agents
+that never link to `agents_365`. They are additive: `Agent_LinkID` and `Agent_Surface` are unchanged.
 
 | Column | Meaning |
 |---|---|
@@ -344,11 +344,41 @@ to `agents_365`. They are additive: `Agent_LinkID` and `Agent_Surface` are uncha
 | `Agent_Is_Published` | TRUE / FALSE, or blank when the audit log cannot tell (Agent Builder, Copilot Studio, connected apps, unclassified). |
 | `Agent_Consolidated_Name` | One name per Microsoft first-party agent (every Researcher row shows `Researcher`, whatever its ID or host). Other agents keep their own name. |
 
-**Optional overrides.** Create a Lakehouse table `agent_type_overrides` with columns `key` and
-`Agent_Type` to correct a category. `key` is an agent ID, agent name or `AppIdentity` (matched
-case-insensitively, in that order); the row's `Agent_Type_Basis` becomes `override`. A category
-that is not one of the built-in names gets `Agent_Publisher` `Unknown`. The processor skips the
-step when the table does not exist (`AGENT_TYPE_OVERRIDES_TABLE` in the config cell).
+**Optional overrides.** Create a Lakehouse table `agent_type_overrides` (Fabric) or a CSV passed as
+`--agent-type-overrides` (Local CSV processor) with columns `key` and `Agent_Type` (`Category` is
+also accepted in the CSV) to correct a category. `key` is an agent ID, agent name or `AppIdentity`
+(matched case-insensitively, in that order); the row's `Agent_Type_Basis` becomes `override`. A
+category that is not one of the built-in names gets `Agent_Publisher` `Unknown`. The Fabric
+processor skips the step when the table does not exist (`AGENT_TYPE_OVERRIDES_TABLE` in the config
+cell).
+
+**Coverage by variant.** Every template loads all six columns on `Chat + Agent Interactions`, and
+the Agent Registry page has an **Agent type (audit log)** slicer and an active-users-by-agent-type
+chart. Where the columns come from depends on the variant:
+
+| Variant | Source of the six columns | Inputs | Overrides |
+|---|---|---|---|
+| Fabric (both templates) | `Copilot_Audit_Log_Processor` | All five (agent ID, name, AppIdentity, PlatformAgentType, workload) | `agent_type_overrides` table |
+| Local CSV | Python processor (`--profile aibv`) | All five | `--agent-type-overrides` CSV |
+| Power Automate + Dataverse | Snapshots built by `Build-DataverseCoreFeeds.py`, which runs the Local CSV processor | All five | Not wired in |
+| Power Automate + Dataverse, snapshots built before this change | Power Query (`ValueLensDescribeAgent`) at refresh | Agent ID, name, AppIdentity only | None |
+| SharePoint (PAX rollup) | Power Query (`ValueLensDescribeAgent`) at refresh | Agent ID, name, AppIdentity only | None |
+
+`ValueLensDescribeAgent` is a Power Query port of the same rules. It runs only when the extract has
+no `Agent_Type` column. The PAX rollup and older snapshots carry `AgentId` (the audit `AgentId`, not
+`CopilotEventData.TargetPlatformAgentId`), `AgentName` and `AppIdentity_DisplayName`, but no
+`PlatformAgentType` or workload. So in those extracts, connected apps and third-party AI apps
+(`ConnectedAIApp` / `AIApp` workloads) are found only by their `AppIdentity` prefix, and a Copilot
+Studio agent known only by `PlatformAgentType` lands in **Unclassified agents**. A test runs the
+shipped M text against the Python rules on the same inputs, so the two cannot drift.
+
+**`Agent Publish Status` (Local CSV, Dataverse, SharePoint) is separate and unchanged.** It is the
+older AI-in-One flag: `Not an Agent Row` with no agent ID, `Unpublished` only for "Draft as 1P"
+agents, otherwise `Published`. `Agent_Type`, `Agent_Publisher` and `Agent_Is_Published` are the
+finer replacement for new analysis: they add the AppIdentity, PlatformAgentType and workload
+signals, name the Microsoft first-party agents, leave the published flag blank where the audit log
+cannot tell and mark which rules are inferred. Local CSV output from a processor older than this
+change also falls back to `ValueLensDescribeAgent`.
 
 The Fabric model loads all six columns. It drops the four raw inputs (`AppIdentity_Text`,
 `Agent_TargetPlatformId`, `Agent_TargetName`, `Agent_PlatformType`). Re-run the processor before

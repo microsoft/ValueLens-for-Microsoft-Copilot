@@ -507,7 +507,12 @@ INTERACTION_COLS = [
     "Agent Filter", "Agent Publish Status", "Resource_Count", "Audit_UserKey",
     "Workload", "ClientRegion", "Delegation_Event_Key", "Human_Baseline_Min",
     "UserKey", "Audit_UserId_Normalized", "Agent_EntraId",
+    "Agent_Key", "Agent_Type", "Agent_Type_Basis", "Agent_Publisher", "Agent_Is_Published",
+    "Agent_Consolidated_Name",
 ]
+
+# PlatformAgentType the audit log reports for each sample agent kind (blank where it varies).
+PLATFORM_AGENT_TYPE = {"studio": "CopilotStudio", "autonomous": "CopilotStudio"}
 
 USER_COLS = [
     "Organization", "PersonId", "PersonId_Normalized", "TotalEmployees", "country",
@@ -1057,6 +1062,8 @@ def make_row(proc, u, ts: datetime, s, p, res, n_rows: int, sens_label: str):
         context = "meeting"
     else:
         context = "chat"
+    agent_type = proc.make_agent_type_describer()(
+        tid, aname, host, PLATFORM_AGENT_TYPE.get(kind, ""), "Copilot")
     return {
         "CreationDate": ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "Audit_UserId": u["upn"],
@@ -1112,6 +1119,7 @@ def make_row(proc, u, ts: datetime, s, p, res, n_rows: int, sens_label: str):
         "UserKey": u["upn"],
         "Audit_UserId_Normalized": u["upn"],
         "Agent_EntraId": f"agt-{agent['tid'].lower()}" if kind in {"autonomous", "cowork", "scout"} else "",
+        **dict(zip(proc.AGENT_TYPE_COLS, agent_type)),
         "_kind": kind, "_shape": s["shape"], "_tid": agent["tid"] if agent else "",
     }
 

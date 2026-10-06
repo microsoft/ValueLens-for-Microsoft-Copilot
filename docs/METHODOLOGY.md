@@ -361,15 +361,18 @@ the behaviour.
 
 #### Agent type classification
 
-Fabric only for now. Every row that involves an agent gets an **agent type** (`Agent_Type`), a
+Every row that involves an agent gets an **agent type** (`Agent_Type`), a
 **publisher**, a **published** flag and a **consolidated name**
-([column definitions](DATA-DICTIONARY.md#agent-type-and-publisher)). The rules read the audit
+([column definitions and coverage by variant](DATA-DICTIONARY.md#agent-type-and-publisher)). The
+rules run in the Fabric and Local CSV processors (the Dataverse snapshot builder uses the Local CSV
+one), and in Power Query (`ValueLensDescribeAgent`) for extracts that lack the columns, such as PAX
+rollups. The rules read the audit
 agent ID (`CopilotEventData.TargetPlatformAgentId`, else `AgentId`, else `PlatformAgentId`), the
 agent name, `AppIdentity`, `PlatformAgentType` and the workload. The first matching rule wins:
 
 | # | Rule (case-insensitive) | Agent type | Publisher / published | Basis |
 |---|---|---|---|---|
-| 0 | Key in the optional `agent_type_overrides` table (agent ID, then name, then AppIdentity) | The override | From the category | override |
+| 0 | Key in the optional overrides (Fabric `agent_type_overrides` table or the Local CSV `--agent-type-overrides` CSV; agent ID, then name, then AppIdentity) | The override | From the category | override |
 | 1 | Workload `AIApp` or AppIdentity `AIApp.*` (third-party AI apps such as ChatGPT) | Not an agent | – | – |
 | 2 | Workload or AppIdentity `ConnectedAIApp` (for example Foundry apps) | Custom / third-party AI apps registered in your organisation | Connected app / unknown | documented |
 | 3 | AppIdentity `Copilot.TeamCopilot.*` | Microsoft Facilitator (Teams) | Microsoft / yes | documented |
@@ -389,12 +392,15 @@ agent name, `AppIdentity`, `PlatformAgentType` and the workload. The first match
   overrides table where you know better.
 - **Known Microsoft agent names** are matched ignoring case, spaces and punctuation, so
   `WordDraftingAgent` and `Word Drafting Agent` are the same agent. The list is
-  `MICROSOFT_AGENT_NAMES` in the processor's helpers cell.
+  `MICROSOFT_AGENT_NAMES` in the processor's helpers cell (the Local CSV processor and
+  `ValueLensDescribeAgent` carry the same list).
 - **Consolidated name.** All Microsoft first-party rows for one agent share one
   `Agent_Consolidated_Name` (for example `Researcher`) across agent IDs, AppIdentity values and
   hosts, so they roll up to one line. Other agents keep their own name. `Agent_LinkID` registry
   linking ([§2.2](#22-how-agents-are-linked-to-the-registry)) is unchanged and still never uses names.
 - The rules are a port of a Purview audit-log analyser script, and the category names match it.
+  The Local CSV processor holds an exact copy of the Fabric code and `ValueLensDescribeAgent` a
+  Power Query port; `tests/test_agent_type_parity.py` fails if either drifts.
 
 ### 3.4 Signal → Impact reference
 
@@ -1014,8 +1020,11 @@ more workloads a day scores full marks for it.
   ([§3.3](#agent-type-classification)). The Fabric ingester pulls only the `copilotInteraction`
   record type, so Teams Facilitator (`TeamCopilotInteraction`) and connected AI app
   (`ConnectedAIAppInteraction`) activity is rare or missing. Adding those record types needs no new
-  permission, but it would change interaction totals, so it is not done by default. Agent types
-  are in the Fabric variant only for now.
+  permission, but it would change interaction totals, so it is not done by default. The SharePoint
+  (PAX) variant, and Dataverse snapshots built before agent types were added, classify in Power
+  Query from the agent ID, name and AppIdentity only (no PlatformAgentType or workload), so more of
+  their rows can land in Unclassified agents
+  ([coverage by variant](DATA-DICTIONARY.md#agent-type-and-publisher)).
 
 ---
 
