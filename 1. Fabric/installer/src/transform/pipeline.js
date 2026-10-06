@@ -49,6 +49,9 @@ const BINDINGS = {
  * @property {string} [consumptionModelId]  Adds a step that refreshes the consumption model.
  * @property {boolean} [agentTranscripts]  Runs the Agent Evaluator transcript parser.
  * @property {string} [agentEvaluatorModelId]  Adds a step that refreshes the Agent Evaluator model.
+ * @property {boolean} [uploadRouter]  Runs the upload router first in lane 2, so uploaded CSVs reach their loads.
+ * @property {boolean} [workday]  Enriches org data from the uploaded Workday export after the Entra ID load.
+ * @property {boolean} [agent365Csv]  Agent 365 comes from its admin center export: the lander replaces the registry load.
  */
 
 export const REFRESH_ACTIVITY = 'Refresh_Semantic_Model';
@@ -86,10 +89,16 @@ export const AGENT365_REGISTRY = 'Run_Agent365_Registry_Ingester';
 /** The template's fallback, which runs only when the Agent 365 load fails. */
 export const AGENT365_FALLBACK = 'Run_Agent365_CSV_Fallback';
 
+/** In CSV mode, the Agent 365 branch runs the lander under this name instead of the registry load. */
+export const AGENT365_LANDER = 'Run_Agent365_Lander';
+export const UPLOAD_ROUTER_ACTIVITY = 'Run_Upload_Router';
+export const WORKDAY_ACTIVITY = 'Run_Org_Data_Workday';
+
 /** Bump when the pipeline's layout changes, so re-running the installer updates a pipeline an older version built. */
-export const PIPELINE_VERSION = 2;
+export const PIPELINE_VERSION = 3;
 /** What this version changed, for people whose pipeline an older version built. */
-export const PIPELINE_CHANGE = 'This version runs the pipeline\'s loads in two lanes rather than all at once, so a trial or small capacity isn\'t overloaded.';
+export const PIPELINE_CHANGE =
+  'This version runs the loads in two lanes so a trial or small capacity isn\'t overloaded, and first routes any CSV exports dropped in Files/analytics_hub_uploads to the load that reads them.';
 
 /**
  * Lane 2: every step except the audit log, its processor and the semantic model refresh, one after
@@ -98,9 +107,11 @@ export const PIPELINE_CHANGE = 'This version runs the pipeline\'s loads in two l
  */
 export const LANE_ORDER = [
   'Run_Licensed_Users_Ingester',
+  UPLOAD_ROUTER_ACTIVITY,
   'Conditionally_Run_Agent365',
   AGENT365_FALLBACK,
   'Conditionally_Run_Org_Data',
+  WORKDAY_ACTIVITY,
   'Conditionally_Run_M365_Activity',
   'Conditionally_Run_Product_Feedback',
   ...ARCHIVED_ACTIVITIES,
@@ -201,7 +212,7 @@ function refreshStep(settings, o) {
 function refreshActivity(activities, settings) {
   const has = (/** @type {string} */ name) => activities.some((a) => a.name === name);
   const dependsOn = [{ activity: 'Run_Audit_Log_Processor', dependencyConditions: ['Succeeded'] }];
-  for (const name of ['Conditionally_Run_Org_Data', 'Conditionally_Run_M365_Activity', 'Conditionally_Run_Product_Feedback']) {
+  for (const name of ['Conditionally_Run_Org_Data', WORKDAY_ACTIVITY, 'Conditionally_Run_M365_Activity', 'Conditionally_Run_Product_Feedback']) {
     if (has(name)) dependsOn.push({ activity: name, dependencyConditions: ['Completed'] });
   }
   return refreshStep(settings, {
@@ -242,7 +253,7 @@ function consumptionRefreshActivity(activities, settings) {
   const dependsOn = activities
     .filter((a) => CONSUMPTION_ACTIVITIES.some((c) => c.name === a.name))
     .map((a) => ({ activity: a.name, dependencyConditions: ['Succeeded'] }));
-  if (activities.some((a) => a.name === 'Conditionally_Run_Org_Data')) dependsOn.push({ activity: 'Conditionally_Run_Org_Data', dependencyConditions: ['Completed'] });
+  dependsOn.push(...orgDataDependencies(activities));
   return refreshStep(settings, {
     name: CONSUMPTION_REFRESH_ACTIVITY,
     description: 'Refreshes the consumption model once every consumption load has succeeded.',
@@ -287,8 +298,7 @@ function agentTranscriptsActivity(settings) {
  * @param {PipelineSettings} settings
  */
 function agentEvaluatorRefreshActivity(activities, settings) {
-  const dependsOn = [{ activity: AGENT_EVALUATOR_ACTIVITY, dependencyConditions: ['Succeeded'] }];
-  if (activities.some((a) => a.name === 'Conditionally_Run_Org_Data')) dependsOn.push({ activity: 'Conditionally_Run_Org_Data', dependencyConditions: ['Completed'] });
+  const dependsOn = [{ activity: AGENT_EVALUATOR_ACTIVITY, dependencyConditions: ['Succeeded'] }, ...orgDataDependencies(activities)];
   return refreshStep(settings, {
     name: AGENT_EVALUATOR_REFRESH_ACTIVITY,
     description: 'Refreshes the Agent Evaluator model once the transcripts have loaded.',
@@ -296,6 +306,50 @@ function agentEvaluatorRefreshActivity(activities, settings) {
     dependsOn,
     writeMode: 'merge',
   });
+}
+
+/**
+ * A model refresh waits for the org data loads that are present, whether they succeeded or not.
+ * @param {any[]} activities
+ */
+function orgDataDependencies(activities) {
+  return ['Conditionally_Run_Org_Data', WORKDAY_ACTIVITY]
+    .filter((name) => activities.some((a) => a.name === name))
+    .map((name) => ({ activity: name, dependencyConditions: ['Completed'] }));
+}
+
+/**
+ * A notebook step with no parameters. `chainLanes` sets its place in lane 2.
+ * @param {PipelineSettings} settings
+ * @param {{ key: import('../catalog.js').NotebookKey, name: string, description: string, timeout: string }} o
+ */
+function notebookStep(settings, o) {
+  const notebookId = settings.notebookIds[o.key];
+  if (!notebookId) throw new Error(`The ${o.name.replace(/^Run_/, '').replace(/_/g, ' ')} notebook has not been deployed.`);
+  return {
+    name: o.name,
+    description: o.description,
+    type: 'TridentNotebook',
+    dependsOn: [],
+    policy: { timeout: o.timeout, ...retryPolicy(o.timeout), secureOutput: false, secureInput: false },
+    typeProperties: { notebookId, workspaceId: settings.workspaceId, parameters: {} },
+  };
+}
+
+/**
+ * Agent 365 from its export: the branch runs the lander, and there is no registry load to fall back from.
+ * The processor, which waited for the fallback, waits for the branch instead.
+ * @param {any[]} activities
+ */
+function agent365FromCsv(activities) {
+  const branch = activities.find((a) => a.name === 'Conditionally_Run_Agent365');
+  const inner = branch && findActivity([branch], AGENT365_REGISTRY);
+  if (!inner) throw new Error(`Pipeline template is missing ${AGENT365_REGISTRY}.`);
+  inner.name = AGENT365_LANDER;
+  inner.description = 'Loads the Agent 365 export from Files/agent365/agents.csv into agent_365_registry.';
+  inner.typeProperties.notebookId = 'REPLACE_WITH_AGENT365_LANDER_NOTEBOOK_ID';
+  const processor = activities.find((a) => a.name === 'Run_Audit_Log_Processor');
+  if (processor) processor.dependsOn = [...(processor.dependsOn ?? []), { activity: branch.name, dependencyConditions: ['Completed'] }];
 }
 
 /**
@@ -318,6 +372,8 @@ export function buildPipeline(template, settings) {
       dropParams.add(branch.parameter);
     }
   }
+  const agent365Csv = !!(settings.modules.agent365 && settings.agent365Csv);
+  if (agent365Csv) drop.add(AGENT365_FALLBACK);
 
   props.activities = props.activities.filter((/** @type {any} */ a) => !drop.has(a.name));
   for (const activity of props.activities) {
@@ -326,6 +382,7 @@ export function buildPipeline(template, settings) {
     }
   }
   for (const name of dropParams) delete props.parameters?.[name];
+  if (agent365Csv) agent365FromCsv(props.activities);
 
   props.parameters = { ...(props.parameters ?? {}), ...structuredClone(RUN_PARAMETERS) };
   if (settings.backfillDays) props.parameters.BackfillDays.defaultValue = settings.backfillDays;
@@ -354,6 +411,27 @@ export function buildPipeline(template, settings) {
   if (left.length) throw new Error(`Pipeline still has placeholders: ${[...new Set(left)].join(', ')}`);
 
   applyRetries(filled.properties.activities);
+  if (settings.uploadRouter) {
+    filled.properties.activities.push(
+      notebookStep(settings, {
+        key: 'uploadRouter',
+        name: UPLOAD_ROUTER_ACTIVITY,
+        description: 'Moves each CSV export dropped in Files/analytics_hub_uploads to the folder its load reads, recognised by its headers. Does nothing when the folder is empty.',
+        timeout: '0.00:30:00',
+      }),
+    );
+  }
+  const workday = !!(settings.workday && settings.modules.orgData !== false);
+  if (workday) {
+    filled.properties.activities.push(
+      notebookStep(settings, {
+        key: 'workdayLander',
+        name: WORKDAY_ACTIVITY,
+        description: 'Adds or overrides org fields in copilot_org_data from the Workday export in Files/org_workday. Does nothing without an export.',
+        timeout: '0.00:30:00',
+      }),
+    );
+  }
   if (settings.semanticModelId) filled.properties.activities.push(refreshActivity(filled.properties.activities, settings));
   if (settings.modules.consumption) {
     filled.properties.activities.push(...consumptionActivities(settings));
@@ -370,6 +448,7 @@ export function buildPipeline(template, settings) {
     'Created by the Analytics Hub installer. The loads run in two lanes rather than all at once, so a trial or small capacity isn\'t overloaded. ' +
     `Lane 1 loads the audit log, then runs the Audit Log Processor${settings.semanticModelId ? ', then refreshes the semantic model' : ''}. ` +
     'Lane 2 runs the other loads one after another; a load that fails doesn\'t stop the next. ' +
+    `${settings.uploadRouter ? 'Lane 2 starts by routing any CSV exports dropped in Files/analytics_hub_uploads to the loads that read them. ' : ''}` +
     `${settings.modules.consumption ? `The credit consumption loads run in lane 2${settings.consumptionModelId ? ' and refresh the consumption model when they all succeed' : ''}. ` : ''}` +
     `${transcripts ? `The Agent Evaluator reads Copilot Studio transcripts at the end of lane 2${settings.agentEvaluatorModelId ? ', then refreshes its model' : ''}. ` : ''}` +
     `Each load retries up to 3 times, ${RETRY_INTERVAL_SECONDS / 60} minutes apart. ` +

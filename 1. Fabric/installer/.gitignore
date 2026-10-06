@@ -3,3 +3,4 @@ valuelens-install.json
 *.tmp
 valuelens-preview/
 dist-exe/
+analytics-hub-feedback-flow.json

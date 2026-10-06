@@ -54,6 +54,8 @@ right (next section) — the data itself must be exported by an admin (or a sche
 |---|---|
 | Run the notebooks / pipeline, write Delta to the Lakehouse | **Contributor** or **Member** on the Fabric workspace |
 | Land export-only files via the Power Automate flows | The flow's identity (app reg or workspace identity) as **Member/Contributor** on the workspace; tenant setting **“Service principals can use Fabric APIs”** enabled |
+| Upload exports with the installer, Fabric or OneLake File Explorer (to `Files/analytics_hub_uploads`) | The signed-in person as **Contributor** or **Member** on the workspace. No extra API permission. |
+| Optional SharePoint/OneDrive folder shortcut into the drop folder | Fabric tenant setting for **OneDrive and SharePoint shortcuts** enabled, and read access to the folder for whoever creates the shortcut. Without it, use the Lakehouse folder. |
 | Capacity | Workspace on a Fabric capacity (**F2+** or trial) |
 | Connect the Power BI template | Read on the Lakehouse **SQL endpoint** (the template signs in to it once) |
 
@@ -62,7 +64,7 @@ right (next section) — the data itself must be exported by an admin (or a sche
 ## Quick "who do I ask?" summary
 
 - **Just the core dashboard:** one Entra app reg (3 Graph perms, admin-consented) + Contributor on the workspace.
-- **+ Feedback:** an admin exports the feedback CSV and lands it, by hand or with the flow. No extra API permission.
+- **+ Feedback:** an admin exports the feedback CSV and lands it, by hand or with the flow. No extra API permission. With the installer, choose **Upload CSV** on its Data sources card, or drop it in `Files/analytics_hub_uploads`.
 - **+ Agents 365:** add `CopilotPackages.Read.All` + `Application.Read.All` (+ `User.Read.All`) to the same app reg, and confirm the tenant has an Agent 365 licence.
 
 See the path README you're following for the step-by-step —

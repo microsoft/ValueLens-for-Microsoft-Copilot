@@ -39,7 +39,7 @@ export function addMonths(from, months) {
 export async function graphRoles(ctx) {
   if (!ctx.graphRoles) {
     const sp = await ctx.api.graph.graphServicePrincipal();
-    const { roles, missing } = resolveAppRoles(sp, permissionsFor(ctx.config.modules), OPTIONAL_PERMISSIONS);
+    const { roles, missing } = resolveAppRoles(sp, permissionsFor(ctx.config.modules, ctx.config.dataSources), OPTIONAL_PERMISSIONS);
     for (const m of missing) {
       ctx.ui.warn(`Microsoft Graph in this tenant has no ${m} permission yet. The Agent 365 registry will fall back to its CSV export.`);
     }

@@ -5,6 +5,7 @@
  */
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { normaliseModules } from './catalog.js';
+import { normaliseDataSources } from './uploads.js';
 
 export const CONFIG_VERSION = 1;
 export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
@@ -13,17 +14,27 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @typedef {object} InstallConfig
  * @property {number} version
  * @property {string} [tenantId]
- * @property {import('./catalog.js').ModuleChoice} modules
+ * @property {import('./catalog.js').ModuleChoice} modules  Follows `dataSources`.
+ * @property {import('./uploads.js').DataSourceModes} dataSources  How each source arrives: API, uploaded CSV, or skipped.
+ * @property {UploadsConfig} uploads
  * @property {{ days: number }} history
  * @property {{ frequency: 'daily' | 'weekly', time: string, weekday: string, timeZone: string }} schedule
  * @property {{ appId?: string, objectId?: string, servicePrincipalId?: string, displayName?: string, secretExpires?: string, existing?: boolean }} app
  * @property {{ subscriptionId?: string, resourceGroup?: string, name?: string, id?: string, uri?: string, location?: string, secretName: string, existing?: boolean, rbac?: boolean, private?: boolean, secretSetAt?: string }} keyVault
- * @property {{ capacityId?: string, workspaceId?: string, workspaceName?: string, lakehouseId?: string, lakehouseName?: string, notebooks: Partial<Record<import('./catalog.js').NotebookKey, string>>, notebookNames?: Partial<Record<import('./catalog.js').NotebookKey, string>>, pipelineId?: string, pipelineName?: string, pipelineModules?: string, pipelineVersion?: number, scheduleId?: string, vaultEndpointId?: string }} fabric
+ * @property {{ capacityId?: string, workspaceId?: string, workspaceName?: string, lakehouseId?: string, lakehouseName?: string, notebooks: Partial<Record<import('./catalog.js').NotebookKey, string>>, notebookNames?: Partial<Record<import('./catalog.js').NotebookKey, string>>, pipelineId?: string, pipelineName?: string, pipelineModules?: string, pipelineVersion?: number, scheduleId?: string, vaultEndpointId?: string, deployedRouter?: string }} fabric
  * @property {{ jobId?: string, status?: string, startedAt?: string, finishedAt?: string }} [firstRun]
  * @property {SemanticModelConfig} semanticModel
  * @property {FabricAppConfig} fabricApp
  * @property {ConsumptionConfig} consumption
  * @property {AgentEvaluatorConfig} agentEvaluator
+ */
+
+/**
+ * The upload drop folder and the optional extras around it.
+ * @typedef {object} UploadsConfig
+ * @property {boolean} [folders]  The drop folder and the folders the loads read exist in the Lakehouse.
+ * @property {boolean} [feedbackFlow]  Write a ready-to-import product feedback email flow.
+ * @property {string} [flowFile]  Where the flow was written.
  */
 
 /**
@@ -111,6 +122,8 @@ export function emptyConfig() {
   return {
     version: CONFIG_VERSION,
     modules: normaliseModules(undefined),
+    dataSources: normaliseDataSources(undefined, normaliseModules(undefined)),
+    uploads: {},
     history: { days: 90 },
     schedule: { frequency: 'daily', time: '02:00', weekday: 'Sunday', timeZone: 'UTC' },
     app: {},
@@ -143,6 +156,8 @@ export function loadConfig(file) {
     ...base,
     ...raw,
     modules: normaliseModules(raw.modules),
+    dataSources: normaliseDataSources(raw.dataSources, normaliseModules(raw.modules), raw.consumption),
+    uploads: { ...(raw.uploads ?? {}) },
     history: { ...base.history, ...(raw.history ?? {}) },
     schedule: { ...base.schedule, ...(raw.schedule ?? {}) },
     app: { ...(raw.app ?? {}) },

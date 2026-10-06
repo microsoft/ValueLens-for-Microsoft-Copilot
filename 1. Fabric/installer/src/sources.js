@@ -11,6 +11,8 @@ export const DEFAULT_SOURCE_DIR = resolve(dirname(fileURLToPath(import.meta.url)
 export const PIPELINE_TEMPLATE = join(SETUP_DIR, 'pipelines', 'CopilotAdoptionPipeline.DataPipeline', 'pipeline-content.json');
 /** The ValueLens web app, inside `1. Fabric`. */
 export const APP_DIR = 'Fabric App';
+/** The Power Automate flow that saves product feedback exports from email to OneLake. */
+export const FEEDBACK_FLOW_TEMPLATE = join(SETUP_DIR, 'flows', 'Copilot_ProductFeedback_Email_to_OneLake.json');
 
 /**
  * @typedef {object} Sources
@@ -21,6 +23,7 @@ export const APP_DIR = 'Fabric App';
  * @property {string} [consumptionModelFile]  `Consumption Central - Fabric.pbit`, for the credit consumption model.
  * @property {string} [agentEvaluatorModelFile]  `Agent Evaluator.pbit`, for the Agent Evaluator model.
  * @property {string} [appDir]  The web app's source, when this checkout has it.
+ * @property {string} [feedbackFlowFile]  The product feedback email flow template.
  */
 
 /**
@@ -44,6 +47,7 @@ export function loadSources(dir = DEFAULT_SOURCE_DIR) {
   const consumptionModelFile = join(root, CONSUMPTION_TEMPLATE);
   const agentEvaluatorModelFile = join(root, AGENT_EVALUATOR_TEMPLATE);
   const appDir = resolve(root, APP_DIR);
+  const feedbackFlowFile = join(root, FEEDBACK_FLOW_TEMPLATE);
   return {
     dir: root,
     notebooks,
@@ -52,6 +56,7 @@ export function loadSources(dir = DEFAULT_SOURCE_DIR) {
     consumptionModelFile: existsSync(consumptionModelFile) ? consumptionModelFile : undefined,
     agentEvaluatorModelFile: existsSync(agentEvaluatorModelFile) ? agentEvaluatorModelFile : undefined,
     appDir: existsSync(join(appDir, 'rayfin', 'rayfin.yml')) ? appDir : undefined,
+    feedbackFlowFile: existsSync(feedbackFlowFile) ? feedbackFlowFile : undefined,
   };
 }
 

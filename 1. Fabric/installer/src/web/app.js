@@ -79,11 +79,17 @@ const COMMANDS = {
     desc: 'Replace the app\'s client secret in Key Vault, and the model connection\'s.',
     off: 'There is no app registration or Key Vault yet.',
   },
+  upload: {
+    title: 'Upload data', short: 'Upload', icon: 'upload', section: 'Upload',
+    row: 'Upload exports', button: 'Upload',
+    desc: 'Send CSV exports from the admin centers to the Lakehouse drop folder. The next pipeline run loads them.',
+    off: 'No source is set to Upload CSV. Choose Repair or change set-up to change that.',
+  },
 };
-const ROW_ORDER = ['run', 'refresh', 'status', 'check', 'update', 'deploy-app', 'rotate-secret', 'install'];
+const ROW_ORDER = ['run', 'refresh', 'status', 'upload', 'check', 'update', 'deploy-app', 'rotate-secret', 'install'];
 
 const INSTALL_STAGES = [
-  'Sign in', 'Checking your tenant', 'What to collect', 'Power BI', 'Fabric', 'App registration',
+  'Sign in', 'Checking your tenant', 'Data sources', 'Power BI', 'Fabric', 'App registration',
   'Key Vault for the app secret', 'Schedule', 'Ready to set up', 'Setting up', 'Done',
 ];
 const DONE_HEADINGS = new Set(['Analytics Hub is set up', 'Connect Power BI']);
@@ -255,6 +261,28 @@ async function post(path, body) {
     return { ok: res.ok, status: res.status, body: data };
   } catch {
     return { ok: false, status: 0, body: { error: `Can't reach the installer. Is it still running in ${installerWindow()}?` } };
+  }
+}
+
+/** Sends one file as raw bytes; the installer keeps it until the install uploads it. */
+async function postFile(file) {
+  try {
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) },
+      body: file,
+      credentials: 'same-origin',
+    });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      // No body.
+    }
+    if (res.status === 401) setConn('closed');
+    return res.ok ? data : { name: file.name, error: data?.error ?? 'The file wasn\'t accepted.' };
+  } catch {
+    return { name: file.name, error: `Can't reach the installer. Is it still running in ${installerWindow()}?` };
   }
 }
 
@@ -507,7 +535,7 @@ function apply(e) {
       ensureRoot(run, e.at);
       const stage = target(run);
       const decide = e.kind === 'confirm' && stage.items.some((it) => it.t === 'review');
-      const item = { t: 'prompt', id: e.id, kind: e.kind, message: e.message, choices: e.choices ?? [], default: e.default, error: '', decide, back: !!e.back, keep: !!e.keep };
+      const item = { t: 'prompt', id: e.id, kind: e.kind, message: e.message, choices: e.choices ?? [], default: e.default, error: '', decide, back: !!e.back, keep: !!e.keep, cards: e.cards ?? [], lockModes: !!e.lockModes, staged: [] };
       run.prompts.set(e.id, item);
       app.openPrompt = item;
       add(run, item);
@@ -930,6 +958,10 @@ function renderPrompt(item) {
         answer(item, picked[0]);
       } else answer(item, picked);
     };
+  } else if (item.kind === 'sources') {
+    const parts = renderSources(item);
+    body = parts.body;
+    submit = parts.submit;
   } else if (item.kind === 'confirm') {
     const yes = h('button', { type: 'button', class: item.default === false ? 'btn' : 'btn primary', onclick: () => answer(item, true) }, 'Yes');
     const no = h('button', { type: 'button', class: item.default === false ? 'btn primary' : 'btn', onclick: () => answer(item, false) }, 'No');
@@ -954,6 +986,80 @@ function renderPrompt(item) {
     submit();
   });
   return form;
+}
+
+/**
+ * The Data sources screen: a card per source with its modes and where to export it, then the
+ * exports to upload. The installer reads each file's headers to tell which source it is.
+ */
+function renderSources(item) {
+  const modes = Object.fromEntries(item.cards.map((c) => [c.id, c.mode]));
+  const wantsCsv = () => item.cards.some((c) => c.uploadable && modes[c.id] === 'csv');
+  const card = (c) => {
+    const where = h('p', { class: 'src-where' });
+    const paint = () => {
+      const m = modes[c.id];
+      where.replaceChildren();
+      put(where, [
+        c.export && (m === 'csv' || item.lockModes) ? [h('span', { class: 's-d' }, 'Export from '), linkify(`${c.export.where}  ${c.export.url}`)] : null,
+        m === 'skip' ? h('span', { class: 's-d' }, c.page ? `The ${c.page} page stays empty.` : 'Not collected.') : null,
+      ]);
+      where.hidden = !where.childNodes.length;
+      picker.hidden = !item.lockModes && !wantsCsv();
+    };
+    const choices = c.locked || item.lockModes || c.modes.length < 2
+      ? h('span', { class: 'opt-tag' }, item.lockModes ? 'Upload CSV' : c.modes.find((m) => m.value === c.mode)?.label ?? 'Always on')
+      : h('fieldset', { class: 'src-modes', 'aria-label': `How ${c.label} arrives` }, c.modes.map((m) => {
+        const input = h('input', { type: 'radio', name: `src${item.id}-${c.id}`, value: m.value, checked: m.value === c.mode });
+        input.addEventListener('change', () => {
+          modes[c.id] = m.value;
+          paint();
+        });
+        return h('label', { class: 'src-mode' }, input, m.label);
+      }));
+    paints.push(paint);
+    return h('div', { class: 'src', role: 'group', 'aria-label': c.label },
+      h('div', { class: 'src-head' }, h('span', { class: 'src-name' }, c.label), c.locked ? h('span', { class: 'opt-tag' }, 'Always on') : null),
+      c.description ? h('span', { class: 'opt-desc' }, c.description) : null,
+      c.locked ? null : choices, where);
+  };
+  const paints = [];
+  const list = h('ul', { class: 'staged', 'aria-live': 'polite' });
+  const paintList = () => {
+    list.replaceChildren(...item.staged.map((f, i) => h('li', null,
+      icon(f.error ? 'x' : 'check'),
+      h('span', null, f.name),
+      h('span', { class: f.error ? 'bad' : 's-d' }, f.error ?? f.label ?? ''),
+      h('button', { type: 'button', class: 'btn quiet', onclick: () => {
+        item.staged.splice(i, 1);
+        paintList();
+      } }, 'Remove'))));
+  };
+  const input = h('input', { type: 'file', accept: '.csv,text/csv', multiple: true, hidden: true });
+  input.addEventListener('change', async () => {
+    const files = [...input.files];
+    input.value = '';
+    if (!files.length) return;
+    setBusy(item, true);
+    for (const f of files) item.staged.push(await postFile(f));
+    setBusy(item, false);
+    paintList();
+  });
+  const picker = h('div', { class: 'ask-body' },
+    h('h3', { class: 'label' }, 'Exports to upload ', h('span', { class: 'hint-inline' }, item.lockModes ? '' : 'optional')),
+    h('p', { class: 'hint' }, 'Choose the CSV files as they came from the admin center. No renaming needed: the installer reads the headers to tell which source each one is. You can also add them later, from Upload on the home page or straight into the Lakehouse folder Files/analytics_hub_uploads.'),
+    h('div', { class: 'picker' }, input, h('button', { type: 'button', class: 'btn', onclick: () => input.click() }, icon('upload'), 'Choose files')),
+    list);
+  const cards = item.lockModes ? item.cards.filter((c) => c.export) : item.cards;
+  const body = h('div', { class: 'ask-body' }, h('div', { class: 'srcs' }, cards.map(card)), picker);
+  for (const p of paints) p();
+  paintList();
+  const submit = () => {
+    const ok = item.staged.filter((f) => f.token && !f.error).map((f) => f.token);
+    if (item.staged.some((f) => f.error)) return showError(item, 'Remove the files that weren\'t recognised first.');
+    answer(item, { modes: item.lockModes ? undefined : modes, uploads: ok });
+  };
+  return { body, submit };
 }
 
 function renderDecide(item) {

@@ -23,7 +23,7 @@ export class HttpError extends Error {
 
 /**
  * @typedef {object} RequestOptions
- * @property {any} [body]  Sent as JSON unless it is a string.
+ * @property {any} [body]  Sent as JSON unless it is a string or bytes.
  * @property {Record<string, string | number | boolean | undefined>} [query]
  * @property {Record<string, string>} [headers]
  * @property {number[]} [retryOn]  Extra statuses to retry (e.g. 403 while a role assignment propagates).
@@ -102,17 +102,17 @@ export function createClient(options) {
       const token = await options.getToken();
       /** @type {Record<string, string>} */
       const headers = { Authorization: `Bearer ${token}`, Accept: 'application/json', ...(opts.headers ?? {}) };
-      /** @type {string | undefined} */
+      /** @type {string | Uint8Array | undefined} */
       let body;
       if (opts.body !== undefined) {
-        body = typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
+        body = typeof opts.body === 'string' || opts.body instanceof Uint8Array ? opts.body : JSON.stringify(opts.body);
         headers['Content-Type'] = headers['Content-Type'] ?? 'application/json';
       }
       debug(`${method} ${url}`);
       /** @type {Response} */
       let res;
       try {
-        res = await fetchImpl(url, { method, headers, body });
+        res = await fetchImpl(url, { method, headers, body: /** @type {BodyInit | undefined} */ (body) });
       } catch (err) {
         if (attempt < maxRetries) {
           await sleep(retryDelayMs(undefined, attempt));

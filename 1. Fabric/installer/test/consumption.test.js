@@ -82,6 +82,7 @@ function setup(o = {}) {
   const config = emptyConfig();
   config.semanticModel.enabled = true;
   config.modules.consumption = true;
+  config.dataSources.azureAi = 'api';
   config.app.displayName = 'ValueLens Data Collector';
   const policies = o.policies;
   const powerPlatform = {
@@ -211,6 +212,16 @@ test('plan: picks the subscription with AI resources; "leave out" is remembered;
   left.arm.aiAccounts[SUB] = 4;
   await planConsumption(left.ctx, /** @type {any} */ ({ subscriptions: subs }));
   assert.equal(left.config.consumption.azureSubscriptionId, '');
+  assert.equal(left.config.dataSources.azureAi, 'skip', 'leaving it out sets the Data sources card to Skip');
+
+  const skipped = setup();
+  Object.assign(skipped.config.consumption, { azureSubscriptionId: SUB, azureAccess: true, paygSubscriptions: [{ subscriptionId: PAYG, policies: ['Studio'] }] });
+  skipped.config.dataSources.azureAi = 'skip';
+  await planConsumption(skipped.ctx, /** @type {any} */ ({ subscriptions: subs }));
+  assert.deepEqual(skipped.arm.calls, [], 'Skip on the Data sources screen asks nothing');
+  assert.equal(skipped.config.consumption.azureSubscriptionId, '');
+  assert.equal(skipped.config.consumption.azureAccess, false);
+  assert.deepEqual(skipped.config.consumption.paygSubscriptions, []);
   const again = setup();
   again.config.consumption = left.config.consumption;
   again.arm.aiAccounts[SUB] = 4;
