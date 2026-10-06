@@ -14,7 +14,7 @@ import { buildPipeline, PIPELINE_CHANGE, PIPELINE_VERSION } from '../transform/p
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
-export const PIPELINE_NAME = 'ValueLens_Pipeline';
+export const PIPELINE_NAME = 'AnalyticsHub_Pipeline';
 
 /** @param {unknown} err */
 const isNotFound = (err) => err instanceof HttpError && (err.status === 404 || err.code === 'ItemNotFound' || err.code === 'WorkspaceNotFound');
@@ -411,8 +411,11 @@ export async function ensureNotebooks(ctx, opts = {}) {
     const payg = nb.key === 'azureAi' ? paygIds(config) : undefined;
     const routed = nb.key === 'uploadRouter' ? routerSignature(config) : undefined;
     f.notebookNames ??= {};
-    const label = f.notebookNames[nb.key] ?? nb.displayName;
     let id = f.notebooks[nb.key];
+    // Older records saved only the ID: keep the name the notebook already has.
+    const current = id ? items.find((i) => i.id === id)?.displayName : undefined;
+    if (current && !f.notebookNames[nb.key]) f.notebookNames[nb.key] = current;
+    const label = f.notebookNames[nb.key] ?? nb.displayName;
     if (id && !ids.has(id)) {
       ui.warn(`${label} was deleted. Deploying it again.`);
       id = undefined;
@@ -466,8 +469,15 @@ export function pipelineSignature(config) {
   if (routerWanted(config.dataSources)) parts.push('router');
   if (workdayOn(config)) parts.push('workday');
   if (agent365Csv(config)) parts.push('agent365=csv');
+  if (coworkDataflowOn(config)) parts.push(`cowork=${config.consumption.dataflowId}`);
   return parts.join(';');
 }
+
+/**
+ * Cowork credits come from the Viva Insights Dataflow, so the pipeline refreshes it before the Viva load.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const coworkDataflowOn = (config) => !!(config.modules.consumption && config.dataSources?.coworkCredits === 'api' && config.consumption?.dataflowId);
 
 /**
  * Workday org data is uploaded, so its lander runs after the Entra ID load.
@@ -534,11 +544,14 @@ export async function ensurePipeline(ctx, opts = {}) {
     uploadRouter: routerWanted(config.dataSources),
     workday: workdayOn(config),
     agent365Csv: agent365Csv(config),
+    coworkDataflowId: coworkDataflowOn(config) ? config.consumption.dataflowId : undefined,
   });
   const signature = pipelineSignature(config);
   const items = await api.fabric.listItems(ws, 'DataPipeline');
 
-  if (f.pipelineId && !items.some((i) => i.id === f.pipelineId)) {
+  const current = f.pipelineId ? items.find((i) => i.id === f.pipelineId) : undefined;
+  if (current && !f.pipelineName) f.pipelineName = current.displayName;
+  if (f.pipelineId && !current) {
     ui.warn(`${f.pipelineName ?? PIPELINE_NAME} was deleted. Creating it again.`);
     delete f.pipelineId;
     delete f.scheduleId;

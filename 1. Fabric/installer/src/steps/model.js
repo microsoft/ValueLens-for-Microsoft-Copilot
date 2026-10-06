@@ -18,7 +18,7 @@ import { addMonths, SECRET_LIFETIME_MONTHS } from './identity.js';
 export const CONNECTION_SECRET_NAME = 'ValueLens semantic model connection';
 
 /** @param {string} workspaceId */
-export const connectionName = (workspaceId) => `ValueLens SQL ${workspaceId.slice(0, 8)}`;
+export const connectionName = (workspaceId) => `Analytics Hub SQL ${workspaceId.slice(0, 8)}`;
 
 /** @param {string} workspaceId @param {string} modelId */
 export const modelSettingsUrl = (workspaceId, modelId) => `https://app.powerbi.com/groups/${workspaceId}/settings/datasets/${modelId}`;
@@ -147,19 +147,31 @@ const credentialsFor = (ctx, clientSecret) => ({
   clientSecret,
 });
 
+const ROLE_RANK = { Viewer: 1, Contributor: 2, Member: 3, Admin: 4 };
+
 /**
- * Gives the app's service principal Viewer on the workspace, so it can read the Lakehouse.
+ * Gives the app's service principal at least `role` on the workspace: Viewer lets the model read
+ * the Lakehouse; Contributor lets the Power Automate flows write to the drop folder.
  * @param {Ctx} ctx
+ * @param {'Viewer' | 'Contributor'} [role]
+ * @param {string} [why]
  */
-async function ensureViewer(ctx) {
+export async function ensureWorkspaceRole(ctx, role = 'Viewer', why = 'so the model can read the Lakehouse') {
   const { ui, config, api } = ctx;
   const ws = /** @type {string} */ (config.fabric.workspaceId);
   const spId = /** @type {string} */ (config.app.servicePrincipalId);
   const roles = await api.fabric.listRoleAssignments(ws);
-  if (roles.some((r) => String(r.principal?.id ?? r.id).toLowerCase() === spId.toLowerCase())) return;
-  await api.fabric.addRoleAssignment(ws, spId, 'ServicePrincipal', 'Viewer');
-  ui.ok(`Gave ${config.app.displayName ?? 'the app'} Viewer on the workspace, so the model can read the Lakehouse`);
+  const mine = roles.find((r) => String(r.principal?.id ?? r.id).toLowerCase() === spId.toLowerCase());
+  // Any assignment reads the workspace; an unrecognised role is never lowered.
+  const has = mine ? (ROLE_RANK[/** @type {keyof typeof ROLE_RANK} */ (mine.role)] ?? (mine.role ? 5 : 1)) : 0;
+  if (has >= ROLE_RANK[role]) return;
+  if (mine) await api.fabric.updateRoleAssignment(ws, mine.id, role);
+  else await api.fabric.addRoleAssignment(ws, spId, 'ServicePrincipal', role);
+  ui.ok(`Gave ${config.app.displayName ?? 'the app'} ${role} on the workspace, ${why}`);
 }
+
+/** @param {Ctx} ctx */
+const ensureViewer = (ctx) => ensureWorkspaceRole(ctx, 'Viewer');
 
 /**
  * Creates the connection. Fabric tests it first, and a new secret or role takes a few minutes to work.

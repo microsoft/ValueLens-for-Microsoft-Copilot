@@ -33,8 +33,20 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * The upload drop folder and the optional extras around it.
  * @typedef {object} UploadsConfig
  * @property {boolean} [folders]  The drop folder and the folders the loads read exist in the Lakehouse.
- * @property {boolean} [feedbackFlow]  Write a ready-to-import product feedback email flow.
- * @property {string} [flowFile]  Where the flow was written.
+ * @property {boolean} [feedbackFlow]  Create the product feedback email flow in Power Automate.
+ * @property {boolean} [studioFlow]  Create the flow that saves Copilot Studio credits from the licensing API each day.
+ * @property {FlowEnvironment} [flowEnvironment]  The Power Platform environment the flows are created in.
+ * @property {Partial<Record<'feedback' | 'studio', string>>} [flowIds]  The flows, once created.
+ * @property {Partial<Record<'feedback' | 'studio', string>>} [flowSignatures]  What each created flow was built from.
+ * @property {Partial<Record<'feedback' | 'studio', string>>} [flowFiles]  Where a flow was written when it couldn't be created.
+ */
+
+/**
+ * A Power Platform environment to create flows in.
+ * @typedef {object} FlowEnvironment
+ * @property {string} url  The Dataverse org URL, without a trailing slash.
+ * @property {string} [id]  The Power Platform environment ID.
+ * @property {string} [name]
  */
 
 /**
@@ -55,6 +67,11 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {PaygSubscription[]} [paygSubscriptions]  Other subscriptions that billing policies charge Copilot pay-as-you-go to.
  * @property {string} [deployedPayg]  The pay-as-you-go subscriptions in the deployed Azure AI notebook, comma-separated.
  * @property {boolean} [landing]  The landing folders exist.
+ * @property {string} [vivaPartition]  The Viva Insights partition the Cowork credits Dataflow reads.
+ * @property {string} [vivaQuery]  The Viva Insights query it reads.
+ * @property {string} [dataflowId]  The Cowork credits Dataflow.
+ * @property {string} [dataflowName]
+ * @property {string} [dataflowSignature]  What the deployed Dataflow definition was built from.
  * @property {ModelConfig} model
  */
 
@@ -113,9 +130,10 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {{ deployments: any, env?: string }} [rayfin]  Rayfin's `.deployments.json` and `.env` for the prebuilt app, which each installer version unpacks afresh.
  */
 
-export const MODEL_NAME = 'ValueLens Model';
-export const CONSUMPTION_MODEL_NAME = 'ValueLens Consumption Model';
-export const AGENT_EVALUATOR_MODEL_NAME = 'ValueLens Agent Evaluator Model';
+// Names for items a new install creates. An existing install keeps the names saved in its record.
+export const MODEL_NAME = 'Analytics Hub Model';
+export const CONSUMPTION_MODEL_NAME = 'Analytics Hub Consumption Model';
+export const AGENT_EVALUATOR_MODEL_NAME = 'Analytics Hub Agent Evaluator Model';
 
 /** @returns {InstallConfig} */
 export function emptyConfig() {

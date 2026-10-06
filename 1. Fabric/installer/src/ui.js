@@ -141,7 +141,7 @@ export function createUi(opts = {}) {
             choices: card.modes.map((m) => ({ name: m.label, value: m.value, description: modeHint(card, m.value) })),
             default: card.mode,
           });
-        } else line(`${c.green('✔')} ${card.label} ${c.cyan(MODE_LABELS[modes[card.id]])}`);
+        } else line(`${c.green('✔')} ${card.label} ${c.cyan(card.modes.find((m) => m.value === modes[card.id])?.label ?? MODE_LABELS[modes[card.id]])}`);
         if (modes[card.id] === 'csv' && card.export && !o.lockModes) line(`    ${c.dim(`Export: ${card.export.where} ${card.export.url}`)}`);
       }
       /** @type {import('./staging.js').PendingUpload[]} */
@@ -204,6 +204,8 @@ export function createUi(opts = {}) {
  * @param {import('./uploads.js').SourceMode} mode
  */
 export function modeHint(card, mode) {
+  const own = card.modes.find((m) => m.value === mode)?.hint;
+  if (own) return own;
   if (mode === 'api') return card.uploadable ? 'Read on every run. If the API can\'t be reached, an uploaded export is used instead.' : 'Read on every run.';
   if (mode === 'csv') return card.export ? `${card.export.where} ${card.export.files}` : 'Upload the export.';
   return card.page ? `Not collected. The ${card.page} page stays empty until you turn it on.` : 'Not collected.';

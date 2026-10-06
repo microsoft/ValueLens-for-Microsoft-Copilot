@@ -99,6 +99,37 @@ export function dataverseApi(http, url) {
      */
     assignRole: (userId, roleId) =>
       http.request('POST', `/systemusers(${userId})/systemuserroles_association/$ref`, { headers: ODATA, body: { '@odata.id': `${base}/roles(${roleId})` } }),
+    /**
+     * Creates a cloud flow, turned off, owned by the signed-in user. Returns its workflowid.
+     * @param {{ name: string, description: string, clientdata: string }} flow
+     */
+    async createFlow(flow) {
+      const res = await http.request('POST', '/workflows', {
+        headers: { ...ODATA, Prefer: 'return=representation' },
+        body: { category: 5, type: 1, primaryentity: 'none', name: flow.name, description: flow.description, clientdata: flow.clientdata },
+      });
+      const id = res.data?.workflowid ?? /\(([0-9a-f-]{36})\)\s*$/i.exec(res.headers.get('odata-entityid') ?? '')?.[1];
+      if (!id) throw new Error('Dataverse created the flow but returned no ID.');
+      return /** @type {string} */ (id);
+    },
+    /**
+     * @param {string} id
+     * @returns {Promise<{ workflowid: string, name: string, statecode: number, workflowidunique?: string } | undefined>}
+     */
+    async getFlow(id) {
+      try {
+        return await http.get(`/workflows(${id})?$select=workflowid,name,statecode,workflowidunique`, { headers: ODATA });
+      } catch (err) {
+        if (/** @type {any} */ (err).status === 404) return undefined;
+        throw err;
+      }
+    },
+    /**
+     * Replaces a flow's definition and connection references.
+     * @param {string} id
+     * @param {string} clientdata
+     */
+    updateFlow: (id, clientdata) => http.request('PATCH', `/workflows(${id})`, { headers: ODATA, body: { clientdata } }),
   };
 }
 

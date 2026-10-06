@@ -5,15 +5,14 @@
  * go to one Lakehouse folder; the pipeline's first step recognises each by its headers and moves
  * it to the folder its load reads. A skipped source leaves its table empty and its page dormant.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { commandLine } from '../launch.js';
 import { inspectFile, releaseStaged } from '../staging.js';
 import { c } from '../ui.js';
 import {
   dataSource,
   DATA_SOURCES,
-  MODE_LABELS,
+  modeLabel,
   modulesFromSources,
   routedSources,
   routerWanted,
@@ -23,13 +22,11 @@ import {
   UPLOAD_FOLDERS,
   uploadName,
 } from '../uploads.js';
+import { planFlows } from './flows.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 /** @typedef {import('../staging.js').PendingUpload} PendingUpload */
 
-/** The flow written beside the install record when the product feedback email flow is chosen. */
-export const FEEDBACK_FLOW_FILE = 'analytics-hub-feedback-flow.json';
-const FLOW_IMPORT = 'https://make.powerautomate.com/';
 const FILE_EXPLORER = 'https://learn.microsoft.com/fabric/onelake/onelake-file-explorer';
 const SHORTCUTS = 'https://learn.microsoft.com/fabric/onelake/create-onedrive-sharepoint-shortcut';
 
@@ -64,13 +61,7 @@ export async function planDataSources(ctx) {
   config.modules = modulesFromSources(picked.modes);
   const fromCli = checkCsvFiles(ctx.csvFiles ?? [], picked.modes);
   ctx.pendingUploads = [...fromCli, ...picked.files];
-
-  if (config.dataSources.productFeedback === 'csv' && ctx.sources.feedbackFlowFile) {
-    config.uploads.feedbackFlow = await ui.confirm(
-      'Also write a Power Automate flow that saves product feedback exports emailed to you into the drop folder? It needs Power Automate premium (the HTTP action) and someone to import it.',
-      config.uploads.feedbackFlow ?? false,
-    );
-  } else if (config.dataSources.productFeedback !== 'csv') config.uploads.feedbackFlow = false;
+  await planFlows(ctx);
 }
 
 /**
@@ -82,7 +73,6 @@ export async function ensureUploads(ctx) {
   if (routerWanted(ctx.config.dataSources) || pending.length) await ensureDropFolders(ctx);
   await uploadFiles(ctx, pending);
   ctx.pendingUploads = [];
-  if (ctx.config.uploads.feedbackFlow) writeFeedbackFlow(ctx);
 }
 
 /**
@@ -133,46 +123,6 @@ export async function uploadFiles(ctx, files) {
 }
 
 /**
- * The product feedback email flow, filled in with this install's workspace, Lakehouse and app,
- * and the drop folder. The client secret stays a placeholder: it never leaves Key Vault.
- * @param {any} template
- * @param {{ workspaceName: string, lakehouseName: string, tenantId: string, clientId: string }} o
- */
-export function feedbackFlow(template, o) {
-  const flow = structuredClone(template);
-  const p = flow.definition.parameters;
-  p.OneLakeWorkspace.defaultValue = o.workspaceName;
-  p.OneLakeLakehouse.defaultValue = o.lakehouseName;
-  p.TargetFolder.defaultValue = UPLOAD_DIR;
-  p.TargetFolder.metadata = { description: 'The Analytics Hub drop folder. The pipeline recognises each export there and loads it.' };
-  p.TenantId.defaultValue = o.tenantId;
-  p.ClientId.defaultValue = o.clientId;
-  flow.$comment = `Written by the Analytics Hub installer. Saves product feedback CSVs emailed to you into ${UPLOAD_DIR}; the pipeline loads them on its next run. Import it in Power Automate (My flows > Import), connect Office 365 Outlook, and set ClientSecret to a secret of the app registration, which needs Contributor on the workspace.`;
-  return flow;
-}
-
-/** @param {Ctx} ctx */
-function writeFeedbackFlow(ctx) {
-  const { ui, config, sources } = ctx;
-  if (!sources.feedbackFlowFile) return;
-  const file = join(ctx.configFile ? dirname(ctx.configFile) : process.cwd(), FEEDBACK_FLOW_FILE);
-  try {
-    const flow = feedbackFlow(JSON.parse(readFileSync(sources.feedbackFlowFile, 'utf8')), {
-      workspaceName: config.fabric.workspaceName ?? '',
-      lakehouseName: config.fabric.lakehouseName ?? '',
-      tenantId: config.tenantId ?? '',
-      clientId: config.app.appId ?? '',
-    });
-    writeFileSync(file, `${JSON.stringify(flow, null, 2)}\n`);
-    config.uploads.flowFile = file;
-    ctx.save();
-    ui.ok(`Product feedback email flow: ${file}`);
-  } catch (err) {
-    ui.warn(`Couldn't write the product feedback email flow (${/** @type {Error} */ (err).message}).`);
-  }
-}
-
-/**
  * How each source arrives, where the exports go, and how to keep them up to date.
  * @param {Ctx} ctx
  */
@@ -184,7 +134,7 @@ export function dataSourcesSummary(ctx) {
   for (const s of DATA_SOURCES) {
     const mode = ds[s.id];
     const dormant = mode === 'skip' && s.page ? c.dim(`  ${s.page} page stays empty`) : '';
-    ui.info(`${s.label}: ${MODE_LABELS[mode]}${dormant}`);
+    ui.info(`${s.label}: ${modeLabel(s.id, mode)}${dormant}`);
     if (mode === 'csv' && s.export) ui.note(`  ${s.export.where} ${s.export.url}`);
   }
   if (!routedSources(ds).length) return;
@@ -201,14 +151,6 @@ export function dataSourcesSummary(ctx) {
   ui.info(`  In the Lakehouse, open ${UPLOAD_DIR}, choose New shortcut > OneDrive (SharePoint), pick your folder,`);
   ui.info(`  and name the shortcut "${SHAREPOINT_SUBDIR.split('/').pop()}". Exports dropped there are loaded once each and left in place.`);
   ui.note(`  Shortcuts need the tenant setting for OneDrive and SharePoint shortcuts; without it, use ${UPLOAD_DIR}.  ${SHORTCUTS}`);
-  if (config.uploads.feedbackFlow && config.uploads.flowFile) {
-    ui.info(c.bold('Product feedback by email'));
-    ui.info(`  1. Import it into Power Automate (${FLOW_IMPORT}), as the flows README describes.`);
-    ui.info(`     The flow: ${config.uploads.flowFile}`);
-    ui.info('  2. Connect Office 365 Outlook, and set ClientSecret to a secret of the app registration.');
-    ui.info(`     The app needs Contributor on ${config.fabric.workspaceName ?? 'the workspace'} to write to the Lakehouse.`);
-    ui.info('  3. Schedule the product feedback export to be emailed with the subject "Copilot Product Feedback".');
-  }
 }
 
 /**

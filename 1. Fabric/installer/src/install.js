@@ -19,7 +19,8 @@ import { commandLine } from './launch.js';
 import { ensureConsent, ensureApp, ensureKeyVault, newSecret } from './steps/identity.js';
 import { agentEvaluatorModelWanted, agentEvaluatorSummary, ensureAgentEvaluatorModel, ensureTranscriptAccess } from './steps/agent-evaluator.js';
 import { deployApp, ensureAppName, ensureFabricApp } from './steps/app.js';
-import { consumptionModelWanted, consumptionSummary, ensureAzureAiAccess, ensureConsumptionModel, ensureLandingFolders } from './steps/consumption.js';
+import { COWORK_DATAFLOW_NAME, consumptionModelWanted, consumptionSummary, ensureAzureAiAccess, ensureConsumptionModel, ensureCoworkDataflow, ensureLandingFolders } from './steps/consumption.js';
+import { coworkDataflowDefinition, isVivaId } from './transform/dataflow.js';
 import {
   agentEvaluatorModelDeployed,
   consumptionModelDeployed,
@@ -37,6 +38,7 @@ import {
 import { ensureModelConnection, ensureSemanticModel, modelUrl, refreshModel, rotateModelSecret } from './steps/model.js';
 import { confirmPlan, plan, preflight } from './steps/plan.js';
 import { dataSourcesSummary, ensureUploads, uploadCommand } from './steps/data-sources.js';
+import { ensureFlows, FLOW_FILES, flowDefinitions, flowsSummary, flowsWanted } from './steps/flows.js';
 import { routerWanted } from './uploads.js';
 import { checkData, chooseLoad, runDataCheck, runPipeline, status } from './steps/run.js';
 import { prepareNotebook, serialiseNotebook } from './transform/notebook.js';
@@ -249,7 +251,7 @@ export async function install(ctx, opts) {
   const withApp = withModel && !!config.fabricApp.enabled;
   const withConsumption = !!config.modules.consumption;
   const withAgentEvaluator = !!config.modules.agentEvaluator;
-  const withUploads = routerWanted(config.dataSources) || !!ctx.pendingUploads?.length || !!config.uploads.feedbackFlow;
+  const withUploads = routerWanted(config.dataSources) || !!ctx.pendingUploads?.length || flowsWanted(config).length > 0;
   const titles = [
     'Key Vault',
     'App registration',
@@ -292,6 +294,7 @@ export async function install(ctx, opts) {
   if (withUploads) {
     step('Data uploads');
     await ensureUploads(ctx);
+    await ensureFlows(ctx);
   }
   step('Notebooks, pipeline and schedule');
   await ensureNotebooks(ctx);
@@ -328,6 +331,7 @@ export async function install(ctx, opts) {
 async function consumptionSteps(ctx, opts = {}) {
   await ensureAzureAiAccess(ctx);
   await ensureLandingFolders(ctx);
+  await ensureCoworkDataflow(ctx);
   if (consumptionModelWanted(ctx)) await ensureConsumptionModel(ctx, opts);
 }
 
@@ -414,6 +418,7 @@ export async function update(ctx, opts = {}) {
   if (config.modules.consumption) await consumptionSteps(ctx, { force: true });
   if (config.modules.agentEvaluator) await agentEvaluatorSteps(ctx, { force: true });
   if (routerWanted(config.dataSources)) await ensureUploads(ctx);
+  await ensureFlows(ctx);
   await ensureNotebooks(ctx, { force: true });
   await ensurePipeline(ctx, { force: true });
   await ensureSchedule(ctx);
@@ -555,6 +560,7 @@ export async function summary(ctx) {
     if (config.modules.consumption) consumptionSummary(ctx);
     if (config.modules.agentEvaluator) agentEvaluatorSummary(ctx);
     dataSourcesSummary(ctx);
+    flowsSummary(ctx);
     return;
   }
 
@@ -577,6 +583,7 @@ export async function summary(ctx) {
   if (config.modules.consumption) consumptionSummary(ctx);
   if (config.modules.agentEvaluator) agentEvaluatorSummary(ctx);
   dataSourcesSummary(ctx);
+  flowsSummary(ctx);
 }
 
 /**
@@ -596,6 +603,7 @@ export function preview(o) {
   const ae = config.agentEvaluator;
   const withTranscripts = !!config.modules.agentEvaluator && ae.environments.length > 0;
   const withAgentEvaluatorModel = withModel && withTranscripts && !!sources.agentEvaluatorModelFile;
+  const withDataflow = !!config.modules.consumption && config.dataSources.coworkCredits === 'api' && isVivaId(cc.vivaPartition) && isVivaId(cc.vivaQuery);
   /** @type {Ctx} */
   const ctx = /** @type {any} */ ({
     config: {
@@ -633,8 +641,25 @@ export function preview(o) {
     consumptionModelId: withConsumptionModel ? ctx.config.consumption.model.id : undefined,
     agentTranscripts: withTranscripts,
     agentEvaluatorModelId: withAgentEvaluatorModel ? ctx.config.agentEvaluator.model.id : undefined,
+    coworkDataflowId: withDataflow ? cc.dataflowId ?? fake(7) : undefined,
   });
   writeFileSync(join(out, 'pipeline-content.json'), `${JSON.stringify(pipeline, null, 2)}\n`, 'utf8');
+  if (withDataflow) {
+    const df = coworkDataflowDefinition(cc.dataflowName ?? COWORK_DATAFLOW_NAME, {
+      partitionId: /** @type {string} */ (cc.vivaPartition),
+      queryId: /** @type {string} */ (cc.vivaQuery),
+      workspaceId: /** @type {string} */ (ctx.config.fabric.workspaceId),
+      lakehouseId: /** @type {string} */ (ctx.config.fabric.lakehouseId ?? fake(3)),
+    });
+    mkdirSync(join(out, 'dataflow'), { recursive: true });
+    for (const p of df.parts) writeFileSync(join(out, 'dataflow', p.path), Buffer.from(p.payload, 'base64'));
+  }
+  const flows = flowsWanted(config);
+  if (flows.length) {
+    const defs = flowDefinitions({ ...ctx.config, app: { ...ctx.config.app, appId: ctx.config.app.appId ?? fake(8) } }, config.tenantId ?? fake(9));
+    mkdirSync(join(out, 'flows'), { recursive: true });
+    for (const kind of flows) writeFileSync(join(out, 'flows', FLOW_FILES[kind]), `${JSON.stringify(defs[kind].definition, null, 2)}\n`, 'utf8');
+  }
   writeFileSync(join(out, 'schedule.json'), `${JSON.stringify(scheduleBody(config.schedule, o.now), null, 2)}\n`, 'utf8');
   writeFileSync(
     join(out, 'graph-permissions.txt'),

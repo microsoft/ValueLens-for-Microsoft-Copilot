@@ -14,7 +14,9 @@ import { c } from '../ui.js';
 import { AGENT_EVALUATOR_MODEL_NAME, CONSUMPTION_MODEL_NAME, MODEL_NAME } from '../config.js';
 import { MIN_NODE, nodeVersionOk } from './app.js';
 import { agentEvaluatorModelWanted, planAgentEvaluator } from './agent-evaluator.js';
-import { AZURE_AI_ROLES, consumptionModelWanted, planConsumption } from './consumption.js';
+import { AZURE_AI_ROLES, consumptionModelWanted, COWORK_DATAFLOW_NAME, planConsumption, planCowork } from './consumption.js';
+import { flowsWanted } from './flows.js';
+import { FEEDBACK_FLOW_NAME, STUDIO_FLOW_NAME } from '../transform/flows.js';
 import { describeSchedule, displayNames, freeName, PIPELINE_NAME } from './fabric.js';
 import { connectionName } from './model.js';
 import { planDataSources } from './data-sources.js';
@@ -22,7 +24,7 @@ import { DATA_SOURCES, modulesFromSources, routerWanted, UPLOAD_DIR } from '../u
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
-export const APP_NAME = 'ValueLens Data Collector';
+export const APP_NAME = 'Analytics Hub Data Collector';
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** @param {string} v */
@@ -226,7 +228,10 @@ export async function plan(ctx, pre) {
   await planDataSources(ctx);
 
   await planPowerBi(ctx, pre);
-  if (config.modules.consumption) await planConsumption(ctx, pre);
+  if (config.modules.consumption) {
+    await planConsumption(ctx, pre);
+    await planCowork(ctx);
+  }
   config.modules = modulesFromSources(config.dataSources);
   if (config.modules.agentEvaluator) await planAgentEvaluator(ctx);
 
@@ -503,13 +508,25 @@ export function planReview(ctx, pre) {
       detail: `Drop exports here; each run loads them.${n ? ` ${n} file${n === 1 ? '' : 's'} uploaded now.` : ''}`,
     });
   }
+  if (config.modules.consumption && config.dataSources.coworkCredits === 'api') {
+    creates.push({ kind: 'Dataflow Gen2', name: cc.dataflowName ?? COWORK_DATAFLOW_NAME, isNew: !cc.dataflowId, detail: 'Reads Cowork credits from your Viva Insights query before each Viva load.' });
+  }
+  const env = config.uploads.flowEnvironment;
+  for (const kind of flowsWanted(config)) {
+    creates.push({
+      kind: 'Power Automate flow',
+      name: kind === 'feedback' ? FEEDBACK_FLOW_NAME : STUDIO_FLOW_NAME,
+      isNew: !config.uploads.flowIds?.[kind],
+      detail: env ? `In ${env.name ?? env.url}, turned off until you sign in to its connections.` : 'Written to a file to import.',
+    });
+  }
   if (sm.enabled) {
     creates.push({ kind: 'Semantic model', name: sm.name, isNew: !sm.id });
     if (consumptionModelWanted(ctx)) creates.push({ kind: 'Semantic model', name: cc.model.name, isNew: !cc.model.id });
     if (agentEvaluatorModelWanted(ctx)) creates.push({ kind: 'Semantic model', name: ae.model.name, isNew: !ae.model.id });
     creates.push({
       kind: 'Connection',
-      name: sm.connectionName ?? (f.workspaceId ? connectionName(f.workspaceId) : 'ValueLens SQL connection'),
+      name: sm.connectionName ?? (f.workspaceId ? connectionName(f.workspaceId) : 'Analytics Hub SQL connection'),
       isNew: !sm.connectionId,
       detail: 'Lets the models read the Lakehouse, with a second client secret that only the connection holds.',
     });
@@ -539,6 +556,10 @@ export function planReview(ctx, pre) {
     });
   }
   if (sm.enabled) grants.push({ who: appWho, what: 'Viewer', where: `Workspace ${f.workspaceName ?? f.workspaceId}`, detail: 'So the semantic models can read the Lakehouse.' });
+  const flows = flowsWanted(config);
+  if (flows.length) {
+    grants.push({ who: appWho, what: 'Contributor', where: `Workspace ${f.workspaceName ?? f.workspaceId}`, detail: 'So the Power Automate flows can save files to the drop folder.' });
+  }
   if (withAzureAi && !cc.azureAccess) {
     grants.push({ who: appWho, what: AZURE_AI_ROLES.map((r) => r.name).join(', '), where: `Azure subscription ${cc.azureSubscriptionName ?? cc.azureSubscriptionId}`, detail: 'So the notebook can read Azure AI usage and cost.' });
   }
