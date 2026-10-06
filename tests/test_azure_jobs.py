@@ -172,6 +172,22 @@ def test_audit_collect_merge_is_idempotent(tmp_path):
     assert len(rows2) == 3 and again["rows"] <= 3
 
 
+def test_audit_merge_logs_records_without_prompts(tmp_path, caplog):
+    # Copilot Studio evaluations carry no messages and some events carry only responses; like every
+    # variant they're not counted, but the run should say so rather than just "merged 0 rows".
+    t0 = NOW - timedelta(hours=20)
+    evaluation = _record(1, t0)
+    evaluation["auditData"]["CopilotEventData"] = {"AppHost": "pva-maker-evaluation", "Messages": []}
+    response_only = _record(2, t0 + timedelta(hours=1))
+    response_only["auditData"]["CopilotEventData"]["Messages"] = [{"Id": "r2", "isPrompt": False}]
+    api, _ = make_api(AuditGraph([evaluation, response_only, _record(3, t0 + timedelta(hours=2))]))
+    store = LocalStore(tmp_path)
+    with caplog.at_level("INFO", logger="valuelens_jobs.collect.audit"):
+        result = audit_collect.collect_audit(api, store, settings(), now=NOW, sleep=lambda x: None)
+    assert result["rows"] == 1
+    assert "2 of 3 staged record(s) have no user prompt" in caplog.text
+
+
 def test_audit_failed_window_raises_and_resumes(tmp_path):
     records = [_record(1, NOW - timedelta(hours=20)), _record(2, NOW - timedelta(hours=3))]
     api, _ = make_api(AuditGraph(records, fail_first=100))

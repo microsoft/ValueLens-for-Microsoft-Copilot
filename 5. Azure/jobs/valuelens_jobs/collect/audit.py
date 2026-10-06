@@ -231,6 +231,11 @@ class AuditCollector:
         staged = f"read_json({paths}, format='newline_delimited', columns={cols})"
         rel = audit.flatten(con, staged)
         con.execute(f"CREATE TEMP TABLE new_rows AS {rel.sql_query()}")
+        records = con.execute(f"SELECT count(*) FROM {staged}").fetchone()[0]
+        skipped = records - con.execute("SELECT count(DISTINCT Source_RecordKey) FROM new_rows").fetchone()[0]
+        if skipped:
+            log.info("audit: %s of %s staged record(s) have no user prompt (e.g. Copilot Studio evaluations or "
+                     "response-only events) and are not counted, as in every ValueLens variant", skipped, records)
         blank = con.execute("SELECT count(*) FROM new_rows WHERE Id IS NULL OR trim(Id) = ''").fetchone()[0]
         if blank:
             raise RuntimeError(f"{blank} parsed audit row(s) have a blank Id; refusing to merge duplicates.")
