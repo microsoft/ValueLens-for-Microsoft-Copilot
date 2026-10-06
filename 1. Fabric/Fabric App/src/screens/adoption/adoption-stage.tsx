@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { useMemo, useState } from "react";
-import { VegaVisual } from "@microsoft/fabric-visuals";
+import { VegaVisual } from "@/components/vega-visual";
 import { stageAnchor } from "@/components/destinations";
 import { FilterNote } from "@/components/filter-note";
 import { KpiCard, KpiStat } from "@/components/kpi-card";

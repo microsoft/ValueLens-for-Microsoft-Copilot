@@ -22,6 +22,11 @@ export function parseSemanticModels(value) {
   if (!value) return {};
   const parsed = JSON.parse(value);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('VALUELENS_SEMANTIC_MODELS must be a JSON object');
+  // The SPA queries the alias `vl`; early installs wrote `valueLensModel`.
+  if (!parsed.vl && parsed.valueLensModel) {
+    const { valueLensModel, ...rest } = parsed;
+    return { vl: valueLensModel, ...rest };
+  }
   return parsed;
 }
 

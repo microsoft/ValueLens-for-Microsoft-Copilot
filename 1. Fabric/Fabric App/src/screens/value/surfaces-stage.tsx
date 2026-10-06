@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { useMemo, useState } from "react";
-import { VegaVisual } from "@microsoft/fabric-visuals";
+import { VegaVisual } from "@/components/vega-visual";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";

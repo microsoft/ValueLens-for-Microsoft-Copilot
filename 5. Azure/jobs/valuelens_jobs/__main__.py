@@ -69,18 +69,28 @@ def _api(settings):
 
 
 def collect(store, settings, api=None) -> dict:
+    """Run every selected collector. One failing source doesn't stop the others (or the publish that
+    follows); failures are returned under ``errors`` and fail the job once the remaining steps finish."""
     from .collect.audit import collect_audit
     from .collect.graph import collect_licensed, collect_m365, collect_org
 
     api = api or _api(settings)
-    out = {}
+    jobs = []
     if settings.has("core"):
-        out["licensed"] = collect_licensed(api, store, settings)
-        out["audit"] = collect_audit(api, store, settings)
+        jobs += [("licensed", collect_licensed), ("audit", collect_audit)]
     if settings.has("orgData"):
-        out["org"] = collect_org(api, store, settings)
+        jobs.append(("org", collect_org))
     if settings.has("m365Activity"):
-        out["m365"] = collect_m365(api, store, settings)
+        jobs.append(("m365", collect_m365))
+    out, errors = {}, {}
+    for name, fn in jobs:
+        try:
+            out[name] = fn(api, store, settings)
+        except Exception as exc:
+            log.exception("collect %s failed: %s", name, exc)
+            errors[name] = f"{type(exc).__name__}: {exc}"
+    if errors:
+        out["errors"] = errors
     return out
 
 
@@ -136,7 +146,9 @@ def refresh_step(settings, api=None):
 def main(argv=None, env=None) -> int:
     logging.basicConfig(level=os.environ.get("VALUELENS_LOG_LEVEL", "INFO"),
                         format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    ap = argparse.ArgumentParser(prog="valuelens_jobs")
+    # The Azure SDK logs every HTTP request and response at INFO, which buries the job's own lines.
+    logging.getLogger("azure").setLevel(os.environ.get("VALUELENS_AZURE_LOG_LEVEL", "WARNING"))
+    ap =  argparse.ArgumentParser(prog="valuelens_jobs")
     sub = ap.add_subparsers(dest="cmd", required=True)
     run = sub.add_parser("run")
     run.add_argument("--steps", default=",".join(STEPS))
@@ -162,12 +174,13 @@ def main(argv=None, env=None) -> int:
     if unknown:
         ap.error(f"unknown steps {unknown}; expected a subset of {list(STEPS)}")
     store = open_store(args.data_dir, settings) if {"collect", "process", "publish"} & set(steps) else None
+    collect_errors = {}
     for step in STEPS:
         if step not in steps:
             continue
         log.info("step %s: start", step)
         if step == "collect":
-            collect(store, settings)
+            collect_errors = collect(store, settings).get("errors", {})
         elif step == "process":
             process(store)
         elif step == "publish":
@@ -175,6 +188,9 @@ def main(argv=None, env=None) -> int:
         else:
             refresh_step(settings)
         log.info("step %s: done", step)
+    if collect_errors:
+        raise RuntimeError("the run published what it collected, but these sources failed and resume next run: "
+                           + "; ".join(f"{k}: {v}" for k, v in collect_errors.items()))
     return 0
 
 

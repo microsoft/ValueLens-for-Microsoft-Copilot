@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import sys
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -180,6 +181,28 @@ def test_audit_failed_window_raises_and_resumes(tmp_path):
     assert not list((tmp_path / "raw").glob("copilot_interactions_parsed/*.parquet"))
     api, _ = make_api(AuditGraph(records))
     assert audit_collect.collect_audit(api, store, settings(), now=NOW, sleep=lambda x: None)["rows"] == 2
+
+
+def test_audit_partial_failure_merges_finished_windows(tmp_path):
+    """One throttled window must not leave the table empty, nor move the high-water mark past it."""
+    records = [_record(1, NOW - timedelta(hours=20)), _record(2, NOW - timedelta(hours=3))]
+
+    class OneBadWindow(AuditGraph):
+        def __call__(self, method, url, kw):
+            if method == "POST" and kw["json"]["filterStartDateTime"] == (NOW - timedelta(hours=20)).isoformat():
+                return Resp(500, {"error": "boom"})
+            return super().__call__(method, url, kw)
+
+    api, _ = make_api(OneBadWindow(records))
+    store = LocalStore(tmp_path)
+    with pytest.raises(RuntimeError, match=r"1 audit window\(s\) failed; the 1 row\(s\)"):
+        audit_collect.collect_audit(api, store, settings(), now=NOW, sleep=lambda x: None)
+    rows, _ = _parsed(store)
+    assert len(rows) == 1
+    assert "high_water_mark" not in store.read_json(audit_collect.STATE)
+    api, _ = make_api(AuditGraph(records))
+    assert audit_collect.collect_audit(api, store, settings(), now=NOW, sleep=lambda x: None)["rows"] == 2
+    assert store.read_json(audit_collect.STATE)["high_water_mark"]
 
 
 def test_audit_permission_error_is_clear(tmp_path):
@@ -491,6 +514,58 @@ def test_collect_dispatch_follows_modules(tmp_path, monkeypatch):
     monkeypatch.setattr(audit_collect, "collect_audit", lambda *a, **k: called.append("collect_audit"))
     jobs_main.collect(LocalStore(tmp_path), settings(modules=frozenset({"core"})), api=object())
     assert called == ["collect_licensed", "collect_audit"]
+
+
+def test_sql_connect_retries_while_serverless_db_resumes(monkeypatch):
+    class Error(Exception):
+        pass
+
+    outcomes = [Error("HYT00", "[HYT00] Login timeout expired (0) (SQLDriverConnect)"),
+                Error("42000", "[42000] Database 'valuelens' is not currently available. (40613)"), "conn"]
+
+    def fake_connect(*a, **k):
+        item = outcomes.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    monkeypatch.setitem(sys.modules, "pyodbc", SimpleNamespace(Error=Error, connect=fake_connect))
+    s = SimpleNamespace(sql_server="srv", sql_database="db")
+    tokens = SimpleNamespace(get=lambda scope: "tok")
+    waits = []
+    assert sql_mod.connect(s, tokens, sleep=waits.append) == "conn"
+    assert waits == [10, 20]
+
+    outcomes[:] = [Error("28000", "Login failed for user")]
+    with pytest.raises(Error, match="28000"):
+        sql_mod.connect(s, tokens, sleep=waits.append)
+
+
+def test_collect_keeps_going_when_a_source_fails(tmp_path, monkeypatch):
+    called = []
+    for name in ("collect_licensed", "collect_org", "collect_m365"):
+        monkeypatch.setattr(graph, name, lambda *a, _n=name, **k: called.append(_n))
+
+    def boom(*a, **k):
+        raise RuntimeError("3 audit window(s) failed")
+
+    monkeypatch.setattr(audit_collect, "collect_audit", boom)
+    out = jobs_main.collect(LocalStore(tmp_path), settings(), api=object())
+    assert called == ["collect_licensed", "collect_org", "collect_m365"]
+    assert out["errors"] == {"audit": "RuntimeError: 3 audit window(s) failed"}
+
+
+def test_run_publishes_then_fails_when_a_source_failed(monkeypatch):
+    ran = []
+    monkeypatch.setattr(jobs_main, "open_store", lambda *a: object())
+    monkeypatch.setattr(jobs_main, "collect", lambda *a: ran.append("collect") or {"errors": {"audit": "boom"}})
+    monkeypatch.setattr(jobs_main, "process", lambda *a: ran.append("process"))
+    monkeypatch.setattr(jobs_main, "publish_step", lambda *a: ran.append("publish"))
+    monkeypatch.setattr(jobs_main, "refresh_step", lambda *a: ran.append("refresh"))
+    monkeypatch.setattr(jobs_main.Settings, "from_env", classmethod(lambda cls, env=None: settings()))
+    with pytest.raises(RuntimeError, match="audit: boom"):
+        jobs_main.main(["run"])
+    assert ran == ["collect", "process", "publish", "refresh"]
 
 
 def test_full_local_pipeline_collect_to_publish(tmp_path, monkeypatch):

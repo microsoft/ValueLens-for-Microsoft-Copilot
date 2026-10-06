@@ -30,12 +30,30 @@ describe("HttpFabricProxy", () => {
         }));
     });
 
-    it("throws FabricApiProxyError for API failures", async () => {
-        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("no role", { status: 403 })));
-        const proxy = new HttpFabricProxy(async () => "token");
+    it("throws FabricApiProxyError for API failures after one forced token refresh", async () => {
+        const fetchMock = vi.fn().mockImplementation(async () => new Response("no role", { status: 403 }));
+        vi.stubGlobal("fetch", fetchMock);
+        const getToken = vi.fn().mockResolvedValue("token");
+        const proxy = new HttpFabricProxy(getToken);
 
         await expect(proxy.semanticModel.executeDaxJson("ws", "model", "EVALUATE ROW()"))
             .rejects.toBeInstanceOf(FabricApiProxyError);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(getToken).toHaveBeenLastCalledWith({ forceRefresh: true });
+    });
+
+    it("retries a 403 with a refreshed token, picking up a newly granted role", async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(new Response("no role", { status: 403 }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({ results: [] }), { status: 200 }));
+        vi.stubGlobal("fetch", fetchMock);
+        const getToken = vi.fn(async (options?: { forceRefresh?: boolean }) => options?.forceRefresh ? "fresh" : "stale");
+        const proxy = new HttpFabricProxy(getToken);
+
+        const result = await proxy.semanticModel.executeDaxJson("ws", "model", "EVALUATE ROW()");
+
+        expect(result.data).toEqual({ results: [] });
+        expect(fetchMock.mock.calls[1][1].headers.authorization).toBe("Bearer fresh");
     });
 
     it("throws FabricNetworkProxyError for fetch failures", async () => {

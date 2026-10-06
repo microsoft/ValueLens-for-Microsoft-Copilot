@@ -14,6 +14,7 @@ import { useIsRefreshing } from "@/lib/refresh-tracker";
 import { runtimeConfig } from "@/lib/runtime-config";
 import { scrollToAnchor } from "@/lib/scroll-to-anchor";
 import { cn } from "@/lib/utils";
+import { getAccessToken } from "@/services/rayfin-auth.service";
 import {
     availableDestinations,
     destinations,
@@ -43,7 +44,8 @@ function UpdateNotice() {
     useEffect(() => {
         if (!isAzureAdmin) return;
         let cancelled = false;
-        fetch("/api/version", { cache: "no-store" })
+        getAccessToken()
+            .then((token) => fetch("/api/version", { cache: "no-store", headers: { authorization: `Bearer ${token}` } }))
             .then((response) => response.ok ? response.json() as Promise<VersionResponse> : null)
             .then((value) => !cancelled && setVersion(value))
             .catch(() => undefined);

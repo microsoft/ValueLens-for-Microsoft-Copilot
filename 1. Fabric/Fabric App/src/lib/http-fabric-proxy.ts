@@ -11,7 +11,7 @@ import {
     type IFabricApiProxy,
 } from "@microsoft/fabric-app-data";
 
-export type TokenFactory = () => Promise<string>;
+export type TokenFactory = (options?: { forceRefresh?: boolean }) => Promise<string>;
 
 /** Fabric SDK proxy that sends DAX JSON queries to the same-origin Azure API. */
 export class HttpFabricProxy implements IFabricApiProxy {
@@ -25,32 +25,10 @@ export class HttpFabricProxy implements IFabricApiProxy {
         },
         executeDaxJson: async (workspaceId: string, itemId: string, query: string) => {
             const requestId = crypto.randomUUID();
-            let token: string;
-            try {
-                token = await this.getToken();
-            } catch (error) {
-                throw new FabricGenericProxyError({ message: "Couldn't get an access token.", requestId, sessionId: this.sessionId, cause: error });
-            }
-
-            let response: Response;
-            try {
-                response = await fetch("/api/query", {
-                    method: "POST",
-                    headers: {
-                        authorization: `Bearer ${token}`,
-                        "content-type": "application/json",
-                        "x-ms-client-request-id": requestId,
-                    },
-                    body: JSON.stringify({ workspaceId, itemId, query }),
-                });
-            } catch (error) {
-                throw new FabricNetworkProxyError({
-                    requestId,
-                    sessionId: this.sessionId,
-                    message: error instanceof Error ? error.message : "The query couldn't reach the Analytics Hub API.",
-                    cause: error,
-                });
-            }
+            let response = await this.post(requestId, workspaceId, itemId, query, false);
+            // A cached token can predate a role assignment, so retry once with a fresh one.
+            if (response.status === 401 || response.status === 403)
+                response = await this.post(requestId, workspaceId, itemId, query, true);
 
             const serviceRequestId = response.headers.get("request-id")
                 ?? response.headers.get("x-ms-request-id")
@@ -70,6 +48,34 @@ export class HttpFabricProxy implements IFabricApiProxy {
             return { data: await response.json(), requestId: serviceRequestId };
         },
     };
+
+    private async post(requestId: string, workspaceId: string, itemId: string, query: string, forceRefresh: boolean): Promise<Response> {
+        let token: string;
+        try {
+            token = await this.getToken(forceRefresh ? { forceRefresh } : undefined);
+        } catch (error) {
+            throw new FabricGenericProxyError({ message: "Couldn't get an access token.", requestId, sessionId: this.sessionId, cause: error });
+        }
+
+        try {
+            return await fetch("/api/query", {
+                method: "POST",
+                headers: {
+                    authorization: `Bearer ${token}`,
+                    "content-type": "application/json",
+                    "x-ms-client-request-id": requestId,
+                },
+                body: JSON.stringify({ workspaceId, itemId, query }),
+            });
+        } catch (error) {
+            throw new FabricNetworkProxyError({
+                requestId,
+                sessionId: this.sessionId,
+                message: error instanceof Error ? error.message : "The query couldn't reach the Analytics Hub API.",
+                cause: error,
+            });
+        }
+    }
 
     readonly lakehouse = {
         executeSql: async () => {

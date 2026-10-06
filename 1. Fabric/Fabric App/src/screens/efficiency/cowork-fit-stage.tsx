@@ -7,7 +7,7 @@
 
 import { useId, useMemo } from "react";
 import { ArrowDown } from "lucide-react";
-import { VegaVisual } from "@microsoft/fabric-visuals";
+import { VegaVisual } from "@/components/vega-visual";
 import { stageAnchor } from "@/components/destinations";
 import { FilterNote } from "@/components/filter-note";
 import { GradeMark } from "@/components/grade-mark";

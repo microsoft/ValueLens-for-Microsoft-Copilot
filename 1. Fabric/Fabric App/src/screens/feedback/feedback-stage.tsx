@@ -7,7 +7,7 @@
 
 import { useMemo } from "react";
 import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
-import { VegaVisual, type VisualizationSpec } from "@microsoft/fabric-visuals";
+import { VegaVisual, type VisualizationSpec } from "@/components/vega-visual";
 import { stageAnchor } from "@/components/destinations";
 import { KpiCard } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";

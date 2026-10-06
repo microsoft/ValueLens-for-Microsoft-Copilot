@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { useMemo, useState } from "react";
-import { VegaVisual } from "@microsoft/fabric-visuals";
+import { VegaVisual } from "@/components/vega-visual";
 import { stageAnchor } from "@/components/destinations";
 import { FilterNote } from "@/components/filter-note";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
@@ -21,6 +21,7 @@ import { formatKpi } from "@/lib/format-kpi";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import { habitStages, habitSummary, habitThresholds, habitTrend } from "@/queries/adoption";
+import { formatMonth } from "./habit-month";
 
 /** Stages place every licensed person, so narrowing to one agent would call everyone else inactive. */
 const AGENT_FILTERS: FilterKey[] = ["agentTypes", "agentNames"];
@@ -31,13 +32,6 @@ const habitScales = [
     { id: "count", label: "Count" },
 ] as const;
 
-const monthFormat = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
-
-/** "June 2026" from the model's `2026-06-01T00:00:00`. */
-function formatMonth(value: string | undefined): string | undefined {
-    if (!value || !/^\d{4}-\d{2}-\d{2}/.test(value)) return undefined;
-    return monthFormat.format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
-}
 
 /**
  * Stage three of the funnel: whether use has become a habit.

@@ -12,6 +12,7 @@ import { buildModel, loadTemplateModel, PBISM } from '../../transform/model.js';
 import { deployModel, modelSignature, REFRESH_POLL_MS } from '../model.js';
 import { addMonths, SECRET_LIFETIME_MONTHS } from '../identity.js';
 import { writeTeamsPackage } from '../../azure/teams.js';
+import { APP_ALIAS } from '../app.js';
 
 /** @typedef {import('../../install.js').Ctx} Ctx */
 
@@ -296,7 +297,7 @@ export async function azureDeployment(ctx, o) {
     publicNetworkAccess: param(az.publicNetworkAccess === false ? 'Disabled' : 'Enabled'), deployWeb: param(true), webMinReplicas: param(0),
     webClientId: param(o.pass === 2 ? (az.webApp?.clientId ?? '') : ''), webAppIdUri: param(o.pass === 2 ? (az.webApp?.appIdUri ?? '') : ''),
     modules: param(enabledAzureModuleIds(config.modules).join(',')), auditHistoryDays: param(config.history.days), powerBiWorkspaceId: param(az.powerBi?.workspaceId ?? ''),
-    semanticModels: param(az.powerBi?.datasetId ? JSON.stringify({ valueLensModel: { workspaceId: az.powerBi.workspaceId, itemId: az.powerBi.datasetId } }) : '{}'),
+    semanticModels: param(az.powerBi?.datasetId ? JSON.stringify({ [APP_ALIAS]: { workspaceId: az.powerBi.workspaceId, itemId: az.powerBi.datasetId } }) : '{}'),
     sqlReaderName: param(SQL_READER_NAME), sqlReaderClientId: param(o.pass === 2 ? (az.sqlReader?.clientId ?? '') : ''),
   };
   return { properties: { mode: 'Incremental', template: ARM, parameters: params } };

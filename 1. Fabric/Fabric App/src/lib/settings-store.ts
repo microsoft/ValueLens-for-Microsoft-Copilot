@@ -153,15 +153,21 @@ class HttpSettingsStore implements SettingsStore {
     }
 
     private async request<T>(entity: "CommercialTerms" | "TaskTime", id?: string, method = "GET", body?: unknown): Promise<T> {
-        const token = await getAccessToken();
-        const response = await fetch(`/api/settings/${entity}${id ? `/${encodeURIComponent(id)}` : ""}`, {
-            method,
-            headers: {
-                authorization: `Bearer ${token}`,
-                ...(body === undefined ? {} : { "content-type": "application/json" }),
-            },
-            body: body === undefined ? undefined : JSON.stringify(body),
-        });
+        const send = async (forceRefresh: boolean) => {
+            const token = await getAccessToken(forceRefresh ? { forceRefresh } : undefined);
+            return fetch(`/api/settings/${entity}${id ? `/${encodeURIComponent(id)}` : ""}`, {
+                method,
+                headers: {
+                    authorization: `Bearer ${token}`,
+                    ...(body === undefined ? {} : { "content-type": "application/json" }),
+                },
+                body: body === undefined ? undefined : JSON.stringify(body),
+            });
+        };
+        let response = await send(false);
+        // A cached token can predate a role assignment, so retry once with a fresh one.
+        if (response.status === 401 || response.status === 403)
+            response = await send(true);
         if (response.status === 403)
             throw new Error(ADMIN_WRITE_MESSAGE);
         if (!response.ok)

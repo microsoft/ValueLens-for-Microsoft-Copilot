@@ -208,14 +208,17 @@ class AuditCollector:
                     raise
                 except Exception as exc:
                     errors.append(f"{futures[fut][0]:%Y-%m-%d %H:%M}: {type(exc).__name__}: {exc}")
+        # Publish the windows that finished even when others failed, so one throttled window doesn't
+        # leave the table empty. The high-water mark holds still until every window succeeds, so the
+        # next run's plan still covers the failed ones.
+        result = self.merge(keys, advance_high_water=not errors)
         if errors:
-            raise RuntimeError(f"{len(errors)} audit window(s) failed; finished windows are kept and the next run "
-                               f"resumes. First error: {errors[0]}")
-        result = self.merge(keys)
+            raise RuntimeError(f"{len(errors)} audit window(s) failed; the {result['rows']} row(s) from finished "
+                               f"windows were merged and the next run resumes the rest. First error: {errors[0]}")
         self.prune(keys)
         return result
 
-    def merge(self, keys) -> dict:
+    def merge(self, keys, advance_high_water=True) -> dict:
         files = sorted(rel for rel in self.store.list(STAGING)
                        if rel.split("/")[-1].split("_", 1)[-1].rsplit("_", 1)[0] in keys)
         if not files:
@@ -251,7 +254,7 @@ class AuditCollector:
             total += con.execute(f"SELECT count(*) FROM new_rows WHERE {match}").fetchone()[0]
         newest = con.execute("SELECT max(CreationDate) FROM new_rows").fetchone()[0]
         con.close()
-        if newest is not None:
+        if newest is not None and advance_high_water:
             old = audit._as_utc_datetime(self.state.get("high_water_mark"))
             newest = audit._as_utc_datetime(newest)
             self.state["high_water_mark"] = (max(old, newest) if old else newest).isoformat()

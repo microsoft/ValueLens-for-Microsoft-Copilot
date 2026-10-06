@@ -31,19 +31,24 @@ export class AnalyticsHubAccessDeniedError extends Error {
     }
 }
 
+export interface TokenOptions {
+    /** Skip cached tokens, e.g. after a role was granted since sign-in. */
+    forceRefresh?: boolean;
+}
+
 export interface IAuthService {
     initEmbeddedAuth(): Promise<OpaqueSession | null>;
     signIn(): Promise<OpaqueSession>;
-    getAccessToken?(): Promise<string>;
+    getAccessToken?(options?: TokenOptions): Promise<string>;
     getUser?(): AnalyticsHubUser | null;
 }
 
 let currentAuthService: IAuthService | undefined;
 
-export function getAccessToken(): Promise<string> {
+export function getAccessToken(options?: TokenOptions): Promise<string> {
     if (!currentAuthService)
         throw new Error("Authentication has not been initialised.");
-    return currentAuthService.getAccessToken?.() ?? Promise.reject(new Error("Authentication cannot supply API tokens."));
+    return currentAuthService.getAccessToken?.(options) ?? Promise.reject(new Error("Authentication cannot supply API tokens."));
 }
 
 /** Construct the auth service used by the app for the current host. */
@@ -134,9 +139,8 @@ class AzureAuthService implements IAuthService {
         return new Promise<OpaqueSession>(() => undefined);
     }
 
-    async getAccessToken(): Promise<string> {
+    async getAccessToken(options?: TokenOptions): Promise<string> {
         await this.ensureInitialised();
-        if (this.token) return this.token;
         if (this.config.inTeams) {
             try {
                 this.token = await teams.authentication.getAuthToken();
@@ -151,7 +155,8 @@ class AzureAuthService implements IAuthService {
         if (!account) throw new Error("Sign in before calling the Analytics Hub API.");
         let result: AuthenticationResult;
         try {
-            result = await this.msal.acquireTokenSilent({ account, scopes: [this.config.apiScope] });
+            // MSAL serves cached tokens until they near expiry; forceRefresh picks up newly granted roles.
+            result = await this.msal.acquireTokenSilent({ account, scopes: [this.config.apiScope], forceRefresh: options?.forceRefresh === true });
         } catch (error) {
             if (error instanceof InteractionRequiredAuthError) {
                 await this.msal.acquireTokenRedirect({ account, scopes: [this.config.apiScope] });

@@ -15,8 +15,9 @@ log = logging.getLogger("valuelens_jobs.sql")
 SQL_COPT_SS_ACCESS_TOKEN = 1256
 MIGRATION = re.compile(r"^V(\d+)__.+\.sql$", re.IGNORECASE)
 GO = re.compile(r"^\s*GO\s*;?\s*$", re.IGNORECASE | re.MULTILINE)
-# Serverless databases resume from auto-pause on the first connection: 40613 / 40197 / 40501.
-RESUMING = ("40613", "40197", "40501", "not currently available")
+# Serverless databases resume from auto-pause on the first connection: 40613 / 40197 / 40501, or the
+# login simply times out (HYT00) while the database wakes.
+RESUMING = ("40613", "40197", "40501", "not currently available", "HYT00")
 
 
 def access_token_struct(token: str) -> bytes:

@@ -67,6 +67,7 @@ export class QueryService {
     });
     const text = await upstream.text();
     if (!upstream.ok) console.warn(`executeQueries ${itemId} returned ${upstream.status}: ${text.slice(0, 300)}`);
+    else logDaxError(text, query);
     const contentType = upstream.headers?.get?.('content-type') || 'application/json';
     const retryAfter = upstream.headers?.get?.('retry-after');
     if (!contentType.toLowerCase().includes('json')) {
@@ -80,3 +81,15 @@ export class QueryService {
   }
 }
 function jsonError(status, code, message) { return { status, headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ error: { code, message } }) }; }
+
+/** executeQueries reports DAX errors inside a 200 body; log them so failing visuals can be traced. */
+function logDaxError(text, query) {
+  if (!text.includes('"error"')) return;
+  try {
+    const result = JSON.parse(text)?.results?.[0];
+    const error = result?.error ?? result?.tables?.[0]?.error;
+    if (!error) return;
+    const detail = error['pbi.error']?.details?.find?.((d) => d.code === 'DetailsMessage')?.detail?.value ?? error.message ?? error.code;
+    console.warn(`DAX error: ${String(detail).slice(0, 400)} | query: ${query.replace(/\s+/g, ' ').slice(0, 300)}`);
+  } catch { /* not JSON; nothing to log */ }
+}

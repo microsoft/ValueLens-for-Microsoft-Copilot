@@ -108,6 +108,9 @@ test('Azure ARM parameters stay in sync with the committed template', async () =
   assert.equal(pinned.imageRegistry.value, 'myacr.azurecr.io/valuelens');
   assert.equal(pinned.imageTag.value, 'dev-1');
   assert.match(pinned.imageRegistryResourceId.value, /registries\/myacr$/);
+  config.azure.powerBi = { workspaceId: 'ws-1', datasetId: 'ds-1' };
+  const models = JSON.parse((await azureDeployment(ctx, { pass: 1 })).properties.parameters.semanticModels.value);
+  assert.deepEqual(models, { vl: { workspaceId: 'ws-1', itemId: 'ds-1' } }, 'the app queries the model through the `vl` alias');
   const armTypes = JSON.parse(readFileSync(new URL('../src/azure/main.arm.json', import.meta.url), 'utf8')).parameters;
   const jsonType = (/** @type {any} */ v) => (Array.isArray(v) ? 'array' : typeof v === 'number' ? (Number.isInteger(v) ? 'int' : 'float') : typeof v === 'boolean' ? 'bool' : typeof v === 'object' ? 'object' : 'string');
   for (const [name, { value }] of Object.entries(pinned)) {
