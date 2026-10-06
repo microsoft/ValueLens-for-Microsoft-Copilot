@@ -57,7 +57,8 @@ it, open the exe again and choose **Run now**.
 
 - **Open the app:** in your Fabric workspace, open **Analytics Hub**.
 - **Share it:** in the app, choose **Share** and add people. They also need **Build** permission on
-  `ValueLens Model` (under **Manage permissions**).
+  `Analytics Hub Model` (under **Manage permissions**). Installs from earlier versions keep the
+  name `ValueLens Model`.
 - **Fresh data:** the pipeline runs on the schedule you chose.
 - **Status, updates or repairs:** open the exe again.
 
@@ -68,13 +69,14 @@ installer under **What to collect**. Each one has a few steps of its own.
 
 | Extra | What it shows | Where the data comes from |
 |---|---|---|
-| [Credit consumption](installer/README.md#credit-consumption) | Credits used and what they cost across Copilot Studio, Copilot Cowork and Azure AI | Copilot Studio exports from the Power Platform admin center, Cowork credits from Viva Insights, and Azure AI and pay-as-you-go costs from Azure |
+| [Credit consumption](installer/README.md#credit-consumption) | Credits used and what they cost across Copilot Studio, Copilot Cowork and Azure AI | Copilot Studio exports from the Power Platform admin center (or a daily flow on its licensing API), Cowork credits from a Viva Insights query through a Dataflow (or its CSV export), and Azure AI and pay-as-you-go costs from Azure |
 | [Agent Evaluator](installer/README.md#agent-evaluator) | How well your Copilot Studio agents work: how conversations end, topics, knowledge, errors and user feedback | Copilot Studio conversation transcripts in Dataverse |
 | [Microsoft 365 activity](installer/README.md#microsoft-365-activity) *(on by default)* | How people work across Teams, Outlook, SharePoint, OneDrive and the Office apps | Microsoft 365 usage reports |
 
 ## Prefer Power BI Desktop?
 
-To build your own reports, connect Power BI Desktop to `ValueLens Model` in your workspace.
+To build your own reports, connect Power BI Desktop to `Analytics Hub Model` (or `ValueLens Model`)
+in your workspace.
 
 To use a template instead, choose not to deploy the model in the installer's **Power BI** step.
 When it finishes, it shows the values to enter in

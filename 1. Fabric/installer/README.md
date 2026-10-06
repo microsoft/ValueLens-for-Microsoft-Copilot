@@ -55,16 +55,24 @@ status, update, or repair the set-up later, open the exe again.
 
 **Using a workspace that already has things in it?** The installer never changes anything it
 didn't create. If one of its names is taken, its own item gets the next free name, such as
-`ValueLens_2` or `Analytics Hub 2`. The plan shows the names before you approve it.
+`AnalyticsHub_Pipeline_2` or `Analytics Hub 2`. The plan shows the names before you approve it.
+
+**Item names.** A new install names its items after Analytics Hub: `Analytics Hub Model`,
+`AnalyticsHub_Pipeline`, the `Analytics Hub SQL …` connection and the `Analytics Hub Data Collector`
+app registration. An install from an earlier version keeps the names it already has, such as
+`ValueLens Model`.
 
 ## After it finishes
 
 - **Admin consent.** If you couldn't grant it, send the link the installer gives you to an admin.
   They select **Grant admin consent**. Then open the exe again and choose **Run now**.
 - **Share the app.** Open **Analytics Hub** in the workspace, choose **Share**, and add people or a
-  group. They also need **Build** on `ValueLens Model` (its **Manage permissions** page), or Viewer
-  on the workspace.
-- **Own reports.** Connect Power BI Desktop to `ValueLens Model`.
+  group. They also need **Build** on `Analytics Hub Model` (its **Manage permissions** page), or
+  Viewer on the workspace.
+- **Own reports.** Connect Power BI Desktop to `Analytics Hub Model`.
+- **Flows and the Cowork Dataflow.** If you chose them, the end of the install lists what to sign
+  in to. See [Power Automate flows](#power-automate-flows-optional) and
+  [Credit consumption](#credit-consumption).
 - **Someone else takes over the pipeline?** The notebooks run as the person who last changed the
   pipeline, or the schedule's owner. Give them Key Vault Secrets User on the vault and Contributor
   on the workspace first.
@@ -80,9 +88,9 @@ didn't create. If one of its names is taken, its own item gets the next free nam
 | Workday org data | | Workday: a report of active workers with **Primary Work Email** | Organisation filters |
 | Microsoft 365 activity | Yes | | M365 activity |
 | Agent 365 registry | Needs an Agent 365 licence | Microsoft 365 admin center > **Agents** > **All agents** > **Export** | Agents |
-| Product feedback | No API | Microsoft 365 admin center > **Health** > **Product feedback** > **Export** | User Feedback |
-| Copilot Studio credits | No API | Power Platform admin center > **Licensing** > **Products** > **Copilot Studio** (Summary, Environments and Agents) | Consumption Central |
-| Copilot Cowork credits | | Viva Insights > Copilot Consumption Dashboard > **Export** | Consumption Central |
+| Product feedback | No API. An optional flow saves exports emailed to you | Microsoft 365 admin center > **Health** > **Product feedback** > **Export** | User Feedback |
+| Copilot Studio credits | An optional daily flow reads the licensing API (environment and agent figures) | Power Platform admin center > **Licensing** > **Products** > **Copilot Studio** (Summary, Environments and Agents) | Consumption Central |
+| Copilot Cowork credits | **Connected (Dataflow)**: a Dataflow Gen2 reads your Viva Insights query | Viva Insights > Copilot Consumption Dashboard > **Export** | Consumption Central |
 | Azure AI costs | Yes | | Consumption Central |
 | Agent Evaluator | Yes | | Agent Evaluator |
 
@@ -109,10 +117,34 @@ name the shortcut `sharepoint`. Files there are read where they are, loaded once
 place. Shortcuts need the Fabric tenant setting for OneDrive and SharePoint shortcuts. Without it,
 use the Lakehouse folder.
 
-**Product feedback by email (optional).** If you have Power Automate premium, the installer can
-write a ready-filled copy of the [product feedback flow](../Manual%20setup/flows/README.md) next to
-your answers. Import it, connect Outlook, and set its client secret. The flow saves each emailed
-export to the same folder. The app registration needs Contributor on the workspace.
+### Power Automate flows (optional)
+
+For a source set to **Upload CSV**, the installer can create a flow that adds the files for you:
+
+| Flow | What it does | Who can use it |
+|---|---|---|
+| `Analytics Hub - Product feedback` | Saves product feedback exports emailed with the subject `Copilot Product Feedback` | Anyone with Power Automate Premium |
+| `Analytics Hub - Copilot Studio credits` | Each day, an hour before the pipeline, reads the last ten days' credits by agent and the tenant's entitlement from the Power Platform licensing API | Power Platform, Billing or Global administrators with Power Automate Premium |
+
+Both are off by default. The installer creates them in the Power Platform environment you pick,
+**turned off**. To finish:
+
+1. Open the flow in Power Automate. Sign in to **Azure Key Vault** (your vault), and to **Office 365
+   Outlook** (the mailbox the export goes to) or **HTTP with Microsoft Entra ID (preauthorized)**
+   (Base Resource URL and Resource URI `https://api.powerplatform.com`).
+2. Save, then turn the flow on.
+3. For product feedback, schedule the export in the Microsoft 365 admin center to be emailed to
+   that mailbox with the subject `Copilot Product Feedback`.
+
+The flows write to the drop folder as the app registration, with its secret from Key Vault, so
+the installer gives the app **Contributor** on the workspace. If a flow can't be created (no
+environment, or no maker rights), the installer writes it to a file beside your answers in
+`Documents\Analytics Hub`. Create a cloud flow and paste the file's `definition` in. The
+[Manual setup flows](../Manual%20setup/flows/README.md) describe the same flows by hand.
+
+The Studio flow only sees environments that have Copilot Studio credits allocated. The exports
+still add per-user figures and the exact prepaid split. For a month an export covers, the
+export's figures are used.
 
 ### Commands
 
@@ -120,11 +152,14 @@ export to the same folder. The app registration needs Contributor on the workspa
 |---|---|
 | Choose sources without the questions | `install --data productFeedback=csv,agent365=api --yes` |
 | Upload exports during the install | `install --data productFeedback=csv --csv feedback.csv` |
-| Write the product feedback email flow | `install --data productFeedback=csv --feedback-flow` |
+| Create the product feedback email flow | `install --data productFeedback=csv --feedback-flow --flow-environment https://contoso.crm.dynamics.com` |
+| Create the Copilot Studio credits flow | `install --data studioCredits=csv --studio-flow --flow-environment https://contoso.crm.dynamics.com` |
+| Read Cowork credits with a Dataflow | `install --data coworkCredits=api --viva-partition <id> --viva-query <id>` |
 | Upload exports later, then load them now | `upload feedback.csv agents.csv --run` |
 
 Source IDs for `--data`: `workday`, `m365Activity`, `agent365`, `productFeedback`,
 `studioCredits`, `coworkCredits`, `azureAi`, `agentEvaluator`. Modes: `api`, `csv` or `skip`.
+Without `--flow-environment`, the installer asks which environment to use.
 
 ## Microsoft 365 activity
 
@@ -138,17 +173,25 @@ Microsoft 365 admin center, go to **Settings** > **Org settings** > **Services**
 
 Optional. It fills the app's Consumption pages. See [Consumption Central](../Manual%20setup/Add%20Credit%20Consumption/).
 
-The installer reads Azure AI and Copilot pay-as-you-go costs for you. Two sources you add yourself:
+The installer reads Azure AI and Copilot pay-as-you-go costs for you. For the other two:
 
 - **Copilot Studio credits.** In the Power Platform admin center, go to **Licensing** >
   **Products** > **Copilot Studio**. Download the `EntitlementConsumption…_MCSMessages…csv` files
   from the Summary, Environments and Agents tabs, and add them as [exports](#data-sources-and-exports).
-  Do it each month; a new file replaces the last one of the same kind.
-- **Cowork credits.** Add the Viva Insights Consumption Dashboard's CSV export as an
-  [export](#data-sources-and-exports). Or build a Viva Insights query with the Copilot credit
-  metrics, turn on auto-refresh, and create a Dataflow Gen2 in the workspace that loads it into
-  `viva_credits_weekly`, following the [Viva Insights guide](https://learn.microsoft.com/viva/insights/advanced/analyst/export-query-data-microsoft-fabric)
-  (Schema type *Pivoted*, Data granularity *Row-level data*).
+  Do it each month; a new file replaces the last one of the same kind. To keep the environment and
+  agent figures up to date between exports, add the
+  [Copilot Studio credits flow](#power-automate-flows-optional).
+- **Cowork credits.** Choose **Connected (Dataflow)** where you can. In Viva Insights > **Analysis**,
+  build a query with the Copilot credit metrics and turn on **Auto-refresh**. In **Analysis
+  results**, choose the link icon to copy its partition and query IDs, and give them to the
+  installer. It creates the Dataflow Gen2 `AnalyticsHub_Cowork_Credits`, which loads the query
+  into `viva_credits_dataflow`, and the pipeline refreshes it before each Viva load. Open the
+  Dataflow once, sign in to Viva Insights and the Lakehouse, then choose **Save and run**. See the
+  [Viva Insights guide](https://learn.microsoft.com/viva/insights/advanced/analyst/export-query-data-microsoft-fabric).
+  You need the Viva Insights **Insights Analyst** role. Without the IDs, or if the Dataflow can't be
+  created, Cowork credits fall back to the Consumption Dashboard's CSV
+  [export](#data-sources-and-exports). Exports can still fill weeks before the query; the
+  Dataflow wins for weeks both cover.
 
 If you can't assign Azure roles, ask an Owner or User Access Administrator to give the app
 registration Reader, Cost Management Reader and Monitoring Reader on the subscription. Then
@@ -189,7 +232,9 @@ the endpoint, someone who manages the vault approves it under **Networking** >
 | A run fails reading the secret | The person the run uses can't read it. See **Someone else takes over the pipeline?** above. |
 | A run says Fabric's capacity was too busy (`TooManyRequestsForCapacity`) | Nothing is lost. Wait a few minutes, then choose **Run now** again. It happens most on trials and small capacities. |
 | `Fabric couldn't set up the model's connection` | Turn on *Service principals can call Fabric public APIs*, then choose **Repair or change**. |
-| `Couldn't connect ValueLens Model to …` | Open the link it shows. Under **Gateway and cloud connections**, pick `ValueLens SQL …`. Then choose **I've connected it myself**. |
+| `Couldn't connect Analytics Hub Model to …` | Open the link it shows. Under **Gateway and cloud connections**, pick `Analytics Hub SQL …` (`ValueLens SQL …` on earlier installs). Then choose **I've connected it myself**. |
+| A run notes that `Refresh_Cowork_Credits` failed | The Dataflow hasn't been signed in to yet, or the Viva Insights query stopped refreshing. Open `AnalyticsHub_Cowork_Credits`, sign in, and choose **Save and run**. The rest of the run carries on. |
+| A flow doesn't save any files | Check it's turned on and its connections are signed in. The Copilot Studio credits flow must be signed in as a Power Platform, Billing or Global administrator. |
 | A model refresh fails with `Login failed` | The connection's secret expired. Choose **Create new secrets**. |
 | `The app wasn't deployed` | Fix the cause it shows, then choose **Redeploy the app**. |
 | `You can't assign Azure roles in …` | See [Credit consumption](#credit-consumption). |

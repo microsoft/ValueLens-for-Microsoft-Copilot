@@ -815,7 +815,8 @@ score = 60 × min(median tasks per active week ÷ 30, 1) + 40 × min(median acti
 From the optional Product Feedback export (Microsoft 365 admin center > Health > Product feedback).
 There is no API for it. On Fabric, each export dropped in `Files/analytics_hub_uploads` is
 recognised by its Feedback Id, Date Submitted (UTC) and Feedback Type columns, added to the
-history, and de-duplicated by Feedback Id. With no export, the page stays empty.
+history, and de-duplicated by Feedback Id. The installer can also create a Power Automate flow that
+saves exports emailed to an admin into that folder. With no export, the page stays empty.
 
 - **Satisfaction:** thumbs up ÷ all feedback items.
 - **Category:** keyword rules over the prompt and comment text, where the first match wins. For
@@ -857,8 +858,8 @@ rebuilds its consumption and cost pages.
 
 | Section | Source | How cost is worked out |
 |---|---|---|
-| **Cowork / Work IQ** | Weekly credits per person from Viva Insights (`viva_credits_weekly`) | Credits up to the Capacity Pack balance are priced at the **prepaid rate**; the rest at the **pay-as-you-go rate**. The pack applies to the credits in the selected period. Week by week it is used up in date order, so later weeks spill into pay-as-you-go first. Blended rate = cost ÷ credits |
-| **Copilot Studio** | Power Platform admin centre exports: tenant by day, plus agent and user views | The tenant export already splits prepaid from pay-as-you-go credits, and each is priced at its rate. Effective rate = cost ÷ credits. Per-agent and per-user cost uses the pay-as-you-go rate |
+| **Cowork / Work IQ** | Weekly credits per person from Viva Insights (`viva_credits_weekly`), read from a Viva Insights query by a Dataflow Gen2 (`viva_credits_dataflow`) or from the Consumption Dashboard's CSV export. Where both cover a week, the Dataflow's figures are used | Credits up to the Capacity Pack balance are priced at the **prepaid rate**; the rest at the **pay-as-you-go rate**. The pack applies to the credits in the selected period. Week by week it is used up in date order, so later weeks spill into pay-as-you-go first. Blended rate = cost ÷ credits |
+| **Copilot Studio** | Power Platform admin centre exports: tenant by day, plus agent and user views. Optionally, a daily flow reads the Power Platform licensing API for credits by agent and day (`studio_agent_daily`), and fills the tenant and agent views for days and months no export covers. It only sees environments with credits allocated, and has no per-user figures. Without an entitlement snapshot, its credits count as prepaid | The tenant export already splits prepaid from pay-as-you-go credits, and each is priced at its rate. The licensing API gives one tenant-wide prepaid share, applied to every environment. Effective rate = cost ÷ credits. Per-agent and per-user cost uses the pay-as-you-go rate |
 | **Azure** | Azure Cost Management export for the whole solution, or Azure AI Foundry spend by model | Actual billed cost, in the export's own currency. The rates don't apply. If neither export is loaded, the section says which to load and the other sections still work |
 
 **Rates & packs.** By default the rates come from the model, through the `commercial_terms` table

@@ -37,6 +37,8 @@ reports** is off (Microsoft 365 admin center → Settings → Org settings → S
 | Source | API? | Automated-pull permission | Manual-export role |
 |---|---|---|---|
 | **Product feedback** (OCV / M365 Health) | ❌ export-only | None — there is no API. Landed by the Power Automate flow, then ingested. | Global Administrator or Reports Reader |
+| **Copilot Studio credits** | ✅ Power Platform licensing API (optional installer flow) | The flow's **HTTP with Microsoft Entra ID** connection signs in as a **Power Platform Administrator**, **Billing Administrator** or **Global Administrator** (audience `https://api.powerplatform.com`). Per-user figures are export-only. | Power Platform Administrator, for the PPAC Licensing exports |
+| **Cowork credits** | ✅ Viva Insights query via Dataflow Gen2 | The person who signs in to the Dataflow needs the Viva Insights **Insights Analyst** role, and the query on Auto-refresh. | Insights Analyst, for the Consumption Dashboard export |
 | **Agents 365** | ✅ Graph | `CopilotPackages.Read.All` + `Application.Read.All` (+ `User.Read.All` to resolve creators), admin-consented, **and an Agent 365 licence** in the tenant (else `403`). Used by `Copilot_Agent365_Registry_Ingester` (Fabric) and `Get-Agents365Registry.ps1` (every other path). | Global Administrator or Reports Reader (with **AI Admin** in a Frontier-enrolled tenant), for the CSV fallback via the admin centre |
 
 For the **export-only** source, the only "permission" to automate landing is the automation's **OneLake write**
@@ -54,6 +56,8 @@ right (next section) — the data itself must be exported by an admin (or a sche
 |---|---|
 | Run the notebooks / pipeline, write Delta to the Lakehouse | **Contributor** or **Member** on the Fabric workspace |
 | Land export-only files via the Power Automate flows | The flow's identity (app reg or workspace identity) as **Member/Contributor** on the workspace; tenant setting **“Service principals can use Fabric APIs”** enabled |
+| Installer-created flows (product feedback, Copilot Studio credits) | The installing person: **Environment Maker** (or System Administrator) in the chosen Power Platform environment. The flow owner: a **Power Automate Premium** licence (HTTP with Microsoft Entra ID is premium). The app registration gets **Contributor** on the workspace from the installer, and the flow reads its secret through an **Azure Key Vault** connection, so the person who signs in to it needs **Key Vault Secrets User** on the vault |
+| Installer-created Cowork credits Dataflow | The installing person as **Contributor** or **Member** on the workspace. Whoever signs in to the Dataflow needs Viva Insights **Insights Analyst** |
 | Upload exports with the installer, Fabric or OneLake File Explorer (to `Files/analytics_hub_uploads`) | The signed-in person as **Contributor** or **Member** on the workspace. No extra API permission. |
 | Optional SharePoint/OneDrive folder shortcut into the drop folder | Fabric tenant setting for **OneDrive and SharePoint shortcuts** enabled, and read access to the folder for whoever creates the shortcut. Without it, use the Lakehouse folder. |
 | Capacity | Workspace on a Fabric capacity (**F2+** or trial) |
