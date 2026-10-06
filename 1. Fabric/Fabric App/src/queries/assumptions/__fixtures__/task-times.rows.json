@@ -17,9 +17,9 @@
     "[Low]": 16,
     "[Typical]": 30,
     "[High]": 51,
-    "[Source]": "SmartBear (2023); MS Research (Bacchelli & Bird 2013)",
-    "[Source URL]": "https://smartbear.com/state-of-software-quality/code-review/",
-    "[Confidence]": "High"
+    "[Source]": "Bacchelli & Bird (ICSE 2013)",
+    "[Source URL]": "https://doi.org/10.1109/ICSE.2013.6606617",
+    "[Confidence]": "Medium"
   },
   {
     "[Task]": "Code Analysis (URL)",
@@ -28,9 +28,9 @@
     "[Low]": 8,
     "[Typical]": 15,
     "[High]": 26,
-    "[Source]": "Stack Overflow (2023); GitHub (2023)",
-    "[Source URL]": "https://survey.stackoverflow.co/",
-    "[Confidence]": "Medium"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Code Review & PR",
@@ -39,8 +39,8 @@
     "[Low]": 21,
     "[Typical]": 40,
     "[High]": 69,
-    "[Source]": "Provisional - BVA estimate, not yet source-good-fit",
-    "[Source URL]": "",
+    "[Source]": "Bacchelli & Bird (ICSE 2013)",
+    "[Source URL]": "https://doi.org/10.1109/ICSE.2013.6606617",
     "[Confidence]": "Low"
   },
   {
@@ -50,7 +50,7 @@
     "[Low]": 24,
     "[Typical]": 45,
     "[High]": 77,
-    "[Source]": "GitHub/NBER (Peng et al. 2023) RCT",
+    "[Source]": "Peng et al. (arXiv 2023, GitHub Copilot RCT)",
     "[Source URL]": "https://arxiv.org/abs/2302.06590",
     "[Confidence]": "High"
   },
@@ -61,9 +61,9 @@
     "[Low]": 6,
     "[Typical]": 11,
     "[High]": 11,
-    "[Source]": "Forrester TEI (2022); Gartner (2023)",
-    "[Source URL]": "https://www.gartner.com/en/topics/hyperautomation",
-    "[Confidence]": "High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Data & Reporting Workflow",
@@ -72,9 +72,9 @@
     "[Low]": 6,
     "[Typical]": 15,
     "[High]": 24,
-    "[Source]": "Forrester TEI (2022); Gartner (2023)",
-    "[Source URL]": "https://www.gartner.com/en/topics/hyperautomation",
-    "[Confidence]": "High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Document Workflow",
@@ -83,9 +83,9 @@
     "[Low]": 8,
     "[Typical]": 15,
     "[High]": 26,
-    "[Source]": "Forrester TEI (2022); Gartner (2023)",
-    "[Source URL]": "https://www.gartner.com/en/topics/hyperautomation",
-    "[Confidence]": "High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Email Workflow",
@@ -94,9 +94,9 @@
     "[Low]": 5,
     "[Typical]": 12,
     "[High]": 12,
-    "[Source]": "Forrester TEI (2022); Gartner (2023)",
-    "[Source URL]": "https://www.gartner.com/en/topics/hyperautomation",
-    "[Confidence]": "High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Form / Survey Work",
@@ -105,9 +105,9 @@
     "[Low]": 10,
     "[Typical]": 25,
     "[High]": 40,
-    "[Source]": "SurveyMonkey (2022); Qualtrics (2023)",
-    "[Source URL]": "https://www.surveymonkey.com/curiosity/",
-    "[Confidence]": "Medium"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Form/Survey Work",
@@ -116,9 +116,9 @@
     "[Low]": 10,
     "[Typical]": 25,
     "[High]": 40,
-    "[Source]": "SurveyMonkey (2022); Qualtrics (2023)",
-    "[Source URL]": "https://www.surveymonkey.com/curiosity/",
-    "[Confidence]": "Medium"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "General Workflow",
@@ -127,9 +127,9 @@
     "[Low]": 6,
     "[Typical]": 15,
     "[High]": 24,
-    "[Source]": "Forrester TEI (2022); Gartner (2023)",
-    "[Source URL]": "https://www.gartner.com/en/topics/hyperautomation",
-    "[Confidence]": "High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Meeting Workflow",
@@ -138,9 +138,9 @@
     "[Low]": 6,
     "[Typical]": 15,
     "[High]": 22,
-    "[Source]": "Forrester TEI (2022); Gartner (2023)",
-    "[Source URL]": "https://www.gartner.com/en/topics/hyperautomation",
-    "[Confidence]": "High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Monitoring & Alerting",
@@ -160,8 +160,8 @@
     "[Low]": 6,
     "[Typical]": 11,
     "[High]": 11,
-    "[Source]": "Microsoft WTI (2023); Gartner (2022)",
-    "[Source URL]": "https://www.microsoft.com/en-us/worklab/work-trend-index",
+    "[Source]": "D'Angelo, Di Iorio & Zacchiroli (CSCW 2018)",
+    "[Source URL]": "https://doi.org/10.1145/3274310",
     "[Confidence]": "Medium"
   },
   {
@@ -171,9 +171,9 @@
     "[Low]": 6,
     "[Typical]": 15,
     "[High]": 24,
-    "[Source]": "Forrester TEI (2022); Gartner (2023)",
-    "[Source URL]": "https://www.gartner.com/en/topics/hyperautomation",
-    "[Confidence]": "High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Scheduled / Recurring Run",
@@ -193,9 +193,9 @@
     "[Low]": 6,
     "[Typical]": 15,
     "[High]": 24,
-    "[Source]": "Forrester TEI (2022); Gartner (2023)",
-    "[Source URL]": "https://www.gartner.com/en/topics/hyperautomation",
-    "[Confidence]": "High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Task Management",
@@ -204,9 +204,9 @@
     "[Low]": 6,
     "[Typical]": 11,
     "[High]": 11,
-    "[Source]": "Atlassian (2022); Scrum Alliance (2023)",
-    "[Source URL]": "https://www.atlassian.com/blog/teamwork",
-    "[Confidence]": "Medium"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Teams Messaging",
@@ -215,8 +215,8 @@
     "[Low]": 4,
     "[Typical]": 8,
     "[High]": 11,
-    "[Source]": "Microsoft WTI (2023); Grammarly (2023)",
-    "[Source URL]": "https://www.microsoft.com/en-us/worklab/work-trend-index",
+    "[Source]": "Cutrell, Czerwinski & Horvitz (Microsoft Research 2001)",
+    "[Source URL]": "https://www.microsoft.com/en-us/research/publication/effects-of-instant-messaging-interruptions-on-computing-tasks-2/",
     "[Confidence]": "Medium"
   },
   {
@@ -226,8 +226,8 @@
     "[Low]": 20,
     "[Typical]": 40,
     "[High]": 42,
-    "[Source]": "IDEO; HBR (2018)",
-    "[Source URL]": "https://hbr.org/topic/innovation",
+    "[Source]": "Diehl & Stroebe (J. Pers. Soc. Psychol. 1987)",
+    "[Source URL]": "https://doi.org/10.1037/0022-3514.53.3.497",
     "[Confidence]": "Medium"
   },
   {
@@ -237,9 +237,9 @@
     "[Low]": 4,
     "[Typical]": 8,
     "[High]": 14,
-    "[Source]": "W3C WAI; DAM Institute (2022)",
-    "[Source URL]": "https://www.w3.org/WAI/",
-    "[Confidence]": "Medium"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Image Generation",
@@ -248,9 +248,9 @@
     "[Low]": 21,
     "[Typical]": 42,
     "[High]": 42,
-    "[Source]": "Adobe (2022); Content Marketing Institute (2023)",
-    "[Source URL]": "https://business.adobe.com/resources/digital-trends-report.html",
-    "[Confidence]": "Medium"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Image/Media Analysis",
@@ -259,9 +259,9 @@
     "[Low]": 4,
     "[Typical]": 8,
     "[High]": 14,
-    "[Source]": "W3C WAI; DAM Institute (2022)",
-    "[Source URL]": "https://www.w3.org/WAI/",
-    "[Confidence]": "Medium"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Data & Reporting",
@@ -270,9 +270,9 @@
     "[Low]": 16,
     "[Typical]": 35,
     "[High]": 48,
-    "[Source]": "Forrester TEI (2022); IDC (2023)",
-    "[Source URL]": "https://www.forrester.com/policies/total-economic-impact/",
-    "[Confidence]": "High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Data Querying",
@@ -281,9 +281,9 @@
     "[Low]": 13,
     "[Typical]": 30,
     "[High]": 41,
-    "[Source]": "Forrester TEI (2022); BCG (2021)",
-    "[Source URL]": "https://www.forrester.com/policies/total-economic-impact/",
-    "[Confidence]": "High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Excel Assistance",
@@ -292,9 +292,9 @@
     "[Low]": 13,
     "[Typical]": 30,
     "[High]": 41,
-    "[Source]": "Deloitte (2023); KPMG (2020)",
-    "[Source URL]": "https://www2.deloitte.com/us/en/insights.html",
-    "[Confidence]": "Medium"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Spreadsheet Analysis",
@@ -303,9 +303,9 @@
     "[Low]": 18,
     "[Typical]": 40,
     "[High]": 55,
-    "[Source]": "Deloitte (2023); KPMG (2020)",
-    "[Source URL]": "https://www2.deloitte.com/us/en/insights.html",
-    "[Confidence]": "High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Spreadsheet Review",
@@ -314,9 +314,9 @@
     "[Low]": 11,
     "[Typical]": 25,
     "[High]": 34,
-    "[Source]": "Deloitte (2023); KPMG (2020)",
-    "[Source URL]": "https://www2.deloitte.com/us/en/insights.html",
-    "[Confidence]": "Medium"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Content Generation",
@@ -325,9 +325,9 @@
     "[Low]": 12,
     "[Typical]": 25,
     "[High]": 42,
-    "[Source]": "Grammarly (2023); Forrester (2022)",
-    "[Source URL]": "https://www.grammarly.com/business/learn",
-    "[Confidence]": "High"
+    "[Source]": "Noy & Zhang (Science 2023)",
+    "[Source URL]": "https://www.science.org/doi/10.1126/science.adh2586",
+    "[Confidence]": "Medium-High"
   },
   {
     "[Task]": "Document Drafting",
@@ -336,7 +336,7 @@
     "[Low]": 21,
     "[Typical]": 42,
     "[High]": 42,
-    "[Source]": "Noy & Zhang (MIT/Science 2023); BCG/Harvard 2023",
+    "[Source]": "Noy & Zhang (Science 2023)",
     "[Source URL]": "https://www.science.org/doi/10.1126/science.adh2586",
     "[Confidence]": "High"
   },
@@ -347,9 +347,9 @@
     "[Low]": 10,
     "[Typical]": 20,
     "[High]": 35,
-    "[Source]": "Microsoft Research (Branham & Brush 2015)",
-    "[Source URL]": "https://www.microsoft.com/en-us/research/people/sbrush/",
-    "[Confidence]": "High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Document Summarising",
@@ -358,8 +358,8 @@
     "[Low]": 10,
     "[Typical]": 20,
     "[High]": 35,
-    "[Source]": "BCG/Harvard (Dell'Acqua et al. 2023); McKinsey 2023",
-    "[Source URL]": "https://www.hbs.edu/ris/Publication%20Files/24-013_d9b45b68-9e74-42d6-a1c6-c72fb70c7282.pdf",
+    "[Source]": "Dell'Acqua et al. (HBS Working Paper 24-013, 2023)",
+    "[Source URL]": "https://aiinstitute.hbs.edu/navigating-the-jagged-technological-frontier/",
     "[Confidence]": "Medium-High"
   },
   {
@@ -369,8 +369,8 @@
     "[Low]": 16,
     "[Typical]": 35,
     "[High]": 48,
-    "[Source]": "Deloitte (2018); Thomson Reuters (2019)",
-    "[Source URL]": "https://legal.thomsonreuters.com/en/insights",
+    "[Source]": "Brysbaert (J. Mem. Lang. 2019)",
+    "[Source URL]": "https://doi.org/10.1016/j.jml.2019.104047",
     "[Confidence]": "Medium"
   },
   {
@@ -380,8 +380,8 @@
     "[Low]": 6,
     "[Typical]": 12,
     "[High]": 21,
-    "[Source]": "Forrester TEI 2024; NNGroup 2020",
-    "[Source URL]": "https://www.forrester.com/policies/total-economic-impact/",
+    "[Source]": "Brysbaert (J. Mem. Lang. 2019)",
+    "[Source URL]": "https://doi.org/10.1016/j.jml.2019.104047",
     "[Confidence]": "Medium"
   },
   {
@@ -391,9 +391,9 @@
     "[Low]": 3,
     "[Typical]": 8,
     "[High]": 12,
-    "[Source]": "McKinsey 2023; Brynjolfsson et al. (NBER 2023)",
+    "[Source]": "Brynjolfsson, Li & Raymond (NBER 2023)",
     "[Source URL]": "https://www.nber.org/papers/w31161",
-    "[Confidence]": "High"
+    "[Confidence]": "Medium"
   },
   {
     "[Task]": "Email Summarising",
@@ -402,8 +402,8 @@
     "[Low]": 2,
     "[Typical]": 4,
     "[High]": 7,
-    "[Source]": "Dabbish & Kraut (CMU 2006); Mark et al. 2012",
-    "[Source URL]": "https://www.ics.uci.edu/~gmark/Home_page/Welcome.html",
+    "[Source]": "Dabbish & Kraut (CSCW 2006); Mark et al. (CHI 2012)",
+    "[Source URL]": "https://doi.org/10.1145/1180875.1180941",
     "[Confidence]": "Medium"
   },
   {
@@ -413,8 +413,8 @@
     "[Low]": 2,
     "[Typical]": 5,
     "[High]": 9,
-    "[Source]": "Nielsen Norman Group 2023; Microsoft WTI 2024",
-    "[Source URL]": "https://www.nngroup.com/articles/",
+    "[Source]": "Mark, Iqbal & Czerwinski (CHI 2016, Microsoft Research)",
+    "[Source URL]": "https://doi.org/10.1145/2858036.2858262",
     "[Confidence]": "Medium"
   },
   {
@@ -424,9 +424,9 @@
     "[Low]": 4,
     "[Typical]": 10,
     "[High]": 12,
-    "[Source]": "Microsoft Research (Iqbal & Horvitz 2007); McKinsey 2023",
-    "[Source URL]": "https://www.microsoft.com/en-us/research/publication/disruption-and-recovery-of-computing-tasks-field-study-analysis-and-directions/",
-    "[Confidence]": "Medium-High"
+    "[Source]": "Iqbal & Horvitz (CHI 2007, Microsoft Research)",
+    "[Source URL]": "https://doi.org/10.1145/1240624.1240730",
+    "[Confidence]": "Medium"
   },
   {
     "[Task]": "Browser Q&A",
@@ -435,8 +435,8 @@
     "[Low]": 3,
     "[Typical]": 8,
     "[High]": 8,
-    "[Source]": "Microsoft WTI (2023); IDC (2018)",
-    "[Source URL]": "https://www.microsoft.com/en-us/worklab/work-trend-index",
+    "[Source]": "Dillon et al. (Microsoft, arXiv 2025)",
+    "[Source URL]": "https://arxiv.org/abs/2504.11443",
     "[Confidence]": "Medium"
   },
   {
@@ -446,8 +446,8 @@
     "[Low]": 3,
     "[Typical]": 8,
     "[High]": 8,
-    "[Source]": "Microsoft WTI (2023); IDC (2023)",
-    "[Source URL]": "https://www.microsoft.com/en-us/worklab/work-trend-index",
+    "[Source]": "Dillon et al. (Microsoft, arXiv 2025)",
+    "[Source URL]": "https://arxiv.org/abs/2504.11443",
     "[Confidence]": "Low"
   },
   {
@@ -457,8 +457,8 @@
     "[Low]": 3,
     "[Typical]": 8,
     "[High]": 8,
-    "[Source]": "Microsoft WTI (2023); IDC (2018)",
-    "[Source URL]": "https://www.microsoft.com/en-us/worklab/work-trend-index",
+    "[Source]": "Dillon et al. (Microsoft, arXiv 2025)",
+    "[Source URL]": "https://arxiv.org/abs/2504.11443",
     "[Confidence]": "Medium"
   },
   {
@@ -468,8 +468,8 @@
     "[Low]": 3,
     "[Typical]": 8,
     "[High]": 8,
-    "[Source]": "Microsoft WTI (2023); IDC (2018)",
-    "[Source URL]": "https://www.microsoft.com/en-us/worklab/work-trend-index",
+    "[Source]": "Dillon et al. (Microsoft, arXiv 2025)",
+    "[Source URL]": "https://arxiv.org/abs/2504.11443",
     "[Confidence]": "Medium"
   },
   {
@@ -479,8 +479,8 @@
     "[Low]": 3,
     "[Typical]": 8,
     "[High]": 8,
-    "[Source]": "Microsoft WTI (2023); IDC (2018)",
-    "[Source URL]": "https://www.microsoft.com/en-us/worklab/work-trend-index",
+    "[Source]": "Dillon et al. (Microsoft, arXiv 2025)",
+    "[Source URL]": "https://arxiv.org/abs/2504.11443",
     "[Confidence]": "Medium"
   },
   {
@@ -490,8 +490,8 @@
     "[Low]": 3,
     "[Typical]": 8,
     "[High]": 8,
-    "[Source]": "Microsoft WTI (2023); IDC (2018)",
-    "[Source URL]": "https://www.microsoft.com/en-us/worklab/work-trend-index",
+    "[Source]": "Dillon et al. (Microsoft, arXiv 2025)",
+    "[Source URL]": "https://arxiv.org/abs/2504.11443",
     "[Confidence]": "Medium"
   },
   {
@@ -501,9 +501,9 @@
     "[Low]": 6,
     "[Typical]": 15,
     "[High]": 22,
-    "[Source]": "Forrester TEI 2024; HBR (Rogelberg 2019)",
-    "[Source URL]": "https://hbr.org/2019/01/why-your-meetings-stink-and-what-to-do-about-it",
-    "[Confidence]": "High"
+    "[Source]": "Rogelberg et al. (J. Applied Psychology 2006)",
+    "[Source URL]": "https://doi.org/10.1037/0021-9010.91.1.83",
+    "[Confidence]": "Medium"
   },
   {
     "[Task]": "Meeting Scheduling",
@@ -512,9 +512,9 @@
     "[Low]": 5,
     "[Typical]": 12,
     "[High]": 17,
-    "[Source]": "Doodle (2019); HBR (2017)",
-    "[Source URL]": "https://meetings.doodle.com/the-state-of-meetings-report-2019",
-    "[Confidence]": "High"
+    "[Source]": "Cranshaw et al. (CHI 2017, Microsoft Research)",
+    "[Source URL]": "https://doi.org/10.1145/3025453.3025780",
+    "[Confidence]": "Medium"
   },
   {
     "[Task]": "Video Summarising",
@@ -523,9 +523,9 @@
     "[Low]": 12,
     "[Typical]": 30,
     "[High]": 44,
-    "[Source]": "Microsoft WTI 2024; Kaltura 2023",
-    "[Source URL]": "https://www.microsoft.com/en-us/worklab/work-trend-index",
-    "[Confidence]": "Medium-High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Presentation Creation",
@@ -534,9 +534,9 @@
     "[Low]": 21,
     "[Typical]": 42,
     "[High]": 42,
-    "[Source]": "Gartner 2024; BCG 2024",
-    "[Source URL]": "https://www.gartner.com/en/topics/generative-ai",
-    "[Confidence]": "Medium-High"
+    "[Source]": "Dell'Acqua et al. (HBS Working Paper 24-013, 2023)",
+    "[Source URL]": "https://aiinstitute.hbs.edu/navigating-the-jagged-technological-frontier/",
+    "[Confidence]": "Medium"
   },
   {
     "[Task]": "Enterprise Searching",
@@ -545,9 +545,9 @@
     "[Low]": 8,
     "[Typical]": 18,
     "[High]": 25,
-    "[Source]": "IDC (2014); McKinsey (2012)",
-    "[Source URL]": "https://www.idc.com/",
-    "[Confidence]": "High"
+    "[Source]": "McKinsey Global Institute (2012)",
+    "[Source URL]": "https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy",
+    "[Confidence]": "Medium"
   },
   {
     "[Task]": "File Retrieval",
@@ -556,8 +556,8 @@
     "[Low]": 7,
     "[Typical]": 15,
     "[High]": 21,
-    "[Source]": "IDC (2014); McKinsey (2012)",
-    "[Source URL]": "https://www.idc.com/",
+    "[Source]": "McKinsey Global Institute (2012)",
+    "[Source URL]": "https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy",
     "[Confidence]": "Medium"
   },
   {
@@ -567,9 +567,9 @@
     "[Low]": 5,
     "[Typical]": 12,
     "[High]": 19,
-    "[Source]": "HDI (2023); Gartner (2022)",
-    "[Source URL]": "https://www.thinkhdi.com/",
-    "[Confidence]": "High"
+    "[Source]": "McKinsey Global Institute (2012)",
+    "[Source URL]": "https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy",
+    "[Confidence]": "Medium"
   },
   {
     "[Task]": "Multi-source Synthesis",
@@ -589,8 +589,8 @@
     "[Low]": 3,
     "[Typical]": 8,
     "[High]": 8,
-    "[Source]": "Gartner (2021); Microsoft Viva (2022)",
-    "[Source URL]": "https://www.microsoft.com/en-us/microsoft-viva",
+    "[Source]": "McKinsey Global Institute (2012)",
+    "[Source URL]": "https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy",
     "[Confidence]": "Medium"
   },
   {
@@ -600,9 +600,9 @@
     "[Low]": 20,
     "[Typical]": 45,
     "[High]": 62,
-    "[Source]": "BCG (2021); McKinsey (2023)",
-    "[Source URL]": "https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights/the-economic-potential-of-generative-ai-the-next-productivity-frontier",
-    "[Confidence]": "High"
+    "[Source]": "Noy & Zhang (Science 2023)",
+    "[Source URL]": "https://www.science.org/doi/10.1126/science.adh2586",
+    "[Confidence]": "Medium"
   },
   {
     "[Task]": "SharePoint Access",
@@ -611,8 +611,8 @@
     "[Low]": 5,
     "[Typical]": 12,
     "[High]": 16,
-    "[Source]": "Forrester TEI (2022); AIIM (2019)",
-    "[Source URL]": "https://www.aiim.org/",
+    "[Source]": "McKinsey Global Institute (2012)",
+    "[Source URL]": "https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy",
     "[Confidence]": "Medium"
   },
   {
@@ -622,9 +622,9 @@
     "[Low]": 10,
     "[Typical]": 22,
     "[High]": 30,
-    "[Source]": "McKinsey (2012); IDC (2018)",
+    "[Source]": "McKinsey Global Institute (2012)",
     "[Source URL]": "https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy",
-    "[Confidence]": "High"
+    "[Confidence]": "Medium"
   },
   {
     "[Task]": "Coaching",
@@ -633,9 +633,9 @@
     "[Low]": 16,
     "[Typical]": 40,
     "[High]": 40,
-    "[Source]": "ICF (2020); SHRM (2023)",
-    "[Source URL]": "https://coachingfederation.org/research/global-coaching-study",
-    "[Confidence]": "Medium"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Coaching (URL)",
@@ -644,9 +644,9 @@
     "[Low]": 10,
     "[Typical]": 25,
     "[High]": 40,
-    "[Source]": "LinkedIn Learning (2023); Deloitte (2022)",
-    "[Source URL]": "https://learning.linkedin.com/resources/workplace-learning-report",
-    "[Confidence]": "Medium"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "Compliance & Policy",
@@ -655,8 +655,8 @@
     "[Low]": 10,
     "[Typical]": 25,
     "[High]": 40,
-    "[Source]": "Deloitte (2022); Thomson Reuters (2023)",
-    "[Source URL]": "https://www2.deloitte.com/us/en/pages/regulatory/topics/compliance.html",
+    "[Source]": "Martin et al. (arXiv 2024)",
+    "[Source URL]": "https://arxiv.org/abs/2401.16212",
     "[Confidence]": "Medium"
   },
   {
@@ -666,8 +666,8 @@
     "[Low]": 12,
     "[Typical]": 30,
     "[High]": 40,
-    "[Source]": "McKinsey (2022); Forrester (2023)",
-    "[Source URL]": "https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights",
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
     "[Confidence]": "Low"
   },
   {
@@ -677,8 +677,8 @@
     "[Low]": 10,
     "[Typical]": 25,
     "[High]": 40,
-    "[Source]": "Deloitte (2022); Gartner (2023)",
-    "[Source URL]": "https://www2.deloitte.com/us/en/insights.html",
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
     "[Confidence]": "Low"
   },
   {
@@ -688,9 +688,9 @@
     "[Low]": 14,
     "[Typical]": 35,
     "[High]": 40,
-    "[Source]": "SHRM (2023); Deloitte (2023)",
-    "[Source URL]": "https://www.shrm.org/topics-tools/research",
-    "[Confidence]": "High"
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
+    "[Confidence]": "Low"
   },
   {
     "[Task]": "IT & Service Desk",
@@ -699,9 +699,9 @@
     "[Low]": 8,
     "[Typical]": 20,
     "[High]": 32,
-    "[Source]": "HDI (2023); MetricNet (2023)",
-    "[Source URL]": "https://www.thinkhdi.com/library/practices-and-salary-report.aspx",
-    "[Confidence]": "High"
+    "[Source]": "Brynjolfsson, Li & Raymond (NBER 2023)",
+    "[Source URL]": "https://www.nber.org/papers/w31161",
+    "[Confidence]": "Medium-High"
   },
   {
     "[Task]": "Sales & Customer",
@@ -710,9 +710,9 @@
     "[Low]": 14,
     "[Typical]": 35,
     "[High]": 40,
-    "[Source]": "Salesforce (2023); Gartner (2022)",
-    "[Source URL]": "https://www.salesforce.com/resources/research-reports/state-of-sales/",
-    "[Confidence]": "High"
+    "[Source]": "Brynjolfsson, Li & Raymond (NBER 2023)",
+    "[Source URL]": "https://www.nber.org/papers/w31161",
+    "[Confidence]": "Medium"
   },
   {
     "[Task]": "Sensitive Content Interaction",
@@ -721,8 +721,8 @@
     "[Low]": 8,
     "[Typical]": 20,
     "[High]": 32,
-    "[Source]": "Deloitte (2023); Gartner (2022)",
-    "[Source URL]": "https://www2.deloitte.com/us/en/insights/topics/risk-management.html",
+    "[Source]": "Provisional estimate",
+    "[Source URL]": "",
     "[Confidence]": "Low"
   }
 ]

@@ -72,9 +72,14 @@ describe("signal impact fixture", () => {
         }
     });
 
-    it("links every estimate to an https source", () => {
+    it("links every sourced estimate over https and marks the rest provisional", () => {
         for (const row of rows) {
-            expect(String(row["[Source URL]"])).toMatch(/^https:\/\//);
+            const url = String(row["[Source URL]"] ?? "");
+            if (url) expect(url).toMatch(/^https:\/\//);
+            else {
+                expect(String(row["[Research Source]"])).toMatch(/^Provisional/);
+                expect(row["[Confidence]"]).toBe("Low");
+            }
         }
     });
 });
