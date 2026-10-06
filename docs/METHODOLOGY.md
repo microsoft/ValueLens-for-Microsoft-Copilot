@@ -359,6 +359,43 @@ the behaviour.
 | **Workflow action** | For workflow rows, the verb: sending, creating, invoking, updating, reading or deleting |
 | **Plausible behaviour** | For unlicensed users, behaviours that need licensed Copilot are relabelled "Free Chat Workaround (pasting …)": the content was pasted into free Copilot Chat |
 
+#### Agent type classification
+
+Fabric only for now. Every row that involves an agent gets an **agent type** (`Agent_Type`), a
+**publisher**, a **published** flag and a **consolidated name**
+([column definitions](DATA-DICTIONARY.md#agent-type-and-publisher)). The rules read the audit
+agent ID (`CopilotEventData.TargetPlatformAgentId`, else `AgentId`, else `PlatformAgentId`), the
+agent name, `AppIdentity`, `PlatformAgentType` and the workload. The first matching rule wins:
+
+| # | Rule (case-insensitive) | Agent type | Publisher / published | Basis |
+|---|---|---|---|---|
+| 0 | Key in the optional `agent_type_overrides` table (agent ID, then name, then AppIdentity) | The override | From the category | override |
+| 1 | Workload `AIApp` or AppIdentity `AIApp.*` (third-party AI apps such as ChatGPT) | Not an agent | – | – |
+| 2 | Workload or AppIdentity `ConnectedAIApp` (for example Foundry apps) | Custom / third-party AI apps registered in your organisation | Connected app / unknown | documented |
+| 3 | AppIdentity `Copilot.TeamCopilot.*` | Microsoft Facilitator (Teams) | Microsoft / yes | documented |
+| 4 | `customengine` in the agent ID or AppIdentity | Copilot Studio - custom engine agents | Your organisation / unknown | documented |
+| 5 | `CopilotStudio.Declarative` or `Copilot.Studio.Declarative` in the agent ID or AppIdentity | Microsoft 365 Copilot Agent Builder - declarative agents | Your organisation / unknown | documented |
+| 6 | AppIdentity `MicrosoftAgent.*`, agent ID `BuiltIn_*`, or a known Microsoft agent name (Researcher, Analyst, Word Drafting Agent, Prompt Coach, …) | Microsoft first-party agents: **M365 Copilot agents** when AppIdentity is `Copilot.M365Copilot*`; **published** when AppIdentity is `MicrosoftAgent.<name>.P_<id>`, or (with no MicrosoftAgent AppIdentity) the agent ID starts `P_`; otherwise **non-published** | Microsoft / yes, yes, no | documented / observed |
+| 7 | AppIdentity `Copilot.Studio.*` or PlatformAgentType `CopilotStudio` | Copilot Studio - other / standalone agents | Your organisation / unknown | documented |
+| 8 | No agent ID, name or type | Not an agent (plain Copilot chat) | – | – |
+| 9 | Agent ID (else AppIdentity) starts `T_` | Published by your organisation | Your organisation / yes | **inferred** |
+| 10 | … starts `U_` | Shared by creator | User-shared / no | **inferred** |
+| 11 | … starts `P_` | Agent Store package (publisher not identified) | Agent Store / yes | **inferred** |
+| 12 | AppIdentity `Copilot.M365Copilot*` | Microsoft first-party agents - M365 Copilot agents | Microsoft / yes | observed |
+| 13 | Anything else | Unclassified agents | Unknown / unknown | – |
+
+- **The `T_` / `U_` / `P_` prefixes are not documented by Microsoft.** They are a convention seen
+  in real audit data, so these rows are marked `inferred`. Treat them as a best guess and use the
+  overrides table where you know better.
+- **Known Microsoft agent names** are matched ignoring case, spaces and punctuation, so
+  `WordDraftingAgent` and `Word Drafting Agent` are the same agent. The list is
+  `MICROSOFT_AGENT_NAMES` in the processor's helpers cell.
+- **Consolidated name.** All Microsoft first-party rows for one agent share one
+  `Agent_Consolidated_Name` (for example `Researcher`) across agent IDs, AppIdentity values and
+  hosts, so they roll up to one line. Other agents keep their own name. `Agent_LinkID` registry
+  linking ([§2.2](#22-how-agents-are-linked-to-the-registry)) is unchanged and still never uses names.
+- The rules are a port of a Purview audit-log analyser script, and the category names match it.
+
 ### 3.4 Signal → Impact reference
 
 What each Task Breakdown means, the audit signal that produces it, and the time a person would
@@ -972,6 +1009,13 @@ more workloads a day scores full marks for it.
 - **Registry usage fields can be up to a week old.** The registry ingester re-fetches an agent's
   detail (usage, Bot Id, sharing) only when the agent is new or changed, or its cached detail is
   older than `FULL_REFRESH_DAYS` (default 7). `Detail As Of` on each `agents_365` row shows when.
+- **Agent types are partly inferred, and only seen through Copilot interaction records.** The
+  `T_` / `U_` / `P_` agent-ID prefixes behind three categories are not documented by Microsoft
+  ([§3.3](#agent-type-classification)). The Fabric ingester pulls only the `copilotInteraction`
+  record type, so Teams Facilitator (`TeamCopilotInteraction`) and connected AI app
+  (`ConnectedAIAppInteraction`) activity is rare or missing. Adding those record types needs no new
+  permission, but it would change interaction totals, so it is not done by default. Agent types
+  are in the Fabric variant only for now.
 
 ---
 
