@@ -1,0 +1,62 @@
+[
+  {
+    "Chat + Agent Org Data[Organization]": "Sales",
+    "[Licensed Seats]": 44,
+    "[Seats In Use Pct]": 0.5681818181818182,
+    "[Habit Pct]": 0.20408163265306123,
+    "[Skills Per Person]": 5.866666666666666,
+    "[Hours]": 409.9166666666666,
+    "[People]": 30,
+    "[Hours Per Seat Month]": 4.726075205176767
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "IT",
+    "[Licensed Seats]": 39,
+    "[Seats In Use Pct]": 0.6410256410256411,
+    "[Habit Pct]": 0.20454545454545453,
+    "[Skills Per Person]": 6,
+    "[Hours]": 283.68333333333334,
+    "[People]": 30,
+    "[Hours Per Seat Month]": 3.690004896723647
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Legal",
+    "[Licensed Seats]": 35,
+    "[Seats In Use Pct]": 0.7142857142857143,
+    "[Habit Pct]": 0.20512820512820512,
+    "[Skills Per Person]": 5.6,
+    "[Hours]": 231.64999999999998,
+    "[People]": 30,
+    "[Hours Per Seat Month]": 3.3575461309523806
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Marketing",
+    "[Licensed Seats]": 39,
+    "[Seats In Use Pct]": 0.6410256410256411,
+    "[Habit Pct]": 0.20454545454545453,
+    "[Skills Per Person]": 6.1,
+    "[Hours]": 232.41666666666669,
+    "[People]": 30,
+    "[Hours Per Seat Month]": 3.0231548254985756
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "Finance",
+    "[Licensed Seats]": 36,
+    "[Seats In Use Pct]": 0.6944444444444444,
+    "[Habit Pct]": 0.24390243902439024,
+    "[Skills Per Person]": 6.466666666666667,
+    "[Hours]": 213.68333333333337,
+    "[People]": 30,
+    "[Hours Per Seat Month]": 3.011104841820988
+  },
+  {
+    "Chat + Agent Org Data[Organization]": "HR",
+    "[Licensed Seats]": 32,
+    "[Seats In Use Pct]": 0.78125,
+    "[Habit Pct]": 0.24324324324324326,
+    "[Skills Per Person]": 5.866666666666666,
+    "[Hours]": 170.1833333333333,
+    "[People]": 30,
+    "[Hours Per Seat Month]": 2.697893337673611
+  }
+]

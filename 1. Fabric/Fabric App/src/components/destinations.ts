@@ -13,6 +13,7 @@ import {
     Coins,
     Gauge,
     KeyRound,
+    LayoutDashboard,
     MessageSquareQuote,
     PoundSterling,
     Timer,
@@ -37,8 +38,25 @@ import { consumptionConnection, evaluatorConnection } from "@/queries/shared";
  * the report placed on its pages; the destination id doubles as its palette.
  * A `reference` destination holds definitions rather than activity, so it has
  * no filters and sits apart in the sidebar.
+ *
+ * The executive summary comes first and is where the app opens: one page
+ * drawing on the others, each of its panels linking to the destination
+ * that tells that part of the story in full.
  */
 export const destinations = [
+    {
+        id: "executive",
+        label: "Executive summary",
+        blurb: "What Copilot is delivering, and where",
+        icon: LayoutDashboard as LucideIcon,
+        filters: ["dateRange", "organizations"] as FilterKey[],
+        stages: [
+            { id: "the-bottom-line", label: "The bottom line", ready: true },
+            { id: "is-it-growing", label: "Is it growing?", ready: true },
+            { id: "where-it-is-landing", label: "Where it is landing", ready: true },
+            { id: "what-needs-attention", label: "What needs attention", ready: true },
+        ],
+    },
     {
         id: "adoption",
         label: "Adoption",

@@ -7,13 +7,22 @@
 
 import type { ReactNode } from "react";
 import { formatKpi, type KpiFormat } from "@/lib/format-kpi";
+import type { Delta } from "@/lib/month-over-month";
 import { cn } from "@/lib/utils";
+
+/** A month-on-month change, and whether a rise is good news. */
+export interface KpiDelta extends Delta {
+    /** `neutral` for figures, such as credits consumed, where growth is neither good nor bad. */
+    polarity?: "up-good" | "neutral";
+}
 
 interface KpiCardProps {
     label: string;
     value: number | undefined;
     format?: KpiFormat;
     prefix?: string;
+    /** Month-on-month change, shown under the figure. */
+    delta?: KpiDelta;
     /** Smaller supporting figure shown beneath the rule. */
     detail?: ReactNode;
     /** Emphasises the card as the lead figure of its group. */
@@ -25,7 +34,7 @@ interface KpiCardProps {
  * A single figure presented as the focus of its card — oversized tabular
  * numerals over a hairline rule, with the label subordinated above it.
  */
-export function KpiCard({ label, value, format = "whole", prefix, detail, emphasis, className }: KpiCardProps) {
+export function KpiCard({ label, value, format = "whole", prefix, delta, detail, emphasis, className }: KpiCardProps) {
     const isBlank = value === undefined;
 
     return (
@@ -50,12 +59,45 @@ export function KpiCard({ label, value, format = "whole", prefix, detail, emphas
             >
                 {formatKpi(value, format, { prefix })}
             </span>
+            {delta && !isBlank && <KpiDeltaLine delta={delta} />}
             {detail && (
                 <div className="border-t border-border pt-200 text-[length:var(--text-200)] leading-300 text-muted-foreground">
                     {detail}
                 </div>
             )}
         </div>
+    );
+}
+
+const DELTA_GLYPH = { up: "▲", down: "▼", flat: "" } as const;
+const DELTA_WORD = { up: "Up", down: "Down", flat: "" } as const;
+
+/**
+ * The arrow line: a rise is teal and a fall coral, unless the figure is
+ * neutral (credits), where either way is simply muted.
+ */
+function KpiDeltaLine({ delta }: { delta: KpiDelta }) {
+    const { direction, amount, comparison, polarity = "up-good" } = delta;
+    const tone =
+        direction === "flat" || polarity === "neutral"
+            ? "text-muted-foreground"
+            : direction === "up"
+              ? "text-positive"
+              : "text-negative";
+
+    return (
+        <span className="flex flex-wrap items-baseline gap-x-100 text-[length:var(--text-200)] leading-200">
+            <span className={cn("font-semibold tabular-nums", tone)}>
+                {direction !== "flat" && (
+                    <>
+                        <span aria-hidden="true">{DELTA_GLYPH[direction]} </span>
+                        <span className="sr-only">{DELTA_WORD[direction]} </span>
+                    </>
+                )}
+                {amount}
+            </span>
+            <span className="text-muted-foreground">{comparison}</span>
+        </span>
     );
 }
 
