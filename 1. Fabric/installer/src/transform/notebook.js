@@ -127,6 +127,8 @@ for _key, _table in _tables.items():
     _summary['tables'][_key] = _info
 # How many licensed users match Copilot activity, from the notebook's overlap check.
 _summary['identity'] = globals().get('overlap_summary')
+# Why the audit table is empty, if the processor left out every record as test activity.
+_summary['auditExcluded'] = globals().get('audit_excluded')
 
 _path = '/lakehouse/default/${DATA_CHECK_FILE}'
 _os.makedirs(_os.path.dirname(_path), exist_ok=True)
