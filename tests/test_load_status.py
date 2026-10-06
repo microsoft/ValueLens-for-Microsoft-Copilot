@@ -56,6 +56,7 @@ class LoadStatusTests(unittest.TestCase):
             "signIn": {"errorCode": "2011", "message": "AADSTS7000215: Invalid client secret provided."},
             "timeout": {"errorCode": "2104", "message": "The notebook timed out after 2 hours"},
             "noData": {"errorCode": "2011", "message": "PATH_NOT_FOUND: Files/agent365/agents.csv"},
+            "notSynced": {"errorCode": "2011", "message": "Table 'copilot_interactions_curated' is not in database"},
         }
         for kind, error in cases.items():
             with self.subTest(kind=kind):

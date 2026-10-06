@@ -105,6 +105,9 @@ test('classifyFailure names the usual reasons in plain words', () => {
   assert.equal(classifyFailure({ message: 'AADSTS7000215: Invalid client secret' }).kind, 'signIn');
   assert.equal(classifyFailure({ errorCode: '2011', message: 'Forbidden' }).kind, 'signIn');
   assert.equal(classifyFailure({ message: 'The activity timed out' }).kind, 'timeout');
+  const lag = classifyFailure({ errorCode: '2011', message: "RuntimeError: The refresh ended as Failed. Table 'copilot_interactions_curated' is not in database" });
+  assert.equal(lag.kind, 'notSynced');
+  assert.ok(lag.fix.includes(RERUN));
   const other = classifyFailure({ message: 'KeyError: tenant\n  at line 3' });
   assert.equal(other.kind, 'other');
   assert.equal(other.text, 'It stopped with an error: KeyError: tenant');
