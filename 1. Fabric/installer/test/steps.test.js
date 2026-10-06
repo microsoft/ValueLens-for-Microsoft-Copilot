@@ -8,7 +8,7 @@ import { ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, freeN
 import { ensureConsent } from '../src/steps/identity.js';
 import { connectionName } from '../src/steps/model.js';
 import { APP_NAME, lakehouseNameFrom, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
-import { capacityBusy, chooseLoad, historyLoaded, printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
+import { BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, chooseLoad, historyLoaded, printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
 import { DATA_CHECK_FILE } from '../src/transform/notebook.js';
 import { PIPELINE_CHANGE, PIPELINE_VERSION, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
 import { fakeCtx, fakeFabric, fakeUi } from './fakes.js';
@@ -626,6 +626,31 @@ test('data check runs the notebook and prints the summary it saved', async () =>
   assert.match(text, /! Org data: 0 rows/);
   assert.match(text, /✓ Microsoft 365 activity: 118 rows, 2026-09-06 to 2026-09-29/);
   assert.match(text, /Agents: not loaded/);
+});
+
+test('data check waits and tries again while the pipeline\'s session holds the capacity', async () => {
+  const fabric = fakeFabric();
+  const busy = { status: 'Failed', failureReason: { errorCode: 'RequestExecutionFailed', message: BUSY } };
+  fabric.jobs.push(busy, { status: 'Completed' });
+  const oneLake = { readJson: async () => ({ checkedAt: '2026-06-01T12:30:00+00:00', tables: { licensed: { rows: 5 } } }) };
+  const ui = fakeUi();
+  const { ctx, config, sleeps } = fakeCtx({ fabric: fabric.api, oneLake, ui: ui.ui });
+  config.fabric.notebooks.dataCheck = 'nb-check';
+  assert.ok(await runDataCheck(ctx));
+  assert.deepEqual(fabric.calls, ['runJob RunNotebook', 'runJob RunNotebook']);
+  assert.ok(sleeps.includes(BUSY_WAIT_MS));
+  assert.match(ui.text(), /Data check: Fabric's capacity is still busy\. Trying again in 5 minutes\./);
+
+  const again = fakeFabric();
+  for (let i = 0; i <= BUSY_RETRIES; i++) again.jobs.push(busy);
+  const ui2 = fakeUi();
+  const t = fakeCtx({ fabric: again.api, oneLake, ui: ui2.ui });
+  t.config.fabric.notebooks.dataCheck = 'nb-check';
+  assert.equal(await runDataCheck(t.ctx), null);
+  assert.equal(again.calls.length, BUSY_RETRIES + 1);
+  const text = ui2.text();
+  assert.match(text, /Fabric's capacity was too busy to start a notebook\. Nothing is lost\./);
+  assert.doesNotMatch(text, /Livy session/, 'the raw error is left out when the reason is a busy capacity');
 });
 
 test('check runs the data check on its own, and needs its notebook', async () => {
