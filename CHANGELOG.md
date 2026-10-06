@@ -16,6 +16,24 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-06 — Analytics Hub installer 0.2.5
+
+The installer bundles the notebooks and templates when it is built, so this release brings
+everything merged since 0.2.4 to installer users:
+
+- the **Data sources** screen, with the API, a CSV upload or Skip for every source, one drop
+  folder for CSV exports, and product feedback;
+- the Viva Insights Dataflow for Cowork credits, the Power Automate flows for product feedback
+  and Copilot Studio credits, and the Analytics Hub names;
+- agent type, publisher and consolidated name in the audit processor;
+- one shared Spark session per run, a card for each source, `dbo.load_log`, **Rerun failed
+  loads**, the SQL endpoint sync before the model refresh, and a data check that explains an
+  empty Copilot interactions table;
+- the Fabric App's Executive summary page.
+
+To update, download the installer again, open it and choose **Repair or change**.
+---
+
 ## 2026-10-06 — Analytics Hub installer: fewer busy-capacity failures, and clearer ones
 
 - **One Spark session per run.** The pipeline's notebooks now share a high-concurrency Spark
