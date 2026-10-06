@@ -35,6 +35,10 @@ Deployment instructions do **not** live here. They live in the path READMEs:
   Lakehouse SQL endpoints to sync before it refreshes the model. Before, a refresh straight after
   a load could fail with *Table '…' is not in database*. If it still happens, the card says so
   and suggests a rerun.
+- **An empty Copilot interactions table says why.** When the audit log only held test or admin
+  activity, such as Copilot Studio test runs (*Maker evaluation*), the Audit Log Processor leaves
+  all of it out and the table is empty. The data check now counts what was left out and why,
+  instead of just reporting 0 rows.
 
 Installer users get this in the next installer release.
 
