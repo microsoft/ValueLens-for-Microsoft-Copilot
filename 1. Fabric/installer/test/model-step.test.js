@@ -31,7 +31,7 @@ test('semantic model: created from the template, left alone on re-run, updated w
   await ensureSemanticModel(t.ctx);
   const item = t.fabric.items.find((i) => i.type === 'SemanticModel');
   assert.ok(item);
-  assert.equal(item.displayName, 'ValueLens Model');
+  assert.equal(item.displayName, 'Analytics Hub Model');
   assert.deepEqual(item.content.parts.map((/** @type {any} */ p) => p.path), ['model.bim', 'definition.pbism']);
   const bim = modelBim(item);
   assert.ok(bim.model.expressions.find((/** @type {any} */ e) => e.name === 'Fabric SQL Endpoint').expression.startsWith('"abc.datawarehouse.fabric.microsoft.com"'));
@@ -41,12 +41,12 @@ test('semantic model: created from the template, left alone on re-run, updated w
 
   t.config.semanticModel.bound = true;
   await ensureSemanticModel(t.ctx);
-  assert.deepEqual(t.fabric.calls, ['createSemanticModel ValueLens Model']);
+  assert.deepEqual(t.fabric.calls, ['createSemanticModel Analytics Hub Model']);
   assert.equal(t.config.semanticModel.bound, true);
 
   t.config.modules.agent365 = !t.config.modules.agent365;
   await ensureSemanticModel(t.ctx);
-  assert.deepEqual(t.fabric.calls.slice(1), ['updateSemanticModel ValueLens Model']);
+  assert.deepEqual(t.fabric.calls.slice(1), ['updateSemanticModel Analytics Hub Model']);
   assert.equal(t.config.semanticModel.bound, false, 'an update needs the connection bound again');
 
   await ensureSemanticModel(t.ctx, { force: true });
@@ -56,15 +56,15 @@ test('semantic model: created from the template, left alone on re-run, updated w
 test('semantic model: waits for the SQL endpoint; a same-name model that is not ours is left alone', async () => {
   const t = setup();
   t.fabric.sqlStates.push({ provisioningStatus: 'InProgress' }, { connectionString: null });
-  const existing = t.fabric.add('SemanticModel', 'ValueLens Model', 'theirs');
+  const existing = t.fabric.add('SemanticModel', 'Analytics Hub Model', 'theirs');
   await ensureSemanticModel(t.ctx);
   assert.equal(t.sleeps.length, 2);
   assert.deepEqual(t.ui.asked, [], 'never asks to replace it');
   assert.notEqual(t.config.semanticModel.id, existing.id);
-  assert.equal(t.config.semanticModel.name, 'ValueLens Model 2');
-  assert.deepEqual(t.fabric.calls, ['createSemanticModel ValueLens Model 2']);
+  assert.equal(t.config.semanticModel.name, 'Analytics Hub Model 2');
+  assert.deepEqual(t.fabric.calls, ['createSemanticModel Analytics Hub Model 2']);
   assert.equal(existing.content, 'theirs');
-  assert.match(t.ui.text(), /"ValueLens Model" is already in the workspace/);
+  assert.match(t.ui.text(), /"Analytics Hub Model" is already in the workspace/);
 
   const failed = setup();
   failed.fabric.sqlStates.push({ provisioningStatus: 'Failed' });
@@ -76,7 +76,7 @@ test('semantic model: a deleted model is deployed again', async () => {
   Object.assign(t.config.semanticModel, { id: 'gone', bound: true, signature: 'x' });
   await ensureSemanticModel(t.ctx);
   assert.notEqual(t.config.semanticModel.id, 'gone');
-  assert.deepEqual(t.fabric.calls, ['createSemanticModel ValueLens Model']);
+  assert.deepEqual(t.fabric.calls, ['createSemanticModel Analytics Hub Model']);
   assert.match(t.ui.text(), /was deleted/);
 });
 
@@ -92,7 +92,7 @@ test('connection: the app gets Viewer and its own secret; the model is bound to 
   await ensureModelConnection(t.ctx);
   const sm = t.config.semanticModel;
   const name = connectionName('ws-1');
-  assert.deepEqual(t.fabric.calls, ['addRoleAssignment sp-1 Viewer', `createConnection ${name}`, `bindConnection ValueLens Model ${sm.connectionId} abc.datawarehouse.fabric.microsoft.com;ValueLens`]);
+  assert.deepEqual(t.fabric.calls, ['addRoleAssignment sp-1 Viewer', `createConnection ${name}`, `bindConnection Analytics Hub Model ${sm.connectionId} abc.datawarehouse.fabric.microsoft.com;ValueLens`]);
   assert.deepEqual(t.graph.calls, [`addPassword ${CONNECTION_SECRET_NAME}`]);
   const body = /** @type {any} */ (t.fabric.connections[0].body);
   assert.equal(body.connectivityType, 'ShareableCloud');

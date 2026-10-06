@@ -15,6 +15,7 @@ import { ensureModelConnection, ensureSemanticModel } from '../src/steps/model.j
 import { MARKER, prepareNotebook, cellText } from '../src/transform/notebook.js';
 import { addCopilotPaygSpend, PAYG_SOURCE_TABLE, PAYG_TABLE } from '../src/transform/payg.js';
 import { buildPipeline, CONSUMPTION_REFRESH_ACTIVITY, findActivity, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
+import { UPLOAD_DIR } from '../src/uploads.js';
 import { fakeCtx, fakeFabric, fakeGraph, fakePowerBi, fakeUi, httpError, realSources } from './fakes.js';
 
 const SUB = '9c2a9418-0000-0000-0000-000000000000';
@@ -503,14 +504,30 @@ test('summary: Azure AI status and the Studio and Cowork upload steps', () => {
   const t = setup();
   Object.assign(t.config.consumption, { azureSubscriptionId: SUB, azureSubscriptionName: 'AI' });
   Object.assign(t.config.consumption.model, { id: 'cc-1', bound: true });
+  Object.assign(t.config.dataSources, { studioCredits: 'csv', coworkCredits: 'csv' });
   consumptionSummary(t.ctx);
   const text = t.ui.text();
   assert.match(text, /left out until ValueLens Data Collector has Reader, Cost Management Reader, Monitoring Reader on AI/);
   assert.match(text, /datasets\/cc-1/);
-  assert.match(text, new RegExp(STUDIO_LANDING));
-  assert.match(text, /Dataflow Gen2/);
-  assert.match(text, /viva_credits_weekly/);
+  assert.match(text, /Copilot Studio credits {2}\(upload the exports\)/);
+  assert.match(text, new RegExp(`Drop them in .+ > ${UPLOAD_DIR}`));
+  assert.match(text, /Cowork credits {2}\(upload the export\)/);
+  assert.match(text, /choose Connected \(Dataflow\)/);
   assert.doesNotMatch(text, /PAYG:/, 'not while Azure AI is off');
+
+  const flowing = setup();
+  flowing.config.modules.consumption = true;
+  Object.assign(flowing.config.dataSources, { studioCredits: 'csv', coworkCredits: 'api' });
+  Object.assign(flowing.config.uploads, { studioFlow: true, flowIds: { studio: 'flow-1' } });
+  flowing.config.consumption.dataflowId = 'df-1';
+  consumptionSummary(flowing.ctx);
+  assert.match(flowing.ui.text(), /a daily flow reads the environment and agent figures/);
+  assert.match(flowing.ui.text(), /Dataflow AnalyticsHub_Cowork_Credits, refreshed by the pipeline/);
+
+  const skipped = setup();
+  Object.assign(skipped.config.dataSources, { studioCredits: 'skip', coworkCredits: 'skip' });
+  consumptionSummary(skipped.ctx);
+  assert.doesNotMatch(skipped.ui.text(), /Copilot Studio credits|Cowork credits/);
 
   const on = setup();
   Object.assign(on.config.consumption, {

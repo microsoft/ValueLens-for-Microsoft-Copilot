@@ -115,6 +115,19 @@ export function fakeFabric() {
       find(id).content = content;
       return null;
     },
+    /** @param {string} _ws @param {string} name */
+    createDataflow: async (_ws, name) => {
+      calls.push(`createDataflow ${name}`);
+      fail('createDataflow');
+      return { id: add('Dataflow', name, null).id };
+    },
+    /** @param {string} _ws @param {string} id @param {any} def */
+    updateDataflow: async (_ws, id, def) => {
+      calls.push(`updateDataflow ${find(id).displayName}`);
+      fail('updateDataflow');
+      find(id).content = def;
+      return null;
+    },
     /** @param {string} _ws @param {string} name @param {any} def */
     createPipeline: async (_ws, name, def) => {
       calls.push(`createPipeline ${name}`);
@@ -197,6 +210,12 @@ export function fakeFabric() {
     addRoleAssignment: async (_ws, id, type, role) => {
       calls.push(`addRoleAssignment ${id} ${role}`);
       roles.push({ id, principal: { id, type }, role });
+      return null;
+    },
+    /** @param {string} _ws @param {string} id @param {string} role */
+    updateRoleAssignment: async (_ws, id, role) => {
+      calls.push(`updateRoleAssignment ${id} ${role}`);
+      Object.assign(/** @type {any} */ (roles.find((r) => r.id === id)), { role });
       return null;
     },
     listConnections: async () => connections.map(({ id, displayName }) => ({ id, displayName })),

@@ -6,7 +6,8 @@ import { emptyConfig } from '../src/config.js';
 import { runCommand } from '../src/install.js';
 import { ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, freeName } from '../src/steps/fabric.js';
 import { ensureConsent } from '../src/steps/identity.js';
-import { lakehouseNameFrom, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
+import { connectionName } from '../src/steps/model.js';
+import { APP_NAME, lakehouseNameFrom, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
 import { capacityBusy, chooseLoad, historyLoaded, printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
 import { DATA_CHECK_FILE } from '../src/transform/notebook.js';
 import { PIPELINE_CHANGE, PIPELINE_VERSION, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
@@ -45,11 +46,11 @@ test('notebooks: a deleted one is deployed again; one with the same name that is
   const { ctx, config } = fakeCtx({ fabric: fabric.api });
   await ensureNotebooks(ctx);
 
-  const gone = fabric.items.findIndex((i) => i.displayName === 'ValueLens_Data_Check');
+  const gone = fabric.items.findIndex((i) => i.displayName === 'AnalyticsHub_Data_Check');
   fabric.items.splice(gone, 1);
   fabric.calls.length = 0;
   await ensureNotebooks(ctx);
-  assert.deepEqual(fabric.calls, ['createNotebook ValueLens_Data_Check']);
+  assert.deepEqual(fabric.calls, ['createNotebook AnalyticsHub_Data_Check']);
   assert.ok(config.fabric.notebooks.dataCheck);
 
   const other = fakeFabric();
@@ -76,7 +77,7 @@ test('freeName: numbers a clash, with a space for names that have spaces', () =>
   assert.equal(freeName('ValueLens', []), 'ValueLens');
   assert.equal(freeName('ValueLens', ['valuelens']), 'ValueLens_2');
   assert.equal(freeName('ValueLens', ['ValueLens', 'ValueLens_2']), 'ValueLens_3');
-  assert.equal(freeName('ValueLens Model', ['ValueLens Model']), 'ValueLens Model 2');
+  assert.equal(freeName('Analytics Hub Model', ['Analytics Hub Model']), 'Analytics Hub Model 2');
 });
 
 test('plan: a new Lakehouse needs a name no Lakehouse in the workspace has', () => {
@@ -98,8 +99,8 @@ test('plan: spaces and hyphens in a Lakehouse name become underscores', () => {
 test('plan: new items get names nothing in the workspace has; a name someone chose stays', async () => {
   const fabric = fakeFabric();
   fabric.add('Notebook', 'Copilot_Audit_Log_Processor', null);
-  fabric.add('DataPipeline', 'ValueLens_Pipeline', null);
-  fabric.add('SemanticModel', 'ValueLens Model', null);
+  fabric.add('DataPipeline', 'AnalyticsHub_Pipeline', null);
+  fabric.add('SemanticModel', 'Analytics Hub Model', null);
   const ui = fakeUi();
   const { ctx, config } = fakeCtx({ fabric: fabric.api, ui: ui.ui });
   config.semanticModel.enabled = true;
@@ -107,19 +108,19 @@ test('plan: new items get names nothing in the workspace has; a name someone cho
   await reserveNames(ctx);
   assert.equal(fabric.calls.length, 0, 'planning changes nothing');
   assert.equal(config.fabric.notebookNames?.processor, 'Copilot_Audit_Log_Processor_2');
-  assert.equal(config.fabric.notebookNames?.dataCheck, 'ValueLens_Data_Check');
-  assert.equal(config.fabric.pipelineName, 'ValueLens_Pipeline_2');
-  assert.equal(config.semanticModel.name, 'ValueLens Model 2');
-  assert.match(ui.text(), /already has "Copilot_Audit_Log_Processor", "ValueLens_Pipeline", "ValueLens Model", not from this install/);
+  assert.equal(config.fabric.notebookNames?.dataCheck, 'AnalyticsHub_Data_Check');
+  assert.equal(config.fabric.pipelineName, 'AnalyticsHub_Pipeline_2');
+  assert.equal(config.semanticModel.name, 'Analytics Hub Model 2');
+  assert.match(ui.text(), /already has "Copilot_Audit_Log_Processor", "AnalyticsHub_Pipeline", "Analytics Hub Model", not from this install/);
   const review = planReview(ctx);
   assert.match(String(review.creates.find((i) => i.kind === 'Notebooks')?.detail), /Copilot_Audit_Log_Processor_2/);
-  assert.equal(review.creates.find((i) => i.kind === 'Pipeline')?.name, 'ValueLens_Pipeline_2');
+  assert.equal(review.creates.find((i) => i.kind === 'Pipeline')?.name, 'AnalyticsHub_Pipeline_2');
 
   fabric.items.length = 0;
   config.semanticModel.name = 'Contoso Model';
   await reserveNames(ctx);
   assert.equal(config.fabric.notebookNames?.processor, 'Copilot_Audit_Log_Processor', 'back to the usual name once it is free');
-  assert.equal(config.fabric.pipelineName, 'ValueLens_Pipeline');
+  assert.equal(config.fabric.pipelineName, 'AnalyticsHub_Pipeline');
   assert.equal(config.semanticModel.name, 'Contoso Model');
 
   await ensureNotebooks(ctx);
@@ -141,17 +142,45 @@ test('lakehouse: never writes to one it did not create', async () => {
 
 test('pipeline: one with the same name that is not ours is left alone', async () => {
   const fabric = fakeFabric();
-  const theirs = fabric.add('DataPipeline', 'ValueLens_Pipeline', 'theirs');
+  const theirs = fabric.add('DataPipeline', 'AnalyticsHub_Pipeline', 'theirs');
   const ui = fakeUi();
   const { ctx, config } = fakeCtx({ fabric: fabric.api, ui: ui.ui });
   await ensureNotebooks(ctx);
   fabric.calls.length = 0;
   await ensurePipeline(ctx);
   assert.deepEqual(ui.asked, []);
-  assert.deepEqual(fabric.calls, ['createPipeline ValueLens_Pipeline_2']);
+  assert.deepEqual(fabric.calls, ['createPipeline AnalyticsHub_Pipeline_2']);
   assert.equal(theirs.content, 'theirs');
   assert.notEqual(config.fabric.pipelineId, theirs.id);
-  assert.equal(config.fabric.pipelineName, 'ValueLens_Pipeline_2');
+  assert.equal(config.fabric.pipelineName, 'AnalyticsHub_Pipeline_2');
+});
+
+test('names: new installs use Analytics Hub names; an older install keeps the names its items have', async () => {
+  const config = emptyConfig();
+  assert.equal(config.semanticModel.name, 'Analytics Hub Model');
+  assert.equal(config.consumption.model.name, 'Analytics Hub Consumption Model');
+  assert.equal(config.agentEvaluator.model.name, 'Analytics Hub Agent Evaluator Model');
+  assert.equal(APP_NAME, 'Analytics Hub Data Collector');
+  assert.equal(connectionName('12345678-aaaa'), 'Analytics Hub SQL 12345678');
+
+  const fabric = fakeFabric();
+  const ui = fakeUi();
+  const old = fakeCtx({ fabric: fabric.api, ui: ui.ui });
+  await ensureNotebooks(old.ctx);
+  const check = /** @type {string} */ (old.config.fabric.notebooks.dataCheck);
+  const item = fabric.items.find((i) => i.id === check);
+  if (item) item.displayName = 'ValueLens_Data_Check';
+  old.config.fabric.notebookNames = {};
+  old.config.fabric.pipelineId = fabric.add('DataPipeline', 'ValueLens_Pipeline', {}).id;
+  delete old.config.fabric.pipelineName;
+  fabric.calls.length = 0;
+  await ensureNotebooks(old.ctx, { force: true });
+  await ensurePipeline(old.ctx);
+  assert.equal(old.config.fabric.notebookNames.dataCheck, 'ValueLens_Data_Check');
+  assert.equal(old.config.fabric.pipelineName, 'ValueLens_Pipeline');
+  assert.ok(fabric.calls.includes('updateNotebook ValueLens_Data_Check'));
+  assert.ok(fabric.calls.includes('updatePipeline ValueLens_Pipeline'));
+  assert.ok(!fabric.calls.some((c) => c.startsWith('create')), 'nothing is created under the new names');
 });
 
 test('pipeline: created once, left alone on re-run, updated when modules change', async () => {
@@ -162,7 +191,7 @@ test('pipeline: created once, left alone on re-run, updated when modules change'
   fabric.calls.length = 0;
 
   await ensurePipeline(ctx);
-  assert.deepEqual(fabric.calls, ['createPipeline ValueLens_Pipeline']);
+  assert.deepEqual(fabric.calls, ['createPipeline AnalyticsHub_Pipeline']);
   const pipeline = fabric.items.find((i) => i.type === 'DataPipeline');
   assert.equal(config.fabric.pipelineId, pipeline?.id, 'ID found by name when the create returns no body');
   assert.equal(config.fabric.pipelineModules, 'core,orgData,m365Activity');
@@ -176,7 +205,7 @@ test('pipeline: created once, left alone on re-run, updated when modules change'
 
   config.modules.m365Activity = false;
   await ensurePipeline(ctx);
-  assert.deepEqual(fabric.calls, ['updatePipeline ValueLens_Pipeline']);
+  assert.deepEqual(fabric.calls, ['updatePipeline AnalyticsHub_Pipeline']);
   assert.equal(config.fabric.pipelineModules, 'core,orgData');
   assert.match(ui.text(), /replaces the pipeline definition/);
 });
@@ -194,7 +223,7 @@ test('pipeline: rewritten when a deleted notebook comes back with a new ID', asy
   assert.notEqual(config.fabric.notebooks.processor, old);
   fabric.calls.length = 0;
   await ensurePipeline(ctx);
-  assert.deepEqual(fabric.calls, ['updatePipeline ValueLens_Pipeline']);
+  assert.deepEqual(fabric.calls, ['updatePipeline AnalyticsHub_Pipeline']);
   assert.equal(config.fabric.pipelineModules, 'core,orgData,m365Activity');
 });
 
@@ -202,8 +231,8 @@ test('pipeline: declining an update keeps the old module signature', async () =>
   const fabric = fakeFabric();
   const { ctx, config } = fakeCtx({ fabric: fabric.api, ui: fakeUi({ answers: [false] }).ui });
   await ensureNotebooks(ctx);
-  config.fabric.pipelineId = fabric.add('DataPipeline', 'ValueLens_Pipeline', {}).id;
-  config.fabric.pipelineName = 'ValueLens_Pipeline';
+  config.fabric.pipelineId = fabric.add('DataPipeline', 'AnalyticsHub_Pipeline', {}).id;
+  config.fabric.pipelineName = 'AnalyticsHub_Pipeline';
   config.fabric.pipelineModules = 'core';
   fabric.calls.length = 0;
 
@@ -225,7 +254,7 @@ test('pipeline: one an older installer built is updated to run in lanes', async 
   delete config.fabric.pipelineVersion;
   fabric.calls.length = 0;
   await ensurePipeline(ctx);
-  assert.deepEqual(fabric.calls, ['updatePipeline ValueLens_Pipeline']);
+  assert.deepEqual(fabric.calls, ['updatePipeline AnalyticsHub_Pipeline']);
   assert.ok(ui.text().includes(PIPELINE_CHANGE));
   assert.equal(config.fabric.pipelineVersion, PIPELINE_VERSION);
 
@@ -412,7 +441,7 @@ test('a run that completed with a failed load says which, and still checks the d
   const ui = fakeUi();
   const { ctx, config } = fakeCtx({ fabric: fabric.api, oneLake, ui: ui.ui });
   config.fabric.pipelineId = 'pipe-1';
-  config.fabric.pipelineName = 'ValueLens_Pipeline';
+  config.fabric.pipelineName = 'AnalyticsHub_Pipeline';
   config.fabric.notebooks.dataCheck = 'nb-check';
   config.firstRun = { jobId: 'job-0', status: 'Completed' };
 
@@ -421,7 +450,7 @@ test('a run that completed with a failed load says which, and still checks the d
   assert.match(text, /✓ Pipeline finished in 30m/);
   assert.match(text, /! Org Data Ingester failed/);
   assert.doesNotMatch(text, /Conditionally/);
-  assert.match(text, /To see why, open ValueLens_Pipeline in Fabric/);
+  assert.match(text, /To see why, open AnalyticsHub_Pipeline in Fabric/);
   assert.deepEqual(fabric.calls, ['runJob Pipeline', 'runJob RunNotebook'], 'the data check still runs');
   assert.match(text, /✓ Licensed users: 5 rows/);
 });
