@@ -64,6 +64,10 @@ export const CAPACITY_BUSY = /TooManyRequestsForCapacity|(?:code|status)[\s:'"=-
  */
 export const capacityBusy = (e) => !!e && (String(e.errorCode ?? '') === '430' || CAPACITY_BUSY.test(`${e.errorCode ?? ''} ${e.message ?? ''}`));
 
+/** Times work turned away by a busy capacity is tried again, and how long to wait first. */
+export const BUSY_RETRIES = 2;
+export const BUSY_WAIT_MS = 5 * 60_000;
+
 /**
  * @param {Ctx} ctx
  * @param {string} again  The command that starts the work again.
@@ -90,8 +94,8 @@ function reportJob(ctx, job, what, again) {
       return true;
     case 'Failed':
       ui.fail(`${what} failed${took}`);
-      if (job.failureReason?.message) ui.info(String(job.failureReason.message).slice(0, 1200));
       if (again && capacityBusy(job.failureReason)) busyNote(ctx, again);
+      else if (job.failureReason?.message) ui.info(String(job.failureReason.message).slice(0, 1200));
       return false;
     default:
       if (TERMINAL.has(job?.status)) ui.warn(`${what} ended with status ${job.status}`);
@@ -289,8 +293,16 @@ export async function runDataCheck(ctx) {
     ui.warn('The data check notebook isn\'t deployed.');
     return null;
   }
-  const url = await api.fabric.runJob(f.workspaceId, notebookId, 'RunNotebook');
-  const job = await waitForJob(ctx, url, 'Data check', { pollMs: 15_000, timeoutMs: 45 * 60_000 });
+  /** @type {any} */
+  let job;
+  for (let attempt = 0; ; attempt++) {
+    const url = await api.fabric.runJob(f.workspaceId, notebookId, 'RunNotebook');
+    job = await waitForJob(ctx, url, 'Data check', { pollMs: 15_000, timeoutMs: 45 * 60_000 });
+    // Straight after a run, the pipeline's Spark session can hold the capacity for a few minutes.
+    if (job?.status !== 'Failed' || !capacityBusy(job.failureReason) || attempt >= BUSY_RETRIES) break;
+    ui.warn(`Data check: Fabric's capacity is still busy. Trying again in ${BUSY_WAIT_MS / 60_000} minutes.`);
+    await ctx.sleep(BUSY_WAIT_MS);
+  }
   if (!reportJob(ctx, job, 'Data check', 'check')) return null;
   const summary = await api.oneLake.readJson(f.workspaceId, f.lakehouseId, DATA_CHECK_FILE).catch(() => null);
   if (!summary) {
