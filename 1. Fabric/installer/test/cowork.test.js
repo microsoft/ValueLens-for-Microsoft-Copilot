@@ -83,7 +83,7 @@ test('ensureCoworkDataflow: created once, left alone on re-run, redefined when t
   assert.ok(t.config.consumption.dataflowId);
   assert.equal(t.config.consumption.dataflowName, COWORK_DATAFLOW_NAME);
   assert.ok(coworkDataflowOn(t.config));
-  assert.match(t.ui.text(), /sign in to Viva Insights and the Lakehouse/);
+  assert.match(t.ui.text(), /Home > Manage connections,[\s\S]*sign in to Viva Insights[\s\S]*wait until it says the Dataflow is published/);
 
   t.fabric.calls.length = 0;
   await ensureCoworkDataflow(t.ctx);
