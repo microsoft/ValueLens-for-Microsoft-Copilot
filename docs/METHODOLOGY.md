@@ -16,7 +16,9 @@ carries the same caveats inside the report.
 1. [What the data can and can't tell you](#1-what-the-data-can-and-cant-tell-you)
 2. [From audit record to dashboard row](#2-from-audit-record-to-dashboard-row)
 3. [How each interaction is classified](#3-how-each-interaction-is-classified), including
-   [from signal to task category](#32-from-signal-to-task-category)
+   [from signal to task category](#32-from-signal-to-task-category),
+   [the Signal → Impact reference](#34-signal--impact-reference) and
+   [the app host reference](#35-app-host-reference)
 4. [Counting units](#4-counting-units)
 5. [Estimated value](#5-estimated-value)
 6. [Page by page](#6-page-by-page)
@@ -234,7 +236,8 @@ Research). Failing that, the open file and then the app host decide:
 
 The app host fills in whenever the resource doesn't say, so many behaviours come from the host
 application rather than the action. Creation-heavy work is under-counted next to summarising and
-review, so treat the task mix as indicative. The **📖 Metric Glossary** explains this under App host.
+review, so treat the task mix as indicative. The **📖 Metric Glossary** explains this under App host,
+and [§3.5](#35-app-host-reference) lists every app host value.
 
 #### Step 2: agent keywords
 
@@ -287,7 +290,8 @@ processors can produce has a row, so no Copilot or agent row is left without a c
 The `Behavior Value Map` also gives each behaviour a one-line **Description**, shown beside its use
 case on the **🧬 Appendix: Signal → Impact** page and in the Fabric App. All 48 are listed in
 [`task-descriptions.json`](../1.%20Fabric/Fabric%20App/src/queries/appendix/task-descriptions.json),
-which the Fabric App reads. A test keeps that file and every template the same.
+which the Fabric App reads. A test keeps that file and every template the same. [§3.4](#34-signal--impact-reference)
+lists each description with its signal and time band.
 
 | Task category | Behaviours |
 |---|---|
@@ -354,6 +358,198 @@ the behaviour.
 | **AI model** | The logged model name, bucketed into GPT-4, GPT-4.1, GPT-5, o-series, Claude, Gemini, LLaMA and Phi. No model logged gives "Embedded App (no model logged)" |
 | **Workflow action** | For workflow rows, the verb: sending, creating, invoking, updating, reading or deleting |
 | **Plausible behaviour** | For unlicensed users, behaviours that need licensed Copilot are relabelled "Free Chat Workaround (pasting …)": the content was pasted into free Copilot Chat |
+
+### 3.4 Signal → Impact reference
+
+What each Task Breakdown means, the audit signal that produces it, and the time a person would
+otherwise spend on it. This matches the **🧬 Appendix: Signal → Impact** page. The Description is
+taken word for word from
+[`task-descriptions.json`](../1.%20Fabric/Fabric%20App/src/queries/appendix/task-descriptions.json).
+The signal summarises the rules in [§3.2](#32-from-signal-to-task-category), where the full order is
+set out. *Typical min* is the default effort scenario. The low and high ends of each band, its grain
+and its research source are in the [appendix](#appendix-time-bands-and-sources).
+
+> The Signal → Impact page in the Fabric App shows a single **Human Equivalent (Minutes)** figure.
+> It comes from the older `Human Baseline (min)` column, which no measure uses, so for some tasks it
+> differs from the Typical figure below (for example, Document Drafting reads 60, not 42). Hours and
+> value are always calculated from the bands.
+
+#### Coding & Technical
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Code Analysis | A code or text file, or a link to a developer site such as GitHub or Stack Overflow | Reading code or developer websites to explain, review or debug code. | 30 | Medium |
+| Code Writing | A code file with an active action | Writing or changing code or scripts. | 45 | High |
+
+#### Collaboration & Workflows
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Coordination Workflow | A workflow mentioning Planner, tasks, approvals, Teams, notifications or lists | Running an automated flow that handles tasks, approvals or team notifications. | 11 | Low |
+| Data & Reporting Workflow | A workflow mentioning Power BI, Dataverse, datasets, reports, Excel or SQL | Running an automated flow that refreshes data or produces a report. | 15 | Low |
+| Document Workflow | A workflow mentioning SharePoint, OneDrive, Word, documents or files | Running an automated flow that creates, files or shares documents. | 15 | Low |
+| Email Workflow | A workflow mentioning Outlook, Exchange or mail | Running an automated flow that sorts, routes or answers email. | 12 | Low |
+| Form / Survey Work | App host Forms | Building a form, quiz or survey in Forms, or reviewing its answers. | 25 | Low |
+| General Workflow | A workflow that matches no narrower group | Running an automated multi-step flow that fits no narrower group. | 15 | Low |
+| Meeting Workflow | A workflow mentioning calendars, meetings or scheduling | Running an automated flow that handles scheduling or meeting logistics. | 15 | Low |
+| Real-time Collaboration | A Loop page, or app host Loop, Whiteboard or Viva Engage | Working on something together in Loop, Whiteboard or Viva Engage. | 11 | Medium |
+| Running a Workflow | A flow, or a connector or HTTP call with an active action. Split into the workflow types in this table on the Fabric path | Starting an automated flow or connector. | 15 | Low |
+| Specialist / Line-of-Business Workflow | A workflow mentioning ServiceNow, Salesforce, Dynamics, Workday, Jira or Zendesk | Running an automated flow in a business system such as ServiceNow, Salesforce, Dynamics or Workday. | 15 | Low |
+| Task Management | A Planner plan or task, or app host Planner | Creating, tracking or updating tasks in Planner. | 11 | Low |
+| Teams Messaging | A Teams message, chat or channel, or a post or create-chat action | Writing or posting a message in a Teams chat or channel. | 8 | Medium |
+
+#### Creative & Design
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Ideation & Creative | An agent named or described for ideas, brainstorming, creativity or design, or one that can generate images | Using a creative agent to brainstorm ideas or design concepts. | 40 | Medium |
+| Image / Media Analysis | An image with no active action | Looking at an image to describe or review it. | 8 | Low |
+| Image Generation | An image with an active action, or app host Designer | Creating or editing an image, for example in Designer. | 42 | Low |
+
+#### Data & Analysis
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Data & Reporting | An agent named or described for data, reports, dashboards or metrics, or one that can use the code interpreter | Using a data or reporting agent to query data or build a report. | 35 | Low |
+| Data Querying | A dataset query or a list or table read, or app host Power BI or a Fabric warehouse | Querying a dataset, list or table to answer a data question. | 30 | Low |
+| Excel Assistance | A spreadsheet with an active action, or app host Excel | Getting help with formulas, formatting or analysis in Excel. | 30 | Low |
+| Spreadsheet Review | A spreadsheet or CSV file with no active action, or an open spreadsheet | Reading a spreadsheet or CSV file to check or explain the numbers. | 25 | Low |
+
+#### Document Creation
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Content Generation | An agent named or described for summarising, drafting, translation or content | Using a writing agent to draft, summarise or translate content. | 25 | Medium-High |
+| Document Drafting | A Word document with an active action, or app host Word with an active action | Writing or editing a document in Word. | 42 | High |
+| Note Taking | App host OneNote | Capturing or organising notes in OneNote. | 20 | Low |
+
+#### Document Summarisation
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Document Summarising | A Word document with an action that is neither active nor exactly "read", an open Word document, or app host Word with no active action | Reading a Word document to summarise it or answer questions about it. | 20 | Medium-High |
+| PDF Analysis | A PDF | Reading a PDF to summarise it or answer questions about it. | 35 | Medium |
+| Presentation Summarising | A PowerPoint file with an action that is neither active nor exactly "read", an open presentation, or app host PowerPoint with no active action | Reading a PowerPoint deck to summarise it or pull out key points. | 12 | Medium |
+
+#### Email
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Email Drafting | An email send or draft action, or app host Outlook with an active action | Writing or replying to an email in Outlook. | 8 | Medium |
+| Email Summarising | Any other email message, or app host Outlook with no active action | Reading emails in Outlook to summarise or sort them. | 4 | Medium |
+
+#### General Chat & Q&A
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| General Assistance | An agent whose name, description and capabilities match no keyword | Using an agent whose name and tools don't show what kind of work it did. | 8 | Low |
+| General Chat | No resource, plugin, open file or app host rule matched | Asking a question or chatting with AI, without a file, app or tool. | 8 | Medium |
+
+#### Meetings
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Meeting Prep | A calendar event or Teams meeting, or an open Teams meeting | Reading a meeting invite or calendar event to prepare or catch up. | 15 | Medium |
+| Meeting Scheduling | A meeting-management action | Booking meetings, finding free time or managing a calendar. | 12 | Medium |
+| Video Summarising | A video, an open video, or app host Stream | Summarising or asking about a video or meeting recording. | 30 | Low |
+
+#### Presentations
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Presentation Creation | A PowerPoint file with an active action, or app host PowerPoint with an active action | Building or editing slides in PowerPoint. | 42 | Medium |
+
+#### Search & Research
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Enterprise Searching | A SharePoint list item, page or link, the enterprise search plugin, or an open SharePoint page | Searching your organisation's own pages, lists and sites. | 18 | Medium |
+| File Retrieval | A Word or PowerPoint file that was read | Pulling a Word or PowerPoint file into a chat for context. | 15 | Medium |
+| Knowledge Base | An agent named or described for knowledge, FAQs, wikis or guides, or one that can read SharePoint | Using a knowledge agent to answer questions from your organisation's guidance and documents. | 12 | Medium |
+| People Lookup | A people answer | Finding colleagues, experts or who works with whom. | 8 | Medium |
+| Research & Analysis | An agent named or described for research, analysis or insight | Using a research or analyst agent to gather and make sense of information. | 45 | Medium |
+| SharePoint Access | App host SharePoint | Finding or browsing team content in SharePoint. | 12 | Medium |
+| Web Searching | A web search query, or any other link or external resource | Searching the public web to answer a question. | 22 | Medium |
+
+#### Specialist Support
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Coaching | An agent named or described for coaching, mentoring, learning or careers, or a link to a learning site | Using a coaching or learning agent to build skills or improve work. | 40 | Low |
+| Compliance & Policy | An agent named or described for policy, compliance, legal, audit or risk | Using a policy, legal or risk agent to check rules and compliance. | 25 | Medium |
+| Domain-Specific Agent | App host Copilot Studio. Those records are dropped by default ([§3.5](#35-app-host-reference)), so this appears only if that exclusion is removed | Using a specialist agent built in Copilot Studio. | 25 | Low |
+| HR & People | An agent named or described for HR, recruiting, talent or onboarding | Using an HR agent for hiring, onboarding or people questions. | 35 | Low |
+| IT & Service Desk | An agent named or described for support, help desks or tickets, or a ServiceNow site | Using an IT or service desk agent to fix a problem or raise a ticket. | 20 | Medium-High |
+| Sales & Customer | An agent named or described for sales, customers or CRM, or a Dynamics site | Using a sales or customer agent for accounts, deals or customer insight. | 35 | Medium |
+
+Agent keywords and the workflow split run only on the Fabric path. On paths 2, 3 and 4 those rows
+stay General Chat or Running a Workflow ([§3.2](#paths-2-3-and-4)).
+
+### 3.5 App host reference
+
+The app host (`AppHost`) is the Microsoft 365 surface the audit log says an interaction happened in.
+It records where Copilot was used, not what the person did. Each row is classified first by the
+resource it touched, then by the enterprise search plugin and the open file. The app host decides the
+Task Breakdown only when none of those match ([§3.2](#step-1-base-behaviour)). Host matching ignores
+case and surrounding spaces.
+
+Microsoft doesn't publish a complete list of app host values, and new surfaces appear over time. The
+descriptions below say what ValueLens does with each value. Where a description says which product
+logs it, check it against your own data.
+
+#### Hosts that set a task
+
+These match a host rule in step 1. The Task Breakdown applies only when no resource, plugin or open
+file decided first.
+
+| App host | What it is | Task Breakdown | Task Category |
+|---|---|---|---|
+| Outlook, OutlookSidepane | Copilot in Outlook | Email Drafting if the action was active; otherwise Email Summarising | Email |
+| Word | Copilot in Word | Document Drafting if active; otherwise Document Summarising | Document Creation / Document Summarisation |
+| Excel | Copilot in Excel | Excel Assistance | Data & Analysis |
+| PowerPoint | Copilot in PowerPoint | Presentation Creation if active; otherwise Presentation Summarising | Presentations / Document Summarisation |
+| OneNote | Copilot in OneNote | Note Taking | Document Creation |
+| Stream | Copilot on a Stream video or recording | Video Summarising | Meetings |
+| SharePoint | Copilot in SharePoint | SharePoint Access | Search & Research |
+| Designer | Microsoft Designer | Image Generation | Creative & Design |
+| Forms | Copilot in Microsoft Forms | Form / Survey Work | Collaboration & Workflows |
+| Planner | Copilot in Planner | Task Management | Collaboration & Workflows |
+| Loop, Whiteboard, VivaEngage | Shared, real-time workspaces | Real-time Collaboration | Collaboration & Workflows |
+| Power BI, DataWarehousing Core | Copilot in Power BI or a Fabric warehouse | Data Querying | Data & Analysis |
+| Logic App | An agent running in an Azure Logic App | Running a Workflow, but only when an agent name or ID is present | Collaboration & Workflows |
+| Copilot Studio | The Copilot Studio test pane | Domain-Specific Agent, **only if** "Copilot Studio test pane" is removed from `DROP_EXCLUDE_REASONS` | Specialist Support |
+| autonomous | An agent run started by a trigger, with no person in the loop | Running a Workflow, **only if** "Autonomous run" is removed from `DROP_EXCLUDE_REASONS` | Collaboration & Workflows |
+
+By default the last two hosts never reach classification: the records are dropped
+([§2.1](#21-which-audit-records-count)), so no reported row shows Domain-Specific Agent, and none
+reaches Running a Workflow through the autonomous host.
+
+#### Hosts classified by what they touched
+
+These have no host rule. The resource, plugin or open file decides the task. If none matches, the
+row is General Chat (or, on the Fabric path, an agent keyword task when an agent is present).
+
+| App host | What it is | How it is classified |
+|---|---|---|
+| Microsoft365Chat | Microsoft 365 Copilot Chat | By the resource: search, file, email, meeting, person or link. Otherwise General Chat |
+| Microsoft Teams | Copilot in Teams | By the resource or the open meeting (Meeting Prep), chat or channel (Teams Messaging). Otherwise General Chat. "Microsoft Teams" and "Teams" count as one app in sessions ([§4](#4-counting-units)) |
+| Microsoft Edge | Copilot in the Edge sidebar | By the resource, usually a web page or search. Otherwise General Chat |
+| Any host containing "cowork" | Copilot Cowork | Put in the Cowork cohort ([§3.1](#31-cohort)) and categorised separately from Copilot and agent tasks. The Local CSV processor also counts an agent name containing "cowork" |
+| Microsoft Scout | Activity logged under the Scout host | No host rule. It counts as agent activity only when the record carries an agent name or ID. The Fabric processor's `Agent_Surface` column labels a row Scout from the agent *name*, not the host |
+
+A Copilot Studio agent published to Teams or another channel also logs a runtime record with no
+messages. That record is kept as one non-prompt row so its user still counts
+([§2](#2-from-audit-record-to-dashboard-row)). Only the exact host "Copilot Studio" is treated as the
+test pane.
+
+#### Hosts excluded from reporting
+
+These records are not someone using Copilot, so they are flagged in `Exclude_Reason` and dropped by
+default. The rules and reasons are in [§2.1](#21-which-audit-records-count): the hosts are
+"Copilot Studio", "pva-maker-evaluation", "agentic-builder", "autonomous" and "workflow-agents", plus
+message-less "m365copilot" records (the M365 Copilot twin). Records whose agent ID is all zeros are
+also dropped, whatever the host. To report autonomous agents, remove "Autonomous run" and
+"Workflow run" from `DROP_EXCLUDE_REASONS`.
 
 ---
 
