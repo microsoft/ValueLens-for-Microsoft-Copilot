@@ -185,8 +185,11 @@ The installer reads Azure AI and Copilot pay-as-you-go costs for you. For the ot
   build a query with the Copilot credit metrics and turn on **Auto-refresh**. In **Analysis
   results**, choose the link icon to copy its partition and query IDs, and give them to the
   installer. It creates the Dataflow Gen2 `AnalyticsHub_Cowork_Credits`, which loads the query
-  into `viva_credits_dataflow`, and the pipeline refreshes it before each Viva load. Open the
-  Dataflow once, sign in to Viva Insights and the Lakehouse, then choose **Save and run**. See the
+  into `viva_credits_dataflow`, and the pipeline refreshes it before each Viva load. Once, open the
+  Dataflow, choose **Edit dataflow**, and under **Home** > **Manage connections** sign in to Viva
+  Insights and the Lakehouse. Then choose **Save**, wait until it's published, and choose **Refresh
+  now**. Rows in the editor's preview use your own sign-in, so they show even while every refresh
+  still fails for want of saved connections. See the
   [Viva Insights guide](https://learn.microsoft.com/viva/insights/advanced/analyst/export-query-data-microsoft-fabric).
   You need the Viva Insights **Insights Analyst** role. Without the IDs, or if the Dataflow can't be
   created, Cowork credits fall back to the Consumption Dashboard's CSV
@@ -233,7 +236,7 @@ the endpoint, someone who manages the vault approves it under **Networking** >
 | A run says Fabric's capacity was too busy (`TooManyRequestsForCapacity`) | Nothing is lost. Wait a few minutes, then choose **Run now** again. It happens most on trials and small capacities. |
 | `Fabric couldn't set up the model's connection` | Turn on *Service principals can call Fabric public APIs*, then choose **Repair or change**. |
 | `Couldn't connect Analytics Hub Model to …` | Open the link it shows. Under **Gateway and cloud connections**, pick `Analytics Hub SQL …` (`ValueLens SQL …` on earlier installs). Then choose **I've connected it myself**. |
-| A run notes that `Refresh_Cowork_Credits` failed | The Dataflow hasn't been signed in to yet, or the Viva Insights query stopped refreshing. Open `AnalyticsHub_Cowork_Credits`, sign in, and choose **Save and run**. The rest of the run carries on. |
+| A run notes that `Refresh_Cowork_Credits` failed | Most often the Dataflow has no saved connections. The refresh then fails within seconds with "Job instance failed without detail error", even if the editor's preview shows rows. Open `AnalyticsHub_Cowork_Credits`, choose **Edit dataflow** > **Home** > **Manage connections**, and sign in to Viva Insights and the Lakehouse. Then choose **Save**, wait until it's published, and choose **Refresh now**. Otherwise the Viva Insights query may have stopped refreshing. The rest of the run carries on either way. |
 | A flow doesn't save any files | Check it's turned on and its connections are signed in. The Copilot Studio credits flow must be signed in as a Power Platform, Billing or Global administrator. |
 | A model refresh fails with `Login failed` | The connection's secret expired. Choose **Create new secrets**. |
 | `The app wasn't deployed` | Fix the cause it shows, then choose **Redeploy the app**. |
