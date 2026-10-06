@@ -1,17 +1,19 @@
 """valuelens-jobs entry point.
 
     python -m valuelens_jobs run --steps collect,process,publish,refresh
-    python -m valuelens_jobs process --data-dir <dir>      # local / mounted data
+    python -m valuelens_jobs run --data-dir <dir> --steps process      # local / mounted data
+    python -m valuelens_jobs process --data-dir <dir>
     python -m valuelens_jobs migrate
 
-Step order mirrors the Fabric CopilotAdoptionPipeline. `process` is implemented on the
-shared DuckDB core; collect, publish, refresh and migrate are MVP (Phase 1) work and
-fail loudly rather than pretending to succeed.
+Step order mirrors the Fabric CopilotAdoptionPipeline. Without `--data-dir` the job works on the
+ADLS account in VALUELENS_STORAGE_ACCOUNT with its managed identity.
 
-Data layout (same under a local directory or the ADLS account):
-    raw/copilot_interactions_parsed/*.parquet
-    raw/copilot_licensed_users/*.parquet   (optional)
-    raw/agents_365/*.parquet               (optional)
+Data layout (same under a local directory or the ADLS account; first segment = container):
+    raw/copilot_interactions_parsed/day-YYYYMMDD.parquet
+    raw/copilot_licensed_users/part-0.parquet
+    raw/copilot_org_data/part-0.parquet
+    raw/m365_activity_daily/day-YYYYMMDD.parquet
+    raw/agents_365/*.parquet                                   (Phase 2, optional)
     curated/copilot_interactions_curated/part-0.parquet
 """
 from __future__ import annotations
@@ -20,51 +22,118 @@ import argparse
 import logging
 import os
 import sys
-from pathlib import Path
 
 import duckdb
 
 from valuelens_core import curate
 
+from .config import Settings
+from .storage import LocalStore, open_store
+from .tables import parquet_glob, q
+
 log = logging.getLogger("valuelens_jobs")
 STEPS = ("collect", "process", "publish", "refresh")
+CURATED = "curated/copilot_interactions_curated/part-0.parquet"
+PROCESS_INPUTS = ("raw/copilot_interactions_parsed", "raw/copilot_licensed_users", "raw/agents_365")
 
 
-class NotYetImplemented(RuntimeError):
-    pass
-
-
-def _glob(base: Path, table: str):
-    folder = base / "raw" / table
-    if folder.is_dir() and any(folder.glob("*.parquet")):
-        return f"read_parquet('{(folder / '*.parquet').as_posix()}')"
-    return None
-
-
-def process(data_dir: str, *, exclude_agent_identities=True, include_raw_passthrough=False) -> int:
-    base = Path(data_dir)
-    interactions = _glob(base, "copilot_interactions_parsed")
+def process(store, *, exclude_agent_identities=True, include_raw_passthrough=False) -> int:
+    for prefix in PROCESS_INPUTS:
+        store.pull(prefix)
+    interactions = parquet_glob(store.root, PROCESS_INPUTS[0])
     if not interactions:
-        raise FileNotFoundError(f"no parquet under {base / 'raw' / 'copilot_interactions_parsed'}")
+        log.warning("process: no Copilot interactions collected yet; nothing to curate")
+        return 0
     con = duckdb.connect()
-    rel = curate(con, interactions, _glob(base, "copilot_licensed_users"), _glob(base, "agents_365"),
+    con.execute("SET TimeZone = 'UTC'")
+    rel = curate(con, interactions, parquet_glob(store.root, PROCESS_INPUTS[1]),
+                 parquet_glob(store.root, PROCESS_INPUTS[2]),
                  exclude_agent_identities=exclude_agent_identities,
                  include_raw_passthrough=include_raw_passthrough)
-    out = base / "curated" / "copilot_interactions_curated"
-    out.mkdir(parents=True, exist_ok=True)
-    target = (out / "part-0.parquet").as_posix().replace("'", "''")
-    con.execute(f"COPY ({rel.sql_query()}) TO '{target}' (FORMAT PARQUET)")
-    rows = rel.count("*").fetchone()[0]
-    log.info("process: wrote %s curated rows to %s", rows, target)
+    target = store.path(CURATED)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_suffix(".tmp")
+    con.execute(f"COPY ({rel.sql_query()}) TO {q(tmp)} (FORMAT PARQUET)")
+    rows = con.execute(f"SELECT count(*) FROM read_parquet({q(tmp)})").fetchone()[0]
+    con.close()
+    tmp.replace(target)
+    store.push([CURATED])
+    log.info("process: wrote %s curated rows", rows)
     return rows
 
 
-def _pending(step: str):
-    raise NotYetImplemented(
-        f"step '{step}' is Phase 1 work (see docs/plans/AZURE-HOSTED-PLAN.md section 7)")
+def _api(settings):
+    from .api import Api, TokenSource
+
+    return Api(TokenSource())
 
 
-def main(argv=None) -> int:
+def collect(store, settings, api=None) -> dict:
+    from .collect.audit import collect_audit
+    from .collect.graph import collect_licensed, collect_m365, collect_org
+
+    api = api or _api(settings)
+    out = {}
+    if settings.has("core"):
+        out["licensed"] = collect_licensed(api, store, settings)
+        out["audit"] = collect_audit(api, store, settings)
+    if settings.has("orgData"):
+        out["org"] = collect_org(api, store, settings)
+    if settings.has("m365Activity"):
+        out["m365"] = collect_m365(api, store, settings)
+    return out
+
+
+def publish_targets(settings) -> list[str]:
+    targets = []
+    if settings.has("core"):
+        targets += ["curated", "licensed"]
+    if settings.has("orgData"):
+        targets.append("org")
+    if settings.has("m365Activity"):
+        targets.append("m365")
+    return targets
+
+
+def _sql(settings):
+    from .api import TokenSource
+    from .sql import connect
+
+    if not settings.sql_server or not settings.sql_database:
+        raise ValueError("VALUELENS_SQL_SERVER and VALUELENS_SQL_DATABASE must be set.")
+    return connect(settings, TokenSource())
+
+
+def publish_step(store, settings, conn=None):
+    from .publish import publish
+
+    conn = conn or _sql(settings)
+    try:
+        return publish(conn, store, publish_targets(settings))
+    finally:
+        conn.close()
+
+
+def migrate_step(settings, conn=None, folder=None):
+    from .sql import default_migrations_dir, ensure_reader, migrate
+
+    folder = folder or os.environ.get("VALUELENS_MIGRATIONS_DIR") or default_migrations_dir()
+    conn = conn or _sql(settings)
+    try:
+        ran = migrate(conn, folder)
+        ensure_reader(conn, settings.sql_reader_name, settings.sql_reader_client_id)
+        return ran
+    finally:
+        conn.close()
+
+
+def refresh_step(settings, api=None):
+    from .refresh import refresh_models
+
+    return refresh_models(api or _api(settings), settings)
+
+
+def main(argv=None, env=None) -> int:
     logging.basicConfig(level=os.environ.get("VALUELENS_LOG_LEVEL", "INFO"),
                         format="%(asctime)s %(levelname)s %(name)s %(message)s")
     ap = argparse.ArgumentParser(prog="valuelens_jobs")
@@ -78,27 +147,33 @@ def main(argv=None) -> int:
     proc.add_argument("--raw-passthrough", action="store_true")
     sub.add_parser("migrate")
     args = ap.parse_args(argv)
+    settings = Settings.from_env(env)
+    log.info("valuelens-jobs %s; modules: %s", settings.version or "dev", ",".join(sorted(settings.modules)))
 
     if args.cmd == "process":
-        process(args.data_dir, exclude_agent_identities=not args.keep_agent_identities,
+        process(LocalStore(args.data_dir), exclude_agent_identities=not args.keep_agent_identities,
                 include_raw_passthrough=args.raw_passthrough)
         return 0
     if args.cmd == "migrate":
-        _pending("migrate")
+        migrate_step(settings)
+        return 0
     steps = [s.strip() for s in args.steps.split(",") if s.strip()]
     unknown = [s for s in steps if s not in STEPS]
     if unknown:
         ap.error(f"unknown steps {unknown}; expected a subset of {list(STEPS)}")
+    store = open_store(args.data_dir, settings) if {"collect", "process", "publish"} & set(steps) else None
     for step in STEPS:
         if step not in steps:
             continue
         log.info("step %s: start", step)
-        if step == "process":
-            if not args.data_dir:
-                _pending("process (ADLS I/O)")
-            process(args.data_dir)
+        if step == "collect":
+            collect(store, settings)
+        elif step == "process":
+            process(store)
+        elif step == "publish":
+            publish_step(store, settings)
         else:
-            _pending(step)
+            refresh_step(settings)
         log.info("step %s: done", step)
     return 0
 
@@ -106,6 +181,6 @@ def main(argv=None) -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except NotYetImplemented as exc:
-        log.error("%s", exc)
-        sys.exit(2)
+    except Exception as exc:  # one clear line in the Container Apps log, then non-zero exit
+        log.exception("valuelens-jobs failed: %s", exc)
+        sys.exit(1)

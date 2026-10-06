@@ -5,10 +5,11 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Moon, Sun } from "lucide-react";
 import { paletteClass, usePaletteTheme } from "@/hooks/use-palette-theme";
 import { ThemeContext, useThemeContext } from "@/hooks/theme.context";
+import { AuthContext } from "@/hooks/auth.context";
 import { useIsRefreshing } from "@/lib/refresh-tracker";
 import { runtimeConfig } from "@/lib/runtime-config";
 import { scrollToAnchor } from "@/lib/scroll-to-anchor";
@@ -27,6 +28,41 @@ import { FilterBar } from "./filter-bar";
 
 /** Pages whose model the install didn't set up are left out of the sidebar. */
 const AVAILABLE = availableDestinations(runtimeConfig().semanticModels);
+
+interface VersionResponse {
+    latest?: string;
+    updateAvailable?: boolean;
+    releaseUrl?: string;
+}
+
+function UpdateNotice() {
+    const auth = useContext(AuthContext);
+    const [version, setVersion] = useState<VersionResponse | null>(null);
+    const isAzureAdmin = runtimeConfig().host === "azure" && (auth?.user?.roles ?? []).includes("AnalyticsHub.Admin");
+
+    useEffect(() => {
+        if (!isAzureAdmin) return;
+        let cancelled = false;
+        fetch("/api/version", { cache: "no-store" })
+            .then((response) => response.ok ? response.json() as Promise<VersionResponse> : null)
+            .then((value) => !cancelled && setVersion(value))
+            .catch(() => undefined);
+        return () => {
+            cancelled = true;
+        };
+    }, [isAzureAdmin]);
+
+    if (!isAzureAdmin || !version?.updateAvailable) return null;
+
+    const label = `Update available: ${version.latest ?? "latest"}`;
+    return version.releaseUrl ? (
+        <a href={version.releaseUrl} className="px-200 text-[length:var(--text-200)] leading-200 text-muted-foreground underline">
+            {label}
+        </a>
+    ) : (
+        <span className="px-200 text-[length:var(--text-200)] leading-200 text-muted-foreground">{label}</span>
+    );
+}
 
 interface AppShellProps {
     active: DestinationId;
@@ -197,6 +233,8 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                         </ul>
                     </div>
                 )}
+
+                <UpdateNotice />
 
                 <button
                     type="button"

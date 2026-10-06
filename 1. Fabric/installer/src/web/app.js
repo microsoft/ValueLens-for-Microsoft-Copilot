@@ -79,12 +79,19 @@ const COMMANDS = {
     desc: 'Replace the app\'s client secret in Key Vault, and the model connection\'s.',
     off: 'There is no app registration or Key Vault yet.',
   },
+  uninstall: {
+    title: 'Uninstall Analytics Hub', short: 'Uninstall', icon: 'x', section: 'Uninstall', adopt: true,
+    row: 'Uninstall', button: 'Uninstall',
+    desc: 'Azure target only: delete the resource group the installer created, or only tagged resources in an existing group.',
+    off: 'Only available for Azure installations.',
+  },
 };
-const ROW_ORDER = ['run', 'refresh', 'status', 'check', 'update', 'deploy-app', 'rotate-secret', 'install'];
+const ROW_ORDER = ['run', 'refresh', 'status', 'check', 'update', 'deploy-app', 'rotate-secret', 'uninstall', 'install'];
 
 const INSTALL_STAGES = [
   'Sign in', 'Checking your tenant', 'What to collect', 'Power BI', 'Fabric', 'App registration',
   'Key Vault for the app secret', 'Schedule', 'Ready to set up', 'Setting up', 'Done',
+  'Where should Analytics Hub run?', 'Azure', 'Checking Azure',
 ];
 const DONE_HEADINGS = new Set(['Analytics Hub is set up', 'Connect Power BI']);
 

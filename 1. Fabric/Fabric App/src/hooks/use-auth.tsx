@@ -4,11 +4,10 @@
 //        Licensed under the MIT license. See LICENSE file in the project root for full license information.
 // </copyright>
 //-----------------------------------------------------------------------
-
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { OpaqueSession } from "@microsoft/rayfin-auth";
 
-import { IAuthService } from "@/services/rayfin-auth.service";
+import { AnalyticsHubAccessDeniedError, type AnalyticsHubUser, type IAuthService } from "@/services/rayfin-auth.service";
 import { AuthContext, type AuthContextValue } from "./auth.context";
 
 interface AuthProviderProps {
@@ -16,23 +15,13 @@ interface AuthProviderProps {
     rayfinAuthService: IAuthService;
 }
 
-/**
- * AuthProvider — runs the Fabric embedded auth handoff once on mount.
- *
- * Behavior:
- * - When loaded inside a Fabric iframe (`?fabricEmbedded=true`), calls
- *   `initEmbeddedAuth` to acquire a Rayfin session via postMessage.
- * - When loaded standalone, `initEmbeddedAuth` returns `null` immediately
- *   and the provider settles in an unauthenticated state. `<AuthGate>` then
- *   sends the visitor to the app's Fabric item, or offers interactive Fabric
- *   sign-in when the build has no item link.
- *
- * Consume the session with the `useAuth` hook.
- */
+/** AuthProvider — runs the current host's passive auth handoff once on mount. */
 export function AuthProvider({ children, rayfinAuthService }: AuthProviderProps) {
     const [session, setSession] = useState<OpaqueSession | null>(null);
+    const [user, setUser] = useState<AnalyticsHubUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
+    const [accessDenied, setAccessDenied] = useState(false);
     const [isSigningIn, setIsSigningIn] = useState(false);
     const [signInError, setSignInError] = useState<Error | null>(null);
     const signInRequestRef = useRef<Promise<OpaqueSession> | null>(null);
@@ -43,11 +32,15 @@ export function AuthProvider({ children, rayfinAuthService }: AuthProviderProps)
         (async () => {
             try {
                 const result = await rayfinAuthService.initEmbeddedAuth();
-                if (cancelled)
-                    return;
+                if (cancelled) return;
                 setSession(result);
+                setUser(rayfinAuthService.getUser?.() ?? null);
             } catch (err) {
-                if (!cancelled) {
+                if (cancelled) return;
+                if (err instanceof AnalyticsHubAccessDeniedError) {
+                    setAccessDenied(true);
+                    setSession(null);
+                } else {
                     setError(err instanceof Error ? err : new Error(String(err)));
                 }
             } finally {
@@ -60,14 +53,21 @@ export function AuthProvider({ children, rayfinAuthService }: AuthProviderProps)
         };
     }, [rayfinAuthService]);
 
+    useEffect(() => {
+        const onAccessDenied = () => {
+            setAccessDenied(true);
+            setSession(null);
+        };
+        window.addEventListener("analytics-hub-access-denied", onAccessDenied);
+        return () => window.removeEventListener("analytics-hub-access-denied", onAccessDenied);
+    }, []);
+
     const signIn = useCallback(() => {
         if (signInRequestRef.current)
             return;
 
         let request: Promise<OpaqueSession>;
         try {
-            // Keep the SDK invocation in the synchronous click call stack so
-            // its broker window is not blocked as an unsolicited popup.
             request = rayfinAuthService.signIn();
         } catch (err) {
             setSignInError(err instanceof Error ? err : new Error(String(err)));
@@ -77,10 +77,16 @@ export function AuthProvider({ children, rayfinAuthService }: AuthProviderProps)
         signInRequestRef.current = request;
         setIsSigningIn(true);
         setSignInError(null);
+        setAccessDenied(false);
 
         void request
-            .then(setSession)
+            .then((value) => {
+                setSession(value);
+                setUser(rayfinAuthService.getUser?.() ?? null);
+            })
             .catch((err: unknown) => {
+                if (err instanceof AnalyticsHubAccessDeniedError)
+                    setAccessDenied(true);
                 setSignInError(err instanceof Error ? err : new Error(String(err)));
             })
             .finally(() => {
@@ -94,14 +100,16 @@ export function AuthProvider({ children, rayfinAuthService }: AuthProviderProps)
     const value = useMemo<AuthContextValue>(
         () => ({
             session,
+            user,
             isAuthenticated: session?.isAuthenticated ?? false,
             isLoading,
             error,
             signIn,
             isSigningIn,
             signInError,
+            accessDenied,
         }),
-        [session, isLoading, error, signIn, isSigningIn, signInError],
+        [session, user, isLoading, error, signIn, isSigningIn, signInError, accessDenied],
     );
 
     if (error)

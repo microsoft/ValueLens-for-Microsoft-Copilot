@@ -7,6 +7,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@microsoft/teams-js", () => ({ app: { initialize: vi.fn().mockRejectedValue(new Error("not teams")) } }));
+
 vi.mock("@/fabric.generated", () => ({
     fabricConfig: {
         semanticModels: {
@@ -16,6 +18,7 @@ vi.mock("@/fabric.generated", () => ({
 }));
 
 import {
+    APP_CONFIG_PATH,
     FABRIC_CONFIG_PATH,
     RuntimeConfigError,
     loadRuntimeConfig,
@@ -82,8 +85,48 @@ describe("runtimeConfig", () => {
         expect(runtimeConfig().semanticModels).toEqual(deployedModels.semanticModels);
     });
 
+    it("uses Azure app config and skips Rayfin resolution", async () => {
+        const azureConfig = {
+            host: "azure",
+            tenantId: "tenant",
+            clientId: "client",
+            apiScope: "api://client/access_as_user",
+            version: "1.2.3",
+            semanticModels: { vl: { workspaceId: "azure-ws", itemId: "azure-model" } },
+        };
+        const fetchMock = stubFiles({
+            [APP_CONFIG_PATH]: { body: JSON.stringify(azureConfig) },
+            "/rayfin.config.json": { status: 500, body: "" },
+        });
+
+        await loadRuntimeConfig();
+
+        expect(runtimeConfig().host).toBe("azure");
+        expect(runtimeConfig().azure).toMatchObject({ tenantId: "tenant", clientId: "client", apiScope: "api://client/access_as_user", version: "1.2.3" });
+        expect(runtimeConfig().semanticModels).toEqual(azureConfig.semanticModels);
+        expect(fetchMock).not.toHaveBeenCalledWith("/rayfin.config.json", expect.anything());
+    });
+
+    it("detects Teams from the Azure query string", async () => {
+        history.replaceState(null, "", "/?host=teams");
+        stubFiles({
+            [APP_CONFIG_PATH]: { body: JSON.stringify({
+                host: "azure",
+                tenantId: "tenant",
+                clientId: "client",
+                apiScope: "scope",
+                semanticModels: { vl: { workspaceId: "w", itemId: "i" } },
+            }) },
+        });
+
+        await loadRuntimeConfig();
+
+        expect(runtimeConfig().azure?.inTeams).toBe(true);
+        history.replaceState(null, "", "/");
+    });
+
     it("keeps the build's values when a developer deploy has no config files", async () => {
-        stubFiles({ "/rayfin.config.json": SPA_FALLBACK, [FABRIC_CONFIG_PATH]: SPA_FALLBACK });
+        stubFiles({ [APP_CONFIG_PATH]: SPA_FALLBACK, "/rayfin.config.json": SPA_FALLBACK, [FABRIC_CONFIG_PATH]: SPA_FALLBACK });
 
         await loadRuntimeConfig();
 

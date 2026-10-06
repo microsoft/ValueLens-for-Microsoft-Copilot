@@ -1,0 +1,33 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "{{version}}",
+  "id": "{{appId}}",
+  "developer": {
+    "name": "Microsoft",
+    "websiteUrl": "https://github.com/microsoft/ValueLens-for-Microsoft-Copilot",
+    "privacyUrl": "https://privacy.microsoft.com/privacystatement",
+    "termsOfUseUrl": "https://www.microsoft.com/legal/terms-of-use"
+  },
+  "name": { "short": "Analytics Hub", "full": "Analytics Hub" },
+  "description": {
+    "short": "Analytics Hub for Microsoft Copilot adoption insights.",
+    "full": "Analytics Hub surfaces ValueLens Microsoft Copilot analytics in Teams."
+  },
+  "icons": { "color": "color.png", "outline": "outline.png" },
+  "accentColor": "6264A7",
+  "staticTabs": [{
+    "entityId": "analytics-hub",
+    "name": "Analytics Hub",
+    "contentUrl": "https://{{fqdn}}/?host=teams",
+    "websiteUrl": "https://{{fqdn}}/",
+    "scopes": ["personal"]
+  }],
+  "configurableTabs": [{
+    "configurationUrl": "https://{{fqdn}}/?host=teams&config=1",
+    "canUpdateConfiguration": true,
+    "scopes": ["team", "groupChat"]
+  }],
+  "validDomains": ["{{fqdn}}"],
+  "webApplicationInfo": { "id": "{{clientId}}", "resource": "{{appIdUri}}" }
+}

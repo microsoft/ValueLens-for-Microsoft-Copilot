@@ -47,6 +47,24 @@ param deployWeb bool = true
 param webMinReplicas int = 0
 @description('App registration (client) id of the Analytics Hub web app; empty until the installer creates it.')
 param webClientId string = ''
+@description('Identifier URI the web API exposes (api://<fqdn>/<clientId>); empty until the installer sets it.')
+param webAppIdUri string = ''
+
+@description('Collection modules the run job executes (catalog ids), e.g. core,org,m365.')
+param modules string = 'core'
+@description('Audit history to backfill on the first run, in days.')
+@allowed([30, 90, 180])
+param auditHistoryDays int = 30
+
+@description('Power BI workspace and semantic models (JSON: {"alias":{"workspaceId":"..","itemId":".."}}). Set by the installer after the models exist.')
+param powerBiWorkspaceId string = ''
+param semanticModels string = '{}'
+
+@description('Display name of the SQL reader app registration that the migrate job grants db_datareader (the Power BI refresh credential).')
+param sqlReaderName string = ''
+
+@description('Client (app) ID of the SQL reader app registration. The migrate job creates its database user by SID, so the SQL server needs no Graph access.')
+param sqlReaderClientId string = ''
 
 var allTags = union(tags, { 'valuelens-install-id': installId, 'valuelens-component': 'analytics-hub' })
 var suffix = substring(uniqueString(resourceGroup().id, installId), 0, 6)
@@ -123,6 +141,14 @@ module apps 'modules/containerapps.bicep' = {
     sqlDatabaseName: sql.outputs.databaseName
     webMinReplicas: webMinReplicas
     webClientId: webClientId
+    webAppIdUri: webAppIdUri
+    version: imageTag
+    modules: modules
+    auditHistoryDays: auditHistoryDays
+    powerBiWorkspaceId: powerBiWorkspaceId
+    semanticModels: semanticModels
+    sqlReaderName: sqlReaderName
+    sqlReaderClientId: sqlReaderClientId
   }
 }
 
@@ -135,3 +161,6 @@ output sqlDatabaseName string = sql.outputs.databaseName
 output runJobName string = names.runJob
 output migrateJobName string = names.migrateJob
 output webUrl string = apps.outputs.webUrl
+output webFqdn string = apps.outputs.webFqdn
+output environmentName string = names.environment
+output webName string = deployWeb ? names.web : ''

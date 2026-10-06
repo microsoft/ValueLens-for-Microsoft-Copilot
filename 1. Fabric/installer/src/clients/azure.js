@@ -7,6 +7,8 @@ export const KEY_VAULT_API = '2023-07-01';
 const RESOURCES_API = '2021-04-01';
 const SUBSCRIPTIONS_API = '2022-12-01';
 const AUTHORIZATION_API = '2022-04-01';
+const DEPLOYMENTS_API = '2022-09-01';
+const CONTAINER_APPS_API = '2024-03-01';
 
 export const ROLES = {
   keyVaultSecretsOfficer: 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7',
@@ -80,6 +82,22 @@ export function armApi(http) {
   return {
     listSubscriptions: () => http.list('/subscriptions', { query: { 'api-version': SUBSCRIPTIONS_API } }),
 
+    /** @param {string} subscriptionId */
+    listLocations: (subscriptionId) => http.list(`/subscriptions/${subscriptionId}/locations`, { query: { 'api-version': SUBSCRIPTIONS_API } }),
+
+    /** @param {string} subscriptionId */
+    listResourceGroups: (subscriptionId) => http.list(`/subscriptions/${subscriptionId}/resourcegroups`, { query: { 'api-version': RESOURCES_API } }),
+
+    /** @param {string} subscriptionId @param {string} name */
+    getResourceGroup: async (subscriptionId, name) => {
+      try {
+        return await http.get(`/subscriptions/${subscriptionId}/resourcegroups/${name}`, { query: { 'api-version': RESOURCES_API } });
+      } catch (err) {
+        if (err instanceof HttpError && err.status === 404) return null;
+        throw err;
+      }
+    },
+
     /** @param {string} scope  e.g. /subscriptions/{id} */
     permissions: (scope) => http.list(`${scope}/providers/Microsoft.Authorization/permissions`, { query: { 'api-version': AUTHORIZATION_API } }),
 
@@ -102,8 +120,80 @@ export function armApi(http) {
     },
 
     /** @param {string} subscriptionId @param {string} name @param {string} location */
-    ensureResourceGroup: (subscriptionId, name, location) =>
-      http.put(`/subscriptions/${subscriptionId}/resourcegroups/${name}`, { location, tags: { app: 'ValueLens' } }, { query: { 'api-version': RESOURCES_API } }),
+    ensureResourceGroup: (subscriptionId, name, location, tags = {}) =>
+      http.put(`/subscriptions/${subscriptionId}/resourcegroups/${name}`, { location, tags: { app: 'ValueLens', ...tags } }, { query: { 'api-version': RESOURCES_API } }),
+
+    /** @param {string} subscriptionId @param {string} resourceGroup */
+    listResources: (subscriptionId, resourceGroup) =>
+      http.list(`/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}/resources`, { query: { 'api-version': RESOURCES_API } }),
+
+    /** @param {string} id */
+    deleteResource: (id) => http.del(id, { query: { 'api-version': RESOURCES_API } }),
+
+    /** @param {string} subscriptionId @param {string} resourceGroup */
+    deleteResourceGroup: (subscriptionId, resourceGroup) =>
+      http.del(`/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}`, { query: { 'api-version': RESOURCES_API } }),
+
+    /**
+     * Validates an ARM template deployment at resource-group scope.
+     * @param {string} subscriptionId @param {string} resourceGroup @param {string} name @param {any} deployment
+     */
+    validateDeployment: (subscriptionId, resourceGroup, name, deployment) =>
+      http.post(`/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}/providers/Microsoft.Resources/deployments/${name}/validate`, deployment, {
+        query: { 'api-version': DEPLOYMENTS_API },
+      }),
+
+    /**
+     * Runs ARM what-if for an incremental deployment.
+     * @param {string} subscriptionId @param {string} resourceGroup @param {string} name @param {any} deployment
+     */
+    whatIfDeployment: (subscriptionId, resourceGroup, name, deployment) =>
+      http.requestLro('POST', `/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}/providers/Microsoft.Resources/deployments/${name}/whatIf`, {
+        query: { 'api-version': DEPLOYMENTS_API },
+        body: deployment,
+        lroResult: true,
+      }),
+
+    /**
+     * Creates or updates an ARM template deployment.
+     * @param {string} subscriptionId @param {string} resourceGroup @param {string} name @param {any} deployment
+     */
+    deployTemplate: (subscriptionId, resourceGroup, name, deployment) =>
+      http.requestLro('PUT', `/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}/providers/Microsoft.Resources/deployments/${name}`, {
+        query: { 'api-version': DEPLOYMENTS_API },
+        body: deployment,
+        lroResult: true,
+      }),
+
+    /** @param {string} subscriptionId @param {string} resourceGroup @param {string} serverName @param {string} databaseName */
+    async getSqlDatabase(subscriptionId, resourceGroup, serverName, databaseName) {
+      try {
+        return await http.get(`/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}/providers/Microsoft.Sql/servers/${serverName}/databases/${databaseName}`, {
+          query: { 'api-version': '2023-08-01' },
+        });
+      } catch (err) {
+        if (err instanceof HttpError && err.status === 404) return null;
+        throw err;
+      }
+    },
+
+    /** @param {string} subscriptionId @param {string} resourceGroup @param {string} name */
+    startContainerAppJob: (subscriptionId, resourceGroup, name) =>
+      http.post(`/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}/providers/Microsoft.App/jobs/${name}/start`, undefined, {
+        query: { 'api-version': CONTAINER_APPS_API },
+      }),
+
+    /** @param {string} subscriptionId @param {string} resourceGroup @param {string} name @param {string} executionName */
+    getContainerAppJobExecution: (subscriptionId, resourceGroup, name, executionName) =>
+      http.get(`/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}/providers/Microsoft.App/jobs/${name}/executions/${executionName}`, {
+        query: { 'api-version': CONTAINER_APPS_API },
+      }),
+
+    /** @param {string} subscriptionId @param {string} resourceGroup @param {string} name */
+    listContainerAppJobExecutions: (subscriptionId, resourceGroup, name) =>
+      http.list(`/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}/providers/Microsoft.App/jobs/${name}/executions`, {
+        query: { 'api-version': CONTAINER_APPS_API },
+      }),
 
     /** @param {string} subscriptionId */
     listVaults: (subscriptionId) =>

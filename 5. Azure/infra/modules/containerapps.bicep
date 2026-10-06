@@ -19,6 +19,14 @@ param sqlServerFqdn string
 param sqlDatabaseName string
 param webMinReplicas int = 0
 param webClientId string = ''
+param webAppIdUri string = ''
+param version string
+param modules string
+param auditHistoryDays int
+param powerBiWorkspaceId string
+param semanticModels string
+param sqlReaderName string
+param sqlReaderClientId string = ''
 
 resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: logAnalyticsName
@@ -45,7 +53,17 @@ var commonEnv = [
   { name: 'VALUELENS_STORAGE_ACCOUNT', value: storageAccountName }
   { name: 'VALUELENS_SQL_SERVER', value: sqlServerFqdn }
   { name: 'VALUELENS_SQL_DATABASE', value: sqlDatabaseName }
+  { name: 'VALUELENS_TENANT_ID', value: subscription().tenantId }
+  { name: 'VALUELENS_VERSION', value: version }
+  { name: 'VALUELENS_POWERBI_WORKSPACE_ID', value: powerBiWorkspaceId }
+  { name: 'VALUELENS_SEMANTIC_MODELS', value: semanticModels }
 ]
+var jobEnv = concat(commonEnv, [
+  { name: 'VALUELENS_MODULES', value: modules }
+  { name: 'VALUELENS_AUDIT_HISTORY_DAYS', value: string(auditHistoryDays) }
+  { name: 'VALUELENS_SQL_READER_NAME', value: sqlReaderName }
+  { name: 'VALUELENS_SQL_READER_CLIENT_ID', value: sqlReaderClientId }
+])
 var identity = {
   type: 'UserAssigned'
   userAssignedIdentities: { '${identityId}': {} }
@@ -70,7 +88,7 @@ resource runJob 'Microsoft.App/jobs@2024-03-01' = {
         name: 'run'
         image: jobsImage
         args: ['run', '--steps', runSteps]
-        env: commonEnv
+        env: jobEnv
         resources: { cpu: json('4'), memory: '8Gi' }
       }]
     }
@@ -96,7 +114,7 @@ resource migrateJob 'Microsoft.App/jobs@2024-03-01' = {
         name: 'migrate'
         image: jobsImage
         args: ['migrate']
-        env: commonEnv
+        env: jobEnv
         resources: { cpu: json('0.5'), memory: '1Gi' }
       }]
     }
@@ -120,7 +138,7 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = if (deployWeb) {
         image: webImage
         env: concat(commonEnv, [
           { name: 'VALUELENS_WEB_CLIENT_ID', value: webClientId }
-          { name: 'VALUELENS_TENANT_ID', value: subscription().tenantId }
+          { name: 'VALUELENS_APP_ID_URI', value: webAppIdUri }
         ])
         resources: { cpu: json('0.5'), memory: '1Gi' }
         probes: [{ type: 'Liveness', httpGet: { path: '/api/health', port: 8080 } }]
@@ -132,3 +150,4 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = if (deployWeb) {
 
 output environmentId string = env.id
 output webUrl string = deployWeb ? 'https://${web!.properties.configuration.ingress.fqdn}' : ''
+output webFqdn string = deployWeb ? web!.properties.configuration.ingress.fqdn : ''

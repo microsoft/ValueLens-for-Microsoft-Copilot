@@ -17,6 +17,7 @@ export const GRAPH_APP_ID = '00000003-0000-0000-c000-000000000000';
  * @property {boolean} required
  * @property {boolean} defaultOn
  * @property {string[]} permissions  Graph application permissions (by value).
+ * @property {{ supported: boolean, graphRoles: string[] }} azure
  * @property {string | null} pipelineParameter  The pipeline's Enable* switch.
  */
 
@@ -29,6 +30,7 @@ export const MODULES = {
     required: true,
     defaultOn: true,
     permissions: ['AuditLogsQuery.Read.All', 'Reports.Read.All'],
+    azure: { supported: true, graphRoles: ['AuditLogsQuery.Read.All', 'Reports.Read.All', 'User.Read.All'] },
     pipelineParameter: null,
   },
   orgData: {
@@ -38,6 +40,7 @@ export const MODULES = {
     required: true,
     defaultOn: true,
     permissions: ['User.Read.All'],
+    azure: { supported: true, graphRoles: ['User.Read.All'] },
     pipelineParameter: 'EnableOrgDataPull',
   },
   m365Activity: {
@@ -47,6 +50,7 @@ export const MODULES = {
     required: false,
     defaultOn: true,
     permissions: ['Reports.Read.All'],
+    azure: { supported: true, graphRoles: ['Reports.Read.All', 'ReportSettings.Read.All'] },
     pipelineParameter: 'EnableM365Activity',
   },
   agent365: {
@@ -56,6 +60,7 @@ export const MODULES = {
     required: false,
     defaultOn: false,
     permissions: ['CopilotPackages.Read.All', 'Application.Read.All', 'User.Read.All'],
+    azure: { supported: false, graphRoles: [] },
     pipelineParameter: 'EnableAgent365',
   },
   productFeedback: {
@@ -65,6 +70,7 @@ export const MODULES = {
     required: false,
     defaultOn: false,
     permissions: [],
+    azure: { supported: false, graphRoles: [] },
     pipelineParameter: 'EnableProductFeedback',
   },
   consumption: {
@@ -74,6 +80,7 @@ export const MODULES = {
     required: false,
     defaultOn: false,
     permissions: [],
+    azure: { supported: false, graphRoles: [] },
     pipelineParameter: null,
   },
   agentEvaluator: {
@@ -83,6 +90,7 @@ export const MODULES = {
     required: false,
     defaultOn: false,
     permissions: [],
+    azure: { supported: false, graphRoles: [] },
     pipelineParameter: null,
   },
 };
@@ -346,6 +354,19 @@ export function permissionsFor(modules) {
   const set = new Set([...MODULES.core.permissions, ...MODULES.orgData.permissions]);
   for (const id of enabledModules(modules)) {
     for (const p of MODULES[id].permissions) set.add(p);
+  }
+  return [...set].sort();
+}
+
+/**
+ * Graph application roles assigned to the Azure managed identity for the selected modules.
+ * @param {ModuleChoice} modules
+ */
+export function azureGraphRolesFor(modules) {
+  const set = new Set(MODULES.core.azure.graphRoles);
+  for (const id of enabledModules(modules)) {
+    if (!MODULES[id].azure.supported && id !== 'core') continue;
+    for (const p of MODULES[id].azure.graphRoles) set.add(p);
   }
   return [...set].sort();
 }

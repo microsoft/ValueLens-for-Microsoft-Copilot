@@ -1,0 +1,68 @@
+name: azure-images
+
+# Builds the two container images the Azure-hosted Analytics Hub runs: valuelens-jobs (collect,
+# process, publish, refresh) and valuelens-web (the app and its /api/query proxy). The installer
+# deploys ghcr.io/microsoft/<image>:<installer version>, so an installer-v* tag pushes both images
+# with that version. Pull requests only check that they build.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['installer-v*']
+  pull_request:
+    paths:
+      - '5. Azure/jobs/**'
+      - '5. Azure/web/**'
+      - '5. Azure/sql/**'
+      - 'shared/python/**'
+      - '1. Fabric/Fabric App/**'
+      - '.github/workflows/azure-images.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [valuelens-jobs, valuelens-web]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The lock files may resolve through Microsoft's internal mirror of npm, which runners can't reach.
+      - name: Use the public npm registry
+        if: matrix.image == 'valuelens-web'
+        run: node "1. Fabric/installer/packaging/public-registry.js" "1. Fabric/Fabric App/package-lock.json" "5. Azure/web/package-lock.json"
+
+      - name: Work out the tag
+        id: tag
+        run: |
+          version=$(node -p "require('./1. Fabric/installer/package.json').version")
+          if [[ "$GITHUB_REF" == refs/tags/installer-v* && "$GITHUB_REF_NAME" != "installer-v$version" ]]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match the installer's version $version." >&2; exit 1
+          fi
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${{ matrix.image }}:$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          dockerfile="5. Azure/${{ matrix.image == 'valuelens-jobs' && 'jobs' || 'web' }}/Dockerfile"
+          docker build -f "$dockerfile" -t "${{ steps.tag.outputs.image }}" .
+
+      - name: Smoke-test the jobs image
+        if: matrix.image == 'valuelens-jobs'
+        run: docker run --rm "${{ steps.tag.outputs.image }}" --help
+
+      - name: Push
+        if: startsWith(github.ref, 'refs/tags/installer-v') || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "${{ steps.tag.outputs.image }}"

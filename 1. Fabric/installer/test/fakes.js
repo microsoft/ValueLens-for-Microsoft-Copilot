@@ -1,9 +1,15 @@
 // @ts-check
 /** In-memory stand-ins for the Fabric and Graph APIs, the UI and the install record. */
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { emptyConfig } from '../src/config.js';
 import { HttpError } from '../src/http.js';
 import { loadSources } from '../src/sources.js';
 import { createUi } from '../src/ui.js';
+
+/** Where fake installs keep their record, so files written beside it (the Teams package) stay out of the repo. */
+const TEST_RECORD_DIR = mkdtempSync(join(tmpdir(), 'valuelens-installer-test-'));
 
 let sources;
 /** Loads the real notebooks and pipeline once. */
@@ -254,6 +260,148 @@ export function fakeGraph() {
   return { api, passwords, calls, failures };
 }
 
+/** Azure Resource Manager fake for the Azure installer path. */
+export function fakeArm() {
+  /** @type {string[]} */
+  const calls = [];
+  /** @type {any[]} */
+  const resources = [];
+  /** @type {Record<string, any>} */
+  const groups = {};
+  /** @type {any[]} */
+  const executions = [];
+  /** @type {Record<string, Error[]>} */
+  const failures = {};
+  const fail = (/** @type {string} */ method) => {
+    const err = failures[method]?.shift();
+    if (err) throw err;
+  };
+  const api = {
+    listSubscriptions: async () => [{ subscriptionId: 'sub-1', displayName: 'Sub', state: 'Enabled' }],
+    listLocations: async () => [{ name: 'uksouth', displayName: 'UK South' }],
+    listResourceGroups: async () => Object.values(groups),
+    getResourceGroup: async (/** @type {string} */ _sub, /** @type {string} */ name) => groups[name] ?? null,
+    ensureResourceGroup: async (/** @type {string} */ _sub, /** @type {string} */ name, /** @type {string} */ location, /** @type {any} */ tags = {}) => {
+      calls.push(`ensureResourceGroup ${name}`);
+      groups[name] = { name, location, tags };
+      return groups[name];
+    },
+    ensureProvider: async (/** @type {string} */ _sub, /** @type {string} */ ns) => {
+      calls.push(`ensureProvider ${ns}`);
+      return false;
+    },
+    validateDeployment: async () => {
+      calls.push('validateDeployment');
+      fail('validateDeployment');
+      return {};
+    },
+    whatIfDeployment: async () => {
+      calls.push('whatIfDeployment');
+      return { properties: { changes: [{ changeType: 'Create', resourceType: 'Microsoft.App/jobs', resourceId: '/x/run' }] } };
+    },
+    listResources: async () => resources,
+    deployTemplate: async (/** @type {string} */ _sub, /** @type {string} */ _rg, /** @type {string} */ name) => {
+      calls.push(`deployTemplate ${name}`);
+      return {
+        name,
+        properties: {
+          outputs: {
+            identityPrincipalId: { value: 'mi-sp' },
+            identityClientId: { value: 'mi-client' },
+            sqlServerFqdn: { value: 'vlens-sql.database.windows.net' },
+            sqlDatabaseName: { value: 'valuelens' },
+            runJobName: { value: 'vlens-run' },
+            migrateJobName: { value: 'vlens-migrate' },
+            webFqdn: { value: 'vlens.example.com' },
+            webUrl: { value: 'https://vlens.example.com' },
+            webName: { value: 'vlens-web' },
+          },
+        },
+      };
+    },
+    getSqlDatabase: async () => null,
+    startContainerAppJob: async (/** @type {string} */ _sub, /** @type {string} */ _rg, /** @type {string} */ name) => {
+      calls.push(`startJob ${name}`);
+      return { name: `${name}-exec` };
+    },
+    getContainerAppJobExecution: async () => executions.shift() ?? { properties: { status: 'Succeeded' } },
+    listContainerAppJobExecutions: async () => executions,
+    deleteResourceGroup: async (/** @type {string} */ _sub, /** @type {string} */ rg) => {
+      calls.push(`deleteResourceGroup ${rg}`);
+      delete groups[rg];
+    },
+    deleteResource: async (/** @type {string} */ id) => {
+      calls.push(`deleteResource ${id}`);
+    },
+  };
+  return { api, calls, resources, groups, executions, failures };
+}
+
+/** Rich Graph fake for Azure app registration work. */
+export function fakeAzureGraph() {
+  let n = 0;
+  /** @type {string[]} */
+  const calls = [];
+  /** @type {any[]} */
+  const applications = [];
+  /** @type {any[]} */
+  const servicePrincipals = [];
+  const graphSp = { id: 'graph-sp', appId: '00000003-0000-0000-c000-000000000000', appRoles: [
+    { id: 'r-audit', value: 'AuditLogsQuery.Read.All' },
+    { id: 'r-reports', value: 'Reports.Read.All' },
+    { id: 'r-users', value: 'User.Read.All' },
+    { id: 'r-settings', value: 'ReportSettings.Read.All' },
+  ], oauth2PermissionScopes: [{ id: 's-user-read', value: 'User.Read' }] };
+  const pbiSp = { id: 'pbi-sp', appId: '00000009-0000-0000-c000-000000000000', oauth2PermissionScopes: [{ id: 's-dataset', value: 'Dataset.Read.All' }] };
+  const api = {
+    servicePrincipalByAppId: async (/** @type {string} */ appId) => (appId === pbiSp.appId ? pbiSp : graphSp),
+    graphServicePrincipal: async () => graphSp,
+    findApplication: async (/** @type {string} */ appId) => applications.find((a) => a.appId === appId) ?? null,
+    findServicePrincipal: async (/** @type {string} */ appId) => servicePrincipals.find((s) => s.appId === appId) ?? null,
+    createAzureWebApplication: async (/** @type {any} */ body) => {
+      calls.push(`createAzureWebApplication ${body.displayName}`);
+      const app = { id: `app-obj-${++n}`, appId: `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`, displayName: body.displayName, api: { oauth2PermissionScopes: [{ id: 'scope-access', value: 'access_as_user' }] }, appRoles: [] };
+      applications.push(app);
+      return app;
+    },
+    updateAzureWebApplication: async (/** @type {any} */ app, /** @type {any} */ body) => {
+      calls.push(`updateAzureWebApplication ${body.fqdn}`);
+      app.identifierUris = [`api://${body.fqdn}/${body.clientId}`];
+      app.spa = { redirectUris: [`https://${body.fqdn}/`, `https://${body.fqdn}/?host=teams&auth=popup`] };
+      app.api = { oauth2PermissionScopes: [{ id: 'scope-access', value: 'access_as_user' }], preAuthorizedApplications: body.teamsClientIds.map((id) => ({ appId: id })) };
+      app.appRoles = [{ value: 'AnalyticsHub.User' }, { value: 'AnalyticsHub.Admin' }];
+      return 'scope-access';
+    },
+    createApplication: async (/** @type {string} */ name) => {
+      calls.push(`createApplication ${name}`);
+      const app = { id: `app-obj-${++n}`, appId: `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`, displayName: name };
+      applications.push(app);
+      return app;
+    },
+    createServicePrincipal: async (/** @type {string} */ appId) => {
+      calls.push(`createServicePrincipal ${appId}`);
+      const sp = { id: `sp-${appId}`, appId };
+      servicePrincipals.push(sp);
+      return sp;
+    },
+    addFederatedIdentityCredential: async (/** @type {string} */ id, /** @type {any} */ fic) => {
+      calls.push(`fic ${id} ${fic.subject}`);
+      return fic;
+    },
+    addPassword: async (/** @type {string} */ _id, /** @type {Date} */ end) => ({ keyId: `key-${++n}`, secretText: `secret-${n}`, endDateTime: end.toISOString() }),
+    assignPrincipalToAppRole: async (/** @type {string} */ principal, /** @type {string} */ _resource, /** @type {string} */ role) => {
+      calls.push(`assign ${principal} ${role}`);
+    },
+    grantOauth2Permission: async (/** @type {any} */ g) => {
+      calls.push(`oauth ${g.scope}`);
+    },
+    deleteApplication: async (/** @type {string} */ id) => {
+      calls.push(`deleteApplication ${id}`);
+    },
+  };
+  return { api, calls, applications, servicePrincipals };
+}
+
 /** Power BI refreshes. `states` scripts what each poll of a refresh returns. */
 export function fakePowerBi() {
   /** @type {string[]} */
@@ -269,6 +417,20 @@ export function fakePowerBi() {
   let n = 0;
   const api = {
     datasources: async () => datasources,
+    groups: async () => [],
+    createGroup: async (/** @type {string} */ name) => {
+      calls.push(`createGroup ${name}`);
+      return { id: 'pbi-ws-1', name };
+    },
+    addGroupUser: async (/** @type {string} */ ws, /** @type {any} */ body) => {
+      calls.push(`addGroupUser ${ws} ${body.identifier}`);
+    },
+    setRefreshSchedule: async (/** @type {string} */ ws, /** @type {string} */ dataset) => {
+      calls.push(`setRefreshSchedule ${ws} ${dataset}`);
+    },
+    updateDatasource: async (/** @type {string} */ gw, /** @type {string} */ ds, /** @type {any} */ body) => {
+      calls.push(`updateDatasource ${gw} ${ds} ${body.credentialDetails.credentialType}`);
+    },
     /** @param {string} _ws @param {string} id @param {any} body */
     refresh: async (_ws, id, body) => {
       calls.push(`refresh ${id} ${body.type}`);
@@ -315,6 +477,7 @@ export function fakeCtx(o = {}) {
     /** @type {unknown} */ ({
       ui: o.ui ?? fakeUi().ui,
       config,
+      file: join(TEST_RECORD_DIR, 'valuelens-install.json'),
       save: () => {
         saves++;
       },

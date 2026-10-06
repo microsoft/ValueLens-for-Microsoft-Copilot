@@ -11,7 +11,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthGate } from "@/components/auth-gate.component";
 import { AuthProvider } from "@/hooks/use-auth";
-import type { IAuthService } from "@/services/rayfin-auth.service";
+import { AnalyticsHubAccessDeniedError, type IAuthService } from "@/services/rayfin-auth.service";
+
+const runtime = vi.hoisted(() => ({ host: "fabric" as "fabric" | "azure" }));
+
+vi.mock("@/lib/runtime-config", () => ({
+    runtimeConfig: () => ({ host: runtime.host, rayfin: {}, semanticModels: {} }),
+}));
 
 const authenticatedSession: OpaqueSession = {
     user: {
@@ -28,6 +34,7 @@ function createAuthService(
     return {
         initEmbeddedAuth: vi.fn().mockResolvedValue(null),
         signIn: vi.fn().mockResolvedValue(authenticatedSession),
+        getAccessToken: vi.fn().mockResolvedValue("token"),
         ...overrides,
     };
 }
@@ -50,6 +57,7 @@ const fabricLink = "https://app.fabric.microsoft.com/groups/ws-1/appbackends/ite
 describe("AuthGate", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        runtime.host = "fabric";
     });
 
     it("sends a visitor on the hosting address to the app's Fabric item instead of signing in", async () => {
@@ -145,4 +153,24 @@ describe("AuthGate", () => {
             name: "Sign in with Fabric",
         })).not.toBeInTheDocument();
     });
+
+    it("does not redirect Azure-hosted users to Fabric", async () => {
+        runtime.host = "azure";
+        const authService = createAuthService();
+        renderAuthGate(authService, { embedded: false, fabricLink });
+
+        expect(await screen.findByRole("button", { name: "Sign in with Microsoft" })).toBeInTheDocument();
+        expect(screen.queryByRole("link", { name: "Open in Fabric" })).not.toBeInTheDocument();
+    });
+
+    it("shows the Azure access denied message", async () => {
+        runtime.host = "azure";
+        const authService = createAuthService({
+            initEmbeddedAuth: vi.fn().mockRejectedValue(new AnalyticsHubAccessDeniedError()),
+        });
+        renderAuthGate(authService);
+
+        expect(await screen.findByRole("alert")).toHaveTextContent("Ask your admin to add you to Analytics Hub users");
+    });
+
 });

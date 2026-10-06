@@ -63,9 +63,17 @@ def test_jobs_process_end_to_end(tmp_path):
     out = tmp_path / "curated" / "copilot_interactions_curated" / "part-0.parquet"
     assert duckdb.sql(f"SELECT count(*) FROM read_parquet('{out.as_posix()}')").fetchone()[0] == 1
 
-    pending = subprocess.run([sys.executable, "-m", "valuelens_jobs", "run", "--steps", "collect"],
-                             env={**os.environ, **env}, capture_output=True, text=True)
-    assert pending.returncode == 2 and "Phase 1" in pending.stderr
+    clean = {k: v for k, v in os.environ.items() if not k.startswith("VALUELENS_")}
+    unconfigured = subprocess.run([sys.executable, "-m", "valuelens_jobs", "run", "--steps", "collect"],
+                                  env={**clean, **env}, capture_output=True, text=True)
+    assert unconfigured.returncode == 1 and "VALUELENS_STORAGE_ACCOUNT" in unconfigured.stderr
+
+
+@pytest.mark.parametrize("name", ["build-package.mjs", "manifest.template.json", "color.png", "outline.png"])
+def test_installer_teams_package_is_vendored_copy(name):
+    vendored = ROOT / "1. Fabric" / "installer" / "src" / "azure" / "teams" / name
+    assert vendored.read_bytes() == (AZURE / "teams" / name).read_bytes(), \
+        f"copy 5. Azure/teams/{name} to {vendored.relative_to(ROOT)}"
 
 
 @pytest.mark.skipif(not shutil.which("az") and not (Path.home() / ".azure" / "bin").exists(),

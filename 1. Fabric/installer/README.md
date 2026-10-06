@@ -19,6 +19,44 @@ and the Analytics Hub app. Then it loads the first data and checks it.
 
 The Graph permissions are listed in [`/docs/PERMISSIONS.md`](../../docs/PERMISSIONS.md).
 
+## Azure target (preview)
+
+The installer can also set up the Phase 1 preview in **your Azure subscription**. Start it with
+`--target azure`, or pick **Your Azure subscription** as the first wizard answer.
+
+You need:
+
+- Contributor plus User Access Administrator (or Owner) on the subscription or resource group.
+- Permission to register Entra apps, or an Application Administrator.
+- A Global Administrator or Privileged Role Administrator to grant the managed identity's Graph app
+  roles, or to use the admin links the installer prints.
+- Power BI Pro or PPU, and permission to create or use the chosen Power BI workspace.
+- Teams custom app upload rights, or a Teams admin to upload the generated package.
+- The tenant settings *Service principals can call Fabric public APIs* (enabled for a group that holds
+  the managed identity, so the jobs can refresh the model) and *Semantic Model Execute Queries REST
+  API* (for the app's queries).
+
+The preview creates or reuses a resource group and deploys a managed identity, Storage, Log Analytics,
+Azure SQL Database serverless, Container Apps jobs, and the web app from the ARM template in
+`src/azure/main.arm.json`. It also creates the Azure web app registration, an SQL reader app
+registration, a Power BI workspace and model, and an `AnalyticsHub-Teams.zip` package (the app as a
+Teams tab, built by `src/azure/teams/build-package.mjs`) next to the install record.
+
+Only `core`, `orgData`, and `m365Activity` are supported on Azure in this preview. Other modules are
+shown as coming soon and cannot be selected. Re-runs are incremental and use the same
+`valuelens-install.json`, with `target: "azure"` and an `azure` block. The installer tags every Azure
+resource with `valuelens-install-id` and stops rather than modifying untagged resources with colliding
+names.
+
+Azure commands:
+
+- `run` starts the Container Apps run job.
+- `status` shows job executions, the web URL, pending admin actions, and SQL reader secret expiry.
+- `refresh` starts a Power BI model refresh.
+- `update` re-runs preflight/what-if and redeploys with the current installer image tag.
+- `rotate-secret` creates a new SQL reader secret and rebinds the Power BI credential.
+- `uninstall` deletes the created resource group, or only tagged resources if you used an existing group.
+
 ## Run it
 
 1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe).

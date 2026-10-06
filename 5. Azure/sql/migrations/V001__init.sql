@@ -1,9 +1,9 @@
 -- V001: schema_version + the curated interactions fact.
 -- Table and column names match the Fabric Lakehouse table so the ValueLens Model's
--- M expressions only change their source function (FabricTable -> SqlTable).
+-- queries keep their FabricTable(...) calls; only the parameters point at Sql.Database.
 -- Columns are the model contract produced by valuelens_core.curate(); keep them in
 -- step with tests/fixtures/valuelens-golden/expected (enforced by test_azure_scaffold.py).
--- Optional passthrough/source columns (e.g. *_Raw) are added by later migrations if enabled.
+-- Optional passthrough/source columns (e.g. *_Raw) are added by the publish step (ALTER ADD, NULLable).
 
 IF OBJECT_ID(N'dbo.schema_version', N'U') IS NULL
 CREATE TABLE dbo.schema_version (
@@ -87,10 +87,8 @@ CREATE CLUSTERED COLUMNSTORE INDEX cci_copilot_interactions_curated
     ON dbo.copilot_interactions_curated;
 GO
 
--- Publish loads each run into a staging copy, then swaps date partitions with MERGE/DELETE+INSERT.
-IF OBJECT_ID(N'dbo.copilot_interactions_curated_staging', N'U') IS NULL
-SELECT TOP 0 * INTO dbo.copilot_interactions_curated_staging FROM dbo.copilot_interactions_curated;
-GO
+-- Publish rewrites only changed date partitions (DELETE + INSERT per day, one transaction each),
+-- tracking per-day fingerprints in dbo.valuelens_publish_state, which it creates on first run.
 
 IF NOT EXISTS (SELECT 1 FROM dbo.schema_version WHERE version = 1)
 INSERT dbo.schema_version (version, description) VALUES (1, N'init: copilot_interactions_curated');

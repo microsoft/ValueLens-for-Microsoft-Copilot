@@ -427,5 +427,12 @@ tests/fixtures/valuelens-golden/
 | DuckDB processor port (`curate()`) plus CLI | `shared/python/valuelens_core` | Done: matches the notebook exactly; tested in CI |
 | Bicep: MI, monitoring, ADLS, SQL serverless, Container Apps env, jobs, web | `5. Azure/infra` | Done: builds and lints cleanly; what-if is not yet run against a subscription |
 | SQL `V001` (curated fact, columnstore, schema_version) | `5. Azure/sql/migrations` | Done: checked against the golden contract in tests |
-| Jobs image and orchestrator | `5. Azure/jobs` | `process` works on local or mounted data; collect, publish, refresh and migrate are Phase 1 |
-| Web API, Teams manifest, app seams, installer Azure target | `5. Azure/web`, `5. Azure/teams`, `1. Fabric/...` | Not started (READMEs describe the design) |
+| Jobs image and orchestrator | `5. Azure/jobs` | Done (Phase 1): collect (licensed users, Purview audit, org, M365 activity), process, publish (incremental per-day DELETE + INSERT into Azure SQL), Power BI refresh, and `migrate`. Tested offline with fakes and sqlite |
+| Collector logic in the shared core (`audit`, `licensed`, `org`, `m365`) | `shared/python/valuelens_core` | Done: the audit flatten matches the notebook on Spark-generated goldens |
+| Web API: `/app.config.json`, `/api/query` (OBO `executeQueries` with a model allowlist), settings | `5. Azure/web` | Done: 10 tests |
+| App seams: runtime host detection, MSAL sign-in, `HttpFabricProxy`, `SettingsStore` | `1. Fabric/Fabric App` | Done: the Fabric build is unchanged; 1,664 tests pass |
+| Teams manifest and package builder | `5. Azure/teams` (vendored into the installer) | Done: built by the installer; SSO through the web app registration |
+| Installer Azure target: wizard choice, preflight, what-if, ARM deploy, app registrations, Graph roles, Power BI model, migrate, `run`, `status`, `refresh`, `update`, `rotate-secret`, `uninstall` | `1. Fabric/installer/src/azure`, `src/steps/azure` | Done: 206 tests pass |
+| CI: installer, web, ARM drift, and image builds (pushed to GHCR on `installer-v*` tags) | `.github/workflows/tests.yml`, `azure-images.yml` | Done |
+| End-to-end deployment to a real tenant and the 101-query parity check | | **Next.** This is the Phase 1 exit criterion |
+| Phase 2 modules (Agent 365, feedback, credit consumption, Agent Evaluator, Workday) and private networking | | Not started |

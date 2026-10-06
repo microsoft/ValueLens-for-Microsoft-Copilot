@@ -10,7 +10,7 @@ import { fromExe } from './launch.js';
 import { loadSources } from './sources.js';
 import { describeSchedule, modelDeployed } from './steps/fabric.js';
 
-export const WEB_COMMANDS = ['install', 'update', 'run', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret'];
+export const WEB_COMMANDS = ['install', 'update', 'run', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'uninstall'];
 const METHODS = ['browser', 'device-code', 'azure-cli'];
 
 /** @typedef {'browser' | 'device-code' | 'azure-cli'} Method */
@@ -22,29 +22,32 @@ const METHODS = ['browser', 'device-code', 'azure-cli'];
  */
 export function describeRecord(config) {
   const f = config.fabric;
+  const az = config.azure;
   const sm = config.semanticModel;
   const fa = config.fabricApp;
-  const installed = !!(f.workspaceId && f.lakehouseId);
+  const azure = config.target === 'azure';
+  const installed = azure ? !!(az?.subscriptionId && az.resourceGroup) : !!(f.workspaceId && f.lakehouseId);
   return {
     tenantId: config.tenantId,
     installed,
-    workspace: f.workspaceName ?? f.workspaceId,
-    workspaceUrl: f.workspaceId ? `https://app.fabric.microsoft.com/groups/${f.workspaceId}` : undefined,
-    lakehouse: f.lakehouseName,
+    workspace: azure ? az?.resourceGroup : f.workspaceName ?? f.workspaceId,
+    workspaceUrl: azure ? az?.outputs?.webUrl : f.workspaceId ? `https://app.fabric.microsoft.com/groups/${f.workspaceId}` : undefined,
+    lakehouse: azure ? az?.outputs?.sqlDatabaseName : f.lakehouseName,
     schedule: f.scheduleId ? describeSchedule(config.schedule) : undefined,
     data: collectedLabels(config.modules),
     model: sm.id ? sm.name : undefined,
-    app: fa.itemId ? { name: fa.name ?? 'Analytics Hub', url: fa.url } : undefined,
-    secretExpires: config.app.secretExpires?.slice(0, 10),
+    app: azure && az?.outputs?.webUrl ? { name: 'Analytics Hub', url: az.outputs.webUrl } : fa.itemId ? { name: fa.name ?? 'Analytics Hub', url: fa.url } : undefined,
+    secretExpires: (azure ? az?.sqlReader?.secretExpiry : config.app.secretExpires)?.slice(0, 10),
     firstRun: config.firstRun?.status,
     can: {
       update: installed,
-      run: installed && !!f.pipelineId,
-      check: installed && !!f.notebooks.dataCheck,
-      refresh: !!sm.id,
-      'deploy-app': modelDeployed(config),
+      run: installed && (azure || !!f.pipelineId),
+      check: !azure && installed && !!f.notebooks.dataCheck,
+      refresh: azure ? !!az?.powerBi?.datasetId : !!sm.id,
+      'deploy-app': !azure && modelDeployed(config),
       status: true,
-      'rotate-secret': !!(config.app.appId && config.keyVault.uri),
+      'rotate-secret': azure ? !!az?.sqlReader?.clientId : !!(config.app.appId && config.keyVault.uri),
+      uninstall: azure && installed,
     },
   };
 }
