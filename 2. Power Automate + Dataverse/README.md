@@ -93,6 +93,12 @@ For a live run, provide `AZURE_CLIENT_SECRET` through a secret store or process 
 
 The script prints the successful run ID. That value is the Power BI `Core Snapshot ID`.
 
+The snapshot runs the [Local CSV processor](../4.%20Local%20CSV/scripts/), so it carries the six
+[agent-type columns](../docs/DATA-DICTIONARY.md#agent-type-and-publisher). Snapshots built before
+those columns were added still load: the template classifies their rows in Power Query from the
+agent ID, name and AppIdentity only, so more rows can land in **Unclassified agents**. Build a new
+snapshot to get the full classification.
+
 If retained raw rows include cancelled, partial, or overlapping collector runs, pin the snapshot to one completed collector run and its audited UTC window:
 
 ```powershell

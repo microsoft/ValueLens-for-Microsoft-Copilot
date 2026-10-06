@@ -6,7 +6,7 @@ Two-input / two-output preprocessor for the ValueLens
 and AI-in-One Rollup PBIPs.
 
 Output profiles (--profile):
-    aibv  (default) : ValueLens. 55-column fact superset —
+    aibv  (default) : ValueLens. 61-column fact superset —
                       Environment {Licensed, Unlicensed} (licensing only;
                       Cowork is flagged in Agent Filter = Cowork/Agents/blank,
                       as in the Fabric notebook),
@@ -17,7 +17,12 @@ Output profiles (--profile):
                       grain for sliceability) + Audit_UserId passthrough.
                       Agent-linking keys as in the Fabric processor
                       (Agent_BotId, Agent_EnvironmentId, Prompts_Available,
-                      Exclude_Reason). Copilot Studio runtime records with no
+                      Exclude_Reason). Agent type / publisher columns
+                      (Agent_Key, Agent_Type, Agent_Type_Basis,
+                      Agent_Publisher, Agent_Is_Published,
+                      Agent_Consolidated_Name) from the same rules as the
+                      Fabric processor (optional --agent-type-overrides CSV).
+                      Copilot Studio runtime records with no
                       Messages are kept (one placeholder row, Message_isPrompt
                       FALSE); M365 Copilot twins, test pane, maker evaluation,
                       agent authoring, autonomous/workflow runs and Fabric
@@ -217,6 +222,14 @@ _NONGRAIN_ATTRS_AIBV: tuple[str, ...] = _NONGRAIN_ATTRS_AIO + (
     "Agent_EnvironmentId",
     "Prompts_Available",
     "Exclude_Reason",
+    # Agent type / publisher / consolidated name (describe_agent, same rules as
+    # the Fabric processor). Agent_Is_Published is TRUE/FALSE/blank text.
+    "Agent_Key",
+    "Agent_Type",
+    "Agent_Type_Basis",
+    "Agent_Publisher",
+    "Agent_Is_Published",
+    "Agent_Consolidated_Name",
 )
 
 # Final fact CSV schemas. One row per (grain x Message_Id). Message_Id is
@@ -1351,6 +1364,239 @@ def compute_agent_publish_status(agent_id: str, agent_name: str) -> str:
     return "Published"
 
 
+# ---------------------------------------------------------------------------
+# Agent type classification: what kind of agent a row used and who published it.
+# EXACT COPY of the classifier in the Fabric processor notebook
+# (1. Fabric/Manual setup/notebooks/Copilot_Audit_Log_Processor.ipynb, cell 2).
+# tests/test_agent_type_parity.py fails if the two copies drift, so edit both.
+# Agent_Type_Basis says how firm each category is:
+#   documented = a value pattern Microsoft documents for audit records
+#   observed   = seen in real audit data but not formally documented
+#   inferred   = the T_ / U_ / P_ agent-ID prefix convention, which Microsoft
+#                does not document
+#   override   = set by the optional --agent-type-overrides CSV
+# 'Agent Publish Status' (above) is the older, coarser flag ported from DAX:
+# 'Unpublished' only for 'Draft as 1P' agents. Agent_Is_Published below is
+# category-based and blank where the audit log cannot tell.
+# ---------------------------------------------------------------------------
+AGENT_TYPE_FP_PUBLISHED = "Microsoft first-party agents - published"
+AGENT_TYPE_FP_NON_PUBLISHED = "Microsoft first-party agents - non-published"
+AGENT_TYPE_FP_M365 = "Microsoft first-party agents - M365 Copilot agents"
+AGENT_TYPE_DECLARATIVE = "Microsoft 365 Copilot Agent Builder - declarative agents"
+AGENT_TYPE_CUSTOM_ENGINE = "Copilot Studio - custom engine agents"
+AGENT_TYPE_COPILOT_STUDIO = "Copilot Studio - other / standalone agents"
+AGENT_TYPE_FACILITATOR = "Microsoft Facilitator (Teams)"
+AGENT_TYPE_ORG_PUBLISHED = "Published by your organisation"
+AGENT_TYPE_SHARED = "Shared by creator"
+AGENT_TYPE_STORE = "Agent Store package (publisher not identified)"
+AGENT_TYPE_CONNECTED_APP = "Custom / third-party AI apps registered in your organisation"
+AGENT_TYPE_UNCLASSIFIED = "Unclassified agents"
+
+# Agent_Type -> (Agent_Publisher, Agent_Is_Published, Agent_Type_Basis).
+# Agent_Is_Published is None where the audit log cannot tell.
+AGENT_TYPE_INFO = {
+    AGENT_TYPE_FP_PUBLISHED: ("Microsoft", True, "documented/observed"),
+    AGENT_TYPE_FP_NON_PUBLISHED: ("Microsoft", False, "documented/observed"),
+    AGENT_TYPE_FP_M365: ("Microsoft", True, "observed"),
+    AGENT_TYPE_DECLARATIVE: ("Your organisation", None, "documented"),
+    AGENT_TYPE_CUSTOM_ENGINE: ("Your organisation", None, "documented"),
+    AGENT_TYPE_COPILOT_STUDIO: ("Your organisation", None, "documented"),
+    AGENT_TYPE_FACILITATOR: ("Microsoft", True, "documented"),
+    AGENT_TYPE_ORG_PUBLISHED: ("Your organisation", True, "inferred"),
+    AGENT_TYPE_SHARED: ("User-shared", False, "inferred"),
+    AGENT_TYPE_STORE: ("Agent Store", True, "inferred"),
+    AGENT_TYPE_CONNECTED_APP: ("Connected app", None, "documented"),
+    AGENT_TYPE_UNCLASSIFIED: ("Unknown", None, None),
+}
+FIRST_PARTY_AGENT_TYPES = (AGENT_TYPE_FP_PUBLISHED, AGENT_TYPE_FP_NON_PUBLISHED,
+                           AGENT_TYPE_FP_M365, AGENT_TYPE_FACILITATOR)
+
+# Microsoft agents that sometimes appear by name only. Extend as needed.
+MICROSOFT_AGENT_NAMES = (
+    "Researcher", "Analyst", "Facilitator", "Word Drafting Agent", "Draft as 1P Agent",
+    "Prompt Coach", "Writing Coach", "Idea Coach", "Career Coach", "Learning Coach", "Surveys",
+    "Skills Agent", "Employee Self-Service", "Visual Creator", "Project Manager",
+    "Knowledge Agent", "Interpreter", "Sales Agent", "Service Agent", "People", "Photos",
+)
+
+
+def _agent_text(value) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def _agent_name_key(value) -> str:
+    # 'Word Drafting Agent', 'WordDraftingAgent' and 'word-drafting-agent' compare equal.
+    return re.sub(r"[^a-z0-9]", "", _agent_text(value).lower())
+
+
+MICROSOFT_AGENT_CANONICAL = {_agent_name_key(name): name for name in MICROSOFT_AGENT_NAMES}
+
+
+def _microsoft_agent_segment(app_identity) -> str:
+    # '<name>' of an AppIdentity 'MicrosoftAgent.<name>.<...>'.
+    match = re.match(r"(?i)^microsoftagent\.([^.]+)", _agent_text(app_identity))
+    return match.group(1) if match else ""
+
+
+def microsoft_agent_name(agent_id=None, agent_name=None, app_identity=None):
+    """Canonical Microsoft agent name ('Researcher', 'Word Drafting Agent', ...) or None.
+
+    Tries the agent name, the agent ID (with and without a 'BuiltIn_' prefix) and the
+    <name> part of 'MicrosoftAgent.<name>.<...>'.
+    """
+    aid = _agent_text(agent_id)
+    candidates = [agent_name, aid, _microsoft_agent_segment(app_identity)]
+    if aid.lower().startswith("builtin_"):
+        candidates.append(aid[len("builtin_"):])
+    for candidate in candidates:
+        found = MICROSOFT_AGENT_CANONICAL.get(_agent_name_key(candidate))
+        if found:
+            return found
+    return None
+
+
+def build_agent_type_overrides(rows):
+    """{lower-cased key: Agent_Type} from (key, Agent_Type) pairs. Blank pairs are skipped."""
+    result = {}
+    for key, agent_type in rows:
+        key, agent_type = _agent_text(key).lower(), _agent_text(agent_type)
+        if key and agent_type:
+            result[key] = agent_type
+    return result
+
+
+def agent_type_override(overrides, agent_id=None, agent_name=None, app_identity=None):
+    # Agent ID first, then agent name, then AppIdentity.
+    for key in (agent_id, agent_name, app_identity):
+        key = _agent_text(key).lower()
+        if key and overrides and key in overrides:
+            return overrides[key]
+    return None
+
+
+def classify_agent(agent_id=None, agent_name=None, app_identity=None, agent_type=None, workload=None):
+    """Agent_Type for one row, or None when the row involves no agent. First match wins."""
+    aid, name, app = _agent_text(agent_id), _agent_text(agent_name), _agent_text(app_identity)
+    aid_l, app_l = aid.lower(), app.lower()
+    kind = re.sub(r"\s", "", _agent_text(agent_type).lower())
+    work = _agent_text(workload).lower()
+    blob = f"{aid_l} {app_l}"
+    if work == "aiapp" or app_l.startswith("aiapp."):
+        return None  # third-party SaaS AI apps (for example ChatGPT) are not agents
+    if work == "connectedaiapp" or app_l.startswith("connectedaiapp."):
+        return AGENT_TYPE_CONNECTED_APP
+    if app_l.startswith("copilot.teamcopilot."):
+        return AGENT_TYPE_FACILITATOR
+    if "customengine" in blob:
+        return AGENT_TYPE_CUSTOM_ENGINE
+    if "copilotstudio.declarative" in blob or "copilot.studio.declarative" in blob:
+        return AGENT_TYPE_DECLARATIVE
+    if app_l.startswith("microsoftagent.") or aid_l.startswith("builtin_") or microsoft_agent_name(aid, name, app):
+        if app_l.startswith("copilot.m365copilot"):
+            return AGENT_TYPE_FP_M365
+        if app_l.startswith("microsoftagent."):
+            published = re.match(r"^microsoftagent\..+\.p_", app_l) is not None
+        else:
+            published = aid_l.startswith("p_")
+        return AGENT_TYPE_FP_PUBLISHED if published else AGENT_TYPE_FP_NON_PUBLISHED
+    if app_l.startswith("copilot.studio.") or kind == "copilotstudio":
+        return AGENT_TYPE_COPILOT_STUDIO
+    if not (aid or name or kind):
+        return None  # plain Copilot chat: no agent fields
+    prefix = (aid or app)[:2].upper()
+    if prefix == "T_":
+        return AGENT_TYPE_ORG_PUBLISHED
+    if prefix == "U_":
+        return AGENT_TYPE_SHARED
+    if prefix == "P_":
+        return AGENT_TYPE_STORE
+    # An agent inside the Microsoft 365 Copilot app that no rule above identified.
+    if app_l.startswith("copilot.m365copilot"):
+        return AGENT_TYPE_FP_M365
+    return AGENT_TYPE_UNCLASSIFIED
+
+
+def describe_agent(agent_id=None, agent_name=None, app_identity=None, agent_type=None, workload=None,
+                   overrides=None):
+    """(Agent_Key, Agent_Type, Agent_Type_Basis, Agent_Publisher, Agent_Is_Published,
+    Agent_Consolidated_Name) for one row. All None when the row involves no agent.
+
+    Agent_Consolidated_Name rolls every Microsoft first-party row up to one canonical
+    name (for example all Researcher rows, whatever their ID or host); other agents
+    keep their own name.
+    """
+    aid, name, app = _agent_text(agent_id), _agent_text(agent_name), _agent_text(app_identity)
+    override = agent_type_override(overrides, aid, name, app)
+    category = override or classify_agent(aid, name, app, agent_type, workload)
+    if not category:
+        return (None,) * 6
+    publisher, published, basis = AGENT_TYPE_INFO.get(category, ("Unknown", None, None))
+    if override:
+        basis = "override"
+    consolidated = None
+    if category in FIRST_PARTY_AGENT_TYPES:
+        consolidated = (microsoft_agent_name(aid, name, app)
+                        or ("Facilitator" if category == AGENT_TYPE_FACILITATOR else None)
+                        or name or _microsoft_agent_segment(app))
+    return (aid or name or app or None, category, basis, publisher, published,
+            consolidated or name or aid or app or None)
+
+
+# End of the exact copy. Processor-only glue below.
+AGENT_TYPE_COLS: tuple[str, ...] = (
+    "Agent_Key", "Agent_Type", "Agent_Type_Basis", "Agent_Publisher",
+    "Agent_Is_Published", "Agent_Consolidated_Name",
+)
+
+
+def load_agent_type_overrides(path: str | None) -> dict[str, str]:
+    """Overrides from a CSV with columns `key` and `Agent_Type` (or `Category`), as the
+    Fabric `agent_type_overrides` table. key is an agent ID, agent name or AppIdentity."""
+    if not path:
+        return {}
+    with open(path, "r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        cols = {(c or "").strip().lower(): c for c in (reader.fieldnames or [])}
+        key_col, type_col = cols.get("key"), cols.get("agent_type") or cols.get("category")
+        if not key_col or not type_col:
+            raise ValueError(f"{path}: agent-type overrides need 'key' and 'Agent_Type' columns")
+        return build_agent_type_overrides((row.get(key_col), row.get(type_col)) for row in reader)
+
+
+def make_agent_type_describer(overrides: dict[str, str] | None = None):
+    """describe_agent with the overrides bound and results cached per distinct input,
+    with the six values as CSV text (Agent_Is_Published as TRUE/FALSE/blank)."""
+    cache: dict[tuple[str, ...], tuple[str, ...]] = {}
+
+    def describe(agent_id: str, agent_name: str, app_identity: str, agent_type: str,
+                 workload: str) -> tuple[str, ...]:
+        key = (agent_id, agent_name, app_identity, agent_type, workload)
+        found = cache.get(key)
+        if found is None:
+            values = describe_agent(*key, overrides=overrides)
+            published = values[4]
+            found = tuple("" if v is None else v for v in values[:4]) + (
+                "" if published is None else ("TRUE" if published else "FALSE"),
+                values[5] or "",
+            )
+            cache[key] = found
+        return found
+
+    return describe
+
+
+_DEFAULT_AGENT_TYPE_DESCRIBER = make_agent_type_describer()
+
+
+def _first_text(*values: Any) -> str:
+    # First non-blank value, trimmed (the Fabric COALESCE over trimmed fields).
+    for value in values:
+        text = to_text(value).strip()
+        if text:
+            return text
+    return ""
+
+
 # Verbatim port of AIBV calc col `Is_Agent_Activity` (emitted as TRUE/FALSE text,
 # mirroring the Is_Sensitive / Message_isPrompt convention; the PBIT types it
 # logical in Phase 3). res_type is the per-resource AccessedResource_Type.
@@ -1643,6 +1889,7 @@ def explode_record(
     thread_key_map: dict[str, int],
     profile: str,
     exclusion_counts: dict[str, int] | None = None,
+    describe_agent_type=None,
 ) -> list[dict[str, Any]]:
     creation_time_raw = audit_data.get("CreationTime")
     creation_time_raw_str = to_text(creation_time_raw).strip()
@@ -1747,6 +1994,16 @@ def explode_record(
     in_entra = (audit_user_id_norm in user_lookup) if audit_user_id_norm else True
     # AIBV-only per-record constants.
     agent_publish_status = compute_agent_publish_status(agent_id, agent_name) if is_aibv else ""
+    agent_type_values: tuple[str, ...] = ("",) * len(AGENT_TYPE_COLS)
+    if is_aibv:
+        # Same inputs as the Fabric processor: CopilotEventData agent fields first.
+        agent_type_values = (describe_agent_type or _DEFAULT_AGENT_TYPE_DESCRIBER)(
+            _first_text(ced.get("TargetPlatformAgentId"), agent_id, audit_data.get("PlatformAgentId")),
+            _first_text(ced.get("TargetAgentName"), ced.get("AgentName"), agent_name),
+            app_identity_display.strip(),
+            _first_text(ced.get("PlatformAgentType"), audit_data.get("AgentPlatform")),
+            _first_text(audit_data.get("Workload")),
+        )
     # has_agent gate for the Behavior_Category "logic app" branch (AIBV).
     has_agent_ctx = bool(agent_name.strip()) or bool(agent_id.strip())
 
@@ -1801,6 +2058,7 @@ def explode_record(
             "Prompts_Available": prompts_available,
             "Exclude_Reason": exclude_reason,
         })
+        base_nongrain.update(zip(AGENT_TYPE_COLS, agent_type_values))
 
     # Output schema: list of tuples
     #   (grain_tuple, message_id_str, nongrain_dict, in_entra, audit_user_id_norm)
@@ -2172,6 +2430,7 @@ def run_processor(
     agg_paths: dict[str, str] | None = None,
     quiet: bool = False,
     licensing_csv: str | None = None,
+    agent_type_overrides_csv: str | None = None,
 ) -> dict[str, Any]:
     start_time = time.perf_counter()
     stats: dict[str, Any] = {
@@ -2226,6 +2485,10 @@ def run_processor(
     mid_to_int: dict[str, int] = {}
     unmatched: set[str] = set()
     exclusion_counts: dict[str, int] = {}
+    agent_type_overrides = load_agent_type_overrides(agent_type_overrides_csv)
+    if agent_type_overrides_csv and not quiet:
+        print(f"  Agent type overrides: {len(agent_type_overrides):,} from {agent_type_overrides_csv}")
+    describe_agent_type = make_agent_type_describer(agent_type_overrides)
 
     with open(purview_csv, "r", encoding="utf-8-sig", newline="") as fin:
         reader = csv.DictReader(fin)
@@ -2250,7 +2513,7 @@ def run_processor(
 
             try:
                 rows = explode_record(audit_data, user_lookup, user_key_map, thread_key_map, profile,
-                                      exclusion_counts)
+                                      exclusion_counts, describe_agent_type)
             except Exception:
                 stats["errors"] += 1
                 continue
@@ -2420,6 +2683,15 @@ def main() -> None:
         help=argparse.SUPPRESS,
     )
     parser.add_argument(
+        "--agent-type-overrides",
+        default=None,
+        help=(
+            "Optional CSV with columns `key` and `Agent_Type`. key is an agent ID, "
+            "agent name or AppIdentity (case-insensitive); Agent_Type replaces the "
+            "rule-based category (Agent_Type_Basis = override). aibv only."
+        ),
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {SCRIPT_VERSION}",
@@ -2446,6 +2718,10 @@ def main() -> None:
     licensing_path = os.path.abspath(args.licensing) if args.licensing else None
     if licensing_path and not os.path.isfile(licensing_path):
         print(f"ERROR: Licensing input file not found: {licensing_path}", file=sys.stderr)
+        sys.exit(1)
+    overrides_path = os.path.abspath(args.agent_type_overrides) if args.agent_type_overrides else None
+    if overrides_path and not os.path.isfile(overrides_path):
+        print(f"ERROR: Agent type overrides file not found: {overrides_path}", file=sys.stderr)
         sys.exit(1)
 
     out_dir = Path(os.path.abspath(args.out_dir)) if args.out_dir else Path(purview_path).parent
@@ -2480,6 +2756,7 @@ def main() -> None:
         agg_paths=agg_paths,
         quiet=args.quiet,
         licensing_csv=licensing_path,
+        agent_type_overrides_csv=overrides_path,
     )
     sys.exit(1 if stats["errors"] > 0 else 0)
 
