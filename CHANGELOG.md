@@ -68,6 +68,29 @@ See [An audit window keeps failing](1.%20Fabric/Manual%20setup/notebooks/README.
 
 ---
 
+## 2026-10-07 — Analytics Hub installer 0.3.2: Azure install fix
+
+Every Azure install with the default settings (images pulled from the public
+`ghcr.io/microsoft/valuelens-*` registry) failed at step 2, *Azure resources*, with
+`InvalidTemplate: ... 'vl-containerapps' ... array index '2' is out of bounds`.
+
+The template's optional private-registry step (the AcrPull role assignment) took its
+subscription and resource group by splitting `imageRegistryResourceId`, and the Container Apps
+deployment always depends on it. ARM evaluates those expressions while validating, even when
+the step is switched off, so an empty registry id broke the deployment. `2. Azure/infra/main.bicep`
+now parses a well-formed stand-in id when no private registry is set; installs that use a private
+Azure Container Registry are unchanged.
+
+The installer tests now evaluate the compiled template the way ARM validates it, with the
+parameters the installer sends (default, private registry, private networking), so this class of
+error fails CI. Previously CI only checked that the template matched the Bicep source and that the
+parameter names and types lined up.
+
+The tag publishes the `valuelens-jobs` and `valuelens-web` images as `0.3.2`. To update, download
+the installer again, open it and choose **Repair or change**.
+
+---
+
 ## 2026-10-07 — Analytics Hub installer 0.3.1
 
 The installer bundles the notebooks, templates and app when it is built, so this release brings
