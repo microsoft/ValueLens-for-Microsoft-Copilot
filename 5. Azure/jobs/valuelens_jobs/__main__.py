@@ -95,6 +95,9 @@ def collect(store, settings, api=None) -> dict:
 
 
 def publish_targets(settings) -> list[str]:
+    if settings.sample_data:
+        # The sample replaces the people and Copilot tables; tenant M365 activity is left as it is.
+        return ["curated", "licensed", "org"]
     targets = []
     if settings.has("core"):
         targets += ["curated", "licensed"]
@@ -174,13 +177,24 @@ def main(argv=None, env=None) -> int:
     if unknown:
         ap.error(f"unknown steps {unknown}; expected a subset of {list(STEPS)}")
     store = open_store(args.data_dir, settings) if {"collect", "process", "publish"} & set(steps) else None
+    if store is not None and settings.sample_data:
+        import tempfile
+
+        # A throwaway store, so the tenant's collected data in Storage is neither read nor changed.
+        store = LocalStore(tempfile.mkdtemp(prefix="valuelens-sample-"))
+        log.warning("VALUELENS_SAMPLE_DATA is on: publishing the synthetic sample instead of tenant data")
     collect_errors = {}
     for step in STEPS:
         if step not in steps:
             continue
         log.info("step %s: start", step)
         if step == "collect":
-            collect_errors = collect(store, settings).get("errors", {})
+            if settings.sample_data:
+                from .sample import load
+
+                load(store)
+            else:
+                collect_errors = collect(store, settings).get("errors", {})
         elif step == "process":
             process(store)
         elif step == "publish":

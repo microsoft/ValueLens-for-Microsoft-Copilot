@@ -23,6 +23,7 @@ class Settings:
     audit_lookback_days: int = 7
     sql_reader_name: str = ""
     sql_reader_client_id: str = ""
+    sample_data: bool = False
 
     def has(self, module: str) -> bool:
         return module in self.modules
@@ -52,6 +53,7 @@ class Settings:
             audit_lookback_days=_int(env, "VALUELENS_AUDIT_LOOKBACK_DAYS", 7),
             sql_reader_name=env.get("VALUELENS_SQL_READER_NAME", ""),
             sql_reader_client_id=env.get("VALUELENS_SQL_READER_CLIENT_ID", ""),
+            sample_data=(env.get("VALUELENS_SAMPLE_DATA") or "").strip().lower() in ("true", "1", "yes"),
         )
 
 

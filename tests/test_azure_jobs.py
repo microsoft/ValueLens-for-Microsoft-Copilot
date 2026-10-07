@@ -521,6 +521,41 @@ def test_settings_from_env():
 def test_publish_targets_follow_modules():
     assert jobs_main.publish_targets(settings(modules=frozenset({"core"}))) == ["curated", "licensed"]
     assert jobs_main.publish_targets(settings()) == ["curated", "licensed", "org", "m365"]
+    assert jobs_main.publish_targets(settings(sample_data=True)) == ["curated", "licensed", "org"]
+
+
+def test_sample_data_setting_from_env():
+    assert Settings.from_env({"VALUELENS_SAMPLE_DATA": "true"}).sample_data is True
+    assert Settings.from_env({}).sample_data is False
+
+
+def test_sample_week_shift_keeps_weekdays_and_lands_last_week():
+    from valuelens_jobs.sample import week_shift
+
+    assert week_shift(date(2026, 8, 31), date(2026, 10, 6)) == 35
+    assert week_shift(date(2026, 10, 5), date(2026, 10, 6)) == 0
+    assert week_shift(date(2026, 10, 6), date(2026, 10, 6)) == 0
+
+
+def test_sample_load_runs_through_processor(tmp_path):
+    from pathlib import Path
+
+    from valuelens_jobs import sample
+
+    folder = Path(__file__).resolve().parents[1] / "4. Local CSV" / "sample-data"
+    store = LocalStore(tmp_path)
+    info = sample.load(store, folder=folder, today=date(2026, 10, 6))
+    assert info["people"] == 170 and info["shift_days"] == 35
+    assert jobs_main.process(store) == info["interactions"]
+
+    curated = f"read_parquet('{(tmp_path / 'curated/copilot_interactions_curated').as_posix()}/*.parquet')"
+    users, latest, licensed = duckdb.sql(
+        f"SELECT count(DISTINCT Audit_UserId), max(InteractionDate), "
+        f"count(*) FILTER (WHERE \"Has license\"::VARCHAR = 'TRUE') FROM {curated}").fetchone()
+    assert users == 151 and latest == date(2026, 10, 5) and licensed > 0
+    for prefix in ("raw/copilot_org_data", "raw/copilot_licensed_users"):
+        rows = duckdb.sql(f"SELECT count(*) FROM read_parquet('{(tmp_path / prefix).as_posix()}/*.parquet')").fetchone()[0]
+        assert rows == 170
 
 
 def test_collect_dispatch_follows_modules(tmp_path, monkeypatch):

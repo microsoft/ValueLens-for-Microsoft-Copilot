@@ -25,6 +25,8 @@ COPY shared/python /src/shared
 RUN pip install /src/shared && rm -rf /src/shared
 
 COPY ["5. Azure/sql/migrations", "/app/sql/migrations"]
+# Synthetic demo data for VALUELENS_SAMPLE_DATA=true (valuelens_jobs/sample.py).
+COPY ["4. Local CSV/sample-data/copilot_interactions_sample.csv", "4. Local CSV/sample-data/copilot_users_sample.csv", "/app/sample-data/"]
 COPY ["5. Azure/jobs/valuelens_jobs", "/app/valuelens_jobs"]
 
 RUN useradd --uid 10001 --create-home valuelens
