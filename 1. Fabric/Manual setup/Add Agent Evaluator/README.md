@@ -54,6 +54,9 @@ Import `Copilot_Agent_Transcript_Parser.ipynb`, attach your Lakehouse, and set t
 | `RAW_TABLE` | `''`. The report doesn't use the raw table. |
 | `LOOKBACK_DAYS` | `7` for a weekly schedule. Use `30` on the first run to load what Dataverse still holds. |
 
+If a scheduled `merge` or `append` run finds no new transcripts, the notebook creates missing
+`agent_*` tables as empty string-schema tables and leaves existing tables unchanged.
+
 ### 3. Open the template
 
 Lakehouse → **Settings** → **SQL analytics endpoint** → copy the connection string. Open

@@ -12,6 +12,7 @@ import { stageAnchor } from "@/components/destinations";
 import { KpiCard } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
+import { useSourceAvailability } from "@/hooks/source-availability.context";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useOutcomeColors, type OutcomeColors } from "@/hooks/use-palette-theme";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
@@ -124,6 +125,27 @@ function uniqueValues(table: { columns: readonly { name: string }[]; rows: reado
  * organization, license or audience data.
  */
 export function FeedbackStage() {
+    const feedbackSource = useSourceAvailability().productFeedback;
+    if (feedbackSource === "notConfigured") return <FeedbackNotConfigured />;
+    return <FeedbackContent />;
+}
+
+function FeedbackNotConfigured() {
+    return (
+        <Section
+            id={stageAnchor("feedback")}
+            title="Feedback"
+            description="What people say after Copilot or an agent helps, misses, or gets in the way."
+        >
+            <QueryEmpty
+                title="Product feedback isn't turned on"
+                description="Run the installer again and tick Product feedback, then upload the Microsoft 365 admin center export so it lands in Files/product_feedback. The page fills in after the next load and model refresh."
+            />
+        </Section>
+    );
+}
+
+function FeedbackContent() {
     const { theme } = useThemeContext();
     const outcomeColors = useOutcomeColors();
 
@@ -206,8 +228,8 @@ export function FeedbackStage() {
                 </div>
             ) : !summaryRow ? (
                 <QueryEmpty
-                    title="No feedback data"
-                    description="The semantic model returned no rows. Check that product feedback has been loaded."
+                    title="No feedback loaded yet"
+                    description="Upload the Microsoft 365 admin center product feedback export. The installer routes it into Files/product_feedback, and the page fills in after the next load and model refresh."
                 />
             ) : (
                 <div className="grid gap-300 md:grid-cols-2 xl:grid-cols-4">

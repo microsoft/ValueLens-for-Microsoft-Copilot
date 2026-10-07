@@ -23,6 +23,7 @@ import {
     RuntimeConfigError,
     loadRuntimeConfig,
     loadSemanticModels,
+    parseModules,
     parseSemanticModels,
     resetRuntimeConfig,
     runtimeConfig,
@@ -60,6 +61,13 @@ const deployedModels = {
         vl: { workspaceId: "ws-deployed", itemId: "vl-deployed" },
         cc: { workspaceId: "ws-deployed", itemId: "cc-deployed" },
     },
+    modules: {
+        m365Activity: true,
+        agent365: false,
+        productFeedback: false,
+        consumption: true,
+        agentEvaluator: false,
+    },
 };
 
 beforeEach(() => resetRuntimeConfig());
@@ -83,6 +91,7 @@ describe("runtimeConfig", () => {
 
         expect(runtimeConfig().rayfin).toEqual({ ...deployedRayfin, apiUrl: "https://api.example.com/" });
         expect(runtimeConfig().semanticModels).toEqual(deployedModels.semanticModels);
+        expect(runtimeConfig().modules).toEqual(deployedModels.modules);
     });
 
     it("uses Azure app config and skips Rayfin resolution", async () => {
@@ -93,6 +102,7 @@ describe("runtimeConfig", () => {
             apiScope: "api://client/access_as_user",
             version: "1.2.3",
             semanticModels: { vl: { workspaceId: "azure-ws", itemId: "azure-model" } },
+            modules: { m365Activity: true, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false },
         };
         const fetchMock = stubFiles({
             [APP_CONFIG_PATH]: { body: JSON.stringify(azureConfig) },
@@ -104,6 +114,7 @@ describe("runtimeConfig", () => {
         expect(runtimeConfig().host).toBe("azure");
         expect(runtimeConfig().azure).toMatchObject({ tenantId: "tenant", clientId: "client", apiScope: "api://client/access_as_user", version: "1.2.3" });
         expect(runtimeConfig().semanticModels).toEqual(azureConfig.semanticModels);
+        expect(runtimeConfig().modules).toEqual(azureConfig.modules);
         expect(fetchMock).not.toHaveBeenCalledWith("/rayfin.config.json", expect.anything());
     });
 
@@ -178,6 +189,19 @@ describe("parseSemanticModels", () => {
             semanticModels: { ae: { workspaceId: "w", itemId: "i", extra: true } },
             other: 1,
         })).toEqual({ ae: { workspaceId: "w", itemId: "i" } });
+    });
+
+    describe("parseModules", () => {
+        it("keeps the optional installer module choices", () => {
+            expect(parseModules(deployedModels)).toEqual(deployedModels.modules);
+        });
+
+        it("treats missing or invalid module choices as an older config", () => {
+            expect(parseModules({ semanticModels: {} })).toBeUndefined();
+            expect(parseModules({ modules: [] })).toBeUndefined();
+            expect(parseModules({ modules: { m365Activity: true } })).toBeUndefined();
+            expect(parseModules({ modules: { ...deployedModels.modules, productFeedback: "no" } })).toBeUndefined();
+        });
     });
 
     it("accepts an install that set up no models", () => {

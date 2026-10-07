@@ -486,6 +486,13 @@ test('app: the prebuilt app is deployed as it is, with its models in fabric.conf
         vl: { workspaceId: 'ws-1', itemId: 'model-1' },
         cc: { workspaceId: 'ws-1', itemId: 'cc-1' },
       },
+      modules: {
+        m365Activity: true,
+        agent365: false,
+        productFeedback: false,
+        consumption: true,
+        agentEvaluator: false,
+      },
     });
     const fa = t.config.fabricApp;
     assert.equal(fa.name, 'Analytics Hub');
@@ -583,5 +590,22 @@ test('app: fabricConfigFile lists only the models the app is built with', () => 
   Object.assign(t.config.agentEvaluator.model, { id: 'ae-1' });
   assert.deepEqual(fabricConfigFile(t.config, 'ws', ['vl', 'ae']), {
     semanticModels: { vl: { workspaceId: 'ws', itemId: 'm' }, ae: { workspaceId: 'ws', itemId: 'ae-1' } },
+    modules: {
+      m365Activity: true,
+      agent365: false,
+      productFeedback: false,
+      consumption: false,
+      agentEvaluator: false,
+    },
+  });
+});
+
+test('app: fabricConfigFile omits module choices from older records that do not have them', () => {
+  const t = setup({ answers: [] });
+  Object.assign(t.config.semanticModel, { id: 'm' });
+  const config = /** @type {any} */ ({ ...t.config });
+  delete config.modules;
+  assert.deepEqual(fabricConfigFile(config, 'ws', ['vl']), {
+    semanticModels: { vl: { workspaceId: 'ws', itemId: 'm' } },
   });
 });

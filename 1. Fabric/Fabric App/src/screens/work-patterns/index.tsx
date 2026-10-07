@@ -8,6 +8,7 @@
 import { stageAnchor } from "@/components/destinations";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
+import { useSourceAvailability } from "@/hooks/source-availability.context";
 import { useM365Activity } from "@/hooks/use-m365-activity";
 import { M365_ACTIVITY_DESCRIPTION, M365_ACTIVITY_TITLE } from "./copy";
 import { M365ActivityStage } from "./m365-activity-stage";
@@ -20,6 +21,12 @@ import { M365SuiteStage } from "./m365-suite-stage";
  * there and says how to switch it on, rather than showing a page of blanks.
  */
 export function WorkPatternsScreen() {
+    const activitySource = useSourceAvailability().m365Activity;
+    if (activitySource === "notConfigured") return <M365NotConfigured />;
+    return <WorkPatternsContent />;
+}
+
+function WorkPatternsContent() {
     const m365 = useM365Activity();
 
     if (m365.state === "ready") {
@@ -54,6 +61,17 @@ export function WorkPatternsScreen() {
                     description="Either the module is switched off, or it hasn't loaded yet. To switch it on, run npx valuelens-install and tick Microsoft 365 activity; it needs the Reports.Read.All permission. The usage reports run two to three days behind, so the first days take a little while to show."
                 />
             )}
+        </Section>
+    );
+}
+
+function M365NotConfigured() {
+    return (
+        <Section id={stageAnchor("m365-activity")} title={M365_ACTIVITY_TITLE} description={M365_ACTIVITY_DESCRIPTION}>
+            <QueryEmpty
+                title="Microsoft 365 activity isn't turned on"
+                description="Run the installer again and tick Microsoft 365 activity. It needs Reports.Read.All, and the page fills in after the next load and model refresh."
+            />
         </Section>
     );
 }
