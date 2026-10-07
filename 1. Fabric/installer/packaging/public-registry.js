@@ -8,7 +8,7 @@
  * Usage: node packaging/public-registry.js <package-lock.json>...
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { publicRegistry } from './payload.js';
+import { publicRegistry } from './registry.js';
 
 const files = process.argv.slice(2);
 if (!files.length) throw new Error('Name the package-lock.json files to rewrite.');

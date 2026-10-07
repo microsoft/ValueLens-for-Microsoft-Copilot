@@ -18,7 +18,7 @@ import { buildPipeline, CONSUMPTION_REFRESH_ACTIVITY, findActivity, REFRESH_ACTI
 import { UPLOAD_DIR } from '../src/uploads.js';
 import { fakeCtx, fakeFabric, fakeGraph, fakePowerBi, fakeUi, httpError, realSources } from './fakes.js';
 
-const SUB = '9c2a9418-0000-0000-0000-000000000000';
+const SUB = '11111111-0000-0000-0000-000000000000';
 /** A subscription that only a billing policy charges. */
 const PAYG = '4b7e2d10-0000-0000-0000-000000000000';
 /** A billing policy's subscription the signed-in user can't see. */

@@ -17,6 +17,28 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-08 — Analytics Hub installer 0.3.3
+
+The installer bundles the notebooks, templates and app when it is built, so this release brings
+everything merged since 0.3.2 to installer users:
+
+- set-ups **without Key Vault write access or app registration rights**: a vault admin adds the
+  secret, an admin pack for app registration, and a check of a bring-your-own app (#138);
+- the **audit ingester** retries, splits and throttles failed query windows instead of stopping
+  the run (#137);
+- Cowork scheduled runs counted, an **Update your install** prompt when the install is older
+  than the app, and empty-source fixes (#136).
+
+The audit ingester's manifest gains a `split` window status, and older copies of the notebook
+reject a manifest that contains one. Don't roll back to an earlier installer or notebook in the
+middle of a backfill.
+
+The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.3.3`, which the
+Azure install pulls. To update, download the installer again, open it and choose
+**Repair or change**.
+
+---
+
 ## 2026-10-08 — Analytics Hub installer: set-ups without Key Vault write access or app registration rights
 
 Until now, the installer stopped with `You can't write secrets to …` when you could pick a vault
@@ -50,6 +72,8 @@ The new ones are:
 
 Both the terminal and the web UI support all of these. See
 [Where the secret goes](1.%20Fabric/installer/README.md#where-the-secret-goes).
+
+---
 
 ## 2026-10-08 — Audit ingester: failed query windows retry, split and slow down
 
