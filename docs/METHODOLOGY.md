@@ -68,7 +68,7 @@ flowchart LR
 | Step | What happens |
 |---|---|
 | **1. Collect** | On Fabric, `Copilot_Audit_Log_Direct_Ingester` calls the Microsoft Graph audit log query API (`security/auditLog/queries`) for `copilotInteraction` records each week. The other paths export the same records; see each path's README. |
-| **2. Flatten** | Each record carries a list of messages and a list of accessed resources. Responses are dropped. Each prompt is paired with every resource the interaction accessed, so there is **one row per prompt × resource**; a prompt with no resources keeps one row. On the reference data that averages 2.65 rows per prompt. A Copilot Studio agent used in Teams or another channel logs a runtime record with **no messages**; it is kept as one row that is not a prompt (`Message_isPrompt` FALSE), so its user still counts. Records that are not end-user agent usage are dropped ([§2.1](#21-which-audit-records-count)). |
+| **2. Flatten** | Each record carries a list of messages and a list of accessed resources. Responses are dropped. Each prompt is paired with every resource the interaction accessed, so there is **one row per prompt × resource**; a prompt with no resources keeps one row. On the reference data that averages 2.65 rows per prompt. A Copilot Studio agent used in Teams or another channel logs a runtime record with **no messages**, and a Cowork scheduled or autonomous run logs a record with **no prompt**; each is kept as one row that is not a prompt (`Message_isPrompt` FALSE), so its user still counts. Records that are not end-user agent usage are dropped ([§2.1](#21-which-audit-records-count)). |
 | **3. De-duplicate** | Each row's ID is a SHA-256 hash of its record, message and resource keys. Duplicate IDs are dropped, so re-running a week never double-counts. Each run also re-queries the trailing `LOOKBACK_DAYS` (default 7) to pick up records that Purview logs late. |
 | **4. Date** | `InteractionDate`, `WeekStart` (Monday) and `MonthStart`, all from the record's UTC timestamp. |
 | **5. Licence** | The user ID is lower-cased and trimmed, then matched to the licensed-users table. `Has license` of YES, TRUE, Y or 1 gives **M365 Copilot Licensed**; anything else, including no match, gives **Unlicensed**. |
@@ -603,7 +603,7 @@ also dropped, whatever the host. To report autonomous agents, remove "Autonomous
 | **AI task** | A prompt row | A proxy, not a finished output. Because rows are prompt × resource, one prompt that reads three files counts as three tasks |
 | **Prompt** | A distinct message ID flagged as a prompt | |
 | **Session** | A distinct user + app + thread, where the prompt row has all three plus a message ID | "Microsoft Teams" and "Teams" count as one app |
-| **Active user** | A named user with at least one AI task in the selection | |
+| **Active user** | A named user with at least one AI task in the selection, or at least one Cowork scheduled run | A scheduled or autonomous Cowork run has no prompt, so it makes its owner active without adding an AI task, prompt or session. Per-user session and prompt averages therefore include people whose only use was a scheduled run |
 | **Active day** | A distinct UTC date with at least one prompt | |
 | **Per week** | Totals ÷ the weeks in the selected dates that hold any activity | Sessions per user per week averages each week's sessions ÷ that week's active users |
 
@@ -902,6 +902,10 @@ or the model's parameters. In the app, **Rates & packs** overrides them for ever
 are stored in the app's SQL database. Each query redefines the model's rate measures with them,
 so the published model and the Power BI report keep their own rates. Rates must be between $0.001
 and $0.05 per credit. A pack balance of 0 means no pack.
+
+**Cowork limits.** A person's monthly credit limit and a spending policy's plan limit only count
+when they are above 0. A blank or 0 limit means **no limit set**: allowance, headroom and allowance
+used are blank, and that person or policy is never over or near the limit.
 
 ### 8.2 Agent Evaluation
 

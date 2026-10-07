@@ -22,11 +22,12 @@ Output profiles (--profile):
                       Agent_Publisher, Agent_Is_Published,
                       Agent_Consolidated_Name) from the same rules as the
                       Fabric processor (optional --agent-type-overrides CSV).
-                      Copilot Studio runtime records with no
-                      Messages are kept (one placeholder row, Message_isPrompt
-                      FALSE); M365 Copilot twins, test pane, maker evaluation,
-                      agent authoring, autonomous/workflow runs and Fabric
-                      multi-agent records are dropped (DROP_EXCLUDE_REASONS).
+                      Copilot Studio runtime records and Cowork scheduled runs
+                      with no prompt are kept (one placeholder row,
+                      Message_isPrompt FALSE); M365 Copilot twins, test pane,
+                      maker evaluation, agent authoring, autonomous/workflow
+                      runs and Fabric multi-agent records are dropped
+                      (DROP_EXCLUDE_REASONS).
     aio             : AI-in-One Dashboard. 36-column fact — 5-value Environment
                       {Autonomous Agent, Cowork, Agents, Licensed M365 Copilot,
                       Unlicensed Chat}. Reproduces the v3.1.0 AIO output
@@ -501,6 +502,13 @@ def derive_bot_and_environment(platform_agent_id: Any) -> tuple[str, str]:
 
 def is_copilot_studio_runtime(audit_data: dict[str, Any]) -> bool:
     return re.sub(r"\s", "", to_text(audit_data.get("AgentPlatform"))).lower() == "copilotstudio"
+
+
+def is_cowork_autonomous(audit_data: dict[str, Any]) -> bool:
+    ced = audit_data.get("CopilotEventData")
+    app_host = to_text(ced.get("AppHost") if isinstance(ced, dict) else "").strip().lower()
+    app_identity = to_text(audit_data.get("AppIdentity")).strip().lower()
+    return app_host == "cowork" or app_identity.startswith("copilot.m365copilot.cowork")
 
 
 # Records that are not end-user agent usage. Same rules, in the same order, as
@@ -1908,14 +1916,14 @@ def explode_record(
 
     is_aibv = profile != "aio"
     prompts = prompt_messages(ced)
-    # aibv: a Copilot Studio runtime record with no messages (Copilot Studio
-    # agents in Teams and other channels log no prompt text) is still one agent
-    # interaction. It is emitted as one placeholder message with
-    # Message_isPrompt FALSE. AIO keeps the v3.1.0 prompt-only behaviour.
-    prompts_available = "TRUE" if get_array(ced, "Messages") else "FALSE"
+    # aibv: a Copilot Studio runtime record or Cowork scheduled/autonomous run
+    # with no prompt text is still one agent interaction. It is emitted as one
+    # placeholder message with Message_isPrompt FALSE. AIO keeps the v3.1.0
+    # prompt-only behaviour.
+    prompts_available = "TRUE" if prompts else "FALSE"
     placeholder_message = (
-        is_aibv and not prompts and prompts_available == "FALSE"
-        and is_copilot_studio_runtime(audit_data)
+        is_aibv and not prompts
+        and (is_copilot_studio_runtime(audit_data) or is_cowork_autonomous(audit_data))
     )
     if not prompts and not placeholder_message:
         return []
@@ -1931,7 +1939,7 @@ def explode_record(
             (creation_time_raw_str, agent_id, to_text(audit_data.get("UserId"))))
         prompts = [{"Id": "none:" + record_id, "isPrompt": False}]
 
-    resources = resource_rows(ced)
+    resources = [{}] if placeholder_message else resource_rows(ced)
     real_resource_count = sum(1 for item in get_array(ced, "AccessedResources") if isinstance(item, dict))
     resource_count_value = real_resource_count if real_resource_count > 0 else 1
     first_context = first_dict_item(get_array(ced, "Contexts"))

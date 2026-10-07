@@ -67,6 +67,7 @@ describe("availableDestinations", () => {
         expect(withSources({ ...empty, productFeedback: "present" })).toContain("feedback");
         expect(withSources({ ...empty, productFeedback: "checking" })).toContain("feedback");
         expect(withSources({ ...empty, productFeedback: "unknown" })).toContain("feedback");
+        expect(withSources({ ...ALL_UNKNOWN, productFeedback: "notConfigured" })).not.toContain("feedback");
         expect(withSources(ALL_UNKNOWN)).toEqual(ids(valuelensOnly));
     });
 

@@ -45,6 +45,11 @@ parameter.
 All other model tables (Calendar, legends, ranking/summary, glossary, value maps, etc.) are
 **calculated/DAX or static** — they have no external source and are version-independent.
 
+> **`Calendar`** runs from the earliest to the latest date across the audit (`CreationDate`) and
+> product feedback (`FeedbackDate`). On Fabric installs made by the Analytics Hub installer it also
+> covers `M365 Activity[ActivityDate]`. With no dates in any of them it holds the last 365 days up
+> to the refresh date, so date slicers still work before the first audit load.
+
 ---
 
 ## Core tables
@@ -83,10 +88,14 @@ Agent_BotId, Agent_EnvironmentId, Exclude_Reason
 > `Agent_PlatformType` come from `CopilotEventData`. The processor uses all four only to compute the
 > [agent type columns](#agent-type-and-publisher); linking does not use them.
 
-> **Runtime records with no messages.** A Copilot Studio agent used in Teams or another channel logs
-> a record with no `Messages`. It is kept as one row with `Prompts_Available` FALSE,
-> `Message_isPrompt` FALSE and a `message:none` `Message_Id`, so the user still counts. Every other
-> record without messages is still dropped. `ConversationId` falls back to the record's
+> **Records with no prompt.** A Copilot Studio agent used in Teams or another channel logs a
+> record with no `Messages`. A Microsoft 365 Copilot **Cowork scheduled or autonomous run** (app
+> host `Cowork`, or an `AppIdentity` starting `Copilot.M365Copilot.Cowork`) logs a record whose
+> messages hold no prompt. Both are kept as one task row per record, with `Prompts_Available` FALSE,
+> `Message_isPrompt` FALSE, a `message:none` `Message_Id` and no resource fan-out. The user still
+> counts as active, but the row adds no AI task, prompt or session; the model's `Is Usage Row`
+> column (`Is Prompt Row` or `Is_Cowork`) and the `Cowork Scheduled Runs` measure count them. Every
+> other record without a prompt is still dropped. `ConversationId` falls back to the record's
 > `ConversationId` when it has no `ThreadId`.
 
 > **`Exclude_Reason`** flags records that are not end-user agent usage: Copilot Studio test pane,

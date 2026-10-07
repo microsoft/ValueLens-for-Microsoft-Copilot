@@ -154,6 +154,13 @@ def raw_audit_payload(record: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def is_cowork_autonomous(audit: dict[str, Any]) -> bool:
+    ced = audit.get("CopilotEventData")
+    app_host = str(ced.get("AppHost") if isinstance(ced, dict) else "").strip().lower()
+    app_identity = str(audit.get("AppIdentity") or "").strip().lower()
+    return app_host == "cowork" or app_identity.startswith("copilot.m365copilot.cowork")
+
+
 def extract_audit_payload(record: dict[str, Any]) -> dict[str, Any]:
     audit = raw_audit_payload(record)
     if audit is None:
@@ -178,9 +185,10 @@ def extract_audit_payload(record: dict[str, Any]) -> dict[str, Any]:
     messages = ced.get("Messages")
     copilot_studio_runtime = re.sub(r"\s", "", str(audit.get("AgentPlatform") or "")).lower() == "copilotstudio"
     if not isinstance(messages, list) or not messages:
-        # Copilot Studio agents in Teams and other channels log runtime records with
-        # no messages. The processor keeps them as one non-prompt interaction.
-        if not (copilot_studio_runtime and messages in (None, [])):
+        # Copilot Studio agents and Cowork scheduled/autonomous runs can log no
+        # prompt messages. The canonical processor keeps them as one non-prompt
+        # interaction.
+        if not ((copilot_studio_runtime or is_cowork_autonomous(audit)) and messages in (None, [])):
             raise PathwayError("Full raw audit payload is missing CopilotEventData.Messages")
         messages = []
     # Mirror the canonical processor's semantics: only isPrompt messages become

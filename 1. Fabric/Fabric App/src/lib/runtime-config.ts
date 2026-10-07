@@ -34,6 +34,16 @@ export interface RuntimeConfig {
     azure?: AzureRuntimeConfig;
     /** The semantic models each page queries, by connection alias. */
     semanticModels: ModelReferences;
+    /** Optional installer modules chosen for this install. Undefined for older installs and Azure hosts that do not say. */
+    modules?: RuntimeModules;
+}
+
+export interface RuntimeModules {
+    m365Activity: boolean;
+    agent365: boolean;
+    productFeedback: boolean;
+    consumption: boolean;
+    agentEvaluator: boolean;
 }
 
 export class RuntimeConfigError extends Error {
@@ -76,18 +86,20 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
             host: "azure",
             azure: { ...azure.azure!, inTeams: azure.azure!.inTeams || await detectTeams() },
             semanticModels: azure.semanticModels,
+            modules: azure.modules,
         };
         return loaded;
     }
 
-    const [rayfin, semanticModels] = await Promise.all([
+    const [rayfin, fabric] = await Promise.all([
         resolveRayfinConfig(defaults.rayfin),
-        loadSemanticModels(FABRIC_CONFIG_PATH),
+        loadFabricConfig(FABRIC_CONFIG_PATH),
     ]);
     loaded = {
         host: "fabric",
         rayfin: rayfin.runtimeConfig,
-        semanticModels: semanticModels ?? defaults.semanticModels,
+        semanticModels: fabric?.semanticModels ?? defaults.semanticModels,
+        modules: fabric?.modules,
     };
     return loaded;
 }
@@ -126,6 +138,11 @@ export async function loadAzureConfig(path = APP_CONFIG_PATH): Promise<RuntimeCo
 }
 
 export async function loadSemanticModels(path = FABRIC_CONFIG_PATH): Promise<ModelReferences | null> {
+    const config = await loadFabricConfig(path);
+    return config?.semanticModels ?? null;
+}
+
+export async function loadFabricConfig(path = FABRIC_CONFIG_PATH): Promise<Pick<RuntimeConfig, "semanticModels" | "modules"> | null> {
     let response: Response;
     try {
         response = await fetch(path, { cache: "no-store" });
@@ -149,7 +166,7 @@ export async function loadSemanticModels(path = FABRIC_CONFIG_PATH): Promise<Mod
     } catch {
         throw new RuntimeConfigError(`${path} isn't valid JSON.`);
     }
-    return parseSemanticModels(json, path);
+    return { semanticModels: parseSemanticModels(json, path), modules: parseModules(json) };
 }
 
 /** Checks an Azure app.config.json body has the host contract shape. */
@@ -170,6 +187,7 @@ export function parseAzureConfig(json: unknown, path = APP_CONFIG_PATH): Runtime
             inTeams: queryRequestsTeams(),
         },
         semanticModels: parseSemanticModels(json, path),
+        modules: parseModules(json),
     };
 }
 
@@ -186,6 +204,15 @@ export function parseSemanticModels(json: unknown, path = FABRIC_CONFIG_PATH): M
         parsed[alias] = { workspaceId: model.workspaceId, itemId: model.itemId };
     }
     return parsed;
+}
+
+export function parseModules(json: unknown): RuntimeModules | undefined {
+    const modules = isRecord(json) ? json.modules : undefined;
+    if (!isRecord(modules)) return undefined;
+
+    const keys = ["m365Activity", "agent365", "productFeedback", "consumption", "agentEvaluator"] as const;
+    if (!keys.every((key) => typeof modules[key] === "boolean")) return undefined;
+    return Object.fromEntries(keys.map((key) => [key, modules[key]])) as unknown as RuntimeModules;
 }
 
 function queryRequestsTeams(): boolean {

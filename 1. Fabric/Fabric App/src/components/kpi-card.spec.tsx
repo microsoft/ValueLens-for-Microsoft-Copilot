@@ -47,4 +47,9 @@ describe("KpiCard delta", () => {
         rerender(<KpiCard label="Hours" value={1500} />);
         expect(container.textContent).not.toMatch(/[▲▼]/);
     });
+
+    it("can name a deliberate blank value", () => {
+        render(<KpiCard label="Allowance used" value={undefined} emptyValue="No limit set" />);
+        expect(screen.getByText("No limit set")).toBeTruthy();
+    });
 });

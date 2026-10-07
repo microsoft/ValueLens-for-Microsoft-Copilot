@@ -238,6 +238,15 @@ def _scalar(path: str, src: str = 'j') -> str:
     return f"json_extract_string({src}, '{path}')"
 
 
+def is_cowork_autonomous(audit_data: dict) -> bool:
+    """True for M365 Copilot Cowork scheduled/autonomous audit records."""
+    audit_data = audit_data or {}
+    ced = audit_data.get('CopilotEventData') or {}
+    app_host = str(ced.get('AppHost') or '').strip().lower()
+    app_identity = str(audit_data.get('AppIdentity') or '').strip().lower()
+    return app_host == 'cowork' or app_identity.startswith('copilot.m365copilot.cowork')
+
+
 def flatten(con, staged_src: str):
     """Parse staged audit records into the Copilot_Interactions_Parsed shape.
 
@@ -262,6 +271,8 @@ def flatten(con, staged_src: str):
             {_scalar('$.AppIdentity.AppId')} AS AppIdentity_AppId,
             {_scalar('$.AppIdentity.DisplayName')} AS AppIdentity_DisplayName,
             {_scalar('$.AppIdentity.PublisherId')} AS AppIdentity_PublisherId,
+            {_scalar('$.AppIdentity')} AS AppIdentity_Text,
+            {_scalar('$.AgentPlatform')} AS AgentPlatform,
             {_scalar('$.ApplicationName')} AS ApplicationName,
             {_scalar('$.ClientRegion')} AS ClientRegion,
             {_scalar('$.UserId')} AS Audit_UserId,
@@ -300,23 +311,45 @@ def flatten(con, staged_src: str):
             CASE WHEN length(trim(coalesce(_SourceRecordKey, ''))) > 0 THEN trim(_SourceRecordKey)
                  WHEN length(trim(coalesce(RecordId, ''))) > 0 THEN 'rid:' || trim(RecordId)
             END AS Source_RecordKey,
+            len(CASE WHEN Messages IS NULL THEN []::JSON[] ELSE list_filter(
+                Messages, m -> lower(json_extract_string(m, '$.isPrompt')) = 'true') END) > 0 AS Has_Prompt,
+            regexp_replace(lower(coalesce(AgentPlatform, '')), '\\s', '', 'g') = 'copilotstudio'
+                AS Is_Copilot_Studio_Runtime,
+            lower(trim(coalesce(AppHost, ''))) = 'cowork'
+                OR starts_with(lower(trim(coalesce(AppIdentity_Text, ''))), 'copilot.m365copilot.cowork')
+                AS Is_Cowork_Autonomous,
             -- Spark size(NULL) is -1 (legacy sizeOfNull), so coalesce(size, 1) keeps -1.
             CASE WHEN Resources IS NULL THEN -1 ELSE len(Resources) END AS Resource_Count
         FROM __vl_audit_base
+    ), task_keyed AS (
+        SELECT *,
+            (NOT Has_Prompt) AND (Is_Copilot_Studio_Runtime OR Is_Cowork_Autonomous)
+                AS Task_Row_Placeholder
+        FROM keyed
     ), msgs AS (
         SELECT k.*, m.ord - 1 AS Message_ArrayOrdinal, m.msg
-        FROM keyed k,
-        LATERAL (SELECT unnest(CASE WHEN len(k.Messages) > 0 THEN k.Messages
-                                    ELSE [NULL::JSON] END) AS msg,
-                        generate_subscripts(CASE WHEN len(k.Messages) > 0 THEN k.Messages
-                                                 ELSE [NULL::JSON] END, 1) AS ord) m
-        WHERE lower({_scalar('$.isPrompt', 'm.msg')}) = 'true'
+        FROM task_keyed k,
+        LATERAL (
+            SELECT unnest(
+                    CASE WHEN k.Task_Row_Placeholder THEN
+                              ['{{"Id":"message:none","isPrompt":false,"_StableKey":"message:none","_StableOrdinal":0}}'::JSON]
+                         WHEN len(k.Messages) > 0 THEN k.Messages
+                         ELSE [NULL::JSON] END) AS msg,
+                   generate_subscripts(
+                    CASE WHEN k.Task_Row_Placeholder THEN
+                              ['{{"Id":"message:none","isPrompt":false,"_StableKey":"message:none","_StableOrdinal":0}}'::JSON]
+                         WHEN len(k.Messages) > 0 THEN k.Messages
+                         ELSE [NULL::JSON] END, 1) AS ord
+        ) m
+        WHERE lower({_scalar('$.isPrompt', 'm.msg')}) = 'true' OR k.Task_Row_Placeholder
     ), res AS (
         SELECT g.*, r.ord - 1 AS Resource_ArrayOrdinal, r.res
         FROM msgs g,
-        LATERAL (SELECT unnest(CASE WHEN len(g.Resources) > 0 THEN g.Resources
+        LATERAL (SELECT unnest(CASE WHEN g.Task_Row_Placeholder THEN ['{{"_StableKey":"resource:none","_StableOrdinal":0}}'::JSON]
+                                    WHEN len(g.Resources) > 0 THEN g.Resources
                                     ELSE ['{{"_StableKey":"resource:none","_StableOrdinal":0}}'::JSON] END) AS res,
-                        generate_subscripts(CASE WHEN len(g.Resources) > 0 THEN g.Resources
+                        generate_subscripts(CASE WHEN g.Task_Row_Placeholder THEN ['{{}}'::JSON]
+                                                 WHEN len(g.Resources) > 0 THEN g.Resources
                                                  ELSE ['{{}}'::JSON] END, 1) AS ord) r
     )
     SELECT *,

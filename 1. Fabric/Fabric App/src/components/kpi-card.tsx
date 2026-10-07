@@ -25,6 +25,8 @@ interface KpiCardProps {
     delta?: KpiDelta;
     /** Smaller supporting figure shown beneath the rule. */
     detail?: ReactNode;
+    /** Text to show when the model returns BLANK for a deliberate, named state. */
+    emptyValue?: string;
     /** Emphasises the card as the lead figure of its group. */
     emphasis?: boolean;
     className?: string;
@@ -34,7 +36,7 @@ interface KpiCardProps {
  * A single figure presented as the focus of its card — oversized tabular
  * numerals over a hairline rule, with the label subordinated above it.
  */
-export function KpiCard({ label, value, format = "whole", prefix, delta, detail, emphasis, className }: KpiCardProps) {
+export function KpiCard({ label, value, format = "whole", prefix, delta, detail, emptyValue, emphasis, className }: KpiCardProps) {
     const isBlank = value === undefined;
 
     return (
@@ -57,7 +59,7 @@ export function KpiCard({ label, value, format = "whole", prefix, delta, detail,
                     isBlank && "text-muted-foreground",
                 )}
             >
-                {formatKpi(value, format, { prefix })}
+                {isBlank && emptyValue ? emptyValue : formatKpi(value, format, { prefix })}
             </span>
             {delta && !isBlank && <KpiDeltaLine delta={delta} />}
             {detail && (
