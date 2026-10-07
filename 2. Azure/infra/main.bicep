@@ -136,6 +136,10 @@ module sql 'modules/sql.bicep' = {
 }
 
 var privateRegistry = !empty(imageRegistryResourceId)
+// ARM evaluates the scope and dependsOn of a module even when its condition is false, so
+// indexing split('') fails validation. Without a private registry, parse a well-formed
+// stand-in id (this resource group) instead; the acrPull module is still skipped.
+var registryIdParts = split(privateRegistry ? imageRegistryResourceId : '${resourceGroup().id}/providers/Microsoft.ContainerRegistry/registries/none', '/')
 
 module network 'modules/network.bicep' = if (privateNetworking) {
   name: 'vl-network'
@@ -151,9 +155,9 @@ module network 'modules/network.bicep' = if (privateNetworking) {
 
 module acrPull 'modules/acrpull.bicep' = if (privateRegistry) {
   name: 'vl-acrpull-${suffix}'
-  scope: resourceGroup(split(imageRegistryResourceId, '/')[2], split(imageRegistryResourceId, '/')[4])
+  scope: resourceGroup(registryIdParts[2], registryIdParts[4])
   params: {
-    registryName: last(split(imageRegistryResourceId, '/'))
+    registryName: last(registryIdParts)
     principalId: identity.outputs.principalId
   }
 }
