@@ -10,6 +10,7 @@ import { connect, createCtx, preview, runCommand } from './install.js';
 import { commandLine } from './launch.js';
 import { runWizard } from './server.js';
 import { loadSources } from './sources.js';
+import { isResumeLater } from './steps/identity.js';
 import { isVivaId } from './transform/dataflow.js';
 import { c, createUi } from './ui.js';
 import { DATA_SOURCE_IDS, modulesFromSources, parseDataFlags } from './uploads.js';
@@ -62,6 +63,8 @@ Options:
   --viva-query <id>    With install: the Viva Insights partition and query the Cowork credits
                        Dataflow reads (needs coworkCredits=api)
   --run                 With upload: run the pipeline straight after, to load the files now
+  --secret-in-notebook With install: store the client secret in plain text in the notebooks instead
+                       of Key Vault. Not recommended: for quick tests only. Needed with --yes.
   --yes                Take saved answers and defaults without asking
   --no-wait            Don't wait for the first load or a refresh to finish
   --verbose            Print each API call
@@ -99,6 +102,7 @@ export function parseCli(argv) {
       'viva-partition': { type: 'string' },
       'viva-query': { type: 'string' },
       run: { type: 'boolean' },
+      'secret-in-notebook': { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
     },
@@ -108,6 +112,8 @@ export function parseCli(argv) {
   if (command !== 'upload' && positionals.length > 1) throw new Error(`Unexpected argument: ${positionals[1]}`);
   if (!COMMANDS.includes(command)) throw new Error(`Unknown command "${command}". Try --help.`);
   if (values.run && command !== 'upload') throw new Error('--run goes with upload.');
+  if (values['secret-in-notebook'] && command !== 'install') throw new Error('--secret-in-notebook goes with install.');
+  if (values['secret-in-notebook'] && values.target === 'azure') throw new Error('--secret-in-notebook is for the Fabric target only.');
   const installOnly = ['feedback-flow', 'studio-flow', 'flow-environment', 'viva-partition', 'viva-query'].filter((k) => values[/** @type {'feedback-flow'} */ (k)] !== undefined);
   if ((values.data?.length || values.csv?.length || installOnly.length) && !['install', 'preview'].includes(command)) {
     throw new Error(`--data, --csv${installOnly.map((k) => ` and --${k}`).join('')} go with install. To add exports later, use upload.`);
@@ -159,6 +165,7 @@ export function parseCli(argv) {
     vivaQuery: values['viva-query']?.trim(),
     files,
     run: values.run,
+    secretInNotebook: !!values['secret-in-notebook'],
     help: !!values.help,
     version: !!values.version,
   };
@@ -232,6 +239,7 @@ export async function main(argv) {
     });
     const ctx = createCtx({ ui, config, file: args.configFile, api, user, sources });
     ctx.csvFiles = args.csvFiles;
+    if (args.secretInNotebook) ctx.secretInNotebook = true;
     const ok = await runCommand(ctx, args.command, { wait: args.wait, backfillDays: args.backfillDays, files: args.files, run: args.run });
     return ok ? 0 : 1;
   } catch (err) {
@@ -239,6 +247,10 @@ export async function main(argv) {
     if (e?.name === 'ExitPromptError') {
       process.stderr.write('\nCancelled.\n');
       return 130;
+    }
+    if (isResumeLater(e)) {
+      process.stderr.write(`\n${c.yellow('!')} ${e.message}\n`);
+      return 0;
     }
     if (/device_code_expired|expired_token|code_expired/i.test(String(e?.message ?? e?.errorCode ?? ''))) {
       process.stderr.write(`\n${c.red('✗')} The sign-in code expired before it was used. Run the installer again and enter the new code within 15 minutes.\n`);

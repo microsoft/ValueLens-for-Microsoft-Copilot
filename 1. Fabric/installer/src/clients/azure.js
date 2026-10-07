@@ -356,11 +356,14 @@ export function armApi(http, opts = {}) {
         { query: { 'api-version': KEY_VAULT_API } },
       ),
 
-    /** Gives a user secret get/list/set on an access-policy vault. @param {string} vaultId @param {string} tenantId @param {string} objectId */
-    addAccessPolicy: (vaultId, tenantId, objectId) =>
+    /**
+     * Gives a user secret permissions on an access-policy vault: get/list/set unless told otherwise.
+     * @param {string} vaultId @param {string} tenantId @param {string} objectId @param {string[]} [secrets]
+     */
+    addAccessPolicy: (vaultId, tenantId, objectId, secrets = ['get', 'list', 'set']) =>
       http.put(
         `${vaultId}/accessPolicies/add`,
-        { properties: { accessPolicies: [{ tenantId, objectId, permissions: { secrets: ['get', 'list', 'set'] } }] } },
+        { properties: { accessPolicies: [{ tenantId, objectId, permissions: { secrets } }] } },
         { query: { 'api-version': KEY_VAULT_API } },
       ),
 

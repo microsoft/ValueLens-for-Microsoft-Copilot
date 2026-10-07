@@ -3,15 +3,35 @@
  * Key Vault, the app registration and its secret, and admin consent.
  * Each step checks what is already there, so a re-run only does what is missing.
  */
-import { permissionsFor } from '../catalog.js';
+import { writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { GRAPH_APP_ID, permissionsFor } from '../catalog.js';
 import { allowsAction, isPrivateVault, networkBlocked, ROLES } from '../clients/azure.js';
 import { adminConsentUrl, apiPermissionsUrl, resolveAppRoles } from '../clients/graph.js';
+import { secretMode } from '../config.js';
 import { HttpError } from '../http.js';
+import { commandLine } from '../launch.js';
+import { c } from '../ui.js';
 import { APP_NAME } from './plan.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
 export const SECRET_LIFETIME_MONTHS = 12;
+
+/**
+ * Thrown when the user stops to wait for someone else, such as a vault admin. The install
+ * record is saved, and running the installer again carries on from the same point.
+ */
+export class ResumeLater extends Error {
+  /** @param {string} message */
+  constructor(message) {
+    super(message);
+    this.name = 'ResumeLater';
+  }
+}
+
+/** @param {unknown} err */
+export const isResumeLater = (err) => /** @type {Error | undefined} */ (err)?.name === 'ResumeLater';
 
 /** Preview permissions that some tenants don't have yet. Their module falls back gracefully. */
 export const OPTIONAL_PERMISSIONS = ['CopilotPackages.Read.All'];
@@ -55,6 +75,10 @@ export async function graphRoles(ctx) {
 export async function ensureKeyVault(ctx) {
   const { ui, config, api, user } = ctx;
   const kv = config.keyVault;
+  if (secretMode(config) === 'notebook') {
+    ui.warn('No Key Vault: the client secret is written into the notebooks (not recommended).');
+    return;
+  }
   if (kv.uri && kv.id) {
     const vault = await api.arm.getVault(kv.id).catch(() => null);
     if (vault) setPrivate(ctx, isPrivateVault(vault));
@@ -70,7 +94,8 @@ export async function ensureKeyVault(ctx) {
     kv.rbac = vault.properties.enableRbacAuthorization === true;
     kv.location = vault.location;
     setPrivate(ctx, isPrivateVault(vault));
-    await grantSecretAccess(ctx, vault);
+    if (secretMode(config) === 'keyvault-admin') await grantReadAccess(ctx, vault);
+    else await grantSecretAccess(ctx, vault);
     ctx.save();
     ui.ok(`Using Key Vault ${kv.name}`);
     return;
@@ -80,17 +105,39 @@ export async function ensureKeyVault(ctx) {
   if (!subscriptionId || !resourceGroup || !name || !location) {
     throw new Error('Key Vault settings are incomplete. Run the installer without --yes to choose them.');
   }
-  if (await api.arm.ensureProvider(subscriptionId, 'Microsoft.KeyVault')) ui.ok('Registered the Microsoft.KeyVault resource provider');
-  await api.arm.ensureResourceGroup(subscriptionId, resourceGroup, location);
-  const vault = await api.arm.createVault({
-    subscriptionId,
-    resourceGroup,
-    name,
-    location,
-    tenantId: user.tenantId,
-    rbac: !!kv.rbac,
-    accessPolicyObjectId: user.id,
-  });
+  // Contributor on a resource group can create a vault but can't register providers or create groups.
+  try {
+    if (await api.arm.ensureProvider(subscriptionId, 'Microsoft.KeyVault')) ui.ok('Registered the Microsoft.KeyVault resource provider');
+  } catch (err) {
+    if (!isStatus(err, 403)) throw err;
+    ui.note('You can\'t check resource providers in this subscription. Carrying on: Microsoft.KeyVault is usually registered already.');
+  }
+  if (!(await api.arm.getResourceGroup(subscriptionId, resourceGroup))) {
+    try {
+      await api.arm.ensureResourceGroup(subscriptionId, resourceGroup, location);
+      ui.ok(`Created resource group ${resourceGroup}`);
+    } catch (err) {
+      if (!isStatus(err, 403)) throw err;
+      throw new Error(`You can't create resource groups in this subscription. Run the installer again and give the name of an existing resource group you can write to (Contributor on it is enough).`);
+    }
+  }
+  let vault;
+  try {
+    vault = await api.arm.createVault({
+      subscriptionId,
+      resourceGroup,
+      name,
+      location,
+      tenantId: user.tenantId,
+      rbac: !!kv.rbac,
+      accessPolicyObjectId: user.id,
+    });
+  } catch (err) {
+    if (err instanceof HttpError && /MissingSubscriptionRegistration|not registered to use namespace/i.test(JSON.stringify(err.body ?? err.message))) {
+      throw new Error(`The subscription isn't registered for Microsoft.KeyVault. Ask a subscription Owner or Contributor to register the Microsoft.KeyVault resource provider, then run the installer again.`);
+    }
+    throw err;
+  }
   kv.id = vault.id;
   kv.uri = vault.properties.vaultUri;
   kv.rbac = vault.properties.enableRbacAuthorization === true;
@@ -150,6 +197,191 @@ async function grantSecretAccess(ctx, vault) {
   } catch (err) {
     if (!isStatus(err, 403)) throw err;
     throw new Error(`You can't change access policies on ${vault.name}. Ask its owner to give you secret get and set, or let the installer create a new vault.`);
+  }
+}
+
+/**
+ * Whether the signed-in user can write secrets to the vault now, or can give themselves the
+ * right to. Asked before anything is created, so a user without it can choose another way.
+ * @param {Ctx} ctx
+ * @param {any} vault  ARM vault resource.
+ * @returns {Promise<boolean>}
+ */
+export async function canWriteSecrets(ctx, vault) {
+  const { api, user } = ctx;
+  const perms = await api.arm.permissions(vault.id).catch(() => null);
+  if (!perms) return true;
+  if (vault.properties?.enableRbacAuthorization) {
+    return (
+      allowsAction(perms, 'Microsoft.KeyVault/vaults/secrets/setSecret/action', 'dataActions') ||
+      allowsAction(perms, 'Microsoft.Authorization/roleAssignments/write')
+    );
+  }
+  const mine = /** @type {any[]} */ (vault.properties?.accessPolicies ?? []).find((p) => p.objectId === user.id);
+  const secrets = new Set((mine?.permissions?.secrets ?? []).map((/** @type {string} */ s) => s.toLowerCase()));
+  if (secrets.has('set') || secrets.has('all')) return true;
+  return allowsAction(perms, 'Microsoft.KeyVault/vaults/accessPolicies/write') || allowsAction(perms, 'Microsoft.KeyVault/vaults/write');
+}
+
+/**
+ * With a vault admin adding the secret, the user only needs to read it: scheduled runs call
+ * getSecret as the schedule's owner. Gives them that when they can; otherwise the admin is asked to.
+ * @param {Ctx} ctx
+ * @param {any} vault
+ */
+async function grantReadAccess(ctx, vault) {
+  const { ui, api, user, config } = ctx;
+  const kv = config.keyVault;
+  kv.handoff ??= {};
+  if (vault.properties.enableRbacAuthorization) {
+    const perms = await api.arm.permissions(vault.id).catch(() => []);
+    if (allowsAction(perms, 'Microsoft.KeyVault/vaults/secrets/getSecret/action', 'dataActions')) {
+      delete kv.handoff.grantRead;
+      return;
+    }
+    try {
+      if (await api.arm.assignRole(vault.id, ROLES.keyVaultSecretsUser, user.id, 'User')) ui.ok('Gave you Key Vault Secrets User on it, so scheduled runs can read the secret');
+      delete kv.handoff.grantRead;
+      return;
+    } catch (err) {
+      if (!isStatus(err, 403)) throw err;
+    }
+  } else {
+    const mine = /** @type {any[]} */ (vault.properties.accessPolicies ?? []).find((p) => p.objectId === user.id);
+    const secrets = new Set((mine?.permissions?.secrets ?? []).map((/** @type {string} */ s) => s.toLowerCase()));
+    if (secrets.has('get') || secrets.has('all')) {
+      delete kv.handoff.grantRead;
+      return;
+    }
+    try {
+      await api.arm.addAccessPolicy(vault.id, user.tenantId, user.id, ['get', 'list']);
+      ui.ok('Added an access policy for you (secret get, list), so scheduled runs can read the secret');
+      delete kv.handoff.grantRead;
+      return;
+    } catch (err) {
+      if (!isStatus(err, 403)) throw err;
+    }
+  }
+  kv.handoff.grantRead = true;
+  ui.warn(`You can't give yourself read access to ${vault.name}. The vault admin's steps include it.`);
+}
+
+/**
+ * The Cloud Shell (bash) commands a vault admin runs to add the app's secret. They create the
+ * secret on the app and store it in the vault in one go, so its value is never shown to anyone.
+ * @param {import('../config.js').InstallConfig} config
+ * @param {{ userId?: string }} [o]  Also gives this user read access, when the handoff needs it.
+ * @returns {string[]}
+ */
+export function handoffCommands(config, o = {}) {
+  const kv = config.keyVault;
+  const appId = config.app.appId ?? '<application (client) ID>';
+  const lines = [];
+  if (o.userId && kv.handoff?.grantRead) {
+    lines.push(
+      kv.rbac
+        ? `az role assignment create --role "Key Vault Secrets User" --assignee-object-id ${o.userId} --assignee-principal-type User --scope ${kv.id}`
+        : `az keyvault set-policy --name ${kv.name} --object-id ${o.userId} --secret-permissions get list`,
+    );
+  }
+  lines.push(
+    `az keyvault secret set --vault-name ${kv.name} --name ${kv.secretName} --content-type "Client secret for ${appId}" ` +
+      `--value "$(az ad app credential reset --id ${appId} --append --display-name "Analytics Hub" --years 1 --query password -o tsv)" --query id -o tsv`,
+  );
+  return lines;
+}
+
+/**
+ * Hands the secret over to a vault admin: shows what to run, optionally makes them an owner of
+ * the app so they can create its secret, then waits for the user to say it's done. The value
+ * never reaches the installer.
+ * @param {Ctx} ctx
+ * @param {{ rotate?: boolean }} [o]
+ */
+export async function secretHandoff(ctx, o = {}) {
+  const { ui, config, user } = ctx;
+  const { app, keyVault: kv } = config;
+  kv.handoff ??= {};
+  const h = kv.handoff;
+  // As when the installer writes it: a shared vault may already hold another install's secret under this name.
+  if (!o.rotate && claimsName(ctx)) {
+    try {
+      await claimSecretName(ctx);
+    } catch (err) {
+      if (/no free secret name/.test(/** @type {Error} */ (err).message)) throw err;
+      ui.note(
+        `Couldn't check whether ${kv.name} already has a secret called ${kv.secretName}. If it holds another app's secret, ` +
+          'the admin shouldn\'t replace it: run the installer again and choose another secret name.',
+      );
+    }
+  }
+  ui.warn(`A vault admin needs to ${o.rotate ? 'replace' : 'add'} the client secret in ${kv.name}. The installer never sees its value.`);
+  ui.info(`Vault:   ${kv.name}${kv.id ? c.dim(`  https://portal.azure.com/#@${user.tenantId}/resource${kv.id}/secrets`) : ''}`);
+  ui.info(`Secret:  ${kv.secretName}`);
+  ui.info(`App:     ${app.displayName ?? APP_NAME} (${app.appId})`);
+  if (h.grantRead) ui.info(`Reader:  ${user.upn}, who needs ${kv.rbac ? 'Key Vault Secrets User' : 'an access policy with secret get and list'} so scheduled runs can read it`);
+  ui.info('They can run this in Azure Cloud Shell (Bash):');
+  for (const line of handoffCommands(config, { userId: user.id })) ui.info(`  ${line}`);
+  if (kv.private) ui.note(`${kv.name} blocks public network access, so run it from a network that can reach the vault, or use the portal steps below.`);
+  ui.note(
+    `Or in the Azure portal: App registrations > ${app.displayName ?? app.appId} > Certificates & secrets > New client secret, then copy its Value into ` +
+      `${kv.name} > Secrets > Generate/Import with the name ${kv.secretName}.`,
+  );
+  if (o.rotate) ui.note('Once a run has succeeded with the new secret, delete the old one from the app\'s Certificates & secrets page.');
+
+  if (!ui.yes && !app.existing && app.objectId) {
+    const email = (await ui.input('Vault admin\'s email, to make them an owner of the app so they can create its secret (leave blank to skip)', { default: h.adminEmail ?? '' })).trim();
+    if (email) await addAdminOwner(ctx, email);
+  }
+  if (!h.adminEmail) ui.note('Creating the secret needs an owner of the app, or an Application Administrator or Cloud Application Administrator.');
+  h.shownAt = ctx.now().toISOString();
+  ctx.save();
+
+  if (ui.yes) {
+    ui.warn(`Carrying on. Data loads fail until the secret is in ${kv.name}. Run "${commandLine('rotate-secret')}" to see these steps again.`);
+    return false;
+  }
+  const next = await ui.select(
+    `Has the admin ${o.rotate ? 'replaced' : 'added'} the secret?`,
+    [
+      { name: 'Yes, carry on', value: 'go' },
+      { name: 'Stop and resume later', value: 'stop', description: 'Your answers are saved. Run the installer again once it\'s there.' },
+    ],
+    'go',
+  );
+  if (next === 'stop') throw new ResumeLater(`Stopped until the vault admin has ${o.rotate ? 'replaced' : 'added'} the secret. Run the installer again to carry on from here.`);
+  h.confirmedAt = ctx.now().toISOString();
+  kv.secretSetAt = h.confirmedAt;
+  if (o.rotate) delete app.secretExpires;
+  ctx.save();
+  ui.ok(`The vault admin has ${o.rotate ? 'replaced' : 'added'} the secret ${kv.secretName}`);
+  return true;
+}
+
+/**
+ * Makes the vault admin an owner of the app, so they can create its client secret.
+ * @param {Ctx} ctx
+ * @param {string} email
+ */
+async function addAdminOwner(ctx, email) {
+  const { ui, config, api } = ctx;
+  const app = config.app;
+  try {
+    const admin = await api.graph.getUser(email);
+    if (!admin) {
+      ui.warn(`No user ${email} in this tenant. Send the steps above to the admin instead.`);
+      return;
+    }
+    try {
+      await api.graph.addOwner(/** @type {string} */ (app.objectId), admin.id);
+    } catch (err) {
+      if (!(err instanceof HttpError && err.status === 400 && /already exist/i.test(JSON.stringify(err.body ?? err.message)))) throw err;
+    }
+    config.keyVault.handoff ??= {};
+    config.keyVault.handoff.adminEmail = admin.userPrincipalName ?? email;
+    ui.ok(`Made ${admin.displayName ?? email} an owner of ${app.displayName ?? 'the app'}, so they can create its secret`);
+  } catch (err) {
+    ui.warn(`Couldn't make ${email} an owner of the app (${/** @type {Error} */ (err).message}).`);
   }
 }
 
@@ -218,6 +450,25 @@ export async function ensureApp(ctx) {
 export async function ensureSecret(ctx) {
   const { ui, config } = ctx;
   const { app, keyVault: kv } = config;
+  const mode = secretMode(config);
+
+  if (mode === 'notebook') {
+    ui.ok('The client secret goes into the notebooks when they are written');
+    return;
+  }
+  if (mode === 'keyvault-admin') {
+    delete ctx.pendingSecret;
+    if (kv.secretSetAt) {
+      ui.ok(`The vault admin added the client secret to ${kv.name} as ${kv.secretName}`);
+      if (kv.handoff?.grantRead) {
+        ui.warn(`You still need read access to ${kv.name} so scheduled runs can read it. Ask the vault admin to run:`);
+        ui.info(`  ${handoffCommands(config, { userId: ctx.user.id })[0]}`);
+      }
+      return;
+    }
+    await secretHandoff(ctx);
+    return;
+  }
 
   if (!ctx.pendingSecret && kv.secretSetAt) {
     if (await secretExists(ctx)) {
@@ -357,6 +608,10 @@ async function checkSecretAccess(ctx) {
 export async function newSecret(ctx) {
   const { ui, config, api } = ctx;
   const { app, keyVault: kv } = config;
+  if (secretMode(config) === 'keyvault-admin') {
+    await secretHandoff(ctx, { rotate: true });
+    return;
+  }
   if (!app.objectId) {
     const application = app.appId ? await api.graph.findApplication(app.appId) : null;
     if (!application) throw new Error('No app registration to add a secret to.');
@@ -445,4 +700,167 @@ export async function ensureConsent(ctx, who) {
     }
     ui.warn(`Still waiting for: ${todo.map((r) => r.value).join(', ')}`);
   }
+}
+
+/**
+ * What an app registration the user brought still needs before the install can use it.
+ * @typedef {object} AppCheck
+ * @property {boolean} found  The app registration exists in this tenant.
+ * @property {string} [displayName]
+ * @property {boolean} servicePrincipal  It has a service principal (enterprise application).
+ * @property {string[]} undeclared  Graph application permissions missing from its API permissions.
+ * @property {string[]} unconsented  Graph application permissions without admin consent.
+ */
+
+/**
+ * Checks an app registration the user brought, before anything is created: that it and its
+ * service principal exist, and that every Graph application permission the chosen modules
+ * need is on it with admin consent.
+ * @param {Ctx} ctx
+ * @param {import('../install.js').Apis} [api]  Uncached clients, so "Check again" sees changes.
+ * @returns {Promise<AppCheck>}
+ */
+export async function checkExistingApp(ctx, api = ctx.api) {
+  const appId = /** @type {string} */ (ctx.config.app.appId);
+  const { sp: graphSp, roles } = await graphRoles(ctx);
+  const application = await api.graph.findApplication(appId);
+  const sp = await api.graph.findServicePrincipal(appId);
+  if (!application && !sp) return { found: false, servicePrincipal: false, undeclared: [], unconsented: roles.map((r) => r.value) };
+  const declared = new Set(
+    /** @type {any[]} */ (application?.requiredResourceAccess ?? [])
+      .filter((r) => r.resourceAppId === GRAPH_APP_ID)
+      .flatMap((r) => r.resourceAccess ?? [])
+      .filter((a) => a.type === 'Role')
+      .map((a) => a.id),
+  );
+  const assigned = sp ? await api.graph.appRoleAssignments(sp.id) : [];
+  const have = new Set(assigned.filter((a) => a.resourceId === graphSp.id).map((a) => a.appRoleId));
+  return {
+    found: true,
+    displayName: application?.displayName ?? sp?.displayName,
+    servicePrincipal: !!sp,
+    // Only the app's owners can read its registration; without it, skip that check.
+    undeclared: application ? roles.filter((r) => !declared.has(r.id)).map((r) => r.value) : [],
+    unconsented: roles.filter((r) => !have.has(r.id)).map((r) => r.value),
+  };
+}
+
+/**
+ * Prints what an app check found. Returns true when nothing is missing.
+ * @param {Ctx} ctx
+ * @param {AppCheck} check
+ * @param {{ canConsent?: boolean }} [who]
+ */
+export function reportAppCheck(ctx, check, who = {}) {
+  const { ui, config, user } = ctx;
+  const appId = /** @type {string} */ (config.app.appId);
+  if (!check.found) {
+    ui.fail(`No app registration or enterprise application with ID ${appId} in this tenant.`);
+    return false;
+  }
+  const missing = [];
+  if (!check.servicePrincipal) missing.push('Its service principal (enterprise application). The installer creates it if you own the app.');
+  if (check.undeclared.length) missing.push(`These Graph application permissions on its API permissions page: ${check.undeclared.join(', ')}`);
+  // Someone who can grant consent gets it granted during the install.
+  if (check.unconsented.length && !who.canConsent) missing.push(`Admin consent for: ${check.unconsented.join(', ')}`);
+  if (!missing.length) {
+    ui.ok(`${check.displayName ?? appId} has everything Analytics Hub needs`);
+    return true;
+  }
+  ui.warn(`${check.displayName ?? appId} isn't ready yet. It still needs:`);
+  for (const m of missing) ui.info(`  - ${m}`);
+  ui.info('An admin can add the permissions and grant consent on its API permissions page:');
+  ui.info(apiPermissionsUrl(appId));
+  if (!check.undeclared.length) ui.note(`Or the direct consent link: ${adminConsentUrl(user.tenantId, appId)}`);
+  return false;
+}
+
+export const ADMIN_PACK_FILE = 'analytics-hub-admin-pack.md';
+
+/**
+ * The steps an admin runs to register the app for someone who can't: an Azure Cloud Shell
+ * script and the same steps in the portal. The client secret goes where the install keeps it,
+ * so in the vault admin mode it never leaves Azure.
+ * @param {Ctx} ctx
+ * @returns {{ script: string[], checklist: string[] }}
+ */
+export function adminPack(ctx) {
+  const { config } = ctx;
+  const kv = config.keyVault;
+  const perms = permissionsFor(config.modules, config.dataSources);
+  const mode = secretMode(config);
+  const script = [
+    '# Run in Azure Cloud Shell (Bash) as someone who can register apps and grant admin consent,',
+    '# such as a Privileged Role Administrator or Global Administrator.',
+    `APP_ID=$(az ad app create --display-name "${APP_NAME}" --sign-in-audience AzureADMyOrg --query appId -o tsv)`,
+    'az ad sp create --id "$APP_ID" -o none',
+    `GRAPH=${GRAPH_APP_ID}`,
+    `for P in ${perms.join(' ')}; do`,
+    '  ROLE=$(az ad sp show --id $GRAPH --query "appRoles[?value==\'$P\'].id | [0]" -o tsv)',
+    '  if [ -n "$ROLE" ]; then az ad app permission add --id "$APP_ID" --api $GRAPH --api-permissions "$ROLE=Role" -o none; else echo "Skipped $P: not in this tenant yet"; fi',
+    'done',
+    'sleep 30  # let Entra catch up before granting consent',
+    'az ad app permission admin-consent --id "$APP_ID"',
+    'echo "Client ID: $APP_ID"',
+  ];
+  if (mode === 'keyvault-admin' && kv.name) {
+    const ours = 'Client secret for $APP_ID';
+    script.push(
+      '# The client secret goes straight into the vault, so nobody sees it. A secret with this name',
+      '# that belongs to another app is left alone.',
+      `CT=$(az keyvault secret show --vault-name ${kv.name} --name ${kv.secretName} --query contentType -o tsv 2>/dev/null)`,
+      `if [ -n "$CT" ] && [ "$CT" != "${ours}" ]; then`,
+      `  echo "${kv.name} already has a secret called ${kv.secretName} for another app. Ask the installer user to choose another secret name."`,
+      'else',
+      `  az keyvault secret set --vault-name ${kv.name} --name ${kv.secretName} --content-type "${ours}" ` +
+        '--value "$(az ad app credential reset --id "$APP_ID" --append --display-name "Analytics Hub" --years 1 --query password -o tsv)" --query id -o tsv',
+      'fi',
+    );
+  } else {
+    script.push(
+      '# The client secret. Send it with the client ID through a secure channel, never by plain email or chat:',
+      'az ad app credential reset --id "$APP_ID" --append --display-name "Analytics Hub" --years 1 --query password -o tsv',
+    );
+  }
+  const checklist = [
+    `Entra admin center > App registrations > New registration. Name it "${APP_NAME}", single tenant, no redirect URI.`,
+    'Copy the Application (client) ID from its Overview page.',
+    `API permissions > Add a permission > Microsoft Graph > Application permissions. Add: ${perms.join(', ')}.`,
+    'Select "Grant admin consent" and confirm every permission shows "Granted".',
+    mode === 'keyvault-admin' && kv.name
+      ? `Certificates & secrets > New client secret (12 months). Copy its Value into Key Vault ${kv.name} > Secrets > Generate/Import, named ${kv.secretName}.`
+      : 'Certificates & secrets > New client secret (12 months). Copy its Value.',
+    mode === 'keyvault-admin' && kv.name
+      ? 'Send the installer user the client ID. They don\'t need the secret.'
+      : 'Send the installer user the client ID and the secret value through a secure channel.',
+  ];
+  return { script, checklist };
+}
+
+/**
+ * Writes the admin pack next to the install record and returns its path.
+ * @param {Ctx} ctx
+ */
+export function writeAdminPack(ctx) {
+  const { script, checklist } = adminPack(ctx);
+  const file = join(ctx.configFile ? dirname(ctx.configFile) : process.cwd(), ADMIN_PACK_FILE);
+  const body = [
+    '# Analytics Hub: register the app',
+    '',
+    'The person setting up Analytics Hub can\'t register apps or grant admin consent in this tenant.',
+    'Run the script, or follow the portal steps, then send them the client ID.',
+    '',
+    '## Azure Cloud Shell (Bash)',
+    '',
+    '```bash',
+    ...script,
+    '```',
+    '',
+    '## Or in the portal',
+    '',
+    ...checklist.map((s, i) => `${i + 1}. ${s}`),
+    '',
+  ].join('\n');
+  writeFileSync(file, body, 'utf8');
+  return file;
 }

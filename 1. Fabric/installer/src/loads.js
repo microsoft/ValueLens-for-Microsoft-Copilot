@@ -69,7 +69,7 @@ export const REASONS = [
     kind: 'signIn',
     pattern: 'AADSTS\\d+|\\b401\\b|\\b403\\b|Unauthori[sz]ed|Forbidden|invalid_client|consent|credential|sign.?in',
     text: 'It couldn\'t sign in, or wasn\'t allowed to read the data.',
-    fix: `Check the app registration still has admin consent for its permissions and its client secret hasn't expired, then ${RERUN}.`,
+    fix: `Check the app registration still has admin consent for its permissions and its client secret hasn't expired (if a vault admin adds it, that it's in the vault and you can read it), then ${RERUN}.`,
   },
   {
     kind: 'timeout',

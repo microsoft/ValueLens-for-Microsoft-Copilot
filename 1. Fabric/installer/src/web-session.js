@@ -4,11 +4,12 @@
  * sign-in for the next command, the way one terminal run does for its steps.
  */
 import { collectedLabels } from './catalog.js';
-import { loadConfig } from './config.js';
+import { loadConfig, secretMode } from './config.js';
 import { connect as realConnect, createCtx, runCommand } from './install.js';
 import { fromExe } from './launch.js';
 import { loadSources } from './sources.js';
 import { describeSchedule, modelDeployed } from './steps/fabric.js';
+import { isResumeLater } from './steps/identity.js';
 import { routerWanted } from './uploads.js';
 
 export const WEB_COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'upload', 'uninstall'];
@@ -48,7 +49,7 @@ export function describeRecord(config) {
       refresh: azure ? !!az?.powerBi?.datasetId : !!sm.id,
       'deploy-app': !azure && modelDeployed(config),
       status: true,
-      'rotate-secret': azure ? !!az?.sqlReader?.clientId : !!(config.app.appId && config.keyVault.uri),
+      'rotate-secret': azure ? !!az?.sqlReader?.clientId : !!(config.app.appId && (secretMode(config) === 'notebook' ? installed : config.keyVault.uri)),
       upload: !azure && installed && !!f.notebooks.uploadRouter && routerWanted(config.dataSources),
       uninstall: azure && installed,
     },
@@ -133,7 +134,10 @@ export function createSession(o) {
       ui.emit({ type: 'command', command, state: ok ? 'done' : 'failed', ...(ok ? {} : { error: 'It didn\'t finish successfully. The details are above.' }) });
     } catch (err) {
       if (/** @type {any} */ (err)?.name === 'ExitPromptError') ui.emit({ type: 'command', command, state: 'cancelled' });
-      else ui.emit({ type: 'command', command, state: 'failed', error: describeError(err) });
+      else if (isResumeLater(err)) {
+        ui.warn(/** @type {Error} */ (err).message);
+        ui.emit({ type: 'command', command, state: 'cancelled', paused: /** @type {Error} */ (err).message });
+      } else ui.emit({ type: 'command', command, state: 'failed', error: describeError(err) });
     } finally {
       running = null;
     }

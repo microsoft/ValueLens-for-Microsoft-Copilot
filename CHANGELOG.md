@@ -17,6 +17,40 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-08 — Analytics Hub installer: set-ups without Key Vault write access or app registration rights
+
+Until now, the installer stopped with `You can't write secrets to …` when you could pick a vault
+but not write to it, and needed you to register the app yourself or bring one that was ready.
+In a large tenant, those rights often sit with someone else. The existing paths haven't changed.
+The new ones are:
+
+- **A vault admin will add the secret for me.** This is offered when you can't write to the
+  vault. The installer shows the vault, the secret name and one Azure Cloud Shell command. The
+  command creates the client secret and stores it in the vault, so its value never reaches the
+  installer. You only need read access (Key Vault Secrets User, or Get and List on an access
+  policy), which is all the notebooks need to read the secret at run time. The installer can
+  make the admin an owner of the app. You can stop and resume later. `rotate-secret` gives the
+  same handoff. It's recorded as `keyVault.mode: "keyvault-admin"`.
+- **Store the secret in the notebook (not recommended).** For quick tests only. It needs no
+  Azure subscription or vault. You have to confirm a warning first: the secret is plain text,
+  anyone with workspace access can read it, and it is copied into run snapshots, exports, Git
+  sync and deployment pipelines. `install --secret-in-notebook` chooses it with `--yes`.
+  Rotating creates a new secret, rewrites the notebooks and removes the old secret. Power
+  Automate flows are skipped. It's recorded as `keyVault.mode: "notebook"`.
+- **Contributor on one resource group** is enough for a new vault. If the installer can't read
+  the subscription's resource providers, that's no longer fatal. It uses an existing group
+  instead of trying to create it, and explains a 403 or an unregistered `Microsoft.KeyVault`
+  provider.
+- **Admin pack.** If you can't register apps or grant consent, choose **An admin will register
+  the app for me**. You get `analytics-hub-admin-pack.md`, which has a Cloud Shell script and
+  portal steps covering every Graph permission your modules need, admin consent and the secret.
+- **Bring-your-own app check.** An app you bring is checked before anything is created: its
+  service principal, its Graph permissions and admin consent. You get a list of what's missing,
+  the consent link, and the choice to **Check again** or **Carry on anyway**.
+
+Both the terminal and the web UI support all of these. See
+[Where the secret goes](1.%20Fabric/installer/README.md#where-the-secret-goes).
+
 ## 2026-10-08 — Audit ingester: failed query windows retry, split and slow down
 
 On large tenants, Purview sometimes ends audit-log queries with status `failed` or `cancelled`,
