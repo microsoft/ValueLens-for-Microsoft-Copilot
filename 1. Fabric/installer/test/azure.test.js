@@ -103,6 +103,10 @@ test('Azure ARM parameters stay in sync with the committed template', async () =
   assert.equal(body.properties.parameters.imageRegistry.value, 'ghcr.io/microsoft');
   assert.equal(body.properties.parameters.imageTag.value, JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
   assert.equal(body.properties.parameters.imageRegistryResourceId.value, '');
+  assert.equal(body.properties.parameters.sampleData.value, false, 'tenant data unless demo mode is chosen');
+  config.azure.sampleData = true;
+  assert.equal((await azureDeployment(ctx, { pass: 1 })).properties.parameters.sampleData.value, true);
+  config.azure.sampleData = false;
   config.azure.images = { registry: 'myacr.azurecr.io/valuelens', registryResourceId: '/subscriptions/s/resourceGroups/r/providers/Microsoft.ContainerRegistry/registries/myacr', tag: 'dev-1' };
   const pinned = (await azureDeployment(ctx, { pass: 1 })).properties.parameters;
   assert.equal(pinned.imageRegistry.value, 'myacr.azurecr.io/valuelens');

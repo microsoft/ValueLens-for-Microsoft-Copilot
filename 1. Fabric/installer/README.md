@@ -48,6 +48,14 @@ shown as coming soon and cannot be selected. Re-runs are incremental and use the
 resource with `valuelens-install-id` and stops rather than modifying untagged resources with colliding
 names.
 
+### Demo mode
+
+After the data tick boxes, the wizard asks which data the dashboard shows. **Demo mode (sample data)**
+deploys everything as usual but sets `VALUELENS_SAMPLE_DATA=true` on the run job, so each run publishes
+the synthetic sample bundled in the jobs image (dates moved forward to end last week) instead of calling
+the tenant's APIs. It's recorded as `azure.sampleData`. To switch to tenant data, run the installer again
+and pick **Your tenant's data**; the next run replaces the sample.
+
 ### Networking
 
 The wizard asks how the app, jobs and Power BI reach Azure SQL and Storage:
