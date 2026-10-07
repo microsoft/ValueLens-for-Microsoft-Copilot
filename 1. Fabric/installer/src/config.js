@@ -20,9 +20,9 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {UploadsConfig} uploads
  * @property {{ days: number }} history
  * @property {{ frequency: 'daily' | 'weekly', time: string, weekday: string, timeZone: string }} schedule
- * @property {{ appId?: string, objectId?: string, servicePrincipalId?: string, displayName?: string, secretExpires?: string, existing?: boolean }} app
- * @property {{ subscriptionId?: string, resourceGroup?: string, name?: string, id?: string, uri?: string, location?: string, secretName: string, existing?: boolean, rbac?: boolean, private?: boolean, secretSetAt?: string }} keyVault
- * @property {{ capacityId?: string, workspaceId?: string, workspaceName?: string, lakehouseId?: string, lakehouseName?: string, notebooks: Partial<Record<import('./catalog.js').NotebookKey, string>>, notebookNames?: Partial<Record<import('./catalog.js').NotebookKey, string>>, pipelineId?: string, pipelineName?: string, pipelineModules?: string, pipelineVersion?: number, scheduleId?: string, vaultEndpointId?: string, deployedRouter?: string }} fabric
+ * @property {{ appId?: string, objectId?: string, servicePrincipalId?: string, displayName?: string, secretExpires?: string, secretKeyId?: string, retiredSecretKeyIds?: string[], existing?: boolean, adminPack?: string }} app
+ * @property {{ subscriptionId?: string, resourceGroup?: string, name?: string, id?: string, uri?: string, location?: string, secretName: string, existing?: boolean, rbac?: boolean, private?: boolean, secretSetAt?: string, mode?: SecretMode, handoff?: SecretHandoff }} keyVault
+ * @property {{ capacityId?: string, workspaceId?: string, workspaceName?: string, lakehouseId?: string, lakehouseName?: string, notebooks: Partial<Record<import('./catalog.js').NotebookKey, string>>, notebookNames?: Partial<Record<import('./catalog.js').NotebookKey, string>>, pipelineId?: string, pipelineName?: string, pipelineModules?: string, pipelineVersion?: number, scheduleId?: string, vaultEndpointId?: string, deployedRouter?: string, secretInNotebooks?: boolean }} fabric
  * @property {{ jobId?: string, status?: string, startedAt?: string, finishedAt?: string }} [firstRun]
  * @property {SemanticModelConfig} semanticModel
  * @property {FabricAppConfig} fabricApp
@@ -30,6 +30,26 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {ConsumptionConfig} consumption
  * @property {AgentEvaluatorConfig} agentEvaluator
  */
+
+/**
+ * Where the app's client secret lives and who puts it there.
+ * - `keyvault`: the installer writes it to Key Vault (the default when absent).
+ * - `keyvault-admin`: a vault admin writes it to Key Vault; the user only needs read access.
+ * - `notebook`: the installer writes it into the notebooks as plain text. Not recommended.
+ * @typedef {'keyvault' | 'keyvault-admin' | 'notebook'} SecretMode
+ */
+
+/**
+ * The vault admin handoff. It never holds the secret value.
+ * @typedef {object} SecretHandoff
+ * @property {string} [shownAt]  When the admin steps were last shown.
+ * @property {string} [adminEmail]  The admin who was added as an owner of the app, if any.
+ * @property {string} [confirmedAt]  When the user said the admin had added the secret.
+ * @property {boolean} [grantRead]  The user couldn't give themselves read access, so the admin is asked to.
+ */
+
+/** @param {InstallConfig} config @returns {SecretMode} */
+export const secretMode = (config) => config.keyVault?.mode ?? 'keyvault';
 
 /**
  * The upload drop folder and the optional extras around it.

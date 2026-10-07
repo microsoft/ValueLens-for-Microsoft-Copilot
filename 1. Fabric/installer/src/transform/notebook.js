@@ -12,7 +12,7 @@
  * @typedef {object} NotebookSettings
  * @property {string} [tenantId]
  * @property {string} [clientId]
- * @property {{ vaultUri: string, secretName: string }} [secret]
+ * @property {{ vaultUri: string, secretName: string } | { value: string }} [secret]  Read from Key Vault at run time, or (not recommended) the value itself.
  * @property {string[]} [parameters]  Assignments the pipeline overrides.
  * @property {Record<string, string>} [values]  Defaults to write into the notebook, e.g. IDs for a manual run.
  * @property {Record<string, string>} [expressions]  Python expressions to assign as they are, e.g. `True`.
@@ -91,12 +91,17 @@ export function findAssignmentCell(nb, name) {
 }
 
 /**
- * Python that reads the client secret from Key Vault at run time.
- * @param {{ vaultUri: string, secretName: string }} secret
+ * Python that reads the client secret from Key Vault at run time, or, when the install keeps
+ * the secret in the notebook, the value as a string literal.
+ * @param {{ vaultUri: string, secretName: string } | { value: string }} secret
  */
 export function secretExpression(secret) {
+  if ('value' in secret) return pyString(secret.value);
   return `notebookutils.credentials.getSecret(${pyString(secret.vaultUri)}, ${pyString(secret.secretName)})`;
 }
+
+/** The comment next to a client secret kept in the notebook. */
+export const INLINE_SECRET_NOTE = `${MARKER}: stored in the notebook (not recommended). Anyone who can open this notebook can read it`;
 
 /** Where the data check's summary lands, relative to the Lakehouse root. */
 export const DATA_CHECK_FILE = 'Files/valuelens_installer/data_check.json';
@@ -159,12 +164,14 @@ export function prepareNotebook(source, settings) {
 
     updateCell(nb.cells[idx], (t) => setAssignment(t, 'TENANT_ID', pyString(/** @type {string} */ (settings.tenantId))));
     updateCell(nb.cells[clientIdx], (t) => setAssignment(t, 'CLIENT_ID', pyString(/** @type {string} */ (settings.clientId))));
-    const secret = /** @type {{ vaultUri: string, secretName: string }} */ (settings.secret);
+    const secret = /** @type {{ vaultUri: string, secretName: string } | { value: string }} */ (settings.secret);
     updateCell(nb.cells[secretIdx], (t) =>
-      setAssignment(t, 'CLIENT_SECRET', secretExpression(secret), {
-        comment: `${MARKER}: read from Azure Key Vault at run time`,
-        before: 'import notebookutils',
-      }),
+      'value' in secret
+        ? setAssignment(t, 'CLIENT_SECRET', secretExpression(secret), { comment: INLINE_SECRET_NOTE })
+        : setAssignment(t, 'CLIENT_SECRET', secretExpression(secret), {
+            comment: `${MARKER}: read from Azure Key Vault at run time`,
+            before: 'import notebookutils',
+          }),
     );
   }
 

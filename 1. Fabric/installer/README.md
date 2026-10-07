@@ -10,14 +10,73 @@ and the Analytics Hub app. Then it loads the first data and checks it.
 |---|---|
 | **Windows 10 or 11** (64-bit) | To run `AnalyticsHubInstaller.exe`. Or use [Node.js](#without-the-exe). |
 | An **active Fabric capacity** (F2 or larger, or a trial) | The workspace runs on it. Or pick an existing workspace where you're an Admin or Member. |
-| An **Azure subscription** where you're a Contributor, or an existing Key Vault you can write secrets to | The client secret lives in Key Vault. |
-| Permission to **register apps** in Entra | The default user setting is enough. You can also use an app you already have. |
+| For a new Key Vault: **Contributor** on a subscription, or on just one resource group | The client secret lives in Key Vault. With Contributor on one resource group only, pick that group: the installer doesn't need to create one. |
+| Or an existing Key Vault you can **write secrets to** (Key Vault Secrets Officer, or secret Set on an access policy) | The installer stores the secret for you. |
+| Or an existing Key Vault you can only **read secrets from** (Key Vault Secrets User, or secret Get on an access policy) | A vault admin adds the secret for you. See [Where the secret goes](#where-the-secret-goes). |
+| Permission to **register apps** in Entra | The default user setting is enough. Or use an app you already have, which the installer checks first. Or let an admin register it with the [admin pack](#if-you-cant-register-apps). |
 | A **Global Administrator** or **Privileged Role Administrator** | To grant admin consent for the Graph permissions. If that isn't you, the installer gives you a link to send them. |
 | These **Fabric tenant settings** turned on | *Service principals can call Fabric public APIs*, *Semantic Model Execute Queries REST API* and *Fabric App items*. If you're a Fabric administrator, the installer checks them. |
 | For credit consumption: **Owner** or **User Access Administrator** on the subscription | Only if you add [credit consumption](#credit-consumption). |
 | For the Agent Evaluator: **System Administrator** in each Power Platform environment | Only if you add the [Agent Evaluator](#agent-evaluator). |
 
 The Graph permissions are listed in [`/docs/PERMISSIONS.md`](../../docs/PERMISSIONS.md).
+
+### Where the secret goes
+
+The notebooks sign in as the app registration with its client secret. The installer offers three
+places for it:
+
+| Option | You need | Use it when |
+|---|---|---|
+| **Key Vault, written by the installer** (the default) | Contributor to create a vault, or write access to an existing one | You can create a vault or already write to one. |
+| **A vault admin will add the secret for me** | Read access to the vault: Key Vault Secrets User, or secret Get and List on an access policy | You can't write to the vault and can't create one. Offered when the installer finds you can't write. |
+| **Store the secret in the notebook (not recommended)** | Nothing in Azure: no subscription and no vault | Quick tests only, in a workspace nobody else uses. |
+
+**A vault admin adds the secret.** The installer shows the vault, the secret name and one
+Azure Cloud Shell command for the admin. The command creates a new client secret on the app and
+stores it in the vault in one step, so nobody, including the installer, sees its value. If you
+don't have read access yet and can't give it to yourself, the command gives it to you as well.
+The installer can make the admin an owner of the app, so they can create its secret: enter their
+email when asked. Then answer **Has the admin added it?** with **Yes, carry on**, or choose
+**Stop and resume later** and run the installer again once it's there. Your answers are kept.
+Read access is all the notebooks need: they read the secret with `notebookutils` as the person
+the run uses. The choice is recorded in the install record as `keyVault.mode: "keyvault-admin"`.
+
+**Store the secret in the notebook.** Choose it in the Key Vault question, or run
+`install --secret-in-notebook`. The installer warns you first, and you have to confirm. The answer
+defaults to no:
+
+- The secret is plain text in the notebook code.
+- Anyone with access to the workspace can read it, and use it to read your tenant's data through
+  Microsoft Graph.
+- It is copied into notebook run snapshots, exports, Git sync and deployment pipelines.
+
+The installer writes the value into each notebook that needs it instead of a Key Vault
+reference, and records `keyVault.mode: "notebook"`. It never logs the value. Power Automate flows
+are left out in this mode, because they read the secret from Key Vault. To move to Key Vault
+later, run the installer again and choose **Use Key Vault instead**. It rewrites the notebooks to
+read the secret from the vault and removes the secret they held from the app.
+
+### If you can't register apps
+
+Choose **An admin will register the app for me** in the app registration question. Before
+anything is created, the installer writes `analytics-hub-admin-pack.md` next to the install record.
+It holds an Azure Cloud Shell script and the same steps for the portal. An admin uses it to:
+
+1. Register the app, with every Graph application permission the modules you picked need.
+2. Grant admin consent.
+3. Create a client secret. If you chose **A vault admin will add the secret for me**, the
+   secret goes straight into the vault. Otherwise the admin sends it to you through a secure
+   channel.
+
+They send you back the client ID. Run the installer again, enter it, and paste the secret if
+you're asked. The installer then checks the app as below.
+
+**Using an app you already have?** The installer checks it before anything is created: that the
+app and its service principal exist, and that every Graph application permission you need is on
+it with admin consent. It lists anything missing with the link to the app's API permissions page.
+Once an admin has fixed it, choose **Check again**. Or choose **Carry on anyway**: data the missing
+permissions cover won't load until they're fixed.
 
 ## Azure target (preview)
 
@@ -122,8 +181,10 @@ Azure commands:
    3. **How much audit history** to load first: 30, 90 or 180 days.
    4. **Capacity, workspace and Lakehouse.** Spaces and hyphens in the Lakehouse name become
       underscores, because Fabric doesn't allow them.
-   5. **App registration:** create one, or use your own.
-   6. **Key Vault:** create one, or pick one you have.
+   5. **App registration:** create one, use your own (it's checked first), or let an admin
+      register it. See [If you can't register apps](#if-you-cant-register-apps).
+   6. **Key Vault:** create one, or pick one you have. If you can't write to it, a vault admin
+      can add the secret. See [Where the secret goes](#where-the-secret-goes).
    7. **Schedule:** daily or weekly, and the time (UTC).
    8. **Whether to run the first load** now.
 6. Check the plan and approve it. Nothing is created until you do.
@@ -160,9 +221,15 @@ app registration. An install from an earlier version keeps the names it already 
   [Credit consumption](#credit-consumption).
 - **Someone else takes over the pipeline?** The notebooks run as the person who last changed the
   pipeline, or the schedule's owner. Give them Key Vault Secrets User on the vault and Contributor
-  on the workspace first.
+  on the workspace first. With the secret in the notebooks, they only need Contributor.
 - **Secrets expire after 12 months.** **Check status** warns you 30 days before. Choose
-  **Create new secrets**.
+  **Create new secrets** (`rotate-secret`). Where the secret goes decides what happens:
+  - **Key Vault, written by the installer:** it creates and stores a new secret.
+  - **A vault admin adds it:** it shows the admin the same steps again, then waits for you to
+    say it's done.
+  - **In the notebooks:** it creates a new secret, rewrites the notebooks and removes the old
+    one. If you brought the app, paste its new secret when asked. Rotate it regularly: anyone
+    who could read the old one could keep using it until then.
 
 ## Power BI reports
 
@@ -390,10 +457,16 @@ the endpoint, someone who manages the vault approves it under **Networking** >
 | Windows says it protected your PC | Choose **More info**, then **Run anyway**. The exe isn't code-signed yet. |
 | `The installer couldn't start` | Download the exe again. If that doesn't help, delete `%LOCALAPPDATA%\AnalyticsHub` and open it again. |
 | `No active Fabric capacity you can use` | Start a Fabric trial, or ask a capacity admin to make you a Contributor on a capacity. |
-| `No Azure subscription you can use` | Ask for Contributor on a subscription, or on a resource group with an existing vault. |
+| `No Azure subscription you can use` | Ask for Contributor on a subscription, on a resource group, or for read access to an existing vault a vault admin can add the secret to. Or, for a quick test only, [store the secret in the notebook](#where-the-secret-goes). |
+| `You can't write secrets to …` or `You can't change access policies on …` | Run the installer again without `--yes`, pick the vault, and choose **A vault admin will add the secret for me**. See [Where the secret goes](#where-the-secret-goes). |
+| `You can't create resource groups in this subscription` | Run the installer again and give the name of a resource group where you're a Contributor. |
+| `The subscription isn't registered for Microsoft.KeyVault` | Ask a subscription Owner or Contributor to register the `Microsoft.KeyVault` resource provider, then run the installer again. |
+| `Stopped until the vault admin has added the secret` | Send the admin the steps the installer showed (run `rotate-secret` to see them again). Once the secret is in the vault, run the installer again: it carries on from there. |
+| `Stopped until an admin has registered the app` | Send the admin `analytics-hub-admin-pack.md` from the install folder. Once they send you the client ID, run the installer again without `--yes`. |
+| `… isn't ready yet. It still needs:` | The app you brought is missing its service principal, Graph permissions or admin consent. Send the admin the link it shows, then choose **Check again**. |
 | A run fails with `AADSTS7000215` | The secret doesn't match the app. Choose **Create new secrets**. |
 | A run fails with `Forbidden` from Graph | Admin consent is missing or still applying. Choose **Repair or change**, then **Run now**. |
-| A run fails reading the secret | The person the run uses can't read it. See **Someone else takes over the pipeline?** above. |
+| A run fails reading the secret | The person the run uses can't read it, or a vault admin hasn't added it yet. See **Someone else takes over the pipeline?** above. |
 | A run says Fabric's capacity was too busy (`TooManyRequestsForCapacity`) | Nothing is lost. Wait a few minutes, then choose **Rerun failed loads**. It happens most on trials and small capacities, and less once the notebooks share one Spark session. See [Load status and reruns](#load-status-and-reruns). |
 | `Couldn't turn on high concurrency for pipelines` | You need the workspace Admin role to change it. Ask a workspace admin to turn it on, or carry on: the notebooks start their own Spark sessions. See [Load status and reruns](#load-status-and-reruns). |
 | The model refresh fails with `Table '…' is not in database` | The Lakehouse's SQL endpoint hadn't caught up with tables the run had just written. The refresh notebook syncs the endpoint first, so this is rare. Wait a couple of minutes, then choose **Rerun failed loads** or **Refresh the models**. |
@@ -428,3 +501,5 @@ npx valuelens-install --ui
 Leave out `--ui` to answer the questions in the terminal. Other commands: `run`, `check`,
 `refresh`, `status`, `update`, `deploy-app`, `rotate-secret`, `upload` and `preview`. Add `--help` for
 options. The exe takes the same commands, for example `AnalyticsHubInstaller.exe status`.
+`install --yes --secret-in-notebook` keeps the secret in the notebooks without asking; only use it
+for [quick tests](#where-the-secret-goes).

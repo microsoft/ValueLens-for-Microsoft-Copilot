@@ -9,9 +9,11 @@ import { routedSources, routerSignaturesJson, routerWanted } from '../uploads.js
 import { statusConfigJson } from '../loads.js';
 import { parseResourceId } from '../clients/azure.js';
 import { scheduleBody } from '../clients/fabric.js';
+import { secretMode } from '../config.js';
 import { HttpError } from '../http.js';
-import { MARKER, prepareNotebook, pyString, serialiseNotebook } from '../transform/notebook.js';
+import { INLINE_SECRET_NOTE, MARKER, prepareNotebook, pyString, serialiseNotebook } from '../transform/notebook.js';
 import { buildPipeline, PIPELINE_CHANGE, PIPELINE_VERSION } from '../transform/pipeline.js';
+import { addMonths, SECRET_LIFETIME_MONTHS } from './identity.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
@@ -217,7 +219,7 @@ export async function ensureVaultEndpoint(ctx) {
   const { ui, config, api } = ctx;
   const kv = config.keyVault;
   const f = config.fabric;
-  if (!kv.private) return true;
+  if (secretMode(config) === 'notebook' || !kv.private) return true;
   const ws = /** @type {string} */ (f.workspaceId);
   const vaultId = /** @type {string} */ (kv.id);
 
@@ -281,6 +283,18 @@ export async function ensureVaultEndpoint(ctx) {
   }
 }
 
+/** Stands in for the client secret when there is no value to write, e.g. in a preview. */
+export const SECRET_PLACEHOLDER = '<client secret>';
+
+/** The Azure AI notebook's Key Vault read, as it ships. */
+export const AZURE_AI_SECRET_FIND = 'secret = notebookutils.credentials.getSecret(KEY_VAULT_URL, CLIENT_SECRET_NAME)';
+
+/**
+ * Notebooks that hold or read the app's client secret.
+ * @param {import('../catalog.js').NotebookInfo} nb
+ */
+export const usesSecret = (nb) => nb.credentials || nb.key === 'azureAi';
+
 /**
  * What the installer changes in one notebook.
  * @param {Ctx} ctx
@@ -290,6 +304,8 @@ export async function ensureVaultEndpoint(ctx) {
 export function notebookSettings(ctx, nb) {
   const { config, user } = ctx;
   const f = config.fabric;
+  const inline = secretMode(config) === 'notebook';
+  const value = ctx.pendingSecret ?? SECRET_PLACEHOLDER;
   /** @type {Record<string, string> | undefined} */
   let values = nb.values;
   if (nb.key === 'refreshModel') values = { WORKSPACE_ID: /** @type {string} */ (f.workspaceId), SEMANTIC_MODEL_ID: /** @type {string} */ (config.semanticModel.id) };
@@ -298,31 +314,32 @@ export function notebookSettings(ctx, nb) {
       SUBSCRIPTION_ID: /** @type {string} */ (config.consumption.azureSubscriptionId),
       TENANT_ID: user.tenantId,
       CLIENT_ID: /** @type {string} */ (config.app.appId),
-      KEY_VAULT_URL: /** @type {string} */ (config.keyVault.uri),
-      CLIENT_SECRET_NAME: config.keyVault.secretName,
+      KEY_VAULT_URL: inline ? '' : /** @type {string} */ (config.keyVault.uri),
+      CLIENT_SECRET_NAME: inline ? '' : config.keyVault.secretName,
     };
   }
   // Merge upserts each run's window, so environments and days accumulate without duplicates.
   if (nb.key === 'agentTranscripts') values = { SOURCE_MODE: 'dataverse', WRITE_MODE: 'merge', RAW_TABLE: '' };
   if (nb.key === 'uploadRouter') values = routerValues(config);
   if (nb.key === 'loadStatus') values = { STATUS_JSON: statusConfigJson() };
+  /** @type {import('../catalog.js').NotebookPatch[]} */
+  const extra = [
+    ...(nb.key === 'agentTranscripts' ? [environmentsPatch(config.agentEvaluator.environments)] : []),
+    ...(nb.key === 'azureAi' && paygReadable(config).length ? [paygPatch(paygReadable(config))] : []),
+    ...(nb.key === 'azureAi' && inline ? [{ find: AZURE_AI_SECRET_FIND, replace: `secret = ${pyString(value)}  # ${INLINE_SECRET_NOTE}` }] : []),
+  ];
   return {
     ...(nb.credentials
       ? {
           tenantId: user.tenantId,
           clientId: config.app.appId,
-          secret: { vaultUri: /** @type {string} */ (config.keyVault.uri), secretName: config.keyVault.secretName },
+          secret: inline ? { value } : { vaultUri: /** @type {string} */ (config.keyVault.uri), secretName: config.keyVault.secretName },
         }
       : {}),
     parameters: nb.parameters,
     ...(values ? { values } : {}),
     ...(nb.expressions ? { expressions: nb.expressions } : {}),
-    patches:
-      nb.key === 'agentTranscripts'
-        ? [...(nb.patches ?? []), environmentsPatch(config.agentEvaluator.environments)]
-        : nb.key === 'azureAi' && paygReadable(config).length
-          ? [...(nb.patches ?? []), paygPatch(paygReadable(config))]
-          : nb.patches,
+    patches: extra.length ? [...(nb.patches ?? []), ...extra] : nb.patches,
     lakehouse: {
       id: /** @type {string} */ (f.lakehouseId),
       name: /** @type {string} */ (f.lakehouseName),
@@ -406,49 +423,194 @@ export async function ensureNotebooks(ctx, opts = {}) {
   const ws = /** @type {string} */ (f.workspaceId);
   const items = await api.fabric.listItems(ws, 'Notebook');
   const ids = new Set(items.map((i) => i.id));
+  const wanted = notebooksFor(config.modules, notebookOptions(config));
+  // The notebooks that read the secret are rewritten when it moves into or out of them.
+  const inNotebooks = secretMode(config) === 'notebook';
+  const switched = !!f.secretInNotebooks !== inNotebooks;
 
-  for (const nb of notebooksFor(config.modules, notebookOptions(config))) {
-    const content = serialiseNotebook(prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb)));
-    const urls = nb.key === 'agentTranscripts' ? environmentUrls(config) : undefined;
-    const payg = nb.key === 'azureAi' ? paygIds(config) : undefined;
-    const routed = nb.key === 'uploadRouter' ? routerSignature(config) : undefined;
-    f.notebookNames ??= {};
-    let id = f.notebooks[nb.key];
-    // Older records saved only the ID: keep the name the notebook already has.
-    const current = id ? items.find((i) => i.id === id)?.displayName : undefined;
-    if (current && !f.notebookNames[nb.key]) f.notebookNames[nb.key] = current;
-    const label = f.notebookNames[nb.key] ?? nb.displayName;
-    if (id && !ids.has(id)) {
-      ui.warn(`${label} was deleted. Deploying it again.`);
-      id = undefined;
-      // The pipeline calls notebooks by ID, so it has to be rewritten for the new one.
-      delete f.pipelineModules;
+  /** @param {import('../catalog.js').NotebookInfo} nb */
+  const stale = (nb) => {
+    const id = f.notebooks[nb.key];
+    return (
+      !id ||
+      !ids.has(id) ||
+      !!opts.force ||
+      (switched && usesSecret(nb)) ||
+      (nb.key === 'agentTranscripts' && environmentUrls(config) !== config.agentEvaluator.deployedUrls) ||
+      (nb.key === 'azureAi' && paygIds(config) !== (config.consumption.deployedPayg ?? '')) ||
+      (nb.key === 'uploadRouter' && routerSignature(config) !== f.deployedRouter)
+    );
+  };
+  // With the secret in the notebooks, writing one means a fresh secret, so all of them get it.
+  const inline = inNotebooks && wanted.some((nb) => usesSecret(nb) && stale(nb));
+  const fresh = inline ? await inlineSecret(ctx) : undefined;
+  let written = 0;
+
+  try {
+    for (const nb of wanted) {
+      const content = serialiseNotebook(prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb)));
+      const urls = nb.key === 'agentTranscripts' ? environmentUrls(config) : undefined;
+      const payg = nb.key === 'azureAi' ? paygIds(config) : undefined;
+      const routed = nb.key === 'uploadRouter' ? routerSignature(config) : undefined;
+      f.notebookNames ??= {};
+      let id = f.notebooks[nb.key];
+      // Older records saved only the ID: keep the name the notebook already has.
+      const current = id ? items.find((i) => i.id === id)?.displayName : undefined;
+      if (current && !f.notebookNames[nb.key]) f.notebookNames[nb.key] = current;
+      const label = f.notebookNames[nb.key] ?? nb.displayName;
+      if (id && !ids.has(id)) {
+        ui.warn(`${label} was deleted. Deploying it again.`);
+        id = undefined;
+        // The pipeline calls notebooks by ID, so it has to be rewritten for the new one.
+        delete f.pipelineModules;
+      }
+      if (!id) {
+        const name = freeName(label, displayNames(items));
+        noteRenamed(ctx, label, name);
+        const created = await api.fabric.createNotebook(ws, name, content);
+        id = await createdId(ctx, created, 'Notebook', name);
+        items.push({ id, displayName: name });
+        f.notebookNames[nb.key] = name;
+        if (usesSecret(nb)) written++;
+        ui.ok(`Created ${name}`);
+      } else if (
+        opts.force ||
+        (inline && usesSecret(nb)) ||
+        (switched && usesSecret(nb)) ||
+        (urls !== undefined && urls !== config.agentEvaluator.deployedUrls) ||
+        (payg !== undefined && payg !== (config.consumption.deployedPayg ?? '')) ||
+        (routed !== undefined && routed !== f.deployedRouter)
+      ) {
+        await api.fabric.updateNotebook(ws, id, content);
+        if (usesSecret(nb)) written++;
+        ui.ok(`Updated ${label}`);
+      } else {
+        ui.ok(`${label} is in place`);
+      }
+      f.notebooks[nb.key] = id;
+      if (urls !== undefined) config.agentEvaluator.deployedUrls = urls;
+      if (payg !== undefined) config.consumption.deployedPayg = payg;
+      if (routed !== undefined) f.deployedRouter = routed;
+      ctx.save();
     }
-    if (!id) {
-      const name = freeName(label, displayNames(items));
-      noteRenamed(ctx, label, name);
-      const created = await api.fabric.createNotebook(ws, name, content);
-      id = await createdId(ctx, created, 'Notebook', name);
-      items.push({ id, displayName: name });
-      f.notebookNames[nb.key] = name;
-      ui.ok(`Created ${name}`);
-    } else if (
-      opts.force ||
-      (urls !== undefined && urls !== config.agentEvaluator.deployedUrls) ||
-      (payg !== undefined && payg !== (config.consumption.deployedPayg ?? '')) ||
-      (routed !== undefined && routed !== f.deployedRouter)
-    ) {
-      await api.fabric.updateNotebook(ws, id, content);
-      ui.ok(`Updated ${label}`);
-    } else {
-      ui.ok(`${label} is in place`);
+  } catch (err) {
+    if (fresh) await settleInlineSecret(ctx, fresh, written > 0 ? 'partial' : 'unused');
+    throw err;
+  }
+  if (fresh) await settleInlineSecret(ctx, fresh, 'written');
+  if (switched) {
+    if (inNotebooks) f.secretInNotebooks = true;
+    else {
+      delete f.secretInNotebooks;
+      await retireInlineSecrets(ctx);
     }
-    f.notebooks[nb.key] = id;
-    if (urls !== undefined) config.agentEvaluator.deployedUrls = urls;
-    if (payg !== undefined) config.consumption.deployedPayg = payg;
-    if (routed !== undefined) f.deployedRouter = routed;
     ctx.save();
   }
+}
+
+/**
+ * Once the notebooks read the secret from Key Vault, removes the secrets that were written
+ * into them, since anyone who saw the notebooks could still use those.
+ * @param {Ctx} ctx
+ */
+async function retireInlineSecrets(ctx) {
+  const { ui, config } = ctx;
+  const app = config.app;
+  const keyIds = [...(app.retiredSecretKeyIds ?? []), ...(app.secretKeyId ? [app.secretKeyId] : [])];
+  if (!keyIds.length) {
+    if (app.existing) ui.warn(`The client secret that was in the notebooks still works. Delete it from ${app.displayName ?? 'the app'}'s Certificates & secrets page.`);
+    return;
+  }
+  await removeKeys(ctx, keyIds);
+  delete app.secretKeyId;
+  if (!app.retiredSecretKeyIds?.length) ui.ok('Removed the client secret that was in the notebooks from the app');
+}
+
+/**
+ * Removes app secrets by key ID. Any that can't be removed are kept in the install record,
+ * so the next run tries again.
+ * @param {Ctx} ctx
+ * @param {string[]} keyIds
+ */
+async function removeKeys(ctx, keyIds) {
+  const { ui, config, api } = ctx;
+  const app = config.app;
+  const objectId = /** @type {string} */ (app.objectId);
+  /** @type {string[]} */
+  const left = [];
+  for (const keyId of new Set(keyIds)) {
+    const removed = await api.graph.removePassword(objectId, keyId).then(
+      () => true,
+      () => false,
+    );
+    if (!removed) {
+      left.push(keyId);
+      ui.warn(`Couldn't remove a previous client secret (key ${keyId}). Delete it from the app's Certificates & secrets page, or run the update again.`);
+    }
+  }
+  if (left.length) app.retiredSecretKeyIds = left;
+  else delete app.retiredSecretKeyIds;
+  ctx.save();
+}
+
+/**
+ * The client secret to write into the notebooks. A new one on the app, unless the app is one
+ * the user brought (they paste its secret) or they already pasted it this run. Held only in memory.
+ * @param {Ctx} ctx
+ * @returns {Promise<{ keyId?: string, endDateTime?: string, previousKeyId?: string }>}
+ */
+export async function inlineSecret(ctx) {
+  const { ui, config, api } = ctx;
+  const app = config.app;
+  if (ctx.pendingSecret) return {};
+  if (app.existing) {
+    ctx.pendingSecret = await ui.secret(`Client secret value for ${app.displayName ?? app.appId}. It is written into the notebooks.`);
+    return {};
+  }
+  if (!app.objectId) throw new Error('No app registration to add a secret to.');
+  const credential = await api.graph.addPassword(app.objectId, addMonths(ctx.now(), SECRET_LIFETIME_MONTHS));
+  ctx.pendingSecret = credential.secretText;
+  ui.ok(`Created a client secret for the notebooks (expires ${credential.endDateTime.slice(0, 10)})`);
+  return { keyId: credential.keyId, endDateTime: credential.endDateTime, previousKeyId: app.secretKeyId };
+}
+
+/**
+ * After the notebooks are written: keep the new secret and remove the one they used before.
+ * If the writes stopped part-way, both stay so every notebook still signs in.
+ * @param {Ctx} ctx
+ * @param {{ keyId?: string, endDateTime?: string, previousKeyId?: string }} fresh
+ * @param {'written' | 'partial' | 'unused'} outcome
+ */
+async function settleInlineSecret(ctx, fresh, outcome) {
+  const { ui, config, api } = ctx;
+  const app = config.app;
+  delete ctx.pendingSecret;
+  const objectId = /** @type {string} */ (app.objectId);
+  if (!fresh.keyId) {
+    if (outcome !== 'unused') config.keyVault.secretSetAt = ctx.now().toISOString();
+    ctx.save();
+    return;
+  }
+  if (outcome === 'unused') {
+    await api.graph.removePassword(objectId, fresh.keyId).catch(() => ui.warn(`Delete the unused client secret (key ${fresh.keyId}) from the app's Certificates & secrets page.`));
+    return;
+  }
+  app.secretKeyId = fresh.keyId;
+  app.secretExpires = fresh.endDateTime;
+  config.keyVault.secretSetAt = ctx.now().toISOString();
+  const previous = fresh.previousKeyId && fresh.previousKeyId !== fresh.keyId ? fresh.previousKeyId : undefined;
+  if (outcome === 'partial') {
+    // Kept in the record, so the run that finishes the notebooks removes it.
+    if (previous) app.retiredSecretKeyIds = [...new Set([...(app.retiredSecretKeyIds ?? []), previous])];
+    ctx.save();
+    if (previous) ui.warn(`Some notebooks still use the previous client secret (key ${previous}), so it stays on the app. Run the update again to finish.`);
+    return;
+  }
+  ctx.save();
+  const stale = [...(app.retiredSecretKeyIds ?? []), ...(previous ? [previous] : [])].filter((k) => k !== fresh.keyId);
+  if (!stale.length) return;
+  await removeKeys(ctx, stale);
+  if (!app.retiredSecretKeyIds?.length) ui.ok('Removed the previous client secret from the app');
 }
 
 /**

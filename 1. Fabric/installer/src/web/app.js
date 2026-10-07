@@ -82,8 +82,8 @@ const COMMANDS = {
   'rotate-secret': {
     title: 'Create new secrets', short: 'New secrets', icon: 'key', section: 'New secrets', adopt: true,
     row: 'Create new secrets', button: 'Create new secrets',
-    desc: 'Replace the app\'s client secret in Key Vault, and the model connection\'s.',
-    off: 'There is no app registration or Key Vault yet.',
+    desc: 'Replace the app\'s client secret in Key Vault (or show a vault admin the steps), or in the notebooks, and the model connection\'s.',
+    off: 'There is no app registration or client secret yet.',
   },
   upload: {
     title: 'Upload data', short: 'Upload', icon: 'upload', section: 'Upload',
@@ -119,8 +119,8 @@ const WAITING = {
 };
 const NEEDS = [
   'An active Fabric capacity (F2 or larger, or a trial) you can assign workspaces to, or a workspace where you\'re an Admin or Member.',
-  'An Azure subscription where you can create a Key Vault, or a vault you can write secrets to.',
-  'Permission to register apps in Entra, or an app registration you already have.',
+  'An Azure subscription where you can create a Key Vault, or a vault you can read secrets from. If you can\'t write to it, a vault admin adds the secret for you.',
+  'Permission to register apps in Entra, or an app registration you already have. If you have neither, you get an admin pack to send an admin.',
   'A Global Administrator or Privileged Role Administrator to grant admin consent. If that isn\'t you, you get a link to send them.',
 ];
 // AnalyticsHubInstaller.exe carries its own Node.js and a ready-built app.
@@ -614,6 +614,7 @@ function onCommand(e) {
   if (!run || run.state !== 'running') return;
   run.state = e.state;
   run.error = e.error ?? '';
+  run.paused = e.paused ?? '';
   run.endedAt = e.at;
   const status = e.state === 'done' ? 'done' : e.state === 'failed' ? 'failed' : 'stopped';
   if (run.child) finish(run.child, e.at, status);
@@ -1148,7 +1149,9 @@ function renderOutcome(run) {
       run.error,
       install ? (built ? 'Fix the problem, then choose Repair or change set-up to carry on. It picks up from what is already there.' : 'Nothing was created. Fix the problem, then set up again.') : null,
     ]],
-    cancelled: ['', 'Stopped', [install && !built ? 'Nothing was created.' : 'Nothing after this point ran.']],
+    cancelled: run.paused
+      ? ['', 'Paused', [run.paused, 'Your answers are saved, so it carries on from here next time.']]
+      : ['', 'Stopped', [install && !built ? 'Nothing was created.' : 'Nothing after this point ran.']],
   }[r] ?? ['', 'Finished', []];
   const rerun = run.failedLoads && app.state?.record?.can?.['rerun-failed'];
   return h('section', { class: `outcome ${copy[0]}`.trim(), 'aria-labelledby': 'outcome-title' },
@@ -1305,7 +1308,7 @@ function blurb(run) {
     const s = target(run);
     return s ? `Running: ${s.heading ?? s.title}` : 'Running';
   }
-  return { done: 'Finished', held: 'Nothing created', failed: 'Stopped with an error', cancelled: 'Stopped' }[result(run)];
+  return { done: 'Finished', held: 'Nothing created', failed: 'Stopped with an error', cancelled: run.paused ? 'Paused' : 'Stopped' }[result(run)];
 }
 
 function stageButton(s) {

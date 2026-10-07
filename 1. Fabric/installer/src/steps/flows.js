@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { orgUrl } from '../clients/dataverse.js';
+import { secretMode } from '../config.js';
 import {
   CONNECTORS,
   connectorsUsed,
@@ -33,11 +34,29 @@ export const FLOW_FILES = /** @type {Record<FlowKind, string>} */ ({
   studio: 'analytics-hub-studio-credits-flow.json',
 });
 
-/** @param {import('../config.js').InstallConfig} config @returns {FlowKind[]} */
-export const flowsWanted = (config) => [
-  ...(config.uploads.feedbackFlow && config.dataSources.productFeedback === 'csv' ? /** @type {const} */ (['feedback']) : []),
-  ...(config.uploads.studioFlow && config.dataSources.studioCredits === 'csv' ? /** @type {const} */ (['studio']) : []),
-];
+/**
+ * The flows read the client secret from Key Vault, so none are made when it's in the notebooks.
+ * @param {import('../config.js').InstallConfig} config @returns {FlowKind[]}
+ */
+export const flowsWanted = (config) =>
+  secretMode(config) === 'notebook'
+    ? []
+    : [
+        ...(config.uploads.feedbackFlow && config.dataSources.productFeedback === 'csv' ? /** @type {const} */ (['feedback']) : []),
+        ...(config.uploads.studioFlow && config.dataSources.studioCredits === 'csv' ? /** @type {const} */ (['studio']) : []),
+      ];
+
+/**
+ * Flows the user asked for that notebook mode leaves out.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const flowsSkipped = (config) =>
+  secretMode(config) !== 'notebook'
+    ? []
+    : [
+        ...(config.uploads.feedbackFlow && config.dataSources.productFeedback === 'csv' ? [FEEDBACK_FLOW_NAME] : []),
+        ...(config.uploads.studioFlow && config.dataSources.studioCredits === 'csv' ? [STUDIO_FLOW_NAME] : []),
+      ];
 
 /** @param {string} v */
 function validateUrl(v) {

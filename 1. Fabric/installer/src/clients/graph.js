@@ -230,6 +230,13 @@ export function graphApi(http) {
     /** @param {string} applicationObjectId @param {string} keyId */
     removePassword: (applicationObjectId, keyId) => http.post(`/applications/${applicationObjectId}/removePassword`, { keyId }),
 
+    /** A user by UPN or email-style sign-in name. Null when there's no such user. @param {string} upn */
+    getUser: (upn) => getOrNull(`/users/${encodeURIComponent(upn)}?$select=id,displayName,userPrincipalName`),
+
+    /** Makes a user an owner of the app registration. @param {string} applicationObjectId @param {string} userId */
+    addOwner: (applicationObjectId, userId) =>
+      http.post(`/applications/${applicationObjectId}/owners/$ref`, { '@odata.id': `https://graph.microsoft.com/v1.0/directoryObjects/${userId}` }),
+
     /** @param {string} servicePrincipalId */
     appRoleAssignments: (servicePrincipalId) => http.list(`/servicePrincipals/${servicePrincipalId}/appRoleAssignments`),
 
