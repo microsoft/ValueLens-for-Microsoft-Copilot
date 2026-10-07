@@ -7,11 +7,20 @@
 
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import { AppShell } from "./components/app-shell";
-import { destinations, stageAnchor, type DestinationId, type StageId } from "./components/destinations";
+import {
+    availableDestinations,
+    destinations,
+    stageAnchor,
+    type DestinationId,
+    type StageId,
+} from "./components/destinations";
 import { FilterProvider } from "./components/filter-provider";
 import { QueryLoading } from "./components/query-states";
 import { TaskTimesProvider } from "./components/task-times-provider";
 import { NavigationContext } from "./hooks/navigation.context";
+import { SourceAvailabilityContext } from "./hooks/source-availability.context";
+import { useSourceProbes } from "./hooks/use-source-probes";
+import { runtimeConfig } from "./lib/runtime-config";
 import { scrollToAnchorWhenReady } from "./lib/scroll-to-anchor";
 
 // Screens load on demand so only the visible destination queries the model.
@@ -54,7 +63,16 @@ const AssumptionsScreen = lazy(() =>
 );
 
 function App() {
-    const [destination, setDestination] = useState<DestinationId>("executive");
+    const [selected, setDestination] = useState<DestinationId>("executive");
+    const sources = useSourceProbes();
+    // A page whose source turns out to have no data gives way to the Executive summary.
+    const destination = useMemo(
+        () =>
+            availableDestinations(runtimeConfig().semanticModels, sources).some(({ id }) => id === selected)
+                ? selected
+                : "executive",
+        [selected, sources],
+    );
     const applicable = destinations.find((candidate) => candidate.id === destination)?.filters ?? [];
     const stopWaiting = useRef<() => void>(undefined);
 
@@ -70,29 +88,31 @@ function App() {
     );
 
     return (
-        <TaskTimesProvider>
-            <FilterProvider applicable={applicable}>
-                <NavigationContext.Provider value={navigation}>
-                    <AppShell active={destination} onNavigate={navigation.navigate}>
-                        <Suspense fallback={<QueryLoading />}>
-                            {destination === "executive" && <ExecutiveScreen />}
-                            {destination === "adoption" && <AdoptionScreen />}
-                            {destination === "leaderboards" && <LeaderboardsScreen />}
-                            {destination === "work-patterns" && <WorkPatternsScreen />}
-                            {destination === "readiness" && <ReadinessScreen />}
-                            {destination === "consumption" && <ConsumptionScreen />}
-                            {destination === "value" && <ValueScreen />}
-                            {destination === "efficiency" && <EfficiencyScreen />}
-                            {destination === "feedback" && <FeedbackScreen />}
-                            {destination === "agent-evaluation" && <AgentEvaluationScreen />}
-                            {destination === "governance" && <GovernanceScreen />}
-                            {destination === "assumptions" && <AssumptionsScreen />}
-                            {destination === "appendix" && <AppendixScreen />}
-                        </Suspense>
-                    </AppShell>
-                </NavigationContext.Provider>
-            </FilterProvider>
-        </TaskTimesProvider>
+        <SourceAvailabilityContext.Provider value={sources}>
+            <TaskTimesProvider>
+                <FilterProvider applicable={applicable}>
+                    <NavigationContext.Provider value={navigation}>
+                        <AppShell active={destination} onNavigate={navigation.navigate}>
+                            <Suspense fallback={<QueryLoading />}>
+                                {destination === "executive" && <ExecutiveScreen />}
+                                {destination === "adoption" && <AdoptionScreen />}
+                                {destination === "leaderboards" && <LeaderboardsScreen />}
+                                {destination === "work-patterns" && <WorkPatternsScreen />}
+                                {destination === "readiness" && <ReadinessScreen />}
+                                {destination === "consumption" && <ConsumptionScreen />}
+                                {destination === "value" && <ValueScreen />}
+                                {destination === "efficiency" && <EfficiencyScreen />}
+                                {destination === "feedback" && <FeedbackScreen />}
+                                {destination === "agent-evaluation" && <AgentEvaluationScreen />}
+                                {destination === "governance" && <GovernanceScreen />}
+                                {destination === "assumptions" && <AssumptionsScreen />}
+                                {destination === "appendix" && <AppendixScreen />}
+                            </Suspense>
+                        </AppShell>
+                    </NavigationContext.Provider>
+                </FilterProvider>
+            </TaskTimesProvider>
+        </SourceAvailabilityContext.Provider>
     );
 }
 

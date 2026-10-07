@@ -15,9 +15,11 @@ import { OpenDestinationLink } from "@/components/open-destination-link";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";
+import { useSourceAvailability } from "@/hooks/source-availability.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { formatKpi } from "@/lib/format-kpi";
 import { heatDomain, heatRenderer } from "@/lib/heat";
+import { isAbsent } from "@/lib/optional-sources";
 import { prefersReducedMotion } from "@/lib/scroll-to-anchor";
 import { readNumber, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
@@ -35,6 +37,9 @@ const SMALL = "text-[length:var(--text-200)] leading-200";
 const BODY = "text-[length:var(--text-300)] leading-300";
 
 const IN_REGISTRY = "In Registry";
+
+/** Leaderboard columns only the Agent 365 registry fills in. */
+const REGISTRY_COLUMNS: ReadonlySet<string> = new Set(["Creator", "Available In", "Lifecycle", "Adoption"]);
 
 const dayFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
@@ -286,7 +291,7 @@ function AgentDetail({ entries, selected, onSelect, ref }: AgentDetailProps) {
  * registry's agents alongside the ones only the audit log names, with the
  * detail card for whichever agent is selected.
  */
-function AgentLeaderboard() {
+function AgentLeaderboard({ registry }: { registry: boolean }) {
     const { theme } = useThemeContext();
     const board = agentLeaderboard();
     const result = useFilteredQuery(board);
@@ -311,7 +316,7 @@ function AgentLeaderboard() {
 
     const columns: GridColumnDef[] = useMemo(() => {
         const usersCell = heatRenderer({ domain: usersDomain, format: formatCell("whole") });
-        return [
+        const all: GridColumnDef[] = [
             {
                 id: "Agent",
                 header: "Agent",
@@ -390,7 +395,8 @@ function AgentLeaderboard() {
             { id: "Lifecycle", header: "Lifecycle stage", width: 210 },
             { id: "Adoption", header: "Adoption", width: 170 },
         ];
-    }, [selected?.key, usersDomain]);
+        return registry ? all : all.filter((column) => !REGISTRY_COLUMNS.has(column.id));
+    }, [selected?.key, usersDomain, registry]);
 
     /** Selects the agent whose row holds `target`; false when `target` isn't in a body row. */
     const pick = (target: EventTarget): boolean => {
@@ -425,7 +431,11 @@ function AgentLeaderboard() {
             <QueryEmpty
                 className="h-[600px]"
                 title="No agents to rank"
-                description="Neither the registry nor the audit log has an agent in this selection. Clear a filter, or check that the registry ingestion has run."
+                description={
+                    registry
+                        ? "Neither the registry nor the audit log has an agent in this selection. Clear a filter, or check that the registry ingestion has run."
+                        : "The audit log has no agent use in this selection. Clear a filter to widen it."
+                }
             />
         );
     }
@@ -450,9 +460,10 @@ function AgentLeaderboard() {
                     theme={theme}
                     header={{
                         title: "Agent leaderboard",
-                        subtitle:
-                            `${formatKpi(inUse, "whole")} in use, ${formatKpi(registered, "whole")} ` +
-                            `registered. Select an agent to see its description.`,
+                        subtitle: registry
+                            ? `${formatKpi(inUse, "whole")} in use, ${formatKpi(registered, "whole")} ` +
+                              `registered. Select an agent to see its description.`
+                            : `${formatKpi(inUse, "whole")} in use. Select an agent to see its details.`,
                     }}
                 />
             </div>
@@ -471,6 +482,7 @@ function AgentLeaderboard() {
  */
 export function AgentRegistryStage() {
     const { theme } = useThemeContext();
+    const registry = !isAbsent(useSourceAvailability(), "agentRegistry");
 
     const activity = useFilteredQuery(agentActivitySummary());
 
@@ -537,9 +549,11 @@ export function AgentRegistryStage() {
                 </div>
             )}
 
-            <OpenDestinationLink destination="governance" stage="estate-health">
-                Where every registered agent sits, who owns it and who can reach it
-            </OpenDestinationLink>
+            {registry && (
+                <OpenDestinationLink destination="governance" stage="estate-health">
+                    Where every registered agent sits, who owns it and who can reach it
+                </OpenDestinationLink>
+            )}
 
             <div className="h-[420px]">
                 {usageResult.data?.status === "error" ? (
@@ -569,7 +583,7 @@ export function AgentRegistryStage() {
                 )}
             </div>
 
-            <AgentLeaderboard />
+            <AgentLeaderboard registry={registry} />
         </Section>
     );
 }

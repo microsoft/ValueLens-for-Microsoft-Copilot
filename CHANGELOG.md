@@ -17,6 +17,22 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-07 — Analytics Hub app: pages without data no longer appear
+
+The app (Fabric and Azure) now checks the ValueLens model's optional sources when it opens, and
+leaves out what would be blank:
+
+- **Feedback** is hidden until `ProductFeedback` has rows, and **Work patterns** until
+  `M365 Activity` does. Links to them (the Executive summary's attention items, page footers)
+  disappear too, and the Executive summary drops its Satisfaction card.
+- Without Agent 365 registry data, **Governance** shows one *Connect the Agent 365 registry* state
+  instead of four empty sections. **Leaderboards** keeps the agent usage and leaderboard, drops the
+  registry-only columns, and drops its link to Governance.
+- The check is unfiltered, so a filter that empties a page never hides it. If the check fails for
+  any reason other than a missing table, everything stays visible.
+
+---
+
 ## 2026-10-07 — Analytics Hub installer: the Power BI reports
 
 The installer can now publish the reports from the Power BI templates, already connected to the

@@ -5,7 +5,12 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { stageAnchor } from "@/components/destinations";
+import { QueryEmpty } from "@/components/query-states";
+import { Section } from "@/components/section";
+import { useSourceAvailability } from "@/hooks/source-availability.context";
 import { useSummaryQuery } from "@/hooks/use-table-query";
+import { isAbsent } from "@/lib/optional-sources";
 import { governanceSummary } from "@/queries/governance";
 import { AccountabilityStage } from "./accountability-stage";
 import { EstateHealthStage } from "./estate-health-stage";
@@ -20,8 +25,16 @@ const SUMMARY = governanceSummary();
  * can read, whether someone is still accountable for it, and the agents to
  * sort out first. The registry is a catalogue rather than activity, so only
  * the agent-type filter applies.
+ *
+ * Every stage reads the registry, so once the app has found it empty the page
+ * says how to connect it instead of running four sets of empty queries.
  */
 export function GovernanceScreen() {
+    const registry = !isAbsent(useSourceAvailability(), "agentRegistry");
+    return registry ? <GovernanceStages /> : <ConnectRegistry />;
+}
+
+function GovernanceStages() {
     const summary = useSummaryQuery(SUMMARY);
 
     return (
@@ -31,5 +44,20 @@ export function GovernanceScreen() {
             <AccountabilityStage summary={summary} />
             <ReviewQueueStage />
         </div>
+    );
+}
+
+function ConnectRegistry() {
+    return (
+        <Section
+            id={stageAnchor("estate-health")}
+            title="Governance"
+            description="Who owns your agents, who can reach them, and what needs a review."
+        >
+            <QueryEmpty
+                title="Connect the Agent 365 registry"
+                description="Governance reads the Agent 365 registry, and the model has no registry data yet. Run the installer again with Agent 365 registry ticked (or run the registry ingester), let the next load finish, then reopen the app."
+            />
+        </Section>
     );
 }

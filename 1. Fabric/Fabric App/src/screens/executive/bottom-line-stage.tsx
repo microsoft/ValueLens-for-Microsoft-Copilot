@@ -11,7 +11,9 @@ import { FilterNote } from "@/components/filter-note";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
+import { useSourceAvailability } from "@/hooks/source-availability.context";
 import { formatKpi } from "@/lib/format-kpi";
+import { isAbsent } from "@/lib/optional-sources";
 import { readNumber, readText, type SummaryRow } from "@/lib/summary-row";
 import { BODY } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
@@ -50,7 +52,21 @@ const readCredits = (row: SummaryRow | undefined) =>
     sumPresent(readNumber(row, "Studio Credits"), readNumber(row, "Cowork Credits"));
 
 const WORK_GRID = CONSUMPTION_CONFIGURED ? "grid gap-300 md:grid-cols-2 xl:grid-cols-4" : "grid gap-300 md:grid-cols-3";
-const HABIT_GRID = "grid gap-300 md:grid-cols-3";
+
+/** Without product feedback the habit row loses its satisfaction card, and the filter note its reason. */
+function feedbackNote(hasFeedback: boolean): { scope: string; reason: string } | undefined {
+    if (hasFeedback) {
+        return CONSUMPTION_CONFIGURED
+            ? {
+                  scope: "to satisfaction or credits",
+                  reason: "feedback isn't linked to people, and Consumption Central records credits for the whole tenant.",
+              }
+            : { scope: "to satisfaction", reason: "feedback isn't linked to people, so it covers everyone." };
+    }
+    return CONSUMPTION_CONFIGURED
+        ? { scope: "to credits", reason: "Consumption Central records credits for the whole tenant." }
+        : undefined;
+}
 
 /**
  * The bottom line: what Copilot did, how broadly, and whether it is
@@ -60,6 +76,8 @@ export function BottomLineStage({ data }: { data: ExecutiveData }) {
     const { summary, months, credits, creditsInRange, range } = data;
     const row = summary.row;
     const pair = range.range?.pair;
+    const hasFeedback = !isAbsent(useSourceAvailability(), "productFeedback");
+    const note = feedbackNote(hasFeedback);
 
     const monthRows = useMemo(() => byMonth(tableRecords(months.table)), [months.table]);
     const creditMonths = useMemo(() => byMonth(tableRecords(credits.table)), [credits.table]);
@@ -186,7 +204,10 @@ export function BottomLineStage({ data }: { data: ExecutiveData }) {
                             ))}
                     </Group>
 
-                    <Group title="Is it becoming how people work?" className={HABIT_GRID}>
+                    <Group
+                        title="Is it becoming how people work?"
+                        className={cn("grid gap-300", hasFeedback ? "md:grid-cols-3" : "md:grid-cols-2")}
+                    >
                         <KpiCard
                             label="Licensed seats in use"
                             value={readNumber(row, "[Seats In Use Pct]")}
@@ -211,30 +232,24 @@ export function BottomLineStage({ data }: { data: ExecutiveData }) {
                                 </Details>
                             }
                         />
-                        <KpiCard
-                            label="Satisfaction · thumbs up"
-                            value={readNumber(row, "[Satisfaction]")}
-                            format="percent"
-                            delta={cardDelta("rate", pair, monthRows, read("Satisfaction"))}
-                            detail={
-                                <Details>
-                                    <KpiStat label="Ratings" value={readNumber(row, "[Feedback]")} />
-                                </Details>
-                            }
-                        />
+                        {hasFeedback && (
+                            <KpiCard
+                                label="Satisfaction · thumbs up"
+                                value={readNumber(row, "[Satisfaction]")}
+                                format="percent"
+                                delta={cardDelta("rate", pair, monthRows, read("Satisfaction"))}
+                                detail={
+                                    <Details>
+                                        <KpiStat label="Ratings" value={readNumber(row, "[Feedback]")} />
+                                    </Details>
+                                }
+                            />
+                        )}
                     </Group>
                 </>
             )}
 
-            <FilterNote
-                ignored={["organizations"]}
-                scope={CONSUMPTION_CONFIGURED ? "to satisfaction or credits" : "to satisfaction"}
-                reason={
-                    CONSUMPTION_CONFIGURED
-                        ? "feedback isn't linked to people, and Consumption Central records credits for the whole tenant."
-                        : "feedback isn't linked to people, so it covers everyone."
-                }
-            />
+            {note && <FilterNote ignored={["organizations"]} scope={note.scope} reason={note.reason} />}
         </Section>
     );
 }

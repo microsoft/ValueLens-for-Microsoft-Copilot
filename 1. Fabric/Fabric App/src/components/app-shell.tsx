@@ -5,11 +5,12 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Moon, Sun } from "lucide-react";
 import { paletteClass, usePaletteTheme } from "@/hooks/use-palette-theme";
 import { ThemeContext, useThemeContext } from "@/hooks/theme.context";
 import { AuthContext } from "@/hooks/auth.context";
+import { useSourceAvailability } from "@/hooks/source-availability.context";
 import { useIsRefreshing } from "@/lib/refresh-tracker";
 import { runtimeConfig } from "@/lib/runtime-config";
 import { scrollToAnchor } from "@/lib/scroll-to-anchor";
@@ -26,9 +27,6 @@ import {
     type StageId,
 } from "./destinations";
 import { FilterBar } from "./filter-bar";
-
-/** Pages whose model the install didn't set up are left out of the sidebar. */
-const AVAILABLE = availableDestinations(runtimeConfig().semanticModels);
 
 interface VersionResponse {
     latest?: string;
@@ -93,6 +91,9 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
     const current = destinations.find((destination) => destination.id === active);
     const mainRef = useRef<HTMLElement>(null);
     const [readingStage, setReadingStage] = useState<StageId>();
+    const sources = useSourceAvailability();
+    // Pages whose model the install didn't set up, or whose source has no data, are left out of the sidebar.
+    const available = useMemo(() => availableDestinations(runtimeConfig().semanticModels, sources), [sources]);
 
     useEffect(() => {
         const main = mainRef.current;
@@ -203,7 +204,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
         );
     };
 
-    const reference = AVAILABLE.filter(isReference);
+    const reference = available.filter(isReference);
 
     return (
         // The shell and both scroll areas are positioned so absolute descendants (sr-only text
@@ -226,7 +227,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                 </div>
 
                 <ul className="flex flex-1 flex-col gap-100-nudge">
-                    {AVAILABLE.filter((destination) => !isReference(destination)).map(renderDestination)}
+                    {available.filter((destination) => !isReference(destination)).map(renderDestination)}
                 </ul>
 
                 {reference.length > 0 && (
