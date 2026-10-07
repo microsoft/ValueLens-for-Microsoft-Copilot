@@ -133,8 +133,20 @@ failure.
 ```powershell
 .\Get-Agents365Registry.ps1 -OutputCsv .\Agents365Registry.csv `
     [-Auth Auto|AppRegistration|Interactive] [-TenantId <id>] [-ClientId <id>] [-ClientSecret <secret>] `
-    [-ApiVersion v1.0|beta] [-SkipDetail] [-SkipCreatorResolution] [-AllowEmpty]
+    [-ApiVersion v1.0|beta] [-SkipDetail] [-FullDetailRefreshDays 7] `
+    [-MaxMissingDetail 25] [-MaxMissingDetailPct 0.5] [-CheckpointEvery 1000] [-ProgressEvery 500] `
+    [-SkipCreatorResolution] [-AllowEmpty]
 ```
+
+**Large tenants.** The first run has no detail cache, so it makes one detail call per agent
+(roughly 0.5 s each; the script prints the expected duration and a progress line with an ETA).
+Successful calls are checkpointed into `<OutputCsv>.detailcache.jsonl` every `-CheckpointEvery`
+calls and again if the run fails or is stopped, so **rerun the same command** after a failure and
+only the agents still missing are fetched. Network timeouts, dropped connections, 429 and 5xx are
+retried. An agent whose detail still fails is written list-only (usage, Bot Id and capability
+columns blank) with a warning and retried next run, up to `-MaxMissingDetail` agents or
+`-MaxMissingDetailPct` percent of the catalogue, whichever is larger; above that the run fails
+and the existing CSV is left in place.
 
 `Auto` uses the app registration when `-ClientId` is given (secret from `-ClientSecret`,
 `$env:AIBV_CLIENT_SECRET`, Credential Manager `PAX-AIBV-<TenantId>`, then a prompt), otherwise an

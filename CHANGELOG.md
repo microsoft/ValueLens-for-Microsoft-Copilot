@@ -17,6 +17,36 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-07 — Agent 365 registry: first runs on very large tenants resume instead of starting over
+
+On a first run there is no detail cache, so a tenant with ~20,000 agents makes ~20,000 detail
+calls. Before this change, one failed call among them failed the whole step, the cache was
+written only at the very end, and so every successful fetch was thrown away. The next run then
+started from zero again. The step 4 cell then failed with `NameError: name 'details' is not
+defined` instead of saying what went wrong.
+
+The Fabric ingester (`Copilot_Agent365_Registry_Ingester.ipynb`) and its PowerShell twin for the
+CSV, SharePoint and Power Automate + Dataverse templates (`Get-Agents365Registry.ps1`) now:
+
+- **Checkpoint the detail cache during the fetch** (every 1,000 successful calls, and again if
+  the run fails), so a rerun fetches only what is still missing. Checkpoints hold only freshly
+  fetched detail, so a changed agent is never marked as seen with stale data.
+- **Retry network timeouts, dropped connections, 500 and 502** with the existing backoff, as
+  well as 429, 503 and 504.
+- **Tolerate a few agents with no detail**, for example a 404 or 403 on one package: up to 25
+  agents or 0.5% of the catalogue, whichever is larger. These agents are written list-only and
+  retried next run. In Fabric they carry a new snapshot column, `Detail status` = `missing`. An
+  agent whose refetch fails keeps its cached detail. Above the tolerance the run fails clearly,
+  listing the failure reasons, and leaves the previous registry in place.
+- **Print the expected duration and progress with an ETA** every 500 calls.
+- **Guard each notebook step**, so a failed step stops later cells with a message naming it.
+
+To pick it up, re-import the notebook (or update the script) and rerun it; if the run is
+interrupted, run it again and it resumes from the cache. The 48-column CSV contract is
+unchanged. See the [data dictionary](docs/DATA-DICTIONARY.md).
+
+---
+
 ## 2026-10-07 — Analytics Hub app: pages without data no longer appear
 
 The app (Fabric and Azure) now checks the ValueLens model's optional sources when it opens, and
