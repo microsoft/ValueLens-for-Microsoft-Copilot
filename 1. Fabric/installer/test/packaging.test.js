@@ -120,3 +120,13 @@ test('packaging: lock files are pointed at the public registry', () => {
   assert.equal(JSON.parse(publicRegistry(lock)).packages['node_modules/a'].resolved, `${PUBLIC_REGISTRY}a/-/a-1.0.0.tgz`);
   assert.equal(publicRegistry(publicRegistry(lock)), publicRegistry(lock));
 });
+
+test('packaging: the lock-file rewrite loads before npm ci', () => {
+  // CI runs public-registry.js before installing dependencies, so neither it nor what it imports
+  // may reach the installer source (which imports npm packages).
+  for (const file of ['public-registry.js', 'registry.js']) {
+    const src = readFileSync(new URL(`../packaging/${file}`, import.meta.url), 'utf8');
+    const imports = [...src.matchAll(/^\s*(?:import|export)\b[^'"]*?from\s+['"]([^'"]+)['"]/gm)].map((m) => m[1]);
+    assert.deepEqual(imports.filter((s) => !s.startsWith('node:') && s !== './registry.js'), [], `${file} imports more than Node built-ins`);
+  }
+});

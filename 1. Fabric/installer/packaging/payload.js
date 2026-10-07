@@ -32,9 +32,7 @@ export const MAX_PAYLOAD_PATH = 200;
  * paths under 260 characters, so these must fit even under a long user name.
  */
 export const MAX_NATIVE_PATH = 120;
-/** Rewritten in the lock files so CI installs from the public registry, not Microsoft's mirror of it. */
-export const MIRROR_REGISTRY = 'https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/';
-export const PUBLIC_REGISTRY = 'https://registry.npmjs.org/';
+export { MIRROR_REGISTRY, PUBLIC_REGISTRY, publicRegistry } from './registry.js';
 
 /** @param {string} p */
 const slash = (p) => p.replaceAll('\\', '/');
@@ -175,12 +173,4 @@ export function localIds(texts, allowed = []) {
  */
 export function leakedIds(text, ids) {
   return [...new Set([...text.matchAll(GUID)].map((m) => m[0].toLowerCase()))].filter((id) => ids.has(id));
-}
-
-/**
- * Points a lock file at the public npm registry.
- * @param {string} lock
- */
-export function publicRegistry(lock) {
-  return lock.replaceAll(MIRROR_REGISTRY, PUBLIC_REGISTRY);
 }
