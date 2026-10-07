@@ -12,9 +12,9 @@ Start with the [README](README.md), then follow the setup and troubleshooting
 guidance for your deployment path:
 
 - [1. Fabric](1.%20Fabric/README.md), including the [Fabric App](1.%20Fabric/Fabric%20App/README.md)
-- [2. Power Automate + Dataverse](2.%20Power%20Automate%20+%20Dataverse/README.md)
-- [3. SharePoint](3.%20SharePoint/README.md)
-- [4. Local CSV](4.%20Local%20CSV/README.md)
+- [3. Power Automate + Dataverse](3.%20Power%20Automate%20+%20Dataverse/README.md)
+- [4. SharePoint](4.%20SharePoint/README.md)
+- [5. Local CSV](5.%20Local%20CSV/README.md)
 
 Search existing issues for the same symptom. For a new bug report, include:
 

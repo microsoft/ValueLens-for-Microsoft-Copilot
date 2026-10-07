@@ -1,4 +1,4 @@
-"""Offline checks for the `5. Azure` scaffold: SQL contract, jobs entry point, Bicep invariants."""
+"""Offline checks for the `2. Azure` scaffold: SQL contract, jobs entry point, Bicep invariants."""
 import json
 import re
 import shutil
@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-AZURE = ROOT / "5. Azure"
+AZURE = ROOT / "2. Azure"
 EXPECTED = ROOT / "tests" / "fixtures" / "valuelens-golden" / "expected"
 SQL_TYPES = {"string": "NVARCHAR(4000)", "timestamp": "DATETIME2(6)", "date": "DATE",
              "bigint": "BIGINT", "boolean": "BIT"}
@@ -73,7 +73,7 @@ def test_jobs_process_end_to_end(tmp_path):
 def test_installer_teams_package_is_vendored_copy(name):
     vendored = ROOT / "1. Fabric" / "installer" / "src" / "azure" / "teams" / name
     assert vendored.read_bytes() == (AZURE / "teams" / name).read_bytes(), \
-        f"copy 5. Azure/teams/{name} to {vendored.relative_to(ROOT)}"
+        f"copy 2. Azure/teams/{name} to {vendored.relative_to(ROOT)}"
 
 
 @pytest.mark.skipif(not shutil.which("az") and not (Path.home() / ".azure" / "bin").exists(),

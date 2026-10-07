@@ -160,7 +160,7 @@ class LicenseClassificationTests(unittest.TestCase):
                     self.assertIn("Csv.Document", expression)
 
     def test_supplied_flags_feed_optional_processor_without_sku_inference(self):
-        path = ROOT / "4. Local CSV" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
+        path = ROOT / "5. Local CSV" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
         tree = ast.parse(path.read_text(encoding="utf-8-sig"))
         nodes = [
             node for node in tree.body

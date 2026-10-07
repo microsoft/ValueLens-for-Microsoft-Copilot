@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PATHWAY = ROOT / "2. Power Automate + Dataverse"
+PATHWAY = ROOT / "3. Power Automate + Dataverse"
 BRIDGE_PATH = PATHWAY / "scripts" / "Build-DataverseCoreFeeds.py"
 DEPLOY_PATH = PATHWAY / "scripts" / "Deploy-DataverseCoreSchema.py"
 SCHEMA_PATH = PATHWAY / "dataverse-core-schema.json"

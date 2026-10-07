@@ -1,5 +1,5 @@
 // @ts-check
-/** Teams package hook for the Azure target. teams/ is vendored from '5. Azure/teams' (drift-checked by tests/test_azure_scaffold.py). */
+/** Teams package hook for the Azure target. teams/ is vendored from '2. Azure/teams' (drift-checked by tests/test_azure_scaffold.py). */
 
 /**
  * @param {{ clientId: string, fqdn: string, appIdUri: string, version: string, outFile: string }} o

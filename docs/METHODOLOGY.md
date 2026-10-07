@@ -73,7 +73,7 @@ flowchart LR
 | **4. Date** | `InteractionDate`, `WeekStart` (Monday) and `MonthStart`, all from the record's UTC timestamp. |
 | **5. Licence** | The user ID is lower-cased and trimmed, then matched to the licensed-users table. `Has license` of YES, TRUE, Y or 1 gives **M365 Copilot Licensed**; anything else, including no match, gives **Unlicensed**. |
 | **6. Link agents** | Each agent row is linked to the Agent 365 registry by Title ID, then Copilot Studio Bot Id, then Entra agent ID. The first match wins. Agents are never matched by name ([§2.2](#22-how-agents-are-linked-to-the-registry)). |
-| **7. Classify** | The rules in [§3](#3-how-each-interaction-is-classified). On Fabric the `Copilot_Audit_Log_Processor` notebook runs them in Spark and writes `copilot_interactions_curated`. The other paths run [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../4.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py), which classifies agents less finely ([§3.2](#paths-2-3-and-4)). |
+| **7. Classify** | The rules in [§3](#3-how-each-interaction-is-classified). On Fabric the `Copilot_Audit_Log_Processor` notebook runs them in Spark and writes `copilot_interactions_curated`. On Azure, the `valuelens_core` DuckDB port runs the same rules. The other paths run [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../5.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py), which classifies agents less finely ([§3.2](#paths-3-4-and-5)). |
 | **8. Model** | The model reads the curated rows without reclassifying them. It joins org data (organisation, department, location) on the normalised person ID, and computes the measures. On Fabric, refresh is incremental by `CreationDate`. |
 
 Table and column contracts are in the [data dictionary](DATA-DICTIONARY.md).
@@ -121,7 +121,7 @@ most recently updated), so the agent's distinct users are counted once. `Agent_M
 the Title ID that actually matched. Agent Builder agents and Microsoft agents are never merged,
 because their copies can be different agents.
 
-The Local CSV processor (Path 4, also run by the Power Automate path) drops the same records and
+The Local CSV processor (Path 5, also run by the Power Automate path) drops the same records and
 keeps the same runtime records. The SharePoint path processes audit data with the PAX script's own
 copy of that processor, which does so only once PAX takes the same change. On all three paths agent
 linking runs in the template, not the processor.
@@ -322,10 +322,10 @@ lists each description with its signal and time band.
 Order decides the last one. Rule 6 (a connector with an active action) comes before rule 25 (a
 ServiceNow site), so the ticket counts as a workflow, not a service desk question.
 
-#### Paths 2, 3 and 4
+#### Paths 3, 4 and 5
 
 These paths classify with
-[`Purview_CopilotInteraction_Processor_v4.0.0.py`](../4.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py).
+[`Purview_CopilotInteraction_Processor_v4.0.0.py`](../5.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py).
 It runs step 1 the same way, and step 4 is in the shared model. But it has no Agent 365 registry,
 doesn't split workflows, and doesn't apply the name keywords to agent rows. So on
 these paths agent chats with no matching resource stay General Chat, and workflows stay Running a
@@ -525,8 +525,8 @@ and its research source are in the [appendix](#appendix-time-bands-and-sources).
 | IT & Service Desk | An agent named or described for support, help desks or tickets, or a ServiceNow site | Using an IT or service desk agent to fix a problem or raise a ticket. | 20 | Medium-High |
 | Sales & Customer | An agent named or described for sales, customers or CRM, or a Dynamics site | Using a sales or customer agent for accounts, deals or customer insight. | 35 | Medium |
 
-Agent keywords and the workflow split run only on the Fabric path. On paths 2, 3 and 4 those rows
-stay General Chat or Running a Workflow ([§3.2](#paths-2-3-and-4)).
+Agent keywords and the workflow split run only on the Fabric and Azure paths. On paths 3, 4 and 5 those rows
+stay General Chat or Running a Workflow ([§3.2](#paths-3-4-and-5)).
 
 ### 3.5 App host reference
 
@@ -1001,8 +1001,8 @@ more workloads a day scores full marks for it.
 - **Tasks are rows, not prompts.** Use prompts or sessions when you need a per-interaction count.
 - **Categories are rule-based.** They are deterministic and explainable, but they won't match
   Copilot Analytics' AI-inferred categories, and agent categories are only as good as agent names
-  and descriptions. Paths 2, 3 and 4 don't read the agent registry or split workflows
-  ([§3.2](#paths-2-3-and-4)).
+  and descriptions. Paths 3, 4 and 5 don't read the agent registry or split workflows
+  ([§3.2](#paths-3-4-and-5)).
 - **Some time bands are provisional.** Rows marked *Low* confidence or *Provisional* in the
   appendix are estimates waiting for a better source.
 - **Habit and readiness thresholds are design choices**, not research results.

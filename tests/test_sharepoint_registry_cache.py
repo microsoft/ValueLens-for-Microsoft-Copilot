@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-SCRIPT = REPO / "3. SharePoint" / "scripts" / "Get-Agents365Registry.ps1"
+SCRIPT = REPO / "4. SharePoint" / "scripts" / "Get-Agents365Registry.ps1"
 
 
 def _find_pwsh():

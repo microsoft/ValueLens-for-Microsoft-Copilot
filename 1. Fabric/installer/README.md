@@ -76,8 +76,8 @@ The wizard asks how the app, jobs and Power BI reach Azure SQL and Storage:
   an unreleased build: `{ "registry": "myacr.azurecr.io/valuelens", "registryResourceId": "<ACR
   resource ID>", "tag": "dev-abc123" }`. With `registryResourceId` set, the managed identity is granted
   AcrPull. Build into your registry from the repo root with
-  `az acr build -r myacr -t valuelens/valuelens-jobs:<tag> -f "5. Azure/jobs/Dockerfile" .` (and the
-  same for `valuelens-web` with `5. Azure/web/Dockerfile`). If the upload fails on long `node_modules`
+  `az acr build -r myacr -t valuelens/valuelens-jobs:<tag> -f "2. Azure/jobs/Dockerfile" .` (and the
+  same for `valuelens-web` with `2. Azure/web/Dockerfile`). If the upload fails on long `node_modules`
   paths, build from a folder that holds only the paths the Dockerfile copies.
 
 If the database migration job fails, setup stops before the first load and prints the

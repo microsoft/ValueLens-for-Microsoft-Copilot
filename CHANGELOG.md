@@ -10,9 +10,30 @@ worse record than pointing you at the commits themselves.
 Deployment instructions do **not** live here. They live in the path READMEs:
 [1. Fabric](1.%20Fabric/README.md) ·
 [1. Fabric/Fabric App](1.%20Fabric/Fabric%20App/README.md) ·
-[2. Power Automate + Dataverse](2.%20Power%20Automate%20+%20Dataverse/README.md) ·
-[3. SharePoint](3.%20SharePoint/README.md) ·
-[4. Local CSV](4.%20Local%20CSV/README.md).
+[2. Azure](2.%20Azure/README.md) ·
+[3. Power Automate + Dataverse](3.%20Power%20Automate%20+%20Dataverse/README.md) ·
+[4. SharePoint](4.%20SharePoint/README.md) ·
+[5. Local CSV](5.%20Local%20CSV/README.md).
+
+---
+
+## 2026-10-07 — Paths renumbered: Azure second
+
+The Azure path (preview) joins the numbered paths, second after Fabric, because it's the other
+route that installs everything for you:
+
+| Was | Now |
+|---|---|
+| `5. Azure` | `2. Azure` |
+| `2. Power Automate + Dataverse` | `3. Power Automate + Dataverse` |
+| `3. SharePoint` | `4. SharePoint` |
+| `4. Local CSV` | `5. Local CSV` |
+
+`1. Fabric` is unchanged. Only paths changed: links, the CI workflows, the Dockerfiles, the tests and
+the installer all point at the new folders, and the older entries below use the new paths so their
+links keep working. Released installers are unaffected, because they bundle what they deploy rather
+than downloading it from the repo. Bookmarks and links from outside the repo to the old folder names
+will break, because GitHub doesn't redirect renamed folders.
 
 ---
 
@@ -645,13 +666,13 @@ Each path folder now has an optional `Add Credit Consumption/` folder holding
 across Cowork / Work IQ, Copilot Studio, GitHub Copilot and Azure AI Foundry. The ValueLens
 templates are unchanged and don't read it.
 
-- **4. Local CSV** — the Local CSV template, `pull_azure_ai.py` and the shared synthetic sample
+- **5. Local CSV** — the Local CSV template, `pull_azure_ai.py` and the shared synthetic sample
   data.
-- **3. SharePoint** — the Viva Direct template, which reads Cowork data straight from Viva
+- **4. SharePoint** — the Viva Direct template, which reads Cowork data straight from Viva
   Insights. Consumption Central has no SharePoint template.
 - **1. Fabric** — the Fabric template, seven ingestion notebooks, `seed_sample_data.py` and the
   data dictionary. It can share the ValueLens Lakehouse; no table names overlap.
-- **2. Power Automate + Dataverse** — the Dataverse template, flow package, schema deploy script
+- **3. Power Automate + Dataverse** — the Dataverse template, flow package, schema deploy script
   and permissions. Tables use the `cc_` prefix, so they sit beside ValueLens's `poc_` tables.
 
 Copied from `microsoft/ConsumptionCentral-for-Microsoft-Copilot` at commit `24b0ca8`, with the
@@ -712,12 +733,12 @@ default is less strict, and you can choose how strict it is. All five templates 
 
 ## 2026-09-28 — sample product feedback
 
-- New `4. Local CSV/sample-data/product_feedback_sample.csv` (172 rows): a fabricated
+- New `5. Local CSV/sample-data/product_feedback_sample.csv` (172 rows): a fabricated
   Microsoft 365 admin centre product-feedback export, so the User Feedback page fills in from
   the sample data like every other page. `Build-SampleData.py` generates it from its own
   random stream, so the other three sample files are unchanged. It uses the same 21-column
   export shape the Fabric `Copilot_ProductFeedback_Ingester` reads.
-- `.gitignore`: the sample-data exception now matches `4. Local CSV/sample-data/`. It was
+- `.gitignore`: the sample-data exception now matches `5. Local CSV/sample-data/`. It was
   anchored to a root `sample-data/` folder that doesn't exist, so new sample files were ignored.
 
 ---
@@ -764,7 +785,7 @@ is about 1.2 MB (previously 4.7–10.5 MB) because it no longer carries pending 
 - **Fabric:** the pipeline runs `Copilot_Agent365_Registry_Ingester` (Graph API) and, only if it
   fails, `Copilot_Agent365_Lander` (admin-centre CSV). See the
   [pipelines README](1.%20Fabric/Manual%20setup/pipelines/README.md) for the migration steps.
-- **Other paths:** [`Get-Agents365Registry.ps1`](3.%20SharePoint/scripts/Get-Agents365Registry.ps1)
+- **Other paths:** [`Get-Agents365Registry.ps1`](4.%20SharePoint/scripts/Get-Agents365Registry.ps1)
   writes the same 48-column registry as the Fabric notebook. `Run-PAX-AIBV.ps1
   -IncludeAgent365Info` runs it after PAX; add `-Agents365Csv` to fall back to the admin-centre
   export, or use `-Agents365Csv` alone in tenants without an Agent 365 licence.

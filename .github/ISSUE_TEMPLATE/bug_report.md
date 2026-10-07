@@ -14,9 +14,10 @@ Use fabricated examples and redact screenshots. -->
 
 - [ ] 1. Fabric (SQL endpoint or OneLake? Specify below.)
 - [ ] 1. Fabric/Fabric App (preview)
-- [ ] 2. Power Automate + Dataverse (preview)
-- [ ] 3. SharePoint
-- [ ] 4. Local CSV
+- [ ] 2. Azure (preview)
+- [ ] 3. Power Automate + Dataverse (preview)
+- [ ] 4. SharePoint
+- [ ] 5. Local CSV
 
 ### Environment
 
