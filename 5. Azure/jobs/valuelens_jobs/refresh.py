@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import timedelta
 
 from .api import POWERBI
 
@@ -16,7 +17,17 @@ log = logging.getLogger("valuelens_jobs.refresh")
 BASE = "https://api.powerbi.com/v1.0/myorg"
 FINAL = {"Completed", "Failed", "Cancelled", "Disabled", "TimedOut"}
 ENHANCED = {"type": "full", "commitMode": "transactional", "applyRefreshPolicy": True, "retryCount": 1}
+# Reloads every partition, not just the incremental window. Used when older days were republished.
+ENHANCED_ALL = {**ENHANCED, "applyRefreshPolicy": False}
 STANDARD = {"notifyOption": "NoNotification"}
+# The template's incremental refresh policy reloads the 7 days before today (offset -1).
+INCREMENTAL_DAYS = 7
+
+
+def needs_full_refresh(publish_results, today) -> bool:
+    """True when publish rewrote or removed a day the incremental refresh window won't reload."""
+    oldest = min((r["oldest_day"] for r in publish_results or [] if r.get("oldest_day")), default=None)
+    return oldest is not None and oldest < (today - timedelta(days=INCREMENTAL_DAYS)).isoformat()
 
 
 class Refresher:
@@ -31,7 +42,7 @@ class Refresher:
     def start(self, url, body):
         """Returns (refresh id or request id, enhanced?). Waits while another refresh is running."""
         deadline = self.clock() + self.busy_minutes * 60
-        enhanced = body is ENHANCED
+        enhanced = body is not STANDARD
         while True:
             r = self.api.post(url, scope=POWERBI, json=body, timeout=60)
             if r.status_code == 202:
@@ -85,14 +96,15 @@ class Refresher:
                 raise TimeoutError(f"The refresh was still running after {self.timeout_minutes} minutes.")
             self.sleep(self.poll_seconds)
 
-    def refresh(self, workspace_id, dataset_id):
+    def refresh(self, workspace_id, dataset_id, *, all_partitions=False):
         url = self._url(workspace_id, dataset_id)
-        refresh_id, enhanced = self.start(url, ENHANCED)
-        log.info("refresh: started %s (%s)", refresh_id, "enhanced" if enhanced else "standard")
+        refresh_id, enhanced = self.start(url, ENHANCED_ALL if all_partitions else ENHANCED)
+        log.info("refresh: started %s (%s%s)", refresh_id, "enhanced" if enhanced else "standard",
+                 ", all partitions" if enhanced and all_partitions else "")
         return self.wait(url, refresh_id, enhanced)
 
 
-def refresh_models(api, settings, **kwargs) -> list[str]:
+def refresh_models(api, settings, *, all_partitions=False, **kwargs) -> list[str]:
     models = settings.semantic_models or {}
     if not models:
         log.warning("refresh: no semantic models configured (VALUELENS_SEMANTIC_MODELS); skipped")
@@ -105,6 +117,6 @@ def refresh_models(api, settings, **kwargs) -> list[str]:
         if not ws or not ds:
             raise ValueError(f"Semantic model {name!r} needs workspaceId and itemId.")
         log.info("refresh: %s", name)
-        r.refresh(ws, ds)
+        r.refresh(ws, ds, all_partitions=all_partitions)
         done.append(name)
     return done

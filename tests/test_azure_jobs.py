@@ -332,7 +332,9 @@ def test_publish_partitions_are_incremental(tmp_path):
     _write_curated(store, [("b2", d2, "bob", 5), ("c", d2, "cy", 1)], extra_col=True)
     r = pub.publish(conn, store, ["curated"])[0]
     assert r["days_removed"] == 1 and r["days_changed"] == 0
+    assert r["oldest_day"] == "2026-09-01"
     assert conn.execute("SELECT count(*) FROM copilot_interactions_curated").fetchone() == (2,)
+    assert pub.publish(conn, store, ["curated"])[0]["oldest_day"] is None
 
 
 def test_publish_snapshot_replaces_and_skips_missing(tmp_path):
@@ -487,6 +489,26 @@ def test_refresh_pro_falls_back_to_standard_and_reads_history():
     assert bodies == [refresh_mod.ENHANCED, refresh_mod.STANDARD]
 
 
+def test_refresh_reloads_all_partitions_when_old_days_were_republished():
+    today = date(2026, 10, 7)
+    recent = [{"oldest_day": "2026-09-30"}, {"oldest_day": None}, {"table": "x"}]
+    assert not refresh_mod.needs_full_refresh(recent, today)
+    assert not refresh_mod.needs_full_refresh(None, today)
+    assert refresh_mod.needs_full_refresh(recent + [{"oldest_day": "2026-09-29"}], today)
+
+    bodies = []
+
+    def handler(m, url, kw):
+        if m == "POST":
+            bodies.append(kw["json"])
+            return Resp(202, headers={"Location": f"{REFRESHES}/rid-1"})
+        return Resp(200, {"extendedStatus": "Completed"})
+
+    r, _ = _refresher(handler)
+    r.refresh(WS, DS, all_partitions=True)
+    assert bodies == [refresh_mod.ENHANCED_ALL] and bodies[0]["applyRefreshPolicy"] is False
+
+
 def test_refresh_failure_surfaces_service_error():
     def handler(m, url, kw):
         if m == "POST":
@@ -611,12 +633,12 @@ def test_run_publishes_then_fails_when_a_source_failed(monkeypatch):
     monkeypatch.setattr(jobs_main, "open_store", lambda *a: object())
     monkeypatch.setattr(jobs_main, "collect", lambda *a: ran.append("collect") or {"errors": {"audit": "boom"}})
     monkeypatch.setattr(jobs_main, "process", lambda *a: ran.append("process"))
-    monkeypatch.setattr(jobs_main, "publish_step", lambda *a: ran.append("publish"))
-    monkeypatch.setattr(jobs_main, "refresh_step", lambda *a: ran.append("refresh"))
+    monkeypatch.setattr(jobs_main, "publish_step", lambda *a: ran.append("publish") or [{"oldest_day": "2020-01-01"}])
+    monkeypatch.setattr(jobs_main, "refresh_step", lambda *a, **kw: ran.append(("refresh", kw)))
     monkeypatch.setattr(jobs_main.Settings, "from_env", classmethod(lambda cls, env=None: settings()))
     with pytest.raises(RuntimeError, match="audit: boom"):
         jobs_main.main(["run"])
-    assert ran == ["collect", "process", "publish", "refresh"]
+    assert ran == ["collect", "process", "publish", ("refresh", {"publish_results": [{"oldest_day": "2020-01-01"}]})]
 
 
 def test_full_local_pipeline_collect_to_publish(tmp_path, monkeypatch):

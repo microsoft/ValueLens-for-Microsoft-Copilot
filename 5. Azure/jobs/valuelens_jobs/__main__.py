@@ -140,10 +140,13 @@ def migrate_step(settings, conn=None, folder=None):
         conn.close()
 
 
-def refresh_step(settings, api=None):
-    from .refresh import refresh_models
+def refresh_step(settings, api=None, publish_results=None, today=None):
+    from datetime import date
 
-    return refresh_models(api or _api(settings), settings)
+    from .refresh import needs_full_refresh, refresh_models
+
+    all_partitions = needs_full_refresh(publish_results, today or date.today())
+    return refresh_models(api or _api(settings), settings, all_partitions=all_partitions)
 
 
 def main(argv=None, env=None) -> int:
@@ -184,6 +187,7 @@ def main(argv=None, env=None) -> int:
         store = LocalStore(tempfile.mkdtemp(prefix="valuelens-sample-"))
         log.warning("VALUELENS_SAMPLE_DATA is on: publishing the synthetic sample instead of tenant data")
     collect_errors = {}
+    published = None
     for step in STEPS:
         if step not in steps:
             continue
@@ -198,9 +202,9 @@ def main(argv=None, env=None) -> int:
         elif step == "process":
             process(store)
         elif step == "publish":
-            publish_step(store, settings)
+            published = publish_step(store, settings)
         else:
-            refresh_step(settings)
+            refresh_step(settings, publish_results=published)
         log.info("step %s: done", step)
     if collect_errors:
         raise RuntimeError("the run published what it collected, but these sources failed and resume next run: "

@@ -175,15 +175,18 @@ def publish_table(conn, store_root, target: Target, *, now=None) -> dict:
     known = dict(cur.fetchall())
     col = b(target.partition)
     changed = removed = rows = 0
+    touched = []
     for key in sorted(set(known) - set(fresh)):
         _delete_partition(cur, target.table, col, key)
         cur.execute(f"DELETE FROM {b(STATE_TABLE)} WHERE {b('table_name')} = ? AND {b('partition_key')} = ?",
                     (target.table, key))
         conn.commit()
         removed += 1
+        touched.append(key)
     for key, (day, fp) in sorted(fresh.items()):
         if known.get(key) == fp:
             continue
+        touched.append(key)
         _delete_partition(cur, target.table, col, key)
         where = f"{part} IS NULL" if day is None else f"{part} = DATE '{day.isoformat()}'"
         rows += _insert(conn, con, target.table, schema, where)
@@ -195,8 +198,9 @@ def publish_table(conn, store_root, target: Target, *, now=None) -> dict:
         changed += 1
     log.info("publish %s: %s day(s) rewritten (%s rows), %s removed, %s unchanged", target.table, changed, rows,
              removed, len(fresh) - changed)
+    days = [k for k in touched if k != "null"]
     return {"table": target.table, "days_changed": changed, "days_removed": removed, "rows": rows,
-            "added_columns": added}
+            "added_columns": added, "oldest_day": min(days) if days else None}
 
 
 def _delete_partition(cur, table, col, key):
