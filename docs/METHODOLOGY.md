@@ -658,12 +658,13 @@ hours = units × minutes (Low / Typical / High) × category adjustment ÷ 60
 
 ## 6. Page by page
 
-The Fabric App gathers the report's pages into seven of its eleven pages:
+The Fabric App gathers the report's pages into eight of its thirteen pages:
 
 | App page | Report pages it holds |
 |---|---|
 | Adoption | Activation, Adoption, Habit Formation, Trend Heatmap |
-| Leaderboards | Leaderboard, Agent Registry |
+| Leaderboards | Leaderboard, plus the most-used agents |
+| Governance | Agent Registry, plus exposure, accountability and a review queue, which are app only ([Governance](#governance-which-agents-need-a-review)) |
 | Readiness | License Readiness, License Allocation, Cowork Readiness |
 | Value | Task Breakdown, Estimated Value, plus Cost vs value, which is app only ([§8.3](#83-cost-vs-value)) |
 | Efficiency | Cowork Fit, Model Fit |
@@ -751,6 +752,34 @@ The first rule that fits wins:
 Agents with the same name are de-duplicated to the copy with the most users. Usage is matched by
 ID first and name last ([§2](#2-from-audit-record-to-dashboard-row), step 6), so a renamed agent
 can appear unused.
+
+### Governance: which agents need a review?
+
+The Fabric App's Governance page. It reads the same registry, and looks only at agents **built in
+this tenant** and not blocked: catalogue listings are Microsoft's or a publisher's to govern.
+
+| Column | Definition |
+|---|---|
+| Sharing Scope | *Whole organisation* (available to or acquired for all), *Specific people or groups* (for some, or a non-empty share list), *Not shared*, or *Not stated* when the registry doesn't say |
+| Data Access | *Organisation content* (reads SharePoint sites, OneDrive files or a Graph connector), *Uploaded files only*, *None declared*, or *Not reported* when the registry gives no capability flags |
+| Owner account | *Active*, *Disabled* or *Not found*: the creator's Entra ID account at the last registry ingester run. Blank when not checked |
+
+An agent needs a review when one or more flags apply:
+
+| Flag | Rule |
+|---|---|
+| Owner has left | Owner account is Disabled or Not found |
+| No owner on record | No creator could be attributed ([Data Dictionary](DATA-DICTIONARY.md#agent-creator-attribution-agent-creator-upn--agent-creator-source)) |
+| Org-wide with org data | Sharing Scope is Whole organisation and Data Access is Organisation content |
+| Shared, no recorded use | Shared with anyone, and no matched users in the audit data |
+
+The review queue lists flagged agents, most flags first, then most users.
+
+- **The owner check needs the Fabric registry ingester** with `CHECK_OWNER_ACCOUNT` on, and
+  `User.Read.All`. A registry loaded from a CSV export leaves every owner *Not checked*.
+- **Sharing and data access are what the registry declares**, not what the agent has actually
+  surfaced. A CSV export may leave them *Not stated* or *Not reported*.
+- *Shared, no recorded use* inherits the usage matching above, so a renamed agent can be flagged.
 
 ### Task Breakdown: what was the work?
 
