@@ -58,6 +58,16 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {string} name
  * @property {string} [signature]  What the deployed definition was built from.
  * @property {boolean} [bound]  Reads the Lakehouse through the installer's connection.
+ * @property {ReportConfig} [report]  The report published on the model.
+ */
+
+/**
+ * A Power BI report published from a template and bound to one of the installer's models.
+ * @typedef {object} ReportConfig
+ * @property {string} [id]
+ * @property {string} name
+ * @property {string} [signature]  A hash of the template's report files when it was published.
+ * @property {string} [modelId]  The model it reads.
  */
 
 /**
@@ -117,6 +127,8 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {string} [secretKeyId]  The app secret that only the connection holds.
  * @property {string} [secretExpires]
  * @property {boolean} [bound]
+ * @property {boolean} [reports]  Publish the Power BI reports on the models. Records from before the choice was offered leave it unset, meaning no.
+ * @property {ReportConfig} [report]  The ValueLens report.
  */
 
 /**
@@ -169,6 +181,9 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
 export const MODEL_NAME = 'Analytics Hub Model';
 export const CONSUMPTION_MODEL_NAME = 'Analytics Hub Consumption Model';
 export const AGENT_EVALUATOR_MODEL_NAME = 'Analytics Hub Agent Evaluator Model';
+export const REPORT_NAME = 'ValueLens';
+export const CONSUMPTION_REPORT_NAME = 'Consumption Central';
+export const AGENT_EVALUATOR_REPORT_NAME = 'Agent Evaluator';
 
 /** @returns {InstallConfig} */
 export function emptyConfig() {

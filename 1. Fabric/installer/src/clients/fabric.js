@@ -182,6 +182,15 @@ export function fabricApi(http) {
     /** @param {string} workspaceId @param {string} id @param {any} definition */
     updateSemanticModel: (workspaceId, id, definition) =>
       http.requestLro('POST', `/workspaces/${workspaceId}/semanticModels/${id}/updateDefinition`, { body: { definition } }),
+    /** @param {string} workspaceId @param {string} displayName @param {any} definition */
+    createReport: (workspaceId, displayName, definition) =>
+      http.requestLro('POST', `/workspaces/${workspaceId}/reports`, {
+        body: { displayName, description: 'Published by the Analytics Hub installer from its Power BI template.', definition },
+        lroResult: true,
+      }),
+    /** @param {string} workspaceId @param {string} id @param {any} definition */
+    updateReport: (workspaceId, id, definition) =>
+      http.requestLro('POST', `/workspaces/${workspaceId}/reports/${id}/updateDefinition`, { body: { definition } }),
     /**
      * Points the model's data source at a connection.
      * @param {string} workspaceId
