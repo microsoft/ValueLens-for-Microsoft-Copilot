@@ -1,6 +1,6 @@
 # web: Analytics Hub on Azure
 
-`valuelens-web` is the Node 20 service for Analytics Hub on Azure. It serves the built SPA from `/app/public` (or `VALUELENS_PUBLIC_DIR`) and exposes the API on port `8080` (`PORT` overrides it).
+`valuelens-web` is the Node 22 service for Analytics Hub on Azure. It serves the built SPA from `/app/public` (or `VALUELENS_PUBLIC_DIR`) and exposes the API on port `8080` (`PORT` overrides it).
 
 ## Routes
 
@@ -21,4 +21,4 @@ npm.cmd install
 npm.cmd test
 ```
 
-The Dockerfile is intended to be built from the repository root and produces a non-root `node:20-alpine` image that builds the Fabric SPA and copies its `dist` into `/app/public`.
+The Dockerfile is intended to be built from the repository root and produces a non-root `node:22-alpine` image that builds the Fabric SPA and copies its `dist` into `/app/public`.
