@@ -4,6 +4,8 @@ Port of the Fabric `Copilot_Audit_Log_Ingester` notebook:
 * the same window grid (`CHUNK_HOURS`), bounded concurrency and per-query wait ceiling;
 * a manifest of finished windows so a failed run resumes without re-querying them;
 * windows within the trailing look-back are always re-queried (late-arriving records);
+* a failing window is re-queried with backoff, then split in halves down to `MIN_CHUNK_HOURS`;
+  failures and 429s lower concurrency for the rest of the run (same helpers as the notebook);
 * records are canonicalised and flattened by `valuelens_core.audit` (golden-checked against Spark);
 * new rows replace existing rows with the same `Id` (the notebook's Delta MERGE), one file per day.
 """
@@ -13,7 +15,7 @@ import json
 import logging
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait as wait_futures
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
@@ -21,7 +23,7 @@ import duckdb
 
 from valuelens_core import audit
 
-from ..api import raise_for_status
+from ..api import TRANSIENT, HttpError, _is_network_error, raise_for_status
 from ..tables import ident, q
 
 log = logging.getLogger("valuelens_jobs.collect.audit")
@@ -31,9 +33,27 @@ PARSED = "raw/copilot_interactions_parsed"
 STAGING = "raw/_audit_staging"
 STATE = "raw/_state/audit.json"
 CHUNK_HOURS = 8
-MAX_CONCURRENT_QUERIES = 6
+MAX_CONCURRENT_QUERIES = 5  # Graph runs ~10 audit queries at once per tenant; leave room for other admins
 MAX_WAIT_MIN_PER_QUERY = 240
 POLL_INTERVAL_SEC = 30
+WINDOW_RETRIES = 3
+MIN_CHUNK_HOURS = 1
+SPLIT_ON_TIMEOUT = True
+RETRY_BASE_SEC = 60
+RETRY_MAX_SEC = 900
+MIN_CONCURRENT_QUERIES = 1
+
+
+class AuditQueryFailed(RuntimeError):
+    """The audit service ended a query as failed or cancelled; a new query for the window may succeed."""
+
+
+def is_retryable(exc) -> bool:
+    if isinstance(exc, (AuditQueryFailed, TimeoutError)):
+        return True
+    if isinstance(exc, HttpError):
+        return exc.status_code in TRANSIENT
+    return _is_network_error(exc)
 
 
 def day_file(day) -> str:
@@ -44,14 +64,25 @@ def _iso(value) -> str:
     return audit._as_utc_datetime(value).isoformat()
 
 
+def _range(ws, we) -> str:
+    return f"{audit._as_utc_datetime(ws):%Y-%m-%d %H:%M}-{audit._as_utc_datetime(we):%H:%M} UTC"
+
+
 class AuditCollector:
     def __init__(self, api, store, settings, *, now=None, sleep=time.sleep, poll_seconds=POLL_INTERVAL_SEC,
                  max_wait_minutes=MAX_WAIT_MIN_PER_QUERY, chunk_hours=CHUNK_HOURS,
-                 max_concurrent=MAX_CONCURRENT_QUERIES):
+                 max_concurrent=MAX_CONCURRENT_QUERIES, window_retries=WINDOW_RETRIES,
+                 min_chunk_hours=MIN_CHUNK_HOURS, split_on_timeout=SPLIT_ON_TIMEOUT,
+                 retry_base_seconds=RETRY_BASE_SEC, retry_max_seconds=RETRY_MAX_SEC,
+                 min_concurrent=MIN_CONCURRENT_QUERIES):
         self.api, self.store, self.settings = api, store, settings
         self.end = now or datetime.now(timezone.utc)
         self.sleep, self.poll_seconds, self.max_wait_minutes = sleep, poll_seconds, max_wait_minutes
         self.chunk_hours, self.max_concurrent = chunk_hours, max_concurrent
+        self.window_retries, self.min_chunk_hours = max(int(window_retries), 0), min_chunk_hours
+        self.split_on_timeout = split_on_timeout
+        self.retry_base_seconds, self.retry_max_seconds = retry_base_seconds, retry_max_seconds
+        self.limiter = audit.AdaptiveLimiter(max_concurrent, min_concurrent)
         self.lookback = max(int(settings.audit_lookback_days), 0)
         self._lock = threading.RLock()
         self.state = store.read_json(STATE, {}) or {}
@@ -121,7 +152,7 @@ class AuditCollector:
             if status == "succeeded":
                 return
             if status in ("failed", "cancelled"):
-                raise RuntimeError(f"Query {qid} ended with status: {status}")
+                raise AuditQueryFailed(f"Query {qid} ended with status: {status}")
             if status not in ("notstarted", "running"):
                 raise RuntimeError(f"Query {qid} returned unexpected status: {status}")
             if time.monotonic() > deadline:
@@ -170,15 +201,18 @@ class AuditCollector:
             url = nxt
         return rows, files
 
-    def _window(self, ws, we):
+    def _window(self, ws, we, attempt=1):
         key = audit.stable_window_key(ws, we)
         self._mark(key, "querying", window_start=_iso(ws), window_end=_iso(we),
-                   refreshed_at=datetime.now(timezone.utc).isoformat(), completed_at=None)
+                   refreshed_at=datetime.now(timezone.utc).isoformat(), completed_at=None,
+                   attempts=attempt, error=None, **({"attempt_errors": []} if attempt == 1 else {}))
         qid = None
         try:
-            qid = self.create_query(ws, we)
-            self._mark(key, "waiting", query_id=qid)
-            self.wait(qid)
+            # Only creating and waiting hold one of the tenant's concurrent query slots; draining doesn't.
+            with self.limiter:
+                qid = self.create_query(ws, we)
+                self._mark(key, "waiting", query_id=qid)
+                self.wait(qid)
             self._mark(key, "draining", query_id=qid)
             rows, files = self.drain(qid, key)
             self._mark(key, "succeeded", query_id=qid, rows=rows, pages=len(files), files=files,
@@ -189,33 +223,120 @@ class AuditCollector:
             self.store.remove(self._files(key))
             raise
 
+    def _run_window(self, ws, we):
+        """Fetch one window: retry with a new query, then split it when the retries run out.
+
+        Returns (key, rows, outcome, detail); outcome is 'done', 'split' (detail = the halves) or
+        'failed' (detail = the last error). Only PermissionError (missing Graph permission) propagates.
+        """
+        key = audit.stable_window_key(ws, we)
+        errors, last = [], None
+        for attempt in range(1, self.window_retries + 2):
+            try:
+                _, rows = self._window(ws, we, attempt)
+                return key, rows, "done", None
+            except PermissionError:
+                raise
+            except Exception as exc:
+                last = f"{type(exc).__name__}: {exc}"
+                errors.append(f"attempt {attempt}: {last}")
+                self._mark(key, "failed", attempts=attempt, attempt_errors=errors[-5:])
+                if not is_retryable(exc):
+                    return key, 0, "failed", last
+                if self.limiter.shrink(f"{key}: {last}", halve=getattr(exc, "status_code", None) == 429):
+                    log.warning("audit: concurrency lowered to %s after: %s", self.limiter.limit, last)
+                if isinstance(exc, TimeoutError) and self.split_on_timeout:
+                    break
+                if attempt <= self.window_retries:
+                    delay = audit.retry_delay(attempt, self.retry_base_seconds, self.retry_max_seconds)
+                    log.warning("audit: window %s: %s; new query in %.0fs (retry %s/%s)", key, last, delay,
+                                attempt, self.window_retries)
+                    self.sleep(delay)
+        halves = audit.split_window(ws, we, self.min_chunk_hours)
+        if not halves:
+            return key, 0, "failed", last
+        self._mark(key, "split", parts=[audit.stable_window_key(a, b) for a, b in halves],
+                   split_at=datetime.now(timezone.utc).isoformat(), error=last, completed_at=None)
+        self.store.remove(self._files(key))
+        return key, 0, "split", halves
+
+    def leaves(self, windows, include_parents=False):
+        """The windows holding a plan's data: split windows are replaced by their parts."""
+        with self._lock:
+            snapshot = dict(self.manifest)
+        return [leaf for ws, we in windows
+                for leaf in audit.expand_split_windows(snapshot, ws, we, self.min_chunk_hours, include_parents)]
+
+    def _fetch(self, pending):
+        outcomes, fatal = {}, None
+        with ThreadPoolExecutor(max_workers=max(1, int(self.max_concurrent))) as pool:
+            running = {pool.submit(self._run_window, ws, we): (ws, we) for ws, we in pending}
+            while running:
+                finished, _ = wait_futures(list(running), return_when=FIRST_COMPLETED)
+                for fut in finished:
+                    running.pop(fut)
+                    if fut.cancelled():
+                        continue
+                    try:
+                        key, rows, how, detail = fut.result()
+                    except Exception as exc:
+                        fatal = fatal or exc
+                        for other in running:
+                            other.cancel()
+                        continue
+                    outcomes[key] = how
+                    if how == "split":
+                        log.warning("audit: window %s kept failing; split into %s parts", key, len(detail))
+                        if fatal is None:
+                            for half in detail:
+                                running[pool.submit(self._run_window, *half)] = half
+                    elif how == "failed":
+                        log.warning("audit: window %s failed: %s", key, detail)
+                    else:
+                        log.info("audit: window %s +%s record(s)", key, rows)
+        if fatal is not None:
+            raise fatal
+        return outcomes
+
     # -------------------------------------------------------------- run
     def run(self) -> dict:
         windows = self.plan()
         self.store.pull(STAGING)
-        keys = {audit.stable_window_key(ws, we): (ws, we) for ws, we in windows}
-        pending = [(ws, we) for key, (ws, we) in keys.items() if not self._reusable(key, we, self.manifest.get(key))]
+        leaves = self.leaves(windows)
+        pending = [(ws, we) for ws, we in leaves
+                   if not self._reusable(audit.stable_window_key(ws, we), we,
+                                         self.manifest.get(audit.stable_window_key(ws, we)))]
         log.info("audit: %s window(s) of %sh from %s; %s to query (<= %s at a time)", len(windows),
-                 self.chunk_hours, windows[0][0] if windows else "-", len(pending), self.max_concurrent)
-        errors = []
-        with ThreadPoolExecutor(max_workers=self.max_concurrent) as pool:
-            futures = {pool.submit(self._window, ws, we): (ws, we) for ws, we in pending}
-            for fut in as_completed(futures):
-                try:
-                    key, rows = fut.result()
-                    log.info("audit: window %s +%s record(s)", key, rows)
-                except PermissionError:
-                    raise
-                except Exception as exc:
-                    errors.append(f"{futures[fut][0]:%Y-%m-%d %H:%M}: {type(exc).__name__}: {exc}")
+                 self.chunk_hours, windows[0][0] if windows else "-", len(pending), self.limiter.limit)
+        previous = getattr(self.api, "on_throttle", None)
+        self.api.on_throttle = lambda: self.limiter.shrink("HTTP 429 (throttled) from Graph", halve=True)
+        try:
+            outcomes = self._fetch(pending)
+        finally:
+            self.api.on_throttle = previous
+        leaves = self.leaves(windows)
+        keys = {audit.stable_window_key(ws, we) for ws, we in leaves}
+        with self._lock:
+            snapshot = dict(self.manifest)
+        errors = [f"{_range(ws, we)}: {(snapshot.get(k) or {}).get('error') or (snapshot.get(k) or {}).get('status')}"
+                  for ws, we in leaves
+                  for k in [audit.stable_window_key(ws, we)]
+                  if (snapshot.get(k) or {}).get("status") != "succeeded"]
+        shrinks = ", ".join(f"{a}->{b}" for a, b, _ in self.limiter.history) or "unchanged"
+        log.info("audit: %s planned window(s) -> %s after splits; fetched %s, split %s, failed %s; concurrency %s",
+                 len(windows), len(leaves), sum(1 for v in outcomes.values() if v == "done"),
+                 sum(1 for v in outcomes.values() if v == "split"), len(errors), shrinks)
         # Publish the windows that finished even when others failed, so one throttled window doesn't
         # leave the table empty. The high-water mark holds still until every window succeeds, so the
         # next run's plan still covers the failed ones.
         result = self.merge(keys, advance_high_water=not errors)
         if errors:
+            listed = "; ".join(errors[:10]) + (f"; ... and {len(errors) - 10} more" if len(errors) > 10 else "")
             raise RuntimeError(f"{len(errors)} audit window(s) failed; the {result['rows']} row(s) from finished "
-                               f"windows were merged and the next run resumes the rest. First error: {errors[0]}")
-        self.prune(keys)
+                               f"windows were merged and the next run resumes the rest. Each failed window was "
+                               f"retried {self.window_retries}x and split down to {self.min_chunk_hours:g}h. "
+                               f"Failed: {listed}")
+        self.prune({audit.stable_window_key(ws, we) for ws, we in self.leaves(windows, include_parents=True)})
         return result
 
     def merge(self, keys, advance_high_water=True) -> dict:
