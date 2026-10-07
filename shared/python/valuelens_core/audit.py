@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 
 WINDOW_KEY_VERSION = 2
@@ -226,6 +229,118 @@ def build_windows(start_date, end_date, chunk_hours: int):
         windows.append((cur, nxt))
         cur = nxt
     return windows
+
+
+# ------------------------------------------------------------------ notebook cell 6: failed-window recovery (verbatim)
+def split_window(win_start, win_end, min_hours):
+    """Halves of a window for another try at a smaller size; [] when a half would be under min_hours."""
+    ws = _as_utc_datetime(win_start)
+    we = _as_utc_datetime(win_end)
+    half_minutes = int((we - ws).total_seconds() // 60) // 2
+    if half_minutes <= 0 or half_minutes < float(min_hours) * 60:
+        return []
+    mid = win_start + timedelta(minutes=half_minutes)
+    return [(win_start, mid), (mid, win_end)]
+
+
+def expand_split_windows(manifest, win_start, win_end, min_hours, include_parents=False):
+    """The windows to query for one grid window: its halves (recursively) if an earlier run split it."""
+    entry = (manifest or {}).get(stable_window_key(win_start, win_end))
+    halves = []
+    if isinstance(entry, dict) and entry.get('status') == 'split':
+        halves = split_window(win_start, win_end, min_hours)
+    if not halves:
+        return [(win_start, win_end)]
+    out = [(win_start, win_end)] if include_parents else []
+    for ws, we in halves:
+        out.extend(expand_split_windows(manifest, ws, we, min_hours, include_parents))
+    return out
+
+
+def retry_delay(attempt, base_seconds, max_seconds, rand=random.random):
+    """Exponential backoff with jitter: base, 2x base, 4x base ... capped at max_seconds, times 50-100%."""
+    raw = min(float(max_seconds), float(base_seconds) * (2 ** max(int(attempt) - 1, 0)))
+    return max(0.0, raw * (0.5 + 0.5 * rand()))
+
+
+class AdaptiveLimiter:
+    """Caps concurrent audit queries. Failures and throttling lower the cap for the rest of the run.
+
+    A burst of failures with one cause (several windows failing in the same second) counts once:
+    the cap moves at most once per cooldown_seconds.
+    """
+
+    def __init__(self, limit, minimum=1, cooldown_seconds=60, clock=time.monotonic):
+        self.minimum = max(1, int(minimum))
+        self.limit = max(self.minimum, int(limit))
+        self.active = 0
+        self.history = []
+        self._cooldown = float(cooldown_seconds)
+        self._clock = clock
+        self._last_shrink = None
+        self._cond = threading.Condition()
+
+    def __enter__(self):
+        with self._cond:
+            while self.active >= self.limit:
+                self._cond.wait()
+            self.active += 1
+        return self
+
+    def __exit__(self, *exc):
+        with self._cond:
+            self.active -= 1
+            self._cond.notify_all()
+        return False
+
+    def shrink(self, reason, halve=False):
+        with self._cond:
+            now = self._clock()
+            if self._last_shrink is not None and now - self._last_shrink < self._cooldown:
+                return False
+            new = max(self.minimum, self.limit // 2 if halve else self.limit - 1)
+            if new >= self.limit:
+                return False
+            self.history.append((self.limit, new, reason))
+            self.limit, self._last_shrink = new, now
+            return True
+
+
+def _manifest_range(entry):
+    if not isinstance(entry, dict):
+        return None
+    try:
+        ws = _as_utc_datetime(entry.get('window_start'))
+        we = _as_utc_datetime(entry.get('window_end'))
+    except (TypeError, ValueError):
+        return None
+    return (ws, we) if ws and we and ws < we else None
+
+
+def uncovered_failed_ranges(manifest, not_before, before):
+    """Time ranges in [not_before, before) of unfinished windows that no succeeded window covers."""
+    lo = _as_utc_datetime(not_before)
+    hi = _as_utc_datetime(before)
+    entries = [e for e in (manifest or {}).values() if isinstance(e, dict)]
+    covered = sorted(r for r in (_manifest_range(e) for e in entries if e.get('status') == 'succeeded') if r)
+    gaps = []
+    for entry in entries:
+        if entry.get('status') in ('succeeded', 'split'):
+            continue
+        rng = _manifest_range(entry)
+        if not rng:
+            continue
+        pieces = [(max(rng[0], lo), min(rng[1], hi))]
+        for cs, ce in covered:
+            pieces = [p for s, e in pieces for p in ((s, min(e, cs)), (max(s, ce), e)) if p[0] < p[1]]
+        gaps.extend(pieces)
+    merged = []
+    for s, e in sorted(gaps):
+        if merged and s <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], e))
+        else:
+            merged.append((s, e))
+    return merged
 
 
 # ------------------------------------------------------------------ cells 14-18 (DuckDB)

@@ -36,7 +36,11 @@ def exec_named_defs(path, index, names, namespace=None, include_imports=True):
     for node in tree.body:
         if include_imports and isinstance(node, (ast.Import, ast.ImportFrom)):
             body.append(node)
-        elif isinstance(node, ast.FunctionDef) and node.name in wanted:
+        elif isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name in wanted:
+            body.append(node)
+        elif isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id in wanted for t in node.targets
+        ):
             body.append(node)
     compiled = compile(ast.Module(body=body, type_ignores=[]), f"{path.name}:cell{index}", "exec")
     ns = {} if namespace is None else namespace
@@ -216,11 +220,28 @@ class AuditReliabilityTests(unittest.TestCase):
         }
         if namespace:
             ns.update(namespace)
-        return exec_named_defs(INGESTER, 8, {"_read_query_status", "wait_for_query"}, ns)
+        return exec_named_defs(INGESTER, 8, {"AuditQueryFailed", "_read_query_status", "wait_for_query"}, ns)
 
     def checkpoint_helpers(self, namespace=None):
         ingester = self.ingester_helpers()
         ns = {
+            "MODE": "incremental",
+            "OUTPUT_TABLE": "dbo.Copilot_Interactions_Parsed",
+            "MAX_CONCURRENT_QUERIES": 5,
+            "MIN_CONCURRENT_QUERIES": 1,
+            "WINDOW_RETRIES": 3,
+            "MIN_CHUNK_HOURS": 1,
+            "SPLIT_ON_TIMEOUT": True,
+            "RETRY_BASE_SEC": 0,
+            "RETRY_MAX_SEC": 0,
+            "_TRANSIENT": {429, 500, 502, 503, 504},
+            "AuditQueryFailed": self.query_helpers()["AuditQueryFailed"],
+            "QUERY_LIMITER": ingester["AdaptiveLimiter"](5, 1),
+            "AdaptiveLimiter": ingester["AdaptiveLimiter"],
+            "split_window": ingester["split_window"],
+            "expand_split_windows": ingester["expand_split_windows"],
+            "retry_delay": ingester["retry_delay"],
+            "uncovered_failed_ranges": ingester["uncovered_failed_ranges"],
             "STAGING_ABS": str(SCRATCH),
             "MANIFEST": str(SCRATCH / "_manifest.json"),
             "LOCAL_STAGE_TMP_DIR": str(SCRATCH),
@@ -281,6 +302,14 @@ class AuditReliabilityTests(unittest.TestCase):
                 "_validate_records_page",
                 "_drain",
                 "_process",
+                "_FATAL_HTTP",
+                "_http_status",
+                "is_retryable_window_error",
+                "_run_window",
+                "leaf_windows",
+                "_fmt_range",
+                "assert_no_unrecovered_gaps",
+                "fetch_windows",
             },
             ns,
         )
@@ -866,6 +895,276 @@ class AgentIdentityTests(unittest.TestCase):
         writer = next(text for text in self.sources if "def write_curated_output" in text)
         self.assertIn("if AGENT_IDENTITY_REGEX and \"Audit_UserId\" in target_columns:", writer)
         self.assertIn(".rlike(AGENT_IDENTITY_REGEX))", writer)
+
+
+class FakeAuditGraph:
+    """Fake Graph audit query API: create_query / wait_for_query / records pages, with scripted failures."""
+
+    def __init__(self, failed, outcome=None):
+        self.failed = failed
+        self.outcome = outcome or (lambda ws, we, attempt: "succeeded")
+        self.created = []
+        self.ranges = {}
+        self.lock = threading.Lock()
+
+    def attempts(self, ws, we):
+        return sum(1 for r in self.created if r == (ws, we))
+
+    def create_query(self, ws, we):
+        with self.lock:
+            self.created.append((ws, we))
+            qid = f"q{len(self.created)}"
+            self.ranges[qid] = (ws, we, self.attempts(ws, we))
+        return qid
+
+    def wait_for_query(self, qid):
+        status = self.outcome(*self.ranges[qid])
+        if status == "timeout":
+            raise TimeoutError(f"Query {qid} did not finish")
+        if status != "succeeded":
+            raise self.failed(f"Query {qid} ended with status: {status}")
+        return {"status": "succeeded", "id": qid}
+
+    def request(self, method, url, **_kwargs):
+        qid = url.split("/queries/")[1].split("/")[0]
+        ws, _we, _attempt = self.ranges[qid]
+        return FakeResponse({"value": [{"id": f"{ws:%Y%m%d%H%M}", "createdDateTime": ws.isoformat()}]})
+
+
+class FailedWindowRecoveryTests(unittest.TestCase):
+    """Failed audit query windows are retried with a new query, then split, and never written partially."""
+
+    setUp = AuditReliabilityTests.setUp
+    tearDown = AuditReliabilityTests.tearDown
+    ingester_helpers = AuditReliabilityTests.ingester_helpers
+    query_helpers = AuditReliabilityTests.query_helpers
+    checkpoint_helpers = AuditReliabilityTests.checkpoint_helpers
+
+    WIN = (datetime(2026, 8, 25, 0, tzinfo=timezone.utc), datetime(2026, 8, 25, 8, tzinfo=timezone.utc))
+    NEXT = (datetime(2026, 8, 25, 8, tzinfo=timezone.utc), datetime(2026, 8, 25, 16, tzinfo=timezone.utc))
+
+    def run_helpers(self, outcome, **config):
+        failed = self.query_helpers()["AuditQueryFailed"]
+        graph = FakeAuditGraph(failed, outcome)
+        ns = {
+            "AuditQueryFailed": failed,
+            "create_query": graph.create_query,
+            "wait_for_query": graph.wait_for_query,
+            "_request": graph.request,
+        }
+        ns.update(config)
+        helpers = self.checkpoint_helpers(ns)
+        helpers["manifest"].update(helpers["_load_manifest"]())
+        return helpers, graph
+
+    def key(self, helpers, win):
+        return helpers["stable_window_key"](*win)
+
+    def test_failed_query_is_resubmitted_as_a_new_query_and_succeeds(self):
+        helpers, graph = self.run_helpers(lambda ws, we, attempt: "failed" if attempt == 1 else "succeeded")
+        keys, rows = helpers["fetch_windows"]([self.WIN])
+        key = self.key(helpers, self.WIN)
+        self.assertEqual(keys, {key})
+        self.assertEqual(rows, 1)
+        self.assertEqual(graph.attempts(*self.WIN), 2)
+        entry = helpers["_load_manifest"]()[key]
+        self.assertEqual(entry["status"], "succeeded")
+        self.assertEqual(entry["attempts"], 2)
+        self.assertEqual(len(entry["attempt_errors"]), 1)
+        self.assertIn("ended with status: failed", entry["attempt_errors"][0])
+        self.assertIsNone(entry["error"])
+        self.assertEqual(helpers["QUERY_LIMITER"].limit, 4)
+
+    def test_cancelled_query_is_retried_too(self):
+        helpers, graph = self.run_helpers(lambda ws, we, attempt: "cancelled" if attempt < 3 else "succeeded")
+        helpers["fetch_windows"]([self.WIN])
+        self.assertEqual(graph.attempts(*self.WIN), 3)
+
+    def test_persistent_failure_splits_window_and_halves_complete_the_parent(self):
+        always_fails_at_8h = lambda ws, we, attempt: "failed" if we - ws == timedelta(hours=8) else "succeeded"
+        helpers, graph = self.run_helpers(always_fails_at_8h, WINDOW_RETRIES=1)
+        keys, rows = helpers["fetch_windows"]([self.WIN, self.NEXT])
+        ws, we = self.WIN
+        mid = ws + timedelta(hours=4)
+        halves = [(ws, mid), (mid, we)]
+        manifest = helpers["_load_manifest"]()
+        parent = manifest[self.key(helpers, self.WIN)]
+        self.assertEqual(parent["status"], "split")
+        self.assertEqual(parent["parts"], [self.key(helpers, h) for h in halves])
+        self.assertEqual(graph.attempts(*self.WIN), 2)
+        for half in halves:
+            self.assertEqual(manifest[self.key(helpers, half)]["status"], "succeeded")
+        self.assertEqual(len(keys), 4)
+        self.assertNotIn(self.key(helpers, self.WIN), keys)
+        self.assertEqual(rows, 4)
+        staged = helpers["list_active_stage_files"](str(SCRATCH), keys)
+        self.assertEqual(len(staged), 4)
+        self.assertFalse(helpers["list_window_files"](str(SCRATCH), self.key(helpers, self.WIN), include_partial=True))
+
+        # A rerun reuses the parts and does not query the parent again.
+        rerun, graph2 = self.run_helpers(lambda *a: self.fail("nothing should be queried"))
+        self.assertEqual(rerun["fetch_windows"]([self.WIN, self.NEXT]), (keys, rows))
+        self.assertEqual(graph2.created, [])
+
+    def test_timeout_splits_at_once_when_configured(self):
+        helpers, graph = self.run_helpers(
+            lambda ws, we, attempt: "timeout" if we - ws == timedelta(hours=8) else "succeeded"
+        )
+        keys, _ = helpers["fetch_windows"]([self.WIN])
+        self.assertEqual(graph.attempts(*self.WIN), 1)
+        self.assertEqual(len(keys), 2)
+
+    def test_failure_at_minimum_size_stops_with_one_clear_error_and_writes_nothing(self):
+        bad_day = lambda ws, we, attempt: "failed" if ws < self.WIN[1] else "succeeded"
+        helpers, graph = self.run_helpers(bad_day, MODE="backfill", WINDOW_RETRIES=1, MIN_CHUNK_HOURS=4)
+        with self.assertRaises(RuntimeError) as caught:
+            helpers["fetch_windows"]([self.WIN, self.NEXT])
+        message = str(caught.exception)
+        self.assertIn("2 audit window(s) still failed", message)
+        self.assertIn("Nothing was written to dbo.Copilot_Interactions_Parsed", message)
+        self.assertIn("2026-08-25 00:00 -> 2026-08-25 04:00 UTC", message)
+        self.assertIn("2026-08-25 04:00 -> 2026-08-25 08:00 UTC", message)
+        self.assertIn("rerun with MODE='backfill'; succeeded windows are reused", message)
+        # The healthy window was still fetched (the run did not abort on the first failure) ...
+        manifest = helpers["_load_manifest"]()
+        self.assertEqual(manifest[self.key(helpers, self.NEXT)]["status"], "succeeded")
+        # ... the 4h halves were each tried twice and left no staged data behind.
+        for half in [(self.WIN[0], self.WIN[0] + timedelta(hours=4)), (self.WIN[0] + timedelta(hours=4), self.WIN[1])]:
+            self.assertEqual(graph.attempts(*half), 2)
+            self.assertEqual(manifest[self.key(helpers, half)]["status"], "failed")
+            self.assertFalse(helpers["list_window_files"](str(SCRATCH), self.key(helpers, half), include_partial=True))
+
+        # A rerun queries only the failed halves.
+        rerun, graph2 = self.run_helpers(lambda *a: "succeeded", MODE="backfill", MIN_CHUNK_HOURS=4)
+        keys, _ = rerun["fetch_windows"]([self.WIN, self.NEXT])
+        self.assertEqual(len(keys), 3)
+        self.assertEqual(sorted(we - ws for ws, we in graph2.created), [timedelta(hours=4)] * 2)
+
+    def test_rerun_reuses_succeeded_windows_from_an_older_manifest(self):
+        helpers, _ = self.run_helpers(lambda *a: "succeeded")
+        key = self.key(helpers, self.WIN)
+        (SCRATCH / f"win_{key}_0000.jsonl").write_text('{"id":"old"}\n', encoding="utf-8")
+        legacy = {
+            key: {
+                "status": "succeeded",
+                "query_id": "old",
+                "rows": 1,
+                "pages": 1,
+                "files": [f"win_{key}_0000.jsonl"],
+                "completed_at": "2026-08-26T00:00:00+00:00",
+                "window_start": self.WIN[0].isoformat(),
+                "window_end": self.WIN[1].isoformat(),
+            }
+        }
+        Path(helpers["MANIFEST"]).write_text(json.dumps(legacy), encoding="utf-8")
+        rerun, graph = self.run_helpers(lambda *a: "succeeded")
+        keys, rows = rerun["fetch_windows"]([self.WIN, self.NEXT])
+        self.assertEqual(graph.created, [self.NEXT])
+        self.assertEqual(keys, {key, self.key(rerun, self.NEXT)})
+        self.assertEqual(rows, 2)
+
+    def test_non_retryable_error_is_not_retried_but_other_windows_continue(self):
+        helpers, graph = self.run_helpers(lambda *a: "succeeded")
+        original = graph.request
+        graph.request = lambda method, url, **kw: (
+            FakeResponse({"value": [], "@odata.nextLink": "https://evil.example/x"})
+            if graph.ranges[url.split("/queries/")[1].split("/")[0]][0] == self.WIN[0]
+            else original(method, url, **kw)
+        )
+        helpers["_request"] = graph.request
+        with self.assertRaisesRegex(RuntimeError, "1 audit window\\(s\\) still failed"):
+            helpers["fetch_windows"]([self.WIN, self.NEXT])
+        self.assertEqual(graph.attempts(*self.WIN), 1)
+        self.assertEqual(helpers["_load_manifest"]()[self.key(helpers, self.NEXT)]["status"], "succeeded")
+
+    def test_authorization_errors_stop_the_run(self):
+        class Forbidden(Exception):
+            response = type("R", (), {"status_code": 403})()
+
+        def create(ws, we):
+            raise Forbidden("403 Forbidden")
+
+        helpers, _ = self.run_helpers(lambda *a: "succeeded", create_query=create)
+        with self.assertRaises(Forbidden):
+            helpers["fetch_windows"]([self.WIN])
+
+    def test_failures_lower_concurrency_for_the_rest_of_the_run(self):
+        active, peak = [0], [0]
+        lock = threading.Lock()
+
+        def wait(qid):
+            with lock:
+                active[0] += 1
+                peak[0] = max(peak[0], active[0])
+            time_sleep(0.02)
+            with lock:
+                active[0] -= 1
+            if graph.ranges[qid][2] == 1 and graph.ranges[qid][0] == self.WIN[0]:
+                raise failed(f"Query {qid} ended with status: failed")
+            return {"status": "succeeded"}
+
+        import time as _time
+        time_sleep = _time.sleep
+        helpers, graph = self.run_helpers(lambda *a: "succeeded", MAX_CONCURRENT_QUERIES=4)
+        failed = helpers["AuditQueryFailed"]
+        helpers["wait_for_query"] = wait
+        helpers["QUERY_LIMITER"] = helpers["AdaptiveLimiter"](4, 1)
+        windows = [
+            (self.WIN[0] + timedelta(hours=8 * i), self.WIN[0] + timedelta(hours=8 * (i + 1))) for i in range(12)
+        ]
+        helpers["fetch_windows"](windows)
+        self.assertLessEqual(peak[0], 4)
+        self.assertEqual(helpers["QUERY_LIMITER"].limit, 3)
+        self.assertEqual([h[:2] for h in helpers["QUERY_LIMITER"].history], [(4, 3)])
+
+    def test_http_429_halves_concurrency_through_the_session_hook(self):
+        from urllib3.util.retry import Retry
+
+        ns = exec_named_defs(
+            INGESTER, 4, {"THROTTLE_LISTENERS", "_notify_throttle", "_ThrottleAwareRetry"}, {"Retry": Retry}
+        )
+        limiter = self.ingester_helpers()["AdaptiveLimiter"](6, 1)
+        ns["THROTTLE_LISTENERS"][:] = [lambda: limiter.shrink("HTTP 429", halve=True)]
+        retry = ns["_ThrottleAwareRetry"](total=3, status_forcelist=(429,), raise_on_status=False)
+        response = type("Resp", (), {"status": 429, "headers": {}, "get_redirect_location": lambda self: None})()
+        retry = retry.increment("GET", "/x", response=response)
+        self.assertIsInstance(retry, ns["_ThrottleAwareRetry"])
+        self.assertEqual(limiter.limit, 3)
+
+    def test_incremental_run_refuses_to_skip_an_unrecovered_older_window(self):
+        helpers, _ = self.run_helpers(lambda *a: "succeeded")
+        key = self.key(helpers, self.WIN)
+        helpers["manifest"][key] = {
+            "status": "failed",
+            "window_start": self.WIN[0].isoformat(),
+            "window_end": self.WIN[1].isoformat(),
+        }
+        start = datetime(2026, 9, 3, tzinfo=timezone.utc)
+        with self.assertRaisesRegex(RuntimeError, "Rerun with MODE='backfill' first") as caught:
+            helpers["assert_no_unrecovered_gaps"](start - timedelta(days=180), start)
+        self.assertIn("2026-08-25 00:00 -> 2026-08-25 08:00 UTC", str(caught.exception))
+        self.assertIn("ALLOW_UNRECOVERED_GAPS = True", str(caught.exception))
+        # Once a later backfill covers the range (even via split parts) the guard passes.
+        helpers["manifest"]["v2_part_a"] = {
+            "status": "succeeded",
+            "window_start": self.WIN[0].isoformat(),
+            "window_end": self.WIN[1].isoformat(),
+        }
+        helpers["assert_no_unrecovered_gaps"](start - timedelta(days=180), start)
+
+    def test_manifest_rejects_split_entry_without_parts(self):
+        helpers, _ = self.run_helpers(lambda *a: "succeeded")
+        Path(helpers["MANIFEST"]).write_text(json.dumps({"k": {"status": "split"}}), encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "split but has no valid parts"):
+            helpers["_load_manifest"]()
+
+    def test_main_loop_wires_the_gap_guard_limiter_and_throttle_hook(self):
+        source = cells(INGESTER)[10]
+        self.assertIn("if MODE == 'incremental' and not ALLOW_UNRECOVERED_GAPS:", source)
+        self.assertIn("QUERY_LIMITER = AdaptiveLimiter(MAX_CONCURRENT_QUERIES, MIN_CONCURRENT_QUERIES)", source)
+        self.assertIn("THROTTLE_LISTENERS[:] = [", source)
+        self.assertIn("ACTIVE_WINDOW_KEYS, total = fetch_windows(windows)", source)
+        self.assertNotIn("as_completed", source)
 
 
 if __name__ == "__main__":

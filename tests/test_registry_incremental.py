@@ -652,7 +652,7 @@ class MissingDetailTests(unittest.TestCase):
 
 
 class FirstRunResumeSimulationTests(unittest.TestCase):
-    """The NatWest loop: a first run that fails must not start from zero next time."""
+    """The large-tenant loop: a first run that fails must not start from zero next time."""
 
     def setUp(self):
         self.ns = detail_helpers()
