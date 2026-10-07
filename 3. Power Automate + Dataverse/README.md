@@ -154,6 +154,7 @@ The runner does not update Power BI parameters, trigger Power BI refresh, or del
 | Dashboard does not change after the schedule runs | Manually advance `Core Snapshot ID` to the new run ID, then refresh Power BI. |
 | Agent catalogue details are blank | Provide an `Agent 365` URL to `agents_365.csv`; audit data alone does not create that catalogue. |
 | A large audit row fails to write | Dataverse memo fields reject payloads above 1,048,576 characters. The helper fails rather than truncates. |
+| `Invoke-CopilotAuditRawCapture.ps1` says the audit query `did not succeed after N attempt(s)` | Purview ended the query as failed or cancelled, or it timed out, and each new query did too. Run it again later with a shorter `-StartDate`/`-EndDate` window, and no other audit searches running. `-QueryRetries` (default 2) sets how many new queries it sends. |
 
 ## Optional add-on
 

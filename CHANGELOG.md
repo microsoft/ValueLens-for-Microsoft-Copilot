@@ -17,6 +17,57 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-08 — Audit ingester: failed query windows retry, split and slow down
+
+On large tenants, Purview sometimes ends audit-log queries with status `failed` or `cancelled`,
+often several at once, when the tenant's limit on concurrent audit queries (about 10, including
+searches other admins run in Purview) is reached. Until now, the first failed window stopped
+`Copilot_Audit_Log_Direct_Ingester`, nothing was written, and the only way back was a manual
+rerun with `MODE = 'backfill'`. Switching to `'incremental'` first lost the older failed windows.
+
+The ingester now recovers by itself:
+
+- **Retry.** A window whose query ends `failed` or `cancelled`, or times out, is sent again as a
+  **new** query after an exponential backoff with jitter, up to `WINDOW_RETRIES` (3) times. The
+  manifest records `attempts` and the recent `attempt_errors` for each window.
+- **Split.** A window that still fails is split in half (8h → 4h → 2h → 1h, down to
+  `MIN_CHUNK_HOURS`) and the halves are queried. A window that hits `MAX_WAIT_MIN_PER_QUERY`
+  splits at once (`SPLIT_ON_TIMEOUT`).
+- **Adaptive concurrency.** After a failure, the run makes one fewer query at a time, and after an
+  HTTP 429 it makes half as many. This lasts for the rest of the run, at most one change a minute,
+  and never goes below `MIN_CONCURRENT_QUERIES`. `MAX_CONCURRENT_QUERIES` now defaults to **5**
+  (it was 6) to leave room for other admins.
+- **No early abort.** Every window is attempted, then a summary prints what was reused, fetched,
+  retried, split and failed.
+- **Safe final failure.** If any window still fails at the smallest size, the run fails **without
+  writing**, with one message listing the failed windows and the next step ("rerun with
+  `MODE='backfill'`; succeeded windows are reused"). An `'incremental'` run refuses to start
+  while an older window failed and was never recovered, so it can't leave a silent gap. Set
+  `ALLOW_UNRECOVERED_GAPS = True` to accept the gap. Missing permissions (401/403) still stop
+  the run at once.
+
+Manifest compatibility: window keys are unchanged (`WINDOW_KEY_VERSION` stays `v2`), so existing
+manifests and their succeeded windows are reused. The halves use the same `stable_window_key` as
+any other window. A split window stays in the manifest with status `split` and its `parts`, and
+counts as complete once all its parts succeed. A manifest that contains a `split` window is
+rejected by older copies of the notebook, so don't switch back after a split.
+
+Other variants:
+
+- **Azure jobs** (`2. Azure/jobs`, also used by the SharePoint Azure container): the same retry,
+  split and concurrency behaviour, using the shared `valuelens_core.audit` helpers. As before,
+  windows that finished are merged and the high-water mark holds until every window succeeds.
+  The job now lists the failed windows (up to 10).
+- **`Invoke-CopilotAuditRawCapture.ps1`** (Power Automate + Dataverse): new `-QueryRetries`
+  (default 2), `-RetryBaseSeconds` and `-RetryMaxSeconds`. A failed, cancelled or timed-out query
+  is sent again as a new query. The script covers one window, so it doesn't split.
+- Not affected: the Power Automate / PAX collector flows, SharePoint without Azure, and Local
+  CSV. They export audit data with Microsoft's tools rather than run these queries.
+
+See [An audit window keeps failing](1.%20Fabric/Manual%20setup/notebooks/README.md#an-audit-window-keeps-failing).
+
+---
+
 ## 2026-10-08 — Cowork scheduled runs, install version checks and empty-source fixes
 
 Fixes from a data audit of a customer install.

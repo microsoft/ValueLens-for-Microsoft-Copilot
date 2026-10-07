@@ -115,10 +115,14 @@ def _record(i, when):
 
 
 class AuditGraph:
-    """Each created query returns the records whose time falls inside its window, in two pages."""
+    """Each created query returns the records whose time falls inside its window, in two pages.
 
-    def __init__(self, records, fail_first=0):
+    `status(ws, we, attempt)` scripts the final query status (e.g. "failed" on a window's first attempt).
+    """
+
+    def __init__(self, records, fail_first=0, status=None):
         self.records, self.queries, self.fail_first = records, {}, fail_first
+        self.status, self.statuses, self.created = status or (lambda ws, we, n: "succeeded"), {}, []
 
     def __call__(self, method, url, kw):
         base = audit_collect.QUERIES
@@ -129,12 +133,14 @@ class AuditGraph:
             body = kw["json"]
             qid = str(uuid.uuid4())
             ws, we = (datetime.fromisoformat(body[k]) for k in ("filterStartDateTime", "filterEndDateTime"))
+            self.created.append((ws, we))
+            self.statuses[qid] = self.status(ws, we, self.created.count((ws, we)))
             self.queries[qid] = [r for r in self.records
                                  if ws <= datetime.fromisoformat(r["createdDateTime"].replace("Z", "+00:00")) < we]
             return Resp(201, {"id": qid})
         qid = url[len(base) + 1:].split("/")[0].split("?")[0]
         if "/records" not in url:
-            return Resp(200, {"status": "succeeded"})
+            return Resp(200, {"status": self.statuses.get(qid, "succeeded")})
         recs = self.queries[qid]
         if "skip=1" in url:
             return Resp(200, {"value": recs[1:]})
@@ -190,7 +196,7 @@ def test_audit_merge_logs_records_without_prompts(tmp_path, caplog):
 
 def test_audit_failed_window_raises_and_resumes(tmp_path):
     records = [_record(1, NOW - timedelta(hours=20)), _record(2, NOW - timedelta(hours=3))]
-    api, _ = make_api(AuditGraph(records, fail_first=100))
+    api, _ = make_api(AuditGraph(records, fail_first=10**6))
     store = LocalStore(tmp_path)
     with pytest.raises(RuntimeError, match="audit window"):
         audit_collect.collect_audit(api, store, settings(), now=NOW, sleep=lambda x: None)
@@ -225,6 +231,83 @@ def test_audit_permission_error_is_clear(tmp_path):
     api, _ = make_api(lambda m, u, kw: Resp(403, {"error": "forbidden"}))
     with pytest.raises(PermissionError, match="AuditLogsQuery.Read.All"):
         audit_collect.collect_audit(api, LocalStore(tmp_path), settings(), now=NOW, sleep=lambda x: None)
+
+
+def test_audit_failed_query_is_resubmitted_and_succeeds(tmp_path):
+    records = [_record(1, NOW - timedelta(hours=20)), _record(2, NOW - timedelta(hours=3))]
+    fake = AuditGraph(records, status=lambda ws, we, n: "failed" if n == 1 else "succeeded")
+    api, _ = make_api(fake)
+    store = LocalStore(tmp_path)
+    assert audit_collect.collect_audit(api, store, settings(), now=NOW, sleep=lambda x: None)["rows"] == 2
+    windows = store.read_json(audit_collect.STATE)["windows"]
+    assert len(windows) == 4 and all(w["status"] == "succeeded" and w["attempts"] == 2 for w in windows.values())
+    assert all("ended with status: failed" in w["attempt_errors"][0] for w in windows.values())
+    assert len(fake.created) == 8
+
+
+def test_audit_persistent_failure_splits_window_and_merges_halves(tmp_path):
+    records = [_record(1, NOW - timedelta(hours=20)), _record(2, NOW - timedelta(hours=13))]
+    fake = AuditGraph(records, status=lambda ws, we, n: "failed" if we - ws == timedelta(hours=8) else "succeeded")
+    api, _ = make_api(fake)
+    store = LocalStore(tmp_path)
+    collector = audit_collect.AuditCollector(api, store, settings(), now=NOW, sleep=lambda x: None,
+                                             window_retries=1)
+    assert collector.run()["rows"] == 2
+    state = store.read_json(audit_collect.STATE)
+    statuses = sorted(w["status"] for w in state["windows"].values())
+    assert statuses == ["split"] * 3 + ["succeeded"] * 7
+    parent = state["windows"][audit_collect.audit.stable_window_key(NOW - timedelta(hours=28), NOW - timedelta(hours=20))]
+    assert len(parent["parts"]) == 2 and all(p in state["windows"] for p in parent["parts"])
+    assert state["high_water_mark"]
+    assert collector.limiter.limit == 4 and api.on_throttle is None
+    # A rerun over the same range reuses the halves instead of querying the failing parents again.
+    fake.status = lambda ws, we, n: "succeeded"
+    rerun = audit_collect.AuditCollector(api, store, settings(), now=NOW, sleep=lambda x: None)
+    leaves = rerun.leaves(audit_collect.audit.build_windows(NOW - timedelta(days=1), NOW, 8))
+    assert len(leaves) == 7 and all(we - ws == timedelta(hours=4) for ws, we in leaves)
+
+
+def test_audit_window_failing_at_minimum_size_holds_high_water_mark(tmp_path):
+    records = [_record(1, NOW - timedelta(hours=20)), _record(2, NOW - timedelta(hours=3))]
+    bad = NOW - timedelta(hours=28)
+    fake = AuditGraph(records, status=lambda ws, we, n: "cancelled" if bad <= ws < bad + timedelta(hours=8) else "succeeded")
+    api, _ = make_api(fake)
+    store = LocalStore(tmp_path)
+    with pytest.raises(RuntimeError, match=r"2 audit window\(s\) failed; the 2 row\(s\).*split down to 4h") as caught:
+        audit_collect.collect_audit(api, store, settings(), now=NOW, sleep=lambda x: None, window_retries=1,
+                                    min_chunk_hours=4)
+    assert "2026-09-09 08:00-12:00 UTC" in str(caught.value) and "2026-09-09 12:00-16:00 UTC" in str(caught.value)
+    assert "high_water_mark" not in store.read_json(audit_collect.STATE)
+    fake.status = lambda ws, we, n: "succeeded"
+    before = len(fake.created)
+    assert audit_collect.collect_audit(api, store, settings(), now=NOW, sleep=lambda x: None, min_chunk_hours=4)["rows"] == 2
+    assert sorted(we - ws for ws, we in fake.created[before:]) == [timedelta(hours=4)] * 2
+
+
+def test_audit_throttling_halves_concurrency(tmp_path):
+    fake = AuditGraph([_record(1, NOW - timedelta(hours=3))])
+    throttled = [True]
+
+    def handler(m, u, kw):
+        if m == "POST" and throttled[0]:
+            throttled[0] = False
+            return Resp(429, {}, headers={"Retry-After": "1"})
+        return fake(m, u, kw)
+
+    api, _ = make_api(handler)
+    collector = audit_collect.AuditCollector(api, LocalStore(tmp_path), settings(), now=NOW, sleep=lambda x: None,
+                                             max_concurrent=6)
+    assert collector.run()["rows"] == 1
+    assert [h[:2] for h in collector.limiter.history] == [(6, 3)]
+    assert api.on_throttle is None
+
+
+def test_audit_retry_classification():
+    assert audit_collect.is_retryable(audit_collect.AuditQueryFailed("failed"))
+    assert audit_collect.is_retryable(TimeoutError("slow"))
+    assert audit_collect.is_retryable(api_mod.HttpError("x: HTTP 503", 503))
+    assert not audit_collect.is_retryable(api_mod.HttpError("x: HTTP 400", 400))
+    assert not audit_collect.is_retryable(RuntimeError("bad next link"))
 
 
 def test_audit_rejects_foreign_next_link(tmp_path):

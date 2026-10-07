@@ -37,7 +37,7 @@ def notebook_helpers() -> dict:
     tree = ast.parse("".join(_cells()[HELPER_CELL]["source"]))
     keep = []
     for node in tree.body:
-        if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef)):
+        if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.ClassDef)):
             keep.append(node)
         elif isinstance(node, ast.Assign) and all(
                 isinstance(t, ast.Name) and t.id in _KEEP_ASSIGNS for t in node.targets):

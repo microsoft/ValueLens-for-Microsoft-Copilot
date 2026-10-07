@@ -60,6 +60,33 @@ Run these before the processor.
 | `AGENT_IDENTITY_PATTERNS` | Processor | Add your own service accounts. Accounts that match, such as Security Copilot agents, aren't counted as people. |
 | `AGENT_TYPE_OVERRIDES_TABLE` | Processor | The optional Lakehouse table (columns `key`, `Agent_Type`) that corrects an agent's type. Default `agent_type_overrides`; skipped when the table doesn't exist. See [agent type and publisher](../../../docs/DATA-DICTIONARY.md#agent-type-and-publisher). |
 | `INCLUDE_RAW_PASSTHROUGH` | Processor, registry ingester | `True` to keep the raw payloads. They can hold names, file names and URLs, so review privacy first. Then run the processor once with `WRITE_MODE = 'overwrite'`. |
+| `MAX_CONCURRENT_QUERIES`, `CHUNK_HOURS` | Audit ingester | Lower them (for example `3` and `4`) if audit windows fail on a large tenant. See below. |
+| `WINDOW_RETRIES`, `MIN_CHUNK_HOURS` | Audit ingester | How often a failing audit window is resent (default `3`), and the smallest size it is split down to (default `1` hour). |
+
+## An audit window keeps failing
+
+On large tenants, Purview sometimes ends an audit query with status `failed` or `cancelled`,
+most often when many queries run at once. Graph runs about 10 audit queries at a time per
+tenant, and that includes searches other admins start in the Purview portal.
+
+The audit ingester recovers by itself:
+
+1. It sends a failed window again as a new query, after a growing wait (about 1, 2, then
+   4 minutes), up to `WINDOW_RETRIES` times.
+2. If the window still fails, it splits it in half (8h, 4h, 2h, then 1h) and queries the halves.
+3. After a failure or an HTTP 429, it runs fewer queries at once for the rest of the run.
+4. It tries every window and then prints a summary. It writes only when every window succeeded.
+
+For a long backfill on a large tenant:
+
+- Keep the defaults, or set `MAX_CONCURRENT_QUERIES = 3` and `CHUNK_HOURS = 4`.
+- Don't run audit searches in the Purview portal while it runs.
+
+If it still ends with `N audit window(s) still failed`, nothing was written. Rerun it with
+`MODE = 'backfill'` and the same `BACKFILL_DAYS`. Windows that succeeded are reused, so only the
+listed windows are queried again. Don't switch to `'incremental'` until a backfill finishes: an
+incremental run refuses to start while an older window was never recovered. To accept that gap,
+set `ALLOW_UNRECOVERED_GAPS = True`.
 
 ## People show as IDs
 

@@ -46,7 +46,7 @@ class Api:
     Other statuses are returned to the caller, which knows what a 400/403/404 means for it.
     """
 
-    def __init__(self, tokens, session=None, sleep=time.sleep, attempts: int = 6):
+    def __init__(self, tokens, session=None, sleep=time.sleep, attempts: int = 6, on_throttle=None):
         if session is None:
             import requests
 
@@ -55,6 +55,7 @@ class Api:
         self.session = session
         self.sleep = sleep
         self.attempts = attempts
+        self.on_throttle = on_throttle  # called on every HTTP 429, e.g. to lower a caller's concurrency
 
     def request(self, method: str, url: str, *, scope: str = GRAPH, headers=None, timeout=120, **kwargs):
         refreshed = False
@@ -75,6 +76,11 @@ class Api:
                 refreshed = True
                 attempt -= 1
                 continue
+            if r.status_code == 429 and self.on_throttle is not None:
+                try:
+                    self.on_throttle()
+                except Exception:  # a listener must never break the request
+                    log.debug("on_throttle listener failed", exc_info=True)
             if r.status_code in TRANSIENT and attempt < self.attempts:
                 wait = retry_after(r, attempt)
                 log.warning("%s %s returned %s; retrying in %.0fs", method, _short(url), r.status_code, wait)
@@ -104,8 +110,16 @@ def _short(url: str) -> str:
     return url.split("?")[0][-80:]
 
 
+class HttpError(RuntimeError):
+    """A non-2xx response; `status_code` lets callers tell throttling/outages from bad requests."""
+
+    def __init__(self, message: str, status_code: int):
+        super().__init__(message)
+        self.status_code = status_code
+
+
 def raise_for_status(r, what: str):
     if 200 <= r.status_code < 300:
         return r
     body = (getattr(r, "text", "") or "")[:500]
-    raise RuntimeError(f"{what}: HTTP {r.status_code} {body}".strip())
+    raise HttpError(f"{what}: HTTP {r.status_code} {body}".strip(), r.status_code)
