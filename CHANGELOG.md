@@ -40,6 +40,15 @@ The tolerance is gone. In the Fabric ingester (`Copilot_Agent365_Registry_Ingest
   are removed. A notebook whose config cell still sets them runs unchanged; the values are ignored.
   Scripts or scheduled tasks that pass the PowerShell parameters must drop them.
 
+Also fixed: **`Last updated` no longer flips between runs.** For a few agents per tenant, the
+detail payload's `lastModifiedDateTime` differs from the list's. A freshly fetched agent took the
+detail's stamp and a cached one took the list's, so `Last updated`, which is part of the
+`agents_365_history` key, changed whenever an agent moved between fetched and cached. Each change
+added a duplicate history row: 499 rows for 495 agents after three runs on one test tenant.
+`Last updated` is now always the list's stamp (the one change detection keys on), falling back to
+the detail's only when the list has none. This applies to the notebook and the PowerShell script.
+History rows already written are left as they are.
+
 To pick it up, re-import the notebook (or update the script) and rerun it. If you patched the
 detail loop by hand to skip 424s, drop that patch: the updated notebook handles them. See the
 [data dictionary](docs/DATA-DICTIONARY.md).

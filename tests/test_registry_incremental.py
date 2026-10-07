@@ -23,7 +23,7 @@ def detail_helpers():
         6,
         functions=(
             "_package_id", "_list_modified", "_parse_utc", "_iso_utc",
-            "_select_detail_targets", "_merge_fresh", "_merge_cached",
+            "_select_detail_targets", "_keep_list_modified", "_merge_fresh", "_merge_cached",
             "_fetch_details", "_assemble_details", "_cache_from_rows", "_cache_to_rows",
             "_fresh_cache_entry", "_fmt_duration", "_progress_line", "_failure_reason",
             "_failure_census", "_http_status",
@@ -430,6 +430,60 @@ class IncrementalRunSimulationTests(unittest.TestCase):
         week_later = NOW + timedelta(days=7, hours=12)
         targets = ns["_select_detail_targets"](day2, cache2, week_later, "incremental", 7)
         self.assertEqual(len(targets), 48, "every agent last fetched on day 1 is due its weekly refresh")
+
+
+class LastUpdatedStabilityTests(unittest.TestCase):
+    """'Last updated' (part of the history key) must not flip between fetched and cached runs."""
+
+    def setUp(self):
+        self.ns = detail_helpers()
+
+    def test_both_merges_keep_the_list_stamp_and_fall_back_to_the_detail(self):
+        listed = {"id": "a", "lastModifiedDateTime": "2026-09-30T10:00:39.3974298Z"}
+        detail = {"id": "a", "lastModifiedDateTime": "2026-09-30T10:00:39.7161648Z", "botId": "b"}
+        fresh = self.ns["_merge_fresh"](listed, detail)
+        cached = self.ns["_merge_cached"](listed, detail)
+        self.assertEqual((fresh["lastModifiedDateTime"], cached["lastModifiedDateTime"]),
+                         (listed["lastModifiedDateTime"],) * 2)
+        self.assertEqual(fresh["botId"], "b", "the rest of the detail still wins")
+        for blank in ({"id": "a"}, {"id": "a", "lastModifiedDateTime": None}):
+            self.assertEqual(self.ns["_merge_fresh"](blank, detail)["lastModifiedDateTime"],
+                             detail["lastModifiedDateTime"])
+            self.assertEqual(self.ns["_merge_cached"](blank, detail)["lastModifiedDateTime"],
+                             detail["lastModifiedDateTime"])
+
+    def test_fetched_cached_and_refetched_runs_add_no_history_rows(self):
+        # 495 agents; 4 have a detail stamp that differs from the list's (as at Contoso).
+        listed = [{"id": f"a{i}", "lastModifiedDateTime": f"2026-09-01T00:00:{i % 60:02d}.1000000Z"}
+                  for i in range(495)]
+        drift = {"a1": "2026-09-01T00:00:01.9000000Z", "a2": "2026-06-24T00:00:00Z",
+                 "a3": "2026-09-30T00:00:00Z", "a4": None}
+        detail = {p["id"]: {"id": p["id"], "botId": "b",
+                            "lastModifiedDateTime": drift.get(p["id"], p["lastModifiedDateTime"])}
+                  for p in listed}
+        history = set()
+
+        def run(cache, now, now_iso):
+            targets = self.ns["_select_detail_targets"](listed, cache, now, "incremental", 7)
+            fetched, failed = self.ns["_fetch_details"](list(targets), lambda pid: detail[pid], 8)
+            details, meta, new_cache = self.ns["_assemble_details"](listed, cache, fetched, failed, now_iso)
+            # Step 5: 'Last updated' = merged lastModifiedDateTime; history key = (Title ID, Last updated).
+            history.update((d["id"], d.get("lastModifiedDateTime") or "") for d in details)
+            return {m["detailStatus"] for m in meta}, self.ns["_cache_from_rows"](self.ns["_cache_to_rows"](new_cache))
+
+        statuses, cache = run({}, NOW, NOW_ISO)
+        self.assertEqual(statuses, {"fetched"})
+        statuses, cache = run(cache, NOW + timedelta(days=1), "2026-10-07T06:00:00Z")
+        self.assertEqual(statuses, {"cached"})
+        statuses, _ = run(cache, NOW + timedelta(days=8), "2026-10-14T06:00:00Z")
+        self.assertEqual(statuses, {"fetched"}, "the weekly refresh refetches every agent")
+        self.assertEqual(len(history), 495, "one history row per agent across fetched/cached runs")
+        self.assertIn(("a2", listed[2]["lastModifiedDateTime"]), history)
+
+    def test_step_5_takes_last_updated_from_the_merged_stamp(self):
+        source = code_from_cell(NOTEBOOK, 11)
+        self.assertIn("'Last updated':       detail.get('lastModifiedDateTime')", source)
+        self.assertIn("HISTORY_KEY = ('Title ID', 'Last updated')", source)
 
 
 class HttpError(Exception):

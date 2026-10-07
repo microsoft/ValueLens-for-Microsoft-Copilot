@@ -190,6 +190,17 @@ $global:StatusIds = @{ P = 403; Q = 424 }
 try { [void](Run); $out.run9b = 'no error' } catch { $out.run9b = "error: $($_.Exception.Message)" }
 $global:StatusIds = @{}
 
+# 10: 'Last updated' is the list's lastModifiedDateTime on fetched and cached runs alike,
+# even when the detail payload carries a different stamp; the detail's is the fallback.
+$csv = Join-Path '__TMP__' 'Stamp.csv'
+$global:Catalog = @((Pkg 'S' 'Sierra' '2025-06-01T10:00:39.3974298Z' ''), (Pkg 'U' 'Uniform' '' ''))
+$global:Details['S'] = [pscustomobject]@{ id = 'S'; activeUsers = 1; lastModifiedDateTime = '2025-06-01T10:00:39.7161648Z' }
+$global:Details['U'] = [pscustomobject]@{ id = 'U'; activeUsers = 1; lastModifiedDateTime = '2025-06-02T00:00:00Z' }
+$r10 = Run
+$out.run10 = @($r10.fetched, @((CsvRow 'T_S').'Last updated', (CsvRow 'T_U').'Last updated'))
+$r10b = Run
+$out.run10b = @($r10b.fetched, @((CsvRow 'T_S').'Last updated', (CsvRow 'T_U').'Last updated'))
+
 # Retry-After: header honoured and capped, else 2^attempt.
 $h = [System.Net.WebHeaderCollection]::new(); $h.Add('Retry-After', '7')
 $err = [pscustomobject]@{ Exception = [pscustomobject]@{ Response = [pscustomobject]@{ Headers = $h } } }
@@ -226,6 +237,11 @@ class ParseTests(unittest.TestCase):
         for param in ("[int]$CheckpointEvery = 1000", "[int]$ProgressEvery = 500"):
             self.assertIn(param, text)
         self.assertNotIn("MaxMissingDetail", text, "the missing-detail limit is gone")
+
+    def test_fetched_and_cached_rows_both_keep_the_list_stamp(self):
+        text = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("Set-ListModified (Merge-Detail $package $detail) $package $detail", text)
+        self.assertIn("Set-ListModified (Merge-Detail $cachedDetail $package) $package $cachedDetail", text)
 
 
 @unittest.skipUnless(SCRIPTS_ALLOWED, "PowerShell execution policy blocks scripts here (not bypassed)")
@@ -298,6 +314,11 @@ class IncrementalCacheTests(unittest.TestCase):
 
     def test_corrupt_checkpoint_line_is_skipped(self):
         self.assertIsInstance(self.out["run8"], dict, self.out["run8"])
+
+    def test_last_updated_is_the_list_stamp_on_fetched_and_cached_runs(self):
+        stamps = ["2025-06-01T10:00:39.3974298Z", "2025-06-02T00:00:00Z"]
+        self.assertEqual(self.out["run10"], [["S", "U"], stamps])
+        self.assertEqual(self.out["run10b"], [[], stamps], "cached run: same 'Last updated', no refetch")
         self.assertEqual(self.out["run8"]["fetched"], [])
 
     def test_network_errors_and_5xx_are_retried(self):

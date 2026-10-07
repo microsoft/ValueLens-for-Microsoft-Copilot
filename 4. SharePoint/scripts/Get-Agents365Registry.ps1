@@ -524,6 +524,18 @@ function Merge-Detail {
   return $merged
 }
 
+function Set-ListModified {
+  # Use the list's lastModifiedDateTime on every path; the detail's only if the list has
+  # none. It is the stamp change detection keys on. The detail payload's can differ from it
+  # (a few agents per tenant), and letting the detail win only on fetched runs made
+  # 'Last updated' flip between fetched and cached runs.
+  param($Merged, $Package, $Detail)
+  $stamp = Get-Field $Package 'lastModifiedDateTime'
+  if (-not $stamp) { $stamp = Get-Field $Detail 'lastModifiedDateTime' }
+  if ($stamp) { $Merged['lastModifiedDateTime'] = $stamp }
+  return $Merged
+}
+
 #############################################################
 # Detail cache (incremental detail fetch)
 #############################################################
@@ -833,9 +845,9 @@ function Export-Agents365Registry {
           Write-Host ("  detail calls {0}/{1} ({2:0}%) | {3:0.0}/s | failed {4} | elapsed {5} | ETA {6}" -f $done, $toFetch, ($done * 100 / $toFetch), $rate, $failed, (Format-Duration $elapsed), $eta)
         }
         if ($null -eq $reason) {
-          # Fresh detail goes over the list fields.
+          # Fresh detail goes over the list fields (bar lastModifiedDateTime).
           $lastModified = ConvertTo-StampKey (Get-Field $package 'lastModifiedDateTime')
-          $details.Add((Merge-Detail $package $detail))
+          $details.Add((Set-ListModified (Merge-Detail $package $detail) $package $detail))
           $meta.Add(@{ Id = $id; Fetched = $true; Detail = $detail; AsOf = $nowUtc; Entry = $entry; Status = 'fetched'
                        LastModified = $lastModified })
           # Checkpoint entries carry no creator, so the creator tiers run for them.
@@ -859,7 +871,7 @@ function Export-Agents365Registry {
       }
       # Cached detail, with today's list fields over it.
       $cachedDetail = Get-Field $entry 'detail'
-      $details.Add((Merge-Detail $cachedDetail $package))
+      $details.Add((Set-ListModified (Merge-Detail $cachedDetail $package) $package $cachedDetail))
       $meta.Add(@{ Id = $id; Fetched = $false; Detail = $cachedDetail; AsOf = (Get-Field $entry 'detailAsOfUtc'); Entry = $entry
                    Status = $(if ($refetchFailed) { 'cached - refetch failed' } else { 'cached' })
                    LastModified = (ConvertTo-StampKey (Get-Field $entry 'lastModified')) })

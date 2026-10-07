@@ -246,7 +246,10 @@ forces a full refresh. It keeps three tables:
 | `agents_365_history` | Every version of every agent, merged on Title ID and `Last updated`, so registry changes can be traced |
 
 For a cached agent, today's list fields override the cached detail; freshly fetched detail
-overrides the list. Usage fields (`Active Users`, `Total sessions` and similar) can therefore be up
+overrides the list. The exception is `lastModifiedDateTime`, which is always the list's (the
+detail's only when the list has none), so `Last updated` is the same stamp change detection uses
+and does not change between fetched and cached runs. The detail payload's stamp can differ from
+the list's for some agents. Usage fields (`Active Users`, `Total sessions` and similar) can therefore be up
 to `FULL_REFRESH_DAYS` old; check `Detail As Of`.
 
 **Large tenants and failed detail calls.** A first run has no cache, so a tenant with tens of
