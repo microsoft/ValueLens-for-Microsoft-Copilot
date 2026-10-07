@@ -11,9 +11,9 @@ on:
     tags: ['installer-v*']
   pull_request:
     paths:
-      - '5. Azure/jobs/**'
-      - '5. Azure/web/**'
-      - '5. Azure/sql/**'
+      - '2. Azure/jobs/**'
+      - '2. Azure/web/**'
+      - '2. Azure/sql/**'
       - 'shared/python/**'
       - '1. Fabric/Fabric App/**'
       - '.github/workflows/azure-images.yml'
@@ -39,7 +39,7 @@ jobs:
       # The lock files may resolve through Microsoft's internal mirror of npm, which runners can't reach.
       - name: Use the public npm registry
         if: matrix.image == 'valuelens-web'
-        run: node "1. Fabric/installer/packaging/public-registry.js" "1. Fabric/Fabric App/package-lock.json" "5. Azure/web/package-lock.json"
+        run: node "1. Fabric/installer/packaging/public-registry.js" "1. Fabric/Fabric App/package-lock.json" "2. Azure/web/package-lock.json"
 
       - name: Work out the tag
         id: tag
@@ -52,7 +52,7 @@ jobs:
 
       - name: Build
         run: |
-          dockerfile="5. Azure/${{ matrix.image == 'valuelens-jobs' && 'jobs' || 'web' }}/Dockerfile"
+          dockerfile="2. Azure/${{ matrix.image == 'valuelens-jobs' && 'jobs' || 'web' }}/Dockerfile"
           docker build -f "$dockerfile" -t "${{ steps.tag.outputs.image }}" .
 
       - name: Smoke-test the jobs image

@@ -53,15 +53,15 @@ jobs:
         with:
           node-version: '22'
       - name: Use the public npm registry
-        run: node "1. Fabric/installer/packaging/public-registry.js" "5. Azure/web/package-lock.json"
+        run: node "1. Fabric/installer/packaging/public-registry.js" "2. Azure/web/package-lock.json"
       - name: Install and test
-        working-directory: '5. Azure/web'
+        working-directory: '2. Azure/web'
         run: |
           npm ci --no-audit --no-fund
           npm test
 
   arm-drift:
-    # The installer ships a compiled copy of 5. Azure/infra; it must match the Bicep source.
+    # The installer ships a compiled copy of 2. Azure/infra; it must match the Bicep source.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -69,7 +69,7 @@ jobs:
       - name: Build the Bicep template
         run: |
           az bicep install
-          az bicep build --file "5. Azure/infra/main.bicep" --outfile "${{ runner.temp }}/main.arm.json"
+          az bicep build --file "2. Azure/infra/main.bicep" --outfile "${{ runner.temp }}/main.arm.json"
       - name: Compare with the installer's copy
         shell: python
         run: |
@@ -81,5 +81,5 @@ jobs:
           built = load(os.path.join(os.environ["RUNNER_TEMP"], "main.arm.json"))
           shipped = load("1. Fabric/installer/src/azure/main.arm.json")
           if built != shipped:
-              sys.exit("1. Fabric/installer/src/azure/main.arm.json is out of date: rebuild it from 5. Azure/infra/main.bicep.")
+              sys.exit("1. Fabric/installer/src/azure/main.arm.json is out of date: rebuild it from 2. Azure/infra/main.bicep.")
           print("ARM template matches the Bicep source.")

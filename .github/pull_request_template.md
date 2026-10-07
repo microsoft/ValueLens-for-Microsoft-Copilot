@@ -4,7 +4,7 @@ Describe what changed and why. Link the related issue, if any.
 
 ## Scope
 
-Deployment paths affected (Fabric / Fabric App / Power Automate + Dataverse / SharePoint / Local CSV):
+Deployment paths affected (Fabric / Fabric App / Azure / Power Automate + Dataverse / SharePoint / Local CSV):
 
 Source contracts, optional inputs or refresh behaviour changed:
 

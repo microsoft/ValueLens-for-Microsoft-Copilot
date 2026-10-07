@@ -10,10 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 ADDON = "Add Credit Consumption"
 # Folder that holds each path's add-on folder.
 PBITS = {
-    "4. Local CSV": "Consumption Central - Local CSV.pbit",
-    "3. SharePoint": "Consumption Central - Viva Direct.pbit",
+    "5. Local CSV": "Consumption Central - Local CSV.pbit",
+    "4. SharePoint": "Consumption Central - Viva Direct.pbit",
     "1. Fabric/Manual setup": "Consumption Central - Fabric.pbit",
-    "2. Power Automate + Dataverse": "Consumption Central - Power Automate + Dataverse.pbit",
+    "3. Power Automate + Dataverse": "Consumption Central - Power Automate + Dataverse.pbit",
 }
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})")
@@ -53,8 +53,8 @@ class CreditConsumptionAddon(unittest.TestCase):
 
     def test_fabric_sample_seeder_points_at_shared_sample(self):
         source = (ROOT / "1. Fabric" / "Manual setup" / ADDON / "seed_sample_data.py").read_text(encoding="utf-8")
-        self.assertIn('"..", "..", "..", "4. Local CSV", "Add Credit Consumption", "sample-data"', source)
-        self.assertTrue((ROOT / "4. Local CSV" / ADDON / "sample-data" / "README.md").is_file())
+        self.assertIn('"..", "..", "..", "5. Local CSV", "Add Credit Consumption", "sample-data"', source)
+        self.assertTrue((ROOT / "5. Local CSV" / ADDON / "sample-data" / "README.md").is_file())
 
     def test_relative_links_resolve(self):
         for doc in addon_files("*.md") + addon_files("*.ipynb"):

@@ -218,9 +218,9 @@ Variants: App Service B1 Linux for the web app (+$13), or B1 Windows as in PnP (
 | `ValueLens_Refresh_Model`, `ValueLens_Data_Check` | Refresh and checks | Becomes the `refresh` and `check` steps |
 | `flows/Copilot_ProductFeedback_Email_to_OneLake` | A Power Automate flow that writes to OneLake | A variant that writes to the **Blob** connector instead |
 
-The logic is **already forked**. `4. Local CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py`
+The logic is **already forked**. `5. Local CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py`
 (which PAX now embeds as `-Dashboard AIBV`) and the Dataverse bridge
-(`2. Power Automate + Dataverse/scripts/Build-DataverseCoreFeeds.py`) both re-implement parts of the
+(`3. Power Automate + Dataverse/scripts/Build-DataverseCoreFeeds.py`) both re-implement parts of the
 Spark processor. The Azure version must not add a fourth copy.
 
 ### 4.2 Strategy: a shared DuckDB core, held to the notebooks by a parity harness
@@ -279,7 +279,7 @@ workspace, dataset and refresh schedule, the web URL and app ID, the MI, and the
 
 ### 5.2 Provisioning mechanics
 
-- **Bicep modules** live in `5. Azure/infra/` and are compiled to ARM JSON in CI. The JSON ships inside the exe.
+- **Bicep modules** live in `2. Azure/infra/` and are compiled to ARM JSON in CI. The JSON ships inside the exe.
   The installer deploys them at resource-group scope in **incremental** mode through ARM REST
   (it extends `clients/azure.js`, and the user's sign-in already includes ARM).
   The same templates support a *Deploy to Azure* button and `azd up` for IT teams that prefer IaC.
@@ -384,7 +384,7 @@ the installer wizard, plan, record and Graph identity steps; the module catalogu
 
 ```
 1. Fabric/            unchanged (app and installer stay here until Phase 3, then move to /app and /installer)
-5. Azure/
+2. Azure/
   infra/              Bicep modules -> ARM JSON (CI)
   jobs/               Dockerfile, valuelens_jobs orchestrator (collect, process, publish, refresh)
   web/                Node API server (query proxy, settings, version) + Dockerfile (serves the app's dist)
@@ -417,7 +417,7 @@ tests/fixtures/valuelens-golden/
 1. Is per-viewer Power BI Pro acceptable for the MVP (option A), or is a Power BI-free tier (C) required from the start?
 2. ~~Spark-in-a-box or DuckDB for the MVP?~~ **Resolved: DuckDB.** The processor port is done and matches the notebook (section 4.2).
 3. Should private networking be in Phase 2 or the MVP (how many target customers have SQL public-access deny policies)?
-4. Repo layout: is a new `5. Azure/` folder OK, and should the app and installer move out of `1. Fabric/` in Phase 3?
+4. Repo layout: should the app and installer move out of `1. Fabric/` in Phase 3? (Decided: the Azure path is `2. Azure/`, second after Fabric.)
 
 ## 10. Progress
 
@@ -425,17 +425,17 @@ tests/fixtures/valuelens-golden/
 |---|---|---|
 | Golden fixtures, Spark-generated expected outputs, parity harness | `tests/valuelens_golden.py`, `tests/fixtures/valuelens-golden/` | Done: 7 cases |
 | DuckDB processor port (`curate()`) plus CLI | `shared/python/valuelens_core` | Done: matches the notebook exactly; tested in CI |
-| Bicep: MI, monitoring, ADLS, SQL serverless, Container Apps env, jobs, web | `5. Azure/infra` | Done: builds and lints cleanly; what-if is not yet run against a subscription |
-| SQL `V001` (curated fact, columnstore, schema_version) | `5. Azure/sql/migrations` | Done: checked against the golden contract in tests |
-| Jobs image and orchestrator | `5. Azure/jobs` | Done (Phase 1): collect (licensed users, Purview audit, org, M365 activity), process, publish (incremental per-day DELETE + INSERT into Azure SQL), Power BI refresh, and `migrate`. Tested offline with fakes and sqlite |
+| Bicep: MI, monitoring, ADLS, SQL serverless, Container Apps env, jobs, web | `2. Azure/infra` | Done: builds and lints cleanly; what-if is not yet run against a subscription |
+| SQL `V001` (curated fact, columnstore, schema_version) | `2. Azure/sql/migrations` | Done: checked against the golden contract in tests |
+| Jobs image and orchestrator | `2. Azure/jobs` | Done (Phase 1): collect (licensed users, Purview audit, org, M365 activity), process, publish (incremental per-day DELETE + INSERT into Azure SQL), Power BI refresh, and `migrate`. Tested offline with fakes and sqlite |
 | Collector logic in the shared core (`audit`, `licensed`, `org`, `m365`) | `shared/python/valuelens_core` | Done: the audit flatten matches the notebook on Spark-generated goldens |
-| Web API: `/app.config.json`, `/api/query` (OBO `executeQueries` with a model allowlist), settings | `5. Azure/web` | Done: 10 tests |
+| Web API: `/app.config.json`, `/api/query` (OBO `executeQueries` with a model allowlist), settings | `2. Azure/web` | Done: 10 tests |
 | App seams: runtime host detection, MSAL sign-in, `HttpFabricProxy`, `SettingsStore` | `1. Fabric/Fabric App` | Done: the Fabric build is unchanged; 1,664 tests pass |
-| Teams manifest and package builder | `5. Azure/teams` (vendored into the installer) | Done: built by the installer; SSO through the web app registration |
+| Teams manifest and package builder | `2. Azure/teams` (vendored into the installer) | Done: built by the installer; SSO through the web app registration |
 | Installer Azure target: wizard choice, preflight, what-if, ARM deploy, app registrations, Graph roles, Power BI model, migrate, `run`, `status`, `refresh`, `update`, `rotate-secret`, `uninstall` | `1. Fabric/installer/src/azure`, `src/steps/azure` | Done: 218 tests pass |
 | CI: installer, web, ARM drift, and image builds (pushed to GHCR on `installer-v*` tags) | `.github/workflows/tests.yml`, `azure-images.yml` | Done |
-| End-to-end deployment to a real tenant and the 101-query parity check | Contoso demo tenant | **Done for core.** Deployed end to end in private networking mode: migrate, a 30-day first load, publish to SQL, and a Power BI refresh through the VNet data gateway. Parity (`5. Azure/tools/parity.mjs`) against the Fabric install: 25 match and 29 empty on both sides. The 7 diffs are Agent 365 registry data (Phase 2) and a one-day difference in the M365 activity report window. 35 queries target the separate consumption and Agent Evaluator models and 5 are templates. The demo tenant has very little Copilot activity, so re-run parity on a busier tenant before GA |
-| Private networking (VNet, private endpoints, VNet data gateway) | `5. Azure/infra/modules/network.bicep`, `src/steps/azure` | Done: pulled forward from Phase 2 because MCAPS policy forces public access off |
+| End-to-end deployment to a real tenant and the 101-query parity check | Contoso demo tenant | **Done for core.** Deployed end to end in private networking mode: migrate, a 30-day first load, publish to SQL, and a Power BI refresh through the VNet data gateway. Parity (`2. Azure/tools/parity.mjs`) against the Fabric install: 25 match and 29 empty on both sides. The 7 diffs are Agent 365 registry data (Phase 2) and a one-day difference in the M365 activity report window. 35 queries target the separate consumption and Agent Evaluator models and 5 are templates. The demo tenant has very little Copilot activity, so re-run parity on a busier tenant before GA |
+| Private networking (VNet, private endpoints, VNet data gateway) | `2. Azure/infra/modules/network.bicep`, `src/steps/azure` | Done: pulled forward from Phase 2 because MCAPS policy forces public access off |
 | Phase 2 modules (Agent 365, feedback, credit consumption, Agent Evaluator, Workday) | | Not started |
 
 ### 10.1 Findings from the first real deployment (Contoso, MCAPS subscription)
@@ -465,5 +465,5 @@ they can be.
 | Job logs were unreadable, and Log Analytics queries timed out | The Azure SDK logged every HTTP request at INFO. It now logs at WARNING (`VALUELENS_AZURE_LOG_LEVEL`) |
 | Publish failed with `HYT00 Login timeout expired` | The serverless database had auto-paused, and a wake-up can surface as a login timeout rather than 40613. `HYT00` is now retried like the other resume errors |
 | Habit formation read "Placed on December 1899" with no audit data | DAX returns its zero date for a blank month. The app now treats years before 1900 as no month |
-| Audit collection found 36 records, but the dashboard stayed empty ("merged 0 rows") | Not a bug. All 36 Contoso records had no user prompt: 30 Copilot Studio maker evaluations (`pva-maker-evaluation`, no messages) and 6 response-only `cowork` events. Every variant counts prompts only. The run now logs how many staged records had no prompt. For demos in tenants like this, `VALUELENS_SAMPLE_DATA=true` publishes the synthetic sample (`4. Local CSV/sample-data`) through the same processor. Its dates are moved forward by whole weeks so that they end last week |
+| Audit collection found 36 records, but the dashboard stayed empty ("merged 0 rows") | Not a bug. All 36 Contoso records had no user prompt: 30 Copilot Studio maker evaluations (`pva-maker-evaluation`, no messages) and 6 response-only `cowork` events. Every variant counts prompts only. The run now logs how many staged records had no prompt. For demos in tenants like this, `VALUELENS_SAMPLE_DATA=true` publishes the synthetic sample (`5. Local CSV/sample-data`) through the same processor. Its dates are moved forward by whole weeks so that they end last week |
 | After the sample was published, the model showed only 1,203 of 13,337 rows | The interactions table's incremental refresh policy reloads only the last 7 days. Older day partitions were created empty, before any data existed, and were never reloaded. The same applies to any backfill of older days. Publish now reports the oldest day it rewrote or removed. When that day falls outside the 7-day window, the refresh uses `applyRefreshPolicy: false`, which reloads every partition |

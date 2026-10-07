@@ -1,7 +1,7 @@
 """Tests for the new Entra directory exporter and Dataverse core refresh runner.
 
 Owned exclusively by this effort — the files under test
-(`2. Power Automate + Dataverse/scripts/Export-EntraCoreSnapshot.py` and
+(`3. Power Automate + Dataverse/scripts/Export-EntraCoreSnapshot.py` and
 `Invoke-DataverseCoreRefresh.ps1`) are new and not touched by any other agent.
 This test module is likewise new and disjoint from every other tests/*.py file;
 it does not import or modify test_dataverse_bridge_safety.py,
@@ -29,7 +29,7 @@ from pathlib import Path
 from urllib import error
 
 ROOT = Path(__file__).resolve().parents[1]
-PATHWAY = ROOT / "2. Power Automate + Dataverse"
+PATHWAY = ROOT / "3. Power Automate + Dataverse"
 EXPORTER_PATH = PATHWAY / "scripts" / "Export-EntraCoreSnapshot.py"
 RUNNER_PATH = PATHWAY / "scripts" / "Invoke-DataverseCoreRefresh.ps1"
 

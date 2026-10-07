@@ -223,7 +223,7 @@ class AgentLinkTests(unittest.TestCase):
             self.assertIn(f'"{column}"', code[12])
 
 
-CSV_PROCESSOR = ROOT / "4. Local CSV" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
+CSV_PROCESSOR = ROOT / "5. Local CSV" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
 
 
 def load_csv_processor():
@@ -333,7 +333,7 @@ class PowerAutomateBridgeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import importlib.util
-        path = ROOT / "2. Power Automate + Dataverse" / "scripts" / "Build-DataverseCoreFeeds.py"
+        path = ROOT / "3. Power Automate + Dataverse" / "scripts" / "Build-DataverseCoreFeeds.py"
         spec = importlib.util.spec_from_file_location("valuelens_bridge_linking", path)
         cls.bridge = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.bridge)

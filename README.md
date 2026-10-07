@@ -27,11 +27,12 @@ steps in its README.
 | Path | You need | Setup |
 |---|---|---|
 | **[1. Fabric](1.%20Fabric/)** (recommended) | Fabric capacity (F2 or larger, or a trial) | Double-click an installer. It sets up everything and deploys the dashboard as an app. **[🎥 Watch the setup](1.%20Fabric/README.md#watch-the-setup)** |
-| **[2. Power Automate + Dataverse](2.%20Power%20Automate%20+%20Dataverse/)** (preview) | Power Automate premium and Dataverse | Import a collector solution and run a refresh script. |
-| **[3. SharePoint](3.%20SharePoint/)** | Power BI Pro | App registration, a SharePoint library and a scheduled export. |
-| **[4. Local CSV](4.%20Local%20CSV/)** | Power BI Desktop | Open the template. Sample data is included. |
+| **[2. Azure](2.%20Azure/)** (preview) | An Azure subscription (Contributor plus User Access Administrator) and Power BI Pro | Run the installer with the Azure target. It deploys Azure SQL, Container Apps jobs and the web app into your subscription, with no Fabric. See [Azure target](1.%20Fabric/installer/README.md#azure-target-preview). |
+| **[3. Power Automate + Dataverse](3.%20Power%20Automate%20+%20Dataverse/)** (preview) | Power Automate premium and Dataverse | Import a collector solution and run a refresh script. |
+| **[4. SharePoint](4.%20SharePoint/)** | Power BI Pro | App registration, a SharePoint library and a scheduled export. |
+| **[5. Local CSV](5.%20Local%20CSV/)** | Power BI Desktop | Open the template. Sample data is included. |
 
-**Just want a look?** Use [4. Local CSV](4.%20Local%20CSV/) with its sample data. It takes two
+**Just want a look?** Use [5. Local CSV](5.%20Local%20CSV/) with its sample data. It takes two
 minutes and needs no access to your tenant.
 
 ## Report interpretation guide

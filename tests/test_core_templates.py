@@ -10,11 +10,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = (
-    Path("4. Local CSV") / "ValueLens - Local CSV.pbit",
-    Path("3. SharePoint") / "ValueLens - SharePoint.pbit",
+    Path("5. Local CSV") / "ValueLens - Local CSV.pbit",
+    Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
     Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
     Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
-    Path("2. Power Automate + Dataverse") / "ValueLens - Power Automate + Dataverse.pbit",
+    Path("3. Power Automate + Dataverse") / "ValueLens - Power Automate + Dataverse.pbit",
 )
 PAGE_COUNT = 16
 # Separate Consumption Central report shipped as an optional add-on in each path.
