@@ -235,6 +235,18 @@ export function fakeFabric() {
       find(id).content = def;
       return null;
     },
+    /** @param {string} _ws @param {string} name @param {any} def */
+    createReport: async (_ws, name, def) => {
+      calls.push(`createReport ${name}`);
+      fail('createReport');
+      return { id: add('Report', name, def).id };
+    },
+    /** @param {string} _ws @param {string} id @param {any} def */
+    updateReport: async (_ws, id, def) => {
+      calls.push(`updateReport ${find(id).displayName}`);
+      find(id).content = def;
+      return null;
+    },
     listRoleAssignments: async () => structuredClone(roles),
     /** @param {string} _ws @param {string} id @param {string} type @param {string} role */
     addRoleAssignment: async (_ws, id, type, role) => {
