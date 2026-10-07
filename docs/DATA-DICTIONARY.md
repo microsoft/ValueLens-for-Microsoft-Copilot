@@ -236,17 +236,50 @@ model is now **100% Lakehouse-sourced**.
 endpoint (Bot Id, usage, sharing, element types) only for agents that are new, whose
 `lastModifiedDateTime` changed, that have no cache entry, or whose cached detail is older than
 `FULL_REFRESH_DAYS` (default 7). Detail calls run in parallel (`DETAIL_WORKERS`, default 8) and retry
-on 429, 503 and 504. `DETAIL_MODE = "full"` forces a full refresh. It keeps three tables:
+on 429, 500, 502, 503 and 504 and on network timeouts or dropped connections. `DETAIL_MODE = "full"`
+forces a full refresh. It keeps three tables:
 
 | Table | Holds |
 |---|---|
 | `agents_365` | Today's registry, one row per agent, with **`Detail As Of`** (when that agent's detail was last fetched) |
-| `agents_365_detail_cache` | The last detail response and resolved creator per agent. Written only after a successful run; agents gone from the list are dropped |
+| `agents_365_detail_cache` | The last detail response and resolved creator per agent. Freshly fetched detail is checkpointed into it during the run (every `DETAIL_CHECKPOINT_EVERY` calls, default 1000, and again if the run fails); the full rewrite, which drops agents gone from the list, happens only after a successful run |
 | `agents_365_history` | Every version of every agent, merged on Title ID and `Last updated`, so registry changes can be traced |
 
 For a cached agent, today's list fields override the cached detail; freshly fetched detail
 overrides the list. Usage fields (`Active Users`, `Total sessions` and similar) can therefore be up
 to `FULL_REFRESH_DAYS` old; check `Detail As Of`.
+
+**Large tenants and failed detail calls.** A first run has no cache, so a tenant with tens of
+thousands of agents makes one detail call per agent; the ingester prints the expected duration
+and a progress line with an ETA every `DETAIL_PROGRESS_EVERY` calls (default 500). Because
+successful calls are checkpointed, a run that fails or is stopped part-way loses nothing: rerun
+it in incremental mode and only the agents still missing are fetched. (Full mode ignores the
+cache, so it does not resume.) Checkpoints hold only freshly fetched detail, keyed to the
+`lastModifiedDateTime` it was fetched for, so an agent is never marked as seen with stale data.
+When an agent's detail call still fails after retries:
+
+- **It has cached detail:** the cached detail is used and the agent stays due a refetch.
+  `Detail status` = `cached - refetch failed`.
+- **It has no cached detail** (for example a 404 or 403 on that one package): the agent is
+  written list-only (usage, Bot Id and capability columns blank, `Detail status` = `missing`)
+  with a warning, left out of the cache and of `agents_365_history`, and retried next run. This
+  is allowed for up to `MAX_MISSING_DETAIL` agents (default 25) or `MAX_MISSING_DETAIL_PCT`
+  percent of the catalogue (default 0.5), whichever is larger: about 104 agents in a
+  20,800-agent tenant. Above that the run fails, names the failure reasons, and leaves the
+  previous `agents_365` in place.
+
+Each step of the notebook checks the one before it, so a failed detail step stops the later
+cells with a message pointing back to it, rather than a `NameError`.
+
+| `Detail status` | Meaning |
+|---|---|
+| `fetched` | Detail fetched this run |
+| `cached` | Unchanged agent; cached detail reused |
+| `cached - refetch failed` | Changed or stale agent whose detail call failed; cached detail used, retried next run |
+| `missing` | No detail and none cached; list-only row, retried next run |
+
+`Detail status` is a Fabric snapshot column like `Detail As Of`: it is not in the 48-column CSV
+contract and not written to `agents_365_history`.
 
 **Local CSV, SharePoint and Dataverse templates** read the same contract from a CSV set in the
 `Agent 365` parameter (blank = the page loads empty). Produce it with
@@ -262,8 +295,13 @@ always agree. The PAX 28-column catalogue and the admin centre export are still 
 The script also keeps a detail cache next to the CSV (`<csv>.detailcache.jsonl`) and, like the
 ingester, fetches detail only for new or changed agents, or those whose cached detail is older than
 `-FullDetailRefreshDays` (default 7; 0 fetches every agent). It honours `Retry-After` on 429 and 5xx
-responses, caches each agent's resolved creator, and writes the cache only after the CSV. The CSV
-keeps its 48 columns; it has no `Detail As Of` column.
+responses, retries network timeouts and dropped connections, and caches each agent's resolved
+creator. Like the ingester, it checkpoints successful detail calls into the cache
+(`-CheckpointEvery`, default 1000) so a failed or stopped run resumes, prints progress with an ETA
+(`-ProgressEvery`, default 500), and applies the same missing-detail tolerance
+(`-MaxMissingDetail` 25 / `-MaxMissingDetailPct` 0.5). The full cache rewrite still happens only
+after the CSV. The CSV keeps its 48 columns; it has no `Detail As Of` or `Detail status` column, so
+list-only agents are reported as a warning in the script output.
 
 #### ⚠️ Two different Agent 365 exports — registry vs observability
 

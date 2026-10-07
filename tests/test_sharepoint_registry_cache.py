@@ -46,14 +46,42 @@ SCRIPTS_ALLOWED = _scripts_allowed()
 HARNESS = r"""
 $ErrorActionPreference = 'Stop'
 . '__SCRIPT__'
+$out = [ordered]@{}
+
+# Real Invoke-Graph against a mocked transport: network errors and 5xx are retried,
+# a 404 is not.
+$script:GraphMode = 'Interactive'
+$global:Calls = 0
+$global:Steps = @()
+function Start-Sleep { param([int]$Seconds) }
+function Invoke-MgGraphRequest { param($Method, $Uri, $Body, $ContentType)
+  $step = $global:Steps[$global:Calls]; $global:Calls++
+  if ($step -eq 'timeout') { throw [System.TimeoutException]::new('The operation has timed out.') }
+  if ($step -eq 'reset') { throw [System.Net.Http.HttpRequestException]::new('connection reset', [System.IO.IOException]::new('reset')) }
+  if ($step -match '^\d+$') { throw "Response status code does not indicate success: $step (Status)." }
+  return 'ok' }
+$global:Calls = 0; $global:Steps = @('timeout', 'reset', '502', 'ok')
+$out.netRetry = @((Invoke-Graph -Uri 'https://graph.test/x'), $global:Calls)
+$global:Calls = 0; $global:Steps = @('404', 'ok')
+try { [void](Invoke-Graph -Uri 'https://graph.test/x'); $out.notFound = 'no error' } catch { $out.notFound = "error $($_.Exception.Data['HttpStatus'])" }
+$out.notFoundCalls = $global:Calls
+$global:Calls = 0; $global:Steps = @('timeout') * 10
+try { [void](Invoke-Graph -Uri 'https://graph.test/x'); $out.netCap = 'no error' } catch { $out.netCap = 'error' }
+$out.netCapCalls = $global:Calls
+$out.transient = @(
+  (Test-TransientNetworkError ([pscustomobject]@{ Exception = [System.TimeoutException]::new('t') })),
+  (Test-TransientNetworkError ([pscustomobject]@{ Exception = [System.InvalidOperationException]::new('x') })))
+$out.allowance = @((Get-MissingDetailAllowance -Total 20836 -MaxCount 25 -MaxPct 0.5), (Get-MissingDetailAllowance -Total 100 -MaxCount 25 -MaxPct 0.5), (Get-MissingDetailAllowance -Total 100 -MaxCount 0 -MaxPct 0))
+Remove-Item function:Start-Sleep
+
 $global:Fetched = [System.Collections.Generic.List[string]]::new()
 $global:OwnerLookups = [System.Collections.Generic.List[string]]::new()
-$global:FailId = ''
+$global:FailIds = @()
 function Get-AgentPackages { param([string]$Version)
   [pscustomobject]@{ Version = $Version; Base = 'https://graph.test/packages'; Packages = @($global:Catalog) } }
 function Invoke-Graph { param([string]$Method = 'GET', [string]$Uri, $Body)
   $id = $Uri.Substring($Uri.LastIndexOf('/') + 1)
-  if ($id -eq $global:FailId) { throw "mock 500 for $id" }
+  if ($global:FailIds -contains $id) { throw "mock 500 for $id" }
   $global:Fetched.Add($id)
   return $global:Details[$id] }
 function Resolve-OwnerIds { param([string[]]$OwnerIds)
@@ -61,13 +89,16 @@ function Resolve-OwnerIds { param([string[]]$OwnerIds)
 function Resolve-SpOwner { param([string]$AppId, [string]$AgentIdentityId) return '' }
 function Pkg($id, $name, $lm, $owner) { [pscustomobject]@{ id = $id; displayName = $name; lastModifiedDateTime = $lm; ownerId = $owner; type = 'Shared' } }
 function Det($id, $users) { [pscustomobject]@{ id = $id; activeUsers = $users; totalSessions = 5; sharedWithUsersAndGroups = @() } }
-function Run([int]$days = 7) {
+function Run([int]$days = 7, [int]$maxMissing = 25, [double]$maxPct = 0.5, [int]$every = 1000) {
   $global:Fetched.Clear(); $global:OwnerLookups.Clear()
-  [void](Export-Agents365Registry -OutputCsvPath $csv -Version 'v1.0' -FullRefreshDays $days)
+  [void](Export-Agents365Registry -OutputCsvPath $csv -Version 'v1.0' -FullRefreshDays $days -MaxMissing $maxMissing -MaxMissingPct $maxPct -CheckpointEvery $every)
   return @{ fetched = @($global:Fetched | Sort-Object); owners = @($global:OwnerLookups | Sort-Object) } }
 
+function CacheIds { @(Get-Content -LiteralPath "$csv.detailcache.jsonl" | Select-Object -Skip 1 | ForEach-Object { ($_ | ConvertFrom-Json).id } | Sort-Object -Unique) }
+function CacheEntry($id) { Get-Content -LiteralPath "$csv.detailcache.jsonl" | Select-Object -Skip 1 | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.id -eq $id } | Select-Object -Last 1 }
+function CsvRow($titleId) { Import-Csv -LiteralPath $csv | Where-Object { $_.'Title ID' -eq $titleId } }
+
 $csv = Join-Path '__TMP__' 'Agents365Registry.csv'
-$out = [ordered]@{}
 
 # 1: first run, no cache -> every detail fetched.
 $global:Catalog = @((Pkg 'A' 'Alpha' '2025-01-01T00:00:00Z' 'owner-a'), (Pkg 'B' 'Beta' '2025-01-01T00:00:00Z' 'owner-b'))
@@ -85,13 +116,15 @@ $global:Catalog = @((Pkg 'A' 'Alpha renamed' '2025-01-01T00:00:00Z' 'owner-a'), 
 $out.run3 = Run
 $out.cache3 = @(Get-Content -LiteralPath "$csv.detailcache.jsonl" | Select-Object -Skip 1 | ForEach-Object { ($_ | ConvertFrom-Json).id } | Sort-Object)
 
-# 4: a failing detail call leaves the CSV and the cache untouched.
+# 4: a failed refetch of a changed, cached agent falls back to the cached detail and
+# keeps the cached lastModified, so the change is not marked as seen and is retried.
 $global:Catalog = @((Pkg 'A' 'Alpha renamed' '2025-03-01T00:00:00Z' 'owner-a'), (Pkg 'B' 'Beta' '2025-02-01T00:00:00Z' 'owner-b'))
-$cacheBefore = [System.IO.File]::ReadAllText("$csv.detailcache.jsonl")
-$global:FailId = 'A'
-try { [void](Run); $out.run4 = 'no error' } catch { $out.run4 = 'error' }
-$global:FailId = ''
-$out.cacheUnchanged = ([System.IO.File]::ReadAllText("$csv.detailcache.jsonl") -eq $cacheBefore)
+$global:FailIds = @('A')
+try { [void](Run); $out.run4 = 'no error' } catch { $out.run4 = "error: $($_.Exception.Message)" }
+$global:FailIds = @()
+$out.run4ActiveUsers = (CsvRow 'T_A').'Active Users'
+$out.run4CachedLastModified = (ConvertTo-StampKey (CacheEntry 'A').lastModified)
+$out.run4b = Run
 
 # 5: an agent whose cached detail is older than FullRefreshDays is re-fetched.
 $lines = [System.IO.File]::ReadAllLines("$csv.detailcache.jsonl")
@@ -104,6 +137,33 @@ $global:Catalog = @((Pkg 'A' 'Alpha renamed' '2025-01-01T00:00:00Z' 'owner-a'), 
 $out.run5 = Run
 $out.run5b = Run
 $out.run5zero = Run 0
+
+# 6: a new agent whose detail fails, with no cache, is written list-only within the
+# tolerance, left out of the cache, and the only call on the next run.
+$global:Catalog = @((Pkg 'A' 'Alpha renamed' '2025-01-01T00:00:00Z' 'owner-a'), (Pkg 'B' 'Beta' '2025-02-01T00:00:00Z' 'owner-b'), (Pkg 'D' 'Delta' '2025-04-01T00:00:00Z' ''))
+$global:Details['D'] = (Det 'D' 40)
+$global:FailIds = @('D')
+try { [void](Run); $out.run6 = 'no error' } catch { $out.run6 = "error: $($_.Exception.Message)" }
+$global:FailIds = @()
+$d = CsvRow 'T_D'
+$out.run6Row = @("$($d.'Agent name')", "$($d.'Active Users')")
+$out.run6Cache = CacheIds
+$out.run6b = Run
+
+# 7: over the tolerance the run fails and the CSV is not replaced, but successes are
+# checkpointed, so the rerun fetches only the failed agent.
+$global:Catalog = @($global:Catalog) + @((Pkg 'F' 'Foxtrot' '2025-05-01T00:00:00Z' ''), (Pkg 'G' 'Golf' '2025-05-01T00:00:00Z' ''), (Pkg 'H' 'Hotel' '2025-05-01T00:00:00Z' ''))
+foreach ($k in 'F', 'G', 'H') { $global:Details[$k] = (Det $k 50) }
+$global:FailIds = @('F')
+try { [void](Run 7 0 0 1); $out.run7 = 'no error' } catch { $out.run7 = "error: $($_.Exception.Message)" }
+$global:FailIds = @()
+$out.run7Csv = @(Import-Csv -LiteralPath $csv | ForEach-Object { $_.'Title ID' } | Sort-Object)
+$out.run7Cache = CacheIds
+$out.run7b = Run 7 0 0
+
+# 8: a corrupt trailing line (a checkpoint cut off mid-write) is skipped, not fatal.
+[System.IO.File]::AppendAllText("$csv.detailcache.jsonl", '{"id":"A","lastMod')
+try { $out.run8 = Run } catch { $out.run8 = "error: $($_.Exception.Message)" }
 
 # Retry-After: header honoured and capped, else 2^attempt.
 $h = [System.Net.WebHeaderCollection]::new(); $h.Add('Retry-After', '7')
@@ -131,6 +191,16 @@ class ParseTests(unittest.TestCase):
         body = text[text.index("function Export-Agents365Registry"):]
         self.assertLess(body.index("Write-RegistryCsv -Rows"), body.index("Write-DetailCache -Path"))
         self.assertIn("[int]$FullDetailRefreshDays = 7", text)
+
+    def test_checkpoint_flush_is_in_a_finally_before_the_csv(self):
+        text = SCRIPT.read_text(encoding="utf-8")
+        body = text[text.index("function Export-Agents365Registry"):]
+        flush = body.index("} finally {")
+        self.assertLess(flush, body.index("Add-DetailCacheEntries -Path", flush))
+        self.assertLess(body.index("Add-DetailCacheEntries -Path", flush), body.index("Write-RegistryCsv -Rows"))
+        for param in ("[int]$MaxMissingDetail = 25", "[double]$MaxMissingDetailPct = 0.5",
+                      "[int]$CheckpointEvery = 1000", "[int]$ProgressEvery = 500"):
+            self.assertIn(param, text)
 
 
 @unittest.skipUnless(SCRIPTS_ALLOWED, "PowerShell execution policy blocks scripts here (not bypassed)")
@@ -172,9 +242,41 @@ class IncrementalCacheTests(unittest.TestCase):
         self.assertEqual(self.out["run3"]["fetched"], [])
         self.assertEqual(self.out["cache3"], ["A", "B"])
 
-    def test_failed_run_does_not_advance_cache(self):
-        self.assertEqual(self.out["run4"], "error")
-        self.assertTrue(self.out["cacheUnchanged"])
+    def test_failed_refetch_falls_back_to_cache_without_marking_seen(self):
+        self.assertEqual(self.out["run4"], "no error")
+        self.assertEqual(self.out["run4ActiveUsers"], "10")
+        self.assertEqual(self.out["run4CachedLastModified"], "2025-01-01T00:00:00Z")
+        self.assertEqual(self.out["run4b"]["fetched"], ["A"])
+
+    def test_missing_detail_within_tolerance_is_list_only_and_retried(self):
+        self.assertEqual(self.out["run6"], "no error")
+        self.assertEqual(self.out["run6Row"], ["Delta", ""])
+        self.assertEqual(self.out["run6Cache"], ["A", "B"])
+        self.assertEqual(self.out["run6b"]["fetched"], ["D"])
+
+    def test_over_tolerance_fails_but_checkpoints_successes(self):
+        self.assertTrue(self.out["run7"].startswith("error: "), self.out["run7"])
+        self.assertIn("rerun", self.out["run7"])
+        self.assertEqual(self.out["run7Csv"], ["T_A", "T_B", "T_D"])  # CSV not replaced
+        self.assertEqual(self.out["run7Cache"], ["A", "B", "D", "G", "H"])
+        self.assertEqual(self.out["run7b"]["fetched"], ["F"])
+
+    def test_corrupt_checkpoint_line_is_skipped(self):
+        self.assertIsInstance(self.out["run8"], dict, self.out["run8"])
+        self.assertEqual(self.out["run8"]["fetched"], [])
+
+    def test_network_errors_and_5xx_are_retried(self):
+        self.assertEqual(self.out["netRetry"], ["ok", 4])
+        self.assertEqual(self.out["netCap"], "error")
+        self.assertEqual(self.out["netCapCalls"], 6)
+        self.assertEqual(self.out["transient"], [True, False])
+
+    def test_404_is_not_retried(self):
+        self.assertEqual(self.out["notFound"], "error 404")
+        self.assertEqual(self.out["notFoundCalls"], 1)
+
+    def test_missing_detail_allowance(self):
+        self.assertEqual(self.out["allowance"], [104, 25, 0])
 
     def test_stale_detail_is_refreshed(self):
         self.assertEqual(self.out["run5"]["fetched"], ["A"])

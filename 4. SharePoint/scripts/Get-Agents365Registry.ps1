@@ -58,6 +58,25 @@
   Activity Date) of a reused detail can therefore be up to this many days old. 0
   fetches every detail on every run.
 
+.PARAMETER MaxMissingDetail
+.PARAMETER MaxMissingDetailPct
+  Tolerance for agents whose detail call still fails after retries (for example a 404
+  or 403 on one package) and that have no cached detail to fall back on. Up to
+  MaxMissingDetail agents (default 25) or MaxMissingDetailPct percent of the catalogue
+  (default 0.5), whichever is larger, are written list-only - usage, Bot Id and
+  capability columns blank - with a warning, and are retried on the next run. Above
+  that the run fails without writing the CSV. An agent with cached detail falls back
+  to it instead and stays due a refetch.
+
+.PARAMETER CheckpointEvery
+  Successful detail calls are appended to the detail cache every this many calls
+  (default 1000) and again if the run fails or is stopped, so a rerun after a failure
+  fetches only what is still missing. A first run on a large tenant has no cache, so
+  this is what stops one failure from discarding thousands of fetched details.
+
+.PARAMETER ProgressEvery
+  Print a progress line with an ETA every this many detail calls. Default 500.
+
 .PARAMETER SkipCreatorResolution
   Do not resolve Agent creator UPN. Every row is then "unattributed".
 
@@ -80,9 +99,9 @@
   The tenant also needs an Agent 365 licence. That is a SKU check, separate from
   permissions: a missing licence returns 403 "Customer must be licensed for Agent 365".
   Point-in-time snapshot: deleted agents disappear on the next run. The detail cache
-  (<OutputCsv>.detailcache.jsonl) is rewritten only after the CSV is written, keeps
-  only agents in the current list, and can be deleted at any time to force a full
-  detail refresh.
+  (<OutputCsv>.detailcache.jsonl) is checkpointed during the detail pull with freshly
+  fetched detail only, then rewritten after the CSV is written, keeping only agents in
+  the current list. It can be deleted at any time to force a full detail refresh.
 #>
 [CmdletBinding()]
 param(
@@ -97,6 +116,14 @@ param(
   [switch]$SkipDetail,
   [ValidateRange(0, 365)]
   [int]$FullDetailRefreshDays = 7,
+  [ValidateRange(0, 1000000)]
+  [int]$MaxMissingDetail = 25,
+  [ValidateRange(0, 100)]
+  [double]$MaxMissingDetailPct = 0.5,
+  [ValidateRange(1, 1000000)]
+  [int]$CheckpointEvery = 1000,
+  [ValidateRange(1, 1000000)]
+  [int]$ProgressEvery = 500,
   [switch]$SkipCreatorResolution,
   [switch]$AllowEmpty
 )
@@ -212,6 +239,22 @@ function Get-HttpStatus {
   return 0
 }
 
+function Test-TransientNetworkError {
+  # True for a timeout or dropped connection that never produced an HTTP response.
+  param($ErrorRecord)
+  # Matched by name: Windows PowerShell 5.1 does not load System.Net.Http by default.
+  $names = 'System.TimeoutException', 'System.Threading.Tasks.TaskCanceledException',
+           'System.Net.Http.HttpRequestException', 'System.IO.IOException', 'System.Net.Sockets.SocketException'
+  $ex = $ErrorRecord.Exception
+  while ($ex) {
+    $name = $ex.GetType().FullName
+    if ($names -contains $name) { return $true }
+    if ($name -eq 'System.Net.WebException' -and $null -eq $ex.Response) { return $true }
+    $ex = $ex.InnerException
+  }
+  return $false
+}
+
 function Get-RetryAfterSeconds {
   # Graph's Retry-After header when present (seconds, capped at 60), else 2^attempt.
   param($ErrorRecord, [int]$Attempt)
@@ -235,9 +278,9 @@ function Get-RetryAfterSeconds {
 }
 
 function Invoke-Graph {
-  # One Graph call with a live token. Retries once on 401 (expired token) and a few
-  # times on 429/5xx, honouring Retry-After; anything else is rethrown with the HTTP
-  # status attached.
+  # One Graph call with a live token. Retries once on 401 (expired token), and up to
+  # five times on 429/5xx or a network timeout / dropped connection, honouring
+  # Retry-After; anything else is rethrown with the HTTP status attached.
   param([string]$Method = 'GET', [string]$Uri, $Body)
   for ($attempt = 1; ; $attempt++) {
     try {
@@ -257,8 +300,9 @@ function Invoke-Graph {
         $script:Token = $null
         continue
       }
-      if (($status -eq 429 -or $status -ge 500) -and $attempt -lt 4) {
-        Start-Sleep -Seconds (Get-RetryAfterSeconds $_ $attempt)
+      $transient = $status -eq 429 -or $status -ge 500 -or ($status -eq 0 -and (Test-TransientNetworkError $_))
+      if ($transient -and $attempt -lt 6) {
+        Start-Sleep -Seconds ([Math]::Min(60, (Get-RetryAfterSeconds $_ $attempt)))
         continue
       }
       $err = [System.Exception]::new("Graph $Method $Uri failed (HTTP $status): $($_.Exception.Message)", $_.Exception)
@@ -510,8 +554,10 @@ function Get-DetailCachePath {
 
 function Read-DetailCache {
   # JSON lines: a header {apiVersion}, then one {id, lastModified, detailAsOfUtc,
-  # detail, creatorUpn, creatorSource} per agent. A missing, unreadable or
-  # other-API-version cache reads as empty, so every detail is fetched.
+  # detail, creatorUpn, creatorSource} per agent; a later line for the same id wins,
+  # which is how mid-run checkpoints are appended. A missing, unreadable or
+  # other-API-version cache reads as empty, so every detail is fetched; a single
+  # corrupt line (say, a checkpoint cut off mid-write) is skipped.
   param([string]$Path, [string]$Version)
   $agents = @{}
   if (-not (Test-Path -LiteralPath $Path)) { return $agents }
@@ -521,7 +567,7 @@ function Read-DetailCache {
     if ("$(Get-Field ($lines[0] | ConvertFrom-Json) 'apiVersion')" -ne $Version) { return @{} }
     for ($i = 1; $i -lt $lines.Count; $i++) {
       if (-not $lines[$i].Trim()) { continue }
-      $entry = $lines[$i] | ConvertFrom-Json
+      try { $entry = $lines[$i] | ConvertFrom-Json } catch { continue }
       $id = "$(Get-Field $entry 'id')"
       if ($id) { $agents[$id] = $entry }
     }
@@ -547,8 +593,9 @@ function Test-NeedsDetail {
 }
 
 function Write-DetailCache {
-  # Written only after the CSV, and only for agents in today's list, so a failed run
-  # never advances the cache and deleted agents drop out.
+  # Full rewrite, after the CSV, for agents in today's list only, so deleted agents
+  # drop out and checkpoint lines are compacted. Mid-run checkpoints
+  # (Add-DetailCacheEntries) only ever add freshly fetched detail.
   param([string]$Path, [string]$Version, $Entries)
   $lines = [System.Collections.Generic.List[string]]::new()
   $lines.Add(([ordered]@{ apiVersion = $Version } | ConvertTo-Json -Compress))
@@ -556,6 +603,40 @@ function Write-DetailCache {
   $tmp = "$Path.tmp"
   [System.IO.File]::WriteAllLines($tmp, $lines, [System.Text.UTF8Encoding]::new($false))
   Move-Item -LiteralPath $tmp -Destination $Path -Force
+}
+
+function Add-DetailCacheEntries {
+  # Mid-run checkpoint: append freshly fetched entries (later lines win on read). Starts
+  # a new file when there is none, or when the existing one is for another API version.
+  param([string]$Path, [string]$Version, $Entries)
+  $lines = [System.Collections.Generic.List[string]]::new()
+  foreach ($entry in $Entries) { $lines.Add(($entry | ConvertTo-Json -Depth 50 -Compress)) }
+  if ($lines.Count -eq 0) { return }
+  $utf8 = [System.Text.UTF8Encoding]::new($false)
+  $header = $null
+  if (Test-Path -LiteralPath $Path) {
+    try {
+      $first = [System.IO.File]::ReadAllLines($Path, $utf8) | Select-Object -First 1
+      $header = "$(Get-Field ($first | ConvertFrom-Json) 'apiVersion')"
+    } catch { $header = $null }
+  }
+  if ($header -ne $Version) { Write-DetailCache -Path $Path -Version $Version -Entries @() }
+  [System.IO.File]::AppendAllLines($Path, $lines, $utf8)
+}
+
+function Format-Duration {
+  param([double]$Seconds)
+  $t = [timespan]::FromSeconds([Math]::Max(0, [Math]::Round($Seconds)))
+  if ($t.TotalHours -ge 1) { return ('{0}h {1:00}m' -f [int][Math]::Floor($t.TotalHours), $t.Minutes) }
+  if ($t.TotalMinutes -ge 1) { return ('{0}m {1:00}s' -f $t.Minutes, $t.Seconds) }
+  return ('{0}s' -f $t.Seconds)
+}
+
+function Get-MissingDetailAllowance {
+  # Agents that may be written list-only: the count or the percentage of the catalogue,
+  # whichever is larger.
+  param([int]$Total, [int]$MaxCount, [double]$MaxPct)
+  return [int][Math]::Max($MaxCount, [Math]::Floor($Total * $MaxPct / 100))
 }
 
 #############################################################
@@ -696,7 +777,8 @@ function Write-RegistryCsv {
 
 function Export-Agents365Registry {
   param([string]$OutputCsvPath, [string]$Version, [switch]$NoDetail, [switch]$NoCreators, [switch]$AllowEmptySnapshot,
-        [int]$FullRefreshDays = 7)
+        [int]$FullRefreshDays = 7, [int]$MaxMissing = 25, [double]$MaxMissingPct = 0.5,
+        [int]$CheckpointEvery = 1000, [int]$ProgressEvery = 500)
   if (-not [System.IO.Path]::IsPathRooted($OutputCsvPath)) {
     $OutputCsvPath = Join-Path -Path (Get-Location -PSProvider FileSystem).ProviderPath -ChildPath $OutputCsvPath
   }
@@ -716,33 +798,111 @@ function Export-Agents365Registry {
     Write-Host "detail: $($cache.Count) cached; re-fetching new, modified and older-than-$FullRefreshDays-day agents"
   }
 
-  $details = [System.Collections.Generic.List[object]]::new()
-  $meta = [System.Collections.Generic.List[object]]::new()
+  # Pass 1: which agents need a detail call.
+  $plan = [System.Collections.Generic.List[object]]::new()
   foreach ($package in $catalog.Packages) {
     $id = Get-Field $package 'id'
     if (-not $id) { $id = Get-Field $package 'titleId' }
     if (-not $id) { $id = Get-Field $package 'packageId' }
     if (-not $id) { throw 'Agent 365 catalogue item is missing id/titleId/packageId.' }
     $id = "$id"
-    if ($NoDetail) { $details.Add((Merge-Detail $package $null)); $meta.Add($null); continue }
     $entry = if ($cache.ContainsKey($id)) { $cache[$id] } else { $null }
-    if (Test-NeedsDetail $package $entry $cutoffUtc) {
-      # Fresh detail goes over the list fields.
-      $detail = Invoke-Graph -Uri "$($catalog.Base)/$id"
-      $details.Add((Merge-Detail $package $detail))
-      $meta.Add(@{ Id = $id; Fetched = $true; Detail = $detail; AsOf = $nowUtc; Entry = $entry
-                   LastModified = (ConvertTo-StampKey (Get-Field $package 'lastModifiedDateTime')) })
-    } else {
+    $need = (-not $NoDetail) -and (Test-NeedsDetail $package $entry $cutoffUtc)
+    $plan.Add(@{ Id = $id; Package = $package; Entry = $entry; Need = $need })
+  }
+  $toFetch = @($plan | Where-Object { $_.Need }).Count
+  if ($toFetch) {
+    Write-Host "detail calls needed: $toFetch of $($plan.Count) - expected duration roughly $(Format-Duration ($toFetch * 0.5)) at ~0.5s per call"
+    Write-Host "successful calls are checkpointed to the detail cache every $CheckpointEvery; if this run fails or is stopped, rerun it and only what is missing is fetched"
+  }
+
+  # Pass 2: fetch (checkpointing each success), fall back to cache, or mark missing.
+  $details = [System.Collections.Generic.List[object]]::new()
+  $meta = [System.Collections.Generic.List[object]]::new()
+  $checkpointBatch = [System.Collections.Generic.List[object]]::new()
+  $failures = @{}
+  $done = 0
+  $started = [datetime]::UtcNow
+  try {
+    foreach ($p in $plan) {
+      $package = $p.Package; $id = $p.Id; $entry = $p.Entry
+      if ($NoDetail) { $details.Add((Merge-Detail $package $null)); $meta.Add($null); continue }
+      $refetchFailed = $false
+      if ($p.Need) {
+        $detail = $null; $reason = $null
+        try {
+          $detail = Invoke-Graph -Uri "$($catalog.Base)/$id"
+        } catch {
+          $status = $_.Exception.Data['HttpStatus']
+          if (-not $status) { $status = Get-HttpStatus $_ }
+          $cause = if ($_.Exception.InnerException) { $_.Exception.InnerException } else { $_.Exception }
+          $reason = if ($status) { "HTTP $status" } else { $cause.GetType().Name }
+          $failures[$reason] = 1 + [int]$failures[$reason]
+        }
+        $done++
+        if ($done % $ProgressEvery -eq 0 -or $done -eq $toFetch) {
+          $elapsed = ([datetime]::UtcNow - $started).TotalSeconds
+          $rate = if ($elapsed -gt 0) { $done / $elapsed } else { 0 }
+          $eta = if ($rate -gt 0) { Format-Duration (($toFetch - $done) / $rate) } else { 'unknown' }
+          $failed = [int](@($failures.Values) | Measure-Object -Sum).Sum
+          Write-Host ("  detail calls {0}/{1} ({2:0}%) | {3:0.0}/s | failed {4} | elapsed {5} | ETA {6}" -f $done, $toFetch, ($done * 100 / $toFetch), $rate, $failed, (Format-Duration $elapsed), $eta)
+        }
+        if ($null -eq $reason) {
+          # Fresh detail goes over the list fields.
+          $lastModified = ConvertTo-StampKey (Get-Field $package 'lastModifiedDateTime')
+          $details.Add((Merge-Detail $package $detail))
+          $meta.Add(@{ Id = $id; Fetched = $true; Detail = $detail; AsOf = $nowUtc; Entry = $entry; Status = 'fetched'
+                       LastModified = $lastModified })
+          # Checkpoint entries carry no creator, so the creator tiers run for them.
+          $checkpointBatch.Add([ordered]@{ id = $id; lastModified = $lastModified; detailAsOfUtc = (ConvertTo-Text $nowUtc)
+                                           creatorUpn = ''; creatorSource = ''; detail = $detail })
+          if ($checkpointBatch.Count -ge $CheckpointEvery) {
+            try { Add-DetailCacheEntries -Path $cachePath -Version $Version -Entries @($checkpointBatch); $checkpointBatch.Clear() }
+            catch { Write-Host "detail checkpoint failed ($($_.Exception.Message)); retrying with the next batch" -ForegroundColor Yellow }
+          }
+          continue
+        }
+        if ($null -eq $entry -or $null -eq (Get-Field $entry 'detail')) {
+          # No detail and nothing cached: list-only row, judged against the tolerance below.
+          $details.Add((Merge-Detail $package $null))
+          $meta.Add(@{ Id = $id; Fetched = $false; Missing = $true; Status = 'missing'; Reason = $reason })
+          continue
+        }
+        # Refetch failed: fall back to the cached detail, keeping the cached
+        # lastModified so the change is retried next run rather than marked as seen.
+        $refetchFailed = $true
+      }
       # Cached detail, with today's list fields over it.
       $cachedDetail = Get-Field $entry 'detail'
       $details.Add((Merge-Detail $cachedDetail $package))
       $meta.Add(@{ Id = $id; Fetched = $false; Detail = $cachedDetail; AsOf = (Get-Field $entry 'detailAsOfUtc'); Entry = $entry
+                   Status = $(if ($refetchFailed) { 'cached - refetch failed' } else { 'cached' })
                    LastModified = (ConvertTo-StampKey (Get-Field $entry 'lastModified')) })
+    }
+  } finally {
+    if ($checkpointBatch.Count) {
+      try { Add-DetailCacheEntries -Path $cachePath -Version $Version -Entries @($checkpointBatch) }
+      catch { Write-Host "detail checkpoint failed ($($_.Exception.Message))" -ForegroundColor Yellow }
     }
   }
   if (-not $NoDetail) {
     $fetched = @($meta | Where-Object { $_.Fetched }).Count
-    Write-Host "details fetched: $fetched, reused from cache: $($details.Count - $fetched)"
+    Write-Host "details fetched: $fetched, reused from cache: $(@($meta | Where-Object { -not $_.Fetched -and -not $_.Missing }).Count)"
+    if ($failures.Count) {
+      Write-Host "detail calls failed after retries: $(($failures.Keys | Sort-Object | ForEach-Object { "$_ x$($failures[$_])" }) -join ', ')" -ForegroundColor Yellow
+    }
+    $missingIds = @($meta | Where-Object { $_.Missing } | ForEach-Object { $_.Id } | Select-Object -Unique)
+    $allowed = Get-MissingDetailAllowance -Total @($plan | ForEach-Object { $_.Id } | Select-Object -Unique).Count -MaxCount $MaxMissing -MaxPct $MaxMissingPct
+    if ($missingIds.Count -gt $allowed) {
+      throw ("Agent 365 detail unavailable for $($missingIds.Count) agent(s) with no cached copy - more than the $allowed " +
+             "allowed by -MaxMissingDetail / -MaxMissingDetailPct, so the CSV is not written. First: $(($missingIds | Select-Object -First 5) -join ', '). " +
+             "Every successful detail call was checkpointed to $cachePath - rerun the script and only the missing agents are fetched again.")
+    }
+    if ($missingIds.Count) {
+      Write-Host "WARNING: $($missingIds.Count) agent(s) have no detail (tolerance $allowed); written list-only (usage, Bot Id and capability columns blank) and retried next run: $(($missingIds | Select-Object -First 10) -join ', ')" -ForegroundColor Yellow
+    }
+    $refetchFailedCount = @($meta | Where-Object { $_.Status -eq 'cached - refetch failed' }).Count
+    if ($refetchFailedCount) { Write-Host "WARNING: $refetchFailedCount agent(s) kept their cached detail after a failed refetch; retried next run." -ForegroundColor Yellow }
   }
 
   $titleIds = @($details | ForEach-Object { Get-TitleId $_ })
@@ -753,7 +913,7 @@ function Export-Agents365Registry {
   # as unattributed are retried at their next detail fetch, not on every run.
   for ($i = 0; $i -lt $details.Count -and -not $NoCreators; $i++) {
     $m = $meta[$i]
-    if ($null -eq $m -or $m.Fetched) { continue }
+    if ($null -eq $m -or $m.Fetched -or $m.Missing) { continue }
     $cachedSource = "$(Get-Field $m.Entry 'creatorSource')"
     if (-not $cachedSource) { continue }
     $settled[$i] = $true
@@ -799,6 +959,7 @@ function Export-Agents365Registry {
   if (-not $NoDetail) {
     $entries = for ($i = 0; $i -lt $details.Count; $i++) {
       $m = $meta[$i]
+      if ($m.Missing) { continue }   # list-only: nothing to cache, retried next run
       if ($NoCreators) {
         # Creators were not resolved this run: keep whatever the cache already had.
         $cUpn = "$(Get-Field $m.Entry 'creatorUpn')"
@@ -829,5 +990,6 @@ if ($MyInvocation.InvocationName -ne '.') {
   Connect-Registry -Mode $Auth -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret
   [void](Export-Agents365Registry -OutputCsvPath $OutputCsv -Version $ApiVersion `
     -NoDetail:$SkipDetail -NoCreators:$SkipCreatorResolution -AllowEmptySnapshot:$AllowEmpty `
-    -FullRefreshDays $FullDetailRefreshDays)
+    -FullRefreshDays $FullDetailRefreshDays -MaxMissing $MaxMissingDetail -MaxMissingPct $MaxMissingDetailPct `
+    -CheckpointEvery $CheckpointEvery -ProgressEvery $ProgressEvery)
 }
