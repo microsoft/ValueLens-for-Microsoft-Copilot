@@ -17,6 +17,35 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-07 — Agent 365 registry: agents with no detail no longer fail the run
+
+On large tenants, some agents' detail calls fail every time, typically with HTTP 424 *Failed
+Dependency* on that package, and there can be more of them than the missing-detail tolerance
+added in the previous entry allowed (25 agents or 0.5% of the catalogue). The run then failed,
+even though every other agent's detail had been fetched.
+
+The tolerance is gone. In the Fabric ingester (`Copilot_Agent365_Registry_Ingester.ipynb`) and
+`Get-Agents365Registry.ps1`:
+
+- **Any agent whose detail call fails is written list-only**, whatever the reason: 424, 404,
+  403, or a 429, 5xx or network error after retries. Its list fields are kept, and the usage,
+  Bot Id and capability columns are blank. In Fabric, `Detail status` records the reason, for
+  example `missing (HTTP 424)`. The run prints a warning counting these agents by reason.
+- **These agents are never cached, so every run retries them.** 424 and 404 are not retried
+  within a run. An agent with cached detail still falls back to it (`cached - refetch failed`).
+- **One safety net remains:** if every detail call failed with 401 or 403 and there is no cached
+  detail, sign-in or consent is broken, so the run fails without writing rather than replacing
+  the registry with one that has no detail at all.
+- `MAX_MISSING_DETAIL` / `MAX_MISSING_DETAIL_PCT` and `-MaxMissingDetail` / `-MaxMissingDetailPct`
+  are removed. A notebook whose config cell still sets them runs unchanged; the values are ignored.
+  Scripts or scheduled tasks that pass the PowerShell parameters must drop them.
+
+To pick it up, re-import the notebook (or update the script) and rerun it. If you patched the
+detail loop by hand to skip 424s, drop that patch: the updated notebook handles them. See the
+[data dictionary](docs/DATA-DICTIONARY.md).
+
+---
+
 ## 2026-10-07 — Agent 365 registry: first runs on very large tenants resume instead of starting over
 
 On a first run there is no detail cache, so a tenant with ~20,000 agents makes ~20,000 detail

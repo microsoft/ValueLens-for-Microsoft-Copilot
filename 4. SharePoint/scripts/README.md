@@ -134,7 +134,7 @@ failure.
 .\Get-Agents365Registry.ps1 -OutputCsv .\Agents365Registry.csv `
     [-Auth Auto|AppRegistration|Interactive] [-TenantId <id>] [-ClientId <id>] [-ClientSecret <secret>] `
     [-ApiVersion v1.0|beta] [-SkipDetail] [-FullDetailRefreshDays 7] `
-    [-MaxMissingDetail 25] [-MaxMissingDetailPct 0.5] [-CheckpointEvery 1000] [-ProgressEvery 500] `
+    [-CheckpointEvery 1000] [-ProgressEvery 500] `
     [-SkipCreatorResolution] [-AllowEmpty]
 ```
 
@@ -143,10 +143,12 @@ failure.
 Successful calls are checkpointed into `<OutputCsv>.detailcache.jsonl` every `-CheckpointEvery`
 calls and again if the run fails or is stopped, so **rerun the same command** after a failure and
 only the agents still missing are fetched. Network timeouts, dropped connections, 429 and 5xx are
-retried. An agent whose detail still fails is written list-only (usage, Bot Id and capability
-columns blank) with a warning and retried next run, up to `-MaxMissingDetail` agents or
-`-MaxMissingDetailPct` percent of the catalogue, whichever is larger; above that the run fails
-and the existing CSV is left in place.
+retried; 404 and 424 *Failed Dependency* are not. An agent whose detail call fails and that has no
+cached detail is written list-only (usage, Bot Id and capability columns blank) and retried next
+run, however many there are; the script prints a warning counting them by reason, for example
+`missing (HTTP 424) x312`. Only if every detail call failed with 401 or 403 and nothing is cached
+does the run stop, leaving the existing CSV in place, because that means sign-in or consent is
+broken.
 
 `Auto` uses the app registration when `-ClientId` is given (secret from `-ClientSecret`,
 `$env:AIBV_CLIENT_SECRET`, Credential Manager `PAX-AIBV-<TenantId>`, then a prompt), otherwise an

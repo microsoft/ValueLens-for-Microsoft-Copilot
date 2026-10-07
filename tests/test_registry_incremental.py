@@ -26,7 +26,7 @@ def detail_helpers():
             "_select_detail_targets", "_merge_fresh", "_merge_cached",
             "_fetch_details", "_assemble_details", "_cache_from_rows", "_cache_to_rows",
             "_fresh_cache_entry", "_fmt_duration", "_progress_line", "_failure_reason",
-            "_failure_census", "_missing_detail_allowance",
+            "_failure_census", "_http_status",
         ),
         import_names=("_json", "ThreadPoolExecutor", "as_completed", "datetime", "timedelta", "timezone",
                       "_monotonic"),
@@ -131,7 +131,7 @@ class GraphRetryTests(unittest.TestCase):
         self.assertEqual(len(fake.calls), 3, "1 call + 2 retries")
 
     def test_non_retryable_errors_are_not_retried(self):
-        for status in (400, 403, 404):
+        for status in (400, 403, 404, 424):
             ns, fake, clock = graph_client([status])
             self.assertEqual(ns["graph_request"]("GET", "https://graph/x").status_code, status)
             self.assertEqual(len(fake.calls), 1, status)
@@ -270,9 +270,11 @@ class DetailMergeAndCacheTests(unittest.TestCase):
         self.assertEqual(new_cache["failed"]["lastModifiedDateTime"], "M8",
                          "a failed refetch must stay 'changed' so the next run retries it")
 
-    def test_assemble_fails_when_a_new_agent_has_no_detail(self):
-        with self.assertRaisesRegex(RuntimeError, "no cached copy"):
-            self.ns["_assemble_details"]([{"id": "new"}], {}, {}, {"new": RuntimeError("429")}, NOW_ISO)
+    def test_a_new_agent_with_no_detail_is_list_only_and_not_cached(self):
+        details, meta, new_cache = self.ns["_assemble_details"](
+            [{"id": "new"}], {}, {}, {"new": RuntimeError("429")}, NOW_ISO)
+        self.assertEqual((details, meta[0]["detailStatus"], new_cache),
+                         ([{"id": "new"}], "missing (RuntimeError)", {}))
 
     def test_cache_round_trips_and_skips_corrupt_rows(self):
         cache = {"a": {"detail": {"id": "a", "n": [1]}, "lastModifiedDateTime": "M",
@@ -517,38 +519,76 @@ class LargeTenantCheckpointTests(unittest.TestCase):
         self.assertEqual(census, {"HTTP 404": 2, "FakeTimeout": 1, "HTTP 403": 1})
 
 
-class MissingDetailToleranceTests(unittest.TestCase):
+class MissingDetailTests(unittest.TestCase):
+    """No limit on missing detail: every failure is written list-only with its reason."""
+
     def setUp(self):
         self.ns = detail_helpers()
 
-    def test_allowance_is_the_larger_of_count_and_percent(self):
-        allow = self.ns["_missing_detail_allowance"]
-        self.assertEqual(allow(20836, 25, 0.5), 104, "NatWest-sized tenant")
-        self.assertEqual(allow(1000, 25, 0.5), 25)
-        self.assertEqual(allow(1000, 0, 0), 0)
-
-    def test_missing_agents_within_tolerance_are_written_list_only_and_not_cached(self):
+    def test_failed_agents_are_written_list_only_with_the_reason_and_never_cached(self):
         packages = [{"id": "ok", "lastModifiedDateTime": "M1", "displayName": "OK"},
-                    {"id": "gone404", "lastModifiedDateTime": "M2", "displayName": "No detail"},
+                    {"id": "dep424", "lastModifiedDateTime": "M2", "displayName": "Failed dependency"},
+                    {"id": "gone404", "lastModifiedDateTime": "M2", "displayName": "Not found"},
+                    {"id": "deny403", "lastModifiedDateTime": "M2", "displayName": "Forbidden"},
+                    {"id": "slow", "lastModifiedDateTime": "M2", "displayName": "Timed out"},
                     {"id": "kept", "lastModifiedDateTime": "M4", "displayName": "Kept"}]
         cache = {"kept": {"detail": {"id": "kept", "activeUsers": 7}, "lastModifiedDateTime": "M3",
                           "detailAsOf": "2026-10-01T00:00:00Z"}}
+        failed = {"dep424": HttpError(424), "gone404": HttpError(404), "deny403": HttpError(403),
+                  "slow": FakeTimeout("t"), "kept": HttpError(503)}
         details, meta, new_cache = self.ns["_assemble_details"](
-            packages, cache, {"ok": {"id": "ok", "activeUsers": 1}},
-            {"gone404": HttpError(404), "kept": HttpError(503)}, NOW_ISO, 1)
-        self.assertEqual([m["detailStatus"] for m in meta], ["fetched", "missing", "cached - refetch failed"])
-        self.assertEqual(details[1], packages[1], "list-only row carries today's list fields")
-        self.assertEqual(meta[1]["detailAsOf"], "")
-        self.assertNotIn("gone404", new_cache, "missing agents are retried next run, never cached")
+            packages, cache, {"ok": {"id": "ok", "activeUsers": 1}}, failed, NOW_ISO)
+        self.assertEqual([m["detailStatus"] for m in meta],
+                         ["fetched", "missing (HTTP 424)", "missing (HTTP 404)", "missing (HTTP 403)",
+                          "missing (FakeTimeout)", "cached - refetch failed"])
+        for i in range(1, 5):
+            self.assertEqual(details[i], packages[i], "list-only row keeps today's list fields")
+            self.assertEqual(meta[i]["detailAsOf"], "")
+        self.assertEqual(set(new_cache), {"ok", "kept"}, "missing agents are retried next run, never cached")
         self.assertEqual(new_cache["kept"]["lastModifiedDateTime"], "M3")
 
-    def test_above_tolerance_fails_with_the_failure_census_and_a_resume_hint(self):
+    def test_any_number_of_missing_agents_never_fails_the_run(self):
+        packages = [{"id": f"a{i}", "lastModifiedDateTime": "M"} for i in range(20836)]
+        failed = {f"a{i}": HttpError(424) for i in range(1, 20836)}
+        _, meta, new_cache = self.ns["_assemble_details"](packages, {}, {"a0": {"id": "a0"}}, failed, NOW_ISO)
+        self.assertEqual(sum(m["detailStatus"] == "missing (HTTP 424)" for m in meta), 20835)
+        self.assertEqual(set(new_cache), {"a0"})
+        # Even a first run where every call fails for a per-agent reason still writes.
+        mixed = {"a0": HttpError(424), "a1": HttpError(404), "a2": HttpError(500), "a3": HttpError(403)}
+        _, meta, new_cache = self.ns["_assemble_details"](packages[:4], {}, {}, mixed, NOW_ISO)
+        self.assertTrue(all(m["detailStatus"].startswith("missing (") for m in meta))
+        self.assertEqual(new_cache, {})
+
+    def test_a_cached_agent_whose_refetch_returns_424_keeps_its_cached_detail(self):
+        packages = [{"id": "a", "lastModifiedDateTime": "NEW"}]
+        cache = {"a": {"detail": {"id": "a", "activeUsers": 7}, "lastModifiedDateTime": "OLD",
+                       "detailAsOf": "2026-10-01T00:00:00Z"}}
+        details, meta, new_cache = self.ns["_assemble_details"](packages, cache, {}, {"a": HttpError(424)},
+                                                               NOW_ISO)
+        self.assertEqual(meta[0]["detailStatus"], "cached - refetch failed")
+        self.assertEqual(details[0]["activeUsers"], 7)
+        self.assertEqual(new_cache["a"]["lastModifiedDateTime"], "OLD", "the change is retried next run")
+
+    def test_all_401_or_403_with_nothing_to_fall_back_on_fails_clearly(self):
         packages = [{"id": f"n{i}"} for i in range(3)]
-        failed = {"n0": HttpError(404), "n1": HttpError(404), "n2": FakeTimeout("t")}
-        with self.assertRaisesRegex(RuntimeError, r"3 agent\(s\) with no cached copy.*2 allowed"
-                                                  r".*HTTP 404': 2.*rerun the notebook") as ctx:
-            self.ns["_assemble_details"](packages, {}, {}, failed, NOW_ISO, 2)
-        self.assertIn("checkpointed", str(ctx.exception))
+        failed = {"n0": HttpError(403), "n1": HttpError(403), "n2": HttpError(401)}
+        with self.assertRaisesRegex(RuntimeError, r"Every Agent 365 detail call \(3\) failed with HTTP "
+                                                  r"401/403.*CopilotPackages\.Read\.All"):
+            self.ns["_assemble_details"](packages, {}, {}, failed, NOW_ISO)
+
+    def test_the_401_403_safety_net_needs_every_row_degraded_and_every_failure_auth(self):
+        packages = [{"id": "a", "lastModifiedDateTime": "M"}, {"id": "b", "lastModifiedDateTime": "M"}]
+        cases = (
+            ("one agent fetched", {"a": {"id": "a"}}, {}, {"b": HttpError(403)}),
+            ("one agent cached", {}, {"a": {"detail": {"id": "a"}, "lastModifiedDateTime": "M",
+                                            "detailAsOf": NOW_ISO}}, {"b": HttpError(403)}),
+            ("not all auth failures", {}, {}, {"a": HttpError(403), "b": HttpError(424)}),
+        )
+        for label, fetched, cache, failed in cases:
+            with self.subTest(label):
+                _, meta, _ = self.ns["_assemble_details"](packages, cache, fetched, failed, NOW_ISO)
+                self.assertEqual(meta[1]["detailStatus"], f"missing ({self.ns['_failure_reason'](failed['b'])})")
+        self.assertEqual(self.ns["_assemble_details"]([], {}, {}, {}, NOW_ISO), ([], [], {}))
 
     def test_cached_and_fetched_agents_are_tagged(self):
         packages = [{"id": "a", "lastModifiedDateTime": "M"}, {"id": "b", "lastModifiedDateTime": "M"}]
@@ -560,43 +600,69 @@ class MissingDetailToleranceTests(unittest.TestCase):
 class FirstRunResumeSimulationTests(unittest.TestCase):
     """The NatWest loop: a first run that fails must not start from zero next time."""
 
-    def test_a_failed_first_run_resumes_from_its_checkpoints(self):
-        ns = detail_helpers()
-        table = {}                     # stands in for agents_365_detail_cache
+    def setUp(self):
+        self.ns = detail_helpers()
+        self.table = {}                # stands in for agents_365_detail_cache
+        self.packages = [{"id": f"a{i}", "lastModifiedDateTime": "M"} for i in range(200)]
+        self.by_id = {p["id"]: p for p in self.packages}
+        self.calls = []
 
-        def checkpoint(batch):
-            entries = {pid: ns["_fresh_cache_entry"](by_id[pid], d, NOW_ISO) for pid, d in batch.items()}
-            for row in ns["_cache_to_rows"](entries):
-                table[row["package_id"]] = row
+    def checkpoint(self, batch):
+        entries = {pid: self.ns["_fresh_cache_entry"](self.by_id[pid], d, NOW_ISO) for pid, d in batch.items()}
+        for row in self.ns["_cache_to_rows"](entries):
+            self.table[row["package_id"]] = row
 
-        packages = [{"id": f"a{i}", "lastModifiedDateTime": "M"} for i in range(200)]
-        by_id = {p["id"]: p for p in packages}
-        outage = {f"a{i}" for i in range(150, 200)}       # 50 failures: well above a tolerance of 25
-        calls = []
+    def rerun(self, fetch):
+        self.calls.clear()
+        cache = self.ns["_cache_from_rows"](list(self.table.values()))
+        targets = self.ns["_select_detail_targets"](self.packages, cache, NOW + timedelta(hours=1))
+        fetched, failed = self.ns["_fetch_details"](list(targets), fetch, 8, on_batch=self.checkpoint,
+                                                    batch_size=40)
+        return set(targets), self.ns["_assemble_details"](self.packages, cache, fetched, failed, NOW_ISO)
 
+    def test_an_interrupted_first_run_resumes_from_its_checkpoints(self):
         def fetch(package_id):
-            calls.append(package_id)
-            if package_id in outage:
-                raise FakeTimeout("read timed out")
+            self.calls.append(package_id)
             return {"id": package_id, "botId": f"bot-{package_id}"}
 
-        targets = ns["_select_detail_targets"](packages, {}, NOW)
-        fetched, failed = ns["_fetch_details"](list(targets), fetch, 8, on_batch=checkpoint, batch_size=40)
-        with self.assertRaisesRegex(RuntimeError, "50 agent"):
-            ns["_assemble_details"](packages, {}, fetched, failed, NOW_ISO, 25)
-        self.assertEqual(len(table), 150, "every success was saved before the run failed")
-        self.assertTrue(all(r["creator_source"] == "" for r in table.values()),
+        def progress(done, *_):
+            if done == 70:
+                raise KeyboardInterrupt   # the session is cancelled part-way through
+
+        targets = self.ns["_select_detail_targets"](self.packages, {}, NOW)
+        with self.assertRaises(KeyboardInterrupt):
+            self.ns["_fetch_details"](list(targets), fetch, 1, on_batch=self.checkpoint, batch_size=40,
+                                      progress=progress, progress_every=1)
+        self.assertEqual(len(self.table), 70, "every collected success was saved before the run died")
+        self.assertTrue(all(r["creator_source"] == "" for r in self.table.values()),
                         "checkpointed agents still go through creator resolution")
 
+        remaining, (details, meta, new_cache) = self.rerun(fetch)
+        self.assertEqual(len(remaining), 130, "the rerun fetches only what is missing")
+        self.assertEqual(len(new_cache), 200)
+        self.assertTrue(all(d.get("botId") for d in details))
+
+    def test_failed_agents_are_written_list_only_then_retried_on_the_next_run(self):
+        outage = {f"a{i}": HttpError(424) for i in range(150, 200)}
+
+        def fetch(package_id):
+            self.calls.append(package_id)
+            if package_id in outage:
+                raise outage[package_id]
+            return {"id": package_id, "botId": f"bot-{package_id}"}
+
+        targets = self.ns["_select_detail_targets"](self.packages, {}, NOW)
+        fetched, failed = self.ns["_fetch_details"](list(targets), fetch, 8, on_batch=self.checkpoint,
+                                                    batch_size=40)
+        _, meta, new_cache = self.ns["_assemble_details"](self.packages, {}, fetched, failed, NOW_ISO)
+        self.assertEqual(sum(m["detailStatus"] == "missing (HTTP 424)" for m in meta), 50)
+        self.assertEqual(len(self.table), 150)
+        self.assertEqual(len(new_cache), 150)
+
         outage.clear()
-        calls.clear()
-        cache = ns["_cache_from_rows"](list(table.values()))
-        targets = ns["_select_detail_targets"](packages, cache, NOW + timedelta(hours=1))
-        self.assertEqual(set(targets), {f"a{i}" for i in range(150, 200)})
-        fetched, failed = ns["_fetch_details"](list(targets), fetch, 8, on_batch=checkpoint, batch_size=40)
-        details, meta, new_cache = ns["_assemble_details"](packages, cache, fetched, failed, NOW_ISO, 25)
-        self.assertEqual(len(calls), 50, "the rerun fetches only what is missing")
-        self.assertEqual(len(details), 200)
+        remaining, (details, meta, new_cache) = self.rerun(fetch)
+        self.assertEqual(remaining, {f"a{i}" for i in range(150, 200)})
+        self.assertEqual(len(self.calls), 50)
         self.assertEqual(len(new_cache), 200)
         self.assertTrue(all(d.get("botId") for d in details))
 
@@ -631,7 +697,11 @@ class StepGuardTests(unittest.TestCase):
         self.assertIn("new_detail_cache.get(info['packageId'])", code_from_cell(NOTEBOOK, 9))
         source = code_from_cell(NOTEBOOK, 11)
         self.assertIn("'Detail status':        detail_meta[idx].get('detailStatus', '')", source)
-        self.assertIn("filter(F.col('`Detail status`') != 'missing')", source)
+        self.assertIn("filter(~F.col('`Detail status`').startswith('missing'))", source)
+
+    def test_the_missing_detail_limit_is_gone(self):
+        for index in (2, 6):
+            self.assertNotIn("MAX_MISSING_DETAIL", code_from_cell(NOTEBOOK, index))
 
 
 if __name__ == "__main__":

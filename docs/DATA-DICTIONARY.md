@@ -256,17 +256,21 @@ successful calls are checkpointed, a run that fails or is stopped part-way loses
 it in incremental mode and only the agents still missing are fetched. (Full mode ignores the
 cache, so it does not resume.) Checkpoints hold only freshly fetched detail, keyed to the
 `lastModifiedDateTime` it was fetched for, so an agent is never marked as seen with stale data.
-When an agent's detail call still fails after retries:
+When an agent's detail call fails (a 424 *Failed Dependency* or 404, which are not retried, or
+a 403, or a 429, 5xx or network error that is still failing after retries):
 
 - **It has cached detail:** the cached detail is used and the agent stays due a refetch.
   `Detail status` = `cached - refetch failed`.
-- **It has no cached detail** (for example a 404 or 403 on that one package): the agent is
-  written list-only (usage, Bot Id and capability columns blank, `Detail status` = `missing`)
-  with a warning, left out of the cache and of `agents_365_history`, and retried next run. This
-  is allowed for up to `MAX_MISSING_DETAIL` agents (default 25) or `MAX_MISSING_DETAIL_PCT`
-  percent of the catalogue (default 0.5), whichever is larger: about 104 agents in a
-  20,800-agent tenant. Above that the run fails, names the failure reasons, and leaves the
-  previous `agents_365` in place.
+- **It has no cached detail:** the agent is written list-only. Its list fields (name, owner,
+  type, dates and so on) are kept; usage, Bot Id and capability columns are blank. `Detail
+  status` records why, for example `missing (HTTP 424)`. The agent is left out of the cache and
+  of `agents_365_history`, and is retried next run. There is no limit: however many agents are
+  missing, the run writes, and step 3 prints a warning counting them by `Detail status`.
+
+The one exception: if **every** detail call failed with 401 or 403 and there is no cached detail
+at all, sign-in or consent is broken (for example `CopilotPackages.Read.All` not admin-consented),
+so the run fails and the previous `agents_365` is left in place, rather than writing a registry
+with no detail.
 
 Each step of the notebook checks the one before it, so a failed detail step stops the later
 cells with a message pointing back to it, rather than a `NameError`.
@@ -276,7 +280,7 @@ cells with a message pointing back to it, rather than a `NameError`.
 | `fetched` | Detail fetched this run |
 | `cached` | Unchanged agent; cached detail reused |
 | `cached - refetch failed` | Changed or stale agent whose detail call failed; cached detail used, retried next run |
-| `missing` | No detail and none cached; list-only row, retried next run |
+| `missing (<reason>)` | No detail and none cached; list-only row, retried next run. The reason is the HTTP status (`missing (HTTP 424)`, `missing (HTTP 404)`, `missing (HTTP 403)`, `missing (HTTP 503)`) or, for a network error, the exception type (`missing (ReadTimeout)`) |
 
 `Detail status` is a Fabric snapshot column like `Detail As Of`: it is not in the 48-column CSV
 contract and not written to `agents_365_history`.
@@ -298,10 +302,11 @@ ingester, fetches detail only for new or changed agents, or those whose cached d
 responses, retries network timeouts and dropped connections, and caches each agent's resolved
 creator. Like the ingester, it checkpoints successful detail calls into the cache
 (`-CheckpointEvery`, default 1000) so a failed or stopped run resumes, prints progress with an ETA
-(`-ProgressEvery`, default 500), and applies the same missing-detail tolerance
-(`-MaxMissingDetail` 25 / `-MaxMissingDetailPct` 0.5). The full cache rewrite still happens only
-after the CSV. The CSV keeps its 48 columns; it has no `Detail As Of` or `Detail status` column, so
-list-only agents are reported as a warning in the script output.
+(`-ProgressEvery`, default 500), and handles failed detail calls the same way: any number of
+agents are written list-only and retried next run, and only an all-401/403 run with no cache stops
+without writing. The full cache rewrite still happens only after the CSV. The CSV keeps its 48
+columns; it has no `Detail As Of` or `Detail status` column, so list-only agents are reported as a
+warning in the script output, counted by reason (for example `missing (HTTP 424) x312`).
 
 #### ⚠️ Two different Agent 365 exports — registry vs observability
 

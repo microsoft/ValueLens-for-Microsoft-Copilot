@@ -49,7 +49,7 @@ $ErrorActionPreference = 'Stop'
 $out = [ordered]@{}
 
 # Real Invoke-Graph against a mocked transport: network errors and 5xx are retried,
-# a 404 is not.
+# a 404 or 424 is not.
 $script:GraphMode = 'Interactive'
 $global:Calls = 0
 $global:Steps = @()
@@ -65,23 +65,28 @@ $out.netRetry = @((Invoke-Graph -Uri 'https://graph.test/x'), $global:Calls)
 $global:Calls = 0; $global:Steps = @('404', 'ok')
 try { [void](Invoke-Graph -Uri 'https://graph.test/x'); $out.notFound = 'no error' } catch { $out.notFound = "error $($_.Exception.Data['HttpStatus'])" }
 $out.notFoundCalls = $global:Calls
+$global:Calls = 0; $global:Steps = @('424', 'ok')
+try { [void](Invoke-Graph -Uri 'https://graph.test/x'); $out.failedDependency = 'no error' } catch { $out.failedDependency = "error $($_.Exception.Data['HttpStatus'])" }
+$out.failedDependencyCalls = $global:Calls
 $global:Calls = 0; $global:Steps = @('timeout') * 10
 try { [void](Invoke-Graph -Uri 'https://graph.test/x'); $out.netCap = 'no error' } catch { $out.netCap = 'error' }
 $out.netCapCalls = $global:Calls
 $out.transient = @(
   (Test-TransientNetworkError ([pscustomobject]@{ Exception = [System.TimeoutException]::new('t') })),
   (Test-TransientNetworkError ([pscustomobject]@{ Exception = [System.InvalidOperationException]::new('x') })))
-$out.allowance = @((Get-MissingDetailAllowance -Total 20836 -MaxCount 25 -MaxPct 0.5), (Get-MissingDetailAllowance -Total 100 -MaxCount 25 -MaxPct 0.5), (Get-MissingDetailAllowance -Total 100 -MaxCount 0 -MaxPct 0))
 Remove-Item function:Start-Sleep
 
 $global:Fetched = [System.Collections.Generic.List[string]]::new()
 $global:OwnerLookups = [System.Collections.Generic.List[string]]::new()
 $global:FailIds = @()
+$global:StatusIds = @{}
 function Get-AgentPackages { param([string]$Version)
   [pscustomobject]@{ Version = $Version; Base = 'https://graph.test/packages'; Packages = @($global:Catalog) } }
 function Invoke-Graph { param([string]$Method = 'GET', [string]$Uri, $Body)
   $id = $Uri.Substring($Uri.LastIndexOf('/') + 1)
   if ($global:FailIds -contains $id) { throw "mock 500 for $id" }
+  if ($global:StatusIds.ContainsKey($id)) {
+    $e = [System.Exception]::new("mock HTTP $($global:StatusIds[$id]) for $id"); $e.Data['HttpStatus'] = $global:StatusIds[$id]; throw $e }
   $global:Fetched.Add($id)
   return $global:Details[$id] }
 function Resolve-OwnerIds { param([string[]]$OwnerIds)
@@ -89,10 +94,16 @@ function Resolve-OwnerIds { param([string[]]$OwnerIds)
 function Resolve-SpOwner { param([string]$AppId, [string]$AgentIdentityId) return '' }
 function Pkg($id, $name, $lm, $owner) { [pscustomobject]@{ id = $id; displayName = $name; lastModifiedDateTime = $lm; ownerId = $owner; type = 'Shared' } }
 function Det($id, $users) { [pscustomobject]@{ id = $id; activeUsers = $users; totalSessions = 5; sharedWithUsersAndGroups = @() } }
-function Run([int]$days = 7, [int]$maxMissing = 25, [double]$maxPct = 0.5, [int]$every = 1000) {
+function Run([int]$days = 7, [int]$every = 1000) {
   $global:Fetched.Clear(); $global:OwnerLookups.Clear()
-  [void](Export-Agents365Registry -OutputCsvPath $csv -Version 'v1.0' -FullRefreshDays $days -MaxMissing $maxMissing -MaxMissingPct $maxPct -CheckpointEvery $every)
+  [void](Export-Agents365Registry -OutputCsvPath $csv -Version 'v1.0' -FullRefreshDays $days -CheckpointEvery $every)
   return @{ fetched = @($global:Fetched | Sort-Object); owners = @($global:OwnerLookups | Sort-Object) } }
+function RunLogged([int]$every = 1000) {
+  # Run, capturing Write-Host (the information stream) as 'log'.
+  $res = @(& { Run 7 $every } 6>&1)
+  $r = @($res | Where-Object { $_ -is [hashtable] })[0]
+  $r.log = (@($res | Where-Object { $_ -is [System.Management.Automation.InformationRecord] } | ForEach-Object { "$($_.MessageData)" }) -join "`n")
+  return $r }
 
 function CacheIds { @(Get-Content -LiteralPath "$csv.detailcache.jsonl" | Select-Object -Skip 1 | ForEach-Object { ($_ | ConvertFrom-Json).id } | Sort-Object -Unique) }
 function CacheEntry($id) { Get-Content -LiteralPath "$csv.detailcache.jsonl" | Select-Object -Skip 1 | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.id -eq $id } | Select-Object -Last 1 }
@@ -138,8 +149,8 @@ $out.run5 = Run
 $out.run5b = Run
 $out.run5zero = Run 0
 
-# 6: a new agent whose detail fails, with no cache, is written list-only within the
-# tolerance, left out of the cache, and the only call on the next run.
+# 6: a new agent whose detail fails, with no cache, is written list-only, left out of
+# the cache, and the only call on the next run.
 $global:Catalog = @((Pkg 'A' 'Alpha renamed' '2025-01-01T00:00:00Z' 'owner-a'), (Pkg 'B' 'Beta' '2025-02-01T00:00:00Z' 'owner-b'), (Pkg 'D' 'Delta' '2025-04-01T00:00:00Z' ''))
 $global:Details['D'] = (Det 'D' 40)
 $global:FailIds = @('D')
@@ -150,20 +161,34 @@ $out.run6Row = @("$($d.'Agent name')", "$($d.'Active Users')")
 $out.run6Cache = CacheIds
 $out.run6b = Run
 
-# 7: over the tolerance the run fails and the CSV is not replaced, but successes are
-# checkpointed, so the rerun fetches only the failed agent.
-$global:Catalog = @($global:Catalog) + @((Pkg 'F' 'Foxtrot' '2025-05-01T00:00:00Z' ''), (Pkg 'G' 'Golf' '2025-05-01T00:00:00Z' ''), (Pkg 'H' 'Hotel' '2025-05-01T00:00:00Z' ''))
-foreach ($k in 'F', 'G', 'H') { $global:Details[$k] = (Det $k 50) }
-$global:FailIds = @('F')
-try { [void](Run 7 0 0 1); $out.run7 = 'no error' } catch { $out.run7 = "error: $($_.Exception.Message)" }
-$global:FailIds = @()
+# 7: no limit on missing detail. 424 and 404 agents (here 3 of 4 new ones) are written
+# list-only with the reason in the log, never cached, and retried next run; successes
+# are checkpointed as they arrive.
+$global:Catalog = @($global:Catalog) + @((Pkg 'F' 'Foxtrot' '2025-05-01T00:00:00Z' ''), (Pkg 'G' 'Golf' '2025-05-01T00:00:00Z' ''), (Pkg 'H' 'Hotel' '2025-05-01T00:00:00Z' ''), (Pkg 'I' 'India' '2025-05-01T00:00:00Z' ''))
+foreach ($k in 'F', 'G', 'H', 'I') { $global:Details[$k] = (Det $k 50) }
+$global:StatusIds = @{ F = 424; G = 424; H = 404 }
+try { $r7 = RunLogged 1; $out.run7 = 'no error'; $out.run7Log = $r7.log; $out.run7Fetched = $r7.fetched } catch { $out.run7 = "error: $($_.Exception.Message)" }
+$global:StatusIds = @{}
 $out.run7Csv = @(Import-Csv -LiteralPath $csv | ForEach-Object { $_.'Title ID' } | Sort-Object)
+$f = CsvRow 'T_F'
+$out.run7Row = @("$($f.'Agent name')", "$($f.'Active Users')")
 $out.run7Cache = CacheIds
-$out.run7b = Run 7 0 0
+$out.run7b = Run
 
 # 8: a corrupt trailing line (a checkpoint cut off mid-write) is skipped, not fatal.
 [System.IO.File]::AppendAllText("$csv.detailcache.jsonl", '{"id":"A","lastMod')
 try { $out.run8 = Run } catch { $out.run8 = "error: $($_.Exception.Message)" }
+
+# 9: every detail call failing with 401/403 and nothing cached is a consent problem:
+# fail, and write no CSV. One non-auth failure, or any detail to fall back on, writes.
+$csv = Join-Path '__TMP__' 'Auth.csv'
+$global:Catalog = @((Pkg 'P' 'Papa' '2025-01-01T00:00:00Z' ''), (Pkg 'Q' 'Quebec' '2025-01-01T00:00:00Z' ''))
+$global:StatusIds = @{ P = 403; Q = 401 }
+try { [void](Run); $out.run9 = 'no error' } catch { $out.run9 = "error: $($_.Exception.Message)" }
+$out.run9Csv = Test-Path -LiteralPath $csv
+$global:StatusIds = @{ P = 403; Q = 424 }
+try { [void](Run); $out.run9b = 'no error' } catch { $out.run9b = "error: $($_.Exception.Message)" }
+$global:StatusIds = @{}
 
 # Retry-After: header honoured and capped, else 2^attempt.
 $h = [System.Net.WebHeaderCollection]::new(); $h.Add('Retry-After', '7')
@@ -198,9 +223,9 @@ class ParseTests(unittest.TestCase):
         flush = body.index("} finally {")
         self.assertLess(flush, body.index("Add-DetailCacheEntries -Path", flush))
         self.assertLess(body.index("Add-DetailCacheEntries -Path", flush), body.index("Write-RegistryCsv -Rows"))
-        for param in ("[int]$MaxMissingDetail = 25", "[double]$MaxMissingDetailPct = 0.5",
-                      "[int]$CheckpointEvery = 1000", "[int]$ProgressEvery = 500"):
+        for param in ("[int]$CheckpointEvery = 1000", "[int]$ProgressEvery = 500"):
             self.assertIn(param, text)
+        self.assertNotIn("MaxMissingDetail", text, "the missing-detail limit is gone")
 
 
 @unittest.skipUnless(SCRIPTS_ALLOWED, "PowerShell execution policy blocks scripts here (not bypassed)")
@@ -248,18 +273,28 @@ class IncrementalCacheTests(unittest.TestCase):
         self.assertEqual(self.out["run4CachedLastModified"], "2025-01-01T00:00:00Z")
         self.assertEqual(self.out["run4b"]["fetched"], ["A"])
 
-    def test_missing_detail_within_tolerance_is_list_only_and_retried(self):
+    def test_missing_detail_is_list_only_and_retried(self):
         self.assertEqual(self.out["run6"], "no error")
         self.assertEqual(self.out["run6Row"], ["Delta", ""])
         self.assertEqual(self.out["run6Cache"], ["A", "B"])
         self.assertEqual(self.out["run6b"]["fetched"], ["D"])
 
-    def test_over_tolerance_fails_but_checkpoints_successes(self):
-        self.assertTrue(self.out["run7"].startswith("error: "), self.out["run7"])
-        self.assertIn("rerun", self.out["run7"])
-        self.assertEqual(self.out["run7Csv"], ["T_A", "T_B", "T_D"])  # CSV not replaced
-        self.assertEqual(self.out["run7Cache"], ["A", "B", "D", "G", "H"])
-        self.assertEqual(self.out["run7b"]["fetched"], ["F"])
+    def test_424_and_404_never_fail_the_run_and_are_retried_next_run(self):
+        self.assertEqual(self.out["run7"], "no error")
+        self.assertEqual(self.out["run7Fetched"], ["I"])
+        self.assertEqual(self.out["run7Csv"], ["T_A", "T_B", "T_D", "T_F", "T_G", "T_H", "T_I"])
+        self.assertEqual(self.out["run7Row"], ["Foxtrot", ""])
+        self.assertIn("3 agent(s) have no detail and no cached copy", self.out["run7Log"])
+        self.assertIn("missing (HTTP 424) x2, missing (HTTP 404) x1", self.out["run7Log"])
+        self.assertEqual(self.out["run7Cache"], ["A", "B", "D", "I"])
+        self.assertEqual(self.out["run7b"]["fetched"], ["F", "G", "H"])
+
+    def test_all_401_403_with_no_cache_fails_without_writing(self):
+        self.assertTrue(self.out["run9"].startswith("error: Every Agent 365 detail call failed with HTTP 401/403"),
+                        self.out["run9"])
+        self.assertIn("CopilotPackages.Read.All", self.out["run9"])
+        self.assertFalse(self.out["run9Csv"])
+        self.assertEqual(self.out["run9b"], "no error")
 
     def test_corrupt_checkpoint_line_is_skipped(self):
         self.assertIsInstance(self.out["run8"], dict, self.out["run8"])
@@ -271,12 +306,11 @@ class IncrementalCacheTests(unittest.TestCase):
         self.assertEqual(self.out["netCapCalls"], 6)
         self.assertEqual(self.out["transient"], [True, False])
 
-    def test_404_is_not_retried(self):
+    def test_404_and_424_are_not_retried(self):
         self.assertEqual(self.out["notFound"], "error 404")
         self.assertEqual(self.out["notFoundCalls"], 1)
-
-    def test_missing_detail_allowance(self):
-        self.assertEqual(self.out["allowance"], [104, 25, 0])
+        self.assertEqual(self.out["failedDependency"], "error 424")
+        self.assertEqual(self.out["failedDependencyCalls"], 1)
 
     def test_stale_detail_is_refreshed(self):
         self.assertEqual(self.out["run5"]["fetched"], ["A"])

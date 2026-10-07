@@ -58,16 +58,6 @@
   Activity Date) of a reused detail can therefore be up to this many days old. 0
   fetches every detail on every run.
 
-.PARAMETER MaxMissingDetail
-.PARAMETER MaxMissingDetailPct
-  Tolerance for agents whose detail call still fails after retries (for example a 404
-  or 403 on one package) and that have no cached detail to fall back on. Up to
-  MaxMissingDetail agents (default 25) or MaxMissingDetailPct percent of the catalogue
-  (default 0.5), whichever is larger, are written list-only - usage, Bot Id and
-  capability columns blank - with a warning, and are retried on the next run. Above
-  that the run fails without writing the CSV. An agent with cached detail falls back
-  to it instead and stays due a refetch.
-
 .PARAMETER CheckpointEvery
   Successful detail calls are appended to the detail cache every this many calls
   (default 1000) and again if the run fails or is stopped, so a rerun after a failure
@@ -102,6 +92,13 @@
   (<OutputCsv>.detailcache.jsonl) is checkpointed during the detail pull with freshly
   fetched detail only, then rewritten after the CSV is written, keeping only agents in
   the current list. It can be deleted at any time to force a full detail refresh.
+  Missing detail: an agent whose detail call fails (424 Failed Dependency, 404, 403, or
+  a 429 / 5xx / network error after retries) falls back to its cached detail if it has
+  one. If not, it is written list-only - usage, Bot Id and capability columns blank -
+  with a warning that counts the failures by reason, is left out of the cache and is
+  retried on the next run. This never stops the export, unless every detail call failed
+  with 401 or 403 and nothing is cached: sign-in or consent is broken, so no CSV is
+  written. 404 and 424 are not retried within a run.
 #>
 [CmdletBinding()]
 param(
@@ -116,10 +113,6 @@ param(
   [switch]$SkipDetail,
   [ValidateRange(0, 365)]
   [int]$FullDetailRefreshDays = 7,
-  [ValidateRange(0, 1000000)]
-  [int]$MaxMissingDetail = 25,
-  [ValidateRange(0, 100)]
-  [double]$MaxMissingDetailPct = 0.5,
   [ValidateRange(1, 1000000)]
   [int]$CheckpointEvery = 1000,
   [ValidateRange(1, 1000000)]
@@ -632,13 +625,6 @@ function Format-Duration {
   return ('{0}s' -f $t.Seconds)
 }
 
-function Get-MissingDetailAllowance {
-  # Agents that may be written list-only: the count or the percentage of the catalogue,
-  # whichever is larger.
-  param([int]$Total, [int]$MaxCount, [double]$MaxPct)
-  return [int][Math]::Max($MaxCount, [Math]::Floor($Total * $MaxPct / 100))
-}
-
 #############################################################
 # Creator resolution
 #############################################################
@@ -777,8 +763,7 @@ function Write-RegistryCsv {
 
 function Export-Agents365Registry {
   param([string]$OutputCsvPath, [string]$Version, [switch]$NoDetail, [switch]$NoCreators, [switch]$AllowEmptySnapshot,
-        [int]$FullRefreshDays = 7, [int]$MaxMissing = 25, [double]$MaxMissingPct = 0.5,
-        [int]$CheckpointEvery = 1000, [int]$ProgressEvery = 500)
+        [int]$FullRefreshDays = 7, [int]$CheckpointEvery = 1000, [int]$ProgressEvery = 500)
   if (-not [System.IO.Path]::IsPathRooted($OutputCsvPath)) {
     $OutputCsvPath = Join-Path -Path (Get-Location -PSProvider FileSystem).ProviderPath -ChildPath $OutputCsvPath
   }
@@ -863,9 +848,9 @@ function Export-Agents365Registry {
           continue
         }
         if ($null -eq $entry -or $null -eq (Get-Field $entry 'detail')) {
-          # No detail and nothing cached: list-only row, judged against the tolerance below.
+          # No detail and nothing cached: list-only row, never cached, retried next run.
           $details.Add((Merge-Detail $package $null))
-          $meta.Add(@{ Id = $id; Fetched = $false; Missing = $true; Status = 'missing'; Reason = $reason })
+          $meta.Add(@{ Id = $id; Fetched = $false; Missing = $true; Status = "missing ($reason)"; Reason = $reason })
           continue
         }
         # Refetch failed: fall back to the cached detail, keeping the cached
@@ -888,18 +873,23 @@ function Export-Agents365Registry {
   if (-not $NoDetail) {
     $fetched = @($meta | Where-Object { $_.Fetched }).Count
     Write-Host "details fetched: $fetched, reused from cache: $(@($meta | Where-Object { -not $_.Fetched -and -not $_.Missing }).Count)"
+    $census = ($failures.Keys | Sort-Object { -$failures[$_] }, { $_ } | ForEach-Object { "$_ x$($failures[$_])" }) -join ', '
     if ($failures.Count) {
-      Write-Host "detail calls failed after retries: $(($failures.Keys | Sort-Object | ForEach-Object { "$_ x$($failures[$_])" }) -join ', ')" -ForegroundColor Yellow
+      Write-Host "detail calls that returned no detail (429, 5xx and network errors after retries; 404 and 424 are not retried): $census" -ForegroundColor Yellow
+    }
+    $authOnly = $failures.Count -and -not @($failures.Keys | Where-Object { $_ -notin 'HTTP 401', 'HTTP 403' }).Count
+    if ($authOnly -and $meta.Count -and -not @($meta | Where-Object { -not $_.Missing }).Count) {
+      throw ("Every Agent 365 detail call failed with HTTP 401/403 ($census) and there is no cached detail to fall back on, " +
+             "so the CSV is not written: it would carry no detail at all. This is a sign-in or consent problem, not a per-agent one - " +
+             "check that CopilotPackages.Read.All is granted and admin-consented, then rerun.")
     }
     $missingIds = @($meta | Where-Object { $_.Missing } | ForEach-Object { $_.Id } | Select-Object -Unique)
-    $allowed = Get-MissingDetailAllowance -Total @($plan | ForEach-Object { $_.Id } | Select-Object -Unique).Count -MaxCount $MaxMissing -MaxPct $MaxMissingPct
-    if ($missingIds.Count -gt $allowed) {
-      throw ("Agent 365 detail unavailable for $($missingIds.Count) agent(s) with no cached copy - more than the $allowed " +
-             "allowed by -MaxMissingDetail / -MaxMissingDetailPct, so the CSV is not written. First: $(($missingIds | Select-Object -First 5) -join ', '). " +
-             "Every successful detail call was checkpointed to $cachePath - rerun the script and only the missing agents are fetched again.")
-    }
     if ($missingIds.Count) {
-      Write-Host "WARNING: $($missingIds.Count) agent(s) have no detail (tolerance $allowed); written list-only (usage, Bot Id and capability columns blank) and retried next run: $(($missingIds | Select-Object -First 10) -join ', ')" -ForegroundColor Yellow
+      $byStatus = @{}
+      foreach ($m in @($meta | Where-Object { $_.Missing })) { $byStatus[$m.Status] = 1 + [int]$byStatus[$m.Status] }
+      $statusCensus = ($byStatus.Keys | Sort-Object { -$byStatus[$_] }, { $_ } | ForEach-Object { "$_ x$($byStatus[$_])" }) -join ', '
+      Write-Host ("WARNING: $($missingIds.Count) agent(s) have no detail and no cached copy: written list-only (usage, Bot Id and capability columns blank) " +
+                  "and retried next run. By status: $statusCensus. First: $(($missingIds | Select-Object -First 10) -join ', ')") -ForegroundColor Yellow
     }
     $refetchFailedCount = @($meta | Where-Object { $_.Status -eq 'cached - refetch failed' }).Count
     if ($refetchFailedCount) { Write-Host "WARNING: $refetchFailedCount agent(s) kept their cached detail after a failed refetch; retried next run." -ForegroundColor Yellow }
@@ -990,6 +980,5 @@ if ($MyInvocation.InvocationName -ne '.') {
   Connect-Registry -Mode $Auth -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret
   [void](Export-Agents365Registry -OutputCsvPath $OutputCsv -Version $ApiVersion `
     -NoDetail:$SkipDetail -NoCreators:$SkipCreatorResolution -AllowEmptySnapshot:$AllowEmpty `
-    -FullRefreshDays $FullDetailRefreshDays -MaxMissing $MaxMissingDetail -MaxMissingPct $MaxMissingDetailPct `
-    -CheckpointEvery $CheckpointEvery -ProgressEvery $ProgressEvery)
+    -FullRefreshDays $FullDetailRefreshDays -CheckpointEvery $CheckpointEvery -ProgressEvery $ProgressEvery)
 }
