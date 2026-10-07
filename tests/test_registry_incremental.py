@@ -266,6 +266,63 @@ class CreatorCacheTests(unittest.TestCase):
         self.assertEqual(settled, {0, 2}, "refetched (b) and never-resolved (d) agents run the tiers")
 
 
+class BatchRequests:
+    """requests stand-in that answers each $batch call with per-key statuses."""
+
+    def __init__(self, answers, batch_status=200):
+        self.answers, self.batch_status, self.batches = answers, batch_status, []
+
+    def request(self, method, url, headers=None, json=None, **kwargs):
+        self.batches.append(json)
+        responses = []
+        for item in json["requests"]:
+            key = item["url"].split("/users/", 1)[1].split("?", 1)[0]
+            status, enabled = self.answers.get(key, (500, None))
+            body = {} if enabled is None else {"accountEnabled": enabled}
+            responses.append({"id": item["id"], "status": status, "body": body})
+        return FakeResponse(self.batch_status, {"responses": responses})
+
+
+class OwnerAccountTests(unittest.TestCase):
+    def setUp(self):
+        self.ns = extract(NOTEBOOK, 8, functions=("_owner_key", "_owner_account_status"), import_names=())
+
+    def check(self, keys, answers, batch_status=200):
+        fake = BatchRequests(answers, batch_status)
+        self.ns["graph_request"] = lambda method, url, **kwargs: fake.request(method, url, **kwargs)
+        return self.ns["_owner_account_status"](keys), fake
+
+    def test_owner_key_prefers_the_stable_object_id(self):
+        key = self.ns["_owner_key"]
+        self.assertEqual(key("oid-1", "a@x.com", "ownerId"), "oid-1")
+        self.assertEqual(key("oid-1", "a@x.com", "auditLog"), "a@x.com")
+        self.assertEqual(key("", "a@x.com", "ownerId"), "a@x.com")
+        self.assertEqual(key("oid-1", "", "unattributed"), "")
+
+    def test_statuses_map_to_active_disabled_and_not_found(self):
+        status, _ = self.check(["a", "b", "c", "d", ""], {
+            "a": (200, True), "b": (200, False), "c": (404, None), "d": (429, None)})
+        self.assertEqual(status, {"a": "Active", "b": "Disabled", "c": "Not found"},
+                         "a throttled answer stays unknown rather than reading as an owner who left")
+
+    def test_a_failed_batch_leaves_every_key_unknown(self):
+        status, _ = self.check(["a"], {"a": (404, None)}, batch_status=503)
+        self.assertEqual(status, {})
+
+    def test_keys_are_deduplicated_batched_by_twenty_and_url_encoded(self):
+        keys = [f"user{n}@x.com" for n in range(25)] + ["user0@x.com", "guest_y.com#EXT#@x.com"]
+        status, fake = self.check(keys, {})
+        self.assertEqual([len(b["requests"]) for b in fake.batches], [20, 6])
+        urls = [r["url"] for b in fake.batches for r in b["requests"]]
+        self.assertIn("/users/guest_y.com%23EXT%23@x.com?$select=id,accountEnabled", urls)
+
+    def test_owner_account_is_written_to_the_snapshot_but_not_history(self):
+        ns = extract(NOTEBOOK, 11, assigns=("CANONICAL", "NEW_CANONICAL", "SNAPSHOT_ONLY"), import_names=())
+        self.assertEqual(ns["SNAPSHOT_ONLY"], ["Owner account"])
+        self.assertNotIn("Owner account", ns["CANONICAL"] + ns["NEW_CANONICAL"])
+        self.assertIn("'Owner account':        owner_account.get(idx, '')", code_from_cell(NOTEBOOK, 11))
+
+
 class RegistryWriteOrderTests(unittest.TestCase):
     def test_history_merge_key_and_updates(self):
         ns = extract(NOTEBOOK, 11, functions=("_history_merge_clauses",), assigns=("HISTORY_KEY",),

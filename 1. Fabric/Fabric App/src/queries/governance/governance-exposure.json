@@ -1,0 +1,120 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [
+    {
+      "joinaggregate": [
+        {
+          "op": "max",
+          "field": "Agents",
+          "as": "Most Agents"
+        }
+      ]
+    },
+    {
+      "calculate": "datum['Most Agents'] > 0 ? datum['Agents'] / datum['Most Agents'] : 0",
+      "as": "Heat"
+    }
+  ],
+  "encoding": {
+    "x": {
+      "field": "Data Access",
+      "type": "ordinal",
+      "title": "What it can read",
+      "sort": {
+        "field": "Access Order",
+        "op": "min",
+        "order": "ascending"
+      },
+      "axis": {
+        "orient": "top",
+        "labelAngle": 0,
+        "labelPadding": 8,
+        "labelLimit": 160
+      }
+    },
+    "y": {
+      "field": "Sharing Scope",
+      "type": "ordinal",
+      "title": null,
+      "sort": {
+        "field": "Scope Order",
+        "op": "min",
+        "order": "ascending"
+      },
+      "axis": {
+        "labelLimit": 200,
+        "labelPadding": 8
+      }
+    },
+    "tooltip": [
+      {
+        "field": "Sharing Scope",
+        "type": "nominal",
+        "title": "Shared with"
+      },
+      {
+        "field": "Data Access",
+        "type": "nominal",
+        "title": "Can read"
+      },
+      {
+        "field": "Agents",
+        "type": "quantitative",
+        "title": "Agents",
+        "format": ",.0f"
+      },
+      {
+        "field": "Unused Agents",
+        "type": "quantitative",
+        "title": "No recorded use",
+        "format": ",.0f"
+      }
+    ]
+  },
+  "layer": [
+    {
+      "mark": {
+        "type": "rect"
+      },
+      "encoding": {
+        "color": {
+          "field": "Agents",
+          "type": "quantitative",
+          "title": null,
+          "scale": {
+            "zero": true,
+            "nice": false
+          },
+          "legend": null
+        }
+      }
+    },
+    {
+      "mark": {
+        "type": "text",
+        "baseline": "middle",
+        "align": "center",
+        "fontWeight": 600,
+        "fontSize": 12
+      },
+      "encoding": {
+        "text": {
+          "field": "Agents",
+          "type": "quantitative",
+          "format": ",.0f"
+        }
+      }
+    }
+  ],
+  "config": {
+    "view": {
+      "stroke": null
+    },
+    "axis": {
+      "domain": false,
+      "ticks": false
+    }
+  }
+}

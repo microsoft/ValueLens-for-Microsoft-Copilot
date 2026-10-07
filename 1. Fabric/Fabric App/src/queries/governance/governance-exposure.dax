@@ -1,0 +1,38 @@
+EVALUATE
+VAR __Live =
+    FILTER(
+        'Agents 365',
+        NOT (LOWER(TRIM(COALESCE('Agents 365'[Created in], ""))) IN {"", "not available"})
+            && NOT (LOWER(TRIM(COALESCE('Agents 365'[Is Blocked], ""))) IN {"true", "yes", "1"})
+    )
+RETURN
+    SELECTCOLUMNS(
+        GROUPBY(
+            __Live,
+            'Agents 365'[Sharing Scope],
+            'Agents 365'[Data Access],
+            "@Agents", COUNTX(CURRENTGROUP(), 1),
+            "@Unused", SUMX(CURRENTGROUP(), IF(COALESCE('Agents 365'[Total Users], 0) = 0, 1, 0))
+        ),
+        "Scope Order",
+            SWITCH(
+                'Agents 365'[Sharing Scope],
+                "Whole organisation", 1,
+                "Specific people or groups", 2,
+                "Not shared", 3,
+                4
+            ),
+        "Sharing Scope", COALESCE('Agents 365'[Sharing Scope], "Not stated"),
+        "Access Order",
+            SWITCH(
+                'Agents 365'[Data Access],
+                "Organisation content", 1,
+                "Uploaded files only", 2,
+                "None declared", 3,
+                4
+            ),
+        "Data Access", 'Agents 365'[Data Access],
+        "Agents", [@Agents],
+        "Unused Agents", [@Unused]
+    )
+ORDER BY [Scope Order], [Access Order]

@@ -105,7 +105,7 @@ export const GLOSSARY_PAGE_HOME: Readonly<Record<string, { destination: Destinat
     "Usage Efficiency": { destination: "efficiency", stage: "cowork-fit" },
     "Model Mix": { destination: "efficiency", stage: "model-fit" },
     Value: { destination: "value", stage: "estimated-value" },
-    "Agent Health": { destination: "leaderboards", stage: "agent-registry" },
+    "Agent Health": { destination: "governance", stage: "estate-health" },
     Feedback: { destination: "feedback", stage: "feedback" },
     Heatmap: { destination: "adoption", stage: "trend-heatmap" },
     Leaderboard: { destination: "leaderboards", stage: "leaderboard" },

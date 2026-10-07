@@ -1,0 +1,18 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER('Agents 365', NOT ISBLANK('Agents 365'[Governance Flags])),
+    "Agent", 'Agents 365'[Agent name],
+    "Registry Id", 'Agents 365'[Title ID],
+    "Type", 'Agents 365'[Agent Type Label],
+    "Creator", 'Agents 365'[Creator],
+    "Sharing Scope", 'Agents 365'[Sharing Scope],
+    "Data Access", 'Agents 365'[Data Access],
+    "Users", COALESCE('Agents 365'[Total Users], 0),
+    "Owner Account", COALESCE('Agents 365'[Owner account], "Not checked"),
+    "Flag Count",
+        LEN('Agents 365'[Governance Flags])
+            - LEN(SUBSTITUTE('Agents 365'[Governance Flags], ";", ""))
+            + 1,
+    "Flags", 'Agents 365'[Governance Flags]
+)
+ORDER BY [Flag Count] DESC, [Users] DESC, [Agent] ASC

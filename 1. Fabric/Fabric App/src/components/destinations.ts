@@ -16,6 +16,7 @@ import {
     LayoutDashboard,
     MessageSquareQuote,
     PoundSterling,
+    ShieldCheck,
     Timer,
     TrendingUp,
     Trophy,
@@ -78,7 +79,7 @@ export const destinations = [
         filters: ["dateRange", "organizations", "licence", "audience", "agentTypes", "agentNames"] as FilterKey[],
         stages: [
             { id: "leaderboard", label: "Leaderboard", ready: true },
-            { id: "agent-registry", label: "Agent registry", ready: true },
+            { id: "agents", label: "Agents", ready: true },
         ],
     },
     {
@@ -103,6 +104,19 @@ export const destinations = [
         stages: [
             { id: "agent-performance", label: "Performance", ready: true },
             { id: "agent-conversations", label: "Conversations & topics", ready: true },
+        ],
+    },
+    {
+        id: "governance",
+        label: "Governance",
+        blurb: "Who owns your agents, who can reach them, and what needs a review",
+        icon: ShieldCheck as LucideIcon,
+        filters: ["agentTypes"] as FilterKey[],
+        stages: [
+            { id: "estate-health", label: "Estate health", ready: true },
+            { id: "exposure", label: "Exposure", ready: true },
+            { id: "accountability", label: "Accountability", ready: true },
+            { id: "review-queue", label: "Review queue", ready: true },
         ],
     },
     {

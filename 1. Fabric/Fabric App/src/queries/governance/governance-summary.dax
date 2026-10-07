@@ -1,0 +1,17 @@
+EVALUATE
+VAR __Tenant =
+    FILTER(
+        'Agents 365',
+        NOT (LOWER(TRIM(COALESCE('Agents 365'[Created in], ""))) IN {"", "not available"})
+    )
+RETURN
+    ROW(
+        "Tenant Agents", COUNTROWS(__Tenant) + 0,
+        "Needs Review", COUNTROWS(FILTER(__Tenant, NOT ISBLANK('Agents 365'[Governance Flags]))) + 0,
+        "Owner Left", COUNTROWS(FILTER(__Tenant, CONTAINSSTRING('Agents 365'[Governance Flags], "Owner has left"))) + 0,
+        "No Owner", COUNTROWS(FILTER(__Tenant, CONTAINSSTRING('Agents 365'[Governance Flags], "No owner on record"))) + 0,
+        "Org Wide Org Data", COUNTROWS(FILTER(__Tenant, CONTAINSSTRING('Agents 365'[Governance Flags], "Org-wide with org data"))) + 0,
+        "Shared Unused", COUNTROWS(FILTER(__Tenant, CONTAINSSTRING('Agents 365'[Governance Flags], "Shared, no recorded use"))) + 0,
+        "Org Wide", COUNTROWS(FILTER(__Tenant, 'Agents 365'[Sharing Scope] = "Whole organisation")) + 0,
+        "Owners Checked", COUNTROWS(FILTER(__Tenant, NOT ISBLANK('Agents 365'[Owner account]))) + 0
+    )
