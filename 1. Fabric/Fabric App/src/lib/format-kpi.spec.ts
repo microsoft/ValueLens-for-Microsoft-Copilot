@@ -45,6 +45,14 @@ describe("formatKpi", () => {
         expect(formatKpi(undefined, "multiple")).toBe("—");
     });
 
+    it("never rounds a multiple below one up to break-even", () => {
+        expect(formatKpi(42 / 42.91, "multiple")).toBe("0.97×");
+        expect(formatKpi(0.999, "multiple")).toBe("0.99×");
+        expect(formatKpi(0.94, "multiple")).toBe("0.9×");
+        expect(formatKpi(1, "multiple")).toBe("1.0×");
+        expect(formatKpi(1.02, "multiple")).toBe("1.0×");
+    });
+
     it("shows a count reported in millions at its own scale", () => {
         // Compact suffixes follow the browser's locale: en-US writes 45K, en-GB 45k.
         const compact = (value: number) => formatKpi(value, "millions").toUpperCase();

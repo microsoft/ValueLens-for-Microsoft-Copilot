@@ -19,7 +19,8 @@ import { commandLine } from './launch.js';
 import { ensureConsent, ensureApp, ensureKeyVault, newSecret } from './steps/identity.js';
 import { agentEvaluatorModelWanted, agentEvaluatorSummary, ensureAgentEvaluatorModel, ensureTranscriptAccess } from './steps/agent-evaluator.js';
 import { deployApp, ensureAppName, ensureFabricApp } from './steps/app.js';
-import { consumptionModelWanted, consumptionSummary, ensureAzureAiAccess, ensureConsumptionModel, ensureLandingFolders } from './steps/consumption.js';
+import { COWORK_DATAFLOW_NAME, consumptionModelWanted, consumptionSummary, ensureAzureAiAccess, ensureConsumptionModel, ensureCoworkDataflow, ensureLandingFolders } from './steps/consumption.js';
+import { coworkDataflowDefinition, isVivaId } from './transform/dataflow.js';
 import {
   agentEvaluatorModelDeployed,
   consumptionModelDeployed,
@@ -27,6 +28,7 @@ import {
   ensureLakehouse,
   ensureNotebooks,
   ensurePipeline,
+  ensureSparkSettings,
   ensureSchedule,
   ensureVaultEndpoint,
   ensureWorkspace,
@@ -36,7 +38,11 @@ import {
 } from './steps/fabric.js';
 import { ensureModelConnection, ensureSemanticModel, modelUrl, refreshModel, rotateModelSecret } from './steps/model.js';
 import { confirmPlan, plan, preflight } from './steps/plan.js';
-import { checkData, runDataCheck, runPipeline, status } from './steps/run.js';
+import { dataSourcesSummary, ensureUploads, uploadCommand } from './steps/data-sources.js';
+import { ensureFlows, FLOW_FILES, flowDefinitions, flowsSummary, flowsWanted } from './steps/flows.js';
+import { routerWanted } from './uploads.js';
+import { checkData, chooseLoad, runDataCheck, runPipeline, status } from './steps/run.js';
+import { rerunFailed } from './steps/rerun.js';
 import { prepareNotebook, serialiseNotebook } from './transform/notebook.js';
 import { buildAgentEvaluatorModel, buildConsumptionModel, buildModel, loadTemplateModel } from './transform/model.js';
 import { buildPipeline } from './transform/pipeline.js';
@@ -71,6 +77,9 @@ import { askTarget, azureRefresh, azureRotateSecret, azureRun, azureStatus, azur
  * @property {boolean} [runFirstLoad]
  * @property {{ sp: any, roles: { id: string, value: string }[] }} [graphRoles]
  * @property {import('./steps/app.js').Runner} [runner]  Runs the app's build tools; tests replace it.
+ * @property {import('./staging.js').PendingUpload[]} [pendingUploads]  Exports to upload to the drop folder during the install.
+ * @property {string[]} [csvFiles]  Exports named with --csv.
+ * @property {string} [configFile]  The install record's path.
  */
 
 /**
@@ -122,6 +131,7 @@ export function createCtx(o) {
     sources: o.sources,
     sleep: o.sleep ?? defaultSleep,
     now: o.now ?? (() => new Date()),
+    configFile: o.file,
   };
 }
 
@@ -200,7 +210,7 @@ export async function rewindable(ctx, fn) {
   // save() writes this object, so it's put back in place rather than replaced.
   const config = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (ctx.config));
   const snapshot = structuredClone(config);
-  const { pendingSecret, runFirstLoad } = ctx;
+  const { pendingSecret, runFirstLoad, pendingUploads } = ctx;
   const real = ctx.api;
   ctx.api = memoApi(real);
   ui.begin();
@@ -214,6 +224,7 @@ export async function rewindable(ctx, fn) {
         Object.assign(config, structuredClone(snapshot));
         ctx.pendingSecret = pendingSecret;
         ctx.runFirstLoad = runFirstLoad;
+        ctx.pendingUploads = pendingUploads;
       }
     }
   } finally {
@@ -252,6 +263,7 @@ export async function install(ctx, opts) {
   const withApp = withModel && !!config.fabricApp.enabled;
   const withConsumption = !!config.modules.consumption;
   const withAgentEvaluator = !!config.modules.agentEvaluator;
+  const withUploads = routerWanted(config.dataSources) || !!ctx.pendingUploads?.length || flowsWanted(config).length > 0;
   const titles = [
     'Key Vault',
     'App registration',
@@ -260,6 +272,7 @@ export async function install(ctx, opts) {
     ...(withModel ? ['Semantic model'] : []),
     ...(withConsumption ? ['Credit consumption'] : []),
     ...(withAgentEvaluator ? ['Copilot Studio transcripts'] : []),
+    ...(withUploads ? ['Data uploads'] : []),
     'Notebooks, pipeline and schedule',
     ...(withApp ? ['Analytics Hub app'] : []),
     ...(ctx.runFirstLoad ? ['First load'] : withModel ? ['Model refresh'] : []),
@@ -290,8 +303,14 @@ export async function install(ctx, opts) {
     step('Copilot Studio transcripts');
     await agentEvaluatorSteps(ctx);
   }
+  if (withUploads) {
+    step('Data uploads');
+    await ensureUploads(ctx);
+    await ensureFlows(ctx);
+  }
   step('Notebooks, pipeline and schedule');
   await ensureNotebooks(ctx);
+  await ensureSparkSettings(ctx);
   await ensurePipeline(ctx);
   await ensureSchedule(ctx);
   if (withApp) {
@@ -308,7 +327,7 @@ export async function install(ctx, opts) {
     } else {
       if (modelDeployed(config)) ui.note(`The pipeline refreshes ${joinNames(deployedModels(config).map((m) => m.name))} as its last step.`);
       const result = await runPipeline(ctx, { backfillDays: config.history.days, wait: opts.wait, first: true });
-      if (result.ok) await runDataCheck(ctx);
+      if (result.status === 'Completed') await runDataCheck(ctx);
     }
   } else if (withModel) {
     step('Model refresh');
@@ -325,6 +344,7 @@ export async function install(ctx, opts) {
 async function consumptionSteps(ctx, opts = {}) {
   await ensureAzureAiAccess(ctx);
   await ensureLandingFolders(ctx);
+  await ensureCoworkDataflow(ctx);
   if (consumptionModelWanted(ctx)) await ensureConsumptionModel(ctx, opts);
 }
 
@@ -414,7 +434,10 @@ export async function update(ctx, opts = {}) {
   }
   if (config.modules.consumption) await consumptionSteps(ctx, { force: true });
   if (config.modules.agentEvaluator) await agentEvaluatorSteps(ctx, { force: true });
+  if (routerWanted(config.dataSources)) await ensureUploads(ctx);
+  await ensureFlows(ctx);
   await ensureNotebooks(ctx, { force: true });
+  await ensureSparkSettings(ctx);
   await ensurePipeline(ctx, { force: true });
   await ensureSchedule(ctx);
   if (sm.enabled && config.fabricApp.enabled) {
@@ -429,13 +452,14 @@ export async function update(ctx, opts = {}) {
 }
 
 /**
+ * Starts the pipeline: the first load until one has loaded the history, then the usual run.
  * @param {Ctx} ctx
  * @param {{ backfillDays?: number, wait: boolean }} opts
  */
 export async function run(ctx, opts) {
   if (ctx.config.target === 'azure') return azureRun(ctx);
-  const result = await runPipeline(ctx, opts);
-  if (result.ok) await runDataCheck(ctx);
+  const result = await runPipeline(ctx, await chooseLoad(ctx, opts));
+  if (result.status === 'Completed') await runDataCheck(ctx);
   return result;
 }
 
@@ -457,7 +481,7 @@ export async function refresh(ctx, opts) {
  * Runs one command against a signed-in context.
  * @param {Ctx} ctx
  * @param {string} command
- * @param {{ wait: boolean, backfillDays?: number }} opts
+ * @param {{ wait: boolean, backfillDays?: number, files?: string[], run?: boolean }} opts
  * @returns {Promise<boolean>} false when a run or refresh it waited for didn't succeed.
  */
 export async function runCommand(ctx, command, opts) {
@@ -472,6 +496,8 @@ export async function runCommand(ctx, command, opts) {
       const result = await run(ctx, opts);
       return !opts.wait || !!result.ok;
     }
+    case 'rerun-failed':
+      return !(await rerunFailed(ctx)).failed.length;
     case 'check':
       return !!(await checkData(ctx));
     case 'refresh': {
@@ -493,6 +519,8 @@ export async function runCommand(ctx, command, opts) {
       if (ctx.config.target === 'azure') await azureUninstall(ctx);
       else throw new Error('Uninstall is only implemented for the Azure target in this preview.');
       return true;
+    case 'upload':
+      return uploadCommand(ctx, { files: opts.files ?? [], run: opts.run, wait: opts.wait }, (c2, o) => run(c2, o));
     default:
       throw new Error(`Unknown command "${command}".`);
   }
@@ -559,6 +587,8 @@ export async function summary(ctx) {
     ui.info(`3. Keep ${c.bold('valuelens-install.json')}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);
     if (config.modules.consumption) consumptionSummary(ctx);
     if (config.modules.agentEvaluator) agentEvaluatorSummary(ctx);
+    dataSourcesSummary(ctx);
+    flowsSummary(ctx);
     return;
   }
 
@@ -580,6 +610,8 @@ export async function summary(ctx) {
   ui.info(`4. Keep ${c.bold('valuelens-install.json')}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);
   if (config.modules.consumption) consumptionSummary(ctx);
   if (config.modules.agentEvaluator) agentEvaluatorSummary(ctx);
+  dataSourcesSummary(ctx);
+  flowsSummary(ctx);
 }
 
 /**
@@ -599,6 +631,7 @@ export function preview(o) {
   const ae = config.agentEvaluator;
   const withTranscripts = !!config.modules.agentEvaluator && ae.environments.length > 0;
   const withAgentEvaluatorModel = withModel && withTranscripts && !!sources.agentEvaluatorModelFile;
+  const withDataflow = !!config.modules.consumption && config.dataSources.coworkCredits === 'api' && isVivaId(cc.vivaPartition) && isVivaId(cc.vivaQuery);
   /** @type {Ctx} */
   const ctx = /** @type {any} */ ({
     config: {
@@ -621,7 +654,7 @@ export function preview(o) {
 
   mkdirSync(join(out, 'notebooks'), { recursive: true });
   let n = 10;
-  for (const nb of notebooksFor(config.modules, { semanticModel: withModel, azureAi: withAzureAi, dataverse: withTranscripts })) {
+  for (const nb of notebooksFor(config.modules, { semanticModel: withModel, azureAi: withAzureAi, dataverse: withTranscripts, dataSources: config.dataSources })) {
     const prepared = prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb));
     writeFileSync(join(out, 'notebooks', `${nb.displayName}.ipynb`), serialiseNotebook(prepared), 'utf8');
     ctx.config.fabric.notebooks[nb.key] = ctx.config.fabric.notebooks[nb.key] ?? fake(n++);
@@ -636,12 +669,29 @@ export function preview(o) {
     consumptionModelId: withConsumptionModel ? ctx.config.consumption.model.id : undefined,
     agentTranscripts: withTranscripts,
     agentEvaluatorModelId: withAgentEvaluatorModel ? ctx.config.agentEvaluator.model.id : undefined,
+    coworkDataflowId: withDataflow ? cc.dataflowId ?? fake(7) : undefined,
   });
   writeFileSync(join(out, 'pipeline-content.json'), `${JSON.stringify(pipeline, null, 2)}\n`, 'utf8');
+  if (withDataflow) {
+    const df = coworkDataflowDefinition(cc.dataflowName ?? COWORK_DATAFLOW_NAME, {
+      partitionId: /** @type {string} */ (cc.vivaPartition),
+      queryId: /** @type {string} */ (cc.vivaQuery),
+      workspaceId: /** @type {string} */ (ctx.config.fabric.workspaceId),
+      lakehouseId: /** @type {string} */ (ctx.config.fabric.lakehouseId ?? fake(3)),
+    });
+    mkdirSync(join(out, 'dataflow'), { recursive: true });
+    for (const p of df.parts) writeFileSync(join(out, 'dataflow', p.path), Buffer.from(p.payload, 'base64'));
+  }
+  const flows = flowsWanted(config);
+  if (flows.length) {
+    const defs = flowDefinitions({ ...ctx.config, app: { ...ctx.config.app, appId: ctx.config.app.appId ?? fake(8) } }, config.tenantId ?? fake(9));
+    mkdirSync(join(out, 'flows'), { recursive: true });
+    for (const kind of flows) writeFileSync(join(out, 'flows', FLOW_FILES[kind]), `${JSON.stringify(defs[kind].definition, null, 2)}\n`, 'utf8');
+  }
   writeFileSync(join(out, 'schedule.json'), `${JSON.stringify(scheduleBody(config.schedule, o.now), null, 2)}\n`, 'utf8');
   writeFileSync(
     join(out, 'graph-permissions.txt'),
-    `Microsoft Graph application permissions for the app registration:\n${permissionsFor(config.modules).map((p) => `  ${p}\n`).join('')}`,
+    `Microsoft Graph application permissions for the app registration:\n${permissionsFor(config.modules, config.dataSources).map((p) => `  ${p}\n`).join('')}`,
     'utf8',
   );
   if (withModel) {

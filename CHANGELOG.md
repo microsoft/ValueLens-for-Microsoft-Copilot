@@ -16,6 +16,168 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-06 — Analytics Hub installer 0.2.5
+
+The installer bundles the notebooks and templates when it is built, so this release brings
+everything merged since 0.2.4 to installer users:
+
+- the **Data sources** screen, with the API, a CSV upload or Skip for every source, one drop
+  folder for CSV exports, and product feedback;
+- the Viva Insights Dataflow for Cowork credits, the Power Automate flows for product feedback
+  and Copilot Studio credits, and the Analytics Hub names;
+- agent type, publisher and consolidated name in the audit processor;
+- one shared Spark session per run, a card for each source, `dbo.load_log`, **Rerun failed
+  loads**, the SQL endpoint sync before the model refresh, and a data check that explains an
+  empty Copilot interactions table;
+- the Fabric App's Executive summary page.
+
+To update, download the installer again, open it and choose **Repair or change**.
+---
+
+## 2026-10-06 — Analytics Hub installer: fewer busy-capacity failures, and clearer ones
+
+- **One Spark session per run.** The pipeline's notebooks now share a high-concurrency Spark
+  session, instead of each starting its own. Small capacities are much less often too busy to
+  start them (`TooManyRequestsForCapacity`). The installer turns the workspace setting on; that
+  needs the workspace Admin role, and without it the installer warns and carries on.
+- **A card for each source.** After a run, the installer says which sources loaded, failed,
+  were skipped or are still running. A failure says why in plain words, such as a busy capacity,
+  a sign-in problem, a timeout or a missing export, and what to do.
+- **`dbo.load_log`.** A new last pipeline step, `AnalyticsHub_Load_Status`, records the same
+  thing in the Lakehouse, one row per source per run. It fails the run when a load failed, so
+  Fabric's run history and alerts show it.
+- **Rerun failed loads.** A new command and button runs only the loads that failed, and the
+  steps and refreshes after them. It waits and tries again while the capacity is busy, and so
+  does the data check after a run.
+- **The model refresh waits for the SQL endpoint.** `AnalyticsHub_Refresh_Model` now asks the
+  Lakehouse SQL endpoints to sync before it refreshes the model. Before, a refresh straight after
+  a load could fail with *Table '…' is not in database*. If it still happens, the card says so
+  and suggests a rerun.
+- **An empty Copilot interactions table says why.** When the audit log only held test or admin
+  activity, such as Copilot Studio test runs (*Maker evaluation*), the Audit Log Processor leaves
+  all of it out and the table is empty. The data check now counts what was left out and why,
+  instead of just reporting 0 rows.
+
+Installer users get this in the next installer release.
+
+---
+
+## 2026-10-06 — Analytics Hub installer: a Viva Insights Dataflow, Power Automate flows and new names
+
+- **Cowork credits** can come straight from a Viva Insights query. Choose **Connected (Dataflow)**
+  and give the partition and query IDs. The installer creates the Dataflow Gen2
+  `AnalyticsHub_Cowork_Credits`, and the pipeline refreshes it before each Viva load. The CSV
+  export is still the fallback. `Ingest_Viva_Consumption` reads both, and the Dataflow wins for
+  weeks both cover.
+- **Copilot Studio credits** can come from the Power Platform licensing API. An optional flow,
+  `Analytics Hub - Copilot Studio credits`, saves the last ten days by agent each day.
+  `Ingest_Studio` loads them into the new `studio_agent_daily` table, and fills the tenant and
+  agent views for days and months no export covers. It only sees environments with credits
+  allocated, and exports still add per-user figures.
+- **The product feedback flow** is now created for you in Power Automate, turned off, instead of
+  written to a file to import. Both flows read the app's secret from Key Vault; you sign in to
+  their connections and turn them on.
+- **New names.** A new install calls its items Analytics Hub: `Analytics Hub Model`,
+  `AnalyticsHub_Pipeline`, `Analytics Hub SQL …` and `Analytics Hub Data Collector`. Existing
+  installs keep their names.
+
+Installer users get this in the next installer release.
+
+---
+
+## 2026-10-05 — Task time estimates cite peer-reviewed sources
+
+The `Human Time Estimates` table in all five templates now cites peer-reviewed studies or major
+research institutions, such as Noy & Zhang (*Science* 2023), Brynjolfsson et al. (NBER) and
+Microsoft Research CHI papers, instead of vendor surveys, blogs and landing pages. Links are DOIs
+where one exists. Rows with no credible time study now say *Provisional estimate*, have no link
+and are rated Low. No confidence went up, and no minutes changed, so value and hours-saved figures
+are the same. The Fabric App reads the new sources from the model. Installer users get this in the
+next installer release.
+
+---
+
+## 2026-10-05 — Analytics Hub installer 0.2.4
+
+The installer bundles the notebooks and templates when it is built, so this release brings
+everything merged since 0.2.3 to installer users: the plain-English task descriptions and App host
+in the glossary, one name for each task level, the review fixes below, agents linked even when they have no name, and an incremental Agent 365
+registry pull. It also stops the installer overwriting another install's client secret in a Key
+Vault you already have.
+
+To update, download the installer again, open it and choose **Repair or change**.
+
+---
+
+## 2026-10-05 — Analytics Hub review fixes
+
+**Templates, all four paths, and the Fabric App.**
+- **🌱 Habit Formation** follows the date filter. Stages use the most recent complete month in
+  the selected dates, capped at the last complete month in the data. Before, they always used the
+  last complete month, whatever dates were picked. Inactive is now blank for Unlicensed users and
+  Agents as well as Cowork, since none of them have a seat to measure against. The app says so,
+  and shows a message instead of a trend when the dates cover fewer than two months.
+
+**Consumption Central add-on, all four paths.** Models named from Azure meters are spelled the
+way OpenAI writes them: GPT-4o, o4-mini, GPT-5.4, GPT-4.1 and GPT-5, not "Gpt 4O", "O4 Mini" and a
+bare "5.4". Other meters, such as Pay As You Go Copilot Credit, keep their names. The app's Cost
+by model and Foundry resources views show the new names even before the template is updated.
+
+**Fabric App.**
+- **Feedback** counts only feedback dated inside the Calendar, as its weekly trend always did.
+  Feedback sent outside the report's dates no longer inflates the totals, satisfaction, topics
+  and surfaces.
+- **Cowork fit** with License set to Unlicensed says Cowork needs a Copilot license, the same as
+  the Cowork leaderboard does, rather than suggesting there's no Cowork activity yet.
+- **Agent registry** keeps its side panel below the table until the window is extra wide, so the
+  table's columns aren't squeezed on a laptop screen.
+
+**Agent Evaluator add-on.** **Knowledge Answered Rate** is now a share of knowledge searches, the
+complement of **Knowledge Gap Rate**, so the two add up to 100%. It used to divide by every
+session, so the Knowledge Gap focus card understated how often searches found an answer. The
+card's content gap is now the Gap Rate itself.
+
+**Fabric installer.** In a Key Vault you already have, the installer no longer overwrites another
+install's client secret. If the secret name is taken by a secret that isn't this app's, it is
+left alone and the new secret goes in the next free name, such as `valuelens-client-secret-2`.
+
+## 2026-10-05 — One name for each task level, and Fabric App review fixes
+
+**Templates, all four paths.** Every page now calls the 12 task groups **Task Category** and the
+detailed tasks **Task Breakdown**. Before, Estimated Value said Category and Task, and the
+Leaderboard said task group and task category. Engagement charts say **Engagement mode**. The
+**🧬 Appendix: Signal → Impact** table adds a plain-English **Description** of each task, and the
+**📖 Metric Glossary** explains App host and why it makes the task mix indicative. Download the
+template again to get these. The installer picks them up in its next release.
+
+**Fabric App.**
+- The filter bar alone picks Licensed, Unlicensed, Agents or Cowork. The pages' own Cohort
+  switches, which could disagree with it, are gone.
+- Work patterns: an org filter no longer inflates active days or drops weeks from the trend.
+- Feedback: feedback with no date stays out of the weekly trend.
+- Consumption: Cowork credits name each person, instead of one "(No value)" row.
+- Value: a return just below 1x shows as a loss, such as 0.97x in red, never as break-even.
+- Adoption: the Activation headline reads as one sentence.
+- Tables fit their headers, date slicers say Date, and the Value task chart's switch reads
+  "Break down by".
+
+---
+
+## 2026-10-05 — Analytics Hub installer 0.2.3: a busy trial capacity
+
+On a Fabric trial or a small capacity, the first load could fail with `TooManyRequestsForCapacity`.
+The pipeline started about six notebooks at once, and Fabric turned some of them away. The pipeline
+now runs its notebooks in two lanes, so no more than two run at the same time. If a notebook still
+fails, the pipeline waits five minutes and tries it again. If Fabric is still too busy after that,
+the installer says so in plain words: nothing is lost, wait a few minutes and choose **Run now**
+again.
+
+If this happened to you, download the installer again, open it and choose **Repair or change**. It
+offers to update the pipeline and to run the first load again. Until the first load succeeds,
+**Run now** runs it again, with the audit history you picked.
+
+---
+
 ## 2026-10-05 — Analytics Hub installer 0.2.2: a Key Vault that another workspace already reads
 
 If you picked a Key Vault that blocks public access, and another Analytics Hub workspace already

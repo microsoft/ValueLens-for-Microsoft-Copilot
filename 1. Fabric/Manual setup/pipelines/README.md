@@ -38,7 +38,7 @@ The pipeline loads the Lakehouse only. To refresh a published model after each r
 1. Publish the report, and set its data source credentials in the semantic model's settings.
 2. In the pipeline, add **Activities** > **Semantic model refresh**. Pick a Power BI connection,
    the workspace and the semantic model.
-3. Add **On success** dependencies from `Run_Audit_Log_Processor` and from each other branch you
+3. Add **On success** dependencies from `Run_Audit_Log_Processor` and from each other load you
    use (org data, Microsoft 365 activity, product feedback). Don't add one from
    `Conditionally_Run_Agent365`.
 4. Leave **Wait on completion** on. Save and run once.
@@ -66,6 +66,10 @@ Open **Monitor** > **Pipeline runs**, select the failed activity and read the no
 the audit or licensed users ingester failed, the processor is skipped: don't refresh the model
 until a run succeeds. When the Agent 365 CSV fallback takes over, the registry activity shows
 *Failed* but the run succeeds. That is expected.
+
+The other loads run one after another, so a small capacity isn't overloaded. If one of them fails,
+the next still runs and the run can show *Succeeded*, so check each activity. If an activity failed
+because Fabric was busy (error 430), run the pipeline again later.
 
 To update the pipeline to a newer version, paste the new JSON, replace the placeholders again, and
 re-add your refresh step.

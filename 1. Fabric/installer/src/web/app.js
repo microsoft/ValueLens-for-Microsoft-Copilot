@@ -44,6 +44,12 @@ const COMMANDS = {
     desc: 'Start the pipeline, wait for it, then run the data check.',
     off: 'There is no pipeline yet.',
   },
+  'rerun-failed': {
+    title: 'Rerun failed loads', short: 'Rerun failed', icon: 'refresh', section: 'Rerun',
+    row: 'Rerun failed loads', button: 'Rerun failed',
+    desc: 'Run again only the loads that failed in the latest pipeline run, and the steps that waited for them, one at a time.',
+    off: 'There is no pipeline yet.',
+  },
   refresh: {
     title: 'Refresh the models', short: 'Refresh', icon: 'refresh', section: 'Model refresh',
     row: 'Refresh the models', button: 'Refresh',
@@ -79,6 +85,12 @@ const COMMANDS = {
     desc: 'Replace the app\'s client secret in Key Vault, and the model connection\'s.',
     off: 'There is no app registration or Key Vault yet.',
   },
+  upload: {
+    title: 'Upload data', short: 'Upload', icon: 'upload', section: 'Upload',
+    row: 'Upload exports', button: 'Upload',
+    desc: 'Send CSV exports from the admin centers to the Lakehouse drop folder. The next pipeline run loads them.',
+    off: 'No source is set to Upload CSV. Choose Repair or change set-up to change that.',
+  },
   uninstall: {
     title: 'Uninstall Analytics Hub', short: 'Uninstall', icon: 'x', section: 'Uninstall', adopt: true,
     row: 'Uninstall', button: 'Uninstall',
@@ -86,10 +98,10 @@ const COMMANDS = {
     off: 'Only available for Azure installations.',
   },
 };
-const ROW_ORDER = ['run', 'refresh', 'status', 'check', 'update', 'deploy-app', 'rotate-secret', 'uninstall', 'install'];
+const ROW_ORDER = ['run', 'rerun-failed', 'refresh', 'status', 'upload', 'check', 'update', 'deploy-app', 'rotate-secret', 'uninstall', 'install'];
 
 const INSTALL_STAGES = [
-  'Sign in', 'Checking your tenant', 'What to collect', 'Power BI', 'Fabric', 'App registration',
+  'Sign in', 'Checking your tenant', 'Data sources', 'Power BI', 'Fabric', 'App registration',
   'Key Vault for the app secret', 'Schedule', 'Ready to set up', 'Setting up', 'Done',
   'Where should Analytics Hub run?', 'Azure', 'Checking Azure',
 ];
@@ -262,6 +274,28 @@ async function post(path, body) {
     return { ok: res.ok, status: res.status, body: data };
   } catch {
     return { ok: false, status: 0, body: { error: `Can't reach the installer. Is it still running in ${installerWindow()}?` } };
+  }
+}
+
+/** Sends one file as raw bytes; the installer keeps it until the install uploads it. */
+async function postFile(file) {
+  try {
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) },
+      body: file,
+      credentials: 'same-origin',
+    });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      // No body.
+    }
+    if (res.status === 401) setConn('closed');
+    return res.ok ? data : { name: file.name, error: data?.error ?? 'The file wasn\'t accepted.' };
+  } catch {
+    return { name: file.name, error: `Can't reach the installer. Is it still running in ${installerWindow()}?` };
   }
 }
 
@@ -506,6 +540,11 @@ function apply(e) {
       add(run, { t: 'review', plan: e.plan });
       return;
     }
+    case 'loads':
+      ensureRoot(run, e.at);
+      add(run, { t: 'loads', cards: e.cards ?? [] });
+      run.failedLoads = (e.cards ?? []).some((card) => card.state === 'failed');
+      return;
     case 'auto':
       ensureRoot(run, e.at);
       add(run, { t: 'qa', message: e.message, display: e.display, auto: true });
@@ -514,7 +553,7 @@ function apply(e) {
       ensureRoot(run, e.at);
       const stage = target(run);
       const decide = e.kind === 'confirm' && stage.items.some((it) => it.t === 'review');
-      const item = { t: 'prompt', id: e.id, kind: e.kind, message: e.message, choices: e.choices ?? [], default: e.default, error: '', decide, back: !!e.back, keep: !!e.keep };
+      const item = { t: 'prompt', id: e.id, kind: e.kind, message: e.message, choices: e.choices ?? [], default: e.default, error: '', decide, back: !!e.back, keep: !!e.keep, cards: e.cards ?? [], lockModes: !!e.lockModes, staged: [] };
       run.prompts.set(e.id, item);
       app.openPrompt = item;
       add(run, item);
@@ -798,9 +837,27 @@ function renderItem(it) {
       return it.done ? null : h('div', { class: 'signin' }, h('span', { class: 'spin', 'aria-hidden': 'true' }), h('span', null, WAITING[it.method] ?? 'Signing in.'));
     case 'review':
       return renderReview(it.plan);
+    case 'loads':
+      return renderLoads(it.cards);
     default:
       return null;
   }
+}
+
+const LOAD_GLYPH = { ok: 'check', failed: 'x', skipped: 'minus', running: 'clock' };
+const LOAD_STATE = { ok: 'loaded', failed: 'failed', skipped: 'didn\'t run', running: 'still running' };
+
+/** One card per source: whether it loaded, why not and what to do. */
+function renderLoads(cards) {
+  return h('ul', { class: 'loads', 'aria-label': 'Loads by source' },
+    cards.map((card) => h('li', { class: `load ${card.state}` },
+      h('span', { class: 'gl' }, icon(LOAD_GLYPH[card.state] ?? 'circle')),
+      h('div', null,
+        h('span', { class: 'load-name' }, card.name),
+        ' ',
+        h('span', { class: 'load-state' }, LOAD_STATE[card.state] ?? card.state, card.attempts ? `, ${card.attempts} attempts` : ''),
+        card.reason ? h('p', null, card.reason) : null,
+        (card.fix ?? []).length ? h('p', { class: 'load-fix' }, card.fix.join('\n')) : null))));
 }
 
 function renderProgress(it) {
@@ -937,6 +994,10 @@ function renderPrompt(item) {
         answer(item, picked[0]);
       } else answer(item, picked);
     };
+  } else if (item.kind === 'sources') {
+    const parts = renderSources(item);
+    body = parts.body;
+    submit = parts.submit;
   } else if (item.kind === 'confirm') {
     const yes = h('button', { type: 'button', class: item.default === false ? 'btn' : 'btn primary', onclick: () => answer(item, true) }, 'Yes');
     const no = h('button', { type: 'button', class: item.default === false ? 'btn primary' : 'btn', onclick: () => answer(item, false) }, 'No');
@@ -961,6 +1022,80 @@ function renderPrompt(item) {
     submit();
   });
   return form;
+}
+
+/**
+ * The Data sources screen: a card per source with its modes and where to export it, then the
+ * exports to upload. The installer reads each file's headers to tell which source it is.
+ */
+function renderSources(item) {
+  const modes = Object.fromEntries(item.cards.map((c) => [c.id, c.mode]));
+  const wantsCsv = () => item.cards.some((c) => c.uploadable && modes[c.id] === 'csv');
+  const card = (c) => {
+    const where = h('p', { class: 'src-where' });
+    const paint = () => {
+      const m = modes[c.id];
+      where.replaceChildren();
+      put(where, [
+        c.export && (m === 'csv' || item.lockModes) ? [h('span', { class: 's-d' }, 'Export from '), linkify(`${c.export.where}  ${c.export.url}`)] : null,
+        m === 'skip' ? h('span', { class: 's-d' }, c.page ? `The ${c.page} page stays empty.` : 'Not collected.') : null,
+      ]);
+      where.hidden = !where.childNodes.length;
+      picker.hidden = !item.lockModes && !wantsCsv();
+    };
+    const choices = c.locked || item.lockModes || c.modes.length < 2
+      ? h('span', { class: 'opt-tag' }, item.lockModes ? 'Upload CSV' : c.modes.find((m) => m.value === c.mode)?.label ?? 'Always on')
+      : h('fieldset', { class: 'src-modes', 'aria-label': `How ${c.label} arrives` }, c.modes.map((m) => {
+        const input = h('input', { type: 'radio', name: `src${item.id}-${c.id}`, value: m.value, checked: m.value === c.mode });
+        input.addEventListener('change', () => {
+          modes[c.id] = m.value;
+          paint();
+        });
+        return h('label', { class: 'src-mode' }, input, m.label);
+      }));
+    paints.push(paint);
+    return h('div', { class: 'src', role: 'group', 'aria-label': c.label },
+      h('div', { class: 'src-head' }, h('span', { class: 'src-name' }, c.label), c.locked ? h('span', { class: 'opt-tag' }, 'Always on') : null),
+      c.description ? h('span', { class: 'opt-desc' }, c.description) : null,
+      c.locked ? null : choices, where);
+  };
+  const paints = [];
+  const list = h('ul', { class: 'staged', 'aria-live': 'polite' });
+  const paintList = () => {
+    list.replaceChildren(...item.staged.map((f, i) => h('li', null,
+      icon(f.error ? 'x' : 'check'),
+      h('span', null, f.name),
+      h('span', { class: f.error ? 'bad' : 's-d' }, f.error ?? f.label ?? ''),
+      h('button', { type: 'button', class: 'btn quiet', onclick: () => {
+        item.staged.splice(i, 1);
+        paintList();
+      } }, 'Remove'))));
+  };
+  const input = h('input', { type: 'file', accept: '.csv,text/csv', multiple: true, hidden: true });
+  input.addEventListener('change', async () => {
+    const files = [...input.files];
+    input.value = '';
+    if (!files.length) return;
+    setBusy(item, true);
+    for (const f of files) item.staged.push(await postFile(f));
+    setBusy(item, false);
+    paintList();
+  });
+  const picker = h('div', { class: 'ask-body' },
+    h('h3', { class: 'label' }, 'Exports to upload ', h('span', { class: 'hint-inline' }, item.lockModes ? '' : 'optional')),
+    h('p', { class: 'hint' }, 'Choose the CSV files as they came from the admin center. No renaming needed: the installer reads the headers to tell which source each one is. You can also add them later, from Upload on the home page or straight into the Lakehouse folder Files/analytics_hub_uploads.'),
+    h('div', { class: 'picker' }, input, h('button', { type: 'button', class: 'btn', onclick: () => input.click() }, icon('upload'), 'Choose files')),
+    list);
+  const cards = item.lockModes ? item.cards.filter((c) => c.export) : item.cards;
+  const body = h('div', { class: 'ask-body' }, h('div', { class: 'srcs' }, cards.map(card)), picker);
+  for (const p of paints) p();
+  paintList();
+  const submit = () => {
+    const ok = item.staged.filter((f) => f.token && !f.error).map((f) => f.token);
+    if (item.staged.some((f) => f.error)) return showError(item, 'Remove the files that weren\'t recognised first.');
+    answer(item, { modes: item.lockModes ? undefined : modes, uploads: ok });
+  };
+  return { body, submit };
 }
 
 function renderDecide(item) {
@@ -1015,11 +1150,14 @@ function renderOutcome(run) {
     ]],
     cancelled: ['', 'Stopped', [install && !built ? 'Nothing was created.' : 'Nothing after this point ran.']],
   }[r] ?? ['', 'Finished', []];
+  const rerun = run.failedLoads && app.state?.record?.can?.['rerun-failed'];
   return h('section', { class: `outcome ${copy[0]}`.trim(), 'aria-labelledby': 'outcome-title' },
     h('h2', { id: 'outcome-title' }, copy[1]),
     copy[2].filter(Boolean).map((p) => h('p', null, p)),
+    rerun ? h('p', null, 'Some loads failed. Rerun failed runs just those again, and the steps that waited for them.') : null,
     h('div', { class: 'actions' },
-      h('button', { type: 'button', class: 'btn primary', onclick: () => saveRecord(run) }, icon('download'), 'Save a record'),
+      rerun ? h('button', { type: 'button', class: 'btn primary', onclick: () => start('rerun-failed') }, icon('refresh'), 'Rerun failed') : null,
+      h('button', { type: 'button', class: rerun ? 'btn' : 'btn primary', onclick: () => saveRecord(run) }, icon('download'), 'Save a record'),
       h('button', { type: 'button', class: 'btn', onclick: () => show('home') }, 'Back to home')));
 }
 
@@ -1392,6 +1530,12 @@ function itemMarkdown(it, depth) {
       return [`- ${it.label}: ${it.status || 'started'}${it.ms != null ? ` (${fmt(it.ms)})` : ''}`];
     case 'review':
       return ['', ...reviewMarkdown(it.plan), ''];
+    case 'loads':
+      return it.cards.flatMap((card) => [
+        `- ${{ ok: '✓', failed: '✗', skipped: '⚠', running: '…' }[card.state] ?? ''} ${card.name}: ${LOAD_STATE[card.state] ?? card.state}${card.attempts ? ` (${card.attempts} attempts)` : ''}`,
+        ...(card.reason ? [`  - ${card.reason}`] : []),
+        ...(card.fix ?? []).map((f) => `  - ${f.trim()}`),
+      ]);
     default:
       return [];
   }

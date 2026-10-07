@@ -5,6 +5,7 @@
  */
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { normaliseModules } from './catalog.js';
+import { normaliseDataSources } from './uploads.js';
 
 export const CONFIG_VERSION = 1;
 export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
@@ -14,18 +15,40 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {number} version
  * @property {'fabric' | 'azure'} [target]
  * @property {string} [tenantId]
- * @property {import('./catalog.js').ModuleChoice} modules
+ * @property {import('./catalog.js').ModuleChoice} modules  Follows `dataSources`.
+ * @property {import('./uploads.js').DataSourceModes} dataSources  How each source arrives: API, uploaded CSV, or skipped.
+ * @property {UploadsConfig} uploads
  * @property {{ days: number }} history
  * @property {{ frequency: 'daily' | 'weekly', time: string, weekday: string, timeZone: string }} schedule
  * @property {{ appId?: string, objectId?: string, servicePrincipalId?: string, displayName?: string, secretExpires?: string, existing?: boolean }} app
  * @property {{ subscriptionId?: string, resourceGroup?: string, name?: string, id?: string, uri?: string, location?: string, secretName: string, existing?: boolean, rbac?: boolean, private?: boolean, secretSetAt?: string }} keyVault
- * @property {{ capacityId?: string, workspaceId?: string, workspaceName?: string, lakehouseId?: string, lakehouseName?: string, notebooks: Partial<Record<import('./catalog.js').NotebookKey, string>>, notebookNames?: Partial<Record<import('./catalog.js').NotebookKey, string>>, pipelineId?: string, pipelineName?: string, pipelineModules?: string, scheduleId?: string, vaultEndpointId?: string }} fabric
+ * @property {{ capacityId?: string, workspaceId?: string, workspaceName?: string, lakehouseId?: string, lakehouseName?: string, notebooks: Partial<Record<import('./catalog.js').NotebookKey, string>>, notebookNames?: Partial<Record<import('./catalog.js').NotebookKey, string>>, pipelineId?: string, pipelineName?: string, pipelineModules?: string, pipelineVersion?: number, scheduleId?: string, vaultEndpointId?: string, deployedRouter?: string }} fabric
  * @property {{ jobId?: string, status?: string, startedAt?: string, finishedAt?: string }} [firstRun]
  * @property {SemanticModelConfig} semanticModel
  * @property {FabricAppConfig} fabricApp
  * @property {AzureConfig} [azure]
  * @property {ConsumptionConfig} consumption
  * @property {AgentEvaluatorConfig} agentEvaluator
+ */
+
+/**
+ * The upload drop folder and the optional extras around it.
+ * @typedef {object} UploadsConfig
+ * @property {boolean} [folders]  The drop folder and the folders the loads read exist in the Lakehouse.
+ * @property {boolean} [feedbackFlow]  Create the product feedback email flow in Power Automate.
+ * @property {boolean} [studioFlow]  Create the flow that saves Copilot Studio credits from the licensing API each day.
+ * @property {FlowEnvironment} [flowEnvironment]  The Power Platform environment the flows are created in.
+ * @property {Partial<Record<'feedback' | 'studio', string>>} [flowIds]  The flows, once created.
+ * @property {Partial<Record<'feedback' | 'studio', string>>} [flowSignatures]  What each created flow was built from.
+ * @property {Partial<Record<'feedback' | 'studio', string>>} [flowFiles]  Where a flow was written when it couldn't be created.
+ */
+
+/**
+ * A Power Platform environment to create flows in.
+ * @typedef {object} FlowEnvironment
+ * @property {string} url  The Dataverse org URL, without a trailing slash.
+ * @property {string} [id]  The Power Platform environment ID.
+ * @property {string} [name]
  */
 
 /**
@@ -46,6 +69,11 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {PaygSubscription[]} [paygSubscriptions]  Other subscriptions that billing policies charge Copilot pay-as-you-go to.
  * @property {string} [deployedPayg]  The pay-as-you-go subscriptions in the deployed Azure AI notebook, comma-separated.
  * @property {boolean} [landing]  The landing folders exist.
+ * @property {string} [vivaPartition]  The Viva Insights partition the Cowork credits Dataflow reads.
+ * @property {string} [vivaQuery]  The Viva Insights query it reads.
+ * @property {string} [dataflowId]  The Cowork credits Dataflow.
+ * @property {string} [dataflowName]
+ * @property {string} [dataflowSignature]  What the deployed Dataflow definition was built from.
  * @property {ModelConfig} model
  */
 
@@ -136,9 +164,10 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {{ whatIf?: any[], pendingAdminActions?: string[], lastRun?: any, lastMigrate?: any }} [status]
  */
 
-export const MODEL_NAME = 'ValueLens Model';
-export const CONSUMPTION_MODEL_NAME = 'ValueLens Consumption Model';
-export const AGENT_EVALUATOR_MODEL_NAME = 'ValueLens Agent Evaluator Model';
+// Names for items a new install creates. An existing install keeps the names saved in its record.
+export const MODEL_NAME = 'Analytics Hub Model';
+export const CONSUMPTION_MODEL_NAME = 'Analytics Hub Consumption Model';
+export const AGENT_EVALUATOR_MODEL_NAME = 'Analytics Hub Agent Evaluator Model';
 
 /** @returns {InstallConfig} */
 export function emptyConfig() {
@@ -146,6 +175,8 @@ export function emptyConfig() {
     version: CONFIG_VERSION,
     target: 'fabric',
     modules: normaliseModules(undefined),
+    dataSources: normaliseDataSources(undefined, normaliseModules(undefined)),
+    uploads: {},
     history: { days: 90 },
     schedule: { frequency: 'daily', time: '02:00', weekday: 'Sunday', timeZone: 'UTC' },
     app: {},
@@ -180,6 +211,8 @@ export function loadConfig(file) {
     ...raw,
     target: raw.target ?? 'fabric',
     modules: normaliseModules(raw.modules),
+    dataSources: normaliseDataSources(raw.dataSources, normaliseModules(raw.modules), raw.consumption),
+    uploads: { ...(raw.uploads ?? {}) },
     history: { ...base.history, ...(raw.history ?? {}) },
     schedule: { ...base.schedule, ...(raw.schedule ?? {}) },
     app: { ...(raw.app ?? {}) },

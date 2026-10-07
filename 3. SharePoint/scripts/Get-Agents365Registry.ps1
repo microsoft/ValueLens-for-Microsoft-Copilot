@@ -49,6 +49,15 @@
   List call only. Faster, but usage metrics, Bot Id, Element types and Custom
   actions stay blank.
 
+.PARAMETER FullDetailRefreshDays
+  Maximum age, in days, of a cached detail. Default 7. The list is pulled in full on
+  every run, but details are fetched only for agents that are new, whose
+  lastModifiedDateTime changed, that have no cache entry, or whose cached detail is
+  older than this; the rest reuse the detail cached in <OutputCsv>.detailcache.jsonl
+  with today's list fields over it. Usage fields (Active Users, Total sessions, Last
+  Activity Date) of a reused detail can therefore be up to this many days old. 0
+  fetches every detail on every run.
+
 .PARAMETER SkipCreatorResolution
   Do not resolve Agent creator UPN. Every row is then "unattributed".
 
@@ -70,7 +79,10 @@
     User.Read.All             tier 1 creator resolution
   The tenant also needs an Agent 365 licence. That is a SKU check, separate from
   permissions: a missing licence returns 403 "Customer must be licensed for Agent 365".
-  Point-in-time snapshot: deleted agents disappear on the next run.
+  Point-in-time snapshot: deleted agents disappear on the next run. The detail cache
+  (<OutputCsv>.detailcache.jsonl) is rewritten only after the CSV is written, keeps
+  only agents in the current list, and can be deleted at any time to force a full
+  detail refresh.
 #>
 [CmdletBinding()]
 param(
@@ -83,6 +95,8 @@ param(
   [ValidateSet('v1.0', 'beta')]
   [string]$ApiVersion = 'v1.0',
   [switch]$SkipDetail,
+  [ValidateRange(0, 365)]
+  [int]$FullDetailRefreshDays = 7,
   [switch]$SkipCreatorResolution,
   [switch]$AllowEmpty
 )
@@ -198,9 +212,32 @@ function Get-HttpStatus {
   return 0
 }
 
+function Get-RetryAfterSeconds {
+  # Graph's Retry-After header when present (seconds, capped at 60), else 2^attempt.
+  param($ErrorRecord, [int]$Attempt)
+  $fallback = [int][Math]::Pow(2, $Attempt)
+  $value = $null
+  try {
+    $resp = $ErrorRecord.Exception.Response
+    if ($resp -and $resp.Headers) {
+      if ($resp.Headers -is [System.Net.WebHeaderCollection]) {
+        $value = $resp.Headers['Retry-After']
+      } elseif ($resp.Headers.RetryAfter) {
+        if ($resp.Headers.RetryAfter.Delta) { $value = [Math]::Ceiling($resp.Headers.RetryAfter.Delta.TotalSeconds) }
+      }
+    }
+  } catch { $value = $null }
+  $seconds = 0
+  if ($null -ne $value -and [int]::TryParse("$value".Trim(), [ref]$seconds) -and $seconds -ge 0) {
+    return [int][Math]::Min(60, [Math]::Max(1, $seconds))
+  }
+  return $fallback
+}
+
 function Invoke-Graph {
   # One Graph call with a live token. Retries once on 401 (expired token) and a few
-  # times on 429/5xx; anything else is rethrown with the HTTP status attached.
+  # times on 429/5xx, honouring Retry-After; anything else is rethrown with the HTTP
+  # status attached.
   param([string]$Method = 'GET', [string]$Uri, $Body)
   for ($attempt = 1; ; $attempt++) {
     try {
@@ -221,7 +258,7 @@ function Invoke-Graph {
         continue
       }
       if (($status -eq 429 -or $status -ge 500) -and $attempt -lt 4) {
-        Start-Sleep -Seconds ([int][Math]::Pow(2, $attempt))
+        Start-Sleep -Seconds (Get-RetryAfterSeconds $_ $attempt)
         continue
       }
       $err = [System.Exception]::new("Graph $Method $Uri failed (HTTP $status): $($_.Exception.Message)", $_.Exception)
@@ -451,6 +488,77 @@ function Merge-Detail {
 }
 
 #############################################################
+# Detail cache (incremental detail fetch)
+#############################################################
+
+function ConvertTo-StampKey {
+  # lastModifiedDateTime as a comparable UTC string, whichever JSON parser read it.
+  param($Value)
+  $text = ConvertTo-Text $Value
+  if (-not $text) { return '' }
+  $parsed = [datetimeoffset]::MinValue
+  if ([datetimeoffset]::TryParse($text, [cultureinfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AssumeUniversal, [ref]$parsed)) {
+    return $parsed.UtcDateTime.ToString('yyyy-MM-ddTHH:mm:ss.FFFFFFFZ', [cultureinfo]::InvariantCulture)
+  }
+  return $text.Trim()
+}
+
+function Get-DetailCachePath {
+  param([string]$CsvPath)
+  return "$CsvPath.detailcache.jsonl"
+}
+
+function Read-DetailCache {
+  # JSON lines: a header {apiVersion}, then one {id, lastModified, detailAsOfUtc,
+  # detail, creatorUpn, creatorSource} per agent. A missing, unreadable or
+  # other-API-version cache reads as empty, so every detail is fetched.
+  param([string]$Path, [string]$Version)
+  $agents = @{}
+  if (-not (Test-Path -LiteralPath $Path)) { return $agents }
+  try {
+    $lines = [System.IO.File]::ReadAllLines($Path, [System.Text.UTF8Encoding]::new($false))
+    if ($lines.Count -eq 0) { return $agents }
+    if ("$(Get-Field ($lines[0] | ConvertFrom-Json) 'apiVersion')" -ne $Version) { return @{} }
+    for ($i = 1; $i -lt $lines.Count; $i++) {
+      if (-not $lines[$i].Trim()) { continue }
+      $entry = $lines[$i] | ConvertFrom-Json
+      $id = "$(Get-Field $entry 'id')"
+      if ($id) { $agents[$id] = $entry }
+    }
+    return $agents
+  } catch {
+    Write-Host "detail cache unreadable ($($_.Exception.Message)); fetching every detail" -ForegroundColor Yellow
+    return @{}
+  }
+}
+
+function Test-NeedsDetail {
+  # Fetch when the agent is uncached, its cache entry has no detail, the list's
+  # lastModifiedDateTime differs from the cached one (newer or older), or the cached
+  # detail is older than the cutoff - the weekly refresh that keeps usage fields fresh.
+  param($Package, $Entry, [datetime]$CutoffUtc)
+  if ($null -eq $Entry) { return $true }
+  if ($null -eq (Get-Field $Entry 'detail')) { return $true }
+  if ((ConvertTo-StampKey (Get-Field $Package 'lastModifiedDateTime')) -ne (ConvertTo-StampKey (Get-Field $Entry 'lastModified'))) { return $true }
+  $asOf = [datetimeoffset]::MinValue
+  $stamp = ConvertTo-StampKey (Get-Field $Entry 'detailAsOfUtc')
+  if (-not $stamp -or -not [datetimeoffset]::TryParse($stamp, [cultureinfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AssumeUniversal, [ref]$asOf)) { return $true }
+  return ($asOf.UtcDateTime -lt $CutoffUtc)
+}
+
+function Write-DetailCache {
+  # Written only after the CSV, and only for agents in today's list, so a failed run
+  # never advances the cache and deleted agents drop out.
+  param([string]$Path, [string]$Version, $Entries)
+  $lines = [System.Collections.Generic.List[string]]::new()
+  $lines.Add(([ordered]@{ apiVersion = $Version } | ConvertTo-Json -Compress))
+  foreach ($entry in $Entries) { $lines.Add(($entry | ConvertTo-Json -Depth 50 -Compress)) }
+  $tmp = "$Path.tmp"
+  [System.IO.File]::WriteAllLines($tmp, $lines, [System.Text.UTF8Encoding]::new($false))
+  Move-Item -LiteralPath $tmp -Destination $Path -Force
+}
+
+#############################################################
 # Creator resolution
 #############################################################
 
@@ -587,45 +695,88 @@ function Write-RegistryCsv {
 }
 
 function Export-Agents365Registry {
-  param([string]$OutputCsvPath, [string]$Version, [switch]$NoDetail, [switch]$NoCreators, [switch]$AllowEmptySnapshot)
+  param([string]$OutputCsvPath, [string]$Version, [switch]$NoDetail, [switch]$NoCreators, [switch]$AllowEmptySnapshot,
+        [int]$FullRefreshDays = 7)
   if (-not [System.IO.Path]::IsPathRooted($OutputCsvPath)) {
     $OutputCsvPath = Join-Path -Path (Get-Location -PSProvider FileSystem).ProviderPath -ChildPath $OutputCsvPath
   }
   $OutputCsvPath = [System.IO.Path]::GetFullPath($OutputCsvPath)
   $script:ElementSkips = @{}
+  $nowUtc = [datetime]::UtcNow
+  $cachePath = Get-DetailCachePath $OutputCsvPath
 
   $catalog = Get-AgentPackages -Version $Version
   Write-Host "packages in catalogue: $($catalog.Packages.Count)"
 
+  $cache = @{}
+  $cutoffUtc = $nowUtc
+  if (-not $NoDetail) {
+    $cache = Read-DetailCache -Path $cachePath -Version $Version
+    if ($FullRefreshDays -gt 0) { $cutoffUtc = $nowUtc.AddDays(-$FullRefreshDays) } else { $cutoffUtc = [datetime]::MaxValue }
+    Write-Host "detail: $($cache.Count) cached; re-fetching new, modified and older-than-$FullRefreshDays-day agents"
+  }
+
   $details = [System.Collections.Generic.List[object]]::new()
+  $meta = [System.Collections.Generic.List[object]]::new()
   foreach ($package in $catalog.Packages) {
     $id = Get-Field $package 'id'
     if (-not $id) { $id = Get-Field $package 'titleId' }
     if (-not $id) { $id = Get-Field $package 'packageId' }
     if (-not $id) { throw 'Agent 365 catalogue item is missing id/titleId/packageId.' }
-    if ($NoDetail) { $details.Add((Merge-Detail $package $null)); continue }
-    $detail = Invoke-Graph -Uri "$($catalog.Base)/$id"
-    $details.Add((Merge-Detail $package $detail))
+    $id = "$id"
+    if ($NoDetail) { $details.Add((Merge-Detail $package $null)); $meta.Add($null); continue }
+    $entry = if ($cache.ContainsKey($id)) { $cache[$id] } else { $null }
+    if (Test-NeedsDetail $package $entry $cutoffUtc) {
+      # Fresh detail goes over the list fields.
+      $detail = Invoke-Graph -Uri "$($catalog.Base)/$id"
+      $details.Add((Merge-Detail $package $detail))
+      $meta.Add(@{ Id = $id; Fetched = $true; Detail = $detail; AsOf = $nowUtc; Entry = $entry
+                   LastModified = (ConvertTo-StampKey (Get-Field $package 'lastModifiedDateTime')) })
+    } else {
+      # Cached detail, with today's list fields over it.
+      $cachedDetail = Get-Field $entry 'detail'
+      $details.Add((Merge-Detail $cachedDetail $package))
+      $meta.Add(@{ Id = $id; Fetched = $false; Detail = $cachedDetail; AsOf = (Get-Field $entry 'detailAsOfUtc'); Entry = $entry
+                   LastModified = (ConvertTo-StampKey (Get-Field $entry 'lastModified')) })
+    }
   }
-  if (-not $NoDetail) { Write-Host "details fetched: $($details.Count)" }
+  if (-not $NoDetail) {
+    $fetched = @($meta | Where-Object { $_.Fetched }).Count
+    Write-Host "details fetched: $fetched, reused from cache: $($details.Count - $fetched)"
+  }
 
   $titleIds = @($details | ForEach-Object { Get-TitleId $_ })
   $upn = @{}
   $source = @{}
+  $settled = @{}
+  # Reuse the cached creator for agents whose detail was not re-fetched. Agents cached
+  # as unattributed are retried at their next detail fetch, not on every run.
+  for ($i = 0; $i -lt $details.Count -and -not $NoCreators; $i++) {
+    $m = $meta[$i]
+    if ($null -eq $m -or $m.Fetched) { continue }
+    $cachedSource = "$(Get-Field $m.Entry 'creatorSource')"
+    if (-not $cachedSource) { continue }
+    $settled[$i] = $true
+    $cachedUpn = "$(Get-Field $m.Entry 'creatorUpn')"
+    if ($cachedSource -ne 'unattributed' -and $cachedUpn) { $upn[$i] = $cachedUpn; $source[$i] = $cachedSource }
+  }
   if (-not $NoCreators -and $details.Count) {
+    Write-Host "creators reused from cache: $($settled.Count)"
     $ownerIds = @($details | ForEach-Object { "$(Get-Field $_ 'ownerId')" })
-    $populated = @($ownerIds | Where-Object { $_ }).Count
-    Write-Host "tier1: ownerId populated on $populated/$($details.Count) agents"
-    if ($populated) {
-      $map = Resolve-OwnerIds $ownerIds
+    $pending = @(for ($i = 0; $i -lt $details.Count; $i++) { if ($ownerIds[$i] -and -not $settled.ContainsKey($i)) { $ownerIds[$i] } })
+    Write-Host "tier1: ownerId populated on $(@($ownerIds | Where-Object { $_ }).Count)/$($details.Count) agents, $($pending.Count) to resolve"
+    $before = $upn.Count
+    if ($pending.Count) {
+      $map = Resolve-OwnerIds $pending
       for ($i = 0; $i -lt $details.Count; $i++) {
+        if ($settled.ContainsKey($i)) { continue }
         if ($ownerIds[$i] -and $map.ContainsKey($ownerIds[$i])) { $upn[$i] = $map[$ownerIds[$i]]; $source[$i] = 'ownerId' }
       }
     }
-    Write-Host "tier1: resolved $($upn.Count)"
+    Write-Host "tier1: resolved $($upn.Count - $before)"
     $before = $upn.Count
     for ($i = 0; $i -lt $details.Count; $i++) {
-      if ($upn.ContainsKey($i)) { continue }
+      if ($upn.ContainsKey($i) -or $settled.ContainsKey($i)) { continue }
       $owner = Resolve-SpOwner -AppId "$(Get-Field $details[$i] 'appId')" -AgentIdentityId "$(Get-Field $details[$i] 'agentIdentityId')"
       if ($owner) { $upn[$i] = $owner; $source[$i] = 'servicePrincipalOwner' }
     }
@@ -645,6 +796,23 @@ function Export-Agents365Registry {
   }
   Write-RegistryCsv -Rows $rows -Path $OutputCsvPath
 
+  if (-not $NoDetail) {
+    $entries = for ($i = 0; $i -lt $details.Count; $i++) {
+      $m = $meta[$i]
+      if ($NoCreators) {
+        # Creators were not resolved this run: keep whatever the cache already had.
+        $cUpn = "$(Get-Field $m.Entry 'creatorUpn')"
+        $cSource = if ($m.Fetched) { '' } else { "$(Get-Field $m.Entry 'creatorSource')" }
+      } else {
+        $cUpn = "$($upn[$i])"
+        $cSource = if ($source.ContainsKey($i)) { $source[$i] } else { 'unattributed' }
+      }
+      [ordered]@{ id = $m.Id; lastModified = $m.LastModified; detailAsOfUtc = (ConvertTo-Text $m.AsOf)
+                  creatorUpn = $cUpn; creatorSource = $cSource; detail = $m.Detail }
+    }
+    Write-DetailCache -Path $cachePath -Version $Version -Entries @($entries)
+  }
+
   if ($script:ElementSkips.Count) {
     Write-Host "elementDetails entries skipped: $((@($script:ElementSkips.Values) | Measure-Object -Sum).Sum)" -ForegroundColor Yellow
     foreach ($k in ($script:ElementSkips.Keys | Sort-Object)) { Write-Host ("   {0,-44} {1}" -f $k, $script:ElementSkips[$k]) }
@@ -660,5 +828,6 @@ function Export-Agents365Registry {
 if ($MyInvocation.InvocationName -ne '.') {
   Connect-Registry -Mode $Auth -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret
   [void](Export-Agents365Registry -OutputCsvPath $OutputCsv -Version $ApiVersion `
-    -NoDetail:$SkipDetail -NoCreators:$SkipCreatorResolution -AllowEmptySnapshot:$AllowEmpty)
+    -NoDetail:$SkipDetail -NoCreators:$SkipCreatorResolution -AllowEmptySnapshot:$AllowEmpty `
+    -FullRefreshDays $FullDetailRefreshDays)
 }

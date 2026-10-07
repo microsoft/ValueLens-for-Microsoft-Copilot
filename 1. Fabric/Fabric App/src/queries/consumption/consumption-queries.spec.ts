@@ -274,6 +274,41 @@ describe("cowork group tree", () => {
         expect(tree.total?.["PAYG Cost"]).toBeGreaterThan(0);
         expect(tree.rows.every((row) => row["PAYG Cost"] === 0)).toBe(true);
     });
+
+    it("names people from the org data, then the billing export, and keeps namesakes apart", () => {
+        const [total, group] = byGroupRows as FixtureRow[];
+        const person = (signIn: string | null, name: string | null, billingName: string | null): FixtureRow => ({
+            ...group,
+            "Org[DisplayName]": name,
+            "Org[UserPrincipalName]": signIn,
+            "[Is Group Total]": false,
+            "[Users]": 1,
+            "[Billing Name]": billingName,
+        });
+        const people = toCoworkGroupTree(
+            fixtureTable(
+                [
+                    total,
+                    group,
+                    person("alexw@contoso.com", "Alex Wilber", "alexw"),
+                    person("alex.wilber@contoso.com", "Alex Wilber", "alex.wilber"),
+                    person("meganb@contoso.com", null, "Megan Bowen"),
+                    person("leeg@contoso.com", null, null),
+                    person(null, null, "Unrelated Name"),
+                ],
+                liveColumns.coworkByGroup,
+                columnMetadata,
+            ),
+        ).rows[0]._children;
+        expect(people?.map((row) => row[COWORK_LABEL_COLUMN])).toEqual([
+            "Alex Wilber",
+            "Alex Wilber",
+            "Megan Bowen",
+            "leeg@contoso.com",
+            "(No value)",
+        ]);
+        expect(new Set(people?.map((row) => row._id)).size).toBe(5);
+    });
 });
 
 describe("studio user tree", () => {

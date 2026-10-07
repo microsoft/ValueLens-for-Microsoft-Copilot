@@ -171,7 +171,11 @@ def verification():
         assert on.where(F.col("Id").isin("row-1", "row-2", "row-3")).count() == 3
         assert on.where(~F.col("AccessedResource_SensitivityLabelId").eqNullSafe("canonical-label")).count() == 0
         assert on.where(~F.col("AppIdentity_DisplayName").eqNullSafe("canonical display")).count() == 0
-        assert on.where(~F.col("Agent_LinkID").eqNullSafe("title-1")).count() == 0
+        # Rows with an Entra agent ID or a Title ID link; rows that only carry an agent
+        # name stay unlinked (agents are never matched on name).
+        name_only = [f"row-{i}" for i in range(len(payloads)) if i % 3 == 2]
+        assert on.where(~F.col("Id").isin(*name_only) & ~F.col("Agent_LinkID").eqNullSafe("title-1")).count() == 0
+        assert on.where(F.col("Id").isin(*name_only) & F.col("Agent_LinkID").isNotNull()).count() == 0
         assert on.where((F.col("Id") == "row-2") & ~F.col("Has license").eqNullSafe("Yes")).count() == 0
         assert on.where(F.col("Id").isin("row-3", "row-4", "row-5") & F.col("Has license").isNotNull()).count() == 0
         report["checks"].append("resource explosion, empty-resource survival, duplicate and canonical/link preservation")

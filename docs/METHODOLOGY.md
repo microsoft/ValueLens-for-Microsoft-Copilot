@@ -16,7 +16,9 @@ carries the same caveats inside the report.
 1. [What the data can and can't tell you](#1-what-the-data-can-and-cant-tell-you)
 2. [From audit record to dashboard row](#2-from-audit-record-to-dashboard-row)
 3. [How each interaction is classified](#3-how-each-interaction-is-classified), including
-   [from signal to task category](#32-from-signal-to-task-category)
+   [from signal to task category](#32-from-signal-to-task-category),
+   [the Signal → Impact reference](#34-signal--impact-reference) and
+   [the app host reference](#35-app-host-reference)
 4. [Counting units](#4-counting-units)
 5. [Estimated value](#5-estimated-value)
 6. [Page by page](#6-page-by-page)
@@ -66,15 +68,63 @@ flowchart LR
 | Step | What happens |
 |---|---|
 | **1. Collect** | On Fabric, `Copilot_Audit_Log_Direct_Ingester` calls the Microsoft Graph audit log query API (`security/auditLog/queries`) for `copilotInteraction` records each week. The other paths export the same records; see each path's README. |
-| **2. Flatten** | Each record carries a list of messages and a list of accessed resources. Responses are dropped. Each prompt is paired with every resource the interaction accessed, so there is **one row per prompt × resource**; a prompt with no resources keeps one row. On the reference data that averages 2.65 rows per prompt. |
-| **3. De-duplicate** | Each row's ID is a SHA-256 hash of its record, message and resource keys. Duplicate IDs are dropped, so re-running a week never double-counts. |
+| **2. Flatten** | Each record carries a list of messages and a list of accessed resources. Responses are dropped. Each prompt is paired with every resource the interaction accessed, so there is **one row per prompt × resource**; a prompt with no resources keeps one row. On the reference data that averages 2.65 rows per prompt. A Copilot Studio agent used in Teams or another channel logs a runtime record with **no messages**; it is kept as one row that is not a prompt (`Message_isPrompt` FALSE), so its user still counts. Records that are not end-user agent usage are dropped ([§2.1](#21-which-audit-records-count)). |
+| **3. De-duplicate** | Each row's ID is a SHA-256 hash of its record, message and resource keys. Duplicate IDs are dropped, so re-running a week never double-counts. Each run also re-queries the trailing `LOOKBACK_DAYS` (default 7) to pick up records that Purview logs late. |
 | **4. Date** | `InteractionDate`, `WeekStart` (Monday) and `MonthStart`, all from the record's UTC timestamp. |
 | **5. Licence** | The user ID is lower-cased and trimmed, then matched to the licensed-users table. `Has license` of YES, TRUE, Y or 1 gives **M365 Copilot Licensed**; anything else, including no match, gives **Unlicensed**. |
-| **6. Link agents** | Each agent row is linked to the Agent 365 registry by Entra app ID, then Title ID, then normalised name. The first match wins. |
+| **6. Link agents** | Each agent row is linked to the Agent 365 registry by Title ID, then Copilot Studio Bot Id, then Entra agent ID. The first match wins. Agents are never matched by name ([§2.2](#22-how-agents-are-linked-to-the-registry)). |
 | **7. Classify** | The rules in [§3](#3-how-each-interaction-is-classified). On Fabric the `Copilot_Audit_Log_Processor` notebook runs them in Spark and writes `copilot_interactions_curated`. The other paths run [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../4.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py), which classifies agents less finely ([§3.2](#paths-2-3-and-4)). |
 | **8. Model** | The model reads the curated rows without reclassifying them. It joins org data (organisation, department, location) on the normalised person ID, and computes the measures. On Fabric, refresh is incremental by `CreationDate`. |
 
 Table and column contracts are in the [data dictionary](DATA-DICTIONARY.md).
+
+### 2.1 Which audit records count
+
+Some `CopilotInteraction` records are not someone using an agent. The ingesters flag them in
+`Exclude_Reason`, and the processors drop every reason listed in `DROP_EXCLUDE_REASONS`
+(all of them by default). The first rule that fits wins:
+
+| `Exclude_Reason` | Rule | Why it is dropped |
+|---|---|---|
+| Copilot Studio test pane | App host is "Copilot Studio" | A maker testing the agent |
+| Maker evaluation | App host is "pva-maker-evaluation" | An automated evaluation run |
+| Agent authoring | App host is "agentic-builder" | Building the agent, not using it |
+| Autonomous run | App host is "autonomous" | No person in the loop |
+| Workflow run | App host is "workflow-agents" | No person in the loop |
+| M365 Copilot twin | A Copilot Studio runtime record with no messages, logged with app host "m365copilot" | Microsoft 365 Copilot logs the same turn again with its messages, so it would count twice |
+| Fabric multi-agent | The agent ID is all zeros | An internal Fabric orchestration record |
+
+To report autonomous agent activity, remove "Autonomous run" and "Workflow run" from
+`DROP_EXCLUDE_REASONS`. Rows a previous run already wrote are removed when their reason is listed.
+
+### 2.2 How agents are linked to the registry
+
+The audit log identifies an agent in several ways, and rarely by the registry's Title ID alone. The
+processor tries each key in turn and stops at the first that matches a registry row:
+
+1. **Title ID**, parsed from the agent ID (`T_…`, `P_…`, `CopilotStudio.Declarative.…`, or a Title ID
+   inside a schema name).
+2. **Copilot Studio Bot Id**, parsed from `PlatformAgentId` on runtime records
+   (`<environment id>_<bot id>`), matched to the registry's `Bot Id`.
+3. **Entra agent ID**, the GUID Agent 365 stamps into the audit `AgentId`, matched to the registry's
+   `Entra Agent ID` (`agentIdentityId`).
+
+Agents are **never matched by name**: names are not unique, and two agents called "HR Helper" would
+merge. On one large tenant name matching linked only about 1.3% more rows, and a direct Title ID
+match linked 55%. A row with a key that matches nothing has `Agent_LinkMethod` "Unlinked"; a row
+with no key has none.
+
+**One agent, two Title IDs.** Publishing a Copilot Studio agent to the organisation (LOB) and sharing
+it creates two registry entries with different Title IDs. When both carry the same Bot Id or Entra
+agent ID they are one agent: both copies link to the LOB Title ID (or, for two Shared copies, the
+most recently updated), so the agent's distinct users are counted once. `Agent_MatchedTitleID` keeps
+the Title ID that actually matched. Agent Builder agents and Microsoft agents are never merged,
+because their copies can be different agents.
+
+The Local CSV processor (Path 4, also run by the Power Automate path) drops the same records and
+keeps the same runtime records. The SharePoint path processes audit data with the PAX script's own
+copy of that processor, which does so only once PAX takes the same change. On all three paths agent
+linking runs in the template, not the processor.
 
 ---
 
@@ -94,7 +144,8 @@ is a separate dimension, so you can combine the two, for example "Unlicensed × 
 ### 3.2 From signal to task category
 
 Each Copilot and agent interaction is classified at two levels: a behaviour, and the task category
-that groups it. Cowork prompts are categorised separately; that method is being revised and isn't
+that groups it. The report and the Fabric App call them **Task Breakdown** and **Task Category**.
+Cowork prompts are categorised separately; that method is being revised and isn't
 documented here yet.
 
 | Level | Column | Values | What it says |
@@ -183,6 +234,11 @@ Research). Failing that, the open file and then the app host decide:
 | Power BI or data warehousing | Data Querying | Data & Analysis |
 | Nothing matched | General Chat | General Chat & Q&A |
 
+The app host fills in whenever the resource doesn't say, so many behaviours come from the host
+application rather than the action. Creation-heavy work is under-counted next to summarising and
+review, so treat the task mix as indicative. The **📖 Metric Glossary** explains this under App host,
+and [§3.5](#35-app-host-reference) lists every app host value.
+
 #### Step 2: agent keywords
 
 Agent rows rarely carry a useful resource, so most reach step 1's General Chat. When
@@ -231,6 +287,11 @@ All seven results are in the Collaboration & Workflows task category.
 Each behaviour has a row in the `Human Time Estimates` table, which holds its task category and time
 band. The model reaches it through the `Behavior Value Map`. Every behaviour the
 processors can produce has a row, so no Copilot or agent row is left without a category.
+The `Behavior Value Map` also gives each behaviour a one-line **Description**, shown beside its use
+case on the **🧬 Appendix: Signal → Impact** page and in the Fabric App. All 48 are listed in
+[`task-descriptions.json`](../1.%20Fabric/Fabric%20App/src/queries/appendix/task-descriptions.json),
+which the Fabric App reads. A test keeps that file and every template the same. [§3.4](#34-signal--impact-reference)
+lists each description with its signal and time band.
 
 | Task category | Behaviours |
 |---|---|
@@ -270,6 +331,11 @@ doesn't split workflows, and doesn't apply the name keywords to agent rows. So o
 these paths agent chats with no matching resource stay General Chat, and workflows stay Running a
 Workflow. Both still get a task category.
 
+Its default `--profile aibv` output drops the same records as the Fabric processor
+([§2.1](#21-which-audit-records-count)), keeps Copilot Studio runtime records with no messages, and
+writes the agent keys (`Agent_TitleID`, `Agent_EntraId`, `Agent_BotId`, `Agent_EnvironmentId`) and
+`Exclude_Reason`, so the template can link agents.
+
 #### Where each level shows
 
 | Level | Where |
@@ -277,9 +343,9 @@ Workflow. Both still get a task category.
 | Behaviour | Task Breakdown's behaviour view, the Leaderboard's activity table for Copilot and agents, and the time bands ([§5.2](#52-copilot-and-agents-behaviour-basis)) |
 | Task category | Estimated Value by task, Model Fit by task, and the **🧬 Appendix: Signal → Impact** page |
 
-Under each task category, the detail rows (`Task Breakdown Category`) show the behaviour. The pages label the two levels
-differently: Estimated Value calls them Category and Task, and the Leaderboard calls them task group
-and task category.
+Under each task category, the detail rows (`Task Breakdown Category`) show the behaviour. Every page
+labels the two levels the same way: **Task Category** for the 12 groups and **Task Breakdown** for
+the behaviour.
 
 ### 3.3 Other derived columns
 
@@ -292,6 +358,241 @@ and task category.
 | **AI model** | The logged model name, bucketed into GPT-4, GPT-4.1, GPT-5, o-series, Claude, Gemini, LLaMA and Phi. No model logged gives "Embedded App (no model logged)" |
 | **Workflow action** | For workflow rows, the verb: sending, creating, invoking, updating, reading or deleting |
 | **Plausible behaviour** | For unlicensed users, behaviours that need licensed Copilot are relabelled "Free Chat Workaround (pasting …)": the content was pasted into free Copilot Chat |
+
+#### Agent type classification
+
+Every row that involves an agent gets an **agent type** (`Agent_Type`), a
+**publisher**, a **published** flag and a **consolidated name**
+([column definitions and coverage by variant](DATA-DICTIONARY.md#agent-type-and-publisher)). The
+rules run in the Fabric and Local CSV processors (the Dataverse snapshot builder uses the Local CSV
+one), and in Power Query (`ValueLensDescribeAgent`) for extracts that lack the columns, such as PAX
+rollups. The rules read the audit
+agent ID (`CopilotEventData.TargetPlatformAgentId`, else `AgentId`, else `PlatformAgentId`), the
+agent name, `AppIdentity`, `PlatformAgentType` and the workload. The first matching rule wins:
+
+| # | Rule (case-insensitive) | Agent type | Publisher / published | Basis |
+|---|---|---|---|---|
+| 0 | Key in the optional overrides (Fabric `agent_type_overrides` table or the Local CSV `--agent-type-overrides` CSV; agent ID, then name, then AppIdentity) | The override | From the category | override |
+| 1 | Workload `AIApp` or AppIdentity `AIApp.*` (third-party AI apps such as ChatGPT) | Not an agent | – | – |
+| 2 | Workload or AppIdentity `ConnectedAIApp` (for example Foundry apps) | Custom / third-party AI apps registered in your organisation | Connected app / unknown | documented |
+| 3 | AppIdentity `Copilot.TeamCopilot.*` | Microsoft Facilitator (Teams) | Microsoft / yes | documented |
+| 4 | `customengine` in the agent ID or AppIdentity | Copilot Studio - custom engine agents | Your organisation / unknown | documented |
+| 5 | `CopilotStudio.Declarative` or `Copilot.Studio.Declarative` in the agent ID or AppIdentity | Microsoft 365 Copilot Agent Builder - declarative agents | Your organisation / unknown | documented |
+| 6 | AppIdentity `MicrosoftAgent.*`, agent ID `BuiltIn_*`, or a known Microsoft agent name (Researcher, Analyst, Word Drafting Agent, Prompt Coach, …) | Microsoft first-party agents: **M365 Copilot agents** when AppIdentity is `Copilot.M365Copilot*`; **published** when AppIdentity is `MicrosoftAgent.<name>.P_<id>`, or (with no MicrosoftAgent AppIdentity) the agent ID starts `P_`; otherwise **non-published** | Microsoft / yes, yes, no | documented / observed |
+| 7 | AppIdentity `Copilot.Studio.*` or PlatformAgentType `CopilotStudio` | Copilot Studio - other / standalone agents | Your organisation / unknown | documented |
+| 8 | No agent ID, name or type | Not an agent (plain Copilot chat) | – | – |
+| 9 | Agent ID (else AppIdentity) starts `T_` | Published by your organisation | Your organisation / yes | **inferred** |
+| 10 | … starts `U_` | Shared by creator | User-shared / no | **inferred** |
+| 11 | … starts `P_` | Agent Store package (publisher not identified) | Agent Store / yes | **inferred** |
+| 12 | AppIdentity `Copilot.M365Copilot*` | Microsoft first-party agents - M365 Copilot agents | Microsoft / yes | observed |
+| 13 | Anything else | Unclassified agents | Unknown / unknown | – |
+
+- **The `T_` / `U_` / `P_` prefixes are not documented by Microsoft.** They are a convention seen
+  in real audit data, so these rows are marked `inferred`. Treat them as a best guess and use the
+  overrides table where you know better.
+- **Known Microsoft agent names** are matched ignoring case, spaces and punctuation, so
+  `WordDraftingAgent` and `Word Drafting Agent` are the same agent. The list is
+  `MICROSOFT_AGENT_NAMES` in the processor's helpers cell (the Local CSV processor and
+  `ValueLensDescribeAgent` carry the same list).
+- **Consolidated name.** All Microsoft first-party rows for one agent share one
+  `Agent_Consolidated_Name` (for example `Researcher`) across agent IDs, AppIdentity values and
+  hosts, so they roll up to one line. Other agents keep their own name. `Agent_LinkID` registry
+  linking ([§2.2](#22-how-agents-are-linked-to-the-registry)) is unchanged and still never uses names.
+- The rules are a port of a Purview audit-log analyser script, and the category names match it.
+  The Local CSV processor holds an exact copy of the Fabric code and `ValueLensDescribeAgent` a
+  Power Query port; `tests/test_agent_type_parity.py` fails if either drifts.
+
+### 3.4 Signal → Impact reference
+
+What each Task Breakdown means, the audit signal that produces it, and the time a person would
+otherwise spend on it. This matches the **🧬 Appendix: Signal → Impact** page. The Description is
+taken word for word from
+[`task-descriptions.json`](../1.%20Fabric/Fabric%20App/src/queries/appendix/task-descriptions.json).
+The signal summarises the rules in [§3.2](#32-from-signal-to-task-category), where the full order is
+set out. *Typical min* is the default effort scenario. The low and high ends of each band, its grain
+and its research source are in the [appendix](#appendix-time-bands-and-sources).
+
+> The Signal → Impact page in the Fabric App shows a single **Human Equivalent (Minutes)** figure.
+> It comes from the older `Human Baseline (min)` column, which no measure uses, so for some tasks it
+> differs from the Typical figure below (for example, Document Drafting reads 60, not 42). Hours and
+> value are always calculated from the bands.
+
+#### Coding & Technical
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Code Analysis | A code or text file, or a link to a developer site such as GitHub or Stack Overflow | Reading code or developer websites to explain, review or debug code. | 30 | Medium |
+| Code Writing | A code file with an active action | Writing or changing code or scripts. | 45 | High |
+
+#### Collaboration & Workflows
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Coordination Workflow | A workflow mentioning Planner, tasks, approvals, Teams, notifications or lists | Running an automated flow that handles tasks, approvals or team notifications. | 11 | Low |
+| Data & Reporting Workflow | A workflow mentioning Power BI, Dataverse, datasets, reports, Excel or SQL | Running an automated flow that refreshes data or produces a report. | 15 | Low |
+| Document Workflow | A workflow mentioning SharePoint, OneDrive, Word, documents or files | Running an automated flow that creates, files or shares documents. | 15 | Low |
+| Email Workflow | A workflow mentioning Outlook, Exchange or mail | Running an automated flow that sorts, routes or answers email. | 12 | Low |
+| Form / Survey Work | App host Forms | Building a form, quiz or survey in Forms, or reviewing its answers. | 25 | Low |
+| General Workflow | A workflow that matches no narrower group | Running an automated multi-step flow that fits no narrower group. | 15 | Low |
+| Meeting Workflow | A workflow mentioning calendars, meetings or scheduling | Running an automated flow that handles scheduling or meeting logistics. | 15 | Low |
+| Real-time Collaboration | A Loop page, or app host Loop, Whiteboard or Viva Engage | Working on something together in Loop, Whiteboard or Viva Engage. | 11 | Medium |
+| Running a Workflow | A flow, or a connector or HTTP call with an active action. Split into the workflow types in this table on the Fabric path | Starting an automated flow or connector. | 15 | Low |
+| Specialist / Line-of-Business Workflow | A workflow mentioning ServiceNow, Salesforce, Dynamics, Workday, Jira or Zendesk | Running an automated flow in a business system such as ServiceNow, Salesforce, Dynamics or Workday. | 15 | Low |
+| Task Management | A Planner plan or task, or app host Planner | Creating, tracking or updating tasks in Planner. | 11 | Low |
+| Teams Messaging | A Teams message, chat or channel, or a post or create-chat action | Writing or posting a message in a Teams chat or channel. | 8 | Medium |
+
+#### Creative & Design
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Ideation & Creative | An agent named or described for ideas, brainstorming, creativity or design, or one that can generate images | Using a creative agent to brainstorm ideas or design concepts. | 40 | Medium |
+| Image / Media Analysis | An image with no active action | Looking at an image to describe or review it. | 8 | Low |
+| Image Generation | An image with an active action, or app host Designer | Creating or editing an image, for example in Designer. | 42 | Low |
+
+#### Data & Analysis
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Data & Reporting | An agent named or described for data, reports, dashboards or metrics, or one that can use the code interpreter | Using a data or reporting agent to query data or build a report. | 35 | Low |
+| Data Querying | A dataset query or a list or table read, or app host Power BI or a Fabric warehouse | Querying a dataset, list or table to answer a data question. | 30 | Low |
+| Excel Assistance | A spreadsheet with an active action, or app host Excel | Getting help with formulas, formatting or analysis in Excel. | 30 | Low |
+| Spreadsheet Review | A spreadsheet or CSV file with no active action, or an open spreadsheet | Reading a spreadsheet or CSV file to check or explain the numbers. | 25 | Low |
+
+#### Document Creation
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Content Generation | An agent named or described for summarising, drafting, translation or content | Using a writing agent to draft, summarise or translate content. | 25 | Medium-High |
+| Document Drafting | A Word document with an active action, or app host Word with an active action | Writing or editing a document in Word. | 42 | High |
+| Note Taking | App host OneNote | Capturing or organising notes in OneNote. | 20 | Low |
+
+#### Document Summarisation
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Document Summarising | A Word document with an action that is neither active nor exactly "read", an open Word document, or app host Word with no active action | Reading a Word document to summarise it or answer questions about it. | 20 | Medium-High |
+| PDF Analysis | A PDF | Reading a PDF to summarise it or answer questions about it. | 35 | Medium |
+| Presentation Summarising | A PowerPoint file with an action that is neither active nor exactly "read", an open presentation, or app host PowerPoint with no active action | Reading a PowerPoint deck to summarise it or pull out key points. | 12 | Medium |
+
+#### Email
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Email Drafting | An email send or draft action, or app host Outlook with an active action | Writing or replying to an email in Outlook. | 8 | Medium |
+| Email Summarising | Any other email message, or app host Outlook with no active action | Reading emails in Outlook to summarise or sort them. | 4 | Medium |
+
+#### General Chat & Q&A
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| General Assistance | An agent whose name, description and capabilities match no keyword | Using an agent whose name and tools don't show what kind of work it did. | 8 | Low |
+| General Chat | No resource, plugin, open file or app host rule matched | Asking a question or chatting with AI, without a file, app or tool. | 8 | Medium |
+
+#### Meetings
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Meeting Prep | A calendar event or Teams meeting, or an open Teams meeting | Reading a meeting invite or calendar event to prepare or catch up. | 15 | Medium |
+| Meeting Scheduling | A meeting-management action | Booking meetings, finding free time or managing a calendar. | 12 | Medium |
+| Video Summarising | A video, an open video, or app host Stream | Summarising or asking about a video or meeting recording. | 30 | Low |
+
+#### Presentations
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Presentation Creation | A PowerPoint file with an active action, or app host PowerPoint with an active action | Building or editing slides in PowerPoint. | 42 | Medium |
+
+#### Search & Research
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Enterprise Searching | A SharePoint list item, page or link, the enterprise search plugin, or an open SharePoint page | Searching your organisation's own pages, lists and sites. | 18 | Medium |
+| File Retrieval | A Word or PowerPoint file that was read | Pulling a Word or PowerPoint file into a chat for context. | 15 | Medium |
+| Knowledge Base | An agent named or described for knowledge, FAQs, wikis or guides, or one that can read SharePoint | Using a knowledge agent to answer questions from your organisation's guidance and documents. | 12 | Medium |
+| People Lookup | A people answer | Finding colleagues, experts or who works with whom. | 8 | Medium |
+| Research & Analysis | An agent named or described for research, analysis or insight | Using a research or analyst agent to gather and make sense of information. | 45 | Medium |
+| SharePoint Access | App host SharePoint | Finding or browsing team content in SharePoint. | 12 | Medium |
+| Web Searching | A web search query, or any other link or external resource | Searching the public web to answer a question. | 22 | Medium |
+
+#### Specialist Support
+
+| Task Breakdown | Signal | Description | Typical min | Confidence |
+|---|---|---|---:|---|
+| Coaching | An agent named or described for coaching, mentoring, learning or careers, or a link to a learning site | Using a coaching or learning agent to build skills or improve work. | 40 | Low |
+| Compliance & Policy | An agent named or described for policy, compliance, legal, audit or risk | Using a policy, legal or risk agent to check rules and compliance. | 25 | Medium |
+| Domain-Specific Agent | App host Copilot Studio. Those records are dropped by default ([§3.5](#35-app-host-reference)), so this appears only if that exclusion is removed | Using a specialist agent built in Copilot Studio. | 25 | Low |
+| HR & People | An agent named or described for HR, recruiting, talent or onboarding | Using an HR agent for hiring, onboarding or people questions. | 35 | Low |
+| IT & Service Desk | An agent named or described for support, help desks or tickets, or a ServiceNow site | Using an IT or service desk agent to fix a problem or raise a ticket. | 20 | Medium-High |
+| Sales & Customer | An agent named or described for sales, customers or CRM, or a Dynamics site | Using a sales or customer agent for accounts, deals or customer insight. | 35 | Medium |
+
+Agent keywords and the workflow split run only on the Fabric path. On paths 2, 3 and 4 those rows
+stay General Chat or Running a Workflow ([§3.2](#paths-2-3-and-4)).
+
+### 3.5 App host reference
+
+The app host (`AppHost`) is the Microsoft 365 surface the audit log says an interaction happened in.
+It records where Copilot was used, not what the person did. Each row is classified first by the
+resource it touched, then by the enterprise search plugin and the open file. The app host decides the
+Task Breakdown only when none of those match ([§3.2](#step-1-base-behaviour)). Host matching ignores
+case and surrounding spaces.
+
+Microsoft doesn't publish a complete list of app host values, and new surfaces appear over time. The
+descriptions below say what ValueLens does with each value. Where a description says which product
+logs it, check it against your own data.
+
+#### Hosts that set a task
+
+These match a host rule in step 1. The Task Breakdown applies only when no resource, plugin or open
+file decided first.
+
+| App host | What it is | Task Breakdown | Task Category |
+|---|---|---|---|
+| Outlook, OutlookSidepane | Copilot in Outlook | Email Drafting if the action was active; otherwise Email Summarising | Email |
+| Word | Copilot in Word | Document Drafting if active; otherwise Document Summarising | Document Creation / Document Summarisation |
+| Excel | Copilot in Excel | Excel Assistance | Data & Analysis |
+| PowerPoint | Copilot in PowerPoint | Presentation Creation if active; otherwise Presentation Summarising | Presentations / Document Summarisation |
+| OneNote | Copilot in OneNote | Note Taking | Document Creation |
+| Stream | Copilot on a Stream video or recording | Video Summarising | Meetings |
+| SharePoint | Copilot in SharePoint | SharePoint Access | Search & Research |
+| Designer | Microsoft Designer | Image Generation | Creative & Design |
+| Forms | Copilot in Microsoft Forms | Form / Survey Work | Collaboration & Workflows |
+| Planner | Copilot in Planner | Task Management | Collaboration & Workflows |
+| Loop, Whiteboard, VivaEngage | Shared, real-time workspaces | Real-time Collaboration | Collaboration & Workflows |
+| Power BI, DataWarehousing Core | Copilot in Power BI or a Fabric warehouse | Data Querying | Data & Analysis |
+| Logic App | An agent running in an Azure Logic App | Running a Workflow, but only when an agent name or ID is present | Collaboration & Workflows |
+| Copilot Studio | The Copilot Studio test pane | Domain-Specific Agent, **only if** "Copilot Studio test pane" is removed from `DROP_EXCLUDE_REASONS` | Specialist Support |
+| autonomous | An agent run started by a trigger, with no person in the loop | Running a Workflow, **only if** "Autonomous run" is removed from `DROP_EXCLUDE_REASONS` | Collaboration & Workflows |
+
+By default the last two hosts never reach classification: the records are dropped
+([§2.1](#21-which-audit-records-count)), so no reported row shows Domain-Specific Agent, and none
+reaches Running a Workflow through the autonomous host.
+
+#### Hosts classified by what they touched
+
+These have no host rule. The resource, plugin or open file decides the task. If none matches, the
+row is General Chat (or, on the Fabric path, an agent keyword task when an agent is present).
+
+| App host | What it is | How it is classified |
+|---|---|---|
+| Microsoft365Chat | Microsoft 365 Copilot Chat | By the resource: search, file, email, meeting, person or link. Otherwise General Chat |
+| Microsoft Teams | Copilot in Teams | By the resource or the open meeting (Meeting Prep), chat or channel (Teams Messaging). Otherwise General Chat. "Microsoft Teams" and "Teams" count as one app in sessions ([§4](#4-counting-units)) |
+| Microsoft Edge | Copilot in the Edge sidebar | By the resource, usually a web page or search. Otherwise General Chat |
+| Any host containing "cowork" | Copilot Cowork | Put in the Cowork cohort ([§3.1](#31-cohort)) and categorised separately from Copilot and agent tasks. The Local CSV processor also counts an agent name containing "cowork" |
+| Microsoft Scout | Activity logged under the Scout host | No host rule. It counts as agent activity only when the record carries an agent name or ID. The Fabric processor's `Agent_Surface` column labels a row Scout from the agent *name*, not the host |
+
+A Copilot Studio agent published to Teams or another channel also logs a runtime record with no
+messages. That record is kept as one non-prompt row so its user still counts
+([§2](#2-from-audit-record-to-dashboard-row)). Only the exact host "Copilot Studio" is treated as the
+test pane.
+
+#### Hosts excluded from reporting
+
+These records are not someone using Copilot, so they are flagged in `Exclude_Reason` and dropped by
+default. The rules and reasons are in [§2.1](#21-which-audit-records-count): the hosts are
+"Copilot Studio", "pva-maker-evaluation", "agentic-builder", "autonomous" and "workflow-agents", plus
+message-less "m365copilot" records (the M365 Copilot twin). Records whose agent ID is all zeros are
+also dropped, whatever the host. To report autonomous agents, remove "Autonomous run" and
+"Workflow run" from `DROP_EXCLUDE_REASONS`.
 
 ---
 
@@ -391,7 +692,8 @@ user per week, expert-equivalent hours per week, and the top value outcome.
 
 ### Habit Formation: has it become a habit?
 
-Each person's active days in the **last complete calendar month** place them in one stage:
+Each person's active days in the **most recent complete calendar month in the selected dates**
+place them in one stage:
 
 | Stage | Active days | Roughly |
 |---|---|---|
@@ -403,7 +705,9 @@ Each person's active days in the **last complete calendar month** place them in 
 
 - If the data ends on a month-end, that month counts as complete. Otherwise the previous month is
   used, so a part month never pushes people down a stage.
-- Inactive needs a seat, so it is blank in the Cowork cohort, which has no seat inventory.
+- A date filter moves the month: the stage uses the last month the selected dates touch, capped at
+  the last complete month. If the dates end before any complete month, the page shows no stage.
+- Inactive needs a seat, so it is not measured for Unlicensed users, Agents or Cowork.
 - The trend repeats the rule for each complete month.
 - **These cut-offs are an inherited working mapping, not a validated benchmark.** No external
   study is behind them. Use them to compare groups and track movement, not as absolute targets.
@@ -417,7 +721,8 @@ user) by organisation over time.
 
 - **People** are ranked by sessions within their organisation, per cohort. Security Copilot's
   automated sessions are excluded, because they would top every list.
-- **Agents** are ranked by users and sessions, with their registry descriptions.
+- **Agents** are ranked by users and sessions, with their registry descriptions. The LOB and Shared
+  copies of one Copilot Studio agent are one agent here ([§2.2](#22-how-agents-are-linked-to-the-registry)).
 
 ### Agent Registry: what agents exist, and are they used?
 
@@ -513,7 +818,11 @@ score = 60 × min(median tasks per active week ÷ 30, 1) + 40 × min(median acti
 
 ### User Feedback: what do people say?
 
-From the optional Product Feedback export.
+From the optional Product Feedback export (Microsoft 365 admin center > Health > Product feedback).
+There is no API for it. On Fabric, each export dropped in `Files/analytics_hub_uploads` is
+recognised by its Feedback Id, Date Submitted (UTC) and Feedback Type columns, added to the
+history, and de-duplicated by Feedback Id. The installer can also create a Power Automate flow that
+saves exports emailed to an admin into that folder. With no export, the page stays empty.
 
 - **Satisfaction:** thumbs up ÷ all feedback items.
 - **Category:** keyword rules over the prompt and comment text, where the first match wins. For
@@ -555,8 +864,8 @@ rebuilds its consumption and cost pages.
 
 | Section | Source | How cost is worked out |
 |---|---|---|
-| **Cowork / Work IQ** | Weekly credits per person from Viva Insights (`viva_credits_weekly`) | Credits up to the Capacity Pack balance are priced at the **prepaid rate**; the rest at the **pay-as-you-go rate**. The pack applies to the credits in the selected period. Week by week it is used up in date order, so later weeks spill into pay-as-you-go first. Blended rate = cost ÷ credits |
-| **Copilot Studio** | Power Platform admin centre exports: tenant by day, plus agent and user views | The tenant export already splits prepaid from pay-as-you-go credits, and each is priced at its rate. Effective rate = cost ÷ credits. Per-agent and per-user cost uses the pay-as-you-go rate |
+| **Cowork / Work IQ** | Weekly credits per person from Viva Insights (`viva_credits_weekly`), read from a Viva Insights query by a Dataflow Gen2 (`viva_credits_dataflow`) or from the Consumption Dashboard's CSV export. Where both cover a week, the Dataflow's figures are used | Credits up to the Capacity Pack balance are priced at the **prepaid rate**; the rest at the **pay-as-you-go rate**. The pack applies to the credits in the selected period. Week by week it is used up in date order, so later weeks spill into pay-as-you-go first. Blended rate = cost ÷ credits |
+| **Copilot Studio** | Power Platform admin centre exports: tenant by day, plus agent and user views. Optionally, a daily flow reads the Power Platform licensing API for credits by agent and day (`studio_agent_daily`), and fills the tenant and agent views for days and months no export covers. It only sees environments with credits allocated, and has no per-user figures. Without an entitlement snapshot, its credits count as prepaid | The tenant export already splits prepaid from pay-as-you-go credits, and each is priced at its rate. The licensing API gives one tenant-wide prepaid share, applied to every environment. Effective rate = cost ÷ credits. Per-agent and per-user cost uses the pay-as-you-go rate |
 | **Azure** | Azure Cost Management export for the whole solution, or Azure AI Foundry spend by model | Actual billed cost, in the export's own currency. The rates don't apply. If neither export is loaded, the section says which to load and the other sections still work |
 
 **Rates & packs.** By default the rates come from the model, through the `commercial_terms` table
@@ -701,6 +1010,22 @@ more workloads a day scores full marks for it.
   matched on the model name.
 - **Dates are UTC.** Days and weeks can shift by one for people far from UTC.
 - **Feedback categories use English keywords.** Other languages mostly land in General.
+- **Agent user counts can differ from the agent builder's own view.** Copilot Studio analytics also
+  counts test-pane, evaluation and autonomous runs, which are dropped here ([§2.1](#21-which-audit-records-count)),
+  and an agent whose audit records carry no key the registry knows stays unlinked ([§2.2](#22-how-agents-are-linked-to-the-registry)).
+- **Registry usage fields can be up to a week old.** The registry ingester re-fetches an agent's
+  detail (usage, Bot Id, sharing) only when the agent is new or changed, or its cached detail is
+  older than `FULL_REFRESH_DAYS` (default 7). `Detail As Of` on each `agents_365` row shows when.
+- **Agent types are partly inferred, and only seen through Copilot interaction records.** The
+  `T_` / `U_` / `P_` agent-ID prefixes behind three categories are not documented by Microsoft
+  ([§3.3](#agent-type-classification)). The Fabric ingester pulls only the `copilotInteraction`
+  record type, so Teams Facilitator (`TeamCopilotInteraction`) and connected AI app
+  (`ConnectedAIAppInteraction`) activity is rare or missing. Adding those record types needs no new
+  permission, but it would change interaction totals, so it is not done by default. The SharePoint
+  (PAX) variant, and Dataverse snapshots built before agent types were added, classify in Power
+  Query from the agent ID, name and AppIdentity only (no PlatformAgentType or workload), so more of
+  their rows can land in Unclassified agents
+  ([coverage by variant](DATA-DICTIONARY.md#agent-type-and-publisher)).
 
 ---
 
@@ -710,65 +1035,70 @@ Minutes per unit of work, from the `Human Time Estimates` table. Typical is the 
 App's Assumptions page lists the same bands and lets you replace them there. The table
 also keeps a single `Human Baseline (min)` column from the earlier method; no measure uses it.
 
+Sources are peer-reviewed studies or work from major research institutions. Many measure a related
+task rather than the exact one, so Confidence reflects how directly the source fits. A row with no
+such source says *Provisional estimate*, has no link, and is rated Low. Confidence is shown for
+context only; no measure uses it.
+
 | Behaviour | Low | Typical | High | Grain | Confidence | Source |
 |---|---:|---:|---:|---|---|---|
-| Email Triage | 4 | 10 | 12 | Turn | Medium-High | [Microsoft Research (Iqbal & Horvitz 2007)](https://www.microsoft.com/en-us/research/publication/disruption-and-recovery-of-computing-tasks-field-study-analysis-and-directions/); McKinsey 2023 |
-| Email Thread Summary | 2 | 5 | 9 | Turn | Medium | [Nielsen Norman Group 2023](https://www.nngroup.com/articles/); Microsoft WTI 2024 |
-| Email Summarising | 2 | 4 | 7 | Turn | Medium | Dabbish & Kraut (CMU 2006); [Mark et al. 2012](https://www.ics.uci.edu/~gmark/Home_page/Welcome.html) |
-| Email Drafting | 3 | 8 | 12 | Turn | High | McKinsey 2023; [Brynjolfsson et al. (NBER 2023)](https://www.nber.org/papers/w31161) |
-| Teams Messaging | 4 | 8 | 11 | Turn | Medium | [Microsoft WTI 2023](https://www.microsoft.com/en-us/worklab/work-trend-index); Grammarly 2023 |
-| Meeting Scheduling | 5 | 12 | 17 | Turn | High | [Doodle 2019](https://meetings.doodle.com/the-state-of-meetings-report-2019); HBR 2017 |
-| Meeting Prep | 6 | 15 | 22 | Resource | High | Forrester TEI 2024; [HBR (Rogelberg 2019)](https://hbr.org/2019/01/why-your-meetings-stink-and-what-to-do-about-it) |
-| Video Summarising | 12 | 30 | 44 | Turn | Medium-High | [Microsoft WTI 2024](https://www.microsoft.com/en-us/worklab/work-trend-index); Kaltura 2023 |
-| Document Drafting | 21 | 42 | 42 | Turn | High | [Noy & Zhang (Science 2023)](https://www.science.org/doi/10.1126/science.adh2586); BCG/Harvard 2023 |
-| Document Summarising | 10 | 20 | 35 | Turn | Medium-High | [BCG/Harvard (Dell'Acqua et al. 2023)](https://www.hbs.edu/ris/Publication%20Files/24-013_d9b45b68-9e74-42d6-a1c6-c72fb70c7282.pdf); McKinsey 2023 |
-| Presentation Creation | 21 | 42 | 42 | Turn | Medium-High | [Gartner 2024](https://www.gartner.com/en/topics/generative-ai); BCG 2024 |
-| Presentation Summarising | 6 | 12 | 21 | Turn | Medium | [Forrester TEI 2024](https://www.forrester.com/policies/total-economic-impact/); NNGroup 2020 |
-| Note Taking | 10 | 20 | 35 | Turn | High | [Microsoft Research (Branham & Brush 2015)](https://www.microsoft.com/en-us/research/people/sbrush/) |
-| Image Generation | 21 | 42 | 42 | Turn | Medium | [Adobe 2022](https://business.adobe.com/resources/digital-trends-report.html); Content Marketing Institute 2023 |
-| Image / Media Analysis | 4 | 8 | 14 | Resource | Medium | [W3C WAI](https://www.w3.org/WAI/); DAM Institute 2022 |
-| Code Writing | 24 | 45 | 77 | Turn | High | [GitHub/NBER (Peng et al. 2023) RCT](https://arxiv.org/abs/2302.06590) |
-| Code Analysis | 16 | 30 | 51 | Resource | High | [SmartBear 2023](https://smartbear.com/state-of-software-quality/code-review/); MS Research (Bacchelli & Bird 2013) |
-| Code Analysis (URL) | 8 | 15 | 26 | Turn | Medium | [Stack Overflow 2023](https://survey.stackoverflow.co/); GitHub 2023 |
-| Code Review & PR | 21 | 40 | 69 | Turn | Low | Provisional estimate |
-| Build & Deploy Run | 10 | 25 | 40 | Turn | Low | Provisional estimate |
-| Data Querying | 13 | 30 | 41 | Resource | High | [Forrester TEI 2022](https://www.forrester.com/policies/total-economic-impact/); BCG 2021 |
-| Spreadsheet Analysis | 18 | 40 | 55 | Turn | High | [Deloitte 2023](https://www2.deloitte.com/us/en/insights.html); KPMG 2020 |
-| Spreadsheet Review | 11 | 25 | 34 | Turn | Medium | [Deloitte 2023](https://www2.deloitte.com/us/en/insights.html); KPMG 2020 |
-| Excel Assistance | 13 | 30 | 41 | Turn | Medium | [Deloitte 2023](https://www2.deloitte.com/us/en/insights.html); KPMG 2020 |
-| Web Searching | 10 | 22 | 30 | Resource | High | [McKinsey 2012](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy); IDC 2018 |
-| Enterprise Searching | 8 | 18 | 25 | Resource | High | [IDC 2014](https://www.idc.com/); McKinsey 2012 |
-| PDF Analysis | 16 | 35 | 48 | Resource | Medium | Deloitte 2018; [Thomson Reuters 2019](https://legal.thomsonreuters.com/en/insights) |
-| SharePoint Access | 5 | 12 | 16 | Turn | Medium | Forrester TEI 2022; [AIIM 2019](https://www.aiim.org/) |
-| File Retrieval | 7 | 15 | 21 | Resource | Medium | [IDC 2014](https://www.idc.com/); McKinsey 2012 |
-| People Lookup | 3 | 8 | 8 | Resource | Medium | Gartner 2021; [Microsoft Viva 2022](https://www.microsoft.com/en-us/microsoft-viva) |
-| Knowledge Base | 5 | 12 | 19 | Turn | High | [HDI 2023](https://www.thinkhdi.com/); Gartner 2022 |
-| Multi-source Synthesis | 34 | 75 | 92 | Resource | Low | Provisional, apportioned from the Analysis & Research band |
-| Research & Analysis | 20 | 45 | 62 | Turn | High | BCG 2021; [McKinsey 2023](https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights/the-economic-potential-of-generative-ai-the-next-productivity-frontier) |
-| Data & Reporting | 16 | 35 | 48 | Turn | High | [Forrester TEI 2022](https://www.forrester.com/policies/total-economic-impact/); IDC 2023 |
-| Content Generation | 12 | 25 | 42 | Turn | High | [Grammarly 2023](https://www.grammarly.com/business/learn); Forrester 2022 |
-| Ideation & Creative | 20 | 40 | 42 | Turn | Medium | IDEO; [HBR 2018](https://hbr.org/topic/innovation) |
-| Coaching | 16 | 40 | 40 | Turn | Medium | [ICF 2020](https://coachingfederation.org/research/global-coaching-study); SHRM 2023 |
-| Coaching (URL) | 10 | 25 | 40 | Turn | Medium | [LinkedIn Learning 2023](https://learning.linkedin.com/resources/workplace-learning-report); Deloitte 2022 |
-| Sales & Customer | 14 | 35 | 40 | Turn | High | [Salesforce 2023](https://www.salesforce.com/resources/research-reports/state-of-sales/); Gartner 2022 |
-| IT & Service Desk | 8 | 20 | 32 | Turn | High | [HDI 2023](https://www.thinkhdi.com/library/practices-and-salary-report.aspx); MetricNet 2023 |
-| HR & People | 14 | 35 | 40 | Turn | High | [SHRM 2023](https://www.shrm.org/topics-tools/research); Deloitte 2023 |
-| Compliance & Policy | 10 | 25 | 40 | Turn | Medium | [Deloitte 2022](https://www2.deloitte.com/us/en/pages/regulatory/topics/compliance.html); Thomson Reuters 2023 |
-| Sensitive Content Interaction | 8 | 20 | 32 | Turn | Low | [Deloitte 2023](https://www2.deloitte.com/us/en/insights/topics/risk-management.html); Gartner 2022 |
-| Domain-Specific Agent | 10 | 25 | 40 | Turn | Low | [Deloitte 2022](https://www2.deloitte.com/us/en/insights.html); Gartner 2023 |
-| Cross-Org Agent | 12 | 30 | 40 | Turn | Low | [McKinsey 2022](https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights); Forrester 2023 |
-| Running a Workflow, LOB, Data & Reporting and General Workflow | 6 | 15 | 24 | Turn | High | Forrester TEI 2022; [Gartner 2023](https://www.gartner.com/en/topics/hyperautomation) |
-| Email Workflow | 5 | 12 | 12 | Turn | High | Forrester TEI 2022; [Gartner 2023](https://www.gartner.com/en/topics/hyperautomation) |
-| Meeting Workflow | 6 | 15 | 22 | Turn | High | Forrester TEI 2022; [Gartner 2023](https://www.gartner.com/en/topics/hyperautomation) |
-| Document Workflow | 8 | 15 | 26 | Turn | High | Forrester TEI 2022; [Gartner 2023](https://www.gartner.com/en/topics/hyperautomation) |
-| Coordination Workflow | 6 | 11 | 11 | Turn | High | Forrester TEI 2022; [Gartner 2023](https://www.gartner.com/en/topics/hyperautomation) |
-| Scheduled / Recurring Run | 8 | 20 | 32 | Turn | Low | Provisional estimate |
-| Monitoring & Alerting | 8 | 20 | 32 | Turn | Low | Provisional estimate |
-| Task Management | 6 | 11 | 11 | Turn | Medium | [Atlassian 2022](https://www.atlassian.com/blog/teamwork); Scrum Alliance 2023 |
-| Real-time Collaboration | 6 | 11 | 11 | Turn | Medium | [Microsoft WTI 2023](https://www.microsoft.com/en-us/worklab/work-trend-index); Gartner 2022 |
-| Form / Survey Work | 10 | 25 | 40 | Turn | Medium | [SurveyMonkey 2022](https://www.surveymonkey.com/curiosity/); Qualtrics 2023 |
-| General Assistance | 3 | 8 | 8 | Turn | Low | [Microsoft WTI 2023](https://www.microsoft.com/en-us/worklab/work-trend-index); IDC 2023 |
-| General Chat and Q&A (M365 Chat, Teams, browser) | 3 | 8 | 8 | Turn | Medium | [Microsoft WTI 2023](https://www.microsoft.com/en-us/worklab/work-trend-index); IDC 2018 |
+| Email Triage | 4 | 10 | 12 | Turn | Medium | [Iqbal & Horvitz (CHI 2007, Microsoft Research)](https://doi.org/10.1145/1240624.1240730) |
+| Email Thread Summary | 2 | 5 | 9 | Turn | Medium | [Mark, Iqbal & Czerwinski (CHI 2016, Microsoft Research)](https://doi.org/10.1145/2858036.2858262) |
+| Email Summarising | 2 | 4 | 7 | Turn | Medium | [Dabbish & Kraut (CSCW 2006); Mark et al. (CHI 2012)](https://doi.org/10.1145/1180875.1180941) |
+| Email Drafting | 3 | 8 | 12 | Turn | Medium | [Brynjolfsson, Li & Raymond (NBER 2023)](https://www.nber.org/papers/w31161) |
+| Teams Messaging | 4 | 8 | 11 | Turn | Medium | [Cutrell, Czerwinski & Horvitz (Microsoft Research 2001)](https://www.microsoft.com/en-us/research/publication/effects-of-instant-messaging-interruptions-on-computing-tasks-2/) |
+| Meeting Scheduling | 5 | 12 | 17 | Turn | Medium | [Cranshaw et al. (CHI 2017, Microsoft Research)](https://doi.org/10.1145/3025453.3025780) |
+| Meeting Prep | 6 | 15 | 22 | Resource | Medium | [Rogelberg et al. (J. Applied Psychology 2006)](https://doi.org/10.1037/0021-9010.91.1.83) |
+| Video Summarising | 12 | 30 | 44 | Turn | Low | Provisional estimate |
+| Document Drafting | 21 | 42 | 42 | Turn | High | [Noy & Zhang (Science 2023)](https://www.science.org/doi/10.1126/science.adh2586) |
+| Document Summarising | 10 | 20 | 35 | Turn | Medium-High | [Dell'Acqua et al. (HBS Working Paper 24-013, 2023)](https://aiinstitute.hbs.edu/navigating-the-jagged-technological-frontier/) |
+| Presentation Creation | 21 | 42 | 42 | Turn | Medium | [Dell'Acqua et al. (HBS Working Paper 24-013, 2023)](https://aiinstitute.hbs.edu/navigating-the-jagged-technological-frontier/) |
+| Presentation Summarising | 6 | 12 | 21 | Turn | Medium | [Brysbaert (J. Mem. Lang. 2019)](https://doi.org/10.1016/j.jml.2019.104047) |
+| Note Taking | 10 | 20 | 35 | Turn | Low | Provisional estimate |
+| Image Generation | 21 | 42 | 42 | Turn | Low | Provisional estimate |
+| Image / Media Analysis | 4 | 8 | 14 | Resource | Low | Provisional estimate |
+| Code Writing | 24 | 45 | 77 | Turn | High | [Peng et al. (arXiv 2023, GitHub Copilot RCT)](https://arxiv.org/abs/2302.06590) |
+| Code Analysis | 16 | 30 | 51 | Resource | Medium | [Bacchelli & Bird (ICSE 2013)](https://doi.org/10.1109/ICSE.2013.6606617) |
+| Code Analysis (URL) | 8 | 15 | 26 | Turn | Low | Provisional estimate |
+| Code Review & PR | 21 | 40 | 69 | Turn | Low | [Bacchelli & Bird (ICSE 2013)](https://doi.org/10.1109/ICSE.2013.6606617) |
+| Build & Deploy Run | 10 | 25 | 40 | Turn | Low | Provisional - BVA estimate, not yet source-good-fit |
+| Data Querying | 13 | 30 | 41 | Resource | Low | Provisional estimate |
+| Spreadsheet Analysis | 18 | 40 | 55 | Turn | Low | Provisional estimate |
+| Spreadsheet Review | 11 | 25 | 34 | Turn | Low | Provisional estimate |
+| Excel Assistance | 13 | 30 | 41 | Turn | Low | Provisional estimate |
+| Web Searching | 10 | 22 | 30 | Resource | Medium | [McKinsey Global Institute (2012)](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy) |
+| Enterprise Searching | 8 | 18 | 25 | Resource | Medium | [McKinsey Global Institute (2012)](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy) |
+| PDF Analysis | 16 | 35 | 48 | Resource | Medium | [Brysbaert (J. Mem. Lang. 2019)](https://doi.org/10.1016/j.jml.2019.104047) |
+| SharePoint Access | 5 | 12 | 16 | Turn | Medium | [McKinsey Global Institute (2012)](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy) |
+| File Retrieval | 7 | 15 | 21 | Resource | Medium | [McKinsey Global Institute (2012)](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy) |
+| People Lookup | 3 | 8 | 8 | Resource | Medium | [McKinsey Global Institute (2012)](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy) |
+| Knowledge Base | 5 | 12 | 19 | Turn | Medium | [McKinsey Global Institute (2012)](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy) |
+| Multi-source Synthesis | 34 | 75 | 92 | Resource | Low | Provisional - apportioned from Analysis & Research envelope |
+| Research & Analysis | 20 | 45 | 62 | Turn | Medium | [Noy & Zhang (Science 2023)](https://www.science.org/doi/10.1126/science.adh2586) |
+| Data & Reporting | 16 | 35 | 48 | Turn | Low | Provisional estimate |
+| Content Generation | 12 | 25 | 42 | Turn | Medium-High | [Noy & Zhang (Science 2023)](https://www.science.org/doi/10.1126/science.adh2586) |
+| Ideation & Creative | 20 | 40 | 42 | Turn | Medium | [Diehl & Stroebe (J. Pers. Soc. Psychol. 1987)](https://doi.org/10.1037/0022-3514.53.3.497) |
+| Coaching | 16 | 40 | 40 | Turn | Low | Provisional estimate |
+| Coaching (URL) | 10 | 25 | 40 | Turn | Low | Provisional estimate |
+| Sales & Customer | 14 | 35 | 40 | Turn | Medium | [Brynjolfsson, Li & Raymond (NBER 2023)](https://www.nber.org/papers/w31161) |
+| IT & Service Desk | 8 | 20 | 32 | Turn | Medium-High | [Brynjolfsson, Li & Raymond (NBER 2023)](https://www.nber.org/papers/w31161) |
+| HR & People | 14 | 35 | 40 | Turn | Low | Provisional estimate |
+| Compliance & Policy | 10 | 25 | 40 | Turn | Medium | [Martin et al. (arXiv 2024)](https://arxiv.org/abs/2401.16212) |
+| Sensitive Content Interaction | 8 | 20 | 32 | Turn | Low | Provisional estimate |
+| Domain-Specific Agent | 10 | 25 | 40 | Turn | Low | Provisional estimate |
+| Cross-Org Agent | 12 | 30 | 40 | Turn | Low | Provisional estimate |
+| Running a Workflow, LOB, Data & Reporting and General Workflow | 6 | 15 | 24 | Turn | Low | Provisional estimate |
+| Email Workflow | 5 | 12 | 12 | Turn | Low | Provisional estimate |
+| Meeting Workflow | 6 | 15 | 22 | Turn | Low | Provisional estimate |
+| Document Workflow | 8 | 15 | 26 | Turn | Low | Provisional estimate |
+| Coordination Workflow | 6 | 11 | 11 | Turn | Low | Provisional estimate |
+| Scheduled / Recurring Run | 8 | 20 | 32 | Turn | Low | Provisional - BVA estimate, not yet source-good-fit |
+| Monitoring & Alerting | 8 | 20 | 32 | Turn | Low | Provisional - BVA estimate, not yet source-good-fit |
+| Task Management | 6 | 11 | 11 | Turn | Low | Provisional estimate |
+| Real-time Collaboration | 6 | 11 | 11 | Turn | Medium | [D'Angelo, Di Iorio & Zacchiroli (CSCW 2018)](https://doi.org/10.1145/3274310) |
+| Form / Survey Work | 10 | 25 | 40 | Turn | Low | Provisional estimate |
+| General Assistance | 3 | 8 | 8 | Turn | Low | [Dillon et al. (Microsoft, arXiv 2025)](https://arxiv.org/abs/2504.11443) |
+| General Chat and Q&A (M365 Chat, Teams, browser) | 3 | 8 | 8 | Turn | Medium | [Dillon et al. (Microsoft, arXiv 2025)](https://arxiv.org/abs/2504.11443) |
 
 Where a band repeats its top value, for example Document Drafting at 21 / 42 / 42, its high end is
 capped.

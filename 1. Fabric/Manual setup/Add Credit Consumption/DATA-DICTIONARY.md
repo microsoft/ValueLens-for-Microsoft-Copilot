@@ -20,7 +20,9 @@ report; useful when a number looks wrong and you need to know when it arrived.
 ## `viva_credits_weekly`
 
 Cowork and Work IQ credit consumption. **One row per person × service × policy × week.** Absent it,
-the Cowork pages are empty and the rest of the report is unaffected.
+the Cowork pages are empty and the rest of the report is unaffected. `Ingest_Viva_Consumption`
+fills it from the Viva Insights Dataflow's staging table, `viva_credits_dataflow` (every column
+text, replaced each refresh), and from CSV exports. For weeks both cover, the Dataflow's rows win.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -81,6 +83,40 @@ Studio table with a real date**, and so the only one Consumption Central plots o
 | `usage_date` | date | Parsed from PPAC's `M/d/yyyy H:mm` |
 
 **Merge key:** `usage_date`, `environment_id`, `billing_plan_id`, `capacity_type`.
+
+Rows from the licensing API flow have `source_file = 'ppac-api'` and the all-zero
+`billing_plan_id`. They fill only the days and environments no export covers. They split each
+day's credits by the tenant-wide prepaid share from the latest entitlement snapshot (all prepaid
+without one), and `entitled_quantity` is the environment's allocation.
+
+---
+
+## `studio_agent_daily`
+
+Per-agent consumption by day, from the optional `Analytics Hub - Copilot Studio credits` flow,
+which calls the Power Platform licensing API. Empty without the flow. Only environments with
+Copilot Studio credits allocated appear, and there are no per-user figures.
+
+| Column | Type | Notes |
+|---|---|---|
+| `usage_date` | date | |
+| `agent_id` | string | |
+| `agent_name` | string | |
+| `environment_id` | string | |
+| `environment_name` | string | From the entitlement snapshot when the call has none |
+| `billable_feature` | string | |
+| `channel` | string | |
+| `billed_credit` | double | |
+| `non_billed_credit` | double | |
+| `users` | double | Distinct users on the day, where the API gives it |
+| `llm_model`, `tool_used`, `knowledge_sources` | string | Comma-separated, sorted |
+| `source_file` | string | Always `ppac-api` |
+
+**Merge key:** `usage_date`, `agent_id`, `billable_feature`, `channel`, `environment_id`. Each
+file restates the last ten days, so those days are replaced.
+
+For months no export covers, `studio_agent` also gets a `ppac-api` row per agent, summed from
+this table. An export for the month replaces them.
 
 ---
 
@@ -275,8 +311,9 @@ a perfectly good use of this.
 **Copilot pay-as-you-go as Azure billed it.** Written by `Ingest_Azure_AI`. Power Platform billing
 policies charge Copilot Studio and Cowork credits beyond prepaid capacity to an Azure subscription;
 this is what Cost Management recorded there, a day at a time. The template doesn't read it. The
-[Fabric installer](../../installer/README.md#credit-consumption) adds it to `ValueLens Consumption Model`
-as `CopilotPaygSpend`, and the Analytics Hub's Consumption pages compare it with the exports.
+[Fabric installer](../../installer/README.md#credit-consumption) adds it to `Analytics Hub Consumption Model`
+(`ValueLens Consumption Model` on earlier installs) as `CopilotPaygSpend`, and the Analytics Hub's
+Consumption pages compare it with the exports.
 
 Grain: day × subscription × meter × `ServiceTag` × currency.
 

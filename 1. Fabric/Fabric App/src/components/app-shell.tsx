@@ -206,10 +206,17 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
     const reference = AVAILABLE.filter(isReference);
 
     return (
-        <div className={cn("flex h-screen w-full overflow-hidden bg-background text-foreground", paletteClass(active))}>
+        // The shell and both scroll areas are positioned so absolute descendants (sr-only text
+        // especially) stay inside them; otherwise they extend the document and add a second scrollbar.
+        <div
+            className={cn(
+                "relative flex h-screen w-full overflow-hidden bg-background text-foreground",
+                paletteClass(active),
+            )}
+        >
             <nav
                 aria-label="Sections"
-                className="flex w-[248px] shrink-0 flex-col gap-500 overflow-y-auto border-r border-border bg-card px-400 py-500"
+                className="relative flex w-[248px] shrink-0 flex-col gap-500 overflow-y-auto border-r border-border bg-card px-400 py-500"
             >
                 <div className="flex flex-col gap-100 px-200">
                     <span className="text-[length:var(--text-500)] leading-500 font-semibold">Analytics Hub</span>
@@ -253,7 +260,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                 </button>
             </nav>
 
-            <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+            <main ref={mainRef} className="relative min-w-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
                 <div className="mx-auto flex max-w-[1400px] flex-col gap-600 px-700 pt-600 pb-800">
                     {current && (
                         <header className="flex items-center gap-400">

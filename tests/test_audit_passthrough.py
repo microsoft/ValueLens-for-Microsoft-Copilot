@@ -50,7 +50,7 @@ class AuditPassthroughTests(unittest.TestCase):
         code = sources()
         self.assertLess(code[15].index("validate_passthrough_columns(passthrough_source_columns"),
                         code[15].index("write_strategy = write_curated_output(fact)"))
-        self.assertIn('"__nkey_fact", "_NormUPN")', code[11])
+        self.assertIn('"__lk_entra", "_NormUPN")', code[11])
         self.assertNotIn('withColumn("Audit_UserId_Norm"', "\n".join(code))
         self.assertIn("if not INCLUDE_RAW_PASSTHROUGH:", code[11])
 

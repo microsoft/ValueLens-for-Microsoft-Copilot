@@ -4,6 +4,8 @@
  * so a saved install record can be replayed without a person at the keyboard.
  */
 import { checkbox, confirm, input, password, select } from '@inquirer/prompts';
+import { inspectFile } from './staging.js';
+import { dataSource, MODE_LABELS, routedSources } from './uploads.js';
 
 const useColour = process.stdout.isTTY && !process.env.NO_COLOR;
 /** @param {string} code */
@@ -60,6 +62,21 @@ export function createUi(opts = {}) {
      * @param {import('./steps/plan.js').PlanReview} _plan
      */
     review: (_plan) => {},
+    /**
+     * How each source's load went: a tick, a cross or a warning per source, then why and what to do.
+     * @param {import('./loads.js').LoadCard[]} cards
+     */
+    loads: (cards) => {
+      for (const card of cards) {
+        const tries = card.attempts ? c.dim(` (${card.attempts} attempts)`) : '';
+        if (card.state === 'ok') line(`  ${c.green('✓')} ${card.name}${tries}`);
+        else if (card.state === 'failed') line(`  ${c.red('✗')} ${card.name}: failed${tries}`);
+        else if (card.state === 'skipped') line(`  ${c.yellow('!')} ${card.name}: skipped`);
+        else line(`  ${c.yellow('!')} ${card.name}: still running`);
+        if (card.reason) line(`    ${card.reason}`);
+        for (const fix of card.fix) line(`    ${c.dim(fix)}`);
+      }
+    },
 
     /**
      * @template T
@@ -122,6 +139,49 @@ export function createUi(opts = {}) {
     },
 
     /**
+     * The Data sources screen: how each source arrives, then any exports to upload now.
+     * @param {string} message
+     * @param {import('./uploads.js').SourceCard[]} cards
+     * @param {{ lockModes?: boolean }} [o]  Only pick files; the modes stay as they are.
+     * @returns {Promise<{ modes: import('./uploads.js').DataSourceModes, files: import('./staging.js').PendingUpload[] }>}
+     */
+    async sources(message, cards, o = {}) {
+      const modes = /** @type {import('./uploads.js').DataSourceModes} */ (Object.fromEntries(cards.map((card) => [card.id, card.mode])));
+      line(`    ${message}`);
+      for (const card of cards) {
+        const fixed = card.locked || o.lockModes || card.modes.length === 1 || yes;
+        if (!fixed) {
+          modes[card.id] = await select({
+            message: card.label,
+            choices: card.modes.map((m) => ({ name: m.label, value: m.value, description: modeHint(card, m.value) })),
+            default: card.mode,
+          });
+        } else line(`${c.green('✔')} ${card.label} ${c.cyan(card.modes.find((m) => m.value === modes[card.id])?.label ?? MODE_LABELS[modes[card.id]])}`);
+        if (modes[card.id] === 'csv' && card.export && !o.lockModes) line(`    ${c.dim(`Export: ${card.export.where} ${card.export.url}`)}`);
+      }
+      /** @type {import('./staging.js').PendingUpload[]} */
+      const files = [];
+      if (yes || !routedSources(modes).length) return { modes, files };
+      for (;;) {
+        const path = await input({
+          message: files.length ? 'Another export to upload now (leave blank when done)' : 'Path to an export to upload now (leave blank to add them later)',
+          validate: (v) => {
+            if (!v.trim()) return true;
+            const r = inspectFile(v, modes);
+            return r.ok ? true : r.error;
+          },
+        });
+        if (!path.trim()) break;
+        const r = inspectFile(path, modes);
+        if (r.ok) {
+          files.push(r.file);
+          line(`    ${c.dim(`${r.file.name}: ${dataSource(r.file.source).label}`)}`);
+        }
+      }
+      return { modes, files };
+    },
+
+    /**
      * A one-line ticking status for long waits.
      * @param {string} label
      */
@@ -152,6 +212,19 @@ export function createUi(opts = {}) {
 }
 
 /** @typedef {ReturnType<typeof createUi>} Ui */
+
+/**
+ * What choosing a mode means for one source, under its name in the list.
+ * @param {import('./uploads.js').SourceCard} card
+ * @param {import('./uploads.js').SourceMode} mode
+ */
+export function modeHint(card, mode) {
+  const own = card.modes.find((m) => m.value === mode)?.hint;
+  if (own) return own;
+  if (mode === 'api') return card.uploadable ? 'Read on every run. If the API can\'t be reached, an uploaded export is used instead.' : 'Read on every run.';
+  if (mode === 'csv') return card.export ? `${card.export.where} ${card.export.files}` : 'Upload the export.';
+  return card.page ? `Not collected. The ${card.page} page stays empty until you turn it on.` : 'Not collected.';
+}
 
 /** @param {number} ms */
 export function formatDuration(ms) {

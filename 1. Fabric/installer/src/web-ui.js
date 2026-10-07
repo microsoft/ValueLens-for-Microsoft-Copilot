@@ -4,6 +4,8 @@
  * methods as the terminal UI, so every step runs unchanged; each question waits until the
  * page answers it. Answers are checked here, with the step's own validation.
  */
+import { checkStaged } from './staging.js';
+import { DATA_SOURCES, parseModes } from './uploads.js';
 
 /**
  * @typedef {'red' | 'green' | 'yellow' | 'cyan'} Colour
@@ -190,6 +192,10 @@ export function createWebUi(opts = {}) {
     review: (plan) => {
       emit({ type: 'review', plan });
     },
+    /** @param {import('./loads.js').LoadCard[]} cards */
+    loads: (cards) => {
+      emit({ type: 'loads', cards });
+    },
 
     /**
      * @template T
@@ -284,6 +290,43 @@ export function createWebUi(opts = {}) {
           return at.every((i) => i >= 0) ? at : null;
         },
         prefill: (v) => ({ choices: choices.map((ch) => choiceView({ ...ch, checked: locked(ch) || has(v, ch.value) })) }),
+      });
+    },
+
+    /**
+     * The Data sources screen. The page answers with each source's mode and the tokens of the
+     * exports it has already sent to /api/upload.
+     * @param {string} message
+     * @param {import('./uploads.js').SourceCard[]} cards
+     * @param {{ lockModes?: boolean }} [o]
+     * @returns {Promise<{ modes: import('./uploads.js').DataSourceModes, files: import('./staging.js').PendingUpload[] }>}
+     */
+    async sources(message, cards, o = {}) {
+      const current = /** @type {import('./uploads.js').DataSourceModes} */ (Object.fromEntries(cards.map((card) => [card.id, card.mode])));
+      return ask('sources', message, { cards, ...(o.lockModes ? { lockModes: true } : {}) }, (raw) => {
+        const r = /** @type {{ modes?: unknown, uploads?: unknown }} */ (raw && typeof raw === 'object' ? raw : {});
+        const m = o.lockModes ? { modes: current } : parseModes(r.modes ?? {}, current);
+        if ('error' in m) return { error: m.error };
+        const tokens = r.uploads === undefined ? [] : r.uploads;
+        if (!Array.isArray(tokens) || tokens.some((t) => typeof t !== 'string')) return { error: 'The uploads list isn\'t right. Choose the files again.' };
+        /** @type {import('./staging.js').PendingUpload[]} */
+        const files = [];
+        for (const t of new Set(tokens)) {
+          const f = checkStaged(t, m.modes);
+          if (!f.ok) return { error: f.error };
+          files.push(f.file);
+        }
+        if (o.lockModes && !files.length) return { error: 'Choose at least one export to upload.' };
+        const changed = DATA_SOURCES.filter((s) => !s.locked && m.modes[s.id] !== current[s.id]).length;
+        const display = [
+          ...(o.lockModes ? [] : [`${changed ? `${changed} changed` : 'As suggested'}`]),
+          ...(files.length ? [`${files.length} file${files.length === 1 ? '' : 's'} to upload`] : []),
+        ].join(', ') || 'No uploads';
+        return { value: { modes: m.modes, files }, display };
+      }, {
+        // Staged files are uploaded once, so going back keeps the modes but not the files.
+        toRaw: (v) => ({ modes: v.modes, uploads: v.files.filter((/** @type {any} */ f) => f.token).map((/** @type {any} */ f) => f.token) }),
+        prefill: (v) => ({ cards: cards.map((card) => ({ ...card, mode: v.modes[card.id] ?? card.mode })) }),
       });
     },
 

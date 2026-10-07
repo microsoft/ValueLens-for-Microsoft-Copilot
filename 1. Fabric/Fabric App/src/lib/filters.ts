@@ -96,6 +96,56 @@ export const AUDIENCE_VALUES: Record<Exclude<Audience, "all">, string> = {
     cowork: "Cowork",
 };
 
+/** How the filter bar names each Activity option. */
+export const AUDIENCE_LABELS: Record<Audience, string> = {
+    all: "All",
+    copilot: "Copilot chat",
+    agents: "Agents",
+    cowork: "Cowork",
+};
+
+/** A group of people some stages show side by side, one card each. */
+export type Cohort = "licensed" | "unlicensed" | "agents" | "cowork";
+
+/**
+ * The group the filter bar's Activity and License filters pick out among the
+ * `cohorts` a stage shows, or `"all"` when they pick none of them. Activity
+ * wins because it names the narrower group, and a filter the destination
+ * doesn't offer is ignored. Activity = Copilot chat is never a cohort.
+ */
+export function selectedCohort<C extends Cohort>(
+    state: FilterState,
+    applicable: readonly FilterKey[],
+    cohorts: readonly C[],
+): C | "all" {
+    const shown = (value: string): value is C => (cohorts as readonly string[]).includes(value);
+    if (applicable.includes("audience") && shown(state.audience)) return state.audience;
+    if (applicable.includes("licence") && shown(state.licence)) return state.licence;
+    return "all";
+}
+
+/**
+ * The Activity filter's label when it picks a group none of a stage's side-by-side
+ * `cohorts` covers, so the stage can say why another card is highlighted.
+ */
+export function unshownActivity(
+    state: FilterState,
+    applicable: readonly FilterKey[],
+    cohorts: readonly Cohort[],
+): string | undefined {
+    if (!applicable.includes("audience") || state.audience === "all") return undefined;
+    return (cohorts as readonly string[]).includes(state.audience) ? undefined : AUDIENCE_LABELS[state.audience];
+}
+
+/**
+ * Whether the License filter picks unlicensed people on a stage that offers it.
+ * Cowork runs only under a Copilot license, so Cowork views are empty by
+ * definition then, rather than because of the data.
+ */
+export function unlicensedOnly(state: FilterState, applicable: readonly FilterKey[]): boolean {
+    return applicable.includes("licence") && state.licence === "unlicensed";
+}
+
 /** Whether a filter narrows the data at all. */
 export function isFilterActive(state: FilterState, key: FilterKey): boolean {
     switch (key) {

@@ -1,0 +1,28 @@
+[
+  {
+    "[Hours]": 1541.5333333333333,
+    "[Hours Conservative]": 695.0666666666667,
+    "[Hours Optimistic]": 2257.75,
+    "[Tasks]": 6300,
+    "[People]": 180,
+    "[Weeks]": 10,
+    "[Skills Per Person]": 5.983333333333333,
+    "[Skills In Use]": 15,
+    "[Skills Available]": 47,
+    "[Broad Users Pct]": 0.3611111111111111,
+    "[Licensed Seats]": 225,
+    "[Seats In Use]": 150,
+    "[Seats In Use Pct]": 0.6666666666666666,
+    "[Unlicensed Users]": 30,
+    "[Habit Month]": "2026-06-01T00:00:00",
+    "[Habitual Pct]": 0.1220472440944882,
+    "[Power Pct]": 0.09448818897637795,
+    "[Agent Users]": 65,
+    "[Agent Hours]": 1090.8,
+    "[Agents In Use]": 9,
+    "[Agent With Most Users]": "Copilot for Excel\nCopilot for Teams\nFinance Analyst Bot",
+    "[Satisfaction]": 0.6222222222222222,
+    "[Feedback]": 360,
+    "[People With Organization]": 180
+  }
+]

@@ -44,7 +44,7 @@ type ModelFitView = "task" | "organization" | "person";
 /** The report's Model Fit View buttons, with the middle one following the Group by choice. */
 function viewOptions(orgLabel: string): readonly { id: ModelFitView; label: string }[] {
     return [
-        { id: "task", label: "Task" },
+        { id: "task", label: "Task Category" },
         { id: "organization", label: orgLabel },
         { id: "person", label: "User" },
     ];
@@ -202,20 +202,21 @@ export function ModelFitStage() {
     // The model leaves the reason blank when nothing is over- or under-specified.
     const showReason = hasAnyText(verdictTable, "Main Reason");
     const views = useMemo(() => viewOptions(org.label), [org.label]);
-    const segmentLabel = view === "person" ? "User" : view === "organization" ? org.label : "Task";
+    const segmentLabel = view === "person" ? "User" : view === "organization" ? org.label : "Task Category";
     // Mirrors the report's mm_table: verdict, main model and reason, then judged coverage and the three shares.
     const verdictColumns: GridColumnDef[] = useMemo(
         () => [
-            { id: "Verdict", header: "Verdict", width: 196, cellRenderer: (value) => verdictCell(value) },
-            // A fixed width keeps the name visible; the grid scrolls sideways on narrow screens.
-            { id: "Segment", header: segmentLabel, width: 232 },
-            { id: "Main Model", header: "Main model", width: 176 },
-            ...(showReason ? [{ id: "Main Reason", header: "Main reason", width: 184 }] : []),
-            { id: "Sessions", header: "Sessions", width: 100, numericStyling: true },
+            { id: "Verdict", header: "Verdict", width: 176, cellRenderer: (value) => verdictCell(value) },
+            // Fixed widths keep names and headers whole; together they fit the widest content
+            // frame (about 1,290 px) and the grid scrolls sideways on smaller screens.
+            { id: "Segment", header: segmentLabel, width: 224 },
+            { id: "Main Model", header: "Main model", width: 136 },
+            ...(showReason ? [{ id: "Main Reason", header: "Main reason", width: 152 }] : []),
+            { id: "Sessions", header: "Sessions", width: 96, numericStyling: true },
             shareColumn("Judged Share", "Judged", 92),
-            shareColumn("Well-matched Share", "Good match", 116),
-            shareColumn("Over-specified Share", "Lighter model may do", 168, palette.negative),
-            shareColumn("Under-specified Share", "Try stronger", 124, palette.caution),
+            shareColumn("Well-matched Share", "Good match", 120),
+            shareColumn("Over-specified Share", "Lighter model may do", 172, palette.negative),
+            shareColumn("Under-specified Share", "Try stronger", 116, palette.caution),
             { id: "Judged Sessions", header: "Judged sessions", hidden: true },
         ],
         [palette, segmentLabel, showReason],

@@ -42,15 +42,18 @@ const BREAKDOWN_CHART = { perRow: 36, chrome: 130, min: 220 };
 // A label on each of ~90 daily bars can't fit; the tooltip carries the numbers.
 const NO_STACK_LABELS = { disableStackedDataLabels: true };
 
+// Each width fits its header beside the sort arrow, and Billing policy fits a
+// typical policy name on one line, so the agents and users tables both fit
+// side by side from 1,536 px.
 const CONSUMPTION_COLUMNS: readonly TreeColumn[] = [
-    { id: "Credits Used", header: "Credits used", width: 128, format: formatCell("whole"), heat: true },
-    { id: "Credit Share", header: "Share", width: 96, format: formatCell("percent") },
-    { id: "Policy", header: "Billing policy", width: 184 },
+    { id: "Credits Used", header: "Credits used", width: 120, format: formatCell("whole"), heat: true },
+    { id: "Credit Share", header: "Share", width: 84, format: formatCell("percent") },
+    { id: "Policy", header: "Billing policy", width: 160 },
 ];
 
 const COST_COLUMNS: readonly TreeColumn[] = [
-    { id: "Billable Credits", header: "Billable credits", width: 140, format: formatCell("whole") },
-    { id: "Estimated Cost", header: "Estimated cost", width: 140, format: money, heat: true },
+    { id: "Billable Credits", header: "Billable credits", width: 132, format: formatCell("whole") },
+    { id: "Estimated Cost", header: "Estimated cost", width: 132, format: money, heat: true },
 ];
 
 /** The model's own "all days" period, which is what the page shows before anyone picks one. */
@@ -105,26 +108,26 @@ export function StudioStage({ options, rates }: StudioStageProps) {
         const table = agents.table;
         return cost
             ? [
-                  { id: "Agent", header: "Agent", width: 240 },
-                  { id: "Billable Credits", header: "Billable credits", width: 140, numericStyling: true, cellRenderer: formatCell("whole") },
+                  { id: "Agent", header: "Agent", width: 232 },
+                  { id: "Billable Credits", header: "Billable credits", width: 132, numericStyling: true, cellRenderer: formatCell("whole") },
                   {
                       id: "Estimated Cost",
                       header: "Estimated cost",
-                      width: 140,
+                      width: 132,
                       numericStyling: true,
                       cellRenderer: heatRenderer({ domain: columnHeat(table, "Estimated Cost"), format: money }),
                   },
               ]
             : [
-                  { id: "Agent", header: "Agent", width: 240 },
+                  { id: "Agent", header: "Agent", width: 232 },
                   {
                       id: "Credits Used",
                       header: "Credits used",
-                      width: 128,
+                      width: 120,
                       numericStyling: true,
                       cellRenderer: heatRenderer({ domain: columnHeat(table, "Credits Used"), format: formatCell("whole") }),
                   },
-                  { id: "Credit Share", header: "Share", width: 96, numericStyling: true, cellRenderer: formatCell("percent") },
+                  { id: "Credit Share", header: "Share", width: 84, numericStyling: true, cellRenderer: formatCell("percent") },
               ];
     }, [agents.table, cost]);
 
@@ -265,7 +268,8 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                 />
             </div>
 
-            <div className="grid grid-cols-1 items-start gap-500 2xl:grid-cols-2">
+            {/* The users table is the wider of the two, so it takes a little more of the row. */}
+            <div className="grid grid-cols-1 items-start gap-500 2xl:grid-cols-[minmax(0,6fr)_minmax(0,7fr)]">
                 <Panel
                     result={agents}
                     height={gridHeight(agents.table?.rows.length ?? 6)}
@@ -290,6 +294,7 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                     toTree={toStudioUserTree}
                     labelColumn={STUDIO_LABEL_COLUMN}
                     labelHeader={`${groupLabel ?? "Group"} / user`}
+                    labelWidth={216}
                     columns={cost ? COST_COLUMNS : CONSUMPTION_COLUMNS}
                     variant={lens}
                     title={cost ? "Users — estimated cost" : "Top users by consumption"}

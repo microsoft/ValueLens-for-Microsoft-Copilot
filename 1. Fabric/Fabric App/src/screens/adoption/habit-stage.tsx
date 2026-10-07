@@ -20,7 +20,7 @@ import type { FilterKey } from "@/lib/filters";
 import { formatKpi } from "@/lib/format-kpi";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
-import { habitStages, habitSummary, habitThresholds, habitTrend } from "@/queries/adoption";
+import { habitStages, habitSummary, habitThresholds, habitTrend, habitTrendMonths, inactiveNotMeasuredFor } from "@/queries/adoption";
 import { formatMonth } from "./habit-month";
 
 /** Stages place every licensed person, so narrowing to one agent would call everyone else inactive. */
@@ -42,7 +42,7 @@ const habitScales = [
 export function HabitStage() {
     const [scale, setScale] = useState<"share" | "count">("share");
     const { theme } = useThemeContext();
-    const { filters } = useFilterContext();
+    const { filters, applicable } = useFilterContext();
     const ladderColors = useLadderColors();
 
     const summary = useFilteredQuery(habitSummary(), { ignore: AGENT_FILTERS });
@@ -63,8 +63,7 @@ export function HabitStage() {
     );
 
     const month = formatMonth(readText(summaryRow, "[Month]"));
-    // The model only knows who is licensed and idle for Copilot, not for Cowork.
-    const inactiveUnmeasured = filters.audience === "cowork";
+    const notMeasuredFor = inactiveNotMeasuredFor(filters, applicable);
 
     return (
         <Section
@@ -81,23 +80,23 @@ export function HabitStage() {
                 <QueryError message={summary.data.error.message} onRetry={summary.refetch} />
             ) : summary.isLoading || !summary.data ? (
                 <QueryLoading />
-            ) : !summaryRow ? (
+            ) : !summaryRow || !month ? (
                 <QueryEmpty
-                    title="No habit data"
-                    description="Habit stages are derived from the most recent complete month. None was found in the current selection."
+                    title="No complete month"
+                    description="Habit stages are placed on a complete month. The selected dates don't reach one yet."
                 />
             ) : (
                 <div className="flex flex-col gap-200">
                     <p className="max-w-[80ch] text-[length:var(--text-200)] leading-200 text-muted-foreground">
-                        {month ? `Placed on ${month}, the last complete month. ` : "Placed on the last complete month. "}
-                        An active day is any day with at least one Copilot or agent interaction.
+                        Placed on {month}, the most recent complete month in the selected dates. An active day is
+                        any day with at least one Copilot or agent interaction.
                     </p>
                     <ol className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
                         {habitStages.map((stage, index) => {
                             const share = readNumber(summaryRow, `[${stage} Pct]`);
                             const count = readNumber(summaryRow, `[${stage}]`);
                             const threshold = habitThresholds[stage];
-                            const unmeasured = stage === "Inactive" && inactiveUnmeasured;
+                            const unmeasured = stage === "Inactive" ? notMeasuredFor : undefined;
                             return (
                                 <li key={stage} className="relative flex items-center gap-400 px-400 py-300">
                                     <span
@@ -120,7 +119,7 @@ export function HabitStage() {
                                             </span>
                                         </span>
                                         <span className="text-[length:var(--text-200)] leading-200 text-muted-foreground">
-                                            {unmeasured ? "Not measured for Cowork" : threshold.meaning}
+                                            {unmeasured ? `Not measured for ${unmeasured}` : threshold.meaning}
                                         </span>
                                     </span>
                                     <span className="relative font-numeric tabular-nums text-[length:var(--text-300)] text-muted-foreground">
@@ -145,11 +144,11 @@ export function HabitStage() {
                     />
                 ) : trendResult.isLoading || !trendTable ? (
                     <QueryLoading className="h-full" />
-                ) : trendTable.rows.length === 0 ? (
+                ) : habitTrendMonths(trendTable.rows) < 2 ? (
                     <QueryEmpty
                         className="h-full"
-                        title="No monthly history"
-                        description="At least two complete months are needed before the habit mix can be trended."
+                        title="Not enough months"
+                        description="At least two complete months in the selected dates are needed before the habit mix can be trended."
                     />
                 ) : (
                     <VegaVisual

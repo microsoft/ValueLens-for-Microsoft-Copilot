@@ -163,6 +163,12 @@ export function fabricApi(http) {
      */
     addRoleAssignment: (workspaceId, principalId, type, role) =>
       http.post(`/workspaces/${workspaceId}/roleAssignments`, { principal: { id: principalId, type }, role }),
+    /**
+     * @param {string} workspaceId
+     * @param {string} assignmentId
+     * @param {'Admin' | 'Member' | 'Contributor' | 'Viewer'} role
+     */
+    updateRoleAssignment: (workspaceId, assignmentId, role) => http.patch(`/workspaces/${workspaceId}/roleAssignments/${assignmentId}`, { role }),
 
     /** Tenant settings. Needs a Fabric administrator; others get 401 or 403. */
     tenantSettings: async () => /** @type {any[]} */ ((await http.get('/admin/tenantsettings'))?.tenantSettings ?? []),
@@ -214,7 +220,7 @@ export function fabricApi(http) {
     /** @param {string} workspaceId @param {string} displayName */
     createLakehouse: (workspaceId, displayName) =>
       http.requestLro('POST', `/workspaces/${workspaceId}/lakehouses`, {
-        body: { displayName, description: 'ValueLens tables.', creationPayload: { enableSchemas: true } },
+        body: { displayName, description: 'Analytics Hub tables.', creationPayload: { enableSchemas: true } },
         lroResult: true,
       }),
 
@@ -228,10 +234,20 @@ export function fabricApi(http) {
     updateNotebook: (workspaceId, id, ipynb) =>
       http.requestLro('POST', `/workspaces/${workspaceId}/notebooks/${id}/updateDefinition`, { body: { definition: notebookDefinition(ipynb) } }),
 
+    /** @param {string} workspaceId @param {string} displayName @param {string} description */
+    createDataflow: (workspaceId, displayName, description) =>
+      http.requestLro('POST', `/workspaces/${workspaceId}/dataflows`, { body: { displayName, description }, lroResult: true }),
+    /** @param {string} workspaceId @param {string} id @param {any} definition */
+    updateDataflow: (workspaceId, id, definition) =>
+      http.requestLro('POST', `/workspaces/${workspaceId}/dataflows/${id}/updateDefinition`, {
+        query: { updateMetadata: true },
+        body: { definition },
+      }),
+
     /** @param {string} workspaceId @param {string} displayName @param {any} pipeline */
     createPipeline: (workspaceId, displayName, pipeline) =>
       http.requestLro('POST', `/workspaces/${workspaceId}/dataPipelines`, {
-        body: { displayName, description: 'ValueLens daily load.', definition: pipelineDefinition(pipeline) },
+        body: { displayName, description: 'Analytics Hub daily load.', definition: pipelineDefinition(pipeline) },
         lroResult: true,
       }),
     /** @param {string} workspaceId @param {string} id @param {any} pipeline */
@@ -244,7 +260,7 @@ export function fabricApi(http) {
      * Starts a job and returns the URL to poll.
      * @param {string} workspaceId
      * @param {string} itemId
-     * @param {'Pipeline' | 'RunNotebook'} jobType
+     * @param {'Pipeline' | 'RunNotebook' | 'Refresh'} jobType  Refresh runs a Dataflow.
      * @param {any} [executionData]
      */
     async runJob(workspaceId, itemId, jobType, executionData) {
@@ -262,6 +278,51 @@ export function fabricApi(http) {
     jobUrl: (workspaceId, itemId, jobId) => `/workspaces/${workspaceId}/items/${itemId}/jobs/instances/${jobId}`,
     /** @param {string} workspaceId @param {string} itemId */
     listJobs: (workspaceId, itemId) => http.list(`/workspaces/${workspaceId}/items/${itemId}/jobs/instances`),
+    /**
+     * The activity runs of one pipeline run. A retried activity can appear once per attempt.
+     * @param {string} workspaceId
+     * @param {string} jobId
+     * @param {Date} after
+     * @param {Date} before
+     * @returns {Promise<any[]>}
+     */
+    async queryActivityRuns(workspaceId, jobId, after, before) {
+      /** @type {any[]} */
+      const out = [];
+      /** @type {string | undefined} */
+      let continuationToken;
+      for (let page = 0; page < 50; page++) {
+        const res = await http.post(`/workspaces/${workspaceId}/datapipelines/pipelineruns/${jobId}/queryactivityruns`, {
+          filters: [],
+          orderBy: [{ orderBy: 'ActivityRunStart', order: 'ASC' }],
+          lastUpdatedAfter: after.toISOString(),
+          lastUpdatedBefore: before.toISOString(),
+          ...(continuationToken ? { continuationToken } : {}),
+        });
+        out.push(...(Array.isArray(res) ? res : (res?.value ?? [])));
+        continuationToken = Array.isArray(res) ? undefined : res?.continuationToken;
+        if (!continuationToken) break;
+      }
+      return out;
+    },
+
+    /**
+     * The pipeline's saved definition, parsed from `pipeline-content.json`.
+     * @param {string} workspaceId
+     * @param {string} id
+     * @returns {Promise<any>}
+     */
+    async getPipelineDefinition(workspaceId, id) {
+      const res = await http.requestLro('POST', `/workspaces/${workspaceId}/dataPipelines/${id}/getDefinition`, { lroResult: true });
+      const part = res?.definition?.parts?.find((/** @type {any} */ p) => p.path === 'pipeline-content.json');
+      if (!part?.payload) throw new Error('Fabric returned the pipeline without its definition.');
+      return JSON.parse(Buffer.from(part.payload, 'base64').toString('utf8'));
+    },
+
+    /** Spark settings of a workspace. Needs workspace Admin. @param {string} workspaceId */
+    getSparkSettings: (workspaceId) => http.get(`/workspaces/${workspaceId}/spark/settings`),
+    /** @param {string} workspaceId @param {any} body  Only the settings to change. */
+    updateSparkSettings: (workspaceId, body) => http.patch(`/workspaces/${workspaceId}/spark/settings`, body),
 
     /** @param {string} workspaceId @param {string} itemId */
     listSchedules: (workspaceId, itemId) => http.list(`/workspaces/${workspaceId}/items/${itemId}/jobs/Pipeline/schedules`),

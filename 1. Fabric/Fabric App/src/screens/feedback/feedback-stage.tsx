@@ -21,6 +21,7 @@ import { withoutEmoji } from "@/lib/model-text";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import {
+    FEEDBACK_ON_CALENDAR,
     FEEDBACK_SURFACE_MIN_COUNT,
     feedbackCategory,
     feedbackComments,
@@ -30,6 +31,9 @@ import {
 } from "@/queries/feedback";
 
 const dateFormatter = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+/** Every feedback query counts the same rows: those dated on the Calendar. */
+const ON_CALENDAR = { extra: [FEEDBACK_ON_CALENDAR] } as const;
 
 /** Automatic segment labels would print thumbs down as negative counts. */
 const NO_STACK_LABELS = { disableStackedDataLabels: true };
@@ -123,15 +127,15 @@ export function FeedbackStage() {
     const { theme } = useThemeContext();
     const outcomeColors = useOutcomeColors();
 
-    const summary = useFilteredQuery(feedbackSummary());
+    const summary = useFilteredQuery(feedbackSummary(), ON_CALENDAR);
     const trend = feedbackTrend();
-    const trendResult = useFilteredQuery({ connection: trend.connection, query: trend.query });
+    const trendResult = useFilteredQuery({ connection: trend.connection, query: trend.query }, ON_CALENDAR);
     const category = feedbackCategory();
-    const categoryResult = useFilteredQuery({ connection: category.connection, query: category.query });
+    const categoryResult = useFilteredQuery({ connection: category.connection, query: category.query }, ON_CALENDAR);
     const surface = feedbackSurface();
-    const surfaceResult = useFilteredQuery({ connection: surface.connection, query: surface.query });
+    const surfaceResult = useFilteredQuery({ connection: surface.connection, query: surface.query }, ON_CALENDAR);
     const comments = feedbackComments();
-    const commentsResult = useFilteredQuery({ connection: comments.connection, query: comments.query });
+    const commentsResult = useFilteredQuery({ connection: comments.connection, query: comments.query }, ON_CALENDAR);
 
     const summaryRow = useMemo(
         () => (summary.data?.status === "success" ? toSummaryRow(summary.data.table) : undefined),

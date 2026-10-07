@@ -48,7 +48,7 @@ DEFINE
             )
 
 EVALUATE
-// Every cohort's cards at once, so the toggle never waits on a query.
+// Every cohort's cards at once, so changing License or Activity never waits on a query.
 CALCULATETABLE(
     ROW(
         "All Users", [All Active Users],

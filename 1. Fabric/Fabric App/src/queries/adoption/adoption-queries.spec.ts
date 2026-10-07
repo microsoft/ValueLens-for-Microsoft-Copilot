@@ -6,6 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { describe, expect, it } from "vitest";
+import { defaultFilters, type FilterState } from "@/lib/filters";
 import {
     activationByOrg,
     activationSummary,
@@ -13,6 +14,8 @@ import {
     adoptionTrend,
     habitSummary,
     habitTrend,
+    habitTrendMonths,
+    inactiveNotMeasuredFor,
     trendHeatmap,
     trendHeatmapHeadline,
 } from "./index";
@@ -196,6 +199,39 @@ describe("adoption spec field references", () => {
 
         const multi = adoptionTrend().vegaLiteSpec as { encoding: { color?: unknown } };
         expect(multi.encoding.color).toBeDefined();
+    });
+
+    it("counts the distinct months in a habit trend result", () => {
+        expect(habitTrendMonths([])).toBe(0);
+        expect(
+            habitTrendMonths([
+                ["2026-05-01T00:00:00", "4 - Power", 3],
+                ["2026-05-01T00:00:00", "0 - Inactive", 9],
+            ]),
+        ).toBe(1);
+        expect(
+            habitTrendMonths([
+                ["2026-05-01T00:00:00", "4 - Power", 3],
+                ["2026-06-01T00:00:00", "4 - Power", 4],
+                [null, "4 - Power", 1],
+            ]),
+        ).toBe(2);
+    });
+
+    it("says Inactive isn't measured for unlicensed users, agents and Cowork", () => {
+        const all = ["audience", "licence"] as const;
+        const state = (audience: FilterState["audience"], licence: FilterState["licence"]): FilterState => ({
+            ...defaultFilters,
+            audience,
+            licence,
+        });
+        expect(inactiveNotMeasuredFor(state("all", "all"), all)).toBeUndefined();
+        expect(inactiveNotMeasuredFor(state("copilot", "licensed"), all)).toBeUndefined();
+        expect(inactiveNotMeasuredFor(state("cowork", "all"), all)).toBe("Cowork");
+        expect(inactiveNotMeasuredFor(state("agents", "all"), all)).toBe("Agents");
+        expect(inactiveNotMeasuredFor(state("all", "unlicensed"), all)).toBe("unlicensed users");
+        // A filter the destination doesn't offer can't narrow it.
+        expect(inactiveNotMeasuredFor(state("cowork", "unlicensed"), [])).toBeUndefined();
     });
 
     it("does not let one variant's spec changes leak into the next", () => {

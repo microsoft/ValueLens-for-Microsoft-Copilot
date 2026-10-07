@@ -30,9 +30,9 @@ export const liveColumns = {
         "[Licensed Rate]",
         "[Unlicensed Rate]",
         "[Agent Rate]",
-        "[Top Value Outcome]",
         "[Licensed Utilisation]",
     ],
+    topOutcome: ["[Top Value Outcome]"],
     taskBreakdown: ["[Dimension]", "[Category]", "[Tasks]", "[Share]"],
     surfaceUsage: [
         "[Lens]",
@@ -90,7 +90,7 @@ export const liveColumns = {
         "[Sessions Per User Per Week]",
     ],
     // The demo tenant has no Cowork sessions, so these were captured by
-    // running the same Task group → Task category rollup with the Everyone
+    // running the same Task Category → Task Breakdown rollup with the Everyone
     // measures; the Cowork query itself was confirmed to run live.
     leaderboardCoworkTasks: [
         "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]",

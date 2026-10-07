@@ -13,7 +13,10 @@ import {
     formatDateRange,
     isFilterActive,
     presetRange,
+    selectedCohort,
     summariseSelection,
+    unlicensedOnly,
+    unshownActivity,
     type FilterKey,
     type FilterState,
 } from "./filters";
@@ -98,5 +101,72 @@ describe("labels", () => {
         expect(summariseSelection([], "All organizations", "organizations")).toBe("All organizations");
         expect(summariseSelection(["HR"], "All organizations", "organizations")).toBe("HR");
         expect(summariseSelection(["HR", "IT"], "All organizations", "organizations")).toBe("2 organizations");
+    });
+});
+
+describe("selectedCohort", () => {
+    const BOTH: FilterKey[] = ["licence", "audience"];
+    const WORK = ["licensed", "unlicensed", "agents", "cowork"] as const;
+    const ACTIVATION = ["licensed", "unlicensed", "agents"] as const;
+    const pick = (licence: FilterState["licence"], audience: FilterState["audience"]) => ({
+        ...defaultFilters,
+        licence,
+        audience,
+    });
+
+    it("is all when neither filter picks a group", () => {
+        expect(selectedCohort(defaultFilters, BOTH, WORK)).toBe("all");
+    });
+
+    it("follows License", () => {
+        expect(selectedCohort(pick("licensed", "all"), BOTH, WORK)).toBe("licensed");
+        expect(selectedCohort(pick("unlicensed", "all"), BOTH, WORK)).toBe("unlicensed");
+    });
+
+    it("prefers Activity over License", () => {
+        expect(selectedCohort(pick("unlicensed", "agents"), BOTH, WORK)).toBe("agents");
+        expect(selectedCohort(pick("licensed", "cowork"), BOTH, WORK)).toBe("cowork");
+    });
+
+    it("falls back to License when Activity names no group the stage shows", () => {
+        expect(selectedCohort(pick("unlicensed", "copilot"), BOTH, WORK)).toBe("unlicensed");
+        expect(selectedCohort(pick("licensed", "cowork"), BOTH, ACTIVATION)).toBe("licensed");
+        expect(selectedCohort(pick("all", "cowork"), BOTH, ACTIVATION)).toBe("all");
+        expect(selectedCohort(pick("all", "copilot"), BOTH, WORK)).toBe("all");
+    });
+
+    it("ignores a filter the destination doesn't offer", () => {
+        expect(selectedCohort(pick("licensed", "agents"), ["licence"], WORK)).toBe("licensed");
+        expect(selectedCohort(pick("licensed", "all"), ["audience"], WORK)).toBe("all");
+        expect(selectedCohort(pick("unlicensed", "agents"), [], WORK)).toBe("all");
+    });
+});
+
+describe("unshownActivity", () => {
+    const BOTH: FilterKey[] = ["licence", "audience"];
+    const SHOWN = ["licensed", "unlicensed", "agents"] as const;
+    const activity = (audience: FilterState["audience"]) => ({ ...defaultFilters, audience });
+
+    it("names an Activity the stage has no card for", () => {
+        expect(unshownActivity(activity("copilot"), BOTH, SHOWN)).toBe("Copilot chat");
+        expect(unshownActivity(activity("cowork"), BOTH, SHOWN)).toBe("Cowork");
+    });
+
+    it("is undefined when Activity is All, has a card, or isn't offered", () => {
+        expect(unshownActivity(defaultFilters, BOTH, SHOWN)).toBeUndefined();
+        expect(unshownActivity(activity("agents"), BOTH, SHOWN)).toBeUndefined();
+        expect(unshownActivity(activity("cowork"), BOTH, [...SHOWN, "cowork"])).toBeUndefined();
+        expect(unshownActivity(activity("copilot"), ["licence"], SHOWN)).toBeUndefined();
+    });
+});
+
+describe("unlicensedOnly", () => {
+    const licence = (value: FilterState["licence"]) => ({ ...defaultFilters, licence: value });
+
+    it("is true only when License picks unlicensed people on a stage that offers it", () => {
+        expect(unlicensedOnly(licence("unlicensed"), ["licence"])).toBe(true);
+        expect(unlicensedOnly(licence("licensed"), ["licence"])).toBe(false);
+        expect(unlicensedOnly(licence("all"), ["licence"])).toBe(false);
+        expect(unlicensedOnly(licence("unlicensed"), ["audience"])).toBe(false);
     });
 });

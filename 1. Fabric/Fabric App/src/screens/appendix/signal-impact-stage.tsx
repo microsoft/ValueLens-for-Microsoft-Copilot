@@ -5,7 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { DataGrid, type GridColumnDef, type Row } from "@microsoft/fabric-datagrid";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { ExternalLink } from "lucide-react";
@@ -18,24 +18,49 @@ import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { formatKpi } from "@/lib/format-kpi";
 import { columnHeat, columnValues, heatRenderer, type HeatDomain } from "@/lib/heat";
 import { toDataTable } from "@/lib/to-data-table";
-import { signalImpact } from "@/queries/appendix";
+import { signalImpact, withTaskDescriptions } from "@/queries/appendix";
 
 const MINUTES = "Human Equivalent (Minutes)";
 
 /**
  * Rows wrap, so their height is only known once drawn. A short list sizes the
- * card to roughly fit; a long one caps it and the grid scrolls.
+ * card from the tallest category's rows (about 92 px each on a 1,440 px
+ * screen), so it never scrolls inside; a long one caps it and the grid scrolls.
  */
 const GRID_CHROME = 150;
-const ROW_ESTIMATE = 58;
+const ROW_ESTIMATE = 92;
 
 /** Grid cells do not wrap by default; the long text here has to. */
 function Wrap({ children }: { children: ReactNode }) {
     return <span className="block whitespace-normal">{children}</span>;
 }
 
+/** Supporting text, smaller and muted so the task and its value lead each row. */
+function Muted({ children }: { children: ReactNode }) {
+    return (
+        <span className="block text-[length:var(--text-200)] leading-200 whitespace-normal text-muted-foreground">
+            {children}
+        </span>
+    );
+}
+
 function text(value: unknown): string {
     return typeof value === "string" ? value : "";
+}
+
+/** Signals list alternatives as "TeamsChat/TeamsChannel"; let them wrap after each slash. */
+function breakAfterSlashes(value: string): ReactNode {
+    const parts = value.split("/");
+    return parts.map((part, index) => (
+        <Fragment key={index}>
+            {part}
+            {index < parts.length - 1 && (
+                <>
+                    /<wbr />
+                </>
+            )}
+        </Fragment>
+    ));
 }
 
 function safeUrl(value: unknown): string | undefined {
@@ -49,11 +74,14 @@ function safeUrl(value: unknown): string | undefined {
 }
 
 function signalColumns(minutesHeat: HeatDomain | undefined): GridColumnDef[] {
+    // The widths add up to just under the table's width on a 1,440 px screen: it stretches on
+    // wider screens and scrolls sideways on narrower ones, so no column collapses. Each is at
+    // least its header plus the sort arrow.
     return [
         {
             id: "AI Tasks",
-            header: "AI task",
-            width: 200,
+            header: "Task Breakdown",
+            width: 152,
             cellRenderer: (value, row: Row) => (
                 <span className="flex flex-col gap-100 whitespace-normal">
                     <span className="font-semibold">{text(value)}</span>
@@ -66,19 +94,16 @@ function signalColumns(minutesHeat: HeatDomain | undefined): GridColumnDef[] {
         {
             id: "Signal",
             header: "Signal in the audit log",
-            width: 250,
-            cellRenderer: (value) => (
-                <span className="block text-[length:var(--text-200)] leading-200 whitespace-normal text-muted-foreground">
-                    {text(value)}
-                </span>
-            ),
+            width: 176,
+            cellRenderer: (value) => <Muted>{breakAfterSlashes(text(value))}</Muted>,
         },
-        { id: "Use Case", header: "Use case", cellRenderer: (value) => <Wrap>{text(value)}</Wrap> },
-        { id: "Value Outcome", header: "Value outcome", width: 150, cellRenderer: (value) => <Wrap>{text(value)}</Wrap> },
+        { id: "Use Case", header: "Use case", width: 152, cellRenderer: (value) => <Wrap>{text(value)}</Wrap> },
+        { id: "Description", header: "Description", width: 168, cellRenderer: (value) => <Muted>{text(value)}</Muted> },
+        { id: "Value Outcome", header: "Value outcome", width: 136, cellRenderer: (value) => <Wrap>{text(value)}</Wrap> },
         {
             id: MINUTES,
             header: "Human minutes",
-            width: 120,
+            width: 140,
             numericStyling: true,
             cellRenderer: heatRenderer({
                 domain: minutesHeat,
@@ -88,7 +113,7 @@ function signalColumns(minutesHeat: HeatDomain | undefined): GridColumnDef[] {
         {
             id: "Research Source",
             header: "Research source",
-            width: 280,
+            width: 144,
             cellRenderer: (value, row: Row) => {
                 const href = safeUrl(row["Source URL"]);
                 const confidence = text(row["Confidence"]);
@@ -119,7 +144,7 @@ function signalColumns(minutesHeat: HeatDomain | undefined): GridColumnDef[] {
         },
         { id: "Source URL", header: "Source URL", hidden: true },
         { id: "Confidence", header: "Confidence", hidden: true },
-        { id: "Category", header: "Category", hidden: true },
+        { id: "Category", header: "Task Category", hidden: true },
     ];
 }
 
@@ -131,9 +156,10 @@ function withCategory(table: DataTable, category: string | undefined): DataTable
 
 /**
  * The report's Signal → Impact appendix: the audit-log signal ValueLens reads
- * as an AI task, the human time that task would take, and the research the
- * estimate rests on. These are the editable assumptions behind the Value
- * destination, so the minutes are shaded on one scale for every category.
+ * as a Task Breakdown, what that task is, the human time it would take, and
+ * the research the estimate rests on. These are the editable assumptions
+ * behind the Value destination, so the minutes are shaded on one scale for
+ * every Task Category.
  */
 export function SignalImpactStage() {
     const { theme } = useThemeContext();
@@ -142,7 +168,10 @@ export function SignalImpactStage() {
     const [category, setCategory] = useState<string>();
 
     const table = useMemo(
-        () => (result.data?.status === "success" ? toDataTable(result.data.table, config.columnMetadata) : undefined),
+        () =>
+            result.data?.status === "success"
+                ? withTaskDescriptions(toDataTable(result.data.table, config.columnMetadata))
+                : undefined,
         [result.data, config.columnMetadata],
     );
     const categories = useMemo(() => {
@@ -162,12 +191,12 @@ export function SignalImpactStage() {
         <Section
             id={stageAnchor("signal-impact")}
             title="Signal → Impact"
-            description="What the audit log shows, the AI task ValueLens reads it as, and the human time that task would otherwise take. These are the assumptions behind every value estimate."
+            description="What the audit log shows, the task ValueLens reads it as, and the human time that task would otherwise take. These are the assumptions behind every value estimate."
             actions={
                 categories.length > 1 ? (
                     <ChoiceMenu
-                        label="Category"
-                        allLabel="All categories"
+                        label="Task Category"
+                        allLabel="All task categories"
                         choices={categories}
                         value={selected}
                         onChange={setCategory}
@@ -203,7 +232,7 @@ export function SignalImpactStage() {
                         theme={theme}
                         header={{
                             title: selected ? `${selected} signals` : "Every signal ValueLens values",
-                            subtitle: `${formatKpi(visible.rows.length, "whole")} signals · minutes shaded on one scale across all categories`,
+                            subtitle: `${formatKpi(visible.rows.length, "whole")} signals · minutes shaded on one scale across all task categories`,
                         }}
                     />
                 )}

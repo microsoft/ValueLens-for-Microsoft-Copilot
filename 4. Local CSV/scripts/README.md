@@ -34,8 +34,22 @@ python "Purview_CopilotInteraction_Processor_v4.0.0.py" \
     --profile    aibv
 ```
 
-`--profile aibv` is the ValueLens output (50-column fact superset, all the calculated columns
-pre-computed). `--profile aio` produces the leaner AI-in-One shape instead.
+`--profile aibv` is the ValueLens output (61-column fact superset, all the calculated columns
+pre-computed). It applies the same audit fixes as the Fabric processor: Copilot Studio runtime
+records with no messages are kept, and M365 Copilot "twins", test-pane, maker-evaluation,
+agent-authoring, autonomous/workflow-run and Fabric multi-agent records are dropped (counted in
+the run summary). It also emits the agent-linking keys `Agent_BotId`, `Agent_EnvironmentId`,
+`Prompts_Available` and `Exclude_Reason` — see [`docs/METHODOLOGY.md`](../../docs/METHODOLOGY.md).
+And it adds the six agent-type columns (`Agent_Key`, `Agent_Type`, `Agent_Type_Basis`,
+`Agent_Publisher`, `Agent_Is_Published`, `Agent_Consolidated_Name`), using an exact copy of the
+Fabric processor's rules — see
+[agent type and publisher](../../docs/DATA-DICTIONARY.md#agent-type-and-publisher). The older
+`Agent Publish Status` column is still emitted, unchanged.
+`--profile aio` produces the leaner AI-in-One shape instead, unchanged.
+
+To correct a category, pass `--agent-type-overrides overrides.csv`: a CSV with columns `key` (an
+agent ID, agent name or AppIdentity, matched case-insensitively) and `Agent_Type` (or `Category`).
+Matching rows get that type and `Agent_Type_Basis` `override`.
 
 `--help` lists everything, including `--out-dir` and `--with-aggregates`.
 

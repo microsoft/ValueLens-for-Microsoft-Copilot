@@ -9,7 +9,9 @@ import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { installerWindow } from './launch.js';
 import { createSession } from './web-session.js';
+import { clearStaged, sizeOk, stageUpload } from './staging.js';
 import { c } from './ui.js';
+import { MAX_UPLOAD_BYTES } from './uploads.js';
 import { createWebUi } from './web-ui.js';
 
 const WEB_DIR = new URL('./web/', import.meta.url);
@@ -72,6 +74,53 @@ function readJson(req) {
         reject(Object.assign(new Error('Not JSON'), { status: 400 }));
       }
     });
+    req.on('error', reject);
+  });
+}
+
+/**
+ * A CSV the page sends as raw bytes, kept on this computer until the install uploads it.
+ * @param {import('node:http').IncomingMessage} req
+ * @param {import('node:http').ServerResponse} res
+ */
+async function upload(req, res) {
+  if (!String(req.headers['content-type'] ?? '').startsWith('application/octet-stream')) return json(res, 415, { error: 'Send the file as application/octet-stream.' });
+  let name = '';
+  try {
+    name = decodeURIComponent(String(req.headers['x-file-name'] ?? ''));
+  } catch {
+    return json(res, 400, { error: 'The file name is not valid.' });
+  }
+  if (!/\.csv$/i.test(name)) return json(res, 422, { error: 'Choose a .csv file.' });
+  const declared = Number(req.headers['content-length'] ?? 0);
+  if (declared > MAX_UPLOAD_BYTES) {
+    req.resume();
+    return json(res, 413, { error: sizeOk(declared) });
+  }
+  const bytes = await readBytes(req, MAX_UPLOAD_BYTES);
+  const ok = sizeOk(bytes.length);
+  if (ok !== true) return json(res, 422, { error: ok });
+  return json(res, 200, stageUpload(name, bytes));
+}
+
+/**
+ * @param {import('node:http').IncomingMessage} req
+ * @param {number} limit
+ * @returns {Promise<Buffer>}
+ */
+function readBytes(req, limit) {
+  return new Promise((resolve, reject) => {
+    /** @type {Buffer[]} */
+    const chunks = [];
+    let size = 0;
+    req.on('data', (/** @type {Buffer} */ chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        reject(Object.assign(new Error(String(sizeOk(size))), { status: 413 }));
+        req.destroy();
+      } else chunks.push(chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
 }
@@ -167,6 +216,7 @@ export async function startServer(o) {
     if (method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
     const origin = req.headers.origin ?? '';
     if (!origins().some((o) => origin === `http://${o}`)) return json(res, 403, { error: 'Cross-site request refused.' });
+    if (url.pathname === '/api/upload') return upload(req, res);
     if (!String(req.headers['content-type'] ?? '').startsWith('application/json')) return json(res, 415, { error: 'Send JSON.' });
     const body = await readJson(req);
 
@@ -207,6 +257,7 @@ export async function startServer(o) {
     unsubscribe();
     for (const res of clients) res.end();
     clients.clear();
+    clearStaged();
     server.close(() => finish());
     server.closeAllConnections?.();
   }
@@ -286,6 +337,14 @@ export function mirror(write) {
         break;
       case 'auto':
         line(`${c.green('✔')} ${e.message} ${c.cyan(e.display)}`);
+        break;
+      case 'loads':
+        for (const card of /** @type {import('./loads.js').LoadCard[]} */ (e.cards)) {
+          const kind = card.state === 'ok' ? 'ok' : card.state === 'failed' ? 'fail' : 'warn';
+          line(`  ${SYMBOL[kind]} ${card.name}${card.state === 'ok' ? '' : `: ${card.state === 'running' ? 'still running' : card.state}`}`);
+          if (card.reason) line(`    ${card.reason}`);
+          for (const fix of card.fix) line(`    ${c.dim(fix)}`);
+        }
         break;
     }
   };

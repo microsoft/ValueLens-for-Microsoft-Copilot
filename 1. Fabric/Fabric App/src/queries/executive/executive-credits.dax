@@ -1,0 +1,29 @@
+EVALUATE
+// Copilot Studio and Cowork credits by month, for the whole tenant. The
+// caller sets 'Reporting Date' to the same six months as the hours trend.
+VAR _months =
+    DISTINCT(
+        SELECTCOLUMNS(
+            VALUES('Reporting Date'[Date]),
+            "Month Start", DATE(YEAR('Reporting Date'[Date]), MONTH('Reporting Date'[Date]), 1)
+        )
+    )
+RETURN
+    GENERATE(
+        _months,
+        VAR _start = [Month Start]
+        RETURN
+            CALCULATETABLE(
+                ROW(
+                    "Studio Credits", [Reporting Studio Credits],
+                    "Cowork Credits", [Reporting Cowork Credits]
+                ),
+                KEEPFILTERS(
+                    FILTER(
+                        ALL('Reporting Date'[Date]),
+                        'Reporting Date'[Date] >= _start && 'Reporting Date'[Date] <= EOMONTH(_start, 0)
+                    )
+                )
+            )
+    )
+ORDER BY [Month Start]

@@ -470,6 +470,27 @@
     --color-data-9: var(--vl-slate);
     --color-data-10: var(--vl-ink);
   }
+  /* The executive summary speaks for every destination at once, so it takes
+     the report's navy as its own and leaves each series in the hue its home
+     destination gives it. */
+  .palette-executive {
+    --color-brand: var(--vl-navy);
+    --color-brand-foreground: var(--vl-navy-text);
+    --color-primary: var(--vl-navy-text);
+    --color-ring: var(--vl-navy-text);
+    --color-accent: var(--vl-navy-tint);
+    --color-accent-foreground: var(--vl-navy-text);
+    --color-data-1: var(--vl-blue);
+    --color-data-2: var(--vl-amber);
+    --color-data-3: var(--vl-lavender);
+    --color-data-4: var(--vl-teal);
+    --color-data-5: var(--vl-plum);
+    --color-data-6: var(--vl-coral);
+    --color-data-7: var(--vl-navy);
+    --color-data-8: var(--vl-periwinkle);
+    --color-data-9: var(--vl-slate);
+    --color-data-10: var(--vl-ink);
+  }
   /* The assumptions and the appendix are reference, not places with their own
      story, so they take the report's navy: the quietest hue in the family. */
   .palette-assumptions,

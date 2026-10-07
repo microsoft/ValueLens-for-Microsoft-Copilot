@@ -61,6 +61,11 @@ export function fakeUi(opts = {}) {
       asked.push(message);
       return answers.length ? answers.shift() : choices.filter((ch) => ch.checked).map((ch) => ch.value);
     },
+    /** @param {string} message @param {import('../src/uploads.js').SourceCard[]} cards */
+    async sources(message, cards) {
+      asked.push(message);
+      return answers.length ? answers.shift() : { modes: Object.fromEntries(cards.map((card) => [card.id, card.mode])), files: [] };
+    },
   };
   return { ui: /** @type {import('../src/ui.js').Ui} */ (/** @type {unknown} */ (ui)), out, asked, text: () => out.join('') };
 }
@@ -76,6 +81,10 @@ export function fakeFabric() {
   const calls = [];
   /** @type {any[]} */
   const jobs = [];
+  /** Job instances listJobs returns. @type {any[]} */
+  const jobList = [];
+  /** Activity runs queryActivityRuns returns, by job id. @type {Record<string, any[]>} */
+  const activityRuns = {};
   /** @type {any[]} */
   const roles = [];
   /** @type {{ id: string, displayName: string, body?: any }[]} */
@@ -88,6 +97,8 @@ export function fakeFabric() {
   const failures = {};
   /** SQL endpoint states getLakehouse returns, in order; then a ready endpoint. @type {any[]} */
   const sqlStates = [];
+  /** The workspace's Spark settings. @type {{ highConcurrency: Record<string, boolean> }} */
+  const spark = { highConcurrency: { notebookInteractiveRunEnabled: true, notebookPipelineRunEnabled: false } };
   const fail = (/** @type {string} */ method) => {
     const err = failures[method]?.shift();
     if (err) throw err;
@@ -116,6 +127,19 @@ export function fakeFabric() {
       find(id).content = content;
       return null;
     },
+    /** @param {string} _ws @param {string} name */
+    createDataflow: async (_ws, name) => {
+      calls.push(`createDataflow ${name}`);
+      fail('createDataflow');
+      return { id: add('Dataflow', name, null).id };
+    },
+    /** @param {string} _ws @param {string} id @param {any} def */
+    updateDataflow: async (_ws, id, def) => {
+      calls.push(`updateDataflow ${find(id).displayName}`);
+      fail('updateDataflow');
+      find(id).content = def;
+      return null;
+    },
     /** @param {string} _ws @param {string} name @param {any} def */
     createPipeline: async (_ws, name, def) => {
       calls.push(`createPipeline ${name}`);
@@ -127,6 +151,24 @@ export function fakeFabric() {
     updatePipeline: async (_ws, id, def) => {
       calls.push(`updatePipeline ${find(id).displayName}`);
       find(id).content = def;
+      return null;
+    },
+    /** @param {string} _ws @param {string} id */
+    getPipelineDefinition: async (_ws, id) => {
+      fail('getPipelineDefinition');
+      const item = items.find((i) => i.id === id);
+      if (!item?.content) throw notFound();
+      return structuredClone(item.content);
+    },
+    getSparkSettings: async () => {
+      fail('getSparkSettings');
+      return structuredClone(spark);
+    },
+    /** @param {string} _ws @param {any} body */
+    updateSparkSettings: async (_ws, body) => {
+      calls.push(`updateSparkSettings ${JSON.stringify(body)}`);
+      fail('updateSparkSettings');
+      spark.highConcurrency = { ...spark.highConcurrency, ...body.highConcurrency };
       return null;
     },
     listSchedules: async () => schedules.map((s) => structuredClone(s)),
@@ -149,7 +191,9 @@ export function fakeFabric() {
       return `https://api.fabric.microsoft.com/v1/workspaces/${ws}/items/${id}/jobs/instances/job-${++n}`;
     },
     getJob: async () => jobs.shift(),
-    listJobs: async () => [],
+    listJobs: async () => structuredClone(jobList),
+    /** @param {string} _ws @param {string} jobId */
+    queryActivityRuns: async (_ws, jobId) => structuredClone(activityRuns[jobId] ?? []),
     /** @param {string} _ws @param {string} id */
     getLakehouse: async (_ws, id) => ({
       id,
@@ -196,6 +240,12 @@ export function fakeFabric() {
     addRoleAssignment: async (_ws, id, type, role) => {
       calls.push(`addRoleAssignment ${id} ${role}`);
       roles.push({ id, principal: { id, type }, role });
+      return null;
+    },
+    /** @param {string} _ws @param {string} id @param {string} role */
+    updateRoleAssignment: async (_ws, id, role) => {
+      calls.push(`updateRoleAssignment ${id} ${role}`);
+      Object.assign(/** @type {any} */ (roles.find((r) => r.id === id)), { role });
       return null;
     },
     listConnections: async () => connections.map(({ id, displayName }) => ({ id, displayName })),
@@ -254,7 +304,7 @@ export function fakeFabric() {
       return null;
     },
   };
-  return { api, items, schedules, calls, jobs, roles, connections, gateways, workspaceCapacities, failures, sqlStates, add };
+  return { api, items, schedules, calls, jobs, jobList, activityRuns, roles, connections, gateways, workspaceCapacities, failures, sqlStates, spark, add };
 }
 
 /** @param {number} [status] @param {string} [message] */

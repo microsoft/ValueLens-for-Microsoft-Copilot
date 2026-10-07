@@ -14,13 +14,17 @@ import { c } from '../ui.js';
 import { AGENT_EVALUATOR_MODEL_NAME, CONSUMPTION_MODEL_NAME, MODEL_NAME } from '../config.js';
 import { MIN_NODE, nodeVersionOk } from './app.js';
 import { agentEvaluatorModelWanted, planAgentEvaluator } from './agent-evaluator.js';
-import { AZURE_AI_ROLES, consumptionModelWanted, planConsumption } from './consumption.js';
+import { AZURE_AI_ROLES, consumptionModelWanted, COWORK_DATAFLOW_NAME, planConsumption, planCowork } from './consumption.js';
+import { flowsWanted } from './flows.js';
+import { FEEDBACK_FLOW_NAME, STUDIO_FLOW_NAME } from '../transform/flows.js';
 import { describeSchedule, displayNames, freeName, PIPELINE_NAME } from './fabric.js';
 import { connectionName } from './model.js';
+import { planDataSources } from './data-sources.js';
+import { DATA_SOURCES, modulesFromSources, routerWanted, UPLOAD_DIR } from '../uploads.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
-export const APP_NAME = 'ValueLens Data Collector';
+export const APP_NAME = 'Analytics Hub Data Collector';
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** @param {string} v */
@@ -223,15 +227,14 @@ export function collectChoices(modules) {
 export async function plan(ctx, pre) {
   const { ui, config, api } = ctx;
 
-  ui.heading('What to collect');
-  const picked = await ui.checkbox('Tick the data you want. The dashboard is built on the first two, so they\'re always collected.', collectChoices(config.modules));
-  config.modules = /** @type {import('../catalog.js').ModuleChoice} */ ({
-    orgData: true,
-    ...Object.fromEntries(OPTIONAL_MODULES.map((id) => [id, picked.includes(id)])),
-  });
+  await planDataSources(ctx);
 
   await planPowerBi(ctx, pre);
-  if (config.modules.consumption) await planConsumption(ctx, pre);
+  if (config.modules.consumption) {
+    await planConsumption(ctx, pre);
+    await planCowork(ctx);
+  }
+  config.modules = modulesFromSources(config.dataSources);
   if (config.modules.agentEvaluator) await planAgentEvaluator(ctx);
 
   if (config.firstRun?.status !== 'Completed') {
@@ -424,6 +427,7 @@ export async function reserveNames(ctx) {
     semanticModel: !!sm.enabled,
     azureAi: !!config.modules.consumption && !!cc.azureSubscriptionId,
     dataverse: !!config.modules.agentEvaluator && ae.environments.length > 0,
+    dataSources: config.dataSources,
   });
   f.notebookNames ??= {};
   for (const nb of notebooks) {
@@ -466,7 +470,7 @@ export function planReview(ctx, pre) {
   const appName = config.app.appId ? config.app.displayName ?? config.app.appId : APP_NAME;
   const withAzureAi = !!config.modules.consumption && !!cc.azureSubscriptionId;
   const withTranscripts = !!config.modules.agentEvaluator && ae.environments.length > 0;
-  const notebooks = notebooksFor(config.modules, { semanticModel: !!sm.enabled, azureAi: withAzureAi, dataverse: withTranscripts });
+  const notebooks = notebooksFor(config.modules, { semanticModel: !!sm.enabled, azureAi: withAzureAi, dataverse: withTranscripts, dataSources: config.dataSources });
 
   /** @type {ReviewItem[]} */
   const creates = [
@@ -497,13 +501,34 @@ export function planReview(ctx, pre) {
     },
     { kind: 'Pipeline', name: f.pipelineName ?? PIPELINE_NAME, isNew: !f.pipelineId, detail: `Runs the notebooks ${describeSchedule(config.schedule)}.` },
   ];
+  if (routerWanted(config.dataSources)) {
+    const n = ctx.pendingUploads?.length ?? 0;
+    creates.push({
+      kind: 'Folder',
+      name: UPLOAD_DIR,
+      isNew: !config.uploads.folders,
+      detail: `Drop exports here; each run loads them.${n ? ` ${n} file${n === 1 ? '' : 's'} uploaded now.` : ''}`,
+    });
+  }
+  if (config.modules.consumption && config.dataSources.coworkCredits === 'api') {
+    creates.push({ kind: 'Dataflow Gen2', name: cc.dataflowName ?? COWORK_DATAFLOW_NAME, isNew: !cc.dataflowId, detail: 'Reads Cowork credits from your Viva Insights query before each Viva load.' });
+  }
+  const env = config.uploads.flowEnvironment;
+  for (const kind of flowsWanted(config)) {
+    creates.push({
+      kind: 'Power Automate flow',
+      name: kind === 'feedback' ? FEEDBACK_FLOW_NAME : STUDIO_FLOW_NAME,
+      isNew: !config.uploads.flowIds?.[kind],
+      detail: env ? `In ${env.name ?? env.url}, turned off until you sign in to its connections.` : 'Written to a file to import.',
+    });
+  }
   if (sm.enabled) {
     creates.push({ kind: 'Semantic model', name: sm.name, isNew: !sm.id });
     if (consumptionModelWanted(ctx)) creates.push({ kind: 'Semantic model', name: cc.model.name, isNew: !cc.model.id });
     if (agentEvaluatorModelWanted(ctx)) creates.push({ kind: 'Semantic model', name: ae.model.name, isNew: !ae.model.id });
     creates.push({
       kind: 'Connection',
-      name: sm.connectionName ?? (f.workspaceId ? connectionName(f.workspaceId) : 'ValueLens SQL connection'),
+      name: sm.connectionName ?? (f.workspaceId ? connectionName(f.workspaceId) : 'Analytics Hub SQL connection'),
       isNew: !sm.connectionId,
       detail: 'Lets the models read the Lakehouse, with a second client secret that only the connection holds.',
     });
@@ -515,7 +540,7 @@ export function planReview(ctx, pre) {
   const grants = [
     {
       who: appWho,
-      what: `Microsoft Graph application permissions: ${permissionsFor(config.modules).join(', ')}`,
+      what: `Microsoft Graph application permissions: ${permissionsFor(config.modules, config.dataSources).join(', ')}`,
       where: 'Your tenant, through admin consent',
       detail: pre && !pre.canConsent ? 'You can\'t grant it yourself. You get a link for a Global Administrator or Privileged Role Administrator to approve.' : undefined,
     },
@@ -533,6 +558,10 @@ export function planReview(ctx, pre) {
     });
   }
   if (sm.enabled) grants.push({ who: appWho, what: 'Viewer', where: `Workspace ${f.workspaceName ?? f.workspaceId}`, detail: 'So the semantic models can read the Lakehouse.' });
+  const flows = flowsWanted(config);
+  if (flows.length) {
+    grants.push({ who: appWho, what: 'Contributor', where: `Workspace ${f.workspaceName ?? f.workspaceId}`, detail: 'So the Power Automate flows can save files to the drop folder.' });
+  }
   if (withAzureAi && !cc.azureAccess) {
     grants.push({ who: appWho, what: AZURE_AI_ROLES.map((r) => r.name).join(', '), where: `Azure subscription ${cc.azureSubscriptionName ?? cc.azureSubscriptionId}`, detail: 'So the notebook can read Azure AI usage and cost.' });
   }
@@ -571,6 +600,10 @@ export async function confirmPlan(ctx, pre) {
   const mods = collectedLabels(config.modules);
   ui.heading('Ready to set up');
   ui.info(`Data:        ${mods.join(', ')}`);
+  const exports = DATA_SOURCES.filter((s) => config.dataSources[s.id] === 'csv').map((s) => s.label);
+  if (exports.length) ui.info(`Exports:     ${exports.join(', ')} ${c.dim(`(dropped in ${UPLOAD_DIR})`)}`);
+  const uploads = ctx.pendingUploads ?? [];
+  if (uploads.length) ui.info(`Uploading:   ${uploads.map((u) => u.name).join(', ')}`);
   ui.info(`Workspace:   ${config.fabric.workspaceName ?? config.fabric.workspaceId} ${config.fabric.workspaceId ? '' : c.dim('(new)')}`);
   ui.info(`Lakehouse:   ${config.fabric.lakehouseName}`);
   ui.info(`App:         ${config.app.appId ? config.app.appId : `${APP_NAME} ${c.dim('(new)')}`}`);

@@ -3,6 +3,7 @@
  * What the installer deploys: the notebooks, the modules that switch them on,
  * and the Graph application permissions each module needs.
  */
+import { routerWanted } from './uploads.js';
 
 /** Microsoft Graph's application ID. Same in every tenant. */
 export const GRAPH_APP_ID = '00000003-0000-0000-c000-000000000000';
@@ -98,13 +99,13 @@ export const MODULES = {
 /** Modules that change the ValueLens semantic model. The others have their own model or none. */
 export const MODEL_MODULES = /** @type {const} */ (['core', 'orgData', 'm365Activity', 'agent365', 'productFeedback']);
 
-/** Always collected: the dashboard is built on them. Shown ticked and locked under "What to collect". */
+/** Always collected: the dashboard is built on them. Shown locked on the Data sources screen. */
 export const ESSENTIAL_MODULES = /** @type {const} */ (['core', 'orgData']);
 
-/** Modules a customer can tick under "What to collect", in order. */
+/** Modules the Data sources screen can switch on, in order. */
 export const OPTIONAL_MODULES = /** @type {const} */ (['m365Activity', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator']);
 
-/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'm365Activity' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts'} NotebookKey */
+/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'm365Activity' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts' | 'uploadRouter' | 'workdayLander' | 'loadStatus'} NotebookKey */
 
 /**
  * A text change the installer makes to its copy of a notebook. `find` must occur exactly once.
@@ -124,6 +125,11 @@ export const OPTIONAL_MODULES = /** @type {const} */ (['m365Activity', 'agent365
  * @property {boolean} [semanticModel]  Only deployed with the semantic model.
  * @property {boolean} [azure]  Only deployed when an Azure subscription is chosen for Azure AI.
  * @property {boolean} [dataverse]  Only deployed when at least one Dataverse environment is chosen.
+ * @property {boolean} [uploads]  Only deployed when a source arrives as an uploaded CSV.
+ * @property {boolean} [workday]  Only deployed when Workday org data is uploaded.
+ * @property {boolean} [registry]  Left out when Agent 365 comes from its CSV export instead of the API.
+ * @property {Record<string, string>} [values]  String settings the installer's copy always has.
+ * @property {Record<string, string>} [expressions]  Python expressions the installer's copy always has, e.g. `True`.
  * @property {NotebookPatch[]} [patches]
  */
 
@@ -132,6 +138,7 @@ export const SETUP_DIR = 'Manual setup';
 export const NOTEBOOKS_DIR = `${SETUP_DIR}/notebooks`;
 export const CONSUMPTION_NOTEBOOKS_DIR = `${NOTEBOOKS_DIR}/credit-consumption`;
 export const AGENT_EVALUATOR_NOTEBOOKS_DIR = `${NOTEBOOKS_DIR}/agent-evaluator`;
+export const WORKDAY_NOTEBOOKS_DIR = `${NOTEBOOKS_DIR}/workday-org-data`;
 export const STUDIO_LANDING = 'Files/landing/studio';
 export const VIVA_LANDING = 'Files/landing/viva';
 
@@ -167,7 +174,7 @@ export const NOTEBOOKS = [
   {
     key: 'dataCheck',
     file: 'ValueLens_Data_Check.ipynb',
-    displayName: 'ValueLens_Data_Check',
+    displayName: 'AnalyticsHub_Data_Check',
     module: 'core',
     credentials: false,
     parameters: [],
@@ -181,6 +188,39 @@ export const NOTEBOOKS = [
     credentials: true,
     parameters: [],
     placeholder: 'REPLACE_WITH_ORG_DATA_NOTEBOOK_ID',
+  },
+  {
+    key: 'workdayLander',
+    file: 'Copilot_Org_Data_Workday_Lander.ipynb',
+    dir: WORKDAY_NOTEBOOKS_DIR,
+    displayName: 'Copilot_Org_Data_Workday_Lander',
+    module: 'orgData',
+    credentials: false,
+    parameters: [],
+    placeholder: null,
+    workday: true,
+    // Runs after the Graph org data load each time, so it enriches the published table itself.
+    values: { OUTPUT_TABLE: 'dbo.copilot_org_data' },
+    expressions: { ALLOW_BASE_OVERWRITE: 'True' },
+  },
+  {
+    key: 'uploadRouter',
+    file: 'AnalyticsHub_Upload_Router.ipynb',
+    displayName: 'AnalyticsHub_Upload_Router',
+    module: 'core',
+    credentials: false,
+    parameters: [],
+    placeholder: null,
+    uploads: true,
+  },
+  {
+    key: 'loadStatus',
+    file: 'AnalyticsHub_Load_Status.ipynb',
+    displayName: 'AnalyticsHub_Load_Status',
+    module: 'core',
+    credentials: false,
+    parameters: ['PIPELINE_RUN_ID', 'PIPELINE_TRIGGER_TIME'],
+    placeholder: null,
   },
   {
     key: 'm365Activity',
@@ -199,6 +239,7 @@ export const NOTEBOOKS = [
     credentials: true,
     parameters: [],
     placeholder: 'REPLACE_WITH_AGENT365_REGISTRY_NOTEBOOK_ID',
+    registry: true,
   },
   {
     key: 'agent365Lander',
@@ -208,6 +249,25 @@ export const NOTEBOOKS = [
     credentials: false,
     parameters: [],
     placeholder: 'REPLACE_WITH_AGENT365_LANDER_NOTEBOOK_ID',
+    // Without an export, an empty table keeps the Agents page dormant instead of failing the model.
+    patches: [
+      {
+        find: '          f"Preserving any existing {OUTPUT_TABLE} snapshot.")\n',
+        replace: `          f"Preserving any existing {OUTPUT_TABLE} snapshot.")
+    if not _table_exists(OUTPUT_TABLE):  # Set by the Analytics Hub installer: an empty table, not a missing one
+        from pyspark.sql.types import StructField, StructType, StringType, TimestampType
+        _empty_cols, _ = _build_alias_plan()
+        (spark.createDataFrame([], StructType([StructField(c, StringType(), True) for c in _empty_cols]
+                                              + [StructField('Snapshot As Of', TimestampType(), True)]))
+            .write.mode('overwrite')
+            .option('delta.columnMapping.mode', 'name')
+            .option('delta.minReaderVersion', '2')
+            .option('delta.minWriterVersion', '5')
+            .format('delta').saveAsTable(OUTPUT_TABLE))
+        print(f"Created an empty {OUTPUT_TABLE}; it fills on the first run after an export is uploaded.")
+`,
+      },
+    ],
   },
   {
     key: 'productFeedback',
@@ -217,11 +277,13 @@ export const NOTEBOOKS = [
     credentials: false,
     parameters: [],
     placeholder: 'REPLACE_WITH_PRODUCT_FEEDBACK_NOTEBOOK_ID',
+    // Until the first export is uploaded, an empty table keeps the User Feedback page dormant.
+    expressions: { ALLOW_EMPTY_FIRST_SNAPSHOT: 'True' },
   },
   {
     key: 'refreshModel',
     file: 'ValueLens_Refresh_Model.ipynb',
-    displayName: 'ValueLens_Refresh_Model',
+    displayName: 'AnalyticsHub_Refresh_Model',
     module: 'core',
     credentials: false,
     parameters: ['WORKSPACE_ID', 'SEMANTIC_MODEL_ID', 'WRITE_MODE'],
@@ -258,17 +320,6 @@ export const NOTEBOOKS = [
     credentials: false,
     parameters: [],
     placeholder: null,
-    // Cowork data usually arrives through a Dataflow, so an empty landing folder is normal.
-    patches: [
-      {
-        find: 'for f in notebookutils.fs.ls(LANDING)\n',
-        replace: 'for f in (notebookutils.fs.ls(LANDING) if notebookutils.fs.exists(LANDING) else [])\n',
-      },
-      {
-        find: "raise ValueError(f'No PersonServiceCreditsMetrics CSV files found in {LANDING}')",
-        replace: "notebookutils.notebook.exit(f'No PersonServiceCreditsMetrics CSV files in {LANDING}, so nothing to load.')  # Set by the Analytics Hub installer",
-      },
-    ],
   },
   {
     key: 'agentTranscripts',
@@ -334,25 +385,36 @@ export function enabledModules(modules) {
 /**
  * Notebooks to deploy for the chosen modules, in deployment order.
  * @param {ModuleChoice} modules
- * @param {{ semanticModel?: boolean, azureAi?: boolean, dataverse?: boolean }} [opts]
+ * @param {{ semanticModel?: boolean, azureAi?: boolean, dataverse?: boolean, dataSources?: import('./uploads.js').DataSourceModes }} [opts]
  * @returns {NotebookInfo[]}
  */
 export function notebooksFor(modules, opts = {}) {
   const on = new Set(enabledModules(modules));
+  const ds = opts.dataSources;
   return NOTEBOOKS.filter(
-    (nb) => on.has(nb.module) && (!nb.semanticModel || opts.semanticModel) && (!nb.azure || opts.azureAi) && (!nb.dataverse || opts.dataverse),
+    (nb) =>
+      on.has(nb.module) &&
+      (!nb.semanticModel || opts.semanticModel) &&
+      (!nb.azure || opts.azureAi) &&
+      (!nb.dataverse || opts.dataverse) &&
+      (!nb.uploads || (!!ds && routerWanted(ds))) &&
+      (!nb.workday || ds?.workday === 'csv') &&
+      (!nb.registry || ds?.agent365 !== 'csv'),
   );
 }
 
 /**
  * Graph application permissions the app registration needs, de-duplicated and sorted.
  * Org data's User.Read.All is always included, because org data is always collected.
+ * Agent 365 from its CSV export needs none of the registry's permissions.
  * @param {ModuleChoice} modules
+ * @param {import('./uploads.js').DataSourceModes} [dataSources]
  * @returns {string[]}
  */
-export function permissionsFor(modules) {
+export function permissionsFor(modules, dataSources) {
   const set = new Set([...MODULES.core.permissions, ...MODULES.orgData.permissions]);
   for (const id of enabledModules(modules)) {
+    if (id === 'agent365' && dataSources?.agent365 === 'csv') continue;
     for (const p of MODULES[id].permissions) set.add(p);
   }
   return [...set].sort();

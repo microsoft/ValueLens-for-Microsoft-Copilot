@@ -37,6 +37,14 @@ OPTIONAL_FABRIC_TABLES = {"Agents 365": "agents_365", "ProductFeedback": "user_f
 # Machine-bound or pending-edit parts that a portable template must not carry.
 FORBIDDEN_PARTS = ("DataModel", "SecurityBindings", "UnappliedChanges")
 LOCAL_PATH = re.compile(r"[a-z]:\\{1,2}users\\{1,2}|onedrive - ", re.IGNORECASE)
+# The Fabric App shows the same task descriptions as the Signal - Impact Table.
+APP_TASK_DESCRIPTIONS = (
+    ROOT / "1. Fabric" / "Fabric App" / "src" / "queries" / "appendix" / "task-descriptions.json"
+)
+# The Fabric App adds these glossary entries when a model lacks them, so the templates carry them too.
+APP_GLOSSARY = ROOT / "1. Fabric" / "Fabric App" / "src" / "queries" / "appendix" / "app-glossary.json"
+M_STRING = re.compile(r'"((?:[^"]|"")*)"')
+GLOSSARY_ORDERS = re.compile(r",(-?\d+),(-?\d+)\},?$")
 
 
 def text(value):
@@ -196,6 +204,38 @@ class CoreTemplateTests(unittest.TestCase):
                         self.assertGreaterEqual(parameter["index"], 0, name)
                         self.assertGreaterEqual(parameter["length"], 0, name)
                         self.assertLessEqual(parameter["index"] + parameter["length"], count, name)
+
+    def test_task_descriptions_match_the_fabric_app(self):
+        expected = list(json.loads(APP_TASK_DESCRIPTIONS.read_text(encoding="utf-8")).items())
+        self.assertTrue(expected)
+        for name, _, model, _ in self.templates:
+            table = next(t for t in model["tables"] if t["name"] == "Behavior Value Map")
+            self.assertIn("Description", [column["name"] for column in table["columns"]], name)
+            rows = []
+            for line in text(table["partitions"][0]["source"]["expression"]).splitlines():
+                values = [value.replace('""', '"') for value in M_STRING.findall(line)]
+                if len(values) == 5 and line.lstrip().startswith("{"):
+                    rows.append(values)
+            self.assertEqual(rows[0], ["Signal", "Behavior", "Use Case", "Value Outcome", "Description"], name)
+            self.assertEqual([(row[1], row[4]) for row in rows[1:]], expected, name)
+
+    def test_app_host_glossary_matches_the_fabric_app(self):
+        glossary = json.loads(APP_GLOSSARY.read_text(encoding="utf-8"))
+        expected = [(entry["metric"], entry["description"]) for entry in glossary["entries"]]
+        self.assertTrue(expected)
+        for name, _, model, _ in self.templates:
+            table = next(t for t in model["tables"] if t["name"].endswith("Metric Glossary"))
+            rows = []
+            for line in text(table["partitions"][0]["source"]["expression"]).splitlines():
+                strings = [value.replace('""', '"') for value in M_STRING.findall(line)]
+                orders = GLOSSARY_ORDERS.search(line.rstrip())
+                if len(strings) == 4 and orders:
+                    rows.append((*strings, int(orders[1]), int(orders[2])))
+            page = sorted((row for row in rows if row[0] == glossary["page"]), key=lambda row: row[5])
+            self.assertEqual({(row[1], row[4]) for row in page},
+                             {(glossary["pageDescription"], glossary["pageOrder"])}, name)
+            # The entries close the page, in the app's order and wording, as the app would add them.
+            self.assertEqual([(row[2], row[3]) for row in page[-len(expected):]], expected, name)
 
 
 if __name__ == "__main__":

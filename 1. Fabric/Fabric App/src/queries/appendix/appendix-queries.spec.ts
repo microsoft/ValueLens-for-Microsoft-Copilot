@@ -6,10 +6,14 @@
 //-----------------------------------------------------------------------
 
 import { describe, expect, it } from "vitest";
-import { glossary, signalImpact } from "./index";
+import { toDataTable } from "@/lib/to-data-table";
+import { glossary, signalImpact, withAppGlossaryEntries, withTaskDescriptions } from "./index";
 import { liveColumns } from "./live-columns.fixture";
 import glossaryRows from "./__fixtures__/glossary.rows.json";
 import signalRows from "./__fixtures__/signal-impact.rows.json";
+import taskDescriptions from "./task-descriptions.json";
+import appGlossary from "./app-glossary.json";
+import { toGlossaryPages } from "@/lib/glossary";
 
 const modules = [
     { name: "glossary", factory: glossary, columns: liveColumns.glossary, rows: glossaryRows },
@@ -68,9 +72,99 @@ describe("signal impact fixture", () => {
         }
     });
 
-    it("links every estimate to an https source", () => {
+    it("links every sourced estimate over https and marks the rest provisional", () => {
         for (const row of rows) {
-            expect(String(row["[Source URL]"])).toMatch(/^https:\/\//);
+            const url = String(row["[Source URL]"] ?? "");
+            if (url) expect(url).toMatch(/^https:\/\//);
+            else {
+                expect(String(row["[Research Source]"])).toMatch(/^Provisional/);
+                expect(row["[Confidence]"]).toBe("Low");
+            }
         }
+    });
+});
+
+describe("signal impact task descriptions", () => {
+    const { columnMetadata } = signalImpact();
+    const rows = signalRows as Record<string, unknown>[];
+    const table = toDataTable(
+        {
+            columns: liveColumns.signalImpact.map((name) => ({ name })),
+            rows: rows.map((row) => liveColumns.signalImpact.map((name) => row[name])),
+        } as never,
+        columnMetadata,
+    );
+    const described = withTaskDescriptions(table);
+    const last = described.columns.length - 1;
+
+    it("labels the two task levels Task Category and Task Breakdown", () => {
+        expect(columnMetadata["[Category]"]?.displayName).toBe("Task Category");
+        expect(columnMetadata["[AI Tasks]"]?.displayName).toBe("Task Breakdown");
+    });
+
+    it("describes exactly the Task Breakdown the model holds", () => {
+        const tasks = new Set(rows.map((row) => String(row["[AI Tasks]"])));
+        expect([...tasks].sort()).toEqual(Object.keys(taskDescriptions).sort());
+    });
+
+    it("gives every signal a plain-language description", () => {
+        for (const row of described.rows) {
+            expect(typeof row[last]).toBe("string");
+            expect(String(row[last]).trim()).not.toBe("");
+        }
+    });
+
+    it("appends the description last and leaves the model's columns untouched", () => {
+        expect(described.columns.slice(0, last)).toEqual(table.columns);
+        expect(described.columns[last]).toMatchObject({ name: "Description", displayName: "Description" });
+        described.rows.forEach((row, i) => expect(row.slice(0, last)).toEqual(table.rows[i]));
+    });
+
+    it("leaves a task with no description blank", () => {
+        expect(withTaskDescriptions({ columns: [{ name: "AI Tasks" }], rows: [["Not a real task"]] }).rows[0][1]).toBeNull();
+        expect(withTaskDescriptions({ columns: [{ name: "Signal" }], rows: [["Email sent"]] }).rows[0][1]).toBeNull();
+    });
+});
+
+describe("app glossary entries", () => {
+    const rows = glossaryRows as Record<string, unknown>[];
+    const merged = withAppGlossaryEntries(rows);
+    const page = toGlossaryPages(merged).find((candidate) => candidate.page === appGlossary.page);
+
+    it("keeps the model's rows and adds the app host entries after its last metric", () => {
+        expect(merged.slice(0, rows.length)).toEqual(rows);
+        const metrics = page?.entries.map((entry) => entry.metric) ?? [];
+        expect(metrics.slice(-appGlossary.entries.length)).toEqual(appGlossary.entries.map((entry) => entry.metric));
+        expect(metrics).toContain("App host");
+    });
+
+    it("explains the app host signal, Cowork and the task category fallback", () => {
+        const text = appGlossary.entries.map((entry) => entry.description).join(" ");
+        for (const term of ["Teams", "Word", "Outlook", "Copilot Studio", "Cowork", "\"cowork\"", "Task Breakdown", "Task Category", "open file"]) {
+            expect(text).toContain(term);
+        }
+    });
+
+    it("joins the model's page with its order and description", () => {
+        const added = merged.slice(rows.length);
+        const modelRow = rows.find((row) => row["[Page]"] === appGlossary.page);
+        for (const row of added) {
+            expect(row["[Page Order]"]).toBe(modelRow?.["[Page Order]"]);
+            expect(row["[Page Description]"]).toBe(modelRow?.["[Page Description]"]);
+        }
+    });
+
+    it("skips an entry the model already defines", () => {
+        const withHost = [...rows, { ...rows.at(-1), "[Page]": appGlossary.page, "[Metric]": "App host" }];
+        const added = withAppGlossaryEntries(withHost).slice(withHost.length);
+        expect(added.map((row) => row["[Metric]"])).not.toContain("App host");
+        expect(added).toHaveLength(appGlossary.entries.length - 1);
+    });
+
+    it("still shows the entries when the model has no such page", () => {
+        const pages = toGlossaryPages(withAppGlossaryEntries([]));
+        expect(pages).toHaveLength(1);
+        expect(pages[0]).toMatchObject({ page: appGlossary.page, description: appGlossary.pageDescription });
+        expect(pages[0].entries).toHaveLength(appGlossary.entries.length);
     });
 });

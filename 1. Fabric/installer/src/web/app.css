@@ -277,6 +277,17 @@ a { overflow-wrap: anywhere; }
 .ln.fail { background: var(--fail-tint); }
 .ln.fail .gl { color: var(--fail); }
 .ln.note { color: var(--muted-fg); }
+.loads { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-width: calc(76ch + 20px); }
+.load { display: flex; gap: 8px; align-items: flex-start; padding: 6px 10px; margin-left: -10px; border-radius: 4px; overflow-wrap: anywhere; }
+.load p { margin: 2px 0 0; }
+.load .load-state { color: var(--muted-fg); font-weight: 400; }
+.load-name { font-weight: 600; }
+.load-fix { color: var(--muted-fg); white-space: pre-wrap; }
+.load.ok .gl { color: var(--ok); }
+.load.failed { background: var(--fail-tint); }
+.load.failed .gl { color: var(--fail); }
+.load.skipped, .load.running { background: var(--warn-tint); }
+.load.skipped .gl, .load.running .gl { color: var(--warn); }
 .kv-row { display: grid; grid-template-columns: minmax(120px, 180px) 1fr; gap: 16px; max-width: 76ch; overflow-wrap: anywhere; }
 .kv-row .k { color: var(--muted-fg); }
 .subhead { font-size: 14px; line-height: 20px; font-weight: 600; margin-top: 12px; }
@@ -352,6 +363,21 @@ a { overflow-wrap: anywhere; }
 .opt-desc { font-size: 12px; line-height: 16px; color: var(--muted-fg); }
 .filter { max-width: 320px; }
 .ask.busy { opacity: 0.7; }
+
+/* Data sources */
+.srcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.src { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: 6px; }
+.src-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.src-name { font-weight: 600; }
+.src-modes { display: flex; flex-wrap: wrap; gap: 4px; border: 0; padding: 0; margin: 0; }
+.src-mode { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); font-size: 12px; cursor: pointer; }
+.src-mode:has(input:checked) { background: var(--accent); border-color: var(--primary); font-weight: 600; }
+.src-mode input { accent-color: var(--primary); margin: 0; }
+.src-where { font-size: 12px; line-height: 16px; }
+.staged { display: flex; flex-direction: column; gap: 4px; list-style: none; padding: 0; margin: 0; }
+.staged li { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.staged .bad { color: var(--fail); }
+.picker { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
 /* Sign-in */
 .device {

@@ -15,6 +15,7 @@
  * @property {{ vaultUri: string, secretName: string }} [secret]
  * @property {string[]} [parameters]  Assignments the pipeline overrides.
  * @property {Record<string, string>} [values]  Defaults to write into the notebook, e.g. IDs for a manual run.
+ * @property {Record<string, string>} [expressions]  Python expressions to assign as they are, e.g. `True`.
  * @property {{ id: string, name: string, workspaceId: string }} [lakehouse]
  * @property {boolean} [dataCheckSummary]  Append a cell that returns a JSON summary to the installer.
  * @property {import('../catalog.js').NotebookPatch[]} [patches]  Text changes to code cells.
@@ -126,6 +127,8 @@ for _key, _table in _tables.items():
     _summary['tables'][_key] = _info
 # How many licensed users match Copilot activity, from the notebook's overlap check.
 _summary['identity'] = globals().get('overlap_summary')
+# Why the audit table is empty, if the processor left out every record as test activity.
+_summary['auditExcluded'] = globals().get('audit_excluded')
 
 _path = '/lakehouse/default/${DATA_CHECK_FILE}'
 _os.makedirs(_os.path.dirname(_path), exist_ok=True)
@@ -182,6 +185,12 @@ export function prepareNotebook(source, settings) {
     const idx = findAssignmentCell(nb, name);
     if (idx < 0) throw new Error(`Could not find "${name} = ..." in the notebook.`);
     updateCell(nb.cells[idx], (t) => setAssignment(t, name, pyString(value)));
+  }
+
+  for (const [name, expression] of Object.entries(settings.expressions ?? {})) {
+    const idx = findAssignmentCell(nb, name);
+    if (idx < 0) throw new Error(`Could not find "${name} = ..." in the notebook.`);
+    updateCell(nb.cells[idx], (t) => setAssignment(t, name, expression, { comment: MARKER }));
   }
 
   for (const patch of settings.patches ?? []) {

@@ -15,10 +15,10 @@ CORE = SETUP / "notebooks"
 # separately against its canonical source.
 SCHEMA_HASHES = {
     "ValueLens - Fabric.pbit": {
-        "DataModelSchema": "38b89fa9af8d991c512368f053c660d24c0038d0bbea5d5b0ccf6308dcb5219f",
+        "DataModelSchema": "e044f22741121cb85ee89d578f343a350130d3d6a43002b24a12d376594ac6a0",
     },
     "ValueLens - Fabric OneLake.pbit": {
-        "DataModelSchema": "10d01fc18ae8c66051b43ad5bacbf732bcbd22edfdba4f723c2ddc01fa496223",
+        "DataModelSchema": "94060a44177ea86695d97e3ef5ca0a5c89bfe8b61bef1e63e7942a904affc19a",
     },
 }
 

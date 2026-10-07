@@ -49,6 +49,10 @@ const BINDINGS = {
  * @property {string} [consumptionModelId]  Adds a step that refreshes the consumption model.
  * @property {boolean} [agentTranscripts]  Runs the Agent Evaluator transcript parser.
  * @property {string} [agentEvaluatorModelId]  Adds a step that refreshes the Agent Evaluator model.
+ * @property {boolean} [uploadRouter]  Runs the upload router first in lane 2, so uploaded CSVs reach their loads.
+ * @property {boolean} [workday]  Enriches org data from the uploaded Workday export after the Entra ID load.
+ * @property {boolean} [agent365Csv]  Agent 365 comes from its admin center export: the lander replaces the registry load.
+ * @property {string} [coworkDataflowId]  Refreshes this Dataflow, which pulls Cowork credits from Viva Insights, before the Viva load.
  */
 
 export const REFRESH_ACTIVITY = 'Refresh_Semantic_Model';
@@ -66,9 +70,6 @@ export const CONSUMPTION_ACTIVITIES = /** @type {const} */ ([
     name: 'Run_Consumption_Azure_AI',
     description: 'Azure AI spend from Cost Management and token use from Azure Monitor for one subscription, plus Copilot pay-as-you-go from each billing policy\'s subscription. Writes azure_ai_spend, azure_ai_tokens and copilot_payg_spend.',
     timeout: '0.01:00:00',
-    // New Azure role assignments can take several minutes to apply.
-    retries: 2,
-    retryIntervalInSeconds: 300,
   },
   {
     key: 'studioConsumption',
@@ -84,8 +85,145 @@ export const CONSUMPTION_ACTIVITIES = /** @type {const} */ ([
   },
 ]);
 
+/** The template's Agent 365 load. Without an Agent 365 licence it fails every time, and the fallback stands in. */
+export const AGENT365_REGISTRY = 'Run_Agent365_Registry_Ingester';
+/** The template's fallback, which runs only when the Agent 365 load fails. */
+export const AGENT365_FALLBACK = 'Run_Agent365_CSV_Fallback';
+
+/** In CSV mode, the Agent 365 branch runs the lander under this name instead of the registry load. */
+export const AGENT365_LANDER = 'Run_Agent365_Lander';
+export const UPLOAD_ROUTER_ACTIVITY = 'Run_Upload_Router';
+export const WORKDAY_ACTIVITY = 'Run_Org_Data_Workday';
+export const COWORK_DATAFLOW_ACTIVITY = 'Refresh_Cowork_Credits';
+
+/** Bump when the pipeline's layout changes, so re-running the installer updates a pipeline an older version built. */
+export const PIPELINE_VERSION = 4;
+/** What this version changed, for people whose pipeline an older version built. */
+export const PIPELINE_CHANGE =
+  'This version runs every notebook in one shared Spark session, so a trial or small capacity turns fewer loads away, and ends with a step that records how each load went in dbo.load_log.';
+
+/** Notebooks with the same tag share one high-concurrency Spark session (letters, digits and underscores only). */
+export const SESSION_TAG = 'analytics_hub';
+/** Last step: records each load's outcome in dbo.load_log and fails the run when a load failed. */
+export const STATUS_ACTIVITY = 'Record_Load_Status';
+
 /**
- * A step that runs ValueLens_Refresh_Model against one model.
+ * Lane 2: every step except the audit log, its processor and the semantic model refresh, one after
+ * another while lane 1 runs. A trial or small capacity can start only a few notebooks at once and
+ * turns the rest away.
+ */
+export const LANE_ORDER = [
+  'Run_Licensed_Users_Ingester',
+  UPLOAD_ROUTER_ACTIVITY,
+  'Conditionally_Run_Agent365',
+  AGENT365_FALLBACK,
+  'Conditionally_Run_Org_Data',
+  WORKDAY_ACTIVITY,
+  'Conditionally_Run_M365_Activity',
+  'Conditionally_Run_Product_Feedback',
+  ...ARCHIVED_ACTIVITIES,
+  ...CONSUMPTION_ACTIVITIES.slice(0, 2).map((a) => a.name),
+  COWORK_DATAFLOW_ACTIVITY,
+  ...CONSUMPTION_ACTIVITIES.slice(2).map((a) => a.name),
+  CONSUMPTION_REFRESH_ACTIVITY,
+  AGENT_EVALUATOR_ACTIVITY,
+  AGENT_EVALUATOR_REFRESH_ACTIVITY,
+];
+
+/** Lane 2 steps that keep their own conditions. Each already waits for the step before it. */
+const OWN_CONDITIONS = new Set([AGENT365_FALLBACK, CONSUMPTION_REFRESH_ACTIVITY, AGENT_EVALUATOR_REFRESH_ACTIVITY]);
+
+/**
+ * Chains the lane 2 steps that are present. Each waits for the one before it to finish, whether it
+ * succeeded or failed. The fallback and the two model refreshes keep their own conditions, and the
+ * next step also runs when one of them is skipped.
+ * @param {any[]} activities  Top-level activities.
+ */
+export function chainLanes(activities) {
+  /** @type {{ activity: string, dependencyConditions: string[] } | undefined} */
+  let after;
+  for (const name of LANE_ORDER) {
+    const activity = activities.find((a) => a.name === name);
+    if (!activity) continue;
+    const own = OWN_CONDITIONS.has(name);
+    if (!own) activity.dependsOn = after ? [after] : [];
+    after = { activity: name, dependencyConditions: own ? ['Completed', 'Skipped'] : ['Completed'] };
+  }
+}
+
+/** Seconds between retries: long enough for a busy capacity to free up. */
+export const RETRY_INTERVAL_SECONDS = 300;
+
+/**
+ * A load that runs for up to an hour or more retries twice; a shorter one three times.
+ * @param {string | undefined} timeout  Activity timeout, as d.hh:mm:ss.
+ */
+export function retryPolicy(timeout) {
+  const m = /^(?:(\d+)\.)?(\d{1,2}):(\d{2}):(\d{2})$/.exec(timeout ?? '');
+  const long = !m || Number(m[1] ?? 0) > 0 || Number(m[2]) >= 1;
+  return { retry: long ? 2 : 3, retryIntervalInSeconds: RETRY_INTERVAL_SECONDS };
+}
+
+/**
+ * Applies `retryPolicy` to every notebook, including those inside IfCondition branches. The Agent 365
+ * load keeps the template's policy: its fallback covers a failure, and longer retries would only delay it.
+ * @param {any[]} activities
+ */
+export function applyRetries(activities) {
+  for (const a of notebookActivities(activities)) {
+    if (a.name !== AGENT365_REGISTRY) a.policy = { ...a.policy, ...retryPolicy(a.policy?.timeout) };
+  }
+}
+
+/**
+ * Every notebook, including those in IfCondition branches, joins one high-concurrency session.
+ * Fabric starts a new session for the sixth notebook, or when the Lakehouse or Spark settings differ.
+ * @param {any[]} activities
+ */
+export function applySessionTag(activities) {
+  for (const a of notebookActivities(activities)) a.typeProperties = { ...a.typeProperties, sessionTag: SESSION_TAG };
+}
+
+/**
+ * The status step waits for every activity nothing else waits for, whether it succeeded, failed or
+ * was skipped. Being the only last step, its result is the run's result.
+ * @param {any[]} activities  Top-level activities.
+ * @param {PipelineSettings} settings
+ */
+function statusActivity(activities, settings) {
+  const waitedOn = new Set(activities.flatMap((a) => (a.dependsOn ?? []).map((/** @type {any} */ d) => d.activity)));
+  return {
+    name: STATUS_ACTIVITY,
+    description: 'Records how each load went in dbo.load_log, in plain words, and fails the run when a load failed so the failure is visible in the run history.',
+    type: 'TridentNotebook',
+    dependsOn: activities
+      .filter((a) => !waitedOn.has(a.name))
+      .map((a) => ({ activity: a.name, dependencyConditions: ['Completed', 'Skipped'] })),
+    policy: { timeout: '0.00:20:00', retry: 0, retryIntervalInSeconds: 60, secureOutput: false, secureInput: false },
+    typeProperties: {
+      notebookId: settings.notebookIds.loadStatus,
+      workspaceId: settings.workspaceId,
+      parameters: {
+        PIPELINE_RUN_ID: { value: { value: '@pipeline().RunId', type: 'Expression' }, type: 'string' },
+        PIPELINE_TRIGGER_TIME: { value: { value: '@string(pipeline().TriggerTime)', type: 'Expression' }, type: 'string' },
+      },
+    },
+  };
+}
+
+/**
+ * @param {any[]} activities
+ * @returns {Generator<any>}
+ */
+function* notebookActivities(activities) {
+  for (const a of activities) {
+    if (a.type === 'TridentNotebook') yield a;
+    yield* notebookActivities([...(a.typeProperties?.ifTrueActivities ?? []), ...(a.typeProperties?.ifFalseActivities ?? [])]);
+  }
+}
+
+/**
+ * A step that runs the Refresh Model notebook against one model.
  * @param {PipelineSettings} settings
  * @param {{ name: string, description: string, modelId: string, dependsOn: any[], writeMode: any }} o
  */
@@ -119,7 +257,7 @@ function refreshStep(settings, o) {
 function refreshActivity(activities, settings) {
   const has = (/** @type {string} */ name) => activities.some((a) => a.name === name);
   const dependsOn = [{ activity: 'Run_Audit_Log_Processor', dependencyConditions: ['Succeeded'] }];
-  for (const name of ['Conditionally_Run_Org_Data', 'Conditionally_Run_M365_Activity', 'Conditionally_Run_Product_Feedback']) {
+  for (const name of ['Conditionally_Run_Org_Data', WORKDAY_ACTIVITY, 'Conditionally_Run_M365_Activity', 'Conditionally_Run_Product_Feedback']) {
     if (has(name)) dependsOn.push({ activity: name, dependencyConditions: ['Completed'] });
   }
   return refreshStep(settings, {
@@ -132,11 +270,11 @@ function refreshActivity(activities, settings) {
 }
 
 /**
- * One activity per consumption notebook. They don't depend on the audit load or on each other.
+ * One activity per consumption notebook. `chainLanes` puts them in lane 2.
  * @param {PipelineSettings} settings
  */
 function consumptionActivities(settings) {
-  return CONSUMPTION_ACTIVITIES.filter((a) => a.key !== 'azureAi' || settings.azureAi).map((/** @type {{ key: 'azureAi' | 'studioConsumption' | 'vivaConsumption', name: string, description: string, timeout: string, retries?: number, retryIntervalInSeconds?: number }} */ a) => {
+  return CONSUMPTION_ACTIVITIES.filter((a) => a.key !== 'azureAi' || settings.azureAi).map((/** @type {{ key: 'azureAi' | 'studioConsumption' | 'vivaConsumption', name: string, description: string, timeout: string }} */ a) => {
     const notebookId = settings.notebookIds[a.key];
     if (!notebookId) throw new Error(`The ${a.name.replace(/^Run_/, '').replace(/_/g, ' ')} notebook has not been deployed.`);
     return {
@@ -144,10 +282,32 @@ function consumptionActivities(settings) {
       description: a.description,
       type: 'TridentNotebook',
       dependsOn: [],
-      policy: { timeout: a.timeout, retry: a.retries ?? 1, retryIntervalInSeconds: a.retryIntervalInSeconds ?? 120, secureOutput: false, secureInput: false },
+      policy: { timeout: a.timeout, ...retryPolicy(a.timeout), secureOutput: false, secureInput: false },
       typeProperties: { notebookId, workspaceId: settings.workspaceId, parameters: {} },
     };
   });
+}
+
+/**
+ * Refreshes the Cowork credits Dataflow just before the Viva load reads its table. It doesn't
+ * retry: a refresh that fails, such as when the Viva Insights sign-in has lapsed, leaves the last
+ * table in place, and the Viva load still runs because lane 2 waits on Completed.
+ * @param {PipelineSettings} settings
+ */
+function coworkDataflowActivity(settings) {
+  return {
+    name: COWORK_DATAFLOW_ACTIVITY,
+    description: 'Refreshes the Dataflow that reads Cowork credits from the Viva Insights query into viva_credits_dataflow.',
+    type: 'RefreshDataflow',
+    dependsOn: [],
+    policy: { timeout: '0.02:00:00', retry: 0, retryIntervalInSeconds: 30, secureOutput: false, secureInput: false },
+    typeProperties: {
+      workspaceId: settings.workspaceId,
+      dataflowId: settings.coworkDataflowId,
+      notifyOption: 'NoNotification',
+      dataflowType: 'DataflowFabric',
+    },
+  };
 }
 
 /**
@@ -160,7 +320,7 @@ function consumptionRefreshActivity(activities, settings) {
   const dependsOn = activities
     .filter((a) => CONSUMPTION_ACTIVITIES.some((c) => c.name === a.name))
     .map((a) => ({ activity: a.name, dependencyConditions: ['Succeeded'] }));
-  if (activities.some((a) => a.name === 'Conditionally_Run_Org_Data')) dependsOn.push({ activity: 'Conditionally_Run_Org_Data', dependencyConditions: ['Completed'] });
+  dependsOn.push(...orgDataDependencies(activities));
   return refreshStep(settings, {
     name: CONSUMPTION_REFRESH_ACTIVITY,
     description: 'Refreshes the consumption model once every consumption load has succeeded.',
@@ -182,7 +342,7 @@ function agentTranscriptsActivity(settings) {
     description: 'Reads Copilot Studio conversation transcripts from each chosen Dataverse environment and merges them into agent_sessions, agent_turns and the other agent tables.',
     type: 'TridentNotebook',
     dependsOn: [],
-    policy: { timeout: '0.02:00:00', retry: 1, retryIntervalInSeconds: 300, secureOutput: false, secureInput: false },
+    policy: { timeout: '0.02:00:00', ...retryPolicy('0.02:00:00'), secureOutput: false, secureInput: false },
     typeProperties: {
       notebookId,
       workspaceId: settings.workspaceId,
@@ -205,8 +365,7 @@ function agentTranscriptsActivity(settings) {
  * @param {PipelineSettings} settings
  */
 function agentEvaluatorRefreshActivity(activities, settings) {
-  const dependsOn = [{ activity: AGENT_EVALUATOR_ACTIVITY, dependencyConditions: ['Succeeded'] }];
-  if (activities.some((a) => a.name === 'Conditionally_Run_Org_Data')) dependsOn.push({ activity: 'Conditionally_Run_Org_Data', dependencyConditions: ['Completed'] });
+  const dependsOn = [{ activity: AGENT_EVALUATOR_ACTIVITY, dependencyConditions: ['Succeeded'] }, ...orgDataDependencies(activities)];
   return refreshStep(settings, {
     name: AGENT_EVALUATOR_REFRESH_ACTIVITY,
     description: 'Refreshes the Agent Evaluator model once the transcripts have loaded.',
@@ -214,6 +373,50 @@ function agentEvaluatorRefreshActivity(activities, settings) {
     dependsOn,
     writeMode: 'merge',
   });
+}
+
+/**
+ * A model refresh waits for the org data loads that are present, whether they succeeded or not.
+ * @param {any[]} activities
+ */
+function orgDataDependencies(activities) {
+  return ['Conditionally_Run_Org_Data', WORKDAY_ACTIVITY]
+    .filter((name) => activities.some((a) => a.name === name))
+    .map((name) => ({ activity: name, dependencyConditions: ['Completed'] }));
+}
+
+/**
+ * A notebook step with no parameters. `chainLanes` sets its place in lane 2.
+ * @param {PipelineSettings} settings
+ * @param {{ key: import('../catalog.js').NotebookKey, name: string, description: string, timeout: string }} o
+ */
+function notebookStep(settings, o) {
+  const notebookId = settings.notebookIds[o.key];
+  if (!notebookId) throw new Error(`The ${o.name.replace(/^Run_/, '').replace(/_/g, ' ')} notebook has not been deployed.`);
+  return {
+    name: o.name,
+    description: o.description,
+    type: 'TridentNotebook',
+    dependsOn: [],
+    policy: { timeout: o.timeout, ...retryPolicy(o.timeout), secureOutput: false, secureInput: false },
+    typeProperties: { notebookId, workspaceId: settings.workspaceId, parameters: {} },
+  };
+}
+
+/**
+ * Agent 365 from its export: the branch runs the lander, and there is no registry load to fall back from.
+ * The processor, which waited for the fallback, waits for the branch instead.
+ * @param {any[]} activities
+ */
+function agent365FromCsv(activities) {
+  const branch = activities.find((a) => a.name === 'Conditionally_Run_Agent365');
+  const inner = branch && findActivity([branch], AGENT365_REGISTRY);
+  if (!inner) throw new Error(`Pipeline template is missing ${AGENT365_REGISTRY}.`);
+  inner.name = AGENT365_LANDER;
+  inner.description = 'Loads the Agent 365 export from Files/agent365/agents.csv into agent_365_registry.';
+  inner.typeProperties.notebookId = 'REPLACE_WITH_AGENT365_LANDER_NOTEBOOK_ID';
+  const processor = activities.find((a) => a.name === 'Run_Audit_Log_Processor');
+  if (processor) processor.dependsOn = [...(processor.dependsOn ?? []), { activity: branch.name, dependencyConditions: ['Completed'] }];
 }
 
 /**
@@ -236,6 +439,8 @@ export function buildPipeline(template, settings) {
       dropParams.add(branch.parameter);
     }
   }
+  const agent365Csv = !!(settings.modules.agent365 && settings.agent365Csv);
+  if (agent365Csv) drop.add(AGENT365_FALLBACK);
 
   props.activities = props.activities.filter((/** @type {any} */ a) => !drop.has(a.name));
   for (const activity of props.activities) {
@@ -244,6 +449,7 @@ export function buildPipeline(template, settings) {
     }
   }
   for (const name of dropParams) delete props.parameters?.[name];
+  if (agent365Csv) agent365FromCsv(props.activities);
 
   props.parameters = { ...(props.parameters ?? {}), ...structuredClone(RUN_PARAMETERS) };
   if (settings.backfillDays) props.parameters.BackfillDays.defaultValue = settings.backfillDays;
@@ -271,9 +477,32 @@ export function buildPipeline(template, settings) {
   const left = [...JSON.stringify(filled).matchAll(/REPLACE_WITH_[A-Z0-9_]+/g)].map((m) => m[0]);
   if (left.length) throw new Error(`Pipeline still has placeholders: ${[...new Set(left)].join(', ')}`);
 
+  applyRetries(filled.properties.activities);
+  if (settings.uploadRouter) {
+    filled.properties.activities.push(
+      notebookStep(settings, {
+        key: 'uploadRouter',
+        name: UPLOAD_ROUTER_ACTIVITY,
+        description: 'Moves each CSV export dropped in Files/analytics_hub_uploads to the folder its load reads, recognised by its headers. Does nothing when the folder is empty.',
+        timeout: '0.00:30:00',
+      }),
+    );
+  }
+  const workday = !!(settings.workday && settings.modules.orgData !== false);
+  if (workday) {
+    filled.properties.activities.push(
+      notebookStep(settings, {
+        key: 'workdayLander',
+        name: WORKDAY_ACTIVITY,
+        description: 'Adds or overrides org fields in copilot_org_data from the Workday export in Files/org_workday. Does nothing without an export.',
+        timeout: '0.00:30:00',
+      }),
+    );
+  }
   if (settings.semanticModelId) filled.properties.activities.push(refreshActivity(filled.properties.activities, settings));
   if (settings.modules.consumption) {
     filled.properties.activities.push(...consumptionActivities(settings));
+    if (settings.coworkDataflowId) filled.properties.activities.push(coworkDataflowActivity(settings));
     if (settings.consumptionModelId) filled.properties.activities.push(consumptionRefreshActivity(filled.properties.activities, settings));
   }
   const transcripts = !!(settings.modules.agentEvaluator && settings.agentTranscripts);
@@ -281,12 +510,21 @@ export function buildPipeline(template, settings) {
     filled.properties.activities.push(agentTranscriptsActivity(settings));
     if (settings.agentEvaluatorModelId) filled.properties.activities.push(agentEvaluatorRefreshActivity(filled.properties.activities, settings));
   }
+  chainLanes(filled.properties.activities);
+  const status = !!settings.notebookIds.loadStatus;
+  if (status) filled.properties.activities.push(statusActivity(filled.properties.activities, settings));
+  applySessionTag(filled.properties.activities);
 
   filled.properties.description =
-    'Created by the Analytics Hub installer. Runs the ingesters, then the Audit Log Processor' +
-    `${settings.semanticModelId ? ', then refreshes the semantic model' : ''}. ` +
-    `${settings.modules.consumption ? `The credit consumption loads run alongside${settings.consumptionModelId ? ' and refresh the consumption model when they all succeed' : ''}. ` : ''}` +
-    `${transcripts ? `The Agent Evaluator reads Copilot Studio transcripts alongside${settings.agentEvaluatorModelId ? ' and refreshes its model' : ''}. ` : ''}` +
+    'Created by the Analytics Hub installer. The loads run in two lanes rather than all at once, so a trial or small capacity isn\'t overloaded. ' +
+    'Every notebook shares one Spark session (high concurrency for pipelines must be on in the workspace\'s Spark settings). ' +
+    `Lane 1 loads the audit log, then runs the Audit Log Processor${settings.semanticModelId ? ', then refreshes the semantic model' : ''}. ` +
+    'Lane 2 runs the other loads one after another; a load that fails doesn\'t stop the next. ' +
+    `${settings.uploadRouter ? 'Lane 2 starts by routing any CSV exports dropped in Files/analytics_hub_uploads to the loads that read them. ' : ''}` +
+    `${settings.modules.consumption ? `The credit consumption loads run in lane 2${settings.consumptionModelId ? ' and refresh the consumption model when they all succeed' : ''}. ` : ''}` +
+    `${transcripts ? `The Agent Evaluator reads Copilot Studio transcripts at the end of lane 2${settings.agentEvaluatorModelId ? ', then refreshes its model' : ''}. ` : ''}` +
+    `${status ? `${STATUS_ACTIVITY} runs last: it writes each load's outcome to dbo.load_log and fails the run if any load failed. ` : ''}` +
+    `Each load retries up to 3 times, ${RETRY_INTERVAL_SECONDS / 60} minutes apart. ` +
     'Scheduled runs use the parameter defaults (incremental audit load, merge into the curated table). ' +
     'The first run overrides them with AuditMode=backfill and ProcessorWriteMode=overwrite. ' +
     'Re-run the installer with "update" to pick up new notebook and pipeline versions.';

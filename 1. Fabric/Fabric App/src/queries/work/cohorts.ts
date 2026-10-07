@@ -21,7 +21,7 @@ const taskFields: Record<WorkCohort, string> = {
     agents: "Agent Tasks",
 };
 
-/** The cohorts in the order every Work toggle presents them. */
+/** The four Work cohorts, in reading order. */
 export const workCohorts: { id: WorkCohort; label: string }[] = [
     { id: "all", label: "Everyone" },
     { id: "licensed", label: "Licensed" },

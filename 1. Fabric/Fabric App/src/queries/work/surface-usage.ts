@@ -41,8 +41,8 @@ interface SurfaceUsageParams {
  *
  * The report draws these as eight separate bar charts across two bookmarked
  * pages — one per cohort per lens. Both lenses and all four cohorts arrive in
- * one ten-row result here, so neither toggle refetches; they only rebind the
- * spec.
+ * one ten-row result here, so binding a different lens or cohort never
+ * refetches; it only rebinds the spec.
  */
 export function surfaceUsage(params: SurfaceUsageParams) {
     const { lens, title } = lenses[params.lens];

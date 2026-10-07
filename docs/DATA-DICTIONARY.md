@@ -56,6 +56,7 @@ pass-through guarded by `Table.HasColumns`, so missing optional columns are tole
 ```
 CreationDate, AgentId, AgentName,
 AppIdentity_AppId, AppIdentity_DisplayName, AppIdentity_PublisherId,
+AppIdentity_Text, Agent_TargetPlatformId, Agent_TargetName, Agent_PlatformType,
 ApplicationName, ClientRegion,
 Audit_UserId, Audit_UserId_Normalized, Workload,
 AppHost, ThreadId, SensitivityLabelId, Context_Type,
@@ -63,16 +64,41 @@ AISystemPlugin_Id, AISystemPlugin_Name, ModelTransparencyDetails_ModelName,
 AccessedResource_Type, AccessedResource_Action, AccessedResource_SiteUrl, AccessedResource_SensitivityLabelId,
 Message_Id, Message_isPrompt, Resource_Count,
 InteractionDate, WeekStart, MonthStart,
-Agent_TitleID, Agent_EntraId
+Agent_TitleID, Agent_EntraId,
+AgentPlatform, PlatformAgentId, ConversationId, Prompts_Available,
+Agent_BotId, Agent_EnvironmentId, Exclude_Reason
 ```
 
-> **Agent identifiers (two keys, used together).** `Agent_TitleID` is parsed from the legacy
+> **Agent identifiers (three keys).** `Agent_TitleID` is parsed from the legacy
 > `CopilotStudio.Declarative.{title}` / `T_`/`P_` forms. `Agent_EntraId` captures the **Microsoft
 > Entra Agent ID** GUID that **Agent 365** now stamps into the audit `AgentId` instead of the
-> declarative string. When agents are registered/recreated under Entra Agent ID, `Agent_TitleID`
-> would otherwise land NULL and drop out of the Agents join — `Agent_EntraId` keeps them resolvable
-> via the registry crosswalk. The two are populated mutually exclusively per row (legacy → TitleID,
-> Entra → EntraId), so old and new agents both join cleanly during a mixed migration.
+> declarative string (an all-zero GUID is treated as no ID). The two are populated mutually
+> exclusively per row. `Agent_BotId` and `Agent_EnvironmentId` are parsed from `PlatformAgentId` on
+> Copilot Studio runtime records (`AgentPlatform` "CopilotStudio"), which usually carry no Title ID.
+
+> **Agent-type inputs.** `AppIdentity_Text` is the raw `AppIdentity` value. Microsoft documents it as
+> a `workload.appGroup.appName` string (for example `Copilot.Studio.<AppId>` or
+> `MicrosoftAgent.Researcher.P_<id>`); when the record holds an object instead, its `DisplayName` is
+> used. `Agent_TargetPlatformId`, `Agent_TargetName` (falling back to `CopilotEventData.AgentName`) and
+> `Agent_PlatformType` come from `CopilotEventData`. The processor uses all four only to compute the
+> [agent type columns](#agent-type-and-publisher); linking does not use them.
+
+> **Runtime records with no messages.** A Copilot Studio agent used in Teams or another channel logs
+> a record with no `Messages`. It is kept as one row with `Prompts_Available` FALSE,
+> `Message_isPrompt` FALSE and a `message:none` `Message_Id`, so the user still counts. Every other
+> record without messages is still dropped. `ConversationId` falls back to the record's
+> `ConversationId` when it has no `ThreadId`.
+
+> **`Exclude_Reason`** flags records that are not end-user agent usage: Copilot Studio test pane,
+> maker evaluation, agent authoring, autonomous and workflow runs, the M365 Copilot twin of a
+> runtime record, and Fabric multi-agent records. They stay in `_parsed`; the processor drops every
+> reason in `DROP_EXCLUDE_REASONS` (all of them by default). The rules are in
+> [METHODOLOGY §2.1](METHODOLOGY.md#21-which-audit-records-count).
+
+> **`AppHost`** is the Microsoft 365 surface the interaction happened in, such as Word, Outlook,
+> Microsoft365Chat or Cowork. It records where Copilot was used, not what the person did. What each
+> value means, and which values set a task, are classified by what they touched or are excluded, is in
+> [METHODOLOGY §3.5](METHODOLOGY.md#35-app-host-reference).
 
 ### 1b. `copilot_interactions_curated` — the table the Fabric model actually reads
 `Copilot_Audit_Log_Processor` reads `copilot_interactions_parsed` (joining `copilot_licensed_users`
@@ -81,7 +107,7 @@ what the Fabric template's `Chat + Agent Interactions (Audit Logs)` partition bi
 same shape the template's Power Query used to produce, but computed once in Spark and V-Ordered on
 disk so the shipped Import templates can read a flat fact table quickly.
 
-**Schema:** additive canonical shaping plus the 26 enrichment columns below, **not**
+**Schema:** additive canonical shaping plus the 32 enrichment columns below, **not**
 a verbatim copy of every parsed column. By default the processor consumes/drops
 `AppIdentity`, `AccessedResources`, `AISystemPlugin` and `Audit_UserId_Normalized`,
 and removes internal join/enrichment helpers.
@@ -102,8 +128,23 @@ Value_Outcome, Usage_Mode, Expertise_Role, Efficiency_Breakdown,
 Web_Grounded_Signal, Behavior_Plausible, Workflow_Action,
 Is_Agent_Activity, Agent Filter, Grounding Source, Agent_Surface, Execution_Trigger,
 UserMonthKey, Delegation_Event_Key, ActivityDate, Agent Last Used Date,
-User_Stage_Maturity, User_Stage
+User_Stage_Maturity, User_Stage,
+Agent_Key, Agent_Type, Agent_Type_Basis, Agent_Publisher, Agent_Is_Published,
+Agent_Consolidated_Name
 ```
+
+**Names in the report.** The report and the Fabric App show `Behavior_Enriched_Full` as **Task
+Breakdown**, and the 12 groups it rolls up to (the model's `Task Breakdown Group` column) as **Task
+Category**. Each task's plain-English description comes from the static `Behavior Value Map` table
+inside the `.pbit`, not from this table.
+
+It also carries the agent link: `Agent_LinkID` (the registry Title ID the row belongs to, the
+relationship key to `agents_365`), `Agent_MatchedTitleID` (the Title ID that actually matched,
+before LOB/Shared copies are merged) and `Agent_LinkMethod` (`Title ID`, `Bot Id`,
+`Entra Agent ID`, `Schema GUID`, `Unlinked`, or null when the row names no agent key). The raw keys
+`Agent_TitleID`, `Agent_EntraId`, `Agent_BotId`, `Agent_EnvironmentId`, `AgentPlatform`,
+`PlatformAgentId`, `Prompts_Available` and `Exclude_Reason` pass through. See
+[agent identity resolution](#agent-identity-resolution).
 
 > **`Behavior_Category` is the join key for the value model.** It relates to the static
 > `Human Time Estimates` table inside the `.pbit`, which holds the per-behaviour
@@ -111,7 +152,7 @@ User_Stage_Maturity, User_Stage
 > `RELATED` — the baselines are **not** materialised into this Delta table.
 >
 > Use `WRITE_MODE = "overwrite"` for the first backfill, then `"merge"` for daily runs. The notebook
-> asserts all 26 columns are present before writing, so a partial enrichment fails loudly rather than
+> asserts all 32 columns are present before writing, so a partial enrichment fails loudly rather than
 > silently shipping an incomplete fact table.
 
 ### 2. `copilot_licensed_users` — licensed user list
@@ -191,6 +232,22 @@ shipped pipeline runs the Ingester **first** and the Lander **only if the Ingest
 (`Run_Agent365_CSV_Fallback`, e.g. no Agent 365 licence). Read via `FabricTable("agents_365")`, wrapped with `Enable_Agent365`. The Fabric
 model is now **100% Lakehouse-sourced**.
 
+**Incremental pull.** The ingester lists every agent on every run, but calls the per-agent detail
+endpoint (Bot Id, usage, sharing, element types) only for agents that are new, whose
+`lastModifiedDateTime` changed, that have no cache entry, or whose cached detail is older than
+`FULL_REFRESH_DAYS` (default 7). Detail calls run in parallel (`DETAIL_WORKERS`, default 8) and retry
+on 429, 503 and 504. `DETAIL_MODE = "full"` forces a full refresh. It keeps three tables:
+
+| Table | Holds |
+|---|---|
+| `agents_365` | Today's registry, one row per agent, with **`Detail As Of`** (when that agent's detail was last fetched) |
+| `agents_365_detail_cache` | The last detail response and resolved creator per agent. Written only after a successful run; agents gone from the list are dropped |
+| `agents_365_history` | Every version of every agent, merged on Title ID and `Last updated`, so registry changes can be traced |
+
+For a cached agent, today's list fields override the cached detail; freshly fetched detail
+overrides the list. Usage fields (`Active Users`, `Total sessions` and similar) can therefore be up
+to `FULL_REFRESH_DAYS` old; check `Detail As Of`.
+
 **Local CSV, SharePoint and Dataverse templates** read the same contract from a CSV set in the
 `Agent 365` parameter (blank = the page loads empty). Produce it with
 [`Get-Agents365Registry.ps1`](../3.%20SharePoint/scripts/Get-Agents365Registry.ps1), which calls the
@@ -201,6 +258,12 @@ same value rules; a parity test runs one mocked Graph response through both. `Ru
 Query only reads and types the file. A hidden staging query (`Agents 365 Staging`) reads it once;
 both the `Agents 365` table and the interactions query's `Agent_LinkID` resolution use it, so they
 always agree. The PAX 28-column catalogue and the admin centre export are still accepted.
+
+The script also keeps a detail cache next to the CSV (`<csv>.detailcache.jsonl`) and, like the
+ingester, fetches detail only for new or changed agents, or those whose cached detail is older than
+`-FullDetailRefreshDays` (default 7; 0 fetches every agent). It honours `Retry-After` on 429 and 5xx
+responses, caches each agent's resolved creator, and writes the cache only after the CSV. The CSV
+keeps its 48 columns; it has no `Detail As Of` column.
 
 #### ⚠️ Two different Agent 365 exports — registry vs observability
 
@@ -229,33 +292,97 @@ with) the registry export. `Agent Activity Status` falls back to audit-log-deriv
 > Adding a column to the Agents 365 model? Add it to the guard's `__expected` list in the query too,
 > or it will be unstable on any source that doesn't emit it.
 
-#### Agent identity resolution (3-key bridge: Entra → Title ID → Name)
+#### Agent identity resolution
 
 The interactions fact joins the Agents dimension through a **resolved key** (`Agent_LinkID`) rather
-than the raw `Agent_TitleID`. This is necessary because the **audit log and the MAC Agents export use
-different identifier namespaces** — the audit `AgentId` is an `SPO_…` blob, a built-in name
-(`WordDraftingAgent`), or an **Entra Agent ID GUID** (Agent 365), while the export keys on `T_…`
-Title IDs. On real tenant data the raw `Agent_TitleID → Title ID` join matches **0%**; resolving the
-shared **display name** lifts that to ~**84% of distinct agents** (the unmatched remainder are mostly
-Microsoft first-party agents that legitimately have no registry row).
+than the raw `Agent_TitleID`. The audit log and the registry use different identifiers: the audit
+`AgentId` can be a `T_…` Title ID, an `SPO_…` blob, a built-in name (`WordDraftingAgent`), an
+**Entra Agent ID GUID** (Agent 365), or, on Copilot Studio runtime records, a Bot Id in
+`PlatformAgentId`. On one large tenant **55%** of agent rows matched a registry Title ID directly;
+most of the rest are Microsoft first-party agents with no registry row.
 
-Resolution is done in Power Query (no DAX circular-dependency risk; mirrors the existing license merge),
-as a **priority chain** that always lands on a real registry `Title ID` or null:
+**Fabric (`Copilot_Audit_Log_Processor`).** Resolution runs in Spark, as a priority chain that
+always lands on a real registry `Title ID` or null, and never uses the agent's name:
 
-1. **Entra Agent ID** — `Agent_EntraId → agents_365[Entra Agent ID]` (future Agent 365 agents).
-2. **Direct Title ID** — `Agent_TitleID` only when it already *is* a registry Title ID.
-3. **Normalised name** — `lower(trim(AgentName)) → agents_365[Agent name]` (the high-yield fallback).
+1. **Title ID** — `Agent_TitleID → agents_365[Title ID]`.
+2. **Bot Id** — `Agent_BotId → agents_365[Bot Id]` (Copilot Studio runtime records).
+3. **Entra agent ID** — `Agent_EntraId → agents_365[Entra Agent ID]` (`agentIdentityId`).
+4. **Schema GUID** — a Title ID found inside a Copilot Studio schema name.
 
-`Agent_LinkID = COALESCE(EntraTitle, DirectTitle, NameTitle)`. All three lookup maps are deduped and
-null-guarded, so the 1.2M-row fact never fans out. The relationship is
-**`Chat + Agent Interactions[Agent_LinkID] → agents_365[Title ID]`** (replaces the old `Agent_TitleID`
-relationship; cross-filter direction unchanged).
+A key is used only when it maps to one registry agent. When a Copilot Studio agent has an LOB and a
+Shared copy (two Title IDs) that share a Bot Id or Entra agent ID, both resolve to one
+`Agent_LinkID`: the LOB Title ID, or for Shared-only copies the most recently updated one. Distinct
+users are therefore counted once across the copies. Agent Builder and Microsoft agents are never
+merged. `Agent_MatchedTitleID` keeps the Title ID that matched. Matching by name was removed:
+names are not unique, and it linked only about 1.3% more rows.
 
-**Zero-touch identity detection.** `agents_365` is given an add-if-missing **`Entra Agent ID`** column
+**Local CSV, SharePoint and Dataverse templates.** Resolution is still done in Power Query, in this
+order: `Agent_EntraId → Entra Agent ID`, then a direct Title ID, then the normalised agent name.
+These templates have not yet moved to the Fabric rules above, so they can still merge two agents
+that share a name.
+
+All lookup maps are deduped and null-guarded, so the fact never fans out. The relationship is
+**`Chat + Agent Interactions[Agent_LinkID] → agents_365[Title ID]`**.
+
+**Zero-touch identity detection (templates).** `agents_365` is given an add-if-missing **`Entra Agent ID`** column
 that **auto-detects** the GUID from whatever the export provides — it picks the first present of
 `Entra Agent ID → EntraAgentId → Agent ID → Bot Id` (and common variants). The customer never has to
-create or populate a column by hand; a non-matching GUID simply does not join (no false links). Until
-an export carries Entra GUIDs, custom agents still resolve by name.
+create or populate a column by hand; a non-matching GUID simply does not join (no false links).
+
+#### Agent type and publisher
+
+`Copilot_Audit_Log_Processor` (Fabric) and the Local CSV processor add six columns that say what
+kind of agent each row used and who published it. This covers the Microsoft first-party agents
+that never link to `agents_365`. They are additive: `Agent_LinkID` and `Agent_Surface` are unchanged.
+
+| Column | Meaning |
+|---|---|
+| `Agent_Key` | The agent: agent ID, else agent name, else `AppIdentity`. Blank for rows with no agent. |
+| `Agent_Type` | The category, from the first matching rule in [METHODOLOGY §3.3](METHODOLOGY.md#agent-type-classification). |
+| `Agent_Type_Basis` | How firm the category is: `documented`, `observed`, `inferred` (agent-ID prefix convention Microsoft does not document) or `override`. |
+| `Agent_Publisher` | `Microsoft`, `Your organisation`, `User-shared`, `Agent Store`, `Connected app` or `Unknown`. |
+| `Agent_Is_Published` | TRUE / FALSE, or blank when the audit log cannot tell (Agent Builder, Copilot Studio, connected apps, unclassified). |
+| `Agent_Consolidated_Name` | One name per Microsoft first-party agent (every Researcher row shows `Researcher`, whatever its ID or host). Other agents keep their own name. |
+
+**Optional overrides.** Create a Lakehouse table `agent_type_overrides` (Fabric) or a CSV passed as
+`--agent-type-overrides` (Local CSV processor) with columns `key` and `Agent_Type` (`Category` is
+also accepted in the CSV) to correct a category. `key` is an agent ID, agent name or `AppIdentity`
+(matched case-insensitively, in that order); the row's `Agent_Type_Basis` becomes `override`. A
+category that is not one of the built-in names gets `Agent_Publisher` `Unknown`. The Fabric
+processor skips the step when the table does not exist (`AGENT_TYPE_OVERRIDES_TABLE` in the config
+cell).
+
+**Coverage by variant.** Every template loads all six columns on `Chat + Agent Interactions`, and
+the Agent Registry page has an **Agent type (audit log)** slicer and an active-users-by-agent-type
+chart. Where the columns come from depends on the variant:
+
+| Variant | Source of the six columns | Inputs | Overrides |
+|---|---|---|---|
+| Fabric (both templates) | `Copilot_Audit_Log_Processor` | All five (agent ID, name, AppIdentity, PlatformAgentType, workload) | `agent_type_overrides` table |
+| Local CSV | Python processor (`--profile aibv`) | All five | `--agent-type-overrides` CSV |
+| Power Automate + Dataverse | Snapshots built by `Build-DataverseCoreFeeds.py`, which runs the Local CSV processor | All five | Not wired in |
+| Power Automate + Dataverse, snapshots built before this change | Power Query (`ValueLensDescribeAgent`) at refresh | Agent ID, name, AppIdentity only | None |
+| SharePoint (PAX rollup) | Power Query (`ValueLensDescribeAgent`) at refresh | Agent ID, name, AppIdentity only | None |
+
+`ValueLensDescribeAgent` is a Power Query port of the same rules. It runs only when the extract has
+no `Agent_Type` column. The PAX rollup and older snapshots carry `AgentId` (the audit `AgentId`, not
+`CopilotEventData.TargetPlatformAgentId`), `AgentName` and `AppIdentity_DisplayName`, but no
+`PlatformAgentType` or workload. So in those extracts, connected apps and third-party AI apps
+(`ConnectedAIApp` / `AIApp` workloads) are found only by their `AppIdentity` prefix, and a Copilot
+Studio agent known only by `PlatformAgentType` lands in **Unclassified agents**. A test runs the
+shipped M text against the Python rules on the same inputs, so the two cannot drift.
+
+**`Agent Publish Status` (Local CSV, Dataverse, SharePoint) is separate and unchanged.** It is the
+older AI-in-One flag: `Not an Agent Row` with no agent ID, `Unpublished` only for "Draft as 1P"
+agents, otherwise `Published`. `Agent_Type`, `Agent_Publisher` and `Agent_Is_Published` are the
+finer replacement for new analysis: they add the AppIdentity, PlatformAgentType and workload
+signals, name the Microsoft first-party agents, leave the published flag blank where the audit log
+cannot tell and mark which rules are inferred. Local CSV output from a processor older than this
+change also falls back to `ValueLensDescribeAgent`.
+
+The Fabric model loads all six columns. It drops the four raw inputs (`AppIdentity_Text`,
+`Agent_TargetPlatformId`, `Agent_TargetName`, `Agent_PlatformType`). Re-run the processor before
+refreshing an updated template, so the curated table has the new columns.
 
 #### Agent creator attribution (`Agent creator UPN` / `Agent creator source`)
 

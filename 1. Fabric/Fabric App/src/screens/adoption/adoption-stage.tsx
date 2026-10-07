@@ -14,8 +14,9 @@ import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states"
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
+import { useFilterContext } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
-import type { FilterKey } from "@/lib/filters";
+import { selectedCohort, unshownActivity, type FilterKey } from "@/lib/filters";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import { adoptionSummary, adoptionTrend, type AdoptionTrendMeasure } from "@/queries/adoption";
@@ -28,8 +29,9 @@ const surfaces = [
     { id: "agents", label: "Agents", usersColumn: "[Agent Users]", rateColumn: "[Agent SPUW]" },
 ] as const;
 
-/** Every card and trend line here is already one surface, so these filters would only blank some out. */
+/** Every card and trend line here is already one surface, so these filters pick the card to highlight instead. */
 const SURFACE_FILTERS: FilterKey[] = ["licence", "audience"];
+const PICKABLE = ["licensed", "unlicensed", "agents"] as const;
 
 const trendMeasures: { id: AdoptionTrendMeasure; label: string }[] = [
     { id: "sessionsPerUser", label: "Per user" },
@@ -46,6 +48,13 @@ const trendMeasures: { id: AdoptionTrendMeasure; label: string }[] = [
 export function AdoptionStage() {
     const [measure, setMeasure] = useState<AdoptionTrendMeasure>("sessionsPerUser");
     const { theme } = useThemeContext();
+    const { filters, applicable } = useFilterContext();
+    const cohort = selectedCohort(filters, applicable, PICKABLE);
+    const highlighted = surfaces.find((surface) => surface.id === cohort) ?? surfaces[0];
+    const unshown = unshownActivity(filters, applicable, PICKABLE);
+    const surfaceReason = unshown
+        ? `${unshown} has no card of its own, so ${highlighted.label} is highlighted.`
+        : `licensed chat, unlicensed chat and agents are each shown in their own card and line, so ${highlighted.label} is highlighted.`;
 
     const summary = useFilteredQuery(adoptionSummary(), { ignore: SURFACE_FILTERS });
     const trend = useMemo(() => adoptionTrend({ measure }), [measure]);
@@ -81,10 +90,7 @@ export function AdoptionStage() {
                 />
             }
         >
-            <FilterNote
-                ignored={SURFACE_FILTERS}
-                reason="licensed chat, unlicensed chat and agents are each shown in their own card and line."
-            />
+            <FilterNote ignored={SURFACE_FILTERS} reason={surfaceReason} />
             {summary.data?.status === "error" ? (
                 <QueryError message={summary.data.error.message} onRetry={summary.refetch} />
             ) : summary.isLoading || !summary.data ? (
@@ -107,7 +113,7 @@ export function AdoptionStage() {
                                 label={surface.label}
                                 value={readNumber(summaryRow, surface.rateColumn)}
                                 format="rate"
-                                emphasis={surface.id === "overall"}
+                                emphasis={surface.id === highlighted.id}
                                 detail={
                                     <div className="flex flex-col gap-100">
                                         <span className="block pb-100">sessions per user per week</span>

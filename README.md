@@ -7,15 +7,11 @@ the hours and value they deliver.
 
 ## Watch first
 
-**Demo: what the dashboard measures, page by page** *(1m 49s)*
+**Demo: what the dashboard measures, page by page** *(2m 4s)*
 
-https://github.com/user-attachments/assets/a037e428-f966-4fdf-bf44-7a1d04155a63
+https://github.com/user-attachments/assets/2aa65c5d-2a20-4d51-9f1d-072c712fb4f3
 
-**Setup guide: getting your own data in, every source, start to finish** *(5m 37s)*
-
-https://github.com/user-attachments/assets/93ed2b50-957f-43ce-ab83-0f6143e7661f
-
-> Prefer to download them? [Demo](media/ValueLens-Demo.mp4) · [Setup guide](media/ValueLens-Setup.mp4)
+> Prefer to download it? [Get the demo video](media/ValueLens-Demo.mp4).
 
 **Have Fabric?** [Download the Analytics Hub installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe),
 open it and follow the steps in your browser. Check

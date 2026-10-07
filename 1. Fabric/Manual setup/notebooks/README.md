@@ -50,12 +50,15 @@ Run these before the processor.
 | `Copilot_ProductFeedback_Ingester` | `user_feedback` | Export product feedback from the Microsoft 365 admin center (**Health** > **Product feedback**) to `Files/product_feedback/`. |
 | `Copilot_M365_Activity_Ingester` | `m365_activity_daily` | Fill in the first cell. Only Analytics Hub reads this table; the templates don't. |
 | [Workday org data](workday-org-data/README.md) | `copilot_org_data` | Adds HR columns to the org data. Follow its README. |
+| `AnalyticsHub_Upload_Router` | `analytics_hub_upload_log` | Run it first. It reads any export dropped in `Files/analytics_hub_uploads`, recognises it from its headers, moves it to the folder its notebook reads, and archives it to `_processed`. Set `ENABLED_SOURCES` to the sources you use. The installer sets this up for you. |
+| `AnalyticsHub_Load_Status` | `load_log` | The pipeline's last step, run whatever happened before it. It writes one row per source with its status and, for a failure, the reason in plain words. It fails when a load failed, so the run shows as failed. Run by hand, it does nothing: it needs the pipeline's run ID. |
 
 ## Settings you might change
 
 | Setting | Notebook | Change it to |
 |---|---|---|
 | `AGENT_IDENTITY_PATTERNS` | Processor | Add your own service accounts. Accounts that match, such as Security Copilot agents, aren't counted as people. |
+| `AGENT_TYPE_OVERRIDES_TABLE` | Processor | The optional Lakehouse table (columns `key`, `Agent_Type`) that corrects an agent's type. Default `agent_type_overrides`; skipped when the table doesn't exist. See [agent type and publisher](../../../docs/DATA-DICTIONARY.md#agent-type-and-publisher). |
 | `INCLUDE_RAW_PASSTHROUGH` | Processor, registry ingester | `True` to keep the raw payloads. They can hold names, file names and URLs, so review privacy first. Then run the processor once with `WRITE_MODE = 'overwrite'`. |
 
 ## People show as IDs

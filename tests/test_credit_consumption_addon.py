@@ -41,6 +41,16 @@ class CreditConsumptionAddon(unittest.TestCase):
                     domains = {m.group(1).lower() for m in EMAIL.finditer(text)}
                     self.assertLessEqual(domains, ALLOWED_DOMAINS, (name, member))
 
+    def test_meter_models_are_spelled_the_openai_way(self):
+        # "Gpt 4O" and a bare "5.4" came from title-casing meter words; ModelLabel
+        # spells them GPT-4o, GPT-5.4 and o4-mini, in the model and its pending copy.
+        for path, name in PBITS.items():
+            with zipfile.ZipFile(ROOT / path / ADDON / name) as archive:
+                for member in ("DataModelSchema", "UnappliedChanges"):
+                    text = archive.read(member).decode("utf-16-le")
+                    self.assertIn("ModelLabel(List.FirstN(ws, i))", text, (name, member))
+                    self.assertNotIn("Text.Proper(Text.Combine(List.FirstN(ws, i)", text, (name, member))
+
     def test_fabric_sample_seeder_points_at_shared_sample(self):
         source = (ROOT / "1. Fabric" / "Manual setup" / ADDON / "seed_sample_data.py").read_text(encoding="utf-8")
         self.assertIn('"..", "..", "..", "4. Local CSV", "Add Credit Consumption", "sample-data"', source)

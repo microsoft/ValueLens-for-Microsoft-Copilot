@@ -43,20 +43,23 @@ function candidateColumns(orgLabel: string, table: DataTable | undefined, withBr
         { id: "Rank", header: "Rank", width: 88, numericStyling: true },
         { id: "User", header: "User", minWidth: 240 },
         { id: "Organization", header: orgLabel, minWidth: 160 },
+        // Short headers, each wide enough for its sort arrow; the subtitle says sessions and active days are per week.
+        // The user and organization share the rest.
         {
             id: "Priority Score",
             header: "Priority score",
+            width: 124,
             numericStyling: true,
             cellRenderer: heatRenderer({
                 domain: columnHeat(table, "Priority Score"),
                 format: columnFormat(table, "Priority Score"),
             }),
         },
-        { id: "Sessions Per Week", header: "Sessions per week", numericStyling: true },
-        { id: "Active Days Per Week", header: "Active days per week", numericStyling: true },
+        { id: "Sessions Per Week", header: "Sessions", width: 96, numericStyling: true },
+        { id: "Active Days Per Week", header: "Active days", width: 116, numericStyling: true },
     ];
     if (withBreadth) {
-        columns.push({ id: "Workloads Per Day", header: "Microsoft 365 workloads per day", numericStyling: true });
+        columns.push({ id: "Workloads Per Day", header: "Workloads per day", width: 156, numericStyling: true });
     }
     return columns;
 }
@@ -269,7 +272,7 @@ export function LicenseReadinessStage() {
                                 withBreadth
                                     ? ": how much they use Copilot, and how many Microsoft 365 workloads they use a day"
                                     : ""
-                            }${unreconciled ? ". Some may already have a license: see the note above." : ""}`,
+                            }. Sessions and active days are per week.${unreconciled ? " Some may already have a license: see the note above." : ""}`,
                         }}
                     />
                 )}

@@ -136,7 +136,7 @@ auditable rather than asserted.
 
 ## Also useful as a test fixture
 
-Because the files satisfy the template's full column contract — 55 interaction columns,
+Because the files satisfy the template's full column contract — 61 interaction columns,
 84 org columns, 41 agent columns, 21 feedback columns — they double as a regression fixture for template
 changes. If a model edit breaks the load path, loading this dataset surfaces it without
 needing tenant access.
@@ -150,7 +150,11 @@ its `compute_*` functions under the `aibv` profile for every derived column:
 `Environment`, `Behavior_Enriched`, `Value_Outcome`, `Usage_Mode`, `Expertise_Role`,
 `Efficiency_Breakdown`, `Autonomy_Pattern`, `Behavior_Source`, `Human_Baseline_Min`,
 `Workflow_Action`, `Web_Grounded_Signal`, `Behavior_Plausible`, `Delegation_Event_Key`,
-`Agent Publish Status` and the rest.
+`Agent Publish Status` and the rest. The six agent-type columns (`Agent_Type` and its
+companions) come from the processor's `make_agent_type_describer`, so every Researcher and
+Analyst row lands in a Microsoft first-party category and the Agent Registry page's agent-type
+slicer and chart populate. Copilot Cowork rows carry no agent ID, so they show as
+**Unclassified agents**, as they would from a real export.
 
 So the sample data **cannot drift from the shipping pipeline**: change the taxonomy or
 the baselines in the processor, re-run the generator, and the CSVs follow. There is no

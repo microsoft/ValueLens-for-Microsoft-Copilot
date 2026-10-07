@@ -26,7 +26,7 @@ const columnMetadata: ColumnMetadataMap = {
     },
     "[Workloads Per Day]": {
         name: "Workloads Per Day",
-        displayName: "Microsoft 365 workloads per day",
+        displayName: "Workloads per day",
         format: FORMAT_RATE,
     },
 };

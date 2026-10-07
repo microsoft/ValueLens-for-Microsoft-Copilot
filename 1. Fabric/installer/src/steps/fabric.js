@@ -3,16 +3,19 @@
  * Workspace, Lakehouse, notebooks, pipeline and schedule. Re-runs reuse what the
  * install record points at; `update` pushes fresh notebook and pipeline content.
  */
+import { createHash } from 'node:crypto';
 import { enabledModules, notebooksFor } from '../catalog.js';
+import { routedSources, routerSignaturesJson, routerWanted } from '../uploads.js';
+import { statusConfigJson } from '../loads.js';
 import { parseResourceId } from '../clients/azure.js';
 import { scheduleBody } from '../clients/fabric.js';
 import { HttpError } from '../http.js';
 import { MARKER, prepareNotebook, pyString, serialiseNotebook } from '../transform/notebook.js';
-import { buildPipeline } from '../transform/pipeline.js';
+import { buildPipeline, PIPELINE_CHANGE, PIPELINE_VERSION } from '../transform/pipeline.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
-export const PIPELINE_NAME = 'ValueLens_Pipeline';
+export const PIPELINE_NAME = 'AnalyticsHub_Pipeline';
 
 /** @param {unknown} err */
 const isNotFound = (err) => err instanceof HttpError && (err.status === 404 || err.code === 'ItemNotFound' || err.code === 'WorkspaceNotFound');
@@ -287,6 +290,22 @@ export async function ensureVaultEndpoint(ctx) {
 export function notebookSettings(ctx, nb) {
   const { config, user } = ctx;
   const f = config.fabric;
+  /** @type {Record<string, string> | undefined} */
+  let values = nb.values;
+  if (nb.key === 'refreshModel') values = { WORKSPACE_ID: /** @type {string} */ (f.workspaceId), SEMANTIC_MODEL_ID: /** @type {string} */ (config.semanticModel.id) };
+  if (nb.key === 'azureAi') {
+    values = {
+      SUBSCRIPTION_ID: /** @type {string} */ (config.consumption.azureSubscriptionId),
+      TENANT_ID: user.tenantId,
+      CLIENT_ID: /** @type {string} */ (config.app.appId),
+      KEY_VAULT_URL: /** @type {string} */ (config.keyVault.uri),
+      CLIENT_SECRET_NAME: config.keyVault.secretName,
+    };
+  }
+  // Merge upserts each run's window, so environments and days accumulate without duplicates.
+  if (nb.key === 'agentTranscripts') values = { SOURCE_MODE: 'dataverse', WRITE_MODE: 'merge', RAW_TABLE: '' };
+  if (nb.key === 'uploadRouter') values = routerValues(config);
+  if (nb.key === 'loadStatus') values = { STATUS_JSON: statusConfigJson() };
   return {
     ...(nb.credentials
       ? {
@@ -296,26 +315,8 @@ export function notebookSettings(ctx, nb) {
         }
       : {}),
     parameters: nb.parameters,
-    ...(nb.key === 'refreshModel'
-      ? { values: { WORKSPACE_ID: /** @type {string} */ (f.workspaceId), SEMANTIC_MODEL_ID: /** @type {string} */ (config.semanticModel.id) } }
-      : {}),
-    ...(nb.key === 'azureAi'
-      ? {
-          values: {
-            SUBSCRIPTION_ID: /** @type {string} */ (config.consumption.azureSubscriptionId),
-            TENANT_ID: user.tenantId,
-            CLIENT_ID: /** @type {string} */ (config.app.appId),
-            KEY_VAULT_URL: /** @type {string} */ (config.keyVault.uri),
-            CLIENT_SECRET_NAME: config.keyVault.secretName,
-          },
-        }
-      : {}),
-    ...(nb.key === 'agentTranscripts'
-      ? {
-          // Merge upserts each run's window, so environments and days accumulate without duplicates.
-          values: { SOURCE_MODE: 'dataverse', WRITE_MODE: 'merge', RAW_TABLE: '' },
-        }
-      : {}),
+    ...(values ? { values } : {}),
+    ...(nb.expressions ? { expressions: nb.expressions } : {}),
     patches:
       nb.key === 'agentTranscripts'
         ? [...(nb.patches ?? []), environmentsPatch(config.agentEvaluator.environments)]
@@ -333,6 +334,32 @@ export function notebookSettings(ctx, nb) {
 
 /** The transcript parser's environment list, as it ships. */
 export const ENVIRONMENTS_FIND = "DATAVERSE_URLS = [\n    # 'https://org1.crm.dynamics.com',\n    # 'https://org2.crm.dynamics.com',\n]";
+
+/**
+ * What the upload router accepts: the sources that aren't skipped, and their header signatures.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const routerValues = (config) => ({
+  ENABLED_SOURCES: routedSources(config.dataSources).join(','),
+  SIGNATURES_JSON: routerSignaturesJson(config.dataSources),
+});
+
+/**
+ * What the deployed router was built from. A change means it has to be updated.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const routerSignature = (config) => createHash('sha256').update(routerSignaturesJson(config.dataSources)).digest('hex').slice(0, 16);
+
+/**
+ * Notebook options that follow the chosen sources.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const notebookOptions = (config) => ({
+  semanticModel: modelDeployed(config),
+  azureAi: azureAiOn(config),
+  dataverse: agentEvaluatorOn(config),
+  dataSources: config.dataSources,
+});
 
 /** The Azure AI notebook's extra pay-as-you-go subscriptions, as it ships. */
 export const PAYG_FIND = 'PAYG_SUBSCRIPTION_IDS = []';
@@ -380,13 +407,17 @@ export async function ensureNotebooks(ctx, opts = {}) {
   const items = await api.fabric.listItems(ws, 'Notebook');
   const ids = new Set(items.map((i) => i.id));
 
-  for (const nb of notebooksFor(config.modules, { semanticModel: modelDeployed(config), azureAi: azureAiOn(config), dataverse: agentEvaluatorOn(config) })) {
+  for (const nb of notebooksFor(config.modules, notebookOptions(config))) {
     const content = serialiseNotebook(prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb)));
     const urls = nb.key === 'agentTranscripts' ? environmentUrls(config) : undefined;
     const payg = nb.key === 'azureAi' ? paygIds(config) : undefined;
+    const routed = nb.key === 'uploadRouter' ? routerSignature(config) : undefined;
     f.notebookNames ??= {};
-    const label = f.notebookNames[nb.key] ?? nb.displayName;
     let id = f.notebooks[nb.key];
+    // Older records saved only the ID: keep the name the notebook already has.
+    const current = id ? items.find((i) => i.id === id)?.displayName : undefined;
+    if (current && !f.notebookNames[nb.key]) f.notebookNames[nb.key] = current;
+    const label = f.notebookNames[nb.key] ?? nb.displayName;
     if (id && !ids.has(id)) {
       ui.warn(`${label} was deleted. Deploying it again.`);
       id = undefined;
@@ -404,7 +435,8 @@ export async function ensureNotebooks(ctx, opts = {}) {
     } else if (
       opts.force ||
       (urls !== undefined && urls !== config.agentEvaluator.deployedUrls) ||
-      (payg !== undefined && payg !== (config.consumption.deployedPayg ?? ''))
+      (payg !== undefined && payg !== (config.consumption.deployedPayg ?? '')) ||
+      (routed !== undefined && routed !== f.deployedRouter)
     ) {
       await api.fabric.updateNotebook(ws, id, content);
       ui.ok(`Updated ${label}`);
@@ -414,6 +446,7 @@ export async function ensureNotebooks(ctx, opts = {}) {
     f.notebooks[nb.key] = id;
     if (urls !== undefined) config.agentEvaluator.deployedUrls = urls;
     if (payg !== undefined) config.consumption.deployedPayg = payg;
+    if (routed !== undefined) f.deployedRouter = routed;
     ctx.save();
   }
 }
@@ -435,8 +468,30 @@ export function pipelineSignature(config) {
   if (consumptionModelDeployed(config)) parts.push(`consumption=${config.consumption.model.id}`);
   if (agentEvaluatorOn(config)) parts.push('agentEvaluator');
   if (agentEvaluatorModelDeployed(config)) parts.push(`ae=${config.agentEvaluator.model.id}`);
+  if (routerWanted(config.dataSources)) parts.push('router');
+  if (workdayOn(config)) parts.push('workday');
+  if (agent365Csv(config)) parts.push('agent365=csv');
+  if (coworkDataflowOn(config)) parts.push(`cowork=${config.consumption.dataflowId}`);
   return parts.join(';');
 }
+
+/**
+ * Cowork credits come from the Viva Insights Dataflow, so the pipeline refreshes it before the Viva load.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const coworkDataflowOn = (config) => !!(config.modules.consumption && config.dataSources?.coworkCredits === 'api' && config.consumption?.dataflowId);
+
+/**
+ * Workday org data is uploaded, so its lander runs after the Entra ID load.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const workdayOn = (config) => config.dataSources?.workday === 'csv';
+
+/**
+ * Agent 365 comes from its admin center export rather than the registry API.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const agent365Csv = (config) => !!(config.modules.agent365 && config.dataSources?.agent365 === 'csv');
 
 /**
  * The semantic model is switched on, exists and reads the Lakehouse, so the pipeline can refresh it.
@@ -471,15 +526,14 @@ export const agentEvaluatorModelDeployed = (config) =>
   !!(config.modules.agentEvaluator && modelDeployed(config) && config.agentEvaluator?.model?.id && config.agentEvaluator.model.bound);
 
 /**
- * @param {Ctx} ctx
- * @param {{ force?: boolean }} [opts]
+ * What the pipeline is built from, for this install.
+ * @param {import('../config.js').InstallConfig} config
+ * @returns {import('../transform/pipeline.js').PipelineSettings}
  */
-export async function ensurePipeline(ctx, opts = {}) {
-  const { ui, config, api, sources } = ctx;
+export function pipelineSettings(config) {
   const f = config.fabric;
-  const ws = /** @type {string} */ (f.workspaceId);
-  const definition = buildPipeline(sources.pipeline, {
-    workspaceId: ws,
+  return {
+    workspaceId: /** @type {string} */ (f.workspaceId),
     notebookIds: f.notebooks,
     modules: config.modules,
     backfillDays: config.history.days,
@@ -488,11 +542,59 @@ export async function ensurePipeline(ctx, opts = {}) {
     consumptionModelId: consumptionModelDeployed(config) ? config.consumption.model.id : undefined,
     agentTranscripts: agentEvaluatorOn(config),
     agentEvaluatorModelId: agentEvaluatorOn(config) && agentEvaluatorModelDeployed(config) ? config.agentEvaluator.model.id : undefined,
-  });
+    uploadRouter: routerWanted(config.dataSources),
+    workday: workdayOn(config),
+    agent365Csv: agent365Csv(config),
+    coworkDataflowId: coworkDataflowOn(config) ? config.consumption.dataflowId : undefined,
+  };
+}
+
+/** Where the setting that lets pipeline notebooks share a Spark session lives. */
+export const HIGH_CONCURRENCY_PATH =
+  'Workspace settings > Data Engineering/Science > Spark settings > High concurrency > "For pipeline running multiple notebooks"';
+
+/**
+ * Lets the pipeline's notebooks share one Spark session, so a run starts a session once instead
+ * of once per notebook. That is what used to fill a small capacity (error 430).
+ * @param {Ctx} ctx
+ */
+export async function ensureSparkSettings(ctx) {
+  const { ui, config, api } = ctx;
+  const ws = /** @type {string} */ (config.fabric.workspaceId);
+  try {
+    const settings = await api.fabric.getSparkSettings(ws);
+    if (settings?.highConcurrency?.notebookPipelineRunEnabled === true) {
+      ui.ok('Pipeline notebooks share one Spark session');
+      return;
+    }
+    await api.fabric.updateSparkSettings(ws, { highConcurrency: { notebookPipelineRunEnabled: true } });
+    ui.ok('Turned on high concurrency for pipelines, so the pipeline\'s notebooks share one Spark session');
+  } catch (err) {
+    if (!(err instanceof HttpError)) throw err;
+    ui.warn(
+      err.status === 403
+        ? 'Couldn\'t turn on high concurrency for pipelines: that needs the workspace Admin role.'
+        : `Couldn't turn on high concurrency for pipelines: ${err.message}`,
+    );
+    ui.note(`Each notebook will start its own Spark session, which can fill a small capacity. A workspace admin can turn it on: ${HIGH_CONCURRENCY_PATH}.`);
+  }
+}
+
+/**
+ * @param {Ctx} ctx
+ * @param {{ force?: boolean }} [opts]
+ */
+export async function ensurePipeline(ctx, opts = {}) {
+  const { ui, config, api, sources } = ctx;
+  const f = config.fabric;
+  const ws = /** @type {string} */ (f.workspaceId);
+  const definition = buildPipeline(sources.pipeline, pipelineSettings(config));
   const signature = pipelineSignature(config);
   const items = await api.fabric.listItems(ws, 'DataPipeline');
 
-  if (f.pipelineId && !items.some((i) => i.id === f.pipelineId)) {
+  const current = f.pipelineId ? items.find((i) => i.id === f.pipelineId) : undefined;
+  if (current && !f.pipelineName) f.pipelineName = current.displayName;
+  if (f.pipelineId && !current) {
     ui.warn(`${f.pipelineName ?? PIPELINE_NAME} was deleted. Creating it again.`);
     delete f.pipelineId;
     delete f.scheduleId;
@@ -506,7 +608,8 @@ export async function ensurePipeline(ctx, opts = {}) {
     f.pipelineId = await createdId(ctx, created, 'DataPipeline', name);
     ui.ok(`Created pipeline ${name}`);
     f.pipelineName = name;
-  } else if (opts.force || f.pipelineModules !== signature) {
+  } else if (opts.force || f.pipelineModules !== signature || f.pipelineVersion !== PIPELINE_VERSION) {
+    if (f.pipelineVersion !== PIPELINE_VERSION) ui.note(PIPELINE_CHANGE);
     ui.note('This replaces the pipeline definition, including any activities you added to it yourself.');
     if (await ui.confirm(`Update ${f.pipelineName ?? PIPELINE_NAME}?`, true)) {
       await api.fabric.updatePipeline(ws, f.pipelineId, definition);
@@ -519,6 +622,7 @@ export async function ensurePipeline(ctx, opts = {}) {
     ui.ok(`Pipeline ${f.pipelineName ?? PIPELINE_NAME} is in place`);
   }
   f.pipelineModules = signature;
+  f.pipelineVersion = PIPELINE_VERSION;
   ctx.save();
 }
 

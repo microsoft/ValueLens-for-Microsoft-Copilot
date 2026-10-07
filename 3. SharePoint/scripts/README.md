@@ -80,6 +80,15 @@ window (e.g. `-Days 2`). The append de-duplicates on each interaction's
 stable message identity, so overlapping days reconcile (nothing dropped or double-counted). Applies
 to interactions only; the Users/org and Agent 365 outputs are **snapshots** (overwritten each run).
 Keep `-Deidentify` consistent across all appends to the same file.
+
+**Agent type columns.** The PAX rollup does not write `Agent_Type` and the other five
+[agent-type columns](../../docs/DATA-DICTIONARY.md#agent-type-and-publisher). The SharePoint template
+classifies each row at refresh instead, in Power Query (`ValueLensDescribeAgent`), from `AgentId`,
+`AgentName` and `AppIdentity_DisplayName`. The rollup has no `PlatformAgentType` or workload, so a
+Copilot Studio agent known only by its platform type lands in **Unclassified agents**, and connected
+or third-party AI apps are recognised only by their `AppIdentity` prefix. The Fabric and Local CSV
+processors use all five inputs and also accept overrides. If PAX later writes the columns, the
+template uses them as they are.
 ```powershell
 # First run — seed with a back-fill (no -AppendFile)
 .\Run-PAX-AIBV.ps1 -TenantId <id> -ClientId <id> -Days 30

@@ -101,7 +101,7 @@ test('Azure ARM parameters stay in sync with the committed template', async () =
   const body = await azureDeployment(ctx, { pass: 1 });
   assert.deepEqual(Object.keys(body.properties.parameters).sort(), REQUIRED_ARM_PARAMETERS.slice().sort());
   assert.equal(body.properties.parameters.imageRegistry.value, 'ghcr.io/microsoft');
-  assert.equal(body.properties.parameters.imageTag.value, '0.2.2');
+  assert.equal(body.properties.parameters.imageTag.value, JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
   assert.equal(body.properties.parameters.imageRegistryResourceId.value, '');
   config.azure.images = { registry: 'myacr.azurecr.io/valuelens', registryResourceId: '/subscriptions/s/resourceGroups/r/providers/Microsoft.ContainerRegistry/registries/myacr', tag: 'dev-1' };
   const pinned = (await azureDeployment(ctx, { pass: 1 })).properties.parameters;

@@ -59,17 +59,20 @@ const seconds = (value: unknown) => {
     return text === null ? null : `${text}s`;
 };
 
-/** The by-group table's figures; each id is both its column there and its measure in the summary. */
+/**
+ * The by-group table's figures; each id is both its column there and its
+ * measure in the summary. Each width fits its header beside the sort arrow.
+ */
 const GROUP_COLUMNS: readonly GroupColumn[] = [
-    { id: "Conversations", header: "Conversations", width: 112, format: formatCell("whole"), heat: "volume" },
-    { id: "People", header: "People", width: 80, format: formatCell("whole") },
-    { id: "Resolution Rate", header: "Resolved", width: 92, format: percent },
+    { id: "Conversations", header: "Conversations", width: 128, format: formatCell("whole"), heat: "volume" },
+    { id: "People", header: "People", width: 88, format: formatCell("whole") },
+    { id: "Resolution Rate", header: "Resolved", width: 100, format: percent },
     { id: "True Failure Rate", header: "Failed", width: 84, format: percent, heat: "bad" },
-    { id: "Unintended Escalation Rate", header: "Escalated after an error", width: 176, format: percent },
-    { id: "Abandonment Rate", header: "Abandoned", width: 100, format: percent },
-    { id: "CSAT", header: "Satisfaction", width: 104, format: percent },
-    { id: "Error Rate", header: "Hit an error", width: 100, format: percent },
-    { id: "Median Response", header: "Median reply", width: 112, format: seconds },
+    { id: "Unintended Escalation Rate", header: "Escalated after an error", width: 180, format: percent },
+    { id: "Abandonment Rate", header: "Abandoned", width: 116, format: percent },
+    { id: "CSAT", header: "Satisfaction", width: 116, format: percent },
+    { id: "Error Rate", header: "Hit an error", width: 116, format: percent },
+    { id: "Median Response", header: "Median reply", width: 124, format: seconds },
 ];
 
 function groupColumns(table: DataTable | undefined, groupHeader: string, badColor: string): GridColumnDef[] {

@@ -15,6 +15,7 @@ import { ensureModelConnection, ensureSemanticModel } from '../src/steps/model.j
 import { MARKER, prepareNotebook, cellText } from '../src/transform/notebook.js';
 import { addCopilotPaygSpend, PAYG_SOURCE_TABLE, PAYG_TABLE } from '../src/transform/payg.js';
 import { buildPipeline, CONSUMPTION_REFRESH_ACTIVITY, findActivity, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
+import { UPLOAD_DIR } from '../src/uploads.js';
 import { fakeCtx, fakeFabric, fakeGraph, fakePowerBi, fakeUi, httpError, realSources } from './fakes.js';
 
 const SUB = '9c2a9418-0000-0000-0000-000000000000';
@@ -82,6 +83,7 @@ function setup(o = {}) {
   const config = emptyConfig();
   config.semanticModel.enabled = true;
   config.modules.consumption = true;
+  config.dataSources.azureAi = 'api';
   config.app.displayName = 'ValueLens Data Collector';
   const policies = o.policies;
   const powerPlatform = {
@@ -108,7 +110,7 @@ const modules = { orgData: true, m365Activity: false, agent365: false, productFe
 /** @param {any} doc */
 const names = (doc) => doc.properties.activities.map((/** @type {any} */ a) => a.name);
 
-test('pipeline: consumption loads run alongside the audit load, then refresh their own model', () => {
+test('pipeline: consumption loads run one after another in lane 2, then refresh their own model', () => {
   const doc = buildPipeline(realSources().pipeline, { workspaceId: 'ws-1', notebookIds: ids, modules, semanticModelId: 'model-1', azureAi: true, consumptionModelId: 'cc-1' });
   const all = names(doc);
   for (const n of ['Run_Consumption_Azure_AI', 'Run_Consumption_Studio', 'Run_Consumption_Viva', REFRESH_ACTIVITY, CONSUMPTION_REFRESH_ACTIVITY]) assert.ok(all.includes(n), n);
@@ -116,10 +118,13 @@ test('pipeline: consumption loads run alongside the audit load, then refresh the
   assert.equal(doc.properties.parameters.EnableConsumption, undefined);
 
   const azure = findActivity(doc.properties.activities, 'Run_Consumption_Azure_AI');
-  assert.deepEqual(azure.dependsOn, []);
+  assert.deepEqual(azure.dependsOn, [{ activity: 'Conditionally_Run_Org_Data', dependencyConditions: ['Completed'] }]);
+  assert.deepEqual(findActivity(doc.properties.activities, 'Run_Consumption_Studio').dependsOn, [{ activity: 'Run_Consumption_Azure_AI', dependencyConditions: ['Completed'] }]);
+  assert.deepEqual(findActivity(doc.properties.activities, 'Run_Consumption_Viva').dependsOn, [{ activity: 'Run_Consumption_Studio', dependencyConditions: ['Completed'] }]);
   assert.equal(azure.typeProperties.notebookId, 'nb-azure');
   assert.equal(azure.policy.retry, 2, 'new Azure roles take a while to apply');
-  assert.equal(findActivity(doc.properties.activities, 'Run_Consumption_Studio').policy.retry, 1);
+  assert.equal(azure.policy.retryIntervalInSeconds, 300);
+  assert.equal(findActivity(doc.properties.activities, 'Run_Consumption_Studio').policy.retry, 3);
 
   const ccRefresh = findActivity(doc.properties.activities, CONSUMPTION_REFRESH_ACTIVITY);
   assert.deepEqual(ccRefresh.dependsOn, [
@@ -208,6 +213,16 @@ test('plan: picks the subscription with AI resources; "leave out" is remembered;
   left.arm.aiAccounts[SUB] = 4;
   await planConsumption(left.ctx, /** @type {any} */ ({ subscriptions: subs }));
   assert.equal(left.config.consumption.azureSubscriptionId, '');
+  assert.equal(left.config.dataSources.azureAi, 'skip', 'leaving it out sets the Data sources card to Skip');
+
+  const skipped = setup();
+  Object.assign(skipped.config.consumption, { azureSubscriptionId: SUB, azureAccess: true, paygSubscriptions: [{ subscriptionId: PAYG, policies: ['Studio'] }] });
+  skipped.config.dataSources.azureAi = 'skip';
+  await planConsumption(skipped.ctx, /** @type {any} */ ({ subscriptions: subs }));
+  assert.deepEqual(skipped.arm.calls, [], 'Skip on the Data sources screen asks nothing');
+  assert.equal(skipped.config.consumption.azureSubscriptionId, '');
+  assert.equal(skipped.config.consumption.azureAccess, false);
+  assert.deepEqual(skipped.config.consumption.paygSubscriptions, []);
   const again = setup();
   again.config.consumption = left.config.consumption;
   again.arm.aiAccounts[SUB] = 4;
@@ -489,14 +504,30 @@ test('summary: Azure AI status and the Studio and Cowork upload steps', () => {
   const t = setup();
   Object.assign(t.config.consumption, { azureSubscriptionId: SUB, azureSubscriptionName: 'AI' });
   Object.assign(t.config.consumption.model, { id: 'cc-1', bound: true });
+  Object.assign(t.config.dataSources, { studioCredits: 'csv', coworkCredits: 'csv' });
   consumptionSummary(t.ctx);
   const text = t.ui.text();
   assert.match(text, /left out until ValueLens Data Collector has Reader, Cost Management Reader, Monitoring Reader on AI/);
   assert.match(text, /datasets\/cc-1/);
-  assert.match(text, new RegExp(STUDIO_LANDING));
-  assert.match(text, /Dataflow Gen2/);
-  assert.match(text, /viva_credits_weekly/);
+  assert.match(text, /Copilot Studio credits {2}\(upload the exports\)/);
+  assert.match(text, new RegExp(`Drop them in .+ > ${UPLOAD_DIR}`));
+  assert.match(text, /Cowork credits {2}\(upload the export\)/);
+  assert.match(text, /choose Connected \(Dataflow\)/);
   assert.doesNotMatch(text, /PAYG:/, 'not while Azure AI is off');
+
+  const flowing = setup();
+  flowing.config.modules.consumption = true;
+  Object.assign(flowing.config.dataSources, { studioCredits: 'csv', coworkCredits: 'api' });
+  Object.assign(flowing.config.uploads, { studioFlow: true, flowIds: { studio: 'flow-1' } });
+  flowing.config.consumption.dataflowId = 'df-1';
+  consumptionSummary(flowing.ctx);
+  assert.match(flowing.ui.text(), /a daily flow reads the environment and agent figures/);
+  assert.match(flowing.ui.text(), /Dataflow AnalyticsHub_Cowork_Credits, refreshed by the pipeline/);
+
+  const skipped = setup();
+  Object.assign(skipped.config.dataSources, { studioCredits: 'skip', coworkCredits: 'skip' });
+  consumptionSummary(skipped.ctx);
+  assert.doesNotMatch(skipped.ui.text(), /Copilot Studio credits|Cowork credits/);
 
   const on = setup();
   Object.assign(on.config.consumption, {

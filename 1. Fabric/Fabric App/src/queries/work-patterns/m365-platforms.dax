@@ -1,7 +1,7 @@
 EVALUATE
 VAR _people =
     CALCULATE(DISTINCTCOUNT('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0)
-VAR _weeks = DIVIDE(DISTINCTCOUNT('M365 Activity'[ActivityDate]), 7)
+VAR _weeks = DIVIDE(CALCULATE(DISTINCTCOUNT('M365 Activity'[ActivityDate]), REMOVEFILTERS('Chat + Agent Org Data')), 7)
 VAR _platforms =
     DATATABLE(
         "Platform", STRING,

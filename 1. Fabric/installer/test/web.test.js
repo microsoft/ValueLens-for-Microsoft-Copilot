@@ -462,6 +462,31 @@ test('terminal: after Back it shows the question the user went back to, not the 
   ]);
 });
 
+test('web ui: load cards become one event, and the terminal shows each source with its fix', () => {
+  const ui = createWebUi();
+  /** @type {string[]} */
+  const out = [];
+  ui.subscribe(mirror((s) => out.push(plainText(s))));
+  /** @type {import('../src/loads.js').LoadCard[]} */
+  const cards = [
+    /** @type {any} */ ({ name: 'Licensed users', state: 'ok', fix: [] }),
+    /** @type {any} */ ({ name: 'Copilot audit log', state: 'failed', reason: 'The capacity was busy.', fix: ['Try again later.'] }),
+    /** @type {any} */ ({ name: 'Agent 365 (API)', state: 'skipped', fix: [] }),
+  ];
+  ui.loads(cards);
+  const e = latest(ui);
+  assert.equal(e.type, 'loads');
+  assert.deepEqual(e.cards.map((/** @type {any} */ c) => c.state), ['ok', 'failed', 'skipped']);
+  const lines = out.join('').split('\n').map((l) => l.trim()).filter(Boolean);
+  assert.deepEqual(lines.slice(-5), [
+    `${String.fromCharCode(10003)} Licensed users`,
+    `${String.fromCharCode(10007)} Copilot audit log: failed`,
+    'The capacity was busy.',
+    'Try again later.',
+    '! Agent 365 (API): skipped',
+  ]);
+});
+
 test('rewindable: Back puts the config back and reuses the API calls; the terminal just runs', async () => {
   const ui = createWebUi();
   let lists = 0;

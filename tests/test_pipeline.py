@@ -15,6 +15,20 @@ INPUTS = {
     "Run_Licensed_Users_Ingester",
     FALLBACK,
 }
+ORG = "Conditionally_Run_Org_Data"
+M365 = "Conditionally_Run_M365_Activity"
+FEEDBACK = "Conditionally_Run_Product_Feedback"
+DATAVERSE = "Conditionally_Run_Dataverse_Transcripts"
+# Lane 2 in run order: (step, the step it waits for, the outcomes it waits for).
+LANE_2 = [
+    (AGENT365, "Run_Licensed_Users_Ingester", ["Completed"]),
+    (FALLBACK, AGENT365, ["Failed"]),
+    (ORG, FALLBACK, ["Completed", "Skipped"]),
+    (M365, ORG, ["Completed"]),
+    (FEEDBACK, M365, ["Completed"]),
+    (DATAVERSE, FEEDBACK, ["Completed"]),
+    ("Conditionally_Run_Credit_Consumption", DATAVERSE, ["Completed"]),
+]
 
 
 class PipelineTests(unittest.TestCase):
@@ -35,7 +49,8 @@ class PipelineTests(unittest.TestCase):
         })
         self.assertEqual(processor.get("state", "Active"), "Active")
         self.assertEqual(processor["policy"]["timeout"], "0.02:00:00")
-        self.assertEqual(processor["policy"]["retry"], 1)
+        self.assertEqual(processor["policy"]["retry"], 2)
+        self.assertEqual(processor["policy"]["retryIntervalInSeconds"], 300)
         self.assertTrue(
             (ROOT / "1. Fabric" / "Manual setup" / "notebooks" / "Copilot_Audit_Log_Processor.ipynb").is_file()
         )
@@ -73,36 +88,46 @@ class PipelineTests(unittest.TestCase):
             self.assertTrue((ROOT / "1. Fabric" / "Manual setup" / "notebooks" / path).is_file(), path)
 
     def simulate(self, outcomes, enabled):
-        """Apply Data Factory's documented dependency and leaf-status rules to the Agent 365 path."""
-        order = ["Run_Audit_Log_Ingester", "Run_Licensed_Users_Ingester", AGENT365, FALLBACK, PROCESSOR]
+        """Apply Data Factory's documented dependency and leaf-status rules to the whole pipeline.
+
+        `enabled` names the IfConditions that take their true branch. `Completed` matches a parent
+        that succeeded or failed, so a step after a skipped one must also list `Skipped`.
+        """
+        parents = {n: [d["activity"] for d in a["dependsOn"]] for n, a in self.activities.items()}
         status = {}
-        for name in order:
+        for name in TopologicalSorter(parents).static_order():
             activity = self.activities[name]
-            if not all(status[d["activity"]] in d["dependencyConditions"] for d in activity["dependsOn"]):
+            if not all(self.met(d["dependencyConditions"], status[d["activity"]]) for d in activity["dependsOn"]):
                 status[name] = "Skipped"
             elif activity["type"] == "IfCondition":
-                branch = "ifTrueActivities" if enabled else "ifFalseActivities"
+                branch = "ifTrueActivities" if name in enabled else "ifFalseActivities"
                 inner = activity["typeProperties"][branch]
                 status[name] = "Failed" if any(outcomes.get(a["name"]) == "Failed" for a in inner) else "Succeeded"
             else:
                 status[name] = outcomes.get(name, "Succeeded")
-        parents = {n: [d["activity"] for d in self.activities[n]["dependsOn"]] for n in order}
 
         def evaluated(name):
             if status[name] != "Skipped":
                 return status[name] == "Succeeded"
             return all(evaluated(p) for p in parents[name])
 
-        leaves = [n for n in order if not any(n in parents[m] for m in order)]
+        leaves = [n for n in parents if not any(n in p for p in parents.values())]
         return status, all(evaluated(n) for n in leaves)
+
+    @staticmethod
+    def met(conditions, status):
+        return status in conditions or ("Completed" in conditions and status in {"Succeeded", "Failed"})
 
     def test_agent365_fallback_scenarios_follow_try_catch_semantics(self):
         cases = {
-            "disabled": ({}, False, "Skipped", "Succeeded", True),
-            "api succeeds": ({}, True, "Skipped", "Succeeded", True),
-            "api fails, csv lands": ({"Run_Agent365_Registry_Ingester": "Failed"}, True, "Succeeded", "Succeeded", True),
+            "disabled": ({}, set(), "Skipped", "Succeeded", True),
+            "api succeeds": ({}, {AGENT365}, "Skipped", "Succeeded", True),
+            "api fails, csv lands": (
+                {"Run_Agent365_Registry_Ingester": "Failed"}, {AGENT365}, "Succeeded", "Succeeded", True,
+            ),
             "api and csv fail": (
-                {"Run_Agent365_Registry_Ingester": "Failed", FALLBACK: "Failed"}, True, "Failed", "Skipped", False,
+                {"Run_Agent365_Registry_Ingester": "Failed", FALLBACK: "Failed"}, {AGENT365}, "Failed", "Skipped",
+                False,
             ),
         }
         for label, (outcomes, enabled, fallback, processor, pipeline_ok) in cases.items():
@@ -122,10 +147,16 @@ class PipelineTests(unittest.TestCase):
         for source in INPUTS:
             self.assertLess(order.index(source), order.index(PROCESSOR))
 
-    def test_ingestion_branches_remain_parallel_and_optional_defaults_unchanged(self):
-        for name, activity in self.activities.items():
-            if name not in {PROCESSOR, FALLBACK}:
-                self.assertEqual(activity["dependsOn"], [], name)
+    def test_loads_run_in_two_lanes_and_optional_defaults_unchanged(self):
+        # Lane 1 is the audit log then the processor; lane 2 is one load after another, so a small
+        # capacity never runs more than two notebooks at once.
+        starts = {name for name, activity in self.activities.items() if not activity["dependsOn"]}
+        self.assertEqual(starts, {"Run_Audit_Log_Ingester", "Run_Licensed_Users_Ingester"})
+        self.assertEqual(self.activities.keys(), starts | {PROCESSOR} | {step for step, _, _ in LANE_2})
+        for step, previous, conditions in LANE_2:
+            self.assertEqual(
+                self.activities[step]["dependsOn"], [{"activity": previous, "dependencyConditions": conditions}], step,
+            )
         self.assertEqual(
             {name: p["defaultValue"] for name, p in self.properties["parameters"].items()},
             {
@@ -137,6 +168,17 @@ class PipelineTests(unittest.TestCase):
                 "EnableAgent365": False,
             },
         )
+
+    def test_a_failed_optional_load_does_not_stop_the_rest_of_its_lane_or_the_processor(self):
+        optional = [step for step, _, _ in LANE_2 if self.activities[step]["type"] == "IfCondition"]
+        for index, step in enumerate(optional):
+            inner = self.activities[step]["typeProperties"]["ifTrueActivities"][0]["name"]
+            with self.subTest(step):
+                status, _ = self.simulate({inner: "Failed"}, set(optional))
+                self.assertEqual(status[step], "Failed")
+                for later in optional[index + 1:]:
+                    self.assertEqual(status[later], "Succeeded", later)
+                self.assertEqual(status[PROCESSOR], "Succeeded")
 
     def test_readme_documents_all_placeholders_and_refresh_handoff(self):
         readme = (PIPELINES / "README.md").read_text(encoding="utf-8")
