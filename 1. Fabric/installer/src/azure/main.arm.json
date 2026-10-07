@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.47.16.16243",
-      "templateHash": "18137643812249579333"
+      "templateHash": "13160135517887713590"
     }
   },
   "parameters": {
@@ -223,7 +223,8 @@
       "migrateJob": "[format('job-{0}-migrate', parameters('namePrefix'))]",
       "web": "[format('ca-{0}-web', parameters('namePrefix'))]"
     },
-    "privateRegistry": "[not(empty(parameters('imageRegistryResourceId')))]"
+    "privateRegistry": "[not(empty(parameters('imageRegistryResourceId')))]",
+    "registryIdParts": "[split(if(variables('privateRegistry'), parameters('imageRegistryResourceId'), format('{0}/providers/Microsoft.ContainerRegistry/registries/none', resourceGroup().id)), '/')]"
   },
   "resources": [
     {
@@ -993,8 +994,8 @@
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "[format('vl-acrpull-{0}', variables('suffix'))]",
-      "subscriptionId": "[split(parameters('imageRegistryResourceId'), '/')[2]]",
-      "resourceGroup": "[split(parameters('imageRegistryResourceId'), '/')[4]]",
+      "subscriptionId": "[variables('registryIdParts')[2]]",
+      "resourceGroup": "[variables('registryIdParts')[4]]",
       "properties": {
         "expressionEvaluationOptions": {
           "scope": "inner"
@@ -1002,7 +1003,7 @@
         "mode": "Incremental",
         "parameters": {
           "registryName": {
-            "value": "[last(split(parameters('imageRegistryResourceId'), '/'))]"
+            "value": "[last(variables('registryIdParts'))]"
           },
           "principalId": {
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'vl-identity'), '2025-04-01').outputs.principalId.value]"
@@ -1479,7 +1480,7 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', split(parameters('imageRegistryResourceId'), '/')[2], split(parameters('imageRegistryResourceId'), '/')[4]), 'Microsoft.Resources/deployments', format('vl-acrpull-{0}', variables('suffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('registryIdParts')[2], variables('registryIdParts')[4]), 'Microsoft.Resources/deployments', format('vl-acrpull-{0}', variables('suffix')))]",
         "[resourceId('Microsoft.Resources/deployments', 'vl-identity')]",
         "[resourceId('Microsoft.Resources/deployments', 'vl-monitoring')]",
         "[resourceId('Microsoft.Resources/deployments', 'vl-network')]",
