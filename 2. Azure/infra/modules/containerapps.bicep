@@ -15,6 +15,7 @@ param jobsImage string
 param webImage string
 param runSchedule string
 param runSteps string
+param sampleData bool = false
 param storageAccountName string
 param sqlServerFqdn string
 param sqlDatabaseName string
@@ -69,6 +70,7 @@ var jobEnv = concat(commonEnv, [
   { name: 'VALUELENS_AUDIT_HISTORY_DAYS', value: string(auditHistoryDays) }
   { name: 'VALUELENS_SQL_READER_NAME', value: sqlReaderName }
   { name: 'VALUELENS_SQL_READER_CLIENT_ID', value: sqlReaderClientId }
+  { name: 'VALUELENS_SAMPLE_DATA', value: sampleData ? 'true' : 'false' }
 ])
 var registries = empty(registryServer) ? [] : [{ server: registryServer, identity: identityId }]
 var identity = {

@@ -159,6 +159,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {Record<string, string>} [tags]
  * @property {'new' | 'existing'} [resourceGroupMode]
  * @property {boolean} [publicNetworkAccess]
+ * @property {boolean} [sampleData] Demo mode: the run job publishes the bundled synthetic sample instead of tenant data.
  * @property {'new' | 'existing'} [workspaceMode]
  * @property {string} [workspaceName]
  * @property {string} [imageTag]

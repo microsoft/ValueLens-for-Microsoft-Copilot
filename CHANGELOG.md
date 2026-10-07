@@ -35,6 +35,23 @@ Installer users get this in the next installer release.
 
 ---
 
+## 2026-10-07 — Analytics Hub installer 0.3.0: the Azure target, and demo mode
+
+This is the first release that can install Analytics Hub in **your own Azure subscription**
+instead of Fabric (preview, see [2. Azure](2.%20Azure/README.md)). Pick **Your Azure subscription**
+as the first wizard answer. The tag also publishes the `valuelens-jobs` and `valuelens-web`
+images to `ghcr.io/microsoft` with the same version, which the Azure install pulls.
+
+- **Demo mode (sample data).** After the data tick boxes, the Azure wizard asks whether the
+  dashboard shows your tenant's data or a synthetic sample. Demo mode deploys everything as usual,
+  but each run publishes the sample bundled in the jobs image, moved forward to end last week.
+  Run the installer again and pick your tenant's data to switch.
+- The Fabric App's page canvas has one scrollbar instead of two (#125), for both targets.
+
+To update a Fabric install, download the installer again, open it and choose **Repair or change**.
+
+---
+
 ## 2026-10-07 — Paths renumbered: Azure second
 
 The Azure path (preview) joins the numbered paths, second after Fabric, because it's the other
