@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { isConnectionConfigured, type ModelReferences } from "@/lib/connections";
 import type { FilterKey } from "@/lib/filters";
+import { isAbsent, type SourceAvailability } from "@/lib/optional-sources";
 import { consumptionConnection, evaluatorConnection } from "@/queries/shared";
 
 /**
@@ -31,6 +32,9 @@ import { consumptionConnection, evaluatorConnection } from "@/queries/shared";
  * come from their own reports, Consumption Central and Agent Evaluator, and
  * bring their own slicers, so they take none of the filter bar's. Their
  * `connection` is optional: without it in `fabric.yaml` they are left out.
+ * A destination with a `source` reads an optional module of the ValueLens
+ * model, and is left out once the app has checked that source has no data;
+ * a stage with one keeps its place but goes by `labelWithout`.
  *
  * A stage that is not built yet stays listed so the shape of the destination
  * is visible; a destination is reachable once any of its stages is built.
@@ -78,7 +82,13 @@ export const destinations = [
         filters: ["dateRange", "organizations", "licence", "audience", "agentTypes", "agentNames"] as FilterKey[],
         stages: [
             { id: "leaderboard", label: "Leaderboard", ready: true },
-            { id: "agent-registry", label: "Agent registry", ready: true },
+            {
+                id: "agent-registry",
+                label: "Agent registry",
+                ready: true,
+                source: "agentRegistry",
+                labelWithout: "Agents",
+            },
         ],
     },
     {
@@ -87,6 +97,7 @@ export const destinations = [
         blurb: "How people work across Microsoft 365, and where Copilot fits",
         icon: Briefcase as LucideIcon,
         filters: ["dateRange", "organizations"] as FilterKey[],
+        source: "m365Activity",
         stages: [
             { id: "m365-activity", label: "Microsoft 365 activity", ready: true },
             { id: "m365-suite", label: "Apps and devices", ready: true },
@@ -160,6 +171,7 @@ export const destinations = [
         blurb: "What people say about it",
         icon: MessageSquareQuote as LucideIcon,
         filters: ["dateRange"] as FilterKey[],
+        source: "productFeedback",
         stages: [{ id: "feedback", label: "Feedback", ready: true }],
     },
     {
@@ -187,7 +199,8 @@ export const destinations = [
 
 export type Destination = (typeof destinations)[number];
 export type DestinationId = Destination["id"];
-export type StageId = Destination["stages"][number]["id"];
+export type Stage = Destination["stages"][number];
+export type StageId = Stage["id"];
 
 /** A destination is reachable once any of its stages is built. */
 export function isDestinationReady(destination: Destination): boolean {
@@ -199,11 +212,21 @@ export function isReference(destination: Destination): boolean {
     return "reference" in destination && destination.reference;
 }
 
-/** Every destination except those reading a model `fabric.yaml` doesn't set up. */
-export function availableDestinations(models: ModelReferences): Destination[] {
+/**
+ * Every destination except those reading a model `fabric.yaml` doesn't set
+ * up, and, once `sources` has been checked, those whose source has no data.
+ */
+export function availableDestinations(models: ModelReferences, sources?: SourceAvailability): Destination[] {
     return destinations.filter(
-        (destination) => !("connection" in destination) || isConnectionConfigured(models, destination.connection),
+        (destination) =>
+            (!("connection" in destination) || isConnectionConfigured(models, destination.connection)) &&
+            (!sources || !("source" in destination) || !isAbsent(sources, destination.source)),
     );
+}
+
+/** A stage reading an optional source goes by its plainer name when that source has no data. */
+export function stageLabel(stage: Stage, sources: SourceAvailability): string {
+    return "source" in stage && isAbsent(sources, stage.source) ? stage.labelWithout : stage.label;
 }
 
 /** The DOM id a stage's section carries, so the sidebar can scroll to it. */

@@ -15,10 +15,12 @@ import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";
+import { useSourceAvailability } from "@/hooks/source-availability.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import type { FilterKey } from "@/lib/filters";
 import { formatKpi } from "@/lib/format-kpi";
 import { heatDomain, heatRenderer } from "@/lib/heat";
+import { isAbsent } from "@/lib/optional-sources";
 import { prefersReducedMotion } from "@/lib/scroll-to-anchor";
 import { readNumber, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
@@ -68,6 +70,12 @@ function linkageMessage(linkage: RegistryLinkage): string | undefined {
 }
 
 const IN_REGISTRY = "In Registry";
+
+/** Leaderboard columns only the Agent 365 registry fills in. */
+const REGISTRY_COLUMNS: ReadonlySet<string> = new Set(["Creator", "Available In", "Lifecycle", "Adoption"]);
+
+/** Stands in for a registry query the stage skips when there is no registry. */
+const SKIPPED = { connection: "", query: "" };
 
 const dayFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
@@ -319,7 +327,7 @@ function AgentDetail({ entries, selected, onSelect, ref }: AgentDetailProps) {
  * registry's agents alongside the ones only the audit log names, with the
  * detail card for whichever agent is selected.
  */
-function AgentLeaderboard() {
+function AgentLeaderboard({ registry }: { registry: boolean }) {
     const { theme } = useThemeContext();
     const board = agentLeaderboard();
     const result = useFilteredQuery(board);
@@ -344,7 +352,7 @@ function AgentLeaderboard() {
 
     const columns: GridColumnDef[] = useMemo(() => {
         const usersCell = heatRenderer({ domain: usersDomain, format: formatCell("whole") });
-        return [
+        const all: GridColumnDef[] = [
             {
                 id: "Agent",
                 header: "Agent",
@@ -423,7 +431,8 @@ function AgentLeaderboard() {
             { id: "Lifecycle", header: "Lifecycle stage", width: 210 },
             { id: "Adoption", header: "Adoption", width: 170 },
         ];
-    }, [selected?.key, usersDomain]);
+        return registry ? all : all.filter((column) => !REGISTRY_COLUMNS.has(column.id));
+    }, [selected?.key, usersDomain, registry]);
 
     /** Selects the agent whose row holds `target`; false when `target` isn't in a body row. */
     const pick = (target: EventTarget): boolean => {
@@ -458,7 +467,11 @@ function AgentLeaderboard() {
             <QueryEmpty
                 className="h-[600px]"
                 title="No agents to rank"
-                description="Neither the registry nor the audit log has an agent in this selection. Clear a filter, or check that the registry ingestion has run."
+                description={
+                    registry
+                        ? "Neither the registry nor the audit log has an agent in this selection. Clear a filter, or check that the registry ingestion has run."
+                        : "The audit log has no agent use in this selection. Clear a filter to widen it."
+                }
             />
         );
     }
@@ -483,9 +496,10 @@ function AgentLeaderboard() {
                     theme={theme}
                     header={{
                         title: "Agent leaderboard",
-                        subtitle:
-                            `${formatKpi(inUse, "whole")} in use, ${formatKpi(registered, "whole")} ` +
-                            `registered. Select an agent to see its description.`,
+                        subtitle: registry
+                            ? `${formatKpi(inUse, "whole")} in use, ${formatKpi(registered, "whole")} ` +
+                              `registered. Select an agent to see its description.`
+                            : `${formatKpi(inUse, "whole")} in use. Select an agent to see its details.`,
                     }}
                 />
             </div>
@@ -507,15 +521,16 @@ function AgentLeaderboard() {
  */
 export function AgentRegistryStage() {
     const { theme } = useThemeContext();
+    const registry = !isAbsent(useSourceAvailability(), "agentRegistry");
 
     const activity = useFilteredQuery(agentActivitySummary());
-    const estate = useFilteredQuery(agentEstateSummary(), { ignore: CATALOGUE_IGNORES });
+    const estate = useFilteredQuery(registry ? agentEstateSummary() : SKIPPED, { ignore: CATALOGUE_IGNORES });
 
     const usage = agentUsage();
     const usageResult = useFilteredQuery({ connection: usage.connection, query: usage.query });
     const lifecycle = agentLifecycle();
     const lifecycleResult = useFilteredQuery(
-        { connection: lifecycle.connection, query: lifecycle.query },
+        registry ? { connection: lifecycle.connection, query: lifecycle.query } : SKIPPED,
         { ignore: CATALOGUE_IGNORES },
     );
 
@@ -542,32 +557,38 @@ export function AgentRegistryStage() {
         [lifecycleResult.data, lifecycle.columnMetadata],
     );
 
-    const message = linkageMessage(describeRegistryLinkage(estateRow));
+    const message = registry ? linkageMessage(describeRegistryLinkage(estateRow)) : undefined;
 
     const summaryError =
         activity.data?.status === "error"
             ? { message: activity.data.error.message, retry: activity.refetch }
-            : estate.data?.status === "error"
+            : registry && estate.data?.status === "error"
               ? { message: estate.data.error.message, retry: estate.refetch }
               : undefined;
-    const summaryLoading = activity.isLoading || !activity.data || estate.isLoading || !estate.data;
+    const summaryLoading =
+        activity.isLoading || !activity.data || (registry && (estate.isLoading || !estate.data));
+    const kpiGrid = cn("grid gap-300", registry ? "md:grid-cols-3" : "md:grid-cols-2");
 
     return (
         <Section
             id={stageAnchor("agent-registry")}
-            title="Agent registry"
-            description="Which agents people actually use, where every registered agent sits in its lifecycle, and what each one is for."
+            title={registry ? "Agent registry" : "Agents"}
+            description={
+                registry
+                    ? "Which agents people actually use, where every registered agent sits in its lifecycle, and what each one is for."
+                    : "Which agents people actually use, and whether they come back to them."
+            }
         >
             {summaryError ? (
                 <QueryError message={summaryError.message} onRetry={summaryError.retry} />
             ) : summaryLoading ? (
-                <div className="grid gap-300 md:grid-cols-3">
-                    <QueryLoading />
-                    <QueryLoading />
-                    <QueryLoading />
+                <div className={kpiGrid}>
+                    {Array.from({ length: registry ? 3 : 2 }, (_, index) => (
+                        <QueryLoading key={index} />
+                    ))}
                 </div>
             ) : (
-                <div className="grid gap-300 md:grid-cols-3">
+                <div className={kpiGrid}>
                     <KpiCard
                         label="Agent users"
                         value={readNumber(activityRow, "[Agent Users]")}
@@ -598,16 +619,18 @@ export function AgentRegistryStage() {
                             </div>
                         }
                     />
-                    <KpiCard
-                        label="Registered agents"
-                        value={readNumber(estateRow, "[Registry Agents]")}
-                        detail={
-                            <div className="flex flex-col gap-100">
-                                <KpiStat label="Built in this tenant" value={readNumber(estateRow, "[Tenant Built]")} />
-                                <KpiStat label="Seen in use" value={readNumber(estateRow, "[Seen In Use]")} />
-                            </div>
-                        }
-                    />
+                    {registry && (
+                        <KpiCard
+                            label="Registered agents"
+                            value={readNumber(estateRow, "[Registry Agents]")}
+                            detail={
+                                <div className="flex flex-col gap-100">
+                                    <KpiStat label="Built in this tenant" value={readNumber(estateRow, "[Tenant Built]")} />
+                                    <KpiStat label="Seen in use" value={readNumber(estateRow, "[Seen In Use]")} />
+                                </div>
+                            }
+                        />
+                    )}
                 </div>
             )}
 
@@ -618,14 +641,16 @@ export function AgentRegistryStage() {
                 </p>
             )}
 
-            <FilterNote
-                ignored={CATALOGUE_IGNORES}
-                reason="the lifecycle chart and the registered-agent count always cover every registered agent, used or not. The agent leaderboard follows every filter for usage and still lists the agents nobody used."
-            />
+            {registry && (
+                <FilterNote
+                    ignored={CATALOGUE_IGNORES}
+                    reason="the lifecycle chart and the registered-agent count always cover every registered agent, used or not. The agent leaderboard follows every filter for usage and still lists the agents nobody used."
+                />
+            )}
 
             {/* grid-cols-1 caps the stacked track at the column width, so a chart
                 drawn wider (before the window narrowed) can shrink back. */}
-            <div className="grid grid-cols-1 gap-400 xl:grid-cols-2">
+            <div className={cn("grid grid-cols-1 gap-400", registry && "xl:grid-cols-2")}>
                 <div className="h-[420px]">
                     {usageResult.data?.status === "error" ? (
                         <QueryError
@@ -654,37 +679,39 @@ export function AgentRegistryStage() {
                     )}
                 </div>
 
-                <div className="h-[420px]">
-                    {lifecycleResult.data?.status === "error" ? (
-                        <QueryError
-                            className="h-full"
-                            message={lifecycleResult.data.error.message}
-                            onRetry={lifecycleResult.refetch}
-                        />
-                    ) : lifecycleResult.isLoading || !lifecycleTable ? (
-                        <QueryLoading className="h-full" />
-                    ) : lifecycleTable.rows.length === 0 ? (
-                        <QueryEmpty
-                            className="h-full"
-                            title="The registry is empty"
-                            description="No agents were loaded from the Agent 365 registry. Check that the registry ingestion has run."
-                        />
-                    ) : (
-                        <VegaVisual
-                            spec={lifecycle.vegaLiteSpec}
-                            data={lifecycleTable}
-                            theme={theme}
-                            capabilities={lifecycle.capabilities}
-                            header={{
-                                title: "Registry by lifecycle",
-                                subtitle: "Registered agents at each stage, by who built them",
-                            }}
-                        />
-                    )}
-                </div>
+                {registry && (
+                    <div className="h-[420px]">
+                        {lifecycleResult.data?.status === "error" ? (
+                            <QueryError
+                                className="h-full"
+                                message={lifecycleResult.data.error.message}
+                                onRetry={lifecycleResult.refetch}
+                            />
+                        ) : lifecycleResult.isLoading || !lifecycleTable ? (
+                            <QueryLoading className="h-full" />
+                        ) : lifecycleTable.rows.length === 0 ? (
+                            <QueryEmpty
+                                className="h-full"
+                                title="The registry is empty"
+                                description="No agents were loaded from the Agent 365 registry. Check that the registry ingestion has run."
+                            />
+                        ) : (
+                            <VegaVisual
+                                spec={lifecycle.vegaLiteSpec}
+                                data={lifecycleTable}
+                                theme={theme}
+                                capabilities={lifecycle.capabilities}
+                                header={{
+                                    title: "Registry by lifecycle",
+                                    subtitle: "Registered agents at each stage, by who built them",
+                                }}
+                            />
+                        )}
+                    </div>
+                )}
             </div>
 
-            <AgentLeaderboard />
+            <AgentLeaderboard registry={registry} />
         </Section>
     );
 }

@@ -8,6 +8,7 @@
 import { createContext, useContext } from "react";
 import { availableDestinations, type DestinationId, type StageId } from "@/components/destinations";
 import { runtimeConfig } from "@/lib/runtime-config";
+import { useSourceAvailability } from "./source-availability.context";
 
 interface NavigationContextValue {
     /** Opens a destination, then brings one of its stages into view once it has rendered. */
@@ -21,19 +22,16 @@ export function useNavigation(): NavigationContextValue | undefined {
     return useContext(NavigationContext);
 }
 
-let installed: ReadonlySet<string> | undefined;
-
-function installedDestinations(): ReadonlySet<string> {
-    installed ??= new Set(availableDestinations(runtimeConfig().semanticModels).map((destination) => destination.id));
-    return installed;
-}
-
 /**
  * Opens `destination`, at one of its stages if given. Undefined outside the
- * app shell, or when this install doesn't have that destination.
+ * app shell, when this install doesn't have that destination, or when its
+ * source turned out to have no data.
  */
 export function useOpenDestination(destination: DestinationId): ((stage?: StageId) => void) | undefined {
     const navigation = useNavigation();
-    if (!navigation || !installedDestinations().has(destination)) return undefined;
+    const sources = useSourceAvailability();
+    if (!navigation) return undefined;
+    const shown = availableDestinations(runtimeConfig().semanticModels, sources).some(({ id }) => id === destination);
+    if (!shown) return undefined;
     return (stage) => navigation.navigate(destination, stage);
 }

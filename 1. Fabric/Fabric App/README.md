@@ -36,6 +36,13 @@ From this folder (`1. Fabric/Fabric App`):
 
 To update it, run `npx rayfin up` again.
 
+The app also leaves out pages and sections whose optional data hasn't arrived. When it opens, it
+counts the rows in the ValueLens model's optional sources (unfiltered). **Feedback** needs
+`ProductFeedback` and **Work patterns** needs `M365 Activity`. Without registry data, the **Agent
+registry** section becomes **Agents**: it keeps the agent usage and drops the registry columns and
+lifecycle chart. Everything shows while the check runs, or if it fails, and a page comes back on
+the next open once its data loads.
+
 ## Settings in the app
 
 Anyone who can open the app can change these, and the change applies for everyone. Share the item

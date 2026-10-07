@@ -6,8 +6,9 @@
 //-----------------------------------------------------------------------
 
 import { describe, expect, it } from "vitest";
-import { availableDestinations } from "@/components/destinations";
+import { availableDestinations, destinations, stageLabel, type Stage } from "@/components/destinations";
 import { isConnectionConfigured, type ModelReferences } from "./connections";
+import { ALL_UNKNOWN, type SourceAvailability } from "./optional-sources";
 
 const WORKSPACE = "11111111-2222-3333-4444-555555555555";
 const ITEM = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
@@ -53,5 +54,32 @@ describe("availableDestinations", () => {
         const withEvaluator = { ...valuelensOnly, ae: { workspaceId: WORKSPACE, itemId: ITEM } };
         expect(ids(withEvaluator)).toContain("agent-evaluation");
         expect(ids(withEvaluator)).not.toContain("consumption");
+    });
+
+    it("leaves out a page only once its source is confirmed empty", () => {
+        const withSources = (sources: SourceAvailability) =>
+            availableDestinations(valuelensOnly, sources).map((destination) => destination.id);
+        const empty = { m365Activity: "absent", productFeedback: "absent", agentRegistry: "absent" } as const;
+
+        expect(withSources(empty)).not.toContain("feedback");
+        expect(withSources(empty)).not.toContain("work-patterns");
+        expect(withSources(empty)).toContain("leaderboards");
+        expect(withSources({ ...empty, productFeedback: "present" })).toContain("feedback");
+        expect(withSources({ ...empty, productFeedback: "checking" })).toContain("feedback");
+        expect(withSources({ ...empty, productFeedback: "unknown" })).toContain("feedback");
+        expect(withSources(ALL_UNKNOWN)).toEqual(ids(valuelensOnly));
+    });
+});
+
+describe("stageLabel", () => {
+    const registryStage = destinations
+        .flatMap((destination): readonly Stage[] => destination.stages)
+        .find((stage) => stage.id === "agent-registry");
+
+    it("renames the Agent registry stage when there's no registry", () => {
+        expect(registryStage).toBeDefined();
+        if (!registryStage) return;
+        expect(stageLabel(registryStage, ALL_UNKNOWN)).toBe(registryStage.label);
+        expect(stageLabel(registryStage, { ...ALL_UNKNOWN, agentRegistry: "absent" })).toBe("Agents");
     });
 });
