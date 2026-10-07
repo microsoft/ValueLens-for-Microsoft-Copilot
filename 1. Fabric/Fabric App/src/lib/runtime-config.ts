@@ -6,20 +6,32 @@
 //-----------------------------------------------------------------------
 
 import { resolveRayfinConfig, type RayfinRuntimeConfig } from "@microsoft/rayfin-client";
+import * as teams from "@microsoft/teams-js";
 import { fabricConfig } from "@/fabric.generated";
 import type { ModelReference, ModelReferences } from "@/lib/connections";
 
-/** Where an install puts the semantic models it set up, next to the `rayfin.config.json` that `rayfin up` writes. */
+/** Where an Azure install puts the host contract, next to the SPA. */
+export const APP_CONFIG_PATH = "/app.config.json";
+/** Where a Fabric install puts the semantic models it set up, next to the `rayfin.config.json` that `rayfin up` writes. */
 export const FABRIC_CONFIG_PATH = "/fabric.config.json";
 
-/**
- * What the app connects to. A developer build bakes these in from `.env.local` and
- * `fabric.yaml`; the prebuilt bundle the installer ships has neither, so it reads
- * them from the files deployed next to it instead.
- */
+export type RuntimeHost = "fabric" | "azure";
+
+export interface AzureRuntimeConfig {
+    tenantId: string;
+    clientId: string;
+    apiScope: string;
+    version?: string;
+    inTeams: boolean;
+}
+
 export interface RuntimeConfig {
-    /** The Rayfin backend and the Fabric item that hosts the app. */
+    /** The host that supplies auth, query transport and app settings. */
+    host: RuntimeHost;
+    /** The Rayfin backend and the Fabric item that hosts the app. Fabric-only. */
     rayfin: RayfinRuntimeConfig;
+    /** Azure auth and host settings. Azure-only. */
+    azure?: AzureRuntimeConfig;
     /** The semantic models each page queries, by connection alias. */
     semanticModels: ModelReferences;
 }
@@ -36,6 +48,7 @@ let loaded: RuntimeConfig | undefined;
 /** The values baked in at build time. */
 export function buildTimeConfig(): RuntimeConfig {
     return {
+        host: "fabric",
         rayfin: {
             apiUrl: import.meta.env.VITE_RAYFIN_API_URL || undefined,
             publishableKey: import.meta.env.VITE_RAYFIN_PUBLISHABLE_KEY || undefined,
@@ -48,22 +61,31 @@ export function buildTimeConfig(): RuntimeConfig {
     };
 }
 
-/** The config {@link loadRuntimeConfig} settled on, or the build-time values before it has run. */
+/** The config loadRuntimeConfig settled on, or the build-time values before it has run. */
 export function runtimeConfig(): RuntimeConfig {
     return loaded ?? buildTimeConfig();
 }
 
-/**
- * Reads the deployed config files over the build-time values. Runs once, before the
- * app renders, so everything after it can read {@link runtimeConfig} synchronously.
- */
+/** Reads deployed host config over build-time defaults. */
 export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
     const defaults = buildTimeConfig();
+    const azure = await loadAzureConfig(APP_CONFIG_PATH);
+    if (azure) {
+        loaded = {
+            ...defaults,
+            host: "azure",
+            azure: { ...azure.azure!, inTeams: azure.azure!.inTeams || await detectTeams() },
+            semanticModels: azure.semanticModels,
+        };
+        return loaded;
+    }
+
     const [rayfin, semanticModels] = await Promise.all([
         resolveRayfinConfig(defaults.rayfin),
         loadSemanticModels(FABRIC_CONFIG_PATH),
     ]);
     loaded = {
+        host: "fabric",
         rayfin: rayfin.runtimeConfig,
         semanticModels: semanticModels ?? defaults.semanticModels,
     };
@@ -75,12 +97,34 @@ export function resetRuntimeConfig(): void {
     loaded = undefined;
 }
 
-/**
- * The semantic models in a deployed `fabric.config.json`, or `null` when there isn't one.
- * A developer deploy doesn't write the file, and hosts answer a missing file with a 404
- * or the app's own page, so both mean "use the build's models". Anything else that stops
- * the file loading is an error: falling back would quietly show the wrong tenant's data.
- */
+/** The Azure host config, or null when this is not an Azure-hosted install. */
+export async function loadAzureConfig(path = APP_CONFIG_PATH): Promise<RuntimeConfig | null> {
+    let response: Response;
+    try {
+        response = await fetch(path, { cache: "no-store" });
+    } catch (error) {
+        throw new RuntimeConfigError(`Couldn't load ${path}: ${error instanceof Error ? error.message : String(error)}.`);
+    }
+
+    if (response.status === 404)
+        return null;
+    if (!response.ok)
+        throw new RuntimeConfigError(`Couldn't load ${path}: ${response.status} ${response.statusText}.`);
+
+    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+    const body = (await response.text()).trimStart();
+    if (contentType.includes("html") || body.startsWith("<"))
+        return null;
+
+    let json: unknown;
+    try {
+        json = JSON.parse(body);
+    } catch {
+        throw new RuntimeConfigError(`${path} isn't valid JSON.`);
+    }
+    return parseAzureConfig(json, path);
+}
+
 export async function loadSemanticModels(path = FABRIC_CONFIG_PATH): Promise<ModelReferences | null> {
     let response: Response;
     try {
@@ -108,7 +152,28 @@ export async function loadSemanticModels(path = FABRIC_CONFIG_PATH): Promise<Mod
     return parseSemanticModels(json, path);
 }
 
-/** Checks a `fabric.config.json` body has the `{ semanticModels: { alias: { workspaceId, itemId } } }` shape. */
+/** Checks an Azure app.config.json body has the host contract shape. */
+export function parseAzureConfig(json: unknown, path = APP_CONFIG_PATH): RuntimeConfig {
+    if (!isRecord(json) || json.host !== "azure")
+        throw new RuntimeConfigError(`${path} needs host: "azure".`);
+    const { tenantId, clientId, apiScope, version } = json;
+    if (typeof tenantId !== "string" || typeof clientId !== "string" || typeof apiScope !== "string")
+        throw new RuntimeConfigError(`${path} needs tenantId, clientId and apiScope.`);
+    return {
+        ...buildTimeConfig(),
+        host: "azure",
+        azure: {
+            tenantId,
+            clientId,
+            apiScope,
+            version: typeof version === "string" ? version : undefined,
+            inTeams: queryRequestsTeams(),
+        },
+        semanticModels: parseSemanticModels(json, path),
+    };
+}
+
+/** Checks a config body has the `{ semanticModels: { alias: { workspaceId, itemId } } }` shape. */
 export function parseSemanticModels(json: unknown, path = FABRIC_CONFIG_PATH): ModelReferences {
     const models = isRecord(json) ? json.semanticModels : undefined;
     if (!isRecord(models))
@@ -121,6 +186,21 @@ export function parseSemanticModels(json: unknown, path = FABRIC_CONFIG_PATH): M
         parsed[alias] = { workspaceId: model.workspaceId, itemId: model.itemId };
     }
     return parsed;
+}
+
+function queryRequestsTeams(): boolean {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("host")?.toLowerCase() === "teams";
+}
+
+async function detectTeams(): Promise<boolean> {
+    if (queryRequestsTeams()) return true;
+    try {
+        await teams.app.initialize();
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

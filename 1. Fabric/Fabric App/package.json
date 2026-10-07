@@ -19,6 +19,7 @@
     "test:fabric": "node scripts/open-fabric-portal.mjs"
   },
   "dependencies": {
+    "@azure/msal-browser": "^5.24.0",
     "@microsoft/fabric-app-data": "1.1.0",
     "@microsoft/fabric-app-data-embed-client": "1.0.0",
     "@microsoft/fabric-app-data-proxy": "1.0.0",
@@ -31,6 +32,7 @@
     "@microsoft/rayfin-core": "^1.35.1",
     "@microsoft/rayfin-data": "^1.35.1",
     "@microsoft/rayfin-lib": "^1.35.1",
+    "@microsoft/teams-js": "^2.57.0",
     "@tailwindcss/vite": "^4.3.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",

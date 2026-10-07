@@ -91,12 +91,19 @@ const COMMANDS = {
     desc: 'Send CSV exports from the admin centers to the Lakehouse drop folder. The next pipeline run loads them.',
     off: 'No source is set to Upload CSV. Choose Repair or change set-up to change that.',
   },
+  uninstall: {
+    title: 'Uninstall Analytics Hub', short: 'Uninstall', icon: 'x', section: 'Uninstall', adopt: true,
+    row: 'Uninstall', button: 'Uninstall',
+    desc: 'Azure target only: delete the resource group the installer created, or only tagged resources in an existing group.',
+    off: 'Only available for Azure installations.',
+  },
 };
-const ROW_ORDER = ['run', 'rerun-failed', 'refresh', 'status', 'upload', 'check', 'update', 'deploy-app', 'rotate-secret', 'install'];
+const ROW_ORDER = ['run', 'rerun-failed', 'refresh', 'status', 'upload', 'check', 'update', 'deploy-app', 'rotate-secret', 'uninstall', 'install'];
 
 const INSTALL_STAGES = [
   'Sign in', 'Checking your tenant', 'Data sources', 'Power BI', 'Fabric', 'App registration',
   'Key Vault for the app secret', 'Schedule', 'Ready to set up', 'Setting up', 'Done',
+  'Where should Analytics Hub run?', 'Azure', 'Checking Azure',
 ];
 const DONE_HEADINGS = new Set(['Analytics Hub is set up', 'Connect Power BI']);
 

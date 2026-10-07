@@ -19,9 +19,67 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install test runner
-        run: python -m pip install pytest==9.1.1
+        run: python -m pip install pytest==9.1.1 duckdb==1.5.5
       - name: Verify PowerShell 7 is available
         run: pwsh -NoProfile -NonInteractive -Command 'if ($PSVersionTable.PSVersion.Major -lt 7) { throw "PowerShell 7 is required" }'
       - name: Run offline regression tests
         # PySpark/Java are optional: the existing local-Spark check skips without them.
         run: python -B -m pytest tests -q -ra
+
+  installer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: '1. Fabric/installer'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      # The lock files may resolve through Microsoft's internal mirror of npm, which runners can't reach.
+      - name: Use the public npm registry
+        run: node packaging/public-registry.js package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run typecheck
+
+  valuelens-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Use the public npm registry
+        run: node "1. Fabric/installer/packaging/public-registry.js" "5. Azure/web/package-lock.json"
+      - name: Install and test
+        working-directory: '5. Azure/web'
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+
+  arm-drift:
+    # The installer ships a compiled copy of 5. Azure/infra; it must match the Bicep source.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build the Bicep template
+        run: |
+          az bicep install
+          az bicep build --file "5. Azure/infra/main.bicep" --outfile "${{ runner.temp }}/main.arm.json"
+      - name: Compare with the installer's copy
+        shell: python
+        run: |
+          import json, os, sys
+          def load(p):
+              d = json.load(open(p, encoding="utf-8"))
+              d.get("metadata", {}).pop("_generator", None)
+              return d
+          built = load(os.path.join(os.environ["RUNNER_TEMP"], "main.arm.json"))
+          shipped = load("1. Fabric/installer/src/azure/main.arm.json")
+          if built != shipped:
+              sys.exit("1. Fabric/installer/src/azure/main.arm.json is out of date: rebuild it from 5. Azure/infra/main.bicep.")
+          print("ARM template matches the Bicep source.")

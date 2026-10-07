@@ -7,7 +7,7 @@
 
 import { useId, useMemo, type ComponentProps, type ReactNode } from "react";
 import { DataGrid, type GridColumnDef, type Row } from "@microsoft/fabric-datagrid";
-import { VegaVisual, type VisualizationSpec } from "@microsoft/fabric-visuals";
+import { VegaVisual, type VisualizationSpec } from "@/components/vega-visual";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { TreeFrame } from "@/components/tree-frame";

@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { useMemo } from "react";
-import { VegaVisual } from "@microsoft/fabric-visuals";
+import { VegaVisual } from "@/components/vega-visual";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";

@@ -13,6 +13,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
 /**
  * @typedef {object} InstallConfig
  * @property {number} version
+ * @property {'fabric' | 'azure'} [target]
  * @property {string} [tenantId]
  * @property {import('./catalog.js').ModuleChoice} modules  Follows `dataSources`.
  * @property {import('./uploads.js').DataSourceModes} dataSources  How each source arrives: API, uploaded CSV, or skipped.
@@ -25,6 +26,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {{ jobId?: string, status?: string, startedAt?: string, finishedAt?: string }} [firstRun]
  * @property {SemanticModelConfig} semanticModel
  * @property {FabricAppConfig} fabricApp
+ * @property {AzureConfig} [azure]
  * @property {ConsumptionConfig} consumption
  * @property {AgentEvaluatorConfig} agentEvaluator
  */
@@ -130,6 +132,38 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {{ deployments: any, env?: string }} [rayfin]  Rayfin's `.deployments.json` and `.env` for the prebuilt app, which each installer version unpacks afresh.
  */
 
+/**
+ * Azure target state. It holds choices and created resource IDs, but never secrets.
+ * @typedef {object} AzureConfig
+ * @property {string} [tenantId]
+ * @property {string} [subscriptionId]
+ * @property {string} [subscriptionName]
+ * @property {string} [resourceGroup]
+ * @property {boolean} [createdResourceGroup]
+ * @property {string} [location]
+ * @property {string} [sqlLocation] Region for Azure SQL when it differs from location (regional SQL capacity).
+ * @property {string} [namePrefix]
+ * @property {string} [installId]
+ * @property {Record<string, string>} [tags]
+ * @property {'new' | 'existing'} [resourceGroupMode]
+ * @property {boolean} [publicNetworkAccess]
+ * @property {'new' | 'existing'} [workspaceMode]
+ * @property {string} [workspaceName]
+ * @property {string} [imageTag]
+ * @property {{ registry?: string, registryResourceId?: string, tag?: string }} [images] Optional image source override:
+ *   a private registry (e.g. `myacr.azurecr.io/valuelens`), its ARM resource ID for AcrPull, and a pinned tag.
+ * @property {any[]} [deployments]
+ * @property {Record<string, any>} [outputs]
+ * @property {{ clientId?: string, objectId?: string, servicePrincipalId?: string, created?: boolean, appIdUri?: string }} [webApp]
+ * @property {{ clientId?: string, objectId?: string, servicePrincipalId?: string, secretKeyId?: string, secretExpiry?: string, created?: boolean }} [sqlReader]
+ * @property {{ workspaceId?: string, createdWorkspace?: boolean, datasetId?: string, capacityId?: string, gatewayId?: string, createdGateway?: boolean, connectionId?: string }} [powerBi]
+ *   `capacityId` hosts the workspace (semantic model definition APIs need a Fabric/Premium capacity) and, in private
+ *   networking mode, the VNet data gateway `gatewayId` whose SQL connection `connectionId` the model is bound to.
+ * @property {{ assigned: string[], pending: string[] }} [graphRoles]
+ * @property {string} [teamsPackage]
+ * @property {{ whatIf?: any[], pendingAdminActions?: string[], lastRun?: any, lastMigrate?: any }} [status]
+ */
+
 // Names for items a new install creates. An existing install keeps the names saved in its record.
 export const MODEL_NAME = 'Analytics Hub Model';
 export const CONSUMPTION_MODEL_NAME = 'Analytics Hub Consumption Model';
@@ -139,6 +173,7 @@ export const AGENT_EVALUATOR_MODEL_NAME = 'Analytics Hub Agent Evaluator Model';
 export function emptyConfig() {
   return {
     version: CONFIG_VERSION,
+    target: 'fabric',
     modules: normaliseModules(undefined),
     dataSources: normaliseDataSources(undefined, normaliseModules(undefined)),
     uploads: {},
@@ -149,6 +184,7 @@ export function emptyConfig() {
     fabric: { notebooks: {} },
     semanticModel: { name: MODEL_NAME },
     fabricApp: {},
+    azure: { tags: {}, deployments: [], outputs: {}, graphRoles: { assigned: [], pending: [] }, publicNetworkAccess: true, namePrefix: 'vlens' },
     consumption: { model: { name: CONSUMPTION_MODEL_NAME } },
     agentEvaluator: { environments: [], model: { name: AGENT_EVALUATOR_MODEL_NAME } },
   };
@@ -173,6 +209,7 @@ export function loadConfig(file) {
   const config = {
     ...base,
     ...raw,
+    target: raw.target ?? 'fabric',
     modules: normaliseModules(raw.modules),
     dataSources: normaliseDataSources(raw.dataSources, normaliseModules(raw.modules), raw.consumption),
     uploads: { ...(raw.uploads ?? {}) },
@@ -183,6 +220,18 @@ export function loadConfig(file) {
     fabric: { ...base.fabric, ...(raw.fabric ?? {}), notebooks: { ...(raw.fabric?.notebooks ?? {}) } },
     semanticModel: { ...base.semanticModel, ...(raw.semanticModel ?? {}) },
     fabricApp: { ...(raw.fabricApp ?? {}) },
+    azure: {
+      ...base.azure,
+      ...(raw.azure ?? {}),
+      tags: { ...(raw.azure?.tags ?? {}) },
+      deployments: [...(raw.azure?.deployments ?? [])],
+      outputs: { ...(raw.azure?.outputs ?? {}) },
+      ...(raw.azure?.webApp ? { webApp: { ...raw.azure.webApp } } : {}),
+      ...(raw.azure?.sqlReader ? { sqlReader: { ...raw.azure.sqlReader } } : {}),
+      ...(raw.azure?.powerBi ? { powerBi: { ...raw.azure.powerBi } } : {}),
+      graphRoles: { assigned: [...(raw.azure?.graphRoles?.assigned ?? [])], pending: [...(raw.azure?.graphRoles?.pending ?? [])] },
+      ...(raw.azure?.status ? { status: { ...raw.azure.status } } : {}),
+    },
     consumption: { ...(raw.consumption ?? {}), model: { ...base.consumption.model, ...(raw.consumption?.model ?? {}) } },
     agentEvaluator: {
       ...(raw.agentEvaluator ?? {}),

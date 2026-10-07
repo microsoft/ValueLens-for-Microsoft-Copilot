@@ -47,6 +47,7 @@ import { prepareNotebook, serialiseNotebook } from './transform/notebook.js';
 import { buildAgentEvaluatorModel, buildConsumptionModel, buildModel, loadTemplateModel } from './transform/model.js';
 import { buildPipeline } from './transform/pipeline.js';
 import { c } from './ui.js';
+import { askTarget, azureRefresh, azureRotateSecret, azureRun, azureStatus, azureUninstall, azureUpdate, confirmAzurePlan, installAzure, planAzure } from './steps/azure/index.js';
 
 /**
  * @typedef {object} Apis
@@ -65,6 +66,7 @@ import { c } from './ui.js';
  * @typedef {object} Ctx
  * @property {import('./ui.js').Ui} ui
  * @property {import('./config.js').InstallConfig} config
+ * @property {string} file
  * @property {() => void} save  Writes the install record.
  * @property {Apis} api
  * @property {User} user
@@ -122,6 +124,7 @@ export function createCtx(o) {
   return {
     ui: o.ui,
     config: o.config,
+    file: o.file,
     save: () => saveConfig(o.file, o.config),
     api: o.api,
     user: o.user,
@@ -237,14 +240,21 @@ export async function rewindable(ctx, fn) {
  */
 export async function install(ctx, opts) {
   const { ui, config } = ctx;
+  await askTarget(ctx);
   const pre = await preflight(ctx);
   const go = await rewindable(ctx, async () => {
-    await plan(ctx, pre);
+    if (config.target === 'azure') await planAzure(ctx, pre);
+    else await plan(ctx, pre);
     ctx.save();
-    return confirmPlan(ctx, pre);
+    return config.target === 'azure' ? confirmAzurePlan(ctx) : confirmPlan(ctx, pre);
   });
   if (!go) {
     ui.warn('Stopped before changing anything. Your answers are saved for next time.');
+    return;
+  }
+
+  if (config.target === 'azure') {
+    await installAzure(ctx, opts);
     return;
   }
 
@@ -404,6 +414,10 @@ async function tryDeployApp(ctx, opts = {}) {
  */
 export async function update(ctx, opts = {}) {
   const { ui, config } = ctx;
+  if (config.target === 'azure') {
+    await azureUpdate(ctx);
+    return;
+  }
   if (!config.fabric.workspaceId || !config.fabric.lakehouseId) throw new Error('Nothing is installed yet. Run the installer first.');
   const sm = config.semanticModel;
   ui.heading('Updating Analytics Hub');
@@ -443,6 +457,7 @@ export async function update(ctx, opts = {}) {
  * @param {{ backfillDays?: number, wait: boolean }} opts
  */
 export async function run(ctx, opts) {
+  if (ctx.config.target === 'azure') return azureRun(ctx);
   const result = await runPipeline(ctx, await chooseLoad(ctx, opts));
   if (result.status === 'Completed') await runDataCheck(ctx);
   return result;
@@ -456,6 +471,7 @@ export { status };
  * @param {{ wait: boolean }} opts
  */
 export async function refresh(ctx, opts) {
+  if (ctx.config.target === 'azure') return azureRefresh(ctx);
   if (!ctx.config.semanticModel.id) throw new Error('There is no semantic model yet. Run the installer and choose to deploy it.');
   if (deployedModels(ctx.config).length < 2) return refreshModel(ctx, opts);
   return refreshModels(ctx, opts);
@@ -492,10 +508,16 @@ export async function runCommand(ctx, command, opts) {
       await deployAppNow(ctx);
       return true;
     case 'status':
-      await status(ctx);
+      if (ctx.config.target === 'azure') await azureStatus(ctx);
+      else await status(ctx);
       return true;
     case 'rotate-secret':
-      await rotateSecret(ctx);
+      if (ctx.config.target === 'azure') await azureRotateSecret(ctx);
+      else await rotateSecret(ctx);
+      return true;
+    case 'uninstall':
+      if (ctx.config.target === 'azure') await azureUninstall(ctx);
+      else throw new Error('Uninstall is only implemented for the Azure target in this preview.');
       return true;
     case 'upload':
       return uploadCommand(ctx, { files: opts.files ?? [], run: opts.run, wait: opts.wait }, (c2, o) => run(c2, o));

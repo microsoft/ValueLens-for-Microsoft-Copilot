@@ -19,6 +19,80 @@ and the Analytics Hub app. Then it loads the first data and checks it.
 
 The Graph permissions are listed in [`/docs/PERMISSIONS.md`](../../docs/PERMISSIONS.md).
 
+## Azure target (preview)
+
+The installer can also set up the Phase 1 preview in **your Azure subscription**. Start it with
+`--target azure`, or pick **Your Azure subscription** as the first wizard answer.
+
+You need:
+
+- Contributor plus User Access Administrator (or Owner) on the subscription or resource group.
+- Permission to register Entra apps, or an Application Administrator.
+- A Global Administrator or Privileged Role Administrator to grant the managed identity's Graph app
+  roles, or to use the admin links the installer prints.
+- Power BI Pro or PPU, and permission to create or use the chosen Power BI workspace.
+- Teams custom app upload rights, or a Teams admin to upload the generated package.
+- The tenant settings *Service principals can call Fabric public APIs* (enabled for a group that holds
+  the managed identity, so the jobs can refresh the model) and *Semantic Model Execute Queries REST
+  API* (for the app's queries).
+
+The preview creates or reuses a resource group and deploys a managed identity, Storage, Log Analytics,
+Azure SQL Database serverless, Container Apps jobs, and the web app from the ARM template in
+`src/azure/main.arm.json`. It also creates the Azure web app registration, an SQL reader app
+registration, a Power BI workspace and model, and an `AnalyticsHub-Teams.zip` package (the app as a
+Teams tab, built by `src/azure/teams/build-package.mjs`) next to the install record.
+
+Only `core`, `orgData`, and `m365Activity` are supported on Azure in this preview. Other modules are
+shown as coming soon and cannot be selected. Re-runs are incremental and use the same
+`valuelens-install.json`, with `target: "azure"` and an `azure` block. The installer tags every Azure
+resource with `valuelens-install-id` and stops rather than modifying untagged resources with colliding
+names.
+
+### Networking
+
+The wizard asks how the app, jobs and Power BI reach Azure SQL and Storage:
+
+- **Public endpoints** (default). SQL allows Azure services and Power BI connects to it directly.
+- **Private networking**. Choose this where Azure Policy keeps public network access off (common on
+  managed and MCAPS subscriptions; the installer says so when what-if hits `DenyPublicEndpointEnabled`).
+  It adds a VNet, private endpoints and private DNS zones for SQL and Storage (blob, dfs, table), a
+  VNet-integrated Container Apps environment, and a Power BI **VNet data gateway** that the model's SQL
+  connection runs through. SQL uses the Proxy connection policy, so everything stays on port 1433.
+  - It needs an active Fabric (F or trial) or Power BI Premium capacity to host the gateway. The
+    Power BI workspace is assigned to it.
+  - The preflight registers the `Microsoft.Network/AllowBringYourOwnPublicIpAddress` subscription
+    feature, which VNet-integrated Container Apps environments need. It's approved automatically.
+  - It adds about $30–40 a month (four private endpoints and DNS zones). The gateway uses capacity units
+    while refreshing.
+  - Networking can't be changed in place. Uninstall and install again to switch.
+
+### Regions and images
+
+- `azure.sqlLocation` puts Azure SQL in a different region from everything else. Some subscriptions
+  can't create SQL in busy regions (for example uksouth, northeurope or westeurope on MCAPS). The
+  preflight checks SQL capability and points at this setting. The private endpoint can be in another
+  region from the server.
+- `azure.images` overrides where the jobs and web images come from, for air-gapped tenants or testing
+  an unreleased build: `{ "registry": "myacr.azurecr.io/valuelens", "registryResourceId": "<ACR
+  resource ID>", "tag": "dev-abc123" }`. With `registryResourceId` set, the managed identity is granted
+  AcrPull. Build into your registry from the repo root with
+  `az acr build -r myacr -t valuelens/valuelens-jobs:<tag> -f "5. Azure/jobs/Dockerfile" .` (and the
+  same for `valuelens-web` with `5. Azure/web/Dockerfile`). If the upload fails on long `node_modules`
+  paths, build from a folder that holds only the paths the Dockerfile copies.
+
+If the database migration job fails, setup stops before the first load and prints the
+`az containerapp job logs show` command for its logs. Fix the cause and run install again; finished
+steps are skipped.
+
+Azure commands:
+
+- `run` starts the Container Apps run job.
+- `status` shows job executions, the web URL, pending admin actions, and SQL reader secret expiry.
+- `refresh` starts a Power BI model refresh.
+- `update` re-runs preflight/what-if and redeploys with the current installer image tag.
+- `rotate-secret` creates a new SQL reader secret and rebinds the Power BI credential.
+- `uninstall` deletes the created resource group, or only tagged resources if you used an existing group.
+
 ## Run it
 
 1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe).

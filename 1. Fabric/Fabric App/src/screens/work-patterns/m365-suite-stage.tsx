@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { useMemo, type ReactNode } from "react";
-import { VegaVisual, type VisualizationSpec } from "@microsoft/fabric-visuals";
+import { VegaVisual, type VisualizationSpec } from "@/components/vega-visual";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { stageAnchor } from "@/components/destinations";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";

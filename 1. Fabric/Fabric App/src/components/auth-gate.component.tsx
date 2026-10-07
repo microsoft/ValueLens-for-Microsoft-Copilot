@@ -4,12 +4,12 @@
 //        Licensed under the MIT license. See LICENSE file in the project root for full license information.
 // </copyright>
 //-----------------------------------------------------------------------
-
 import { type ReactNode } from "react";
 import { isRunningInFabric } from "@microsoft/fabric-app-data-embed-client";
 
 import { useAuth } from "@/hooks/auth.context";
 import { fabricItemUrl } from "@/lib/fabric-item-url";
+import { runtimeConfig } from "@/lib/runtime-config";
 
 interface AuthGateProps {
     children: ReactNode;
@@ -19,25 +19,23 @@ interface AuthGateProps {
     fabricLink?: string | null;
 }
 
-/**
- * The app's data only loads inside Fabric, which brokers its semantic model queries. Opened from
- * its `…fabricapps.net` hosting address instead, every visual would fail with "Not running inside
- * a Fabric iframe", so the gate sends the visitor to the app's Fabric item first.
- */
+/** Host-aware auth gate. Fabric keeps the brokered iframe path; Azure signs in directly. */
 export function AuthGate({
     children,
     embedded = isRunningInFabric(),
     fabricLink = fabricItemUrl(),
 }: AuthGateProps) {
+    const host = runtimeConfig().host;
     const {
         isLoading,
         isAuthenticated,
         signIn,
         isSigningIn,
         signInError,
+        accessDenied,
     } = useAuth();
 
-    if (!embedded && fabricLink) {
+    if (host === "fabric" && !embedded && fabricLink) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-background p-400">
                 <div className="w-full max-w-md rounded-xl border border-border bg-card p-800 text-center shadow-8">
@@ -65,13 +63,29 @@ export function AuthGate({
         return (
             <div className="flex min-h-screen items-center justify-center bg-background">
                 <div className="text-sm text-muted-foreground">
-                    Connecting to Fabric…
+                    Connecting to {host === "azure" ? "Analytics Hub" : "Fabric"}…
+                </div>
+            </div>
+        );
+    }
+
+    if (accessDenied) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-background p-400">
+                <div role="alert" className="w-full max-w-md rounded-xl border border-border bg-card p-800 text-center shadow-8">
+                    <h1 className="mb-200 text-500 font-semibold leading-500 text-card-foreground">
+                        You don't have access
+                    </h1>
+                    <p className="text-300 leading-300 text-muted-foreground">
+                        Ask your admin to add you to Analytics Hub users.
+                    </p>
                 </div>
             </div>
         );
     }
 
     if (!isAuthenticated) {
+        const signInLabel = host === "azure" ? "Sign in with Microsoft" : "Sign in with Fabric";
         return (
             <div className="flex min-h-screen items-center justify-center bg-background p-400">
                 <div className="w-full max-w-md rounded-xl border border-border bg-card p-800 text-center shadow-8">
@@ -79,7 +93,9 @@ export function AuthGate({
                         Sign in to open this app
                     </h1>
                     <p className="mb-600 text-300 leading-300 text-muted-foreground">
-                        Use your Fabric account to access this app and its connected semantic models.
+                        {host === "azure"
+                            ? "Use your Microsoft account to access Analytics Hub."
+                            : "Use your Fabric account to access this app and its connected semantic models."}
                     </p>
                     <button
                         type="button"
@@ -88,13 +104,10 @@ export function AuthGate({
                         aria-busy={isSigningIn}
                         className="rounded-lg bg-primary px-400 py-200 text-300 font-semibold text-primary-foreground hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        {isSigningIn ? "Signing in…" : "Sign in with Fabric"}
+                        {isSigningIn ? "Signing in…" : signInLabel}
                     </button>
                     {signInError && (
-                        <p
-                            role="alert"
-                            className="mt-400 text-300 leading-300 text-destructive"
-                        >
+                        <p role="alert" className="mt-400 text-300 leading-300 text-destructive">
                             We couldn't sign you in: {signInError.message} Please try again and allow pop-ups for this site.
                         </p>
                     )}

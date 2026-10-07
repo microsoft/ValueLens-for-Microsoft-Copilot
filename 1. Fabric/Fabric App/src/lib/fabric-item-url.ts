@@ -4,7 +4,6 @@
 //        Licensed under the MIT license. See LICENSE file in the project root for full license information.
 // </copyright>
 //-----------------------------------------------------------------------
-
 import { runtimeConfig } from "@/lib/runtime-config";
 
 export interface FabricItemLinkConfig {
@@ -14,14 +13,22 @@ export interface FabricItemLinkConfig {
     tenantId?: string;
     /** The hostname the app is served from. */
     hostname?: string;
+    /** Link shape to build. */
+    host?: "fabric" | "azure";
 }
 
 const MSIT_HOSTING = /\.msit\.fabricapps\.net$/i;
 const MSIT_PORTAL = "https://msit.fabric.microsoft.com";
 
 function fromRuntime(): FabricItemLinkConfig {
-    const { portalUrl, workspaceId, itemId, tenantId } = runtimeConfig().rayfin;
+    const config = runtimeConfig();
+    if (config.host === "azure") {
+        const model = config.semanticModels.vl ?? Object.values(config.semanticModels)[0];
+        return { host: "azure", workspaceId: model?.workspaceId, itemId: model?.itemId };
+    }
+    const { portalUrl, workspaceId, itemId, tenantId } = config.rayfin;
     return {
+        host: "fabric",
         portalUrl,
         workspaceId,
         itemId,
@@ -30,20 +37,17 @@ function fromRuntime(): FabricItemLinkConfig {
     };
 }
 
-/**
- * The Fabric portal link that opens this app's item, in the
- * `<portal>/groups/<workspace>/appbackends/<item>?ctid=<tenant>` form `rayfin up` prints.
- * Fabric hosts the app in an iframe there and brokers its semantic model queries, which the
- * `…fabricapps.net` hosting address can't do on its own. `null` when the build has no item IDs.
- *
- * Apps hosted under `*.msit.fabricapps.net` live on Microsoft's internal ring, so their item opens
- * on the internal portal whichever portal the build was given.
- */
+/** The host-aware link for the app's primary item. */
 export function fabricItemUrl(config: FabricItemLinkConfig = fromRuntime()): string | null {
-    const { portalUrl, workspaceId, itemId, tenantId, hostname } = config;
-    if (!portalUrl || !workspaceId || !itemId)
+    const { portalUrl, workspaceId, itemId, tenantId, hostname, host = "fabric" } = config;
+    if (!workspaceId || !itemId)
         return null;
 
+    if (host === "azure")
+        return `https://app.powerbi.com/groups/${encodeURIComponent(workspaceId)}/datasets/${encodeURIComponent(itemId)}/details`;
+
+    if (!portalUrl)
+        return null;
     let url: URL;
     try {
         url = new URL(hostname && MSIT_HOSTING.test(hostname) ? MSIT_PORTAL : portalUrl);

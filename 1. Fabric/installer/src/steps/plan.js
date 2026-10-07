@@ -134,12 +134,14 @@ export async function preflight(ctx) {
     ui.warn('Users in this tenant can\'t register apps and you have no app admin role. Choose "use an existing app registration" or ask an admin.');
   }
 
-  const capacities = (await api.fabric.listCapacities()).filter((cap) => cap.state === 'Active' && runsFabric(cap));
-  if (!capacities.length) {
-    ui.fail('No active Fabric capacity you can use.');
-    throw new Error('Start a Fabric trial, or ask a capacity admin to make you a contributor on an F2 or larger capacity, then run the installer again.');
+  const capacities = ctx.config.target === 'azure' ? [] : (await api.fabric.listCapacities()).filter((cap) => cap.state === 'Active' && runsFabric(cap));
+  if (ctx.config.target !== 'azure') {
+    if (!capacities.length) {
+      ui.fail('No active Fabric capacity you can use.');
+      throw new Error('Start a Fabric trial, or ask a capacity admin to make you a contributor on an F2 or larger capacity, then run the installer again.');
+    }
+    ui.ok(`${capacities.length} active Fabric ${capacities.length === 1 ? 'capacity' : 'capacities'}`);
   }
-  ui.ok(`${capacities.length} active Fabric ${capacities.length === 1 ? 'capacity' : 'capacities'}`);
 
   /** @type {any[]} */
   let subscriptions = [];

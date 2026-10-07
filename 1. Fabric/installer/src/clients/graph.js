@@ -1,5 +1,6 @@
 // @ts-check
 /** Microsoft Graph calls for the app registration and the signed-in user's roles. */
+import crypto from 'node:crypto';
 import { GRAPH_APP_ID } from '../catalog.js';
 import { HttpError } from '../http.js';
 
@@ -14,6 +15,8 @@ export const APP_ROLES = {
   '9b895d92-2cd3-44c7-9d02-a6ac2d5ea5c3': 'Application Administrator',
   '158c047a-c907-4556-b7ef-446551a6b5f7': 'Cloud Application Administrator',
 };
+
+export const POWER_BI_APP_ID = '00000009-0000-0000-c000-000000000000';
 
 /**
  * Maps permission names to Graph app role IDs. A missing required permission is an
@@ -87,6 +90,9 @@ export function graphApi(http) {
 
     graphServicePrincipal: () =>
       http.get(`/servicePrincipals(appId='${GRAPH_APP_ID}')`, { query: { $select: 'id,appId,appRoles' } }),
+    /** @param {string} appId */
+    servicePrincipalByAppId: (appId) =>
+      http.get(`/servicePrincipals(appId='${appId}')`, { query: { $select: 'id,appId,appRoles,oauth2PermissionScopes' } }),
 
     /** @param {string} appId */
     findApplication: (appId) => getOrNull(`/applications(appId='${appId}')`),
@@ -102,8 +108,85 @@ export function graphApi(http) {
         displayName,
         signInAudience: 'AzureADMyOrg',
         notes: 'Created by the Analytics Hub installer. Reads Copilot audit, usage report and directory data for ValueLens.',
-        requiredResourceAccess: [{ resourceAppId: GRAPH_APP_ID, resourceAccess: appRoles.map((r) => ({ id: r.id, type: 'Role' })) }],
+        requiredResourceAccess: appRoles.length ? [{ resourceAppId: GRAPH_APP_ID, resourceAccess: appRoles.map((r) => ({ id: r.id, type: 'Role' })) }] : [],
       }),
+    /**
+     * Creates the Azure-hosted web application registration.
+     * @param {{ displayName: string, fqdn: string, pbiScopeId: string, graphUserReadScopeId: string, teamsClientIds: string[] }} o
+     */
+    createAzureWebApplication(o) {
+      const scopeId = crypto.randomUUID();
+      // No identifierUris here: tenant policy needs the URI to contain the app ID, so
+      // updateAzureWebApplication sets api://<fqdn>/<appId> once the app ID exists.
+      return http.post('/applications', {
+        displayName: o.displayName,
+        signInAudience: 'AzureADMyOrg',
+        spa: { redirectUris: [`https://${o.fqdn}/`, `https://${o.fqdn}/?host=teams&auth=popup`] },
+        api: {
+          oauth2PermissionScopes: [
+            {
+              id: scopeId,
+              adminConsentDescription: 'Allow users to access Analytics Hub.',
+              adminConsentDisplayName: 'Access Analytics Hub',
+              isEnabled: true,
+              type: 'User',
+              userConsentDescription: 'Allow you to access Analytics Hub.',
+              userConsentDisplayName: 'Access Analytics Hub',
+              value: 'access_as_user',
+            },
+          ],
+          preAuthorizedApplications: o.teamsClientIds.map((appId) => ({ appId, delegatedPermissionIds: [scopeId] })),
+        },
+        appRoles: [
+          { id: crypto.randomUUID(), allowedMemberTypes: ['User'], displayName: 'Analytics Hub User', value: 'AnalyticsHub.User', description: 'Can use Analytics Hub.', isEnabled: true },
+          { id: crypto.randomUUID(), allowedMemberTypes: ['User'], displayName: 'Analytics Hub Admin', value: 'AnalyticsHub.Admin', description: 'Can administer Analytics Hub.', isEnabled: true },
+        ],
+        requiredResourceAccess: [
+          { resourceAppId: POWER_BI_APP_ID, resourceAccess: [{ id: o.pbiScopeId, type: 'Scope' }] },
+          { resourceAppId: GRAPH_APP_ID, resourceAccess: [{ id: o.graphUserReadScopeId, type: 'Scope' }] },
+        ],
+        notes: 'Created by the Analytics Hub installer for the Azure-hosted web app.',
+      });
+    },
+
+    /**
+     * @param {any} application
+     * @param {{ fqdn: string, clientId: string, pbiScopeId: string, graphUserReadScopeId: string, teamsClientIds: string[] }} o
+     */
+    async updateAzureWebApplication(application, o) {
+      const scope = application.api?.oauth2PermissionScopes?.find((s) => s.value === 'access_as_user') ?? { id: crypto.randomUUID() };
+      await http.patch(`/applications/${application.id}`, {
+        spa: { redirectUris: [`https://${o.fqdn}/`, `https://${o.fqdn}/?host=teams&auth=popup`] },
+        identifierUris: [`api://${o.fqdn}/${o.clientId}`],
+        api: {
+          ...(application.api ?? {}),
+          oauth2PermissionScopes: [
+            {
+              ...scope,
+              adminConsentDescription: scope.adminConsentDescription ?? 'Allow users to access Analytics Hub.',
+              adminConsentDisplayName: scope.adminConsentDisplayName ?? 'Access Analytics Hub',
+              isEnabled: true,
+              type: 'User',
+              userConsentDescription: scope.userConsentDescription ?? 'Allow you to access Analytics Hub.',
+              userConsentDisplayName: scope.userConsentDisplayName ?? 'Access Analytics Hub',
+              value: 'access_as_user',
+            },
+          ],
+          preAuthorizedApplications: o.teamsClientIds.map((appId) => ({ appId, delegatedPermissionIds: [scope.id] })),
+        },
+        appRoles: application.appRoles?.length
+          ? application.appRoles
+          : [
+              { id: crypto.randomUUID(), allowedMemberTypes: ['User'], displayName: 'Analytics Hub User', value: 'AnalyticsHub.User', description: 'Can use Analytics Hub.', isEnabled: true },
+              { id: crypto.randomUUID(), allowedMemberTypes: ['User'], displayName: 'Analytics Hub Admin', value: 'AnalyticsHub.Admin', description: 'Can administer Analytics Hub.', isEnabled: true },
+            ],
+        requiredResourceAccess: [
+          { resourceAppId: POWER_BI_APP_ID, resourceAccess: [{ id: o.pbiScopeId, type: 'Scope' }] },
+          { resourceAppId: GRAPH_APP_ID, resourceAccess: [{ id: o.graphUserReadScopeId, type: 'Scope' }] },
+        ],
+      });
+      return scope.id;
+    },
     /**
      * Adds Graph app roles to the app's required permissions, keeping what is there.
      * @param {any} application
@@ -123,6 +206,16 @@ export function graphApi(http) {
 
     /** New apps take a few seconds to replicate, so 400/404 are retried briefly. @param {string} appId */
     createServicePrincipal: (appId) => http.post('/servicePrincipals', { appId }, replicationRetry),
+
+    /** @param {string} applicationObjectId */
+    deleteApplication: (applicationObjectId) => http.del(`/applications/${applicationObjectId}`),
+
+    /**
+     * @param {string} applicationObjectId
+     * @param {{ name: string, issuer: string, subject: string, audiences: string[] }} credential
+     */
+    addFederatedIdentityCredential: (applicationObjectId, credential) =>
+      http.post(`/applications/${applicationObjectId}/federatedIdentityCredentials`, credential, replicationRetry),
 
     /**
      * @param {string} applicationObjectId
@@ -148,6 +241,25 @@ export function graphApi(http) {
      */
     grantAppRole: (resourceId, principalId, appRoleId) =>
       http.post(`/servicePrincipals/${resourceId}/appRoleAssignedTo`, { principalId, resourceId, appRoleId }, replicationRetry),
+
+    /**
+     * Admin consent for a delegated scope for all users. Reuses an existing grant, adding the scope if it's missing.
+     * @param {{ clientId: string, resourceId: string, scope: string }} o
+     */
+    async grantOauth2Permission(o) {
+      const existing = /** @type {any[]} */ (await http.list('/oauth2PermissionGrants', { query: { $filter: `clientId eq '${o.clientId}' and resourceId eq '${o.resourceId}'` } }).catch(() => [])).find((g) => g.consentType === 'AllPrincipals');
+      if (!existing) return http.post('/oauth2PermissionGrants', { clientId: o.clientId, consentType: 'AllPrincipals', resourceId: o.resourceId, scope: o.scope }, replicationRetry);
+      const scopes = String(existing.scope ?? '').split(' ').filter(Boolean);
+      if (scopes.includes(o.scope)) return existing;
+      return http.patch(`/oauth2PermissionGrants/${existing.id}`, { scope: [...scopes, o.scope].join(' ') });
+    },
+
+    /** @param {string} principalId @param {string} resourceId @param {string} appRoleId */
+    assignPrincipalToAppRole: (principalId, resourceId, appRoleId) =>
+      http.post(`/servicePrincipals/${resourceId}/appRoleAssignedTo`, { principalId, resourceId, appRoleId }, replicationRetry),
+
+    /** Users, groups and apps assigned to this service principal's app roles. @param {string} resourceId */
+    appRoleAssignedTo: (resourceId) => http.list(`/servicePrincipals/${resourceId}/appRoleAssignedTo`),
   };
 }
 

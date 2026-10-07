@@ -7,7 +7,7 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { DataGrid, type GridColumnDef, type Row } from "@microsoft/fabric-datagrid";
-import { VegaVisual } from "@microsoft/fabric-visuals";
+import { VegaVisual } from "@/components/vega-visual";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { SegmentedControl } from "@/components/segmented-control";
