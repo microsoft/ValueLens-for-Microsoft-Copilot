@@ -128,12 +128,25 @@ RETURN
         "Agent With Most Users", CALCULATE([ValueLens Agent With Most Users], KEEPFILTERS(_noSecurityCopilot)),
         "Satisfaction", 'ProductFeedback'[Satisfaction Rate],
         "Feedback", 'ProductFeedback'[Total Feedback],
+        // Same people as [All Active Users]: a prompt or a Cowork scheduled run.
         "People With Organization",
             COUNTROWS(
                 FILTER(
                     VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
                     LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Audit_UserId])) > 0
-                        && CALCULATE([AI Tasks]) > 0
+                        && CALCULATE(
+                            COUNTROWS('Chat + Agent Interactions (Audit Logs)'),
+                            KEEPFILTERS(
+                                FILTER(
+                                    ALL(
+                                        'Chat + Agent Interactions (Audit Logs)'[Is Prompt Row],
+                                        'Chat + Agent Interactions (Audit Logs)'[Is_Cowork]
+                                    ),
+                                    'Chat + Agent Interactions (Audit Logs)'[Is Prompt Row]
+                                        || 'Chat + Agent Interactions (Audit Logs)'[Is_Cowork]
+                                )
+                            )
+                        ) > 0
                         && LEN(TRIM(CALCULATE(MAX('Chat + Agent Org Data'[Organization])))) > 0
                 )
             )

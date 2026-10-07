@@ -17,6 +17,63 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-08 — Cowork scheduled runs, install version checks and empty-source fixes
+
+Fixes from a data audit of a customer install.
+
+**Cowork scheduled and autonomous runs are counted (P3).** These runs log a record with no
+prompt, so every parser dropped them and their users never appeared in Adoption or Executive,
+even though Viva Insights billed their credits. They are now kept as one task row per record
+(`Message_isPrompt` FALSE, `message:none`, no resource fan-out), the way Copilot Studio runtime
+records already were. In the model:
+
+- a hidden `Is Usage Row` column (`Is Prompt Row` or `Is_Cowork`) and `Usage Rows` measure;
+- `All Active Users`, `Active Licensed Users`, `Active Unlicensed Users` and `Cowork Users` count
+  people with a usage row, so a person whose only use was a scheduled run is an active Cowork user;
+- a new `Cowork Scheduled Runs` measure;
+- `AI Tasks`, prompts, sessions and Cowork Fit stay prompt-only. Per-user session and prompt
+  averages now include people whose only use was a scheduled run.
+
+| Variant | Change |
+|---|---|
+| Fabric | Audit ingester notebook; both Fabric templates; the Fabric App's org-coverage count |
+| Azure | `valuelens_core` DuckDB port (which now also keeps Copilot Studio runtime records, matching Fabric) |
+| Local CSV | `Purview_CopilotInteraction_Processor_v4.0.0.py` (aibv profile) and template |
+| SharePoint | Template. The scheduled path flattens with the upstream PAX processor that `Run-PAX-AIBV.ps1` downloads, so that needs a PAX follow-up; installs that run the Local CSV processor get the fix |
+| Power Automate + Dataverse | `Build-DataverseCoreFeeds.py` and template |
+
+**The app says when the install is older than the app (P1).** Pages that need newer model
+columns, starting with Governance and the Agent 365 columns from #130, probe for them first. If
+any are missing, the page shows **Update your install** and lists them, instead of four query
+errors. Requirements are listed in one place (`src/lib/model-requirements.ts`), and any query that
+fails on a missing column or table shows the same guidance. *Fabric App and installer only.*
+
+**Optional modules left off are "not configured" (P8).** The installer now writes the chosen
+modules into the app's `fabric.config.json`. A module that is off hides its pages, as an empty
+source already did (#129), and the Feedback page explains it isn't set up rather than saying
+"No feedback data". Installs without the field keep the data probe. *Fabric App and installer
+only.*
+
+**The Calendar covers more than the audit (P7).** It runs from the earliest to the latest of the
+audit and product feedback dates, and on installer-built Fabric models the M365 Activity dates.
+With none of them it holds the last 365 days, so date-sliced M365 and feedback visuals work before
+the first audit load. *All five ValueLens templates, and the Fabric installer for M365 Activity,
+which only it adds.*
+
+**A blank or 0 Cowork limit means no limit (P9).** Allowance and headroom are blank, and nobody
+is over or near the limit, instead of a negative headroom and everyone over. The app's Cowork
+section shows **No limit set**. *All four Consumption Central templates and the Fabric App.*
+
+**The Agent Evaluator writes empty tables in merge mode (P6).** With no transcripts and no
+existing tables, merge and append now create the `dbo.agent_*` tables with their schema, as
+overwrite does, and the log says what happened to each table. *Fabric only: the Agent Evaluator
+notebooks run only there.*
+
+The template DAX changes are applied by `scripts/Update-Template-Dax.py` (`--check` reports
+templates that need it). Refresh a published model after updating its template.
+
+---
+
 ## 2026-10-07 — Analytics Hub installer 0.3.2: Azure install fix
 
 Every Azure install with the default settings (images pulled from the public

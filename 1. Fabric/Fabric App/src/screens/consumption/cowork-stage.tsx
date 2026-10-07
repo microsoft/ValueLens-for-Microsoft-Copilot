@@ -29,6 +29,7 @@ import {
     type ConsumptionOptions,
 } from "@/queries/consumption";
 import { billedText, readAzureBilling } from "./azure-billing";
+import { coworkLimitState } from "./cowork-limit";
 import { CREDIT_CURRENCY, LENSES, moneyCell, standalone, useConsumptionSummary, useConsumptionTable } from "./data";
 import { ChartPanel, KpiRowState, NoteCard, RollupGrid, type TreeColumn } from "@/components/report-panels";
 
@@ -94,6 +95,7 @@ export function CoworkStage({ options, rates }: CoworkStageProps) {
     const azure = readAzureBilling(useConsumptionSummary(studioAzureBilling()));
     const azureBilled = azure && billedText(azure, azure.coworkCost, azure.coworkCredits);
     const azureText = azureBilled && `${azureBilled} of pay-as-you-go, ${azure.window}, as Azure Cost Management recorded it.`;
+    const { allowanceUsed, policyHeadroom, usersOverLimit, noLimitSet } = coworkLimitState(row);
 
     return (
         <Section
@@ -176,8 +178,9 @@ export function CoworkStage({ options, rates }: CoworkStageProps) {
                         />
                         <KpiCard
                             label="Policy headroom"
-                            value={readNumber(row, "[Policy Headroom]")}
-                            detail="Credits left under the policy allowances"
+                            value={noLimitSet ? undefined : policyHeadroom}
+                            emptyValue="No limit set"
+                            detail={noLimitSet ? "No Cowork credit allowance is configured" : "Credits left under the policy allowances"}
                         />
                     </>
                 ) : (
@@ -196,9 +199,16 @@ export function CoworkStage({ options, rates }: CoworkStageProps) {
                         <KpiCard label="Credits per user" value={readNumber(row, "[Avg Credits Per User]")} />
                         <KpiCard
                             label="Allowance used"
-                            value={readNumber(row, "[Allowance Used]")}
+                            value={noLimitSet ? undefined : allowanceUsed}
+                            emptyValue="No limit set"
                             format="percent"
-                            detail={<KpiStat label="Users over limit" value={readNumber(row, "[Users Over Limit]")} format="percent" />}
+                            detail={
+                                noLimitSet ? (
+                                    "No Cowork credit allowance is configured"
+                                ) : (
+                                    <KpiStat label="Users over limit" value={usersOverLimit} format="percent" />
+                                )
+                            }
                         />
                         <KpiCard label="Spending policies" value={readNumber(row, "[Policies]")} />
                     </>

@@ -40,8 +40,10 @@ The app also leaves out pages and sections whose optional data hasn't arrived. W
 counts the rows in the ValueLens model's optional sources (unfiltered). **Feedback** needs
 `ProductFeedback` and **Work patterns** needs `M365 Activity`. Without registry data, **Governance**
 shows how to connect the Agent 365 registry instead of empty sections, and the **Agents** leaderboard
-drops its registry columns. Everything shows while the check runs, or if it fails, and a page comes back on
-the next open once its data loads.
+drops its registry columns. Newer installer builds also write which optional modules were switched
+off into `fabric.config.json`; those pages stay hidden without probing until the admin turns the
+module on. Everything shows while the check runs, or if it fails, and a page comes back on the next
+open once its data loads.
 
 ## Settings in the app
 
@@ -70,6 +72,7 @@ Don't commit your IDs in `fabric.yaml` or the redirect URI that `rayfin up` adds
 `rayfin/rayfin.yml`. Its local state files are gitignored.
 
 The installer ships one build for every tenant, so it reads the model IDs from a
-`fabric.config.json` deployed next to the app. A deploy from this folder uses `fabric.yaml`
-instead. See [`src/lib/runtime-config.ts`](src/lib/runtime-config.ts).
+`fabric.config.json` deployed next to the app. Newer files also include a `modules` block for the
+optional module choices. A deploy from this folder uses `fabric.yaml` instead. See
+[`src/lib/runtime-config.ts`](src/lib/runtime-config.ts).
 [`AGENTS.md`](AGENTS.md) has the conventions for coding agents.

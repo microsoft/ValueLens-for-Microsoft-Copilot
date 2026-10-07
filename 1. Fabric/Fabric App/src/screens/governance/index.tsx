@@ -6,9 +6,10 @@
 //-----------------------------------------------------------------------
 
 import { stageAnchor } from "@/components/destinations";
-import { QueryEmpty } from "@/components/query-states";
+import { ModelUpdateRequired, QueryEmpty, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { useSourceAvailability } from "@/hooks/source-availability.context";
+import { useModelRequirementState } from "@/hooks/use-model-requirements";
 import { useSummaryQuery } from "@/hooks/use-table-query";
 import { isAbsent } from "@/lib/optional-sources";
 import { governanceSummary } from "@/queries/governance";
@@ -30,8 +31,26 @@ const SUMMARY = governanceSummary();
  * says how to connect it instead of running four sets of empty queries.
  */
 export function GovernanceScreen() {
-    const registry = !isAbsent(useSourceAvailability(), "agentRegistry");
-    return registry ? <GovernanceStages /> : <ConnectRegistry />;
+    const sources = useSourceAvailability();
+    const registry = !isAbsent(sources, "agentRegistry");
+    return registry ? <GovernanceRequirements /> : <ConnectRegistry configured={sources.agentRegistry !== "notConfigured"} />;
+}
+
+function GovernanceRequirements() {
+    const requirements = useModelRequirementState("governance");
+    if (requirements.status === "outdated") return <GovernanceUpdate missing={requirements.missing} />;
+    if (requirements.status === "checking") {
+        return (
+            <Section
+                id={stageAnchor("estate-health")}
+                title="Governance"
+                description="Who owns your agents, who can reach them, and what needs a review."
+            >
+                <QueryLoading />
+            </Section>
+        );
+    }
+    return <GovernanceStages />;
 }
 
 function GovernanceStages() {
@@ -47,7 +66,7 @@ function GovernanceStages() {
     );
 }
 
-function ConnectRegistry() {
+function ConnectRegistry({ configured }: { configured: boolean }) {
     return (
         <Section
             id={stageAnchor("estate-health")}
@@ -55,9 +74,25 @@ function ConnectRegistry() {
             description="Who owns your agents, who can reach them, and what needs a review."
         >
             <QueryEmpty
-                title="Connect the Agent 365 registry"
-                description="Governance reads the Agent 365 registry, and the model has no registry data yet. Run the installer again with Agent 365 registry ticked (or run the registry ingester), let the next load finish, then reopen the app."
+                title={configured ? "Connect the Agent 365 registry" : "Agent 365 registry isn't turned on"}
+                description={
+                    configured
+                        ? "Governance reads the Agent 365 registry, and the model has no registry data yet. Run the installer again with Agent 365 registry ticked (or run the registry ingester), let the next load finish, then reopen the app."
+                        : "Run the installer again and tick Agent 365 registry. You can connect the API or upload the Microsoft 365 admin center Agents export; Governance fills in after the next load and model refresh."
+                }
             />
+        </Section>
+    );
+}
+
+function GovernanceUpdate({ missing }: { missing: readonly string[] }) {
+    return (
+        <Section
+            id={stageAnchor("estate-health")}
+            title="Governance"
+            description="Who owns your agents, who can reach them, and what needs a review."
+        >
+            <ModelUpdateRequired missing={missing} />
         </Section>
     );
 }

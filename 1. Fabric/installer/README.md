@@ -180,6 +180,27 @@ Pages for sources you skip stay empty rather than failing. To leave the reports 
 from an earlier version gets the reports offered the next time you choose **Repair or change**;
 **Update** on its own doesn't add them.
 
+The Analytics Hub app reads a small `fabric.config.json` deployed beside it. It contains the
+semantic model IDs the app should query and, for newer installs, the optional modules the admin
+turned on:
+
+```json
+{
+  "semanticModels": {
+    "vl": { "workspaceId": "<workspace>", "itemId": "<Analytics Hub Model>" }
+  },
+  "modules": {
+    "m365Activity": true,
+    "agent365": false,
+    "productFeedback": false,
+    "consumption": false,
+    "agentEvaluator": false
+  }
+}
+```
+
+Older installs may not have `modules`; the app then probes the model as before.
+
 **Editing a report.** A new installer version may bring a new version of a report. **Update** and
 **Repair or change** then ask before replacing it, because that replaces edits made in Power BI.
 To keep your edits, use **File** > **Save a copy** in Power BI first and edit the copy.

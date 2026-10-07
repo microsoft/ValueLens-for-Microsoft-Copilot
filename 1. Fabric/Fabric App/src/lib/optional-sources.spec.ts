@@ -41,5 +41,6 @@ describe("isAbsent", () => {
         expect(isAbsent({ ...ALL_UNKNOWN, productFeedback: "checking" }, "productFeedback")).toBe(false);
         expect(isAbsent({ ...ALL_UNKNOWN, productFeedback: "present" }, "productFeedback")).toBe(false);
         expect(isAbsent({ ...ALL_UNKNOWN, productFeedback: "absent" }, "productFeedback")).toBe(true);
+        expect(isAbsent({ ...ALL_UNKNOWN, productFeedback: "notConfigured" }, "productFeedback")).toBe(true);
     });
 });

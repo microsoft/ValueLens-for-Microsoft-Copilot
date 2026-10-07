@@ -86,8 +86,30 @@ function column(c) {
   return { ...base, dataType: 'int64', formatString: c.kind === 'count' ? '#,0' : '0', summarizeBy: 'sum', annotations };
 }
 
+/** The template Calendar's date-range lines, and the same lines with the activity dates added. */
+export const CALENDAR_RANGE = /** @type {[string, string][]} */ ([
+  ['VAR MinDate = MINX({ AuditMin, FeedbackMin }, [Value])',
+    `VAR MinDate = MINX({ AuditMin, FeedbackMin, MIN('${M365_TABLE}'[ActivityDate]) }, [Value])`],
+  ['VAR MaxDate = MAXX({ AuditMax, FeedbackMax }, [Value])',
+    `VAR MaxDate = MAXX({ AuditMax, FeedbackMax, MAX('${M365_TABLE}'[ActivityDate]) }, [Value])`],
+]);
+
 /**
- * Adds the table and its relationships. A template that already has the table is left alone.
+ * Widens the Calendar to cover the activity dates too, so the M365 pages still slice by date
+ * when the audit is empty or starts later. A Calendar without the template's range lines
+ * (an older template) is left alone.
+ * @param {import('./model.js').ModelBim['model']} model
+ */
+export function addM365CalendarRange(model) {
+  const source = model.tables.find((t) => t.name === 'Calendar')?.partitions?.[0]?.source;
+  if (!source || source.type !== 'calculated') return;
+  const lines = Array.isArray(source.expression) ? source.expression : String(source.expression ?? '').split('\n');
+  if (!CALENDAR_RANGE.every(([before]) => lines.some((l) => l.trim() === before))) return;
+  source.expression = lines.map((l) => CALENDAR_RANGE.find(([before]) => l.trim() === before)?.[1] ?? l);
+}
+
+/**
+ * Adds the table, its relationships and the Calendar range. A template that already has the table is left alone.
  * @param {import('./model.js').ModelBim['model']} model
  * @param {boolean} on
  */
@@ -113,4 +135,5 @@ export function addM365Activity(model, on) {
       toColumn: r.toColumn,
     });
   }
+  addM365CalendarRange(model);
 }

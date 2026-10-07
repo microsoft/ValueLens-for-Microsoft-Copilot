@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { defaultModules, MODULES, NOTEBOOKS_DIR, notebooksFor, OPTIONAL_MODULES, permissionsFor } from '../src/catalog.js';
 import { realSources } from './fakes.js';
-import { M365_COLUMNS, M365_RELATIONSHIPS, M365_SOURCE_TABLE, M365_TABLE, stableGuid } from '../src/transform/m365.js';
+import { addM365CalendarRange, CALENDAR_RANGE, M365_COLUMNS, M365_RELATIONSHIPS, M365_SOURCE_TABLE, M365_TABLE, stableGuid } from '../src/transform/m365.js';
 import { buildModel, loadTemplateModel } from '../src/transform/model.js';
 import { buildPipeline, findActivity, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
 
@@ -100,6 +100,33 @@ test('model: relationships point at real columns, lineage is stable and unique',
 
   const twice = buildModel({ compatibilityLevel: 1600, model }, { ...lake, modules: on }).model;
   assert.equal(twice.tables.filter((t) => t.name === M365_TABLE).length, 1, 'a model that has the table already is left alone');
+});
+
+test('model: the Calendar spans the activity dates as well as the audit and feedback dates', () => {
+  const calendar = (/** @type {any} */ doc) => {
+    const model = doc.model ?? doc;
+    const expr = model.tables.find((/** @type {any} */ t) => t.name === 'Calendar').partitions[0].source.expression;
+    return Array.isArray(expr) ? expr.join('\n') : expr;
+  };
+  const original = calendar(template);
+  for (const [before] of CALENDAR_RANGE) assert.ok(original.includes(before), `the template has: ${before}`);
+  assert.doesNotMatch(original, /M365 Activity/, 'the template itself stays source-agnostic');
+
+  for (const modules of [on, off]) {
+    const model = buildModel(template, { ...lake, modules }).model;
+    const expr = calendar(model);
+    assert.match(expr, /MINX\(\{ AuditMin, FeedbackMin, MIN\('M365 Activity'\[ActivityDate\]\) \}, \[Value\]\)/);
+    assert.match(expr, /MAXX\(\{ AuditMax, FeedbackMax, MAX\('M365 Activity'\[ActivityDate\]\) \}, \[Value\]\)/);
+    assert.match(expr, /RunDate - 364/, 'keeps the rolling fallback for a model with no dates');
+    const once = structuredClone(model);
+    addM365CalendarRange(once);
+    assert.equal(calendar(once), expr, 'idempotent');
+  }
+  assert.equal(calendar(template), original, 'the template is untouched');
+
+  const legacy = { tables: [{ name: 'Calendar', partitions: [{ source: { type: 'calculated', expression: ['VAR MinDate = MIN(x)'] } }] }] };
+  addM365CalendarRange(/** @type {any} */ (legacy));
+  assert.deepEqual(legacy.tables[0].partitions[0].source.expression, ['VAR MinDate = MIN(x)'], 'an older Calendar is left alone');
 });
 
 test('model columns are all written by the notebook', () => {

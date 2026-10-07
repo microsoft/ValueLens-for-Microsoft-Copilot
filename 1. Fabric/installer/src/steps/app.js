@@ -429,7 +429,14 @@ export function fabricConfigFile(config, ws, models) {
     [CONSUMPTION_ALIAS]: config.consumption.model.id,
     [EVALUATOR_ALIAS]: config.agentEvaluator.model.id,
   };
-  return { semanticModels: Object.fromEntries(models.map((alias) => [alias, { workspaceId: ws, itemId: ids[alias] }])) };
+  /** @type {{ semanticModels: Record<string, { workspaceId: string, itemId: string | undefined }>, modules?: Record<string, boolean> }} */
+  const body = { semanticModels: Object.fromEntries(models.map((alias) => [alias, { workspaceId: ws, itemId: ids[alias] }])) };
+  if (config.modules) {
+    body.modules = Object.fromEntries(
+      ['m365Activity', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator'].map((id) => [id, Boolean(config.modules[id])]),
+    );
+  }
+  return body;
 }
 
 /**
