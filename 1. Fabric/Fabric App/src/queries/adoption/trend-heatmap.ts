@@ -7,6 +7,7 @@
 
 import type { VisualizationSpec } from "@microsoft/fabric-visuals";
 import type { ColumnMetadataMap } from "@/lib/to-data-table";
+import { contrastingTextColor } from "@/lib/color-scale";
 import { connection, FORMAT_HOURS, FORMAT_RATE, FORMAT_WHOLE } from "../shared";
 import query from "./trend-heatmap.dax?raw";
 import spec from "./trend-heatmap.json";
@@ -106,9 +107,9 @@ interface TrendHeatmapThemeParams {
     quiet: string;
     /** Strong endpoint from the host theme, scoped to the current destination palette. */
     strong: string;
-    /** Text colour for low-intensity cells. */
+    /** One label colour, usually the page text. */
     quietText: string;
-    /** Text colour for high-intensity cells. */
+    /** The other label colour, usually the page background. Each cell takes whichever reads better on it. */
     strongText: string;
 }
 
@@ -139,20 +140,15 @@ export function applyTrendHeatmapTheme(
     colors: TrendHeatmapThemeParams,
 ): VisualizationSpec {
     const themed = structuredClone(baseSpec) as unknown as MutableHeatmapSpec;
-    themed.layer[0].encoding.color.scale = {
-        ...(themed.layer[0].encoding.color.scale ?? {}),
-        range: [colors.quiet, colors.strong],
-    };
-    themed.layer[1].encoding.color = {
-        condition: { test: "datum['Heatmap Intensity'] > 0.58", value: colors.strongText },
-        value: colors.quietText,
-    };
+    const cellColor = themed.layer[0].encoding.color;
+    cellColor.scale = { ...(cellColor.scale ?? {}), range: [colors.quiet, colors.strong] };
+    themed.layer[1].encoding.color = contrastingTextColor(cellColor.field, colors.quietText, colors.strongText);
     return themed as unknown as VisualizationSpec;
 }
 
 interface MutableHeatmapSpec {
     layer: [
-        { encoding: { color: { scale?: Record<string, unknown> } } },
+        { encoding: { color: { field: string; scale?: Record<string, unknown> } } },
         { encoding: { color?: unknown } },
     ];
 }

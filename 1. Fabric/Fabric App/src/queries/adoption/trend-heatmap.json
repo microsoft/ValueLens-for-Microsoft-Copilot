@@ -12,16 +12,6 @@
       "as": "Week Label"
     },
     {
-      "joinaggregate": [
-        { "op": "min", "field": "__VALUE__", "as": "Heatmap Min" },
-        { "op": "max", "field": "__VALUE__", "as": "Heatmap Max" }
-      ]
-    },
-    {
-      "calculate": "isValid(datum['__VALUE__']) && datum['Heatmap Max'] > datum['Heatmap Min'] ? (datum['__VALUE__'] - datum['Heatmap Min']) / (datum['Heatmap Max'] - datum['Heatmap Min']) : isValid(datum['__VALUE__']) ? 1 : 0",
-      "as": "Heatmap Intensity"
-    },
-    {
       "calculate": "isValid(datum['__VALUE__']) ? format(datum['__VALUE__'], '__FORMAT__') : ''",
       "as": "Heatmap Label"
     }

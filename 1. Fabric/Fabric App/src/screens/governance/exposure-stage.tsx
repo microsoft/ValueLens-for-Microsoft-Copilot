@@ -11,9 +11,16 @@ import { ChartPanel, NoteCard } from "@/components/report-panels";
 import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useTableQuery } from "@/hooks/use-table-query";
-import { applyExposureTheme, governanceExposure } from "@/queries/governance";
+import { applyExposureTheme, completeExposureGrid, governanceExposure, soleExposureAccess } from "@/queries/governance";
 
 const EXPOSURE = governanceExposure();
+
+/** Said when every agent sits in one data access column, so the empty columns read as a finding, not a fault. */
+function soleAccessNote(access: string): string {
+    if (access === "Not reported") return "The registry gave no capability details for these agents, so what they can read is unknown";
+    if (access === "None declared") return "None of these agents declares any data it can read";
+    return `Every one of these agents can read ${access.toLowerCase()}`;
+}
 
 const NOTES = [
     {
@@ -38,6 +45,8 @@ const NOTES = [
 export function ExposureStage() {
     const { theme } = useThemeContext();
     const exposure = useTableQuery(EXPOSURE);
+    const gridTable = useMemo(() => exposure.table && completeExposureGrid(exposure.table), [exposure.table]);
+    const sole = soleExposureAccess(exposure.table);
 
     const spec = useMemo(
         () =>
@@ -45,7 +54,7 @@ export function ExposureStage() {
                 quiet: theme.backgroundHover || theme.backgroundSecondary,
                 strong: theme.brandBackground,
                 quietText: theme.foreground,
-                strongText: theme.brandForeground,
+                strongText: theme.background,
             }),
         [theme],
     );
@@ -58,11 +67,15 @@ export function ExposureStage() {
         >
             <div className="grid grid-cols-1 gap-500 xl:grid-cols-[minmax(0,1fr)_320px]">
                 <ChartPanel
-                    result={exposure}
+                    result={{ ...exposure, table: gridTable }}
                     spec={spec}
                     height={340}
                     title="Sharing against data access"
-                    subtitle="Tenant-built agents in each pairing; hover for how many have no recorded use"
+                    subtitle={
+                        sole
+                            ? soleAccessNote(sole)
+                            : "Tenant-built agents in each pairing; hover for how many have no recorded use"
+                    }
                     emptyTitle="No tenant-built agents"
                     emptyDescription="The registry holds no agents built in this tenant for these filters."
                 />

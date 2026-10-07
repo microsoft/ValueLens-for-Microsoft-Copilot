@@ -2,21 +2,6 @@
   "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
   "width": "container",
   "height": "container",
-  "transform": [
-    {
-      "joinaggregate": [
-        {
-          "op": "max",
-          "field": "Agents",
-          "as": "Most Agents"
-        }
-      ]
-    },
-    {
-      "calculate": "datum['Most Agents'] > 0 ? datum['Agents'] / datum['Most Agents'] : 0",
-      "as": "Heat"
-    }
-  ],
   "encoding": {
     "x": {
       "field": "Data Access",
@@ -92,6 +77,11 @@
       }
     },
     {
+      "transform": [
+        {
+          "filter": "datum['Agents'] > 0"
+        }
+      ],
       "mark": {
         "type": "text",
         "baseline": "middle",
