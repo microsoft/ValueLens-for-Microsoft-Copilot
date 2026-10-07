@@ -64,6 +64,7 @@ right (next section) — the data itself must be exported by an admin (or a sche
 | Optional SharePoint/OneDrive folder shortcut into the drop folder | Fabric tenant setting for **OneDrive and SharePoint shortcuts** enabled, and read access to the folder for whoever creates the shortcut. Without it, use the Lakehouse folder. |
 | Capacity | Workspace on a Fabric capacity (**F2+** or trial) |
 | Connect the Power BI template | Read on the Lakehouse **SQL endpoint** (the template signs in to it once) |
+| Installer-published Power BI reports | The installing person as **Contributor** or **Member** on the workspace. No extra API permission. The Tornado chart, Word cloud and Deneb visuals need the tenant setting **Allow visuals created using the Power BI SDK** |
 
 ---
 

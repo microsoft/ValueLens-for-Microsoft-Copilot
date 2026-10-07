@@ -17,6 +17,24 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-07 — Analytics Hub installer: the Power BI reports
+
+The installer can now publish the reports from the Power BI templates, already connected to the
+semantic models it deploys: `ValueLens`, and `Consumption Central` and `Agent Evaluator` with their
+modules. It's the new default for Power BI, alongside the model and the app, so nobody needs Power BI
+Desktop. The plan lists the reports, and the summary links to them.
+
+A new installer version that brings a changed report asks before replacing it, because that
+replaces edits made in Power BI. A report that can't be published is reported, and the rest of the
+install carries on. If you're a Fabric administrator, the installer also checks the tenant setting
+*Allow visuals created using the Power BI SDK*, which the Tornado chart, Word cloud and Deneb
+visuals need. See [Power BI reports](1.%20Fabric/installer/README.md#power-bi-reports).
+
+An earlier install gets the reports offered the next time you choose **Repair or change**.
+Installer users get this in the next installer release.
+
+---
+
 ## 2026-10-07 — Paths renumbered: Azure second
 
 The Azure path (preview) joins the numbered paths, second after Fabric, because it's the other

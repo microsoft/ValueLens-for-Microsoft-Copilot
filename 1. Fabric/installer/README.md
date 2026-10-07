@@ -108,7 +108,9 @@ Azure commands:
       connected by default; the rest are skipped until you choose otherwise. A CSV card says
       where to export the file, and you can pick the exports to upload now. See
       [Data sources and exports](#data-sources-and-exports).
-   2. **Power BI:** the semantic model and the app (the default), the model only, or neither.
+   2. **Power BI:** the semantic model, the Power BI reports and the app (the default). Or the
+      model and reports, the model and app, the model only, or neither. See
+      [Power BI reports](#power-bi-reports).
    3. **How much audit history** to load first: 30, 90 or 180 days.
    4. **Capacity, workspace and Lakehouse.** Spaces and hyphens in the Lakehouse name become
       underscores, because Fabric doesn't allow them.
@@ -140,10 +142,11 @@ app registration. An install from an earlier version keeps the names it already 
 
 - **Admin consent.** If you couldn't grant it, send the link the installer gives you to an admin.
   They select **Grant admin consent**. Then open the exe again and choose **Run now**.
-- **Share the app.** Open **Analytics Hub** in the workspace, choose **Share**, and add people or a
-  group. They also need **Build** on `Analytics Hub Model` (its **Manage permissions** page), or
-  Viewer on the workspace.
-- **Own reports.** Connect Power BI Desktop to `Analytics Hub Model`.
+- **Share the app and reports.** Open **Analytics Hub** or the **ValueLens** report in the
+  workspace, choose **Share**, and add people or a group. They also need **Build** on
+  `Analytics Hub Model` (its **Manage permissions** page), or Viewer on the workspace.
+- **Own reports.** Connect Power BI Desktop to `Analytics Hub Model`, or use **Save a copy** on a
+  published report.
 - **Flows and the Cowork Dataflow.** If you chose them, the end of the install lists what to sign
   in to. See [Power Automate flows](#power-automate-flows-optional) and
   [Credit consumption](#credit-consumption).
@@ -152,6 +155,33 @@ app registration. An install from an earlier version keeps the names it already 
   on the workspace first.
 - **Secrets expire after 12 months.** **Check status** warns you 30 days before. Choose
   **Create new secrets**.
+
+## Power BI reports
+
+The installer publishes the reports from the Power BI templates to the workspace, already
+connected to its semantic models, so nobody has to open Power BI Desktop:
+
+| Report | Reads | Published when |
+|---|---|---|
+| `ValueLens` | `Analytics Hub Model` | Always, with the reports |
+| `Consumption Central` | `Analytics Hub Consumption Model` | Credit consumption is on |
+| `Agent Evaluator` | `Analytics Hub Agent Evaluator Model` | Agent Evaluator is on, with an environment |
+
+Pages for sources you skip stay empty rather than failing. To leave the reports out, choose
+**Semantic model and the Analytics Hub app** or **Semantic model only** for Power BI. An install
+from an earlier version gets the reports offered the next time you choose **Repair or change**;
+**Update** on its own doesn't add them.
+
+**Editing a report.** A new installer version may bring a new version of a report. **Update** and
+**Repair or change** then ask before replacing it, because that replaces edits made in Power BI.
+To keep your edits, use **File** > **Save a copy** in Power BI first and edit the copy.
+
+**Blank visuals.** The Tornado chart, Word cloud and Deneb visuals need the tenant setting
+*Allow visuals created using the Power BI SDK*. If you're a Fabric administrator, the installer
+checks it.
+
+Without the reports, publish the templates yourself: open `ValueLens - Fabric.pbit` in Power BI
+Desktop with the values the installer shows, and publish it to the workspace.
 
 ## Load status and reruns
 
@@ -346,6 +376,8 @@ the endpoint, someone who manages the vault approves it under **Networking** >
 | A flow doesn't save any files | Check it's turned on and its connections are signed in. The Copilot Studio credits flow must be signed in as a Power Platform, Billing or Global administrator. |
 | A model refresh fails with `Login failed` | The connection's secret expired. Choose **Create new secrets**. |
 | `The app wasn't deployed` | Fix the cause it shows, then choose **Redeploy the app**. |
+| `The … report wasn't published` | Fix the cause it shows, then choose **Update**. The models and data aren't affected. |
+| A report's Tornado chart, Word cloud or Deneb visual is blank | Turn on the tenant setting *Allow visuals created using the Power BI SDK*. See [Power BI reports](#power-bi-reports). |
 | `You can't assign Azure roles in …` | See [Credit consumption](#credit-consumption). |
 | `You can't add … to …, so its transcripts are skipped` | See [Agent Evaluator](#agent-evaluator). |
 | Work patterns says the reports hide user names | See [Microsoft 365 activity](#microsoft-365-activity). |
