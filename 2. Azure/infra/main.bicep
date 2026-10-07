@@ -33,6 +33,9 @@ param runSchedule string = '0 3 * * *'
 @description('Steps the scheduled run executes, mirroring the Enable* switches of the Fabric pipeline.')
 param runSteps string = 'collect,process,publish,refresh'
 
+@description('Demo mode: the run job publishes the bundled synthetic sample instead of collecting tenant data (VALUELENS_SAMPLE_DATA).')
+param sampleData bool = false
+
 @description('Entra principal that administers SQL. Defaults to the managed identity so the migrate job can create database users.')
 param sqlAdminLogin string = ''
 param sqlAdminObjectId string = ''
@@ -175,6 +178,7 @@ module apps 'modules/containerapps.bicep' = {
     webImage: '${imageRegistry}/valuelens-web:${imageTag}'
     runSchedule: runSchedule
     runSteps: runSteps
+    sampleData: sampleData
     storageAccountName: storage.outputs.name
     sqlServerFqdn: sql.outputs.serverFqdn
     sqlDatabaseName: sql.outputs.databaseName

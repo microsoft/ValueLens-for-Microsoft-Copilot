@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.47.16.16243",
-      "templateHash": "4563906889663112324"
+      "templateHash": "18137643812249579333"
     }
   },
   "parameters": {
@@ -74,6 +74,13 @@
       "defaultValue": "collect,process,publish,refresh",
       "metadata": {
         "description": "Steps the scheduled run executes, mirroring the Enable* switches of the Fabric pipeline."
+      }
+    },
+    "sampleData": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Demo mode: the run job publishes the bundled synthetic sample instead of collecting tenant data (VALUELENS_SAMPLE_DATA)."
       }
     },
     "sqlAdminLogin": {
@@ -1095,6 +1102,9 @@
           "runSteps": {
             "value": "[parameters('runSteps')]"
           },
+          "sampleData": {
+            "value": "[parameters('sampleData')]"
+          },
           "storageAccountName": {
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'vl-storage'), '2025-04-01').outputs.name.value]"
           },
@@ -1142,7 +1152,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.47.16.16243",
-              "templateHash": "11920865376665819382"
+              "templateHash": "13284548157189845414"
             }
           },
           "parameters": {
@@ -1187,6 +1197,10 @@
             },
             "runSteps": {
               "type": "string"
+            },
+            "sampleData": {
+              "type": "bool",
+              "defaultValue": false
             },
             "storageAccountName": {
               "type": "string"
@@ -1278,7 +1292,7 @@
                 "value": "[parameters('semanticModels')]"
               }
             ],
-            "jobEnv": "[concat(variables('commonEnv'), createArray(createObject('name', 'VALUELENS_MODULES', 'value', parameters('modules')), createObject('name', 'VALUELENS_AUDIT_HISTORY_DAYS', 'value', string(parameters('auditHistoryDays'))), createObject('name', 'VALUELENS_SQL_READER_NAME', 'value', parameters('sqlReaderName')), createObject('name', 'VALUELENS_SQL_READER_CLIENT_ID', 'value', parameters('sqlReaderClientId'))))]",
+            "jobEnv": "[concat(variables('commonEnv'), createArray(createObject('name', 'VALUELENS_MODULES', 'value', parameters('modules')), createObject('name', 'VALUELENS_AUDIT_HISTORY_DAYS', 'value', string(parameters('auditHistoryDays'))), createObject('name', 'VALUELENS_SQL_READER_NAME', 'value', parameters('sqlReaderName')), createObject('name', 'VALUELENS_SQL_READER_CLIENT_ID', 'value', parameters('sqlReaderClientId')), createObject('name', 'VALUELENS_SAMPLE_DATA', 'value', if(parameters('sampleData'), 'true', 'false'))))]",
             "registries": "[if(empty(parameters('registryServer')), createArray(), createArray(createObject('server', parameters('registryServer'), 'identity', parameters('identityId'))))]",
             "identity": {
               "type": "UserAssigned",
