@@ -24,6 +24,17 @@ export function outcomePalette(outcomeColors: OutcomeColors | undefined, theme: 
     };
 }
 
+/**
+ * A heatmap label colour: whichever of two text colours contrasts more with
+ * the cell's own fill, read back from the chart's colour scale. The label
+ * then stays legible at every step of any ramp, in light and dark themes.
+ */
+export function contrastingTextColor(field: string, first: string, second: string) {
+    const fill = `scale('color', datum[${JSON.stringify(field)}])`;
+    const test = `contrast(${fill}, ${JSON.stringify(first)}) >= contrast(${fill}, ${JSON.stringify(second)})`;
+    return { condition: { test, value: first }, value: second };
+}
+
 /** Pins a spec's colour encoding to fixed categories and colours, so a verdict keeps its tone wherever it appears. */
 export function withColorScale(
     spec: VisualizationSpec,

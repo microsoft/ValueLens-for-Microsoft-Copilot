@@ -12,7 +12,7 @@ import { compile } from "vega-lite";
 import { parse, View, type Scene, type SceneItem } from "vega";
 import type { TopLevelSpec } from "vega-lite";
 import type { ColumnMetadataMap } from "@/lib/to-data-table";
-import { trendHeatmap } from "./trend-heatmap";
+import { applyTrendHeatmapTheme, trendHeatmap } from "./trend-heatmap";
 import heatmapRows from "./__fixtures__/trend-heatmap.rows.json";
 
 type Row = Record<string, string | number | boolean | null>;
@@ -25,7 +25,13 @@ interface Rect {
     bounds: { x1: number; y1: number; x2: number; y2: number };
 }
 
-async function renderRects(spec: unknown, rows: Row[], columnMetadata: ColumnMetadataMap, valueField: string) {
+async function renderRects(
+    spec: unknown,
+    rows: Row[],
+    columnMetadata: ColumnMetadataMap,
+    valueField: string,
+    marktype = "rect",
+) {
     const rename = new Map(Object.entries(columnMetadata).map(([daxName, column]) => [daxName, column.name]));
     const values = rows.map((row) =>
         Object.fromEntries(Object.entries(row).map(([key, value]) => [rename.get(key) ?? key, value])),
@@ -38,7 +44,7 @@ async function renderRects(spec: unknown, rows: Row[], columnMetadata: ColumnMet
     const rects: SceneItem[] = [];
     const walk = (node: Scene | SceneItem) => {
         const scene = node as Scene;
-        if (scene.marktype === "rect") rects.push(...(scene.items as SceneItem[]));
+        if (scene.marktype === marktype && scene.role === "mark") rects.push(...(scene.items as SceneItem[]));
         for (const item of (scene.items ?? []) as (Scene | SceneItem)[]) {
             if ((item as Scene).marktype || (item as { items?: unknown }).items) walk(item);
         }
@@ -104,5 +110,23 @@ describe("adoption trend heatmap renders", () => {
         expect(max.fill).toBeDefined();
         expect(min.fill).toBeDefined();
         expect(max.fill).not.toBe(min.fill);
+    });
+
+    it.each([
+        { theme: "light", quiet: "#f5f5f5", strong: "#0f6cbd", text: "#242424", page: "#fafafa" },
+        { theme: "dark", quiet: "#333333", strong: "#479ef5", text: "#ffffff", page: "#1f1f1f" },
+    ])("labels the fullest and emptiest cells in the text colour that reads best in the $theme theme", async (colors) => {
+        const { vegaLiteSpec, columnMetadata } = trendHeatmap({ metric: "activeUsers" });
+        const spec = applyTrendHeatmapTheme(vegaLiteSpec, {
+            quiet: colors.quiet,
+            strong: colors.strong,
+            quietText: colors.text,
+            strongText: colors.page,
+        });
+        const labels = await renderRects(spec, rows, columnMetadata, "Active Users", "text");
+        const values = labels.map((label) => label.datum["Active Users"] as number);
+
+        expect(labels.find((label) => label.datum["Active Users"] === Math.max(...values))?.fill).toBe(colors.page);
+        expect(labels.find((label) => label.datum["Active Users"] === Math.min(...values))?.fill).toBe(colors.text);
     });
 });

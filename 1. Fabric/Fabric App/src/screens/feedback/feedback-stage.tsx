@@ -181,6 +181,11 @@ export function FeedbackStage() {
     );
     const columns = useMemo(() => commentColumns(colorRange), [colorRange]);
 
+    // The trend and topic charts sit side by side, so they share one height: enough for every topic label.
+    const pairStyle = categoryTable
+        ? { height: rowChartHeight(uniqueValues(categoryTable, "Category"), { perRow: 28, chrome: 116, min: 360 }) }
+        : undefined;
+
     const rawThemeSummary = readText(summaryRow, "[Theme Summary]");
     const themeSummary = rawThemeSummary ? withoutEmoji(rawThemeSummary) : undefined;
 
@@ -225,19 +230,7 @@ export function FeedbackStage() {
             )}
 
             <div className="grid gap-400 xl:grid-cols-2">
-                <div
-                    className="h-[360px]"
-                    style={
-                        categoryTable
-                            ? {
-                                  height: rowChartHeight(uniqueValues(categoryTable, "Category"), {
-                                      perRow: 40,
-                                      chrome: 116,
-                                  }),
-                              }
-                            : undefined
-                    }
-                >
+                <div className="h-[360px]" style={pairStyle}>
                     {trendResult.data?.status === "error" ? (
                         <QueryError
                             className="h-full"
@@ -266,7 +259,7 @@ export function FeedbackStage() {
                     )}
                 </div>
 
-                <div className="h-[360px]">
+                <div className="h-[360px]" style={pairStyle}>
                     {categoryResult.data?.status === "error" ? (
                         <QueryError
                             className="h-full"

@@ -72,7 +72,7 @@ export function TrendHeatmapStage() {
                 quiet: theme.backgroundHover || theme.backgroundSecondary,
                 strong: theme.brandBackground,
                 quietText: theme.foreground,
-                strongText: theme.brandForeground,
+                strongText: theme.background,
             }),
         [heatmap.vegaLiteSpec, theme],
     );
