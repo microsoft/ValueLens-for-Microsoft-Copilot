@@ -164,7 +164,7 @@ function RankingNotes({ cohort, unassigned }: { cohort: LeaderboardCohort; unass
                 {cohort === "agents" && (
                     <button
                         type="button"
-                        onClick={() => scrollToAnchor(stageAnchor("agent-registry"))}
+                        onClick={() => scrollToAnchor(stageAnchor("agents"))}
                         className={`inline-flex w-fit items-center gap-100 ${SMALL} font-semibold text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
                     >
                         Every agent, ranked by its users

@@ -8,16 +8,15 @@
 import { useId, useMemo, useRef, useState, type Ref } from "react";
 import { DataGrid, type GridColumnDef, type Row } from "@microsoft/fabric-datagrid";
 import { VegaVisual } from "@/components/vega-visual";
-import { ChevronDown, Unlink } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { stageAnchor } from "@/components/destinations";
-import { FilterNote } from "@/components/filter-note";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
+import { OpenDestinationLink } from "@/components/open-destination-link";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useSourceAvailability } from "@/hooks/source-availability.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
-import type { FilterKey } from "@/lib/filters";
 import { formatKpi } from "@/lib/format-kpi";
 import { heatDomain, heatRenderer } from "@/lib/heat";
 import { isAbsent } from "@/lib/optional-sources";
@@ -28,54 +27,19 @@ import { formatCell, textCell } from "@/lib/tree-grid";
 import { cn } from "@/lib/utils";
 import {
     agentActivitySummary,
-    agentEstateSummary,
     agentLeaderboard,
-    agentLifecycle,
     agentUsage,
-    describeRegistryLinkage,
     toAgentEntries,
     type AgentEntry,
-    type RegistryLinkage,
 } from "@/queries/agents";
 
 const SMALL = "text-[length:var(--text-200)] leading-200";
 const BODY = "text-[length:var(--text-300)] leading-300";
 
-/**
- * The registry is a catalogue, not activity: narrowing it to a window or an
- * organization would drop every agent nobody used there, which is exactly the
- * part of the estate this stage exists to show. Agent type still applies.
- */
-const CATALOGUE_IGNORES: FilterKey[] = ["dateRange", "organizations", "licence", "audience"];
-
-/** The one sentence explaining how far usage could be tied back to the registry, if any is needed. */
-function linkageMessage(linkage: RegistryLinkage): string | undefined {
-    switch (linkage.kind) {
-        case "none":
-            return (
-                `None of the ${formatKpi(linkage.unmatchedSessions, "whole")} agent sessions in the audit log ` +
-                `match an agent in the registry, so no registered agent shows any use. The agent leaderboard ` +
-                `lists the agents people did use by the names the audit log gives them, marked Not in registry.`
-            );
-        case "partial":
-            return (
-                `${formatKpi(linkage.unmatchedSessions, "whole")} agent sessions match no agent in the registry; ` +
-                `the agent leaderboard lists those agents by their audit-log names, marked Not in registry. ` +
-                `${formatKpi(linkage.seenInUse, "whole")} of ${formatKpi(linkage.registryAgents, "whole")} ` +
-                `registered agents are seen in use.`
-            );
-        default:
-            return undefined;
-    }
-}
-
 const IN_REGISTRY = "In Registry";
 
 /** Leaderboard columns only the Agent 365 registry fills in. */
 const REGISTRY_COLUMNS: ReadonlySet<string> = new Set(["Creator", "Available In", "Lifecycle", "Adoption"]);
-
-/** Stands in for a registry query the stage skips when there is no registry. */
-const SKIPPED = { connection: "", query: "" };
 
 const dayFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
@@ -510,37 +474,24 @@ function AgentLeaderboard({ registry }: { registry: boolean }) {
 
 /**
  * The agent half of the Leaderboards destination: which agents people use,
- * where the registry's agents sit in their lifecycle, and what each one is
- * for.
+ * and what each one is for.
  *
- * The report's Agent Registry page leans on the join between the audit log
- * and the Agent 365 registry for every figure. Here usage is read straight
- * from the audit log, agents the registry doesn't know are listed by their
- * audit-log names, and when the two do not line up the screen says so
- * instead of reporting zero use.
+ * Usage is read straight from the audit log, and agents the registry doesn't
+ * know are listed by their audit-log names. Where every registered agent sits
+ * in its lifecycle, who owns it and who can reach it is Governance's story.
  */
 export function AgentRegistryStage() {
     const { theme } = useThemeContext();
     const registry = !isAbsent(useSourceAvailability(), "agentRegistry");
 
     const activity = useFilteredQuery(agentActivitySummary());
-    const estate = useFilteredQuery(registry ? agentEstateSummary() : SKIPPED, { ignore: CATALOGUE_IGNORES });
 
     const usage = agentUsage();
     const usageResult = useFilteredQuery({ connection: usage.connection, query: usage.query });
-    const lifecycle = agentLifecycle();
-    const lifecycleResult = useFilteredQuery(
-        registry ? { connection: lifecycle.connection, query: lifecycle.query } : SKIPPED,
-        { ignore: CATALOGUE_IGNORES },
-    );
 
     const activityRow = useMemo(
         () => (activity.data?.status === "success" ? toSummaryRow(activity.data.table) : undefined),
         [activity.data],
-    );
-    const estateRow = useMemo(
-        () => (estate.data?.status === "success" ? toSummaryRow(estate.data.table) : undefined),
-        [estate.data],
     );
     const usageTable = useMemo(
         () =>
@@ -549,46 +500,22 @@ export function AgentRegistryStage() {
                 : undefined,
         [usageResult.data, usage.columnMetadata],
     );
-    const lifecycleTable = useMemo(
-        () =>
-            lifecycleResult.data?.status === "success"
-                ? toDataTable(lifecycleResult.data.table, lifecycle.columnMetadata)
-                : undefined,
-        [lifecycleResult.data, lifecycle.columnMetadata],
-    );
-
-    const message = registry ? linkageMessage(describeRegistryLinkage(estateRow)) : undefined;
-
-    const summaryError =
-        activity.data?.status === "error"
-            ? { message: activity.data.error.message, retry: activity.refetch }
-            : registry && estate.data?.status === "error"
-              ? { message: estate.data.error.message, retry: estate.refetch }
-              : undefined;
-    const summaryLoading =
-        activity.isLoading || !activity.data || (registry && (estate.isLoading || !estate.data));
-    const kpiGrid = cn("grid gap-300", registry ? "md:grid-cols-3" : "md:grid-cols-2");
 
     return (
         <Section
-            id={stageAnchor("agent-registry")}
-            title={registry ? "Agent registry" : "Agents"}
-            description={
-                registry
-                    ? "Which agents people actually use, where every registered agent sits in its lifecycle, and what each one is for."
-                    : "Which agents people actually use, and whether they come back to them."
-            }
+            id={stageAnchor("agents")}
+            title="Agents"
+            description="Which agents people actually use, and what each one is for."
         >
-            {summaryError ? (
-                <QueryError message={summaryError.message} onRetry={summaryError.retry} />
-            ) : summaryLoading ? (
-                <div className={kpiGrid}>
-                    {Array.from({ length: registry ? 3 : 2 }, (_, index) => (
-                        <QueryLoading key={index} />
-                    ))}
+            {activity.data?.status === "error" ? (
+                <QueryError message={activity.data.error.message} onRetry={activity.refetch} />
+            ) : activity.isLoading || !activity.data ? (
+                <div className="grid gap-300 md:grid-cols-2">
+                    <QueryLoading />
+                    <QueryLoading />
                 </div>
             ) : (
-                <div className={kpiGrid}>
+                <div className="grid gap-300 md:grid-cols-2">
                     <KpiCard
                         label="Agent users"
                         value={readNumber(activityRow, "[Agent Users]")}
@@ -619,95 +546,40 @@ export function AgentRegistryStage() {
                             </div>
                         }
                     />
-                    {registry && (
-                        <KpiCard
-                            label="Registered agents"
-                            value={readNumber(estateRow, "[Registry Agents]")}
-                            detail={
-                                <div className="flex flex-col gap-100">
-                                    <KpiStat label="Built in this tenant" value={readNumber(estateRow, "[Tenant Built]")} />
-                                    <KpiStat label="Seen in use" value={readNumber(estateRow, "[Seen In Use]")} />
-                                </div>
-                            }
-                        />
-                    )}
                 </div>
-            )}
-
-            {message && (
-                <p className="flex max-w-[80ch] items-start gap-200 text-[length:var(--text-300)] leading-300 text-muted-foreground">
-                    <Unlink className="icon-size-200 mt-[2px] shrink-0" aria-hidden="true" />
-                    {message}
-                </p>
             )}
 
             {registry && (
-                <FilterNote
-                    ignored={CATALOGUE_IGNORES}
-                    reason="the lifecycle chart and the registered-agent count always cover every registered agent, used or not. The agent leaderboard follows every filter for usage and still lists the agents nobody used."
-                />
+                <OpenDestinationLink destination="governance" stage="estate-health">
+                    Where every registered agent sits, who owns it and who can reach it
+                </OpenDestinationLink>
             )}
 
-            {/* grid-cols-1 caps the stacked track at the column width, so a chart
-                drawn wider (before the window narrowed) can shrink back. */}
-            <div className={cn("grid grid-cols-1 gap-400", registry && "xl:grid-cols-2")}>
-                <div className="h-[420px]">
-                    {usageResult.data?.status === "error" ? (
-                        <QueryError
-                            className="h-full"
-                            message={usageResult.data.error.message}
-                            onRetry={usageResult.refetch}
-                        />
-                    ) : usageResult.isLoading || !usageTable ? (
-                        <QueryLoading className="h-full" />
-                    ) : usageTable.rows.length === 0 ? (
-                        <QueryEmpty
-                            className="h-full"
-                            title="No agent sessions"
-                            description="The audit log records no agent use in this period."
-                        />
-                    ) : (
-                        <VegaVisual
-                            spec={usage.vegaLiteSpec}
-                            data={usageTable}
-                            theme={theme}
-                            header={{
-                                title: "Most-used agents",
-                                subtitle: "Sessions per agent, as the audit log names them",
-                            }}
-                        />
-                    )}
-                </div>
-
-                {registry && (
-                    <div className="h-[420px]">
-                        {lifecycleResult.data?.status === "error" ? (
-                            <QueryError
-                                className="h-full"
-                                message={lifecycleResult.data.error.message}
-                                onRetry={lifecycleResult.refetch}
-                            />
-                        ) : lifecycleResult.isLoading || !lifecycleTable ? (
-                            <QueryLoading className="h-full" />
-                        ) : lifecycleTable.rows.length === 0 ? (
-                            <QueryEmpty
-                                className="h-full"
-                                title="The registry is empty"
-                                description="No agents were loaded from the Agent 365 registry. Check that the registry ingestion has run."
-                            />
-                        ) : (
-                            <VegaVisual
-                                spec={lifecycle.vegaLiteSpec}
-                                data={lifecycleTable}
-                                theme={theme}
-                                capabilities={lifecycle.capabilities}
-                                header={{
-                                    title: "Registry by lifecycle",
-                                    subtitle: "Registered agents at each stage, by who built them",
-                                }}
-                            />
-                        )}
-                    </div>
+            <div className="h-[420px]">
+                {usageResult.data?.status === "error" ? (
+                    <QueryError
+                        className="h-full"
+                        message={usageResult.data.error.message}
+                        onRetry={usageResult.refetch}
+                    />
+                ) : usageResult.isLoading || !usageTable ? (
+                    <QueryLoading className="h-full" />
+                ) : usageTable.rows.length === 0 ? (
+                    <QueryEmpty
+                        className="h-full"
+                        title="No agent sessions"
+                        description="The audit log records no agent use in this period."
+                    />
+                ) : (
+                    <VegaVisual
+                        spec={usage.vegaLiteSpec}
+                        data={usageTable}
+                        theme={theme}
+                        header={{
+                            title: "Most-used agents",
+                            subtitle: "Sessions per agent, as the audit log names them",
+                        }}
+                    />
                 )}
             </div>
 

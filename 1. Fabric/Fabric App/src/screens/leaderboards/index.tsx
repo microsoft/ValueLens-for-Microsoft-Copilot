@@ -10,7 +10,8 @@ import { LeaderboardStage } from "./leaderboard-stage";
 
 /**
  * Who is doing the most, read top to bottom: the people, then the agents.
- * The report's Leaderboard and Agent Registry pages.
+ * The report's Leaderboard page and the usage half of its Agent Registry
+ * page; the registry itself is Governance's.
  */
 export function LeaderboardsScreen() {
     return (

@@ -254,6 +254,9 @@
     /* Indigo belongs to Work patterns, the page about Microsoft 365 rather than
        Copilot, and borrows the Teams hue so it reads as the suite around it. */
     --vl-indigo: #5b5fc7;      --vl-indigo-text: #444791;    --vl-indigo-tint: #e8ebfa;
+    /* Steel belongs to Governance: a sober, desaturated blue for a page about
+       oversight, kept clear of the coral and amber its flags would compete with. */
+    --vl-steel: #4a6b82;       --vl-steel-text: #36546a;     --vl-steel-tint: #eaf0f4;
     --vl-periwinkle: #95a9ce;
     --vl-slate: #8793a3;
     --vl-ink: #1c2632;
@@ -279,6 +282,7 @@
     --vl-green: #6cc07f;       --vl-green-text: #93d3a1;     --vl-green-tint: #1a3020;
     --vl-cyan: #56bfe0;        --vl-cyan-text: #8fd5ec;      --vl-cyan-tint: #14303a;
     --vl-indigo: #7f85f5;      --vl-indigo-text: #aab1fa;    --vl-indigo-tint: #262848;
+    --vl-steel: #86a7bf;       --vl-steel-text: #adc6d8;     --vl-steel-tint: #1a2731;
     --vl-periwinkle: #b3c2de;
     --vl-slate: #a3aebd;
     --vl-ink: #dbdfe4;
@@ -444,6 +448,27 @@
     --color-data-4: var(--vl-lavender);
     --color-data-5: var(--vl-teal);
     --color-data-6: var(--vl-amber);
+    --color-data-7: var(--vl-navy);
+    --color-data-8: var(--vl-periwinkle);
+    --color-data-9: var(--vl-slate);
+    --color-data-10: var(--vl-ink);
+  }
+
+  /* Governance leads with steel, the registry seen as an estate to look after
+     rather than activity to celebrate. */
+  .palette-governance {
+    --color-brand: var(--vl-steel);
+    --color-brand-foreground: var(--vl-steel-text);
+    --color-primary: var(--vl-steel-text);
+    --color-ring: var(--vl-steel-text);
+    --color-accent: var(--vl-steel-tint);
+    --color-accent-foreground: var(--vl-steel-text);
+    --color-data-1: var(--vl-steel);
+    --color-data-2: var(--vl-teal);
+    --color-data-3: var(--vl-amber);
+    --color-data-4: var(--vl-plum);
+    --color-data-5: var(--vl-blue);
+    --color-data-6: var(--vl-coral);
     --color-data-7: var(--vl-navy);
     --color-data-8: var(--vl-periwinkle);
     --color-data-9: var(--vl-slate);

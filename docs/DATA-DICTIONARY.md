@@ -415,6 +415,22 @@ switchable via a `RESOLVE_VIA_*` flag at the top of the notebook:
 Because attribution is best-effort, always surface `Agent creator source` alongside any
 creator-based visual — filtering out `unattributed` silently understates your builder counts.
 
+#### Governance columns (`Owner account`, `Sharing Scope`, `Data Access`, `Governance Flags`)
+
+These back the Fabric App's Governance page ([Methodology](METHODOLOGY.md#governance-which-agents-need-a-review)).
+
+| Column | Where it comes from |
+|---|---|
+| `Owner account` | Fabric ingester only. Each run looks up every agent's `ownerId` at `/users/{id}?$select=id,accountEnabled` (batched, `User.Read.All`) and writes `Active`, `Disabled` or `Not found`; blank when unchecked. It is a snapshot column, like `Detail As Of`: not in the 48-column CSV contract, not cached and not written to `agents_365_history`. `CHECK_OWNER_ACCOUNT = False` skips it |
+| `Sharing Scope` | Power Query, from `Availability`, `Status` and the share count: `Whole organisation`, `Specific people or groups`, `Not shared` or `Not stated` |
+| `Shared With Count` | Power Query: distinct people and groups across the share lists. The lists themselves are not loaded |
+| `Data Access` | DAX calculated column, from the SharePoint, OneDrive, Graph connector and uploaded-file capability flags |
+| `Governance Flags` | DAX calculated column: the review flags that apply, separated by `; `. Blank for catalogue and blocked agents |
+
+Only the two Fabric templates carry these columns so far. The CSV, SharePoint and Dataverse
+templates will gain `Sharing Scope`, `Data Access` and `Governance Flags` later; they have no
+`Owner account`, so owners there will read *Not checked*.
+
 #### Optional raw API passthrough (`INCLUDE_RAW_PASSTHROUGH`)
 
 The ingester maps the Graph payload onto the model's canonical column names. Fields the model does

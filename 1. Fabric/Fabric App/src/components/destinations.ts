@@ -16,6 +16,7 @@ import {
     LayoutDashboard,
     MessageSquareQuote,
     PoundSterling,
+    ShieldCheck,
     Timer,
     TrendingUp,
     Trophy,
@@ -33,8 +34,9 @@ import { consumptionConnection, evaluatorConnection } from "@/queries/shared";
  * bring their own slicers, so they take none of the filter bar's. Their
  * `connection` is optional: without it in `fabric.yaml` they are left out.
  * A destination with a `source` reads an optional module of the ValueLens
- * model, and is left out once the app has checked that source has no data;
- * a stage with one keeps its place but goes by `labelWithout`.
+ * model, and is left out once the app has checked that source has no data.
+ * Governance reads only the Agent 365 registry, but stays listed without it
+ * and says how to connect it.
  *
  * A stage that is not built yet stays listed so the shape of the destination
  * is visible; a destination is reachable once any of its stages is built.
@@ -82,13 +84,7 @@ export const destinations = [
         filters: ["dateRange", "organizations", "licence", "audience", "agentTypes", "agentNames"] as FilterKey[],
         stages: [
             { id: "leaderboard", label: "Leaderboard", ready: true },
-            {
-                id: "agent-registry",
-                label: "Agent registry",
-                ready: true,
-                source: "agentRegistry",
-                labelWithout: "Agents",
-            },
+            { id: "agents", label: "Agents", ready: true },
         ],
     },
     {
@@ -114,6 +110,19 @@ export const destinations = [
         stages: [
             { id: "agent-performance", label: "Performance", ready: true },
             { id: "agent-conversations", label: "Conversations & topics", ready: true },
+        ],
+    },
+    {
+        id: "governance",
+        label: "Governance",
+        blurb: "Who owns your agents, who can reach them, and what needs a review",
+        icon: ShieldCheck as LucideIcon,
+        filters: ["agentTypes"] as FilterKey[],
+        stages: [
+            { id: "estate-health", label: "Estate health", ready: true },
+            { id: "exposure", label: "Exposure", ready: true },
+            { id: "accountability", label: "Accountability", ready: true },
+            { id: "review-queue", label: "Review queue", ready: true },
         ],
     },
     {
@@ -222,11 +231,6 @@ export function availableDestinations(models: ModelReferences, sources?: SourceA
             (!("connection" in destination) || isConnectionConfigured(models, destination.connection)) &&
             (!sources || !("source" in destination) || !isAbsent(sources, destination.source)),
     );
-}
-
-/** A stage reading an optional source goes by its plainer name when that source has no data. */
-export function stageLabel(stage: Stage, sources: SourceAvailability): string {
-    return "source" in stage && isAbsent(sources, stage.source) ? stage.labelWithout : stage.label;
 }
 
 /** The DOM id a stage's section carries, so the sidebar can scroll to it. */

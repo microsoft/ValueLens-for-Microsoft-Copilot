@@ -19,6 +19,7 @@ import { flowsWanted } from './flows.js';
 import { FEEDBACK_FLOW_NAME, STUDIO_FLOW_NAME } from '../transform/flows.js';
 import { describeSchedule, displayNames, freeName, PIPELINE_NAME } from './fabric.js';
 import { connectionName } from './model.js';
+import { reportsWanted } from './report.js';
 import { planDataSources } from './data-sources.js';
 import { DATA_SOURCES, modulesFromSources, routerWanted, UPLOAD_DIR } from '../uploads.js';
 
@@ -78,8 +79,8 @@ export const runsFabric = (capacity) => !/^(PP|A|EM)\d/i.test(String(capacity.sk
  */
 
 /**
- * Tenant settings the semantic model and the app rely on, and what breaks without them.
- * @type {{ name: string, title: string, effect: string, app?: boolean }[]}
+ * Tenant settings the semantic model, the reports and the app rely on, and what breaks without them.
+ * @type {{ name: string, title: string, effect: string, app?: boolean, reports?: boolean }[]}
  */
 export const POWER_BI_SETTINGS = [
   {
@@ -99,16 +100,24 @@ export const POWER_BI_SETTINGS = [
     effect: 'The Analytics Hub app is a Fabric App item.',
     app: true,
   },
+  {
+    name: 'CustomVisualsTenant',
+    title: 'Allow visuals created using the Power BI SDK',
+    effect: 'The reports\' Tornado chart, Word cloud and Deneb visuals stay blank without it.',
+    reports: true,
+  },
 ];
 
 /**
  * Settings that look switched off. A setting delegated to capacity admins may still be on there.
  * @param {Preflight['tenantSettings']} settings
- * @param {{ app: boolean }} opts
+ * @param {{ app: boolean, reports?: boolean }} opts
  */
 export function blockedSettings(settings, opts) {
   if (!settings) return [];
-  return POWER_BI_SETTINGS.filter((s) => (opts.app || !s.app) && settings[s.name]?.enabled === false && !settings[s.name]?.delegateToCapacity);
+  return POWER_BI_SETTINGS.filter(
+    (s) => (opts.app || !s.app) && (opts.reports || !s.reports) && settings[s.name]?.enabled === false && !settings[s.name]?.delegateToCapacity,
+  );
 }
 
 /**
@@ -168,6 +177,30 @@ export async function preflight(ctx) {
 }
 
 /**
+ * The Power BI choice to offer first. The reports and the app are on unless switched off, so
+ * re-running an older install offers the reports too.
+ * @param {import('../config.js').InstallConfig} config
+ * @param {boolean} canApp
+ * @returns {'all' | 'reports' | 'both' | 'model' | 'none'}
+ */
+export function powerBiChoice(config, canApp) {
+  if (config.semanticModel.enabled === false) return 'none';
+  const reports = config.semanticModel.reports !== false;
+  if (canApp && config.fabricApp.enabled !== false) return reports ? 'all' : 'both';
+  return reports ? 'reports' : 'model';
+}
+
+/**
+ * @param {import('../config.js').InstallConfig} config
+ * @param {string} choice
+ */
+export function applyPowerBiChoice(config, choice) {
+  config.semanticModel.enabled = choice !== 'none';
+  config.semanticModel.reports = choice === 'all' || choice === 'reports';
+  config.fabricApp.enabled = choice === 'all' || choice === 'both';
+}
+
+/**
  * The semantic model, and the app on top of it.
  * @param {Ctx} ctx
  * @param {Preflight} pre
@@ -184,25 +217,25 @@ async function planPowerBi(ctx, pre) {
     return;
   }
   const canApp = !!sources.appDir;
-  const current = sm.enabled === false ? 'none' : fa.enabled === false || !canApp ? 'model' : 'both';
   const choice = await ui.select(
     'Deploy the semantic model?',
     [
-      ...(canApp ? [{ name: 'Semantic model and the Analytics Hub app (recommended)', value: 'both', description: 'A web app in the workspace, built on the model.' }] : []),
+      ...(canApp ? [{ name: 'Semantic model, Power BI reports and the Analytics Hub app (recommended)', value: 'all', description: 'The ValueLens reports and a web app in the workspace, built on the model.' }] : []),
+      { name: `Semantic model and Power BI reports${canApp ? '' : ' (recommended)'}`, value: 'reports', description: 'The ValueLens reports, published to the workspace and ready to share.' },
+      ...(canApp ? [{ name: 'Semantic model and the Analytics Hub app', value: 'both', description: 'A web app in the workspace, built on the model, without the reports.' }] : []),
       { name: 'Semantic model only', value: 'model', description: 'Build your own reports on it in Power BI.' },
       { name: 'Neither', value: 'none', description: 'You publish "ValueLens - Fabric.pbit" yourself.' },
     ],
-    current,
+    powerBiChoice(config, canApp),
   );
-  sm.enabled = choice !== 'none';
-  fa.enabled = choice === 'both';
+  applyPowerBiChoice(config, choice);
   if (fa.enabled && !nodeVersionOk()) {
     fa.enabled = false;
     ui.warn(`Building the app needs Node.js ${MIN_NODE.join('.')} or later; this is ${process.versions.node}. Deploying the semantic model only.`);
     ui.note(`Install a newer Node.js, then run "${commandLine('deploy-app')}".`);
   }
   if (!sm.enabled) return;
-  for (const s of blockedSettings(pre.tenantSettings, { app: !!fa.enabled })) {
+  for (const s of blockedSettings(pre.tenantSettings, { app: !!fa.enabled, reports: !!sm.reports })) {
     ui.warn(`The tenant setting "${s.title}" is off. ${s.effect}`);
     ui.note('A Fabric administrator can switch it on in the admin portal, under Tenant settings.');
   }
@@ -412,7 +445,7 @@ export async function reserveNames(ctx) {
   const ae = config.agentEvaluator;
   const ws = f.workspaceId;
   const list = async (/** @type {string} */ type) => (ws ? displayNames(await api.fabric.listItems(ws, type)) : []);
-  const [notebookNames, pipelineNames, modelNames] = await Promise.all([list('Notebook'), list('DataPipeline'), list('SemanticModel')]);
+  const [notebookNames, pipelineNames, modelNames, reportNames] = await Promise.all([list('Notebook'), list('DataPipeline'), list('SemanticModel'), list('Report')]);
   /** @type {string[]} */
   const renamed = [];
   /** @param {string} wanted @param {string[]} taken */
@@ -437,6 +470,9 @@ export async function reserveNames(ctx) {
   if (sm.enabled && !sm.id) sm.name = pick(startFrom(sm.name, MODEL_NAME), modelNames);
   if (sm.enabled && consumptionModelWanted(ctx) && !cc.model.id) cc.model.name = pick(startFrom(cc.model.name, CONSUMPTION_MODEL_NAME), modelNames);
   if (sm.enabled && agentEvaluatorModelWanted(ctx) && !ae.model.id) ae.model.name = pick(startFrom(ae.model.name, AGENT_EVALUATOR_MODEL_NAME), modelNames);
+  for (const w of reportsWanted(ctx)) {
+    if (!w.model.report?.id) w.model.report = { ...w.model.report, name: pick(startFrom(w.model.report?.name, w.name), reportNames) };
+  }
 
   if (renamed.length) {
     ui.note(
@@ -533,6 +569,9 @@ export function planReview(ctx, pre) {
       detail: 'Lets the models read the Lakehouse, with a second client secret that only the connection holds.',
     });
     if (fa.enabled) creates.push({ kind: 'Fabric app', name: fa.name ?? 'Analytics Hub', isNew: !fa.itemId, detail: 'A web app in the workspace, built on the semantic model.' });
+    for (const w of reportsWanted(ctx)) {
+      creates.push({ kind: 'Report', name: w.model.report?.name ?? w.name, isNew: !w.model.report?.id, detail: `From its Power BI template, reading ${w.model.name}.` });
+    }
   }
 
   const appWho = `${appName} (app)`;
@@ -580,7 +619,7 @@ export function planReview(ctx, pre) {
   /** @type {ReviewRun[]} */
   const runsOn = [
     {
-      what: sm.enabled ? `Notebooks, pipeline, semantic models${fa.enabled ? ' and the app' : ''}` : 'Notebooks and pipeline',
+      what: sm.enabled ? `Notebooks, pipeline, semantic models${reportsWanted(ctx).length ? ', reports' : ''}${fa.enabled ? ' and the app' : ''}` : 'Notebooks and pipeline',
       where: capacity ? `Fabric capacity ${capacity.displayName} (${capacity.sku}, ${capacity.region})` : `Fabric capacity ${f.capacityId ?? 'not chosen'}`,
     },
     { what: 'Key Vault', where: `Azure subscription ${subscription?.displayName ?? kv.subscriptionId ?? 'already chosen'}`, detail: 'Standard tier.' },
@@ -616,6 +655,8 @@ export async function confirmPlan(ctx, pre) {
     const evaluator = agentEvaluatorModelWanted(ctx) ? `, ${am.name} ${am.id ? '' : c.dim('(new)')}`.trimEnd() : '';
     const app = config.fabricApp.enabled ? `, and the Analytics Hub app ${config.fabricApp.itemId ? '' : c.dim('(new)')}` : '';
     ui.info(`Power BI:    ${config.semanticModel.name} ${config.semanticModel.id ? '' : c.dim('(new)')}`.trimEnd() + consumption + evaluator + app.trimEnd());
+    const reports = reportsWanted(ctx).map((w) => `${w.model.report?.name ?? w.name} ${w.model.report?.id ? '' : c.dim('(new)')}`.trimEnd());
+    if (reports.length) ui.info(`Reports:     ${reports.join(', ')}`);
   }
   if (config.modules.consumption) {
     const cc = config.consumption;

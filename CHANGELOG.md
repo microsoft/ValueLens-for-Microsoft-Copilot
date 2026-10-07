@@ -17,7 +17,7 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
-## 2026-10-08 — Analytics Hub app: pages without data no longer appear
+## 2026-10-07 — Analytics Hub app: pages without data no longer appear
 
 The app (Fabric and Azure) now checks the ValueLens model's optional sources when it opens, and
 leaves out what would be blank:
@@ -25,11 +25,31 @@ leaves out what would be blank:
 - **Feedback** is hidden until `ProductFeedback` has rows, and **Work patterns** until
   `M365 Activity` does. Links to them (the Executive summary's attention items, page footers)
   disappear too, and the Executive summary drops its Satisfaction card.
-- Without Agent 365 registry data, the **Agent registry** section becomes **Agents**. It keeps the
-  agent usage and leaderboard, and drops the registered-agent count, lifecycle chart and registry
-  columns.
+- Without Agent 365 registry data, **Governance** shows one *Connect the Agent 365 registry* state
+  instead of four empty sections. **Leaderboards** keeps the agent usage and leaderboard, drops the
+  registry-only columns, and drops its link to Governance.
 - The check is unfiltered, so a filter that empties a page never hides it. If the check fails for
   any reason other than a missing table, everything stays visible.
+
+---
+
+## 2026-10-07 — Analytics Hub installer: the Power BI reports
+
+The installer can now publish the reports from the Power BI templates, already connected to the
+semantic models it deploys: `ValueLens`, and `Consumption Central` and `Agent Evaluator` with their
+modules. It's the new default for Power BI, alongside the model and the app, so nobody needs Power BI
+Desktop. The plan lists the reports, and the summary links to them.
+
+A new installer version that brings a changed report asks before replacing it, because that
+replaces edits made in Power BI. A report that can't be published is reported, and the rest of the
+install carries on. If you're a Fabric administrator, the installer also checks the tenant setting
+*Allow visuals created using the Power BI SDK*, which the Tornado chart, Word cloud and Deneb
+visuals need. See [Power BI reports](1.%20Fabric/installer/README.md#power-bi-reports).
+
+An earlier install gets the reports offered the next time you choose **Repair or change**.
+Installer users get this in the next installer release.
+
+---
 
 ## 2026-10-07 — Analytics Hub installer 0.3.0: the Azure target, and demo mode
 

@@ -22,7 +22,6 @@ import {
     isDestinationReady,
     isReference,
     stageAnchor,
-    stageLabel,
     type Destination,
     type DestinationId,
     type StageId,
@@ -188,7 +187,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                                                     : "border-transparent text-muted-foreground hover:text-foreground",
                                             )}
                                         >
-                                            {stageLabel(stage, sources)}
+                                            {stage.label}
                                         </button>
                                     ) : (
                                         <span className="-ml-px flex items-baseline justify-between gap-200 border-l-2 border-transparent py-100 pr-200 pl-[18px] text-[length:var(--text-200)] leading-200 text-muted-foreground opacity-60">

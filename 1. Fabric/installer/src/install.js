@@ -38,6 +38,7 @@ import {
 } from './steps/fabric.js';
 import { ensureModelConnection, ensureSemanticModel, modelUrl, refreshModel, rotateModelSecret } from './steps/model.js';
 import { confirmPlan, plan, preflight } from './steps/plan.js';
+import { ensureReports, reportsOn, reportsSummary } from './steps/report.js';
 import { dataSourcesSummary, ensureUploads, uploadCommand } from './steps/data-sources.js';
 import { ensureFlows, FLOW_FILES, flowDefinitions, flowsSummary, flowsWanted } from './steps/flows.js';
 import { routerWanted } from './uploads.js';
@@ -264,6 +265,7 @@ export async function install(ctx, opts) {
   const withConsumption = !!config.modules.consumption;
   const withAgentEvaluator = !!config.modules.agentEvaluator;
   const withUploads = routerWanted(config.dataSources) || !!ctx.pendingUploads?.length || flowsWanted(config).length > 0;
+  const withReports = reportsOn(config);
   const titles = [
     'Key Vault',
     'App registration',
@@ -272,6 +274,7 @@ export async function install(ctx, opts) {
     ...(withModel ? ['Semantic model'] : []),
     ...(withConsumption ? ['Credit consumption'] : []),
     ...(withAgentEvaluator ? ['Copilot Studio transcripts'] : []),
+    ...(withReports ? ['Power BI reports'] : []),
     ...(withUploads ? ['Data uploads'] : []),
     'Notebooks, pipeline and schedule',
     ...(withApp ? ['Analytics Hub app'] : []),
@@ -302,6 +305,10 @@ export async function install(ctx, opts) {
   if (withAgentEvaluator) {
     step('Copilot Studio transcripts');
     await agentEvaluatorSteps(ctx);
+  }
+  if (withReports) {
+    step('Power BI reports');
+    await ensureReports(ctx);
   }
   if (withUploads) {
     step('Data uploads');
@@ -434,6 +441,7 @@ export async function update(ctx, opts = {}) {
   }
   if (config.modules.consumption) await consumptionSteps(ctx, { force: true });
   if (config.modules.agentEvaluator) await agentEvaluatorSteps(ctx, { force: true });
+  if (reportsOn(config)) await ensureReports(ctx);
   if (routerWanted(config.dataSources)) await ensureUploads(ctx);
   await ensureFlows(ctx);
   await ensureNotebooks(ctx, { force: true });
@@ -578,9 +586,11 @@ export async function summary(ctx) {
     ui.info(`Model:      ${sm.name}  ${c.dim(modelUrl(ws, sm.id))}`);
     if (sm.connectionName) ui.info(`            ${c.dim(`Reads the Lakehouse through "${sm.connectionName}"${sm.secretExpires ? `, whose secret expires ${sm.secretExpires.slice(0, 10)}` : ''}.`)}`);
     if (fa.enabled && fa.itemId) ui.info(`App:        ${fa.name}  ${c.dim(fa.url ?? '')}`);
+    reportsSummary(ctx);
 
+    const shared = [...(reportsOn(config) ? ['reports'] : []), ...(fa.enabled ? ['app'] : [])].join(' and ') || 'reports you publish';
     ui.heading('Next steps');
-    ui.info('1. Share the app: open it in the workspace, choose Share, and add people or a group.');
+    ui.info(`1. Share the ${shared}: open ${shared === 'app' ? 'it' : 'them'} in the workspace, choose Share, and add people or a group.`);
     ui.info(`   They also need Build on ${sm.name} (its Manage permissions page), or Viewer on the workspace.`);
     ui.info('2. Scheduled runs read the Key Vault secret as you, the schedule\'s owner, and refresh the model');
     ui.info('   as you. Anyone who takes over the pipeline needs "get" on the secret and Contributor on the workspace.');

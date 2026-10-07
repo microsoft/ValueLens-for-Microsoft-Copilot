@@ -54,6 +54,31 @@ export function listZip(buf) {
 export function readZipEntry(buf, name) {
   const entry = listZip(buf).get(name);
   if (!entry) throw new Error(`The file has no ${name}.`);
+  return entryData(buf, entry);
+}
+
+/**
+ * Every file whose name starts with `prefix`, in the zip's order. Folder entries are left out.
+ * @param {Buffer} buf
+ * @param {string} prefix
+ * @returns {Map<string, Buffer>}
+ */
+export function readZipEntries(buf, prefix) {
+  /** @type {Map<string, Buffer>} */
+  const out = new Map();
+  for (const entry of listZip(buf).values()) {
+    if (entry.name.startsWith(prefix) && !entry.name.endsWith('/')) out.set(entry.name, entryData(buf, entry));
+  }
+  return out;
+}
+
+/**
+ * @param {Buffer} buf
+ * @param {ZipEntry} entry
+ * @returns {Buffer}
+ */
+function entryData(buf, entry) {
+  const { name } = entry;
   if (buf.readUInt32LE(entry.offset) !== LOCAL) throw new Error(`The zip entry ${name} is damaged.`);
   const start = entry.offset + 30 + buf.readUInt16LE(entry.offset + 26) + buf.readUInt16LE(entry.offset + 28);
   const raw = buf.subarray(start, start + entry.compressedSize);

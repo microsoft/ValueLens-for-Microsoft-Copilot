@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { describe, expect, it } from "vitest";
-import { availableDestinations, destinations, stageLabel, type Stage } from "@/components/destinations";
+import { availableDestinations } from "@/components/destinations";
 import { isConnectionConfigured, type ModelReferences } from "./connections";
 import { ALL_UNKNOWN, type SourceAvailability } from "./optional-sources";
 
@@ -69,17 +69,11 @@ describe("availableDestinations", () => {
         expect(withSources({ ...empty, productFeedback: "unknown" })).toContain("feedback");
         expect(withSources(ALL_UNKNOWN)).toEqual(ids(valuelensOnly));
     });
-});
 
-describe("stageLabel", () => {
-    const registryStage = destinations
-        .flatMap((destination): readonly Stage[] => destination.stages)
-        .find((stage) => stage.id === "agent-registry");
-
-    it("renames the Agent registry stage when there's no registry", () => {
-        expect(registryStage).toBeDefined();
-        if (!registryStage) return;
-        expect(stageLabel(registryStage, ALL_UNKNOWN)).toBe(registryStage.label);
-        expect(stageLabel(registryStage, { ...ALL_UNKNOWN, agentRegistry: "absent" })).toBe("Agents");
+    it("keeps Governance without a registry, so it can say how to connect one", () => {
+        const noRegistry = { ...ALL_UNKNOWN, agentRegistry: "absent" } as const;
+        expect(availableDestinations(valuelensOnly, noRegistry).map((destination) => destination.id)).toContain(
+            "governance",
+        );
     });
 });
