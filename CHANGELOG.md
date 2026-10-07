@@ -17,6 +17,23 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-07 — Analytics Hub installer 0.3.1
+
+The installer bundles the notebooks, templates and app when it is built, so this release brings
+everything merged since 0.3.0 to installer users:
+
+- the **Power BI reports**, published and connected to the semantic models (#128);
+- the Fabric App's **Governance** page (#130), pages hidden when their optional source has no
+  data (#129), and the Feedback card height and heatmap contrast fixes (#133);
+- the Agent 365 registry ingester that checkpoints and resumes on large tenants, and no longer
+  fails on agents with no detail (#131, #132).
+
+The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.3.1`, which the
+Azure install pulls. To update, download the installer again, open it and choose
+**Repair or change**.
+
+---
+
 ## 2026-10-07 — Agent 365 registry: agents with no detail no longer fail the run
 
 On large tenants, some agents' detail calls fail every time, typically with HTTP 424 *Failed
