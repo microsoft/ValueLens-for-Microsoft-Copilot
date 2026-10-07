@@ -10,7 +10,9 @@
 
     Safety properties:
       * All date inputs are normalised to UTC; the window must be non-empty.
-      * The poll loop is bounded by -TimeoutSeconds; unknown/failed query status throws.
+      * The poll loop is bounded by -TimeoutSeconds. A query the service ends as failed or
+        cancelled, or one that times out, is resubmitted as a new query with exponential
+        backoff up to -QueryRetries times; an unknown status throws.
       * When -ExecuteDataverseWrite is set, Dataverse readiness is validated BEFORE the
         expensive Graph query so credential problems fail fast.
       * Paging follows only nextLink values whose host is graph.microsoft.com; the
@@ -54,6 +56,16 @@ param(
 
     [ValidateRange(30, 86400)]
     [int]$TimeoutSeconds = 900,
+
+    # New queries to submit when the service ends one as failed/cancelled or it exceeds -TimeoutSeconds.
+    [ValidateRange(0, 10)]
+    [int]$QueryRetries = 2,
+
+    [ValidateRange(1, 3600)]
+    [int]$RetryBaseSeconds = 60,
+
+    [ValidateRange(1, 3600)]
+    [int]$RetryMaxSeconds = 900,
 
     [switch]$ExecuteDataverseWrite
 )
@@ -195,28 +207,45 @@ $queryBody = @{
     operationFilters    = @("CopilotInteraction")
 }
 
-$query = Invoke-JsonRequest -Method Post -Uri "https://$GraphHost/v1.0/security/auditLog/queries" -Headers $headers -Body $queryBody
-$queryId = $query.id
-if (-not $queryId) { throw "Graph did not return an auditLog query id." }
-
-# --- Bounded poll loop -----------------------------------------------------
+# --- Query with bounded poll loop; failed/cancelled/timed-out queries are resubmitted ---
 $runningStatuses = @('notStarted', 'running', 'queued', 'inProgress')
-$deadline = (Get-Date).ToUniversalTime().AddSeconds($TimeoutSeconds)
-$status = ''
-do {
-    Start-Sleep -Seconds $PollSeconds
-    $query = Invoke-JsonRequest -Method Get -Uri "https://$GraphHost/v1.0/security/auditLog/queries/$queryId" -Headers $headers
-    $status = "$($query.status)"
-    if ([string]::IsNullOrWhiteSpace($status)) {
-        throw "Graph auditLog query $queryId returned an empty/unknown status."
-    }
-    if (((Get-Date).ToUniversalTime() -gt $deadline) -and ($status -in $runningStatuses)) {
-        throw "Timed out after ${TimeoutSeconds}s waiting for auditLog query $queryId (last status '$status')."
-    }
-} while ($status -in $runningStatuses)
+$attemptErrors = @()
+for ($attempt = 1; ; $attempt++) {
+    $query = Invoke-JsonRequest -Method Post -Uri "https://$GraphHost/v1.0/security/auditLog/queries" -Headers $headers -Body $queryBody
+    $queryId = $query.id
+    if (-not $queryId) { throw "Graph did not return an auditLog query id." }
 
-if ($status -ne 'succeeded') {
-    throw "Graph auditLog query $queryId ended with unexpected status '$status'."
+    $deadline = (Get-Date).ToUniversalTime().AddSeconds($TimeoutSeconds)
+    $status = ''
+    $timedOut = $false
+    do {
+        Start-Sleep -Seconds $PollSeconds
+        $query = Invoke-JsonRequest -Method Get -Uri "https://$GraphHost/v1.0/security/auditLog/queries/$queryId" -Headers $headers
+        $status = "$($query.status)"
+        if ([string]::IsNullOrWhiteSpace($status)) {
+            throw "Graph auditLog query $queryId returned an empty/unknown status."
+        }
+        if (((Get-Date).ToUniversalTime() -gt $deadline) -and ($status -in $runningStatuses)) {
+            $timedOut = $true
+            break
+        }
+    } while ($status -in $runningStatuses)
+
+    if ($status -eq 'succeeded' -and -not $timedOut) { break }
+    $why = if ($timedOut) { "timed out after ${TimeoutSeconds}s (last status '$status')" } else { "ended with status '$status'" }
+    $attemptErrors += "attempt ${attempt}: query $queryId $why"
+    if (-not $timedOut -and $status -notin @('failed', 'cancelled')) {
+        throw "Graph auditLog query $queryId ended with unexpected status '$status'."
+    }
+    if ($attempt -gt $QueryRetries) {
+        throw ("Graph auditLog query for $($startUtc.ToString('o'))..$($endUtc.ToString('o')) did not succeed after " +
+            "$attempt attempt(s): $($attemptErrors -join '; '). Rerun later or with a shorter -StartDate/-EndDate window.")
+    }
+    # Exponential backoff with jitter before a NEW query; the service often recovers once other queries finish.
+    $delay = [math]::Min($RetryMaxSeconds, $RetryBaseSeconds * [math]::Pow(2, $attempt - 1))
+    $delay = [int][math]::Ceiling($delay / 2 + (Get-Random -Minimum 0.0 -Maximum ($delay / 2)))
+    Write-Warning "auditLog query $queryId $why; submitting a new query in ${delay}s (retry $attempt/$QueryRetries)."
+    Start-Sleep -Seconds $delay
 }
 
 # --- Atomic output setup ---------------------------------------------------
