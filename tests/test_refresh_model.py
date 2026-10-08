@@ -31,9 +31,10 @@ class Response:
 class FakeApi:
     """Answers the Fabric and Power BI calls the notebook makes and records them in order."""
 
-    def __init__(self, endpoints, sync=None):
+    def __init__(self, endpoints, sync=None, refresh=None):
         self.endpoints = endpoints
         self.sync = sync or (lambda endpoint_id: Response(200, {"value": []}))
+        self.refresh = refresh or {"status": "Completed"}
         self.calls = []
 
     def get(self, url, headers=None, params=None, timeout=None):
@@ -44,7 +45,7 @@ class FakeApi:
             return Response(200, {"status": "Succeeded"})
         if url.endswith("/refreshes"):
             return Response(200, {"value": [{"status": "Completed"}]})
-        return Response(200, {"status": "Completed"})
+        return Response(200, self.refresh)
 
     def post(self, url, headers=None, json=None, timeout=None):
         self.calls.append(("POST", url))
@@ -102,6 +103,24 @@ class RefreshModelTests(unittest.TestCase):
             with self.subTest(calls=api.endpoints):
                 posts = run_notebook(api)
                 self.assertTrue(posts[-1][1].endswith("/datasets/model/refreshes"))
+
+    def test_a_completed_refresh_with_a_warning_fails(self):
+        # A calculated table whose DAX does not parse is only a Warning, and the refresh still
+        # ends Completed. Nothing that depends on it is calculated, so the notebook must fail.
+        warning = {"type": "Warning", "code": "0x413A0013",
+                   "message": "The syntax for 'LastDate' is incorrect."}
+        for body in ({"status": "Completed", "messages": [warning]},
+                     {"status": "Completed", "messages": [dict(warning, type="Error")]},
+                     {"status": "Failed", "messages": [{"message": "boom"}]}):
+            with self.subTest(body=body):
+                with self.assertRaises(RuntimeError) as raised:
+                    run_notebook(FakeApi([], refresh=body))
+                self.assertIn(body["messages"][0]["message"], str(raised.exception))
+
+    def test_a_completed_refresh_with_only_information_messages_passes(self):
+        info = {"type": "Information", "message": "Partition processed."}
+        posts = run_notebook(FakeApi([], refresh={"status": "Completed", "messages": [info]}))
+        self.assertTrue(posts[-1][1].endswith("/datasets/model/refreshes"))
 
 
 if __name__ == "__main__":

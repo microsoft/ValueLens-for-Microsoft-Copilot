@@ -17,7 +17,54 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
-## Unreleased — Fabric: long first loads on very large tenants carry on instead of timing out
+## 2026-10-08 — Analytics Hub installer 0.3.4
+
+This release fixes models that never finished calculating, and lets long first loads on very
+large tenants carry on instead of timing out.
+
+### Fix: report pages say a column "needs to be recalculated"
+
+**Symptom.** After installing with 0.3.3, or deploying a 0.3.3 ValueLens template, report pages
+fail with *"The expression referenced column '…'[Is Usage Row] which does not hold any data
+because it needs to be recalculated"*. The relationship between Audit_UserId and Org Data
+PersonId shows the same message. The model refresh still says **Completed**.
+
+**Cause.** The Calendar table named a variable `LastDate`, which the DAX parser rejects. Power BI
+only logs that as a refresh warning, so Calendar, `Is Usage Row` and the relationship were never
+calculated. The Agent Evaluator template had two more warnings of the same kind: its Metric
+Glossary table and its Conversations Shown measure didn't parse.
+
+**Fix an existing install (Fabric):**
+
+1. Download installer 0.3.4 and open it.
+2. Choose **Repair or change** and go through the steps. The installer redeploys any model whose
+   definition changed (ValueLens, and Agent Evaluator if you have it), connects it again,
+   refreshes it and runs a test query against it. The run ends with
+   `✓ … answers queries (its Calendar has N days)`.
+3. If you run commands instead, `AnalyticsHubInstaller.exe update` does the same.
+4. To check later, run `AnalyticsHubInstaller.exe check`. It now also queries the model and fails
+   when its tables weren't calculated.
+
+**Fix an existing install (Azure):** choose **Repair or change**, then run
+`AnalyticsHubInstaller.exe refresh`. A redeployed model has no data until it refreshes.
+
+**Manual set-up from a template:** download the updated `.pbit`, or open the Calendar table's
+DAX in Power BI Desktop, rename the variable `LastDate` to `MaxDay` (it appears three times), and
+refresh.
+
+What else changes:
+
+- A refresh that ends **Completed** with a warning or error message now counts as failed, both in
+  the installer and in the `AnalyticsHub_Refresh_Model` notebook. So the nightly pipeline fails
+  instead of leaving a half-calculated model.
+- **Repair** now pushes new versions of the notebooks, such as the refresh notebook and the
+  ingesters below. Before, only `update` did. Notebooks that hold the client secret inline (no
+  Key Vault) still need `update`, because writing them needs a fresh secret.
+- CI rejects DAX variable names that the service rejects
+  ([tests/fixtures/dax_reserved_names.txt](tests/fixtures/dax_reserved_names.txt), built by
+  asking the service) and string literals with an unescaped quote.
+
+### Fabric: long first loads on very large tenants carry on instead of timing out
 
 - The **first load now defaults to 30 days** of audit history (the notebook was 180, the installer
   90). You can still choose up to 180 days, or load more later with `run --backfill-days <n>`.

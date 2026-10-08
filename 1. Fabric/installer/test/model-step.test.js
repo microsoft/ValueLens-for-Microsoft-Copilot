@@ -5,9 +5,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { emptyConfig } from '../src/config.js';
+import { HttpError } from '../src/http.js';
 import { DATA_CLI, deployApp, deploymentKey, ensureAppName, ensureFabricApp, FABRIC_CONFIG, fabricConfigFile, findDeployment, nodeVersionOk, PREBUILT_MARKER, PREBUILT_STATIC, profileName, RAYFIN_CLI, yamlValue } from '../src/steps/app.js';
-import { CONNECTION_SECRET_NAME, connectionName, ensureModelConnection, ensureSemanticModel, refreshModel, rotateModelSecret } from '../src/steps/model.js';
+import { CONNECTION_SECRET_NAME, connectionName, definitionHash, ensureModelConnection, ensureSemanticModel, MODEL_PROBE, refreshModel, rotateModelSecret, verifyModel } from '../src/steps/model.js';
 import { blockedSettings } from '../src/steps/plan.js';
+import { buildModel, loadTemplateModel } from '../src/transform/model.js';
 import { fakeCtx, fakeFabric, fakeGraph, fakePowerBi, fakeUi, httpError, realSources } from './fakes.js';
 
 /** @param {any} item */
@@ -78,6 +80,56 @@ test('semantic model: a deleted model is deployed again', async () => {
   assert.notEqual(t.config.semanticModel.id, 'gone');
   assert.deepEqual(t.fabric.calls, ['createSemanticModel Analytics Hub Model']);
   assert.match(t.ui.text(), /was deleted/);
+});
+
+test('semantic model: a re-run redeploys a model whose definition changed, such as one from an older installer', async () => {
+  const t = setup();
+  await ensureSemanticModel(t.ctx);
+  const sm = t.config.semanticModel;
+  assert.match(String(sm.signature), /;[0-9a-f]{16}$/, 'the signature carries the definition hash');
+  sm.bound = true;
+
+  await ensureSemanticModel(t.ctx);
+  assert.deepEqual(t.fabric.calls, ['createSemanticModel Analytics Hub Model'], 'the same definition is left in place');
+
+  sm.signature = String(sm.signature).replace(/;[0-9a-f]{16}$/, '');
+  await ensureSemanticModel(t.ctx);
+  assert.deepEqual(t.fabric.calls.slice(1), ['updateSemanticModel Analytics Hub Model'], 'a record without the hash (0.3.3) is updated');
+  assert.equal(sm.bound, false, 'so the connection is bound again and the repair refreshes it');
+
+  sm.signature = `${String(sm.signature).slice(0, -16)}0000000000000000`;
+  await ensureSemanticModel(t.ctx);
+  assert.equal(t.fabric.calls.length, 3, 'a different template is updated');
+  assert.equal(definitionHash({ a: 1 }), definitionHash({ a: 1 }));
+  assert.notEqual(definitionHash({ a: 1 }), definitionHash({ a: 2 }));
+});
+
+test('the built model has no DAX variable named after a reserved word, which would leave its tables uncalculated', () => {
+  const reserved = new Set(
+    readFileSync(new URL('../../../tests/fixtures/dax_reserved_names.txt', import.meta.url), 'utf8')
+      .split(/\r?\n/)
+      .map((l) => l.trim().toUpperCase())
+      .filter((l) => l && !l.startsWith('#')),
+  );
+  assert.ok(reserved.has('LASTDATE'));
+  const sources = realSources();
+  const models = [buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { server: 's', database: 'd', modules: emptyConfig().modules })];
+  /** @type {string[]} */
+  const bad = [];
+  for (const model of models) {
+    for (const table of model.model.tables) {
+      const texts = [
+        ...(table.measures ?? []).map((/** @type {any} */ m) => m.expression),
+        ...(table.columns ?? []).map((/** @type {any} */ c) => c.expression),
+        ...(table.partitions ?? []).filter((/** @type {any} */ p) => p.source?.type === 'calculated').map((/** @type {any} */ p) => p.source.expression),
+      ];
+      for (const text of texts) {
+        const dax = Array.isArray(text) ? text.join('\n') : String(text ?? '');
+        for (const [, name] of dax.matchAll(/\bVAR\s+([A-Za-z_][A-Za-z0-9_.]*)/gi)) if (reserved.has(name.toUpperCase())) bad.push(`${table.name}: VAR ${name}`);
+      }
+    }
+  }
+  assert.deepEqual(bad, []);
 });
 
 /** @param {ReturnType<typeof setup>} t */
@@ -176,6 +228,56 @@ test('refresh: polls until it ends and reports a failure with its messages', asy
 
   const quick = await refreshModel(t.ctx, { wait: false });
   assert.equal(quick.ok, true);
+});
+
+test('refresh: Completed with a warning or error message is a failure, since parts of the model were not calculated', async () => {
+  const t = setup();
+  Object.assign(t.config.semanticModel, { id: 'model-1', bound: true });
+  const warning = "Failed to save modifications to the server. Error returned: 'The syntax for 'LastDate' is incorrect.'";
+  t.powerBi.states.push({ status: 'Completed', extendedStatus: 'Completed', messages: [{ type: 'Warning', message: warning }] });
+  assert.deepEqual(await refreshModel(t.ctx), { ok: false, status: 'Completed' });
+  const text = t.ui.text();
+  assert.match(text, /Power BI reported problems/);
+  assert.match(text, /The syntax for 'LastDate' is incorrect/);
+  assert.match(text, /Run the installer again/);
+
+  t.powerBi.states.push({ status: 'Completed', extendedStatus: 'Completed', messages: [{ type: 'Error', message: 'x' }] });
+  assert.equal((await refreshModel(t.ctx)).ok, false);
+  t.powerBi.states.push({ status: 'Completed', extendedStatus: 'Completed', messages: [{ type: 'Information', message: 'fine' }] });
+  assert.deepEqual(await refreshModel(t.ctx), { ok: true, status: 'Completed' });
+});
+
+test('probe: a model whose Calendar has days passes; an empty or broken one fails; a blocked API is skipped', async () => {
+  const t = setup();
+  Object.assign(t.config.semanticModel, { id: 'model-1', bound: true });
+  assert.deepEqual(await verifyModel(t.ctx), { ok: true, calendarDays: 90 });
+  assert.deepEqual(t.powerBi.calls, ['executeQueries model-1']);
+  assert.match(MODEL_PROBE, /COUNTROWS\('Calendar'\)/);
+  assert.match(t.ui.text(), /answers queries \(its Calendar has 90 days\)/);
+
+  t.powerBi.answers.push({ results: [{ tables: [{ rows: [{ '[CalendarDays]': 0 }] }] }] });
+  assert.equal((await verifyModel(t.ctx)).ok, false);
+  assert.match(t.ui.text(), /its Calendar table is empty/);
+
+  const detail = "Query (1, 26) The expression referenced column 'Calendar'[Date] which does not hold any data because it needs to be recalculated.";
+  t.powerBi.failures.executeQueries = [new HttpError('Bad request', { status: 400, method: 'POST', url: 'https://x', body: { error: { code: 'DatasetExecuteQueriesError', 'pbi.error': { details: [{ code: 'DetailsMessage', detail: { value: detail } }] } } } })];
+  const broken = await verifyModel(t.ctx);
+  assert.equal(broken.ok, false);
+  assert.match(String(broken.error), /needs to be recalculated/);
+  assert.match(t.ui.text(), /a test query failed, so report pages will fail/);
+
+  t.powerBi.failures.executeQueries = [httpError(401, 'Unauthorized')];
+  assert.deepEqual(await verifyModel(t.ctx), { ok: true, skipped: true });
+  assert.match(t.ui.text(), /Execute Queries REST API/);
+
+  t.powerBi.failures.executeQueries = [httpError(500, 'Boom')];
+  assert.deepEqual(await verifyModel(t.ctx), { ok: true, skipped: true }, 'a service hiccup does not fail a finished install');
+  assert.match(t.ui.text(), /Couldn't query Analytics Hub Model to check it \(Boom\)/);
+
+  t.config.semanticModel.bound = false;
+  const before = t.powerBi.calls.length;
+  assert.deepEqual(await verifyModel(t.ctx), { ok: true, skipped: true });
+  assert.equal(t.powerBi.calls.length, before, 'an unconnected model is not queried');
 });
 
 test('refresh: one already running is followed; an unconnected model is not refreshed', async () => {

@@ -452,6 +452,11 @@ export async function ensureNotebooks(ctx, opts = {}) {
       const urls = nb.key === 'agentTranscripts' ? environmentUrls(config) : undefined;
       const payg = nb.key === 'azureAi' ? paygIds(config) : undefined;
       const routed = nb.key === 'uploadRouter' ? routerSignature(config) : undefined;
+      // Notebooks are updated when this checkout's version differs, so running the installer again
+      // from a newer release pushes their fixes. Not those holding an inline secret: their content
+      // changes with each secret, and writing them needs a fresh one.
+      const hash = inNotebooks && usesSecret(nb) ? undefined : createHash('sha256').update(content).digest('hex').slice(0, 16);
+      f.notebookHashes ??= {};
       f.notebookNames ??= {};
       let id = f.notebooks[nb.key];
       // Older records saved only the ID: keep the name the notebook already has.
@@ -479,7 +484,8 @@ export async function ensureNotebooks(ctx, opts = {}) {
         (switched && usesSecret(nb)) ||
         (urls !== undefined && urls !== config.agentEvaluator.deployedUrls) ||
         (payg !== undefined && payg !== (config.consumption.deployedPayg ?? '')) ||
-        (routed !== undefined && routed !== f.deployedRouter)
+        (routed !== undefined && routed !== f.deployedRouter) ||
+        (hash !== undefined && hash !== f.notebookHashes[nb.key])
       ) {
         await api.fabric.updateNotebook(ws, id, content);
         if (usesSecret(nb)) written++;
@@ -491,6 +497,7 @@ export async function ensureNotebooks(ctx, opts = {}) {
       if (urls !== undefined) config.agentEvaluator.deployedUrls = urls;
       if (payg !== undefined) config.consumption.deployedPayg = payg;
       if (routed !== undefined) f.deployedRouter = routed;
+      if (hash !== undefined) f.notebookHashes[nb.key] = hash;
       ctx.save();
     }
   } catch (err) {
