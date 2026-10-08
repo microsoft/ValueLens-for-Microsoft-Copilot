@@ -759,7 +759,7 @@ export function reportAppCheck(ctx, check, who = {}) {
     return false;
   }
   const missing = [];
-  if (!check.servicePrincipal) missing.push('Its service principal (enterprise application). The installer creates it if you own the app.');
+  if (!check.servicePrincipal) missing.push('Its service principal (enterprise application). If you own the app, choose "Carry on anyway" and the installer creates it.');
   if (check.undeclared.length) missing.push(`These Graph application permissions on its API permissions page: ${check.undeclared.join(', ')}`);
   // Someone who can grant consent gets it granted during the install.
   if (check.unconsented.length && !who.canConsent) missing.push(`Admin consent for: ${check.unconsented.join(', ')}`);

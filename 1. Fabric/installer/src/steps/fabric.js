@@ -634,6 +634,7 @@ export function pipelineSignature(config) {
   if (workdayOn(config)) parts.push('workday');
   if (agent365Csv(config)) parts.push('agent365=csv');
   if (coworkDataflowOn(config)) parts.push(`cowork=${config.consumption.dataflowId}`);
+  if (config.scale) parts.push(`scale=${config.scale}`);
   return parts.join(';');
 }
 
@@ -696,6 +697,7 @@ export function pipelineSettings(config) {
   const f = config.fabric;
   return {
     workspaceId: /** @type {string} */ (f.workspaceId),
+    scale: config.scale,
     notebookIds: f.notebooks,
     modules: config.modules,
     backfillDays: config.history.days,

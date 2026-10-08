@@ -124,7 +124,7 @@ class LicenseClassificationTests(unittest.TestCase):
             ("User Principal Name,Other Column\nuser@example.com,value\n", False),
         ]:
             response = SimpleNamespace(text=text, raise_for_status=lambda: None)
-            namespace = {"requests": SimpleNamespace(get=lambda *a, **k: response),
+            namespace = {"graph_get": lambda *a, **k: response,
                          "REPORT_PERIOD": "D7", "headers": {}}
             with contextlib.redirect_stdout(io.StringIO()):
                 if valid:

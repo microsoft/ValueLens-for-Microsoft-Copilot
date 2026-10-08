@@ -574,7 +574,7 @@ test('app check: an app the user brought is checked for its service principal, p
   const ui = fakeUi();
   t.ctx.ui = ui.ui;
   assert.equal(reportAppCheck(t.ctx, check), false);
-  assert.match(ui.text(), /Its service principal/);
+  assert.match(ui.text(), /Its service principal \(enterprise application\)\. If you own the app, choose "Carry on anyway" and the installer creates it\./);
   assert.match(ui.text(), /These Graph application permissions on its API permissions page: Reports\.Read\.All, User\.Read\.All/);
   assert.match(ui.text(), /Admin consent for: AuditLogsQuery\.Read\.All/);
   assert.match(ui.text(), /CallAnAPI\/appId\/app-1/);

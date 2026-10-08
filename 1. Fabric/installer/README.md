@@ -178,9 +178,11 @@ Azure commands:
    2. **Power BI:** the semantic model, the Power BI reports and the app (the default). Or the
       model and reports, the model and app, the model only, or neither. See
       [Power BI reports](#power-bi-reports).
-   3. **How much audit history** to load first: 30, 90 or 180 days.
+   3. **How much audit history** to load first: 30 (the default), 90 or 180 days. You can load
+      more later with `run --backfill-days <n>`.
    4. **Capacity, workspace and Lakehouse.** Spaces and hyphens in the Lakehouse name become
-      underscores, because Fabric doesn't allow them.
+      underscores, because Fabric doesn't allow them. With the capacity comes **how many people
+      are in the tenant**: up to 10,000, or more. See [A large tenant](#a-large-tenant).
    5. **App registration:** create one, use your own (it's checked first), or let an admin
       register it. See [If you can't register apps](#if-you-cant-register-apps).
    6. **Key Vault:** create one, or pick one you have. If you can't write to it, a vault admin
@@ -305,6 +307,29 @@ pipeline's Spark session can hold the capacity for a few minutes after the run e
 **The model sees new tables.** Before refreshing the model, `AnalyticsHub_Refresh_Model` asks the
 Lakehouse SQL endpoints to sync. Otherwise a refresh straight after a load can fail with
 *Table '…' is not in database*.
+
+## A large tenant
+
+Each audit query waits a few minutes in Microsoft's queue, however little it returns, so the first
+load's time grows with the days of history. With 30 days a tenant of up to 10,000 people usually
+loads in under an hour. Later runs load only what's new.
+
+On a tenant with tens of thousands of people, choose **More than 10,000** when asked how many
+people are in the tenant. It's chosen for you on an F64 or larger capacity. Then:
+
+- The audit log is read in 2-hour windows instead of 24-hour ones. A long window can hold too many
+  records, and the audit service fails it after an hour or more. A window that fails is split after
+  one retry instead of three.
+- Each daily run reads the last 3 days again, not 7, which keeps the extra queries down. Records
+  that arrive more than 3 days late are missed.
+- The loads and the model refresh get longer time limits: up to 6 hours for the audit log.
+- If a run can't finish the history in time, it stops before writing anything and the retry carries
+  on from where it stopped. Windows already read aren't read again. `run` does the same.
+
+Expect the first load to take several hours. Start with 30 days, use an F64 or larger capacity,
+and load more history later with `run --backfill-days <n>`. Don't run audit searches in the
+Purview portal while it loads. To change the tenant size, choose **Repair or change** and answer
+again. An install from an earlier version keeps its audit windows and time limits until you do.
 
 ## Data sources and exports
 
