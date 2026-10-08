@@ -39,6 +39,12 @@ export function powerBiApi(http) {
     /** @param {string} workspaceId @param {string} datasetId @param {number} [top] @returns {Promise<any[]>} */
     refreshes: async (workspaceId, datasetId, top = 5) =>
       (await http.get(`/groups/${workspaceId}/datasets/${datasetId}/refreshes`, { query: { $top: top } }))?.value ?? [],
+    /** @param {string} workspaceId @param {string} datasetId @param {string} query @returns {Promise<any>} */
+    executeQueries: (workspaceId, datasetId, query) =>
+      http.post(`/groups/${workspaceId}/datasets/${datasetId}/executeQueries`, {
+        queries: [{ query }],
+        serializerSettings: { includeNulls: true },
+      }),
   };
 }
 

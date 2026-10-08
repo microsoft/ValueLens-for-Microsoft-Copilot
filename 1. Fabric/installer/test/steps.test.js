@@ -4,14 +4,14 @@ import { test } from 'node:test';
 import { notebooksFor } from '../src/catalog.js';
 import { emptyConfig } from '../src/config.js';
 import { runCommand } from '../src/install.js';
-import { ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, freeName } from '../src/steps/fabric.js';
+import { ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, freeName, usesSecret } from '../src/steps/fabric.js';
 import { ensureConsent } from '../src/steps/identity.js';
 import { connectionName } from '../src/steps/model.js';
 import { APP_NAME, lakehouseNameFrom, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
 import { BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, chooseLoad, historyLoaded, printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
 import { DATA_CHECK_FILE } from '../src/transform/notebook.js';
 import { PIPELINE_CHANGE, PIPELINE_VERSION, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
-import { fakeCtx, fakeFabric, fakeUi } from './fakes.js';
+import { fakeCtx, fakeFabric, fakePowerBi, fakeUi } from './fakes.js';
 
 const defaultNotebooks = notebooksFor(emptyConfig().modules);
 
@@ -39,6 +39,29 @@ test('notebooks: first run creates, a re-run changes nothing, update pushes cont
     fabric.calls,
     defaultNotebooks.map((nb) => `updateNotebook ${nb.displayName}`),
   );
+});
+
+test('notebooks: a re-run from a newer release pushes changed notebooks that do not hold the secret', async () => {
+  const fabric = fakeFabric();
+  const { ctx, config } = fakeCtx({ fabric: fabric.api });
+  await ensureNotebooks(ctx);
+  const plain = defaultNotebooks.filter((nb) => !usesSecret(nb));
+  assert.ok(plain.length > 0);
+  assert.deepEqual(Object.keys(config.fabric.notebookHashes ?? {}).sort(), plain.map((nb) => nb.key).sort());
+
+  delete config.fabric.notebookHashes;
+  fabric.calls.length = 0;
+  await ensureNotebooks(ctx);
+  assert.deepEqual(fabric.calls, plain.map((nb) => `updateNotebook ${nb.displayName}`), 'a record from an older installer');
+
+  fabric.calls.length = 0;
+  /** @type {any} */ (config.fabric.notebookHashes)[plain[0].key] = 'older';
+  await ensureNotebooks(ctx);
+  assert.deepEqual(fabric.calls, [`updateNotebook ${plain[0].displayName}`]);
+
+  fabric.calls.length = 0;
+  await ensureNotebooks(ctx);
+  assert.deepEqual(fabric.calls, [], 'the same version is left in place');
 });
 
 test('notebooks: a deleted one is deployed again; one with the same name that is not ours is left alone', async () => {
@@ -669,6 +692,23 @@ test('check runs the data check on its own, and needs its notebook', async () =>
 
   fabric.jobs.push({ status: 'Failed' });
   assert.equal(await runCommand(ctx, 'check', { wait: true }), false);
+});
+
+test('check also asks a deployed model a DAX question, and fails when its tables were never calculated', async () => {
+  const fabric = fakeFabric();
+  const powerBi = fakePowerBi();
+  const oneLake = { readJson: async () => ({ checkedAt: '2026-06-01T12:30:00+00:00', tables: { licensed: { rows: 5 } } }) };
+  const ui = fakeUi();
+  const { ctx, config } = fakeCtx({ fabric: fabric.api, powerBi: powerBi.api, oneLake, ui: ui.ui });
+  config.fabric.notebooks.dataCheck = 'nb-check';
+  Object.assign(config.semanticModel, { enabled: true, id: 'model-1', bound: true });
+  fabric.jobs.push({ status: 'Completed' }, { status: 'Completed' });
+  assert.equal(await runCommand(ctx, 'check', { wait: true }), true);
+  assert.deepEqual(powerBi.calls, ['executeQueries model-1']);
+
+  powerBi.answers.push({ results: [{ error: { message: "The syntax for 'LastDate' is incorrect." } }] });
+  assert.equal(await runCommand(ctx, 'check', { wait: true }), false);
+  assert.match(ui.text(), /a test query failed, so report pages will fail/);
 });
 
 test('ranSince: a run that ended after the check makes it out of date', () => {

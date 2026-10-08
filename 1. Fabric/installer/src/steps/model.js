@@ -3,6 +3,7 @@
  * The ValueLens semantic model: deployed from the Power BI template, connected to the
  * Lakehouse through a cloud connection that signs in as the app registration, and refreshed.
  */
+import { createHash } from 'node:crypto';
 import { enabledModules, MODEL_MODULES } from '../catalog.js';
 import { servicePrincipalCredentials, semanticModelDefinition, sqlConnectionBody } from '../clients/fabric.js';
 import { HttpError } from '../http.js';
@@ -64,9 +65,14 @@ export async function waitForSqlEndpoint(ctx) {
 export const modelSignature = (server, database, modules) =>
   `${server.toLowerCase()};${database};${enabledModules(modules).filter((m) => /** @type {readonly string[]} */ (MODEL_MODULES).includes(m)).join(',')}`;
 
+/** @param {unknown} definition */
+export const definitionHash = (definition) => createHash('sha256').update(JSON.stringify(definition)).digest('hex').slice(0, 16);
+
 /**
- * Creates a semantic model item, or updates it when its inputs changed or `force` is set.
- * An update clears the model's data and its connection binding.
+ * Creates a semantic model item, or updates it when its inputs or its definition changed, or
+ * `force` is set. The definition's hash is part of the signature, so running the installer again
+ * from a newer checkout redeploys a model whose template changed. An update clears the model's
+ * data and its connection binding.
  * @param {Ctx} ctx
  * @param {import('../config.js').ModelConfig} m
  * @param {{ signature: string, definition: () => any, force?: boolean }} o
@@ -75,6 +81,8 @@ export async function deployModel(ctx, m, o) {
   const { ui, api } = ctx;
   const ws = /** @type {string} */ (ctx.config.fabric.workspaceId);
   const items = await api.fabric.listItems(ws, 'SemanticModel');
+  const definition = o.definition();
+  const signature = `${o.signature};${definitionHash(definition)}`;
 
   if (m.id && !items.some((i) => i.id === m.id)) {
     ui.warn(`${m.name} was deleted. Deploying it again.`);
@@ -83,19 +91,19 @@ export async function deployModel(ctx, m, o) {
   if (!m.id) {
     const name = freeName(m.name, displayNames(items));
     noteRenamed(ctx, m.name, name);
-    const created = await api.fabric.createSemanticModel(ws, name, o.definition());
+    const created = await api.fabric.createSemanticModel(ws, name, definition);
     m.id = await createdId(ctx, created, 'SemanticModel', name);
     m.name = name;
     ui.ok(`Created semantic model ${name}`);
     m.bound = false;
-  } else if (o.force || m.signature !== o.signature) {
-    await api.fabric.updateSemanticModel(ws, m.id, o.definition());
+  } else if (o.force || m.signature !== signature) {
+    await api.fabric.updateSemanticModel(ws, m.id, definition);
     m.bound = false;
     ui.ok(`Updated semantic model ${m.name}`);
   } else {
     ui.ok(`Semantic model ${m.name} is in place`);
   }
-  m.signature = o.signature;
+  m.signature = signature;
   ctx.save();
 }
 
@@ -339,14 +347,18 @@ export async function refreshModel(ctx, opts = {}) {
     took = progress.done();
   }
   const state = r?.extendedStatus ?? r?.status;
-  if (state === 'Completed') {
+  // A calculated table whose DAX doesn't parse is only a Warning, and the refresh still ends
+  // Completed. Nothing that depends on it is calculated and report pages fail, so it's a failure.
+  const problems = (r?.messages ?? []).filter((/** @type {any} */ m) => m?.type === 'Warning' || m?.type === 'Error');
+  if (state === 'Completed' && !problems.length) {
     ui.ok(`${sm.name} refreshed in ${formatDuration(took)}`);
     return { ok: true, status: state };
   }
   if (REFRESH_FINAL.has(state)) {
-    ui.fail(`The refresh ended as ${state}`);
-    for (const m of (r?.messages ?? []).slice(0, 3)) ui.info(String(m.message ?? m).slice(0, 600));
+    ui.fail(state === 'Completed' ? `${sm.name} refreshed, but Power BI reported problems, so parts of it weren't calculated` : `The refresh ended as ${state}`);
+    for (const m of (problems.length ? problems : r?.messages ?? []).slice(0, 3)) ui.info(String(m.message ?? m).slice(0, 600));
     if (r?.serviceExceptionJson) ui.info(String(r.serviceExceptionJson).slice(0, 600));
+    if (state === 'Completed') ui.info(`Run the installer again from the latest release to redeploy the model, or run "${commandLine('update')}".`);
     return { ok: false, status: state };
   }
   ui.warn(`The refresh is still running. Check later with "${commandLine('status')}".`);
@@ -361,6 +373,54 @@ export async function refreshModel(ctx, opts = {}) {
 export async function modelRefreshes(ctx, m = ctx.config.semanticModel) {
   if (!m.id) return [];
   return ctx.api.powerBi.refreshes(/** @type {string} */ (ctx.config.fabric.workspaceId), m.id, 3);
+}
+
+/** The probe's DAX. It errors when the Calendar table was never calculated. */
+export const MODEL_PROBE = 'EVALUATE ROW("CalendarDays", COUNTROWS(\'Calendar\'))';
+
+/** @param {any} err */
+function queryError(err) {
+  const details = err?.body?.error?.['pbi.error']?.details;
+  const detail = Array.isArray(details) ? details.find((d) => d?.code === 'DetailsMessage')?.detail?.value : undefined;
+  return String(detail ?? err?.message ?? err).slice(0, 600);
+}
+
+/**
+ * Asks the ValueLens model a small DAX question. A refresh can report Completed while a
+ * calculated table, column or relationship was never calculated; this catches that.
+ * @param {Ctx} ctx
+ * @returns {Promise<{ ok: boolean, skipped?: boolean, calendarDays?: number, error?: string }>}
+ *   `skipped` when the model can't be queried (no model, or the API is turned off), which isn't a failure.
+ */
+export async function verifyModel(ctx) {
+  const { ui, config, api } = ctx;
+  const sm = config.semanticModel;
+  const ws = /** @type {string} */ (config.fabric.workspaceId);
+  if (!sm.enabled || !sm.id || !sm.bound) return { ok: true, skipped: true };
+  /** @type {any} */
+  let res;
+  try {
+    res = await api.powerBi.executeQueries(ws, sm.id, MODEL_PROBE);
+  } catch (err) {
+    const s = status(err);
+    if (s !== 400) {
+      ui.warn(`Couldn't query ${sm.name} to check it (${queryError(err)}).`);
+      if (s === 401 || s === 403) ui.note('The tenant setting "Semantic model Execute Queries REST API" may be off. Open a report page to check the model.');
+      return { ok: true, skipped: true };
+    }
+    res = { results: [{ error: { message: queryError(err) } }] };
+  }
+  const result = res?.results?.[0];
+  const error = result?.error ? String(result.error.message ?? JSON.stringify(result.error)).slice(0, 600) : undefined;
+  const calendarDays = Number(result?.tables?.[0]?.rows?.[0]?.['[CalendarDays]'] ?? 0);
+  if (!error && calendarDays > 0) {
+    ui.ok(`${sm.name} answers queries (its Calendar has ${calendarDays.toLocaleString('en-GB')} days)`);
+    return { ok: true, calendarDays };
+  }
+  ui.fail(`${sm.name} refreshed, but ${error ? 'a test query failed' : 'its Calendar table is empty'}, so report pages will fail`);
+  if (error) ui.info(error);
+  ui.info(`Run the installer again from the latest release to redeploy and refresh the model, or run "${commandLine('update')}".`);
+  return { ok: false, calendarDays, error };
 }
 
 /**

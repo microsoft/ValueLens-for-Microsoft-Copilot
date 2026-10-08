@@ -17,6 +17,49 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-08 — Analytics Hub installer 0.3.4 (hotfix)
+
+**Symptom.** After installing with 0.3.3, or deploying a 0.3.3 ValueLens template, report pages
+fail with *"The expression referenced column '…'[Is Usage Row] which does not hold any data
+because it needs to be recalculated"*. The relationship between Audit_UserId and Org Data
+PersonId shows the same message. The model refresh still says **Completed**.
+
+**Cause.** The Calendar table named a variable `LastDate`, which the DAX parser rejects. Power BI
+only logs that as a refresh warning, so Calendar, `Is Usage Row` and the relationship were never
+calculated. The Agent Evaluator template had two more warnings of the same kind: its Metric
+Glossary table and its Conversations Shown measure didn't parse.
+
+**Fix an existing install (Fabric):**
+
+1. Download installer 0.3.4 and open it.
+2. Choose **Repair or change** and go through the steps. The installer redeploys any model whose
+   definition changed (ValueLens, and Agent Evaluator if you have it), connects it again,
+   refreshes it and runs a test query against it. The run ends with
+   `✓ … answers queries (its Calendar has N days)`.
+3. If you run commands instead, `AnalyticsHubInstaller.exe update` does the same.
+4. To check later, run `AnalyticsHubInstaller.exe check`. It now also queries the model and fails
+   when its tables weren't calculated.
+
+**Fix an existing install (Azure):** choose **Repair or change**, then run
+`AnalyticsHubInstaller.exe refresh`. A redeployed model has no data until it refreshes.
+
+**Manual set-up from a template:** download the updated `.pbit`, or open the Calendar table's
+DAX in Power BI Desktop, rename the variable `LastDate` to `MaxDay` (it appears three times), and
+refresh.
+
+What else changes:
+
+- A refresh that ends **Completed** with a warning or error message now counts as failed, both in
+  the installer and in the `AnalyticsHub_Refresh_Model` notebook. So the nightly pipeline fails
+  instead of leaving a half-calculated model.
+- **Repair** now pushes new versions of the notebooks that don't hold the client secret, such as
+  the refresh notebook. Before, only `update` did.
+- CI rejects DAX variable names that the service rejects
+  ([tests/fixtures/dax_reserved_names.txt](tests/fixtures/dax_reserved_names.txt), built by
+  asking the service) and string literals with an unescaped quote.
+
+---
+
 ## 2026-10-08 — Analytics Hub installer 0.3.3
 
 The installer bundles the notebooks, templates and app when it is built, so this release brings

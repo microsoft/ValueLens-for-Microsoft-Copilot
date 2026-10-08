@@ -36,7 +36,7 @@ import {
   notebookSettings,
   PIPELINE_NAME,
 } from './steps/fabric.js';
-import { ensureModelConnection, ensureSemanticModel, modelUrl, refreshModel, rotateModelSecret } from './steps/model.js';
+import { ensureModelConnection, ensureSemanticModel, modelUrl, refreshModel, rotateModelSecret, verifyModel } from './steps/model.js';
 import { confirmPlan, plan, preflight } from './steps/plan.js';
 import { ensureReports, reportsOn, reportsSummary } from './steps/report.js';
 import { dataSourcesSummary, ensureUploads, uploadCommand } from './steps/data-sources.js';
@@ -242,6 +242,7 @@ export async function rewindable(ctx, fn) {
  * Full set-up, or a repair when the install record already has IDs.
  * @param {Ctx} ctx
  * @param {{ wait: boolean }} opts
+ * @returns {Promise<boolean>} false when the first load or model refresh it waited for didn't leave a working model.
  */
 export async function install(ctx, opts) {
   const { ui, config } = ctx;
@@ -255,12 +256,12 @@ export async function install(ctx, opts) {
   });
   if (!go) {
     ui.warn('Stopped before changing anything. Your answers are saved for next time.');
-    return;
+    return true;
   }
 
   if (config.target === 'azure') {
     await installAzure(ctx, opts);
-    return;
+    return true;
   }
 
   const sm = config.semanticModel;
@@ -329,6 +330,7 @@ export async function install(ctx, opts) {
     await tryDeployApp(ctx);
   }
 
+  let ok = true;
   if (ctx.runFirstLoad) {
     step('First load');
     if (!consented) {
@@ -338,13 +340,19 @@ export async function install(ctx, opts) {
     } else {
       if (modelDeployed(config)) ui.note(`The pipeline refreshes ${joinNames(deployedModels(config).map((m) => m.name))} as its last step.`);
       const result = await runPipeline(ctx, { backfillDays: config.history.days, wait: opts.wait, first: true });
-      if (result.status === 'Completed') await runDataCheck(ctx);
+      if (result.status === 'Completed') {
+        await runDataCheck(ctx);
+        if (modelDeployed(config)) ok = (await verifyModel(ctx)).ok;
+      }
     }
   } else if (withModel) {
     step('Model refresh');
-    await refreshModels(ctx, { wait: opts.wait });
+    const refreshed = await refreshModels(ctx, { wait: opts.wait });
+    if (refreshed.ok && opts.wait) ok = (await verifyModel(ctx)).ok;
+    else if (opts.wait) ok = false;
   }
   await summary(ctx);
+  return ok;
 }
 
 /**
@@ -458,9 +466,11 @@ export async function update(ctx, opts = {}) {
   }
   if (modelDeployed(config)) {
     ui.note('Updating a model clears its data, so it refreshes now.');
-    await refreshModels(ctx, { wait: opts.wait ?? true });
+    const refreshed = await refreshModels(ctx, { wait: opts.wait ?? true });
+    if (refreshed.ok && (opts.wait ?? true) && !(await verifyModel(ctx)).ok) return false;
   }
   ui.ok('Up to date. The next scheduled run uses the new versions.');
+  return true;
 }
 
 /**
@@ -499,19 +509,20 @@ export async function refresh(ctx, opts) {
 export async function runCommand(ctx, command, opts) {
   switch (command) {
     case 'install':
-      await install(ctx, opts);
-      return true;
+      return install(ctx, opts);
     case 'update':
-      await update(ctx, opts);
-      return true;
+      return (await update(ctx, opts)) !== false;
     case 'run': {
       const result = await run(ctx, opts);
       return !opts.wait || !!result.ok;
     }
     case 'rerun-failed':
       return !(await rerunFailed(ctx)).failed.length;
-    case 'check':
-      return !!(await checkData(ctx));
+    case 'check': {
+      const checked = !!(await checkData(ctx));
+      if (ctx.config.target === 'azure' || !modelDeployed(ctx.config)) return checked;
+      return (await verifyModel(ctx)).ok && checked;
+    }
     case 'refresh': {
       const result = await refresh(ctx, opts);
       return !opts.wait || result.ok;

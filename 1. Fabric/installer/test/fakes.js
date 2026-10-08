@@ -522,6 +522,8 @@ export function fakePowerBi() {
   const states = [];
   /** @type {any[]} */
   const history = [];
+  /** @type {any[]} What each executeQueries call returns, in order. */
+  const answers = [];
   /** @type {Record<string, Error[]>} */
   const failures = {};
   /** @type {any[]} */
@@ -559,6 +561,13 @@ export function fakePowerBi() {
       return states.length ? states.shift() : { status: 'Completed', extendedStatus: 'Completed' };
     },
     refreshes: async () => structuredClone(history),
+    /** @param {string} _ws @param {string} id @param {string} _query */
+    executeQueries: async (_ws, id, _query) => {
+      calls.push(`executeQueries ${id}`);
+      const err = failures.executeQueries?.shift();
+      if (err) throw err;
+      return answers.length ? answers.shift() : { results: [{ tables: [{ rows: [{ '[CalendarDays]': 90 }] }] }] };
+    },
   };
   return {
     api,
@@ -566,6 +575,7 @@ export function fakePowerBi() {
     states,
     history,
     failures,
+    answers,
     /** @param {any[]} d */
     setDatasources: (d) => {
       datasources = d;
