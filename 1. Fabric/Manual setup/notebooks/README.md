@@ -30,7 +30,8 @@ The [installer](../../installer/) does all of this for you. Use these steps only
    CLIENT_SECRET = notebookutils.credentials.getSecret('https://<vault>.vault.azure.net/', '<secret-name>')
    ```
 4. **Run the 3 ingesters.** For the first run, set `MODE = 'backfill'` in the audit ingester. It
-   loads 180 days (`BACKFILL_DAYS`). Afterwards, set it back to `'incremental'`.
+   loads 30 days (`BACKFILL_DAYS`, up to 180). Afterwards, set it back to `'incremental'`. On a
+   large tenant, read [A large tenant](#a-large-tenant) first.
 5. **Run `Copilot_Audit_Log_Processor`** once the ingesters finish.
 6. **Open the template** in Power BI Desktop and publish it:
    - [`ValueLens - Fabric.pbit`](../ValueLens%20-%20Fabric.pbit): enter the Lakehouse's **SQL analytics endpoint** and its name.
@@ -60,8 +61,9 @@ Run these before the processor.
 | `AGENT_IDENTITY_PATTERNS` | Processor | Add your own service accounts. Accounts that match, such as Security Copilot agents, aren't counted as people. |
 | `AGENT_TYPE_OVERRIDES_TABLE` | Processor | The optional Lakehouse table (columns `key`, `Agent_Type`) that corrects an agent's type. Default `agent_type_overrides`; skipped when the table doesn't exist. See [agent type and publisher](../../../docs/DATA-DICTIONARY.md#agent-type-and-publisher). |
 | `INCLUDE_RAW_PASSTHROUGH` | Processor, registry ingester | `True` to keep the raw payloads. They can hold names, file names and URLs, so review privacy first. Then run the processor once with `WRITE_MODE = 'overwrite'`. |
-| `MAX_CONCURRENT_QUERIES`, `CHUNK_HOURS` | Audit ingester | Lower them (for example `3` and `4`) if audit windows fail on a large tenant. See below. |
+| `MAX_CONCURRENT_QUERIES`, `CHUNK_HOURS` | Audit ingester | Lower them if audit windows fail on a large tenant. See [A large tenant](#a-large-tenant). |
 | `WINDOW_RETRIES`, `MIN_CHUNK_HOURS` | Audit ingester | How often a failing audit window is resent (default `3`), and the smallest size it is split down to (default `1` hour). |
+| `TIME_BUDGET_MIN` | Audit ingester | Minutes to spend fetching before the run stops and leaves the rest to the next run (default `0`, no limit). Set it below the pipeline activity's timeout. |
 
 ## An audit window keeps failing
 
@@ -73,20 +75,38 @@ The audit ingester recovers by itself:
 
 1. It sends a failed window again as a new query, after a growing wait (about 1, 2, then
    4 minutes), up to `WINDOW_RETRIES` times.
-2. If the window still fails, it splits it in half (8h, 4h, 2h, then 1h) and queries the halves.
+2. If the window still fails, it splits it in half (for example 8h, 4h, 2h, then 1h) and queries
+   the halves, down to `MIN_CHUNK_HOURS`.
 3. After a failure or an HTTP 429, it runs fewer queries at once for the rest of the run.
 4. It tries every window and then prints a summary. It writes only when every window succeeded.
-
-For a long backfill on a large tenant:
-
-- Keep the defaults, or set `MAX_CONCURRENT_QUERIES = 3` and `CHUNK_HOURS = 4`.
-- Don't run audit searches in the Purview portal while it runs.
 
 If it still ends with `N audit window(s) still failed`, nothing was written. Rerun it with
 `MODE = 'backfill'` and the same `BACKFILL_DAYS`. Windows that succeeded are reused, so only the
 listed windows are queried again. Don't switch to `'incremental'` until a backfill finishes: an
 incremental run refuses to start while an older window was never recovered. To accept that gap,
 set `ALLOW_UNRECOVERED_GAPS = True`.
+
+## A large tenant
+
+Every audit query waits in a queue for a few minutes, however little it returns, so the first
+load's time grows with the number of windows. On a tenant with tens of thousands of people, an 8h
+window can also hold too many records: the audit service then fails it after an hour or more, and
+a manual Purview search of the same 8h fails too. For more than about 10,000 people:
+
+- Set `CHUNK_HOURS = 2` and `WINDOW_RETRIES = 1`, so a window that fails is split after one
+  retry instead of three.
+- Set `LOOKBACK_DAYS = 3`. Each incremental run queries the trailing `LOOKBACK_DAYS` again, and
+  with 2h windows 7 days is 84 queries. Records that arrive more than 3 days late are missed.
+- Set `TIME_BUDGET_MIN` below the pipeline activity's timeout (for example `300` with a 6-hour
+  timeout). When the budget runs out, the run stops before writing anything and the next run
+  carries on: finished windows are reused, and queries still running in the audit service are
+  picked up rather than sent again.
+- Start with the default 30 days. Load more later with a backfill run.
+- Use an F64 or larger capacity, and don't run audit searches in the Purview portal while it runs.
+
+The installer does this when you choose **More than 10,000** people. It also gives the loads and
+the model refresh longer time limits. For a smaller tenant it uses 24h windows, which need fewer
+queries each day.
 
 ## People show as IDs
 

@@ -5,6 +5,7 @@ import json
 import shutil
 import tempfile
 import threading
+import time
 import unittest
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -220,10 +221,14 @@ class AuditReliabilityTests(unittest.TestCase):
         }
         if namespace:
             ns.update(namespace)
-        return exec_named_defs(INGESTER, 8, {"AuditQueryFailed", "_read_query_status", "wait_for_query"}, ns)
+        ns.setdefault("RUN_DEADLINE", None)
+        return exec_named_defs(
+            INGESTER, 8, {"AuditQueryFailed", "BudgetReached", "budget_exhausted", "_read_query_status", "wait_for_query"}, ns
+        )
 
     def checkpoint_helpers(self, namespace=None):
         ingester = self.ingester_helpers()
+        query = self.query_helpers()
         ns = {
             "MODE": "incremental",
             "OUTPUT_TABLE": "dbo.Copilot_Interactions_Parsed",
@@ -235,7 +240,13 @@ class AuditReliabilityTests(unittest.TestCase):
             "RETRY_BASE_SEC": 0,
             "RETRY_MAX_SEC": 0,
             "_TRANSIENT": {429, 500, 502, 503, 504},
-            "AuditQueryFailed": self.query_helpers()["AuditQueryFailed"],
+            "AuditQueryFailed": query["AuditQueryFailed"],
+            "BudgetReached": query["BudgetReached"],
+            "budget_exhausted": query["budget_exhausted"],
+            "RUN_DEADLINE": None,
+            "TIME_BUDGET_MIN": 0,
+            "RESUME_QUERY_HOURS": 12,
+            "TRAILING_REUSE_HOURS": 0,
             "QUERY_LIMITER": ingester["AdaptiveLimiter"](5, 1),
             "AdaptiveLimiter": ingester["AdaptiveLimiter"],
             "split_window": ingester["split_window"],
@@ -292,6 +303,8 @@ class AuditReliabilityTests(unittest.TestCase):
                 "_save_manifest",
                 "manifest_succeeded",
                 "should_refresh_window",
+                "trailing_fresh_after",
+                "resumable_query_id",
                 "window_stage_files_reusable",
                 "is_window_reusable",
                 "_read_manifest_entry",
@@ -1039,6 +1052,96 @@ class FailedWindowRecoveryTests(unittest.TestCase):
         keys, _ = rerun["fetch_windows"]([self.WIN, self.NEXT])
         self.assertEqual(len(keys), 3)
         self.assertEqual(sorted(we - ws for ws, we in graph2.created), [timedelta(hours=4)] * 2)
+
+    def test_budget_reached_while_waiting_keeps_the_query_for_the_retry(self):
+        helpers, graph = self.run_helpers(lambda *a: "succeeded")
+        budget = helpers["BudgetReached"]
+
+        def wait_then_run_out(qid):
+            if graph.ranges[qid][:2] == self.WIN:
+                raise budget("still running")
+            return graph.wait_for_query(qid)
+
+        helpers["wait_for_query"] = wait_then_run_out
+        with self.assertRaisesRegex(RuntimeError, "Time budget"):
+            helpers["fetch_windows"]([self.WIN, self.NEXT])
+        manifest = helpers["_load_manifest"]()
+        paused = manifest[self.key(helpers, self.WIN)]
+        self.assertEqual(paused["status"], "waiting")
+        self.assertEqual(paused["query_id"], "q1")
+        self.assertIn("paused_at", paused)
+        self.assertEqual(manifest[self.key(helpers, self.NEXT)]["status"], "succeeded")
+
+        # The retry re-polls q1 instead of queueing a new query, and reuses the finished window.
+        rerun, graph2 = self.run_helpers(lambda *a: self.fail("nothing new should be queried"))
+        graph2.ranges["q1"] = (*self.WIN, 1)
+        rerun["wait_for_query"] = lambda qid: {"status": "succeeded", "id": qid}
+        keys, rows = rerun["fetch_windows"]([self.WIN, self.NEXT])
+        self.assertEqual(graph2.created, [])
+        self.assertEqual(len(keys), 2)
+        self.assertEqual(rows, 2)
+        self.assertEqual(rerun["_load_manifest"]()[self.key(helpers, self.WIN)]["status"], "succeeded")
+
+    def test_budget_already_spent_starts_no_queries(self):
+        helpers, graph = self.run_helpers(lambda *a: "succeeded", RUN_DEADLINE=time.monotonic() - 1, TIME_BUDGET_MIN=1)
+        with self.assertRaisesRegex(RuntimeError, "Time budget of 1 min reached with 2 audit window"):
+            helpers["fetch_windows"]([self.WIN, self.NEXT])
+        self.assertEqual(graph.created, [])
+
+    def seed_waiting(self, helpers, created_at, qid="old-q"):
+        key = self.key(helpers, self.WIN)
+        helpers["_mark_window"](key, "waiting", query_id=qid, query_created_at=created_at.isoformat())
+        return key
+
+    def test_old_or_failed_earlier_query_is_replaced_by_a_new_one(self):
+        now = datetime.now(timezone.utc)
+        helpers, graph = self.run_helpers(lambda *a: "succeeded")
+        self.seed_waiting(helpers, now - timedelta(hours=13))
+        helpers["fetch_windows"]([self.WIN])
+        self.assertEqual(graph.attempts(*self.WIN), 1)
+
+        helpers, graph = self.run_helpers(lambda *a: "succeeded")
+        self.seed_waiting(helpers, now - timedelta(hours=1))
+        failed = helpers["AuditQueryFailed"]
+
+        def old_query_failed(qid):
+            if qid == "old-q":
+                raise failed("Query old-q ended with status: failed")
+            return graph.wait_for_query(qid)
+
+        helpers["wait_for_query"] = old_query_failed
+        keys, _ = helpers["fetch_windows"]([self.WIN])
+        self.assertEqual(graph.attempts(*self.WIN), 1)
+        entry = helpers["_load_manifest"]()[self.key(helpers, self.WIN)]
+        self.assertEqual(entry["status"], "succeeded")
+        self.assertEqual(entry["query_id"], "q1")
+
+    def test_resumable_query_id_only_for_recent_unfinished_queries(self):
+        resumable = self.checkpoint_helpers()["resumable_query_id"]
+        now = datetime(2026, 9, 10, 12, tzinfo=timezone.utc)
+        recent = (now - timedelta(hours=2)).isoformat()
+        self.assertEqual(resumable({"status": "waiting", "query_id": "q", "query_created_at": recent}, now, 12), "q")
+        self.assertEqual(resumable({"status": "draining", "query_id": "q", "refreshed_at": recent}, now, 12), "q")
+        self.assertIsNone(resumable({"status": "failed", "query_id": "q", "query_created_at": recent}, now, 12))
+        self.assertIsNone(resumable({"status": "succeeded", "query_id": "q", "query_created_at": recent}, now, 12))
+        self.assertIsNone(resumable({"status": "waiting", "query_created_at": recent}, now, 12))
+        self.assertIsNone(resumable({"status": "waiting", "query_id": "q", "query_created_at": recent}, now, 1))
+        self.assertIsNone(resumable({"status": "waiting", "query_id": "q", "query_created_at": recent}, now, 0))
+        self.assertIsNone(resumable(None, now, 12))
+
+    def test_trailing_window_fetched_recently_is_reused_by_a_retry(self):
+        helpers = self.checkpoint_helpers()
+        refresh = helpers["should_refresh_window"]
+        fresh_after = helpers["trailing_fresh_after"]
+        now = datetime(2026, 9, 10, tzinfo=timezone.utc)
+        cutoff = now - timedelta(days=7)
+        trailing_end = now - timedelta(days=1)
+        done = lambda hours_ago: {"status": "succeeded", "completed_at": (now - timedelta(hours=hours_ago)).isoformat()}
+        self.assertFalse(refresh(trailing_end, done(1), cutoff, fresh_after(now, 6)))
+        self.assertTrue(refresh(trailing_end, done(7), cutoff, fresh_after(now, 6)))
+        self.assertTrue(refresh(trailing_end, done(1), cutoff, fresh_after(now, 0)))
+        self.assertTrue(refresh(trailing_end, done(1), cutoff))
+        self.assertFalse(refresh(cutoff - timedelta(days=1), done(500), cutoff, fresh_after(now, 6)))
 
     def test_rerun_reuses_succeeded_windows_from_an_older_manifest(self):
         helpers, _ = self.run_helpers(lambda *a: "succeeded")

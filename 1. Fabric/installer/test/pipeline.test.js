@@ -16,6 +16,7 @@ import {
   REFRESH_ACTIVITY,
   RETRY_INTERVAL_SECONDS,
   retryPolicy,
+  SCALE_PROFILES,
 } from '../src/transform/pipeline.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -100,6 +101,63 @@ test('audit and processor notebooks take their mode from pipeline parameters', (
 
 test('first run backfills and rebuilds', () => {
   assert.deepEqual(firstRunParameters(30), { AuditMode: 'backfill', BackfillDays: 30, ProcessorWriteMode: 'overwrite' });
+});
+
+test('the first load defaults to 30 days of history', () => {
+  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules: { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false } });
+  assert.equal(doc.properties.parameters.BackfillDays.defaultValue, 30);
+});
+
+test('a standard tenant pulls day-long audit windows within a budget and keeps the template timeouts', () => {
+  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: allIds, modules: allModules, semanticModelId: 'model-1', scale: 'standard' });
+  const audit = findActivity(doc.properties.activities, 'Run_Audit_Log_Ingester');
+  assert.deepEqual(audit.typeProperties.parameters.CHUNK_HOURS, { value: 24, type: 'int' });
+  assert.deepEqual(audit.typeProperties.parameters.TIME_BUDGET_MIN, { value: 90, type: 'int' });
+  assert.equal(audit.typeProperties.parameters.WINDOW_RETRIES, undefined);
+  assert.equal(audit.typeProperties.parameters.LOOKBACK_DAYS, undefined);
+  for (const a of template.properties.activities.flatMap((/** @type {any} */ x) => [x, ...(x.typeProperties?.ifTrueActivities ?? [])])) {
+    const built = findActivity(doc.properties.activities, a.name);
+    if (built && a.policy?.timeout) assert.equal(built.policy.timeout, a.policy.timeout, a.name);
+  }
+  const refresh = findActivity(doc.properties.activities, 'Refresh_Semantic_Model');
+  assert.equal(refresh.policy.timeout, '0.03:00:00');
+  assert.deepEqual(refresh.typeProperties.parameters.TIMEOUT_MINUTES, { value: 170, type: 'int' });
+  assert.ok(SCALE_PROFILES.standard.audit.TIME_BUDGET_MIN < 120, 'the budget leaves time to write before the 2h timeout');
+});
+
+test('an install from before tenant sizes keeps its audit windows and timeouts, and gains only the time budget', () => {
+  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: allIds, modules: allModules, semanticModelId: 'model-1' });
+  const params = findActivity(doc.properties.activities, 'Run_Audit_Log_Ingester').typeProperties.parameters;
+  assert.deepEqual(params.TIME_BUDGET_MIN, { value: 90, type: 'int' });
+  for (const name of ['CHUNK_HOURS', 'WINDOW_RETRIES', 'LOOKBACK_DAYS']) assert.equal(params[name], undefined, name);
+  for (const a of template.properties.activities.flatMap((/** @type {any} */ x) => [x, ...(x.typeProperties?.ifTrueActivities ?? [])])) {
+    const built = findActivity(doc.properties.activities, a.name);
+    if (built && a.policy?.timeout) assert.equal(built.policy.timeout, a.policy.timeout, a.name);
+  }
+});
+
+test('a large tenant pulls short audit windows, splits a failing one fast and gets longer time limits', () => {
+  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: allIds, modules: allModules, semanticModelId: 'model-1', scale: 'large' });
+  const audit = findActivity(doc.properties.activities, 'Run_Audit_Log_Ingester');
+  const params = audit.typeProperties.parameters;
+  assert.equal(params.CHUNK_HOURS.value, 2);
+  assert.equal(params.WINDOW_RETRIES.value, 1);
+  assert.equal(params.LOOKBACK_DAYS.value, 3);
+  assert.equal(params.TIME_BUDGET_MIN.value, 300);
+  assert.equal(params.MODE.value.value, '@pipeline().parameters.AuditMode', 'the run-time bindings stay');
+  assert.equal(audit.policy.timeout, '0.06:00:00');
+  assert.equal(audit.policy.retry, 2);
+  assert.ok(params.TIME_BUDGET_MIN.value + 45 <= 6 * 60, 'the budget leaves time to write before the timeout');
+  assert.equal(findActivity(doc.properties.activities, 'Run_Audit_Log_Processor').policy.timeout, '0.03:00:00');
+  assert.equal(findActivity(doc.properties.activities, 'Run_Licensed_Users_Ingester').policy.timeout, '0.00:30:00');
+  assert.equal(findActivity(doc.properties.activities, 'Run_Org_Data_Ingester').policy.timeout, '0.01:00:00');
+  assert.equal(findActivity(doc.properties.activities, 'Run_M365_Activity_Ingester').policy.timeout, '0.02:00:00');
+  for (const name of ['Refresh_Semantic_Model', 'Refresh_Consumption_Model', 'Refresh_Agent_Evaluator_Model']) {
+    const refresh = findActivity(doc.properties.activities, name);
+    if (!refresh) continue;
+    assert.equal(refresh.policy.timeout, '0.05:00:00', name);
+    assert.ok(refresh.typeProperties.parameters.TIMEOUT_MINUTES.value < 300, name);
+  }
 });
 
 const allModules = { orgData: true, m365Activity: true, agent365: true, productFeedback: true, consumption: true, agentEvaluator: true };

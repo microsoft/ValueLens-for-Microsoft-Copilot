@@ -17,6 +17,29 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased — Fabric: long first loads on very large tenants carry on instead of timing out
+
+- The **first load now defaults to 30 days** of audit history (the notebook was 180, the installer
+  90). You can still choose up to 180 days, or load more later with `run --backfill-days <n>`.
+- The **audit ingester** stops cleanly before its activity time limit (`TIME_BUDGET_MIN`) and saves
+  where it got to. The next run or the pipeline retry reuses queries the audit service is still
+  working on, and skips recent windows it finished in the last few hours, so nothing is queried twice.
+- The **Licensed users** and **Org data** ingesters retry Microsoft Graph throttling (429), server
+  errors and dropped connections, honour `Retry-After`, and renew an expired token once.
+- The installer asks **how many people are in the tenant**, prefilled from the capacity size:
+  - **Up to 10,000** uses 24-hour audit windows (about 8 queries a day instead of 22) and keeps the
+    template timeouts.
+  - **More than 10,000** uses 2-hour windows that the audit service can finish, gives up on a failing
+    window after one retry, splits it sooner, and gives the longer activities more time.
+  - An existing install keeps 8-hour windows and its timeouts until you choose **Repair or change**.
+- The first-load message gives a realistic estimate instead of "10 to 40 minutes", and the
+  missing service principal message says **Carry on anyway** creates it.
+
+The first daily run after you pick a size re-queries the trailing week once, because the windows
+change size. A first load in progress restarts its windows at the new size.
+
+---
+
 ## 2026-10-08 — Analytics Hub installer 0.3.3
 
 The installer bundles the notebooks, templates and app when it is built, so this release brings

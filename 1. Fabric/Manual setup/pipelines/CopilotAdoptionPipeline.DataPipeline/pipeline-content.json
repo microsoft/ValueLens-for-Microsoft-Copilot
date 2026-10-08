@@ -5,7 +5,7 @@
     "activities": [
       {
         "name": "Run_Audit_Log_Ingester",
-        "description": "Calls Microsoft Graph audit log API, polls until Purview is ready, fetches records, parses + flattens, writes Delta table dbo.copilot_interactions_parsed. Typical runtime 5-15 min.",
+        "description": "Calls Microsoft Graph audit log API, polls until Purview is ready, fetches records, parses + flattens, writes Delta table dbo.copilot_interactions_parsed. A daily run takes minutes to half an hour; a first load takes an hour or more, and several hours on a large tenant. The installer sets the window size, time budget and timeout by tenant size; a run that stops is picked up by the retry.",
         "type": "TridentNotebook",
         "dependsOn": [],
         "policy": {
@@ -23,7 +23,7 @@
       },
       {
         "name": "Run_Licensed_Users_Ingester",
-        "description": "Calls Microsoft Graph M365 active user report, derives HasCopilot flag, writes Delta table dbo.copilot_licensed_users. Typical runtime <30 sec.",
+        "description": "Calls Microsoft Graph M365 active user report, derives HasCopilot flag, writes Delta table dbo.copilot_licensed_users. Usually a minute or two; throttling and brief Graph outages are retried.",
         "type": "TridentNotebook",
         "dependsOn": [],
         "policy": {
@@ -88,7 +88,7 @@
           "ifTrueActivities": [
             {
               "name": "Run_Org_Data_Ingester",
-              "description": "Calls Microsoft Graph /users with manager expansion, writes Delta table dbo.copilot_org_data. Typical runtime <30 sec.",
+              "description": "Calls Microsoft Graph /users with manager expansion, writes Delta table dbo.copilot_org_data. Minutes on a small tenant, longer on a large one (999 people a page); throttling and brief Graph outages are retried.",
               "type": "TridentNotebook",
               "dependsOn": [],
               "policy": {
@@ -126,7 +126,7 @@
           "ifTrueActivities": [
             {
               "name": "Run_M365_Activity_Ingester",
-              "description": "Reads the six daily Microsoft 365 usage reports from Microsoft Graph and writes one row per person per day to Delta table dbo.m365_activity_daily. Typical runtime 2-10 min; the first run loads 28 days.",
+              "description": "Reads the six daily Microsoft 365 usage reports from Microsoft Graph and writes one row per person per day to Delta table dbo.m365_activity_daily. Usually 2-10 min, longer on a large tenant; the first run loads 28 days.",
               "type": "TridentNotebook",
               "dependsOn": [],
               "policy": {

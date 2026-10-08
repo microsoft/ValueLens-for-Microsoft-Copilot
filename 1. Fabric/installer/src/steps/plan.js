@@ -70,6 +70,15 @@ export function validateTime(v) {
 export const runsFabric = (capacity) => !/^(PP|A|EM)\d/i.test(String(capacity.sku ?? ''));
 
 /**
+ * F64 and up, or a Premium P capacity: what a large tenant usually runs on, so the tenant size starts at large.
+ * @param {{ sku?: string }} capacity
+ */
+export function largeCapacity(capacity) {
+  const m = /^([FP])(\d+)$/i.exec(String(capacity.sku ?? ''));
+  return !!m && (m[1].toUpperCase() === 'P' || Number(m[2]) >= 64);
+}
+
+/**
  * @typedef {object} Preflight
  * @property {any[]} capacities  Active capacities the user can use.
  * @property {any[]} subscriptions  Enabled Azure subscriptions.
@@ -281,9 +290,9 @@ export async function plan(ctx, pre) {
     config.history.days = await ui.select(
       'How much audit history should the first load pull?',
       [
-        { name: '30 days (quickest)', value: 30 },
-        { name: '90 days', value: 90 },
-        { name: '180 days (the most the audit log keeps by default)', value: 180 },
+        { name: '30 days (quickest; you can load more later)', value: 30 },
+        { name: '90 days (a few hours; longer on a large tenant)', value: 90 },
+        { name: '180 days (the most the audit log keeps by default; many hours)', value: 180 },
       ],
       config.history.days,
     );
@@ -297,7 +306,14 @@ export async function plan(ctx, pre) {
     pre.capacities.some((cap) => cap.id === config.fabric.capacityId) ? config.fabric.capacityId : pre.capacities[0].id,
   );
   const capacity = pre.capacities.find((cap) => cap.id === config.fabric.capacityId);
-
+  config.scale = await ui.select(
+    'How many people are in the tenant?',
+    [
+      { name: 'Up to 10,000', value: 'standard' },
+      { name: 'More than 10,000 (smaller audit windows, longer time limits; best on F64 or larger)', value: 'large' },
+    ],
+    config.scale ?? (capacity && largeCapacity(capacity) ? 'large' : 'standard'),
+  );
   if (config.fabric.workspaceId) {
     ui.ok(`Workspace: ${config.fabric.workspaceName ?? config.fabric.workspaceId}`);
   } else {
@@ -890,6 +906,7 @@ export async function confirmPlan(ctx, pre) {
   else if (kvMode === 'keyvault-admin') ui.info(`Key Vault:   ${config.keyVault.name} ${c.dim('(a vault admin adds the secret)')}`);
   else ui.info(`Key Vault:   ${config.keyVault.name} ${config.keyVault.existing || config.keyVault.uri ? '' : c.dim(`(new, ${config.keyVault.rbac ? 'Azure RBAC' : 'access policies'})`)}`);
   ui.info(`Schedule:    ${config.schedule.frequency === 'weekly' ? `${config.schedule.weekday}s` : 'Daily'} at ${config.schedule.time} ${config.schedule.timeZone}`);
+  ui.info(`Tenant size: ${config.scale === 'large' ? 'large (more than 10,000 people)' : 'standard (up to 10,000 people)'}`);
   if (config.semanticModel.enabled) {
     const cm = config.consumption.model;
     const consumption = consumptionModelWanted(ctx) ? `, ${cm.name} ${cm.id ? '' : c.dim('(new)')}`.trimEnd() : '';

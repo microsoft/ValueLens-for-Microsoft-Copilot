@@ -4,11 +4,11 @@ import { test } from 'node:test';
 import { notebooksFor } from '../src/catalog.js';
 import { emptyConfig } from '../src/config.js';
 import { runCommand } from '../src/install.js';
-import { ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, freeName } from '../src/steps/fabric.js';
+import { ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, freeName, pipelineSignature } from '../src/steps/fabric.js';
 import { ensureConsent } from '../src/steps/identity.js';
 import { connectionName } from '../src/steps/model.js';
-import { APP_NAME, lakehouseNameFrom, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
-import { BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, chooseLoad, historyLoaded, printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
+import { APP_NAME, lakehouseNameFrom, largeCapacity, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
+import { BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, chooseLoad, firstLoadEstimate, historyLoaded, printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
 import { DATA_CHECK_FILE } from '../src/transform/notebook.js';
 import { PIPELINE_CHANGE, PIPELINE_VERSION, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
 import { fakeCtx, fakeFabric, fakeUi } from './fakes.js';
@@ -502,11 +502,11 @@ test('run loads the history until a run has loaded it, then runs as usual', asyn
   config.fabric.pipelineId = 'pipe-1';
   const wait = { wait: true };
 
-  assert.deepEqual(await chooseLoad(ctx, wait), { wait: true, backfillDays: 90, first: true }, 'nothing has run yet');
+  assert.deepEqual(await chooseLoad(ctx, wait), { wait: true, backfillDays: 30, first: true }, 'nothing has run yet');
 
   config.firstRun = { jobId: 'job-9', status: 'Completed' };
   assert.deepEqual(await chooseLoad(ctx, wait), { wait: true });
-  assert.deepEqual(await chooseLoad(ctx, { wait: true, backfillDays: 30 }), { wait: true, backfillDays: 30, first: false }, 'asking for days reloads them');
+  assert.deepEqual(await chooseLoad(ctx, { wait: true, backfillDays: 60 }), { wait: true, backfillDays: 60, first: false }, 'asking for days reloads them');
 
   // A first load where only another load failed did load the history.
   config.firstRun = { jobId: 'job-9', status: 'Failed' };
@@ -521,8 +521,8 @@ test('run loads the history until a run has loaded it, then runs as usual', asyn
   fabric.activityRuns['job-9'].push(activity(REFRESH_ACTIVITY, 'Succeeded'));
   config.modules.agentEvaluator = true;
   config.agentEvaluator.environments = [{ url: 'https://org.crm.dynamics.com', access: true }];
-  assert.deepEqual(await chooseLoad(ctx, wait), { wait: true, backfillDays: 90, first: true }, 'the transcripts are missing');
-  assert.deepEqual(await chooseLoad(ctx, { wait: true, backfillDays: 30 }), { wait: true, backfillDays: 30, first: true });
+  assert.deepEqual(await chooseLoad(ctx, wait), { wait: true, backfillDays: 30, first: true }, 'the transcripts are missing');
+  assert.deepEqual(await chooseLoad(ctx, { wait: true, backfillDays: 60 }), { wait: true, backfillDays: 60, first: true });
   fabric.activityRuns['job-9'].push(activity('Run_Agent_Evaluator_Transcripts', 'Succeeded'));
   assert.equal(await historyLoaded(ctx), true);
 
@@ -544,10 +544,28 @@ test("run starts the first load again when the last one didn't load the history"
 
   await runCommand(ctx, 'run', { wait: true });
   assert.match(fabric.calls[0], /"AuditMode":"backfill"/);
-  assert.match(fabric.calls[0], /"BackfillDays":90/);
-  assert.match(ui.text(), /Started the first load: 90 days of audit history/);
+  assert.match(fabric.calls[0], /"BackfillDays":30/);
+  assert.match(ui.text(), /Started the first load: 30 days of audit history/);
+  assert.match(ui.text(), /usually takes under an hour/);
   assert.equal(config.firstRun?.jobId, 'job-1');
   assert.equal(config.firstRun?.status, 'Completed');
+});
+
+test('tenant size: a big capacity suggests a large tenant, and the first-load estimate and pipeline follow the size', () => {
+  for (const sku of ['F64', 'F128', 'P1', 'p3']) assert.equal(largeCapacity({ sku }), true, sku);
+  for (const sku of ['F2', 'F32', 'FT1', 'FTL64', 'Trial', 'A4', undefined]) assert.equal(largeCapacity({ sku }), false, String(sku));
+
+  assert.match(firstLoadEstimate(30, 'standard'), /under an hour/);
+  assert.match(firstLoadEstimate(30, undefined), /under an hour/);
+  assert.match(firstLoadEstimate(90, 'standard'), /90 days of history can take a few hours/);
+  assert.match(firstLoadEstimate(30, 'large'), /several hours.*picks up where the last stopped.*F64/);
+
+  const config = emptyConfig();
+  const unsized = pipelineSignature(config);
+  config.scale = 'standard';
+  const standard = pipelineSignature(config);
+  config.scale = 'large';
+  assert.equal(new Set([unsized, standard, pipelineSignature(config)]).size, 3, 'picking or changing the size rebuilds the pipeline');
 });
 
 test('status names the loads that failed in the latest run, unless a retry or the fallback covered them', async () => {
