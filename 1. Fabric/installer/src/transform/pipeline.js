@@ -23,7 +23,7 @@ const MODULE_BRANCHES = {
  */
 export const RUN_PARAMETERS = {
   AuditMode: { type: 'String', defaultValue: 'incremental' },
-  BackfillDays: { type: 'Int', defaultValue: 180 },
+  BackfillDays: { type: 'Int', defaultValue: 30 },
   ProcessorWriteMode: { type: 'String', defaultValue: 'merge' },
 };
 
@@ -38,9 +38,52 @@ const BINDINGS = {
   },
 };
 
+/** @typedef {'standard' | 'large'} TenantScale */
+
+/**
+ * How the loads are sized for the tenant. Standard keeps every timeout from the template and pulls the
+ * audit log in day-long windows, so a small tenant sends few queries. Large is for tens of thousands of
+ * users: the audit service fails long windows on busy tenants, so it pulls 2-hour windows, splits a
+ * failing one after a single retry, re-reads 3 trailing days rather than 7 to keep the daily query count
+ * down, and gives the Graph loads and the model refresh more time.
+ *
+ * `budget` is the audit load's TIME_BUDGET_MIN: it stops starting windows in time to write what it has
+ * fetched before the activity timeout, and the retry carries on where it stopped.
+ * @type {Record<TenantScale, { audit: Record<string, number>, timeouts: Record<string, string>, refresh: { timeout: string, minutes: number } }>}
+ */
+export const SCALE_PROFILES = {
+  standard: {
+    audit: { CHUNK_HOURS: 24, TIME_BUDGET_MIN: 90 },
+    timeouts: {},
+    refresh: { timeout: '0.03:00:00', minutes: 170 },
+  },
+  large: {
+    audit: { CHUNK_HOURS: 2, WINDOW_RETRIES: 1, LOOKBACK_DAYS: 3, TIME_BUDGET_MIN: 300 },
+    timeouts: {
+      Run_Audit_Log_Ingester: '0.06:00:00',
+      Run_Audit_Log_Processor: '0.03:00:00',
+      Run_Licensed_Users_Ingester: '0.00:30:00',
+      Run_Org_Data_Ingester: '0.01:00:00',
+      Run_M365_Activity_Ingester: '0.02:00:00',
+    },
+    refresh: { timeout: '0.05:00:00', minutes: 290 },
+  },
+};
+
+/**
+ * An install from before tenant sizes keeps the template's windows and time limits until someone picks a
+ * size, so a large tenant isn't moved to day-long windows by an update. It only gains the time budget,
+ * so a long load that runs out of time is carried on by the retry.
+ */
+export const UNSIZED_PROFILE = { audit: { TIME_BUDGET_MIN: 90 }, timeouts: {}, refresh: SCALE_PROFILES.standard.refresh };
+
+/** @param {TenantScale | undefined} scale */
+export const scaleProfile = (scale) => (scale === 'large' || scale === 'standard' ? SCALE_PROFILES[scale] : UNSIZED_PROFILE);
+
 /**
  * @typedef {object} PipelineSettings
  * @property {string} workspaceId
+ * @property {TenantScale} [scale]  Sizes windows, budgets and timeouts. Absent on an install from before tenant sizes: see UNSIZED_PROFILE.
  * @property {Partial<Record<import('../catalog.js').NotebookKey, string>>} notebookIds
  * @property {import('../catalog.js').ModuleChoice} modules
  * @property {number} [backfillDays]  Default for BackfillDays.
@@ -97,10 +140,10 @@ export const WORKDAY_ACTIVITY = 'Run_Org_Data_Workday';
 export const COWORK_DATAFLOW_ACTIVITY = 'Refresh_Cowork_Credits';
 
 /** Bump when the pipeline's layout changes, so re-running the installer updates a pipeline an older version built. */
-export const PIPELINE_VERSION = 4;
+export const PIPELINE_VERSION = 5;
 /** What this version changed, for people whose pipeline an older version built. */
 export const PIPELINE_CHANGE =
-  'This version runs every notebook in one shared Spark session, so a trial or small capacity turns fewer loads away, and ends with a step that records how each load went in dbo.load_log.';
+  'This version lets a long audit load that runs out of time carry on where it stopped when the run retries, instead of starting again. To size the audit windows and time limits for your tenant, choose Repair or change and answer how many people are in it. A first load still in progress then starts its audit windows again at the new size.';
 
 /** Notebooks with the same tag share one high-concurrency Spark session (letters, digits and underscores only). */
 export const SESSION_TAG = 'analytics_hub';
@@ -230,12 +273,13 @@ function* notebookActivities(activities) {
 function refreshStep(settings, o) {
   const notebookId = settings.notebookIds.refreshModel;
   if (!notebookId) throw new Error('The semantic model refresh notebook has not been deployed.');
+  const { refresh } = scaleProfile(settings.scale);
   return {
     name: o.name,
     description: o.description,
     type: 'TridentNotebook',
     dependsOn: o.dependsOn,
-    policy: { timeout: '0.03:00:00', retry: 0, retryIntervalInSeconds: 60, secureOutput: false, secureInput: false },
+    policy: { timeout: refresh.timeout, retry: 0, retryIntervalInSeconds: 60, secureOutput: false, secureInput: false },
     typeProperties: {
       notebookId,
       workspaceId: settings.workspaceId,
@@ -243,6 +287,7 @@ function refreshStep(settings, o) {
         WORKSPACE_ID: { value: settings.workspaceId, type: 'string' },
         SEMANTIC_MODEL_ID: { value: o.modelId, type: 'string' },
         WRITE_MODE: { value: o.writeMode, type: 'string' },
+        TIMEOUT_MINUTES: { value: refresh.minutes, type: 'int' },
       },
     },
   };
@@ -465,6 +510,7 @@ export function buildPipeline(template, settings) {
       };
     }
   }
+  applyScale(props.activities, scaleProfile(settings.scale));
 
   /** @type {Record<string, string>} */
   const ids = { REPLACE_WITH_WORKSPACE_ID: settings.workspaceId };
@@ -529,6 +575,21 @@ export function buildPipeline(template, settings) {
     'The first run overrides them with AuditMode=backfill and ProcessorWriteMode=overwrite. ' +
     'Re-run the installer with "update" to pick up new notebook and pipeline versions.';
   return filled;
+}
+
+/**
+ * Fixes the audit load's window size and budget, and lengthens the timeouts the profile names.
+ * Runs before `applyRetries`, which reads the timeouts.
+ * @param {any[]} activities
+ * @param {ReturnType<typeof scaleProfile>} profile
+ */
+function applyScale(activities, profile) {
+  const audit = findActivity(activities, 'Run_Audit_Log_Ingester');
+  for (const [name, value] of Object.entries(profile.audit)) audit.typeProperties.parameters[name] = { value, type: 'int' };
+  for (const [name, timeout] of Object.entries(profile.timeouts)) {
+    const activity = findActivity(activities, name);
+    if (activity) activity.policy = { ...activity.policy, timeout };
+  }
 }
 
 /**

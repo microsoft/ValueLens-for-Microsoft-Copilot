@@ -112,6 +112,23 @@ function reportJob(ctx, job, what, again) {
  * @property {string[]} [failed]  The activities that failed.
  */
 
+/**
+ * How long loading the audit history is likely to take. Microsoft queues each audit query for a few
+ * minutes whatever its size, so the time grows with the days asked for and, on a large tenant, with
+ * the number of short windows.
+ * @param {number} days
+ * @param {string} [scale]
+ */
+export function firstLoadEstimate(days, scale) {
+  if (scale === 'large') {
+    return `Loading ${days} days of history on a large tenant can take several hours, and may need more than one run: each run picks up where the last stopped. An F64 or larger capacity helps. `;
+  }
+  if (days > 30) {
+    return `Loading ${days} days of history can take a few hours, longer on a trial or small capacity. Each run picks up where the last stopped. `;
+  }
+  return 'Loading the history usually takes under an hour, longer on a trial or small capacity. ';
+}
+
 /** A run that started longer ago than this is stuck, not running. */
 const STUCK_MS = 24 * 3_600_000;
 
@@ -151,7 +168,7 @@ export async function runPipeline(ctx, opts) {
     ui.note(`It runs in Fabric. Check on it with "${commandLine('status')}".`);
     return { jobId, status: 'NotStarted' };
   }
-  ui.note(`${days ? 'Loading the history usually takes 10 to 40 minutes, longer on a trial or small capacity. ' : ''}You can press Ctrl+C; the run carries on in Fabric.`);
+  ui.note(`${days ? firstLoadEstimate(days, config.scale) : ''}You can press Ctrl+C; the run carries on in Fabric.`);
   const job = await waitForJob(ctx, url, 'Pipeline');
   const ok = reportJob(ctx, job, 'Pipeline');
   const runs = TERMINAL.has(job?.status) ? await activityRuns(ctx, jobId, { startTimeUtc: job.startTimeUtc ?? startedAt, endTimeUtc: job.endTimeUtc }) : null;

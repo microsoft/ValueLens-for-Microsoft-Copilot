@@ -19,6 +19,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {import('./uploads.js').DataSourceModes} dataSources  How each source arrives: API, uploaded CSV, or skipped.
  * @property {UploadsConfig} uploads
  * @property {{ days: number }} history
+ * @property {import('./transform/pipeline.js').TenantScale} [scale]  How the loads are sized. Standard when absent.
  * @property {{ frequency: 'daily' | 'weekly', time: string, weekday: string, timeZone: string }} schedule
  * @property {{ appId?: string, objectId?: string, servicePrincipalId?: string, displayName?: string, secretExpires?: string, secretKeyId?: string, retiredSecretKeyIds?: string[], existing?: boolean, adminPack?: string }} app
  * @property {{ subscriptionId?: string, resourceGroup?: string, name?: string, id?: string, uri?: string, location?: string, secretName: string, existing?: boolean, rbac?: boolean, private?: boolean, secretSetAt?: string, mode?: SecretMode, handoff?: SecretHandoff }} keyVault
@@ -213,7 +214,7 @@ export function emptyConfig() {
     modules: normaliseModules(undefined),
     dataSources: normaliseDataSources(undefined, normaliseModules(undefined)),
     uploads: {},
-    history: { days: 90 },
+    history: { days: 30 },
     schedule: { frequency: 'daily', time: '02:00', weekday: 'Sunday', timeZone: 'UTC' },
     app: {},
     keyVault: { secretName: 'valuelens-client-secret' },
