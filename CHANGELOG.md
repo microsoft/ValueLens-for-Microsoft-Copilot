@@ -17,10 +17,15 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
-## Unreleased
+## 2026-10-09 — Analytics Hub installer 0.3.6
 
-**Update an existing install:** once the next installer is released, open it and choose
-**Repair or change**. Repair sees the changed Agent Evaluator model, redeploys it and refreshes it.
+**Update an existing install:** download installer 0.3.6, open it and choose **Repair or change**.
+Repair sees the changed Agent Evaluator model, redeploys it and refreshes it.
+
+The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.3.6`, which the
+Azure install pulls.
+
+The README also has a new collapsed note on which agents the Purview audit log covers.
 
 ### Fix: Agent Evaluator refresh fails with "Cannot order 'Metric Glossary'[Metric] by [MetricOrder]"
 
