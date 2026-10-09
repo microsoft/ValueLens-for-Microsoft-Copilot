@@ -28,6 +28,9 @@ See [`sample-data/README.md`](sample-data/README.md) for what the sample contain
 - Roles and permissions listed in [`../docs/PERMISSIONS.md`](../docs/PERMISSIONS.md).
 - Optional access for Agent 365 registry data or product feedback.
 
+Read the [disclaimer](../README.md#disclaimer) too: these aren't the official Copilot reports, and
+you're responsible for the exported CSV files.
+
 ### Steps
 
 1. Export Copilot interactions from Microsoft Purview > Audit: search `CopilotInteraction`, export CSV, and save it as `raw_copilot_interactions.csv`.

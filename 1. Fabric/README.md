@@ -34,6 +34,9 @@ Someone in your organisation also needs to:
 
 The full list of roles is in the [installer README](installer/README.md#before-you-start).
 
+Read the [disclaimer](../README.md#disclaimer) too: these aren't the official Copilot reports, and
+you're responsible for the data once it's in your workspace.
+
 ## Install
 
 1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe).
