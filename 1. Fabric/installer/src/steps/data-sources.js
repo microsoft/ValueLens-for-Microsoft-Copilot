@@ -12,6 +12,7 @@ import { c } from '../ui.js';
 import {
   dataSource,
   DATA_SOURCES,
+  exportModesOf,
   modeLabel,
   modulesFromSources,
   routedSources,
@@ -135,7 +136,7 @@ export function dataSourcesSummary(ctx) {
     const mode = ds[s.id];
     const dormant = mode === 'skip' && s.page ? c.dim(`  ${s.page} page stays empty`) : '';
     ui.info(`${s.label}: ${modeLabel(s.id, mode)}${dormant}`);
-    if (mode === 'csv' && s.export) ui.note(`  ${s.export.where} ${s.export.url}`);
+    if (s.export && exportModesOf(s).includes(mode)) ui.note(`  ${s.export.where} ${s.export.url}`);
   }
   if (!routedSources(ds).length) return;
 

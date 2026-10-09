@@ -171,7 +171,7 @@ export function createUi(opts = {}) {
             default: card.mode,
           });
         } else line(`${c.green('✔')} ${card.label} ${c.cyan(card.modes.find((m) => m.value === modes[card.id])?.label ?? MODE_LABELS[modes[card.id]])}`);
-        if (modes[card.id] === 'csv' && card.export && !o.lockModes) line(`    ${c.dim(`Export: ${card.export.where} ${card.export.url}`)}`);
+        if ((card.exportModes ?? ['csv']).includes(modes[card.id]) && card.export && !o.lockModes) line(`    ${c.dim(`Export: ${card.export.where} ${card.export.url}`)}`);
       }
       /** @type {import('./staging.js').PendingUpload[]} */
       const files = [];

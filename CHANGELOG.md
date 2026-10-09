@@ -53,6 +53,24 @@ when the new version changed it. Now a flow with no connections signed in to is 
 new version. Bindings made in the Power Automate designer are recognised and kept. A flow that gains
 a connection is turned off first, and replaced if Dataverse refuses the update.
 
+### Changed: Product feedback's Power Automate route is its own choice
+
+**What changed.** Product feedback now offers **Power Automate (emailed export)** next to
+**Upload CSV** and **Skip**, rather than a yes/no question after Upload CSV. It creates the flow that
+saves the exports emailed to a mailbox. The plan, the Data sources screen in `--ui` and the README
+show it as its own mode. On the command line it's `--data productFeedback=flow` (or `=api`);
+`--feedback-flow` still works and means the same. A saved install that had the flow keeps it.
+
+### New: run the Copilot Studio credits flow now
+
+**What changed.** The Studio credits flow loads its first six months on its first run, which used to
+be the next day. Now `run` (in the terminal and in `--ui`) and **Repair or change** check whether
+the flow is on and has loaded them yet. If it hasn't, they offer to run it now as you, and to wait
+for it so the pipeline that follows picks up its files. On Fabric the check is the flow's
+`studio_backfill_done` marker; on Azure, its run history. If the flow is off, or Power Automate
+turns the run down, the installer prints the steps to do it by hand and carries on. `--yes` never
+runs it. The flows summary after an install says the same.
+
 ---
 
 ## 2026-10-09 — Analytics Hub installer 0.3.8

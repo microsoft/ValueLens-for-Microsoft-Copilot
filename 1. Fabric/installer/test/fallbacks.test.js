@@ -444,8 +444,7 @@ test('notebook mode: an app the user brought gets its pasted secret; no vault ne
 
 test('notebook mode: the flows sign in to OneLake, so only flows that write as the app are left out', () => {
   const { config } = fakeCtx();
-  config.uploads.feedbackFlow = true;
-  config.dataSources.productFeedback = 'csv';
+  config.dataSources.productFeedback = 'api';
   config.keyVault.mode = 'notebook';
   assert.deepEqual(flowsWanted(config), ['feedback']);
   assert.deepEqual(flowsSkipped(config), []);

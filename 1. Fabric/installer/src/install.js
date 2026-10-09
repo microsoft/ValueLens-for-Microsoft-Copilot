@@ -8,6 +8,7 @@ import { createCredential, createTokenProvider, decodeJwt } from './auth.js';
 import { notebooksFor, permissionsFor } from './catalog.js';
 import { armApi, keyVaultApi } from './clients/azure.js';
 import { dataverseApi, dataverseScope, DISCOVERY_URL, discoveryApi, orgUrl } from './clients/dataverse.js';
+import { FLOW_URL, flowApi } from './clients/flow.js';
 import { fabricApi, scheduleBody } from './clients/fabric.js';
 import { CONSENT_ROLES, graphApi } from './clients/graph.js';
 import { ONELAKE_URL, oneLakeApi } from './clients/onelake.js';
@@ -41,7 +42,7 @@ import { confirmPlan, plan, preflight } from './steps/plan.js';
 import { checkPrereqs } from './prereqs.js';
 import { ensureReports, reportsOn, reportsSummary } from './steps/report.js';
 import { dataSourcesSummary, ensureUploads, uploadCommand } from './steps/data-sources.js';
-import { ensureFlows, FLOW_FILES, flowDefinitions, flowsSummary, flowsWanted } from './steps/flows.js';
+import { ensureFlows, FLOW_FILES, flowDefinitions, flowsSummary, flowsWanted, offerStudioRun } from './steps/flows.js';
 import { routerWanted } from './uploads.js';
 import { checkData, chooseLoad, runDataCheck, runPipeline, status } from './steps/run.js';
 import { rerunFailed } from './steps/rerun.js';
@@ -61,6 +62,7 @@ import { askTarget, azureRefresh, azureRotateSecret, azureRun, azureStatus, azur
  * @property {import('./clients/powerbi.js').PowerBiApi} powerBi
  * @property {import('./clients/dataverse.js').DiscoveryApi} discovery
  * @property {import('./clients/powerplatform.js').PowerPlatformApi} powerPlatform
+ * @property {import('./clients/flow.js').FlowApi} flow
  * @property {(url: string) => import('./clients/dataverse.js').DataverseApi} dataverse  A Dataverse environment, by org URL.
  *
  * @typedef {{ id: string, upn: string, tenantId: string, displayName?: string }} User
@@ -110,6 +112,7 @@ export async function connect(opts) {
     powerBi: powerBiApi(client('https://api.powerbi.com/v1.0/myorg', 'powerbi')),
     discovery: discoveryApi(client(DISCOVERY_URL, 'discovery')),
     powerPlatform: powerPlatformApi(client(POWER_PLATFORM_URL, 'powerPlatform')),
+    flow: flowApi(client(FLOW_URL, 'flow')),
     dataverse: (url) => dataverseApi(client(`${orgUrl(url)}/api/data/v9.2`, dataverseScope(url)), url),
   };
   const claims = decodeJwt(await getToken('graph'));
@@ -333,6 +336,9 @@ export async function install(ctx, opts) {
     await tryDeployApp(ctx);
   }
 
+  // A Studio flow that's on but hasn't loaded its six months yet: run it now, before the pipeline.
+  if (withUploads) await offerStudioRun(ctx, { pipelineNext: !!(ctx.runFirstLoad || ctx.reloadHistoryDays) && consented && vaultReachable, quietWhenOff: true });
+
   let ok = true;
   if (ctx.runFirstLoad) {
     step('First load');
@@ -503,6 +509,7 @@ export async function update(ctx, opts = {}) {
  */
 export async function run(ctx, opts) {
   if (ctx.config.target === 'azure') return azureRun(ctx, opts);
+  await offerStudioRun(ctx, { pipelineNext: true });
   const load = await chooseLoad(ctx, opts);
   const result = await runPipeline(ctx, load);
   // Asking for more history than the record has: later repairs offer more than this.

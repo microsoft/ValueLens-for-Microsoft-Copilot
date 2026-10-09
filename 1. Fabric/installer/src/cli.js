@@ -52,11 +52,12 @@ Options:
   --backfill-days <n>  With run: reload n days of audit history and rebuild the curated table
   --out <dir>          With preview: where to write (default ./valuelens-preview)
   --data <id=mode>     With install: how a source arrives, api, csv or skip. Repeat it or use
-                       commas, e.g. --data productFeedback=csv,agent365=api. Sources:
-                       ${DATA_SOURCE_IDS.join(', ')}
+                       commas, e.g. --data productFeedback=flow,agent365=api. flow is the
+                       Power Automate flow, the api mode of productFeedback and studioCredits.
+                       Sources: ${DATA_SOURCE_IDS.join(', ')}
   --csv <file>         With install: an export to upload during the install. Repeat for more.
-  --feedback-flow      With install: create the Power Automate flow that saves product feedback
-                       exports emailed to you (needs productFeedback=csv)
+  --feedback-flow      With install: same as --data productFeedback=flow, the flow that saves
+                       product feedback exports emailed to you (needs Power Automate Premium)
   --studio-flow        With install: same as --data studioCredits=api, the daily flow that reads
                        Copilot Studio credits from the licensing API
   --flow-environment <url>
@@ -195,14 +196,14 @@ export function version() {
  * @param {{ dataSources: Partial<import('./uploads.js').DataSourceModes>, feedbackFlow?: boolean, studioFlow?: boolean, flowEnvironment?: string, flowIdentity?: import('./config.js').FlowIdentity, vivaPartition?: string, vivaQuery?: string }} args
  */
 export function applyDataFlags(config, args) {
-  // --studio-flow is from before the flow was the API mode: with csv (as the old docs had it) or alone, it means studioCredits=api.
+  // --studio-flow and --feedback-flow are from before each flow was its source's api mode: with csv (as the old docs had it) or alone, they mean api.
   const studio = args.studioFlow && args.dataSources.studioCredits !== 'skip' ? { studioCredits: /** @type {const} */ ('api') } : {};
-  const sources = { ...args.dataSources, ...studio };
+  const feedback = args.feedbackFlow && args.dataSources.productFeedback !== 'skip' ? { productFeedback: /** @type {const} */ ('api') } : {};
+  const sources = { ...args.dataSources, ...studio, ...feedback };
   if (Object.keys(sources).length) {
     config.dataSources = { ...config.dataSources, ...sources };
     config.modules = modulesFromSources(config.dataSources);
   }
-  if (args.feedbackFlow !== undefined) config.uploads.feedbackFlow = args.feedbackFlow;
   if (args.flowEnvironment && args.flowEnvironment !== config.uploads.flowEnvironment?.url) config.uploads.flowEnvironment = { url: args.flowEnvironment };
   if (args.flowIdentity) config.uploads.flowIdentity = args.flowIdentity;
   if (args.vivaPartition) config.consumption.vivaPartition = args.vivaPartition;
