@@ -27,6 +27,7 @@ import {
     type StageId,
 } from "./destinations";
 import { FilterBar } from "./filter-bar";
+import { FreshnessLabel } from "./freshness-label";
 
 interface VersionResponse {
     latest?: string;
@@ -275,6 +276,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                                 <span className="text-[length:var(--text-300)] leading-300 text-muted-foreground">
                                     {current.blurb}
                                 </span>
+                                <FreshnessLabel key={current.id} destination={current.id} />
                             </span>
                         </header>
                     )}

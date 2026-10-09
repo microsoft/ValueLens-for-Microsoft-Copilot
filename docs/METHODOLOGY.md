@@ -1083,6 +1083,37 @@ category or period, a tie for the lead, a zero or negative total, or fewer than 
 a share or a ranking. A peak is never compared with the period before, because the latest period
 may be incomplete.
 
+### 8.6 Concentration, value by habit and agent spotlights
+
+- **Concentration** (Leaderboards, Consumption's Copilot Studio section, Value) ranks people by one
+  measure and shows the share of the total taken by the top 1%, 5% and 25%, with a Pareto curve
+  of cumulative share against cumulative people. On Leaderboards the measure is sessions under the
+  page filters. On Consumption it is Copilot Studio credits this month. On Value it is
+  expert-equivalent hours in the last full month. A slice is the top *pct × people*, rounded up,
+  and its share is shown only when it covers at least five people.
+- **Value by habit** (Value) puts each person active in the last full month into a habit group by
+  their active days (Power 16+, Habitual 11–15, Developing 6–10, Beginner 1–5), then shows each
+  group's expert-equivalent hours per person that month under the selected effort scenario. A
+  group under five people isn't shown.   It's a comparison, not a cause: more active days means more
+    activity to count.
+- **Agent spotlights** (Leaderboards) name the agent with the most sessions, the one used by
+  the most job functions (distinct non-blank `Function` values in the org directory, among the
+  people behind its sessions), and the one reached across the most organisations. Ties name up to
+  two agents and count the rest. The job-functions and organisations cards are hidden below two,
+  and the job-functions card is hidden when the directory has no functions.
+
+### 8.7 Data freshness and chart actions
+
+Each page shows, under its description, the latest date each of its sources holds, such as
+*Audit log to 7 Oct*. The date is the latest row in the source's own table, not the date table,
+which runs on past the data, and it ignores the page filters. Cowork credits arrive weekly, so
+theirs reads *to week of*. The Agent 365 registry uses the model's own freshness measure. A source
+that isn't connected, or whose date can't be read, is left out.
+
+Each chart's actions menu offers **Copy as image** and **Download CSV**. The CSV holds the rows
+the chart was drawn from, with the chart's column names. Where the browser blocks the clipboard,
+as it can inside Fabric, the image downloads as a PNG instead.
+
 ---
 
 ## 9. Known limits
