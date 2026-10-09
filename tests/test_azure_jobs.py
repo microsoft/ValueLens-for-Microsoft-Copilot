@@ -354,6 +354,21 @@ def test_collect_licensed_and_org(tmp_path):
     assert org_rows == (2,)
 
 
+def test_collect_org_keeps_manager_cycles_and_warns(tmp_path, caplog):
+    users = [{"userPrincipalName": "a@contoso.com", "manager": {"userPrincipalName": "b@contoso.com"}},
+             {"userPrincipalName": "b@contoso.com", "manager": {"userPrincipalName": "a@contoso.com"}},
+             {"userPrincipalName": "top@contoso.com", "manager": {"userPrincipalName": "top@contoso.com"}}]
+    api, _ = make_api(lambda m, u, kw: Resp(200, {"value": users}))
+    store = LocalStore(tmp_path)
+    with caplog.at_level("WARNING", logger="valuelens_jobs.collect"):
+        assert graph.collect_org(api, store, settings()) == 3
+    assert "2 distinct manager cycle(s)" in caplog.text
+    rows = duckdb.sql(f"SELECT PersonId, HierarchyError FROM '{store.path('raw/copilot_org_data/part-0.parquet').as_posix()}' ORDER BY 1").fetchall()
+    assert rows == [("a@contoso.com", "Cycle detected at 'a@contoso.com'"),
+                    ("b@contoso.com", "Cycle detected at 'b@contoso.com'"),
+                    ("top@contoso.com", "")]
+
+
 def test_collect_org_rejects_loops_and_foreign_links(tmp_path):
     api, _ = make_api(lambda m, u, kw: Resp(200, {"value": [], "@odata.nextLink": graph.org.USERS_URL}))
     with pytest.raises(RuntimeError, match="looped"):

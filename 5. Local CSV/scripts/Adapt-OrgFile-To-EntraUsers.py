@@ -91,7 +91,9 @@ def resolve_col(headers, wanted, auto_aliases):
 def build_hierarchy(rows, upn_key, mgr_key, name_key, max_levels):
     """Flatten the manager chain into Level0_Name..LevelN_Name + OrgLevel +
     HierarchyPath, mirroring PAX. Level0 = top of chain, deepest = the person.
-    Cycle-safe. Returns dict upn_norm -> {col: value}."""
+    Cycle-tolerant: someone who is their own manager is the top of their chain;
+    a loop between people truncates the chain and is recorded in HierarchyError.
+    Returns dict upn_norm -> {col: value}."""
     by_upn = {}
     name_of = {}
     mgr_of = {}
@@ -103,10 +105,10 @@ def build_hierarchy(rows, upn_key, mgr_key, name_key, max_levels):
         name_of[u] = (r.get(name_key) or r.get(upn_key) or "").strip() if name_key else u
         mgr_of[u] = (r.get(mgr_key) or "").strip().lower() if mgr_key else ""
 
-    # direct-report counts
+    # direct-report counts (someone who is their own manager is not their own report)
     direct = {u: 0 for u in by_upn}
     for u, m in mgr_of.items():
-        if m and m in direct:
+        if m and m != u and m in direct:
             direct[m] += 1
 
     out = {}
@@ -114,19 +116,25 @@ def build_hierarchy(rows, upn_key, mgr_key, name_key, max_levels):
         chain = []
         seen = set()
         cur = u
-        while cur and cur in by_upn and cur not in seen:
+        error = ""
+        while cur and cur in by_upn:
+            if cur in seen:
+                error = f"Cycle detected at {cur!r}"
+                break
             seen.add(cur)
             chain.append(cur)
-            cur = mgr_of.get(cur, "")
+            m = mgr_of.get(cur, "")
+            cur = "" if m == cur else m
         chain = list(reversed(chain))        # top -> self
         rec = {}
         for i in range(max_levels + 1):
             rec[f"Level{i}_Name"] = name_of.get(chain[i], "") if i < len(chain) else ""
-        rec["OrgLevel"] = str(len(chain) - 1)
+        rec["OrgLevel"] = str(max(len(chain) - 1, 0))
         rec["HierarchyPath"] = " > ".join(name_of.get(c, c) for c in chain)
         rec["TopOfChain_Name"] = name_of.get(chain[0], "") if chain else ""
         rec["IsManager"] = "TRUE" if direct.get(u, 0) > 0 else "FALSE"
         rec["DirectReports"] = str(direct.get(u, 0))
+        rec["HierarchyError"] = error
         out[u] = rec
     return out
 
@@ -172,7 +180,7 @@ def main():
     out_cols = [OUT_UPN, OUT_DISPLAY, OUT_DEPT, OUT_TITLE, OUT_MGR_UPN, OUT_MGR_NAME, OUT_LICENSE]
     hier_cols = []
     if mgr:
-        hier_cols = (["OrgLevel", "HierarchyPath", "TopOfChain_Name", "IsManager", "DirectReports"]
+        hier_cols = (["OrgLevel", "HierarchyPath", "TopOfChain_Name", "IsManager", "DirectReports", "HierarchyError"]
                      + [f"Level{i}_Name" for i in range(args.max_levels + 1)])
     out_cols += hier_cols
 
@@ -228,6 +236,11 @@ def main():
     print(f"  UPN-shaped values   : {valid_upn}/{n}" + ("  <-- WARNING: some rows are not UPNs; they will not join the audit log" if valid_upn < n else ""))
     print(f"  Licensed (TRUE)     : {licensed}")
     print(f"  Output              : {args.outfile}")
+    cycles = sorted({rec["HierarchyError"] for rec in hierarchy.values() if rec["HierarchyError"]})
+    if cycles:
+        print(f"  Manager cycles      : {len(cycles)} distinct (rows kept, chain truncated). Examples:")
+        for err in cycles[:20]:
+            print(f"    {err}")
     if valid_upn == 0:
         print("  *** CRITICAL: no UPN-shaped values found. The --upn-col must contain the same UPN as the audit log. ***")
 

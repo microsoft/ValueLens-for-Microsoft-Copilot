@@ -17,6 +17,36 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased — 0.3.5
+
+### Fix: org data load stops with "Cycle detected in manager hierarchy"
+
+**Symptom.** On a tenant whose manager data contains a cycle, the org data notebook
+(`Copilot_Org_Data_Direct_Ingester`), and so the nightly pipeline, stops with
+`ValueError: Cycle detected in manager hierarchy at '…'` and `copilot_org_data` isn't written.
+The Azure path's org collector stops the same way.
+
+**Cause.** The manager-chain walk treated any repeat as fatal. That includes someone who is
+their own manager in Entra, which is common for the person at the top of the org.
+
+**Fix.**
+
+- Someone whose manager is themselves is now the top of their chain, with no error, and is no
+  longer counted as one of their own direct reports.
+- A real loop between people (A → B → A) no longer stops the load. Every row is kept, the chain
+  is cut where it loops, and the new `HierarchyError` column says where (for example
+  `Cycle detected at 'a@contoso.com'`). It's empty for everyone else. The notebook prints how
+  many distinct loops it found and up to 20 examples; the Azure collector logs the same as a
+  warning.
+- The same rules apply to the Local CSV `Adapt-OrgFile-To-EntraUsers.py` adapter, which also
+  gains the `HierarchyError` column. The Workday lander's standalone mode adds the column empty so
+  its output keeps the same shape.
+
+The report templates don't need changing: they ignore org columns they don't use. The table is
+written with `overwriteSchema`, so the new column needs no migration.
+
+---
+
 ## 2026-10-08 — Analytics Hub installer 0.3.4
 
 This release fixes models that never finished calculating, and lets long first loads on very

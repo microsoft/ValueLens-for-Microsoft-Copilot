@@ -95,7 +95,9 @@ AI-in-One shape. `--with-aggregates` adds pre-rolled summary files you don't nee
 Optional pre-step. The processor's `--entra` input must be in the **EntraUsers** shape (it joins to
 the audit log on `userPrincipalName`). If your org/HR export uses different headers, an employee-ID
 key, a semicolon delimiter or UTF-16, this adapter maps it into the expected shape — and can flatten
-the manager chain into the `Level0..N` hierarchy for org drill-down.
+the manager chain into the `Level0..N` hierarchy for org drill-down. Someone listed as their own
+manager is treated as the top of the chain. A loop between people (A → B → A) keeps every row,
+truncates the chain and names the loop in the `HierarchyError` column.
 
 ```bash
 python "Adapt-OrgFile-To-EntraUsers.py" \
