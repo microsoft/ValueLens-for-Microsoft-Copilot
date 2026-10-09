@@ -19,6 +19,23 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ## Unreleased
 
+### New: Fabric App concentration, value by habit, agent spotlights and chart actions
+
+**What changed.** More additions to the Fabric App, for both the Fabric and Azure paths (#163).
+
+- **Concentration.** Leaderboards, Consumption's Copilot Studio section and Value show the share
+  taken by the top 1%, 5% and 25% of people, with a Pareto curve. A share is shown only when its
+  slice covers at least five people.
+- **Value by habit.** Value has a new section with expert-equivalent hours per person last month
+  for Power, Habitual, Developing and Beginner users, labelled as a comparison, not a cause.
+- **Agent spotlights.** The agent leaderboard opens with the most used agent, the one used by the
+  most job functions, and the one reached across the most organisations.
+- **Chart actions.** Every chart's menu has **Copy as image** (it downloads a PNG where the
+  clipboard is blocked) and **Download CSV**.
+- **Data freshness.** Each page lists the latest date each of its sources holds.
+
+The Power BI templates are unchanged; #167 tracks porting the read-only visuals to them.
+
 ### New: Fabric App budget runway, chart headlines and heavy users without a licence
 
 **What changed.** Three additions to the Fabric App, which serves both the Fabric and Azure paths

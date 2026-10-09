@@ -161,6 +161,7 @@ export const destinations = [
         stages: [
             { id: "task-breakdown", label: "Task breakdown", ready: true },
             { id: "estimated-value", label: "Estimated value", ready: true },
+            { id: "value-by-habit", label: "Value by habit", ready: true },
             { id: "cost-vs-value", label: "Cost vs value", ready: true },
         ],
     },

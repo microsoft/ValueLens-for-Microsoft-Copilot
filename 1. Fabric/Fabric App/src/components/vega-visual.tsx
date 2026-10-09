@@ -7,7 +7,7 @@
 import { VegaVisual as EvalVegaVisual } from "@microsoft/fabric-visuals";
 import { EmbeddableVegaVisual } from "@microsoft/fabric-visuals/embeddable";
 
-export type { VisualizationSpec } from "@microsoft/fabric-visuals";
+export type { VegaVisualHandle, VisualizationSpec } from "@microsoft/fabric-visuals";
 
 /** True when the page's Content-Security-Policy blocks `new Function`, as the Azure host's does. */
 export function isEvalBlocked(): boolean {

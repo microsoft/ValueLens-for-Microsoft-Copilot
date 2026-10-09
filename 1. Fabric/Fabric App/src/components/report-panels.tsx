@@ -5,10 +5,16 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { useId, useMemo, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ComponentProps, type ReactNode, type RefObject } from "react";
+import { Copy, Download } from "lucide-react";
 import { DataGrid, type GridColumnDef, type Row } from "@microsoft/fabric-datagrid";
-import { VegaVisual, type VisualizationSpec } from "@/components/vega-visual";
+import { VegaVisual, type VegaVisualHandle, type VisualizationSpec } from "@/components/vega-visual";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
+import { VisualContainer, type VisualContainerAction, type VisualContainerHandle } from "@microsoft/fabric-visuals-extensibility";
+import { backgroundOf, captureChart, copyOrDownloadImage, viewToPng } from "@/lib/chart-image";
+import { fileNameFor } from "@/lib/download";
+import { downloadTableCsv } from "@/lib/table-csv";
+import { cn } from "@/lib/utils";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { TreeFrame } from "@/components/tree-frame";
 import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
@@ -96,10 +102,101 @@ export function ChartPanel({ spec, title, subtitle, capabilities, headline, ...p
         <Panel {...panel} height={panel.height + (text ? HEADLINE_SPACE : 0)}>
             {(table) => (
                 <Headlined text={text}>
-                    <VegaVisual spec={spec} data={table} theme={theme} capabilities={capabilities} header={{ title, subtitle }} />
+                    <ChartFrame title={title} subtitle={subtitle} table={table}>
+                        {(visual) => <VegaVisual ref={visual} spec={spec} data={table} theme={theme} capabilities={capabilities} />}
+                    </ChartFrame>
                 </Headlined>
             )}
         </Panel>
+    );
+}
+
+const STATUS_MS = 3000;
+
+/**
+ * Frames a chart with its title and an actions menu: copy the chart as a
+ * picture, or download the rows it was drawn from as CSV.
+ */
+function ChartFrame({
+    title,
+    subtitle,
+    table,
+    children,
+}: {
+    title: string;
+    subtitle: string;
+    table: DataTable;
+    children: (visual: RefObject<VegaVisualHandle | null>) => ReactNode;
+}) {
+    const container = useRef<VisualContainerHandle>(null);
+    const visual = useRef<VegaVisualHandle>(null);
+    const [status, setStatus] = useState<string>();
+
+    useEffect(() => {
+        if (!status) return;
+        const timer = setTimeout(() => setStatus(undefined), STATUS_MS);
+        return () => clearTimeout(timer);
+    }, [status]);
+
+    // The container names its toolbar generically; this says which chart it acts on.
+    useEffect(() => {
+        container.current?.element?.parentElement
+            ?.querySelector('[role="toolbar"]')
+            ?.setAttribute("aria-label", `Chart actions for ${title}`);
+    });
+
+    const actions = useMemo<VisualContainerAction[]>(
+        () => [
+            {
+                id: "copy-image",
+                label: "Copy as image",
+                icon: <Copy aria-hidden="true" />,
+                onClick: async () => {
+                    const element = container.current?.element;
+                    const view = visual.current?.view;
+                    const blob = await captureChart(
+                        () => container.current?.captureAsImage() ?? Promise.reject(new Error("The chart isn't drawn yet.")),
+                        view ? () => viewToPng(view, backgroundOf(element)) : undefined,
+                    );
+                    const outcome = await copyOrDownloadImage(blob, title, fileNameFor(title, "png"));
+                    setStatus(outcome === "copied" ? "Copied" : "Downloaded");
+                },
+            },
+            {
+                id: "download-csv",
+                label: "Download CSV",
+                icon: <Download aria-hidden="true" />,
+                onClick: () => {
+                    downloadTableCsv(table, title);
+                    setStatus("Downloaded");
+                },
+            },
+        ],
+        [table, title],
+    );
+
+    return (
+        <div className="relative h-full min-h-0">
+            <VisualContainer
+                ref={container}
+                header={{ title, subtitle }}
+                builtInActionIds={[]}
+                customActions={actions}
+                maxVisibleButtons={1}
+            >
+                {children(visual)}
+            </VisualContainer>
+            <span
+                role="status"
+                className={cn(
+                    "pointer-events-none absolute right-300 bottom-300 rounded-md bg-foreground text-background",
+                    SMALL,
+                    status ? "px-200 py-100" : "sr-only",
+                )}
+            >
+                {status}
+            </span>
+        </div>
     );
 }
 

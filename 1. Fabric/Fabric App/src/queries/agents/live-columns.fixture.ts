@@ -79,4 +79,7 @@ export const liveColumns = {
         "[Worth A Look Share]",
         "[Fit Notice]",
     ],
+    // Authored from the model's measure definitions, not captured live: no published model was
+    // reachable when these were written.
+    agentFunctions: ["[Agent]", "[Registry Id]", "[Functions]"],
 } as const;

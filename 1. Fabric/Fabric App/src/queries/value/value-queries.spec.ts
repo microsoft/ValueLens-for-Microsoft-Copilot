@@ -21,6 +21,7 @@ import {
     toValueTaskTree,
     valueByTask,
     valueSummary,
+    valuePerPerson,
 } from "./index";
 import { liveColumns } from "./live-columns.fixture";
 import { toDataTable } from "@/lib/to-data-table";
@@ -34,6 +35,7 @@ const modules = [
     { name: "costValueWindow", factory: () => costValueWindow(), columns: liveColumns.costValueWindow },
     { name: "costValueBySource", factory: () => costValueBySource(), columns: liveColumns.costValueBySource },
     { name: "costValueAgents", factory: () => costValueAgents(), columns: liveColumns.costValueAgents },
+    { name: "valuePerPerson", factory: () => valuePerPerson(), columns: liveColumns.valuePerPerson },
 ];
 
 const specModules = [{ name: "valueByTask", factory: () => valueByTask() }];
@@ -92,6 +94,20 @@ describe("value query contract", () => {
         const { query } = costValueBySource();
         expect(query).toMatch(/SUMMARIZECOLUMNS\([\s\S]*'Effort Scenario'\[Scenario\]/);
         expect(query).not.toMatch(/TREATAS|'Effort Scenario'\[Scenario\]\s*=/);
+    });
+
+    it("reads hours and habit per person for the same last full month", () => {
+        const { query } = valuePerPerson();
+        expect(query).toContain("[Last Full Month Start]");
+        expect(query).toContain("[Expert Equivalent Hours]");
+        expect(query).toMatch(/\[MonthStart\] = __Month/);
+        // The same bands as the Adoption page's habit measures.
+        expect(query).toMatch(/\[@Days\] >= 16, "Power"/);
+        expect(query).toMatch(/\[@Days\] >= 11, "Habitual"/);
+        expect(query).toMatch(/\[@Days\] >= 6, "Developing"/);
+        expect(query).toMatch(/"Beginner"/);
+        // A column named after the measure would clash with the task-time overrides.
+        expect(Object.keys(valuePerPerson().columnMetadata)).not.toContain("[Expert Equivalent Hours]");
     });
 });
 

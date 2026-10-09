@@ -159,6 +159,9 @@ export function studioAgents() {
 const GROUP_COLUMN = "Group ByGroup";
 const USER_COLUMN = "Credit Consumption (User)User Name";
 
+/** The user on the users table's person rows. */
+export const STUDIO_USER_COLUMN = USER_COLUMN;
+
 /** The grid's first column: the group on group rows, the user on leaf rows. */
 export const STUDIO_LABEL_COLUMN = "Who";
 export const STUDIO_USER_FIELDS = ["Credits Used", "Credit Share", "Billable Credits", "Estimated Cost", "Policy"] as const;

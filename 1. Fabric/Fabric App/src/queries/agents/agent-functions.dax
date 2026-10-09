@@ -1,0 +1,75 @@
+EVALUATE
+// How many job functions used each agent: the distinct non-blank Function
+// values, from the org directory, of the people behind its agent sessions.
+// The org directory relates to the audit log by person, as the Orgs Reached
+// figure on the leaderboard does, and only agent activity counts.
+// Agents are named as on the leaderboard: registered agents by their registry
+// name, the rest by the name the audit log gives them. Only agents with
+// sessions under the current filters are returned.
+VAR _catalogue =
+    CALCULATETABLE(
+        SUMMARIZE(
+            FILTER('Agents 365', NOT ISBLANK('Agents 365'[Title ID])),
+            'Agents 365'[Title ID],
+            'Agents 365'[Agent name]
+        ),
+        CROSSFILTER(
+            'Chat + Agent Interactions (Audit Logs)'[Agent_LinkID],
+            'Agents 365'[Title ID],
+            OneWay
+        )
+    )
+VAR _registered =
+    SELECTCOLUMNS(
+        FILTER(
+            ADDCOLUMNS(
+                _catalogue,
+                "@Sessions", [Observed Agent Sessions],
+                "@Functions",
+                    CALCULATE(
+                        COUNTROWS(
+                            FILTER(
+                                SUMMARIZE('Chat + Agent Interactions (Audit Logs)', 'Chat + Agent Org Data'[Function]),
+                                LEN(TRIM('Chat + Agent Org Data'[Function])) > 0
+                            )
+                        ),
+                        KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)] = "Agents")
+                    )
+            ),
+            NOT ISBLANK([@Sessions])
+        ),
+        "Agent", 'Agents 365'[Agent name],
+        "Registry Id", 'Agents 365'[Title ID],
+        "Functions", [@Functions] + 0
+    )
+// "Draft as 1P Agent" is left out, as on the leaderboard.
+VAR _unregistered =
+    SELECTCOLUMNS(
+        FILTER(
+            SUMMARIZECOLUMNS(
+                'Chat + Agent Interactions (Audit Logs)'[AgentName],
+                FILTER(ALL('Agents 365'[Title ID]), ISBLANK('Agents 365'[Title ID])),
+                "@Sessions", [Observed Agent Sessions],
+                "@Functions",
+                    CALCULATE(
+                        COUNTROWS(
+                            FILTER(
+                                SUMMARIZE('Chat + Agent Interactions (Audit Logs)', 'Chat + Agent Org Data'[Function]),
+                                LEN(TRIM('Chat + Agent Org Data'[Function])) > 0
+                            )
+                        ),
+                        KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)] = "Agents")
+                    )
+            ),
+            NOT ISBLANK([@Sessions])
+                && 'Chat + Agent Interactions (Audit Logs)'[AgentName] <> "Draft as 1P Agent"
+        ),
+        "Agent",
+            VAR _name = 'Chat + Agent Interactions (Audit Logs)'[AgentName]
+            RETURN IF(LEN(TRIM(_name)) = 0, "Unnamed agent", _name),
+        "Registry Id", BLANK(),
+        "Functions", [@Functions] + 0
+    )
+RETURN
+    UNION(_registered, _unregistered)
+ORDER BY [Functions] DESC, [Agent] ASC

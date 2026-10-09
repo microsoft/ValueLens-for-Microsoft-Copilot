@@ -11,3 +11,4 @@ export * from "./agent-value";
 export * from "./organization-value";
 export * from "./cost-vs-value";
 export * from "./scenarios";
+export * from "./value-per-person";

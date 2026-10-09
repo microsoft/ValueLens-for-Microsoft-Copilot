@@ -43,4 +43,7 @@ export const liveColumns = {
     costValueWindow: ["[First Date]", "[Last Date]", "[Licensed Users]", "[Currency Symbol]"],
     costValueBySource: ["[Source]", "[Licence]", "[Scenario]", "[Hours]", "[Value]"],
     costValueAgents: ["[Agent]", "[Sessions]", "[Hours]", "[Value]"],
+    // Authored from the model's measure definitions, not captured live: no published model was
+    // reachable when these were written.
+    valuePerPerson: ["[Month]", "[User]", "[Active Days]", "[Cohort]", "[Hours]"],
 } as const;

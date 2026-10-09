@@ -39,6 +39,7 @@ import {
     toLeaderboardTaskTree,
     type LeaderboardCohort,
 } from "@/queries/work";
+import { LeaderboardConcentration } from "./leaderboard-concentration";
 
 type Breakdown = "people" | "tasks";
 
@@ -417,6 +418,12 @@ export function LeaderboardStage() {
                         <SegmentedControl label="Break down by" options={breakdowns} value={view} onChange={setView} />
                     </div>
                     <LeaderboardBreakdown cohort={cohort} view={view} />
+                </div>
+            )}
+
+            {!isEmpty && (
+                <div className="max-w-[960px]">
+                    <LeaderboardConcentration cohort={cohort} noun={SESSIONS_NOUN[cohort]} />
                 </div>
             )}
         </Section>

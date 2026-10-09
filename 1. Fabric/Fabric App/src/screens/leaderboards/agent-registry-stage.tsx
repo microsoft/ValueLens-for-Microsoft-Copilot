@@ -34,6 +34,7 @@ import {
     type AgentEntry,
 } from "@/queries/agents";
 import { AGENT_USAGE_HEADLINE } from "./headlines";
+import { AgentSpotlightCards } from "./agent-spotlight-cards";
 
 const SMALL = "text-[length:var(--text-200)] leading-200";
 const BODY = "text-[length:var(--text-300)] leading-300";
@@ -446,30 +447,33 @@ function AgentLeaderboard({ registry }: { registry: boolean }) {
     const registered = entries.filter((entry) => entry.inRegistry).length;
 
     return (
-        <div className="grid grid-cols-1 items-start gap-400 2xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div
-                ref={gridRef}
-                className="flex h-[600px] min-w-0 flex-col [&_tbody_tr]:cursor-pointer"
-                onClick={(event) => pick(event.target)}
-                onKeyDown={(event) => {
-                    if ((event.key === "Enter" || event.key === " ") && pick(event.target)) event.preventDefault();
-                }}
-            >
-                <DataGrid
-                    columns={columns}
-                    data={rows}
-                    defaultSort={[{ columnId: "Users", direction: "desc" }]}
-                    theme={theme}
-                    header={{
-                        title: "Agent leaderboard",
-                        subtitle: registry
-                            ? `${formatKpi(inUse, "whole")} in use, ${formatKpi(registered, "whole")} ` +
-                              `registered. Select an agent to see its description.`
-                            : `${formatKpi(inUse, "whole")} in use. Select an agent to see its details.`,
+        <div className="flex flex-col gap-400">
+            <AgentSpotlightCards entries={entries} />
+            <div className="grid grid-cols-1 items-start gap-400 2xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div
+                    ref={gridRef}
+                    className="flex h-[600px] min-w-0 flex-col [&_tbody_tr]:cursor-pointer"
+                    onClick={(event) => pick(event.target)}
+                    onKeyDown={(event) => {
+                        if ((event.key === "Enter" || event.key === " ") && pick(event.target)) event.preventDefault();
                     }}
-                />
+                >
+                    <DataGrid
+                        columns={columns}
+                        data={rows}
+                        defaultSort={[{ columnId: "Users", direction: "desc" }]}
+                        theme={theme}
+                        header={{
+                            title: "Agent leaderboard",
+                            subtitle: registry
+                                ? `${formatKpi(inUse, "whole")} in use, ${formatKpi(registered, "whole")} ` +
+                                  `registered. Select an agent to see its description.`
+                                : `${formatKpi(inUse, "whole")} in use. Select an agent to see its details.`,
+                        }}
+                    />
+                </div>
+                <AgentDetail ref={detailRef} entries={entries} selected={selected} onSelect={setSelectedKey} />
             </div>
-            <AgentDetail ref={detailRef} entries={entries} selected={selected} onSelect={setSelectedKey} />
         </div>
     );
 }
