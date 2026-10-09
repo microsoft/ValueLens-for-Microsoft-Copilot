@@ -53,11 +53,21 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
 export const secretMode = (config) => config.keyVault?.mode ?? 'keyvault';
 
 /**
+ * Who the Power Automate flows write to OneLake as.
+ *  - user: a person signs in to an HTTP with Microsoft Entra ID connection. No secret, no Key Vault.
+ *  - app: the app registration, with its secret read from Key Vault by the Key Vault connector.
+ * @typedef {'user' | 'app'} FlowIdentity
+ */
+
+/** @param {InstallConfig} config @returns {FlowIdentity} */
+export const flowIdentity = (config) => (config.uploads?.flowIdentity === 'app' ? 'app' : 'user');
+
+/**
  * The upload drop folder and the optional extras around it.
  * @typedef {object} UploadsConfig
  * @property {boolean} [folders]  The drop folder and the folders the loads read exist in the Lakehouse.
  * @property {boolean} [feedbackFlow]  Create the product feedback email flow in Power Automate.
- * @property {boolean} [studioFlow]  Create the flow that saves Copilot Studio credits from the licensing API each day.
+ * @property {FlowIdentity} [flowIdentity]  Who the flows write to OneLake as. Default user.
  * @property {FlowEnvironment} [flowEnvironment]  The Power Platform environment the flows are created in.
  * @property {Partial<Record<'feedback' | 'studio', string>>} [flowIds]  The flows, once created.
  * @property {Partial<Record<'feedback' | 'studio', string>>} [flowSignatures]  What each created flow was built from.
@@ -248,8 +258,9 @@ export function loadConfig(file) {
     ...raw,
     target: raw.target ?? 'fabric',
     modules: normaliseModules(raw.modules),
-    dataSources: normaliseDataSources(raw.dataSources, normaliseModules(raw.modules), raw.consumption),
-    uploads: { ...(raw.uploads ?? {}) },
+    dataSources: normaliseDataSources(raw.dataSources, normaliseModules(raw.modules), raw.consumption, raw.uploads),
+    // studioFlow is read once, above: a Studio flow is now the api mode.
+    uploads: Object.fromEntries(Object.entries(raw.uploads ?? {}).filter(([k]) => k !== 'studioFlow')),
     history: { ...base.history, ...(raw.history ?? {}) },
     schedule: { ...base.schedule, ...(raw.schedule ?? {}) },
     app: { ...(raw.app ?? {}) },

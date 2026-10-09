@@ -17,6 +17,53 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased
+
+**Update an existing install:** open the installer and choose **Repair or change**. Repair
+updates the flows in place and keeps the connections already signed in to. Because the flows now
+need a OneLake connection, Repair turns each flow off and lists the connection to sign in to. Sign
+in, then turn the flow back on. A saved choice of *Upload CSV* for Copilot Studio credits with the
+flow chosen becomes **Connected**, which behaves the same.
+
+### Change: Power Automate flows write to OneLake as a signed-in person, with no Key Vault
+
+**Symptom.** The installer's flows (`Analytics Hub - Product feedback` and `Analytics Hub -
+Copilot Studio credits`) read the app's secret through the Azure Key Vault connector. That
+connector needs the vault to allow public network access. Where tenant policy keeps vaults
+private, the flows could never run. The installer's advice ("allow public access from trusted
+services or use a gateway") was wrong: Power Automate isn't an Azure trusted service, and a data
+gateway doesn't help this connector.
+
+**Fix.**
+
+- By default, the flows write to `Files/analytics_hub_uploads` through an **HTTP with Microsoft
+  Entra ID (preauthorized)** connection to OneLake (Base Resource URL
+  `https://onelake.dfs.fabric.microsoft.com`, Resource URI `https://storage.azure.com`). Whoever
+  signs in needs Contributor or higher on the workspace. No secret, no Key Vault connection, and
+  the flows now work when the secret is kept in the notebooks.
+- `install --flow-identity app` keeps the previous behaviour, for tenants that want writes made
+  by the app registration. It needs Key Vault, and the installer warns if the vault is private.
+- The private-vault warning now says only what's true, and appears only with `--flow-identity app`.
+- The installer's next steps for each flow are short numbered steps, with a tip to sign in with
+  a dedicated admin account and add a co-owner.
+- The manual-setup product feedback flow (`Manual setup/flows`) uses the same OneLake connection.
+- The flow writer accepts any ADLS Gen2 (DFS) endpoint, ready for the Azure path.
+
+### Change: Copilot Studio credits come from the licensing API by default
+
+- **Connected (Power Automate flow)** is now the default for Copilot Studio credits. Admin centre
+  exports are optional, and win for the months they cover.
+- The flow's first run loads about six months of history; then it restates the last ten days
+  each day.
+- It fills in environment names, which were blank on API rows.
+- It also saves per-user credits by day (`StudioApiUserDaily_*.csv`), best effort, from an
+  undocumented API route. `Ingest_Studio` loads them into the new `studio_user_daily` table,
+  resolves user IDs to UPNs, and fills `studio_user` for months no export covers.
+- Consumption Central and the Fabric App say which Studio figures are dated (API) and which are
+  month-to-date snapshots (export).
+
+---
+
 ## 2026-10-09 — Analytics Hub installer 0.3.5
 
 **Update an existing install:** download installer 0.3.5, open it and choose **Repair or change**.

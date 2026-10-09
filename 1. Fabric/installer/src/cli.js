@@ -55,10 +55,15 @@ Options:
   --csv <file>         With install: an export to upload during the install. Repeat for more.
   --feedback-flow      With install: create the Power Automate flow that saves product feedback
                        exports emailed to you (needs productFeedback=csv)
-  --studio-flow        With install: create the Power Automate flow that saves Copilot Studio
-                       credits from the licensing API each day (needs studioCredits=csv)
+  --studio-flow        With install: same as --data studioCredits=api, the daily flow that reads
+                       Copilot Studio credits from the licensing API
   --flow-environment <url>
                        With install: the Power Platform environment to create the flows in
+  --flow-identity <user|app>
+                       With install: who the flows write to OneLake as. user (default): a person
+                       signs in to an HTTP with Microsoft Entra ID connection; no Key Vault.
+                       app: the app registration, with its secret from Key Vault. The vault must
+                       allow public network access.
   --viva-partition <id>
   --viva-query <id>    With install: the Viva Insights partition and query the Cowork credits
                        Dataflow reads (needs coworkCredits=api)
@@ -99,6 +104,7 @@ export function parseCli(argv) {
       'feedback-flow': { type: 'boolean' },
       'studio-flow': { type: 'boolean' },
       'flow-environment': { type: 'string' },
+      'flow-identity': { type: 'string' },
       'viva-partition': { type: 'string' },
       'viva-query': { type: 'string' },
       run: { type: 'boolean' },
@@ -114,10 +120,13 @@ export function parseCli(argv) {
   if (values.run && command !== 'upload') throw new Error('--run goes with upload.');
   if (values['secret-in-notebook'] && command !== 'install') throw new Error('--secret-in-notebook goes with install.');
   if (values['secret-in-notebook'] && values.target === 'azure') throw new Error('--secret-in-notebook is for the Fabric target only.');
-  const installOnly = ['feedback-flow', 'studio-flow', 'flow-environment', 'viva-partition', 'viva-query'].filter((k) => values[/** @type {'feedback-flow'} */ (k)] !== undefined);
+  const installOnly = ['feedback-flow', 'studio-flow', 'flow-environment', 'flow-identity', 'viva-partition', 'viva-query'].filter((k) => values[/** @type {'feedback-flow'} */ (k)] !== undefined);
   if ((values.data?.length || values.csv?.length || installOnly.length) && !['install', 'preview'].includes(command)) {
     throw new Error(`--data, --csv${installOnly.map((k) => ` and --${k}`).join('')} go with install. To add exports later, use upload.`);
   }
+  const identity = values['flow-identity'];
+  if (identity !== undefined && identity !== 'user' && identity !== 'app') throw new Error('--flow-identity must be "user" or "app".');
+  if (identity === 'app' && values['secret-in-notebook']) throw new Error('--flow-identity app reads the secret from Key Vault, so it can\'t go with --secret-in-notebook.');
   const dataSources = parseDataFlags(values.data ?? []);
   for (const k of /** @type {const} */ (['viva-partition', 'viva-query'])) {
     if (values[k] !== undefined && !isVivaId(values[k])) throw new Error(`--${k} should be a GUID, as Viva Insights shows it.`);
@@ -161,6 +170,7 @@ export function parseCli(argv) {
     feedbackFlow: values['feedback-flow'],
     studioFlow: values['studio-flow'],
     flowEnvironment,
+    flowIdentity: /** @type {import('./config.js').FlowIdentity | undefined} */ (identity),
     vivaPartition: values['viva-partition']?.trim(),
     vivaQuery: values['viva-query']?.trim(),
     files,
@@ -180,16 +190,19 @@ export function version() {
  * Applies --data, the flow flags and the Viva IDs to the install record's answers. The Data
  * sources screen then opens with them, and --yes takes them as they are.
  * @param {import('./config.js').InstallConfig} config
- * @param {{ dataSources: Partial<import('./uploads.js').DataSourceModes>, feedbackFlow?: boolean, studioFlow?: boolean, flowEnvironment?: string, vivaPartition?: string, vivaQuery?: string }} args
+ * @param {{ dataSources: Partial<import('./uploads.js').DataSourceModes>, feedbackFlow?: boolean, studioFlow?: boolean, flowEnvironment?: string, flowIdentity?: import('./config.js').FlowIdentity, vivaPartition?: string, vivaQuery?: string }} args
  */
 export function applyDataFlags(config, args) {
-  if (Object.keys(args.dataSources).length) {
-    config.dataSources = { ...config.dataSources, ...args.dataSources };
+  // --studio-flow is from before the flow was the API mode: with csv (as the old docs had it) or alone, it means studioCredits=api.
+  const studio = args.studioFlow && args.dataSources.studioCredits !== 'skip' ? { studioCredits: /** @type {const} */ ('api') } : {};
+  const sources = { ...args.dataSources, ...studio };
+  if (Object.keys(sources).length) {
+    config.dataSources = { ...config.dataSources, ...sources };
     config.modules = modulesFromSources(config.dataSources);
   }
   if (args.feedbackFlow !== undefined) config.uploads.feedbackFlow = args.feedbackFlow;
-  if (args.studioFlow !== undefined) config.uploads.studioFlow = args.studioFlow;
   if (args.flowEnvironment && args.flowEnvironment !== config.uploads.flowEnvironment?.url) config.uploads.flowEnvironment = { url: args.flowEnvironment };
+  if (args.flowIdentity) config.uploads.flowIdentity = args.flowIdentity;
   if (args.vivaPartition) config.consumption.vivaPartition = args.vivaPartition;
   if (args.vivaQuery) config.consumption.vivaQuery = args.vivaQuery;
 }

@@ -53,7 +53,9 @@ Vault Secrets User** role on the vault.
 
 ## What this does not cover
 
-Copilot Studio **per-user** consumption has no API. No permission here will get
-it. That page is fed by a manual `StudioPerUser.csv` export from the Power
-Platform admin centre, as described in
+Copilot Studio **per-user** consumption has no documented API, so these flows
+don't load it. That page is fed by a manual `StudioPerUser.csv` export from the
+Power Platform admin centre, as described in
 [docs/DATA-SOURCES.md](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot/blob/main/docs/DATA-SOURCES.md).
+The [Fabric installer's flow](../../1.%20Fabric/installer/README.md#power-automate-flows) also
+reads per-user figures, best effort, from an undocumented licensing API route.

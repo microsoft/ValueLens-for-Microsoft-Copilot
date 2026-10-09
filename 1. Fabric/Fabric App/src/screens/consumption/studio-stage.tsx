@@ -68,8 +68,8 @@ interface StudioStageProps {
 
 /**
  * The report's two Copilot Studio pages as one stage. Tenant totals follow
- * the period; the per-agent and per-user tables come from an undated export
- * snapshot, as the report's own note says.
+ * the period; the per-agent and per-user tables are a month-to-date snapshot
+ * (a PPAC export, or the licensing API flow's rollup), as the report's own note says.
  */
 export function StudioStage({ options, rates }: StudioStageProps) {
     const { theme } = useThemeContext();
@@ -171,7 +171,7 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                 count={5}
                 className={KPI_GRID}
                 emptyTitle="No Copilot Studio credits"
-                emptyDescription="Consumption Central has no Copilot Studio credit rows for this period. Check that the Power Platform export has loaded."
+                emptyDescription="Consumption Central has no Copilot Studio credit rows for this period. Check that the Copilot Studio credits flow is on, or that a PPAC export has loaded."
             >
                 {cost ? (
                     <>
@@ -229,7 +229,7 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                     title={cost ? "Cost over time" : "Consumption over time"}
                     subtitle={cost ? "Tenant cost each day, prepaid then pay-as-you-go" : "Tenant credits each day, prepaid then pay-as-you-go"}
                     emptyTitle="No daily credits"
-                    emptyDescription="The tenant export has no days with Copilot Studio credits in this period."
+                    emptyDescription="The tenant data has no days with Copilot Studio credits in this period."
                 />
                 <NoteCard
                     title="About these figures"
@@ -254,7 +254,7 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                     title={cost ? "Cost by model" : "Consumption by model"}
                     subtitle="The model behind each agent's credits"
                     emptyTitle="No model detail"
-                    emptyDescription="The agent export does not name a model for these credits."
+                    emptyDescription="The agent detail does not name a model for these credits."
                 />
                 <ChartPanel
                     result={breakdown}
@@ -264,7 +264,7 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                     title={cost ? "Cost by feature" : "Consumption by feature"}
                     subtitle="The billable feature each credit was spent on"
                     emptyTitle="No feature detail"
-                    emptyDescription="The agent export does not name a billable feature for these credits."
+                    emptyDescription="The agent detail does not name a billable feature for these credits."
                 />
             </div>
 

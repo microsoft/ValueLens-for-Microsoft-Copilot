@@ -156,6 +156,25 @@ test('Studio consumption: licensing API files fill studio_agent_daily and never 
   assert.match(all, /no entitlement snapshot - treating every credit as prepaid/);
 });
 
+test('Studio consumption: per-user API files fill studio_user_daily, look up UPNs without failing, and roll up only months no export covers', () => {
+  const info = consumption('studioConsumption');
+  assert.equal(info.credentials, true, 'the installer fills in the app, for the Graph lookup');
+  const nb = prepareNotebook(load(info.file, info.dir), { lakehouse: LAKEHOUSE, tenantId: TENANT, clientId: CLIENT, secret: SECRET });
+  const all = nb.cells.map(cellText).join('\n');
+  assert.match(all, new RegExp(`^TENANT_ID = '${TENANT}'`, 'm'));
+  assert.match(all, /^CLIENT_SECRET = notebookutils\.credentials\.getSecret\('https:\/\/vl-kv-test\.vault\.azure\.net\/', 'valuelens-client-secret'\)/m);
+  assert.match(all, /PAT_API_USER = \("StudioApiUserDaily\*\.csv",\)/);
+  assert.match(all, /TBL_USER_DAILY = "studio_user_daily"/);
+  assert.match(all, /user_raw = read\(\*PAT_API_USER, api=True\)\nif user_raw is None:\n\s+print\("no licensing API user files - skipping"\)/);
+  assert.match(all, /graph\.microsoft\.com\/v1\.0\/\$batch/);
+  assert.match(all, /except Exception as e:\n\s+print\(f" {2}UPN lookup skipped: \{e\}"\)/, 'a failed lookup never fails the run');
+  assert.match(all, /an export covers this month, so the API user figures aren't used/);
+  assert.match(all, /merge\(umonthly, TBL_USER, \["snapshot_month", "user_id", "agent_id"\]\)/);
+  assert.match(all, /merge\(user, TBL_USER, \["snapshot_month", "user_id", "agent_id"\]\)\n\s+drop_api_rows\(TBL_USER, user, \["snapshot_month"\]\)/, 'an export replaces the API rollup for its month');
+  // The per-user cell runs after the per-agent one, which it takes agent names from.
+  assert.ok(all.indexOf('user_raw = read(') > all.indexOf('api_raw = read('));
+});
+
 test('a patch that no longer matches exactly once is an error', () => {
   const info = consumption('vivaConsumption');
   assert.throws(() => prepareNotebook(load(info.file, info.dir), { patches: [{ find: 'no such text', replace: '' }] }), /found it 0 times/);

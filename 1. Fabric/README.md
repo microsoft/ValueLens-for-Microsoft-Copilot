@@ -69,7 +69,7 @@ installer under **What to collect**. Each one has a few steps of its own.
 
 | Extra | What it shows | Where the data comes from |
 |---|---|---|
-| [Credit consumption](installer/README.md#credit-consumption) | Credits used and what they cost across Copilot Studio, Copilot Cowork and Azure AI | Copilot Studio exports from the Power Platform admin center (or a daily flow on its licensing API), Cowork credits from a Viva Insights query through a Dataflow (or its CSV export), and Azure AI and pay-as-you-go costs from Azure |
+| [Credit consumption](installer/README.md#credit-consumption) | Credits used and what they cost across Copilot Studio, Copilot Cowork and Azure AI | Copilot Studio credits from a daily flow on the Power Platform licensing API (exports from the Power Platform admin center are optional), Cowork credits from a Viva Insights query through a Dataflow (or its CSV export), and Azure AI and pay-as-you-go costs from Azure |
 | [Agent Evaluator](installer/README.md#agent-evaluator) | How well your Copilot Studio agents work: how conversations end, topics, knowledge, errors and user feedback | Copilot Studio conversation transcripts in Dataverse |
 | [Microsoft 365 activity](installer/README.md#microsoft-365-activity) *(on by default)* | How people work across Teams, Outlook, SharePoint, OneDrive and the Office apps | Microsoft 365 usage reports |
 

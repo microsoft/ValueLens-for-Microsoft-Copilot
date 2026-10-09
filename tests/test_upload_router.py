@@ -18,6 +18,7 @@ HEADERS = {
     "studioUser": "User id,User email,Credits used,Billable credit used",
     "studioAgentDaily": "Usage date,Agent id,Agent name,Billed credit,Non billed credit,Channel,Environment id",
     "studioEntitlement": "Snapshot date,Environment id,Environment allocated,Tenant prepaid consumed,Tenant PAYG consumed",
+    "studioUserDaily": "Usage Date,User Id,Environment Id,Agent Id,Billed credit,Non-billed credit,Unit",
     "vivaCredits": "ServiceId,ServiceName,SpendingPolicyId,MetricDate,TotalCopilotCreditsUsed",
     "vivaPolicy": "SpendingPolicyId,Name,PlanLimit,UserLimit,IncludedServices",
     "workday": "Primary Work Email,Cost Center,Level",

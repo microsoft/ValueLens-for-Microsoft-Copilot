@@ -307,7 +307,7 @@ export const NOTEBOOKS = [
     dir: CONSUMPTION_NOTEBOOKS_DIR,
     displayName: 'Consumption_Ingest_Studio',
     module: 'consumption',
-    credentials: false,
+    credentials: true,
     parameters: [],
     placeholder: null,
   },

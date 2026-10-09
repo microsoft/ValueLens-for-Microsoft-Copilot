@@ -225,6 +225,21 @@ CONSUMPTION_OBJECTS = (
             "limits. Shown as \"Credits left\". " + NO_LIMIT,
         ]},
     },
+    {
+        # Fabric installs fill Studio user and agent detail from the licensing API for
+        # months no PPAC export covers, so the note no longer says "export" only.
+        "kind": "measure", "table": "Settings", "name": "Studio Snapshot Note",
+        "expression": "\n".join((
+            "VAR AgentRows = COUNTROWS('Credit Consumption (Agent)')",
+            "VAR UserRows = COUNTROWS('Credit Consumption (User)')",
+            "RETURN \"Date controls affect tenant totals only. User and agent detail is a month-to-date "
+            "snapshot, from a PPAC export or, where your install collects it, the Power Platform "
+            "licensing API. Costs are rate estimates, not an allocation of the selected-period PAYG bill. \"",
+            "& IF(AgentRows = 0, \"No matching agent-detail rows: model/feature breakdown is unavailable. \", \"\")",
+            "& IF(UserRows = 0, \"No matching user-detail rows: upload a PPAC user export, or turn on the "
+            "Copilot Studio credits flow if your install has one. \", \"\")",
+        )),
+    },
 )
 
 TARGETS = tuple((path, VALUELENS_OBJECTS) for path in VALUELENS) + tuple(

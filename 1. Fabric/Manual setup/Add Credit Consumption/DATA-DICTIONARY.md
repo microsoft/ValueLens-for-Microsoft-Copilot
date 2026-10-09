@@ -93,9 +93,9 @@ without one), and `entitled_quantity` is the environment's allocation.
 
 ## `studio_agent_daily`
 
-Per-agent consumption by day, from the optional `Analytics Hub - Copilot Studio credits` flow,
-which calls the Power Platform licensing API. Empty without the flow. Only environments with
-Copilot Studio credits allocated appear, and there are no per-user figures.
+Per-agent consumption by day, from the `Analytics Hub - Copilot Studio credits` flow, which calls
+the Power Platform licensing API. Empty without the flow. Only environments with Copilot Studio
+credits allocated appear. Per-user figures are in `studio_user_daily`.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -117,6 +117,31 @@ file restates the last ten days, so those days are replaced.
 
 For months no export covers, `studio_agent` also gets a `ppac-api` row per agent, summed from
 this table. An export for the month replaces them.
+
+---
+
+## `studio_user_daily`
+
+Per-user consumption by day, from the same flow's `StudioApiUserDaily_*.csv` files. The flow reads
+an undocumented licensing API route, so this is best effort: empty if the route returns nothing.
+
+| Column | Type | Notes |
+|---|---|---|
+| `usage_date` | date | |
+| `user_id` | string | Entra object ID |
+| `user_upn` | string | Lowercased. From earlier exports and loads, else Graph (`User.Read.All`); blank if neither knows it |
+| `environment_id` | string | |
+| `agent_id` | string | |
+| `billed_credit` | double | |
+| `non_billed_credit` | double | |
+| `source_file` | string | Always `ppac-api` |
+| `_loaded_at` | timestamp | |
+
+**Merge key:** `usage_date`, `user_id`, `environment_id`, `agent_id`. Each file restates the last
+ten days, so those days are replaced.
+
+For months no export covers, `studio_user` also gets a `ppac-api` row per user and agent, summed
+from this table, with `user_email` set to `user_upn`. An export for the month replaces them.
 
 ---
 

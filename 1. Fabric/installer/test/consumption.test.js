@@ -517,11 +517,14 @@ test('summary: Azure AI status and the Studio and Cowork upload steps', () => {
 
   const flowing = setup();
   flowing.config.modules.consumption = true;
-  Object.assign(flowing.config.dataSources, { studioCredits: 'csv', coworkCredits: 'api' });
-  Object.assign(flowing.config.uploads, { studioFlow: true, flowIds: { studio: 'flow-1' } });
+  Object.assign(flowing.config.dataSources, { studioCredits: 'api', coworkCredits: 'api' });
+  Object.assign(flowing.config.uploads, { flowIds: { studio: 'flow-1' } });
   flowing.config.consumption.dataflowId = 'df-1';
   consumptionSummary(flowing.ctx);
-  assert.match(flowing.ui.text(), /a daily flow reads the environment and agent figures/);
+  assert.match(flowing.ui.text(), /a daily flow reads the licensing API/);
+  assert.match(flowing.ui.text(), /Sign in to the flow and turn it on/);
+  assert.match(flowing.ui.text(), /Optional: drop the Power Platform admin center exports/);
+  assert.doesNotMatch(flowing.ui.text(), /download the EntitlementConsumption/);
   assert.match(flowing.ui.text(), /Dataflow AnalyticsHub_Cowork_Credits, refreshed by the pipeline/);
 
   const skipped = setup();

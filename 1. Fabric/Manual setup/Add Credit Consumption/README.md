@@ -57,7 +57,7 @@ Set the workspace and Lakehouse at the top of each notebook, then run it.
 
 | Notebook | Reads | Writes |
 |---|---|---|
-| `Ingest_Studio` | Power Platform admin centre exports in `Files/landing/studio/`, and the optional licensing API flow's files there | `studio_*` |
+| `Ingest_Studio` | The licensing API flow's files and any Power Platform admin centre exports in `Files/landing/studio/` | `studio_*` |
 | `Ingest_GitHub_API` | GitHub REST API *(preferred: runs unattended)* | `github_*` |
 | `Ingest_GitHub` | The emailed AI usage report in `Files/landing/github/` | `github_*` |
 | `Ingest_Azure_AI` | Azure Cost Management and Monitor ([setup ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot/blob/main/docs/ADVANCED-SETUP.md#azure-ingestion-in-fabric)) | `azure_ai_spend`, `azure_ai_tokens`, and `copilot_payg_spend` for Copilot Studio and Cowork pay-as-you-go billed in Azure |
@@ -107,10 +107,12 @@ It writes to the `dbo` schema; add `--schema=` if your Lakehouse was created wit
 - [Advanced setup: Azure auth, scheduling ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot/blob/main/docs/ADVANCED-SETUP.md)
 
 The upstream `Ingest_Studio_Consumption` notebook isn't included. It needs a delegated sign-in, so it
-can't run on a Fabric schedule. Instead, the installer can create a Power Automate flow,
+can't run on a Fabric schedule. Instead, the installer creates a Power Automate flow,
 `Analytics Hub - Copilot Studio credits`, that calls the same Power Platform licensing API each day
-as an admin and saves `StudioApiAgentDaily_*.csv` and `StudioApiEntitlement_*.csv` for
-`Ingest_Studio`. See the [installer's flows](../../installer/README.md#power-automate-flows-optional).
+as an admin and saves `StudioApiAgentDaily_*.csv`, `StudioApiUserDaily_*.csv` and
+`StudioApiEntitlement_*.csv` for `Ingest_Studio`. It's the default source for Studio credits; the
+PPAC exports are optional and win for the months they cover. See the
+[installer's flows](../../installer/README.md#power-automate-flows).
 
 Copied from [microsoft/ConsumptionCentral-for-Microsoft-Copilot ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot)
 (MIT) at commit `24b0ca8`. Full documentation and issues live there.

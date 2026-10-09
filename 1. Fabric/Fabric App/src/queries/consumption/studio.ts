@@ -54,8 +54,8 @@ const summaryColumns: ColumnMetadataMap = {
 
 /**
  * The headline cards of the report's Studio Consumption and Cost pages. The
- * period only moves the tenant totals; per-user figures come from an undated
- * export snapshot, which the snapshot note says in the model's own words.
+ * period only moves the tenant totals; per-user figures are a month-to-date
+ * snapshot, which the snapshot note says in the model's own words.
  */
 export function studioCreditsSummary() {
     return { connection, query: summaryQuery, columnMetadata: summaryColumns };
