@@ -5,6 +5,7 @@
  */
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { normaliseModules } from './catalog.js';
+import { normaliseReporting } from './currency.js';
 import { normaliseDataSources } from './uploads.js';
 
 export const CONFIG_VERSION = 1;
@@ -20,6 +21,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {UploadsConfig} uploads
  * @property {{ days: number }} history
  * @property {import('./transform/pipeline.js').TenantScale} [scale]  How the loads are sized. Standard when absent.
+ * @property {import('./currency.js').ReportingConfig} [reporting]  The currency the Value page reports in until one is saved in the app. Asked for when absent.
  * @property {{ frequency: 'daily' | 'weekly', time: string, weekday: string, timeZone: string }} schedule
  * @property {{ appId?: string, objectId?: string, servicePrincipalId?: string, displayName?: string, secretExpires?: string, secretKeyId?: string, retiredSecretKeyIds?: string[], existing?: boolean, adminPack?: string }} app
  * @property {{ subscriptionId?: string, resourceGroup?: string, name?: string, id?: string, uri?: string, location?: string, secretName: string, existing?: boolean, rbac?: boolean, private?: boolean, secretSetAt?: string, mode?: SecretMode, handoff?: SecretHandoff }} keyVault
@@ -186,6 +188,7 @@ export const flowIdentity = (config) => (config.target !== 'azure' && config.upl
  * @property {string} [profile]
  * @property {string[]} [models]  Model aliases the app was built with. Older records mean just "vl".
  * @property {string} [deployedAt]
+ * @property {import('./currency.js').ReportingConfig} [reporting]  The Value page currency a prebuilt app was deployed with.
  * @property {{ deployments: any, env?: string }} [rayfin]  Rayfin's `.deployments.json` and `.env` for the prebuilt app, which each installer version unpacks afresh.
  */
 
@@ -292,6 +295,7 @@ export function loadConfig(file) {
     // studioFlow and feedbackFlow are read once, above: each flow is now its source's api mode.
     uploads: Object.fromEntries(Object.entries(raw.uploads ?? {}).filter(([k]) => k !== 'studioFlow' && k !== 'feedbackFlow')),
     history: { ...base.history, ...(raw.history ?? {}) },
+    reporting: normaliseReporting(raw.reporting),
     schedule: { ...base.schedule, ...(raw.schedule ?? {}) },
     app: { ...(raw.app ?? {}) },
     keyVault: { ...base.keyVault, ...(raw.keyVault ?? {}) },
@@ -319,6 +323,7 @@ export function loadConfig(file) {
     },
     resourceGraph: normaliseResourceGraph(raw.resourceGraph),
   };
+  if (!config.reporting) delete config.reporting;
   assertNoSecrets(config);
   return { config, existed: true };
 }

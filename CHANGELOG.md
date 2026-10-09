@@ -17,6 +17,34 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased
+
+### Changed: one reporting currency, US dollars by default
+
+**What changed.** The Fabric App's Value page used to show costs in dollars and value in pounds.
+Return on cost and the break-even hourly rate stayed blank until someone saved a pounds-per-dollar
+rate (#173).
+
+- **One currency.** The whole Value page now uses one reporting currency: US dollars unless another
+  is chosen. With dollars nothing is converted and nothing needs setting.
+- **Another currency.** Pick it under **Prices** on the Value page (16 common currencies) and give
+  how many of it make $1. Licence and credit costs are converted at that rate. The hourly value is
+  entered in the chosen currency.
+- **Consumption** figures stay in the currency they're billed in, now labelled *as billed*.
+- **Installer.** Setup, on both Fabric and Azure, asks for the Value page's currency and an
+  optional rate. Nothing is looked up online. It saves them in `valuelens-install.json`, passes them
+  to the app (`fabric.config.json` on Fabric; `VALUELENS_CURRENCY` and `VALUELENS_EXCHANGE_RATE` on
+  the Azure web app), and sets the Power BI model's `Currency Symbol Value` to match.
+- **Settings.** The app's settings gain a `currency` value next to the exchange rate: a column in
+  the app's SQL database on Fabric, and a field in Table Storage on Azure.
+
+**If you used pounds.** A saved exchange rate with no currency is read as pounds, the old
+behaviour, until the installer is run again. The installer defaults to US dollars, so pick
+**GBP** in it, or under **Prices**, to keep pounds. A currency saved under Prices always wins.
+
+**Power BI templates.** The manual `.pbit` templates still ship with `£` as `Currency Symbol Value`.
+Change that measure in the `Assumptions` table to your currency; #167 tracks the templates.
+
 ## 2026-10-09 — Analytics Hub installer 0.4.0
 
 **Update an existing install:** download installer 0.4.0, open it and choose **Repair or change**.

@@ -24,6 +24,7 @@ import {
     loadRuntimeConfig,
     loadSemanticModels,
     parseModules,
+    parseReporting,
     parseSemanticModels,
     resetRuntimeConfig,
     runtimeConfig,
@@ -213,6 +214,21 @@ describe("parseSemanticModels", () => {
             expect(parseModules({ modules: { ...deployedModels.modules, resourceGraph: false } })?.resourceGraph).toBe(false);
             expect(parseModules({ modules: { ...deployedModels.modules, resourceGraph: "yes" } })).toEqual(deployedModels.modules);
             expect(parseModules(deployedModels)).not.toHaveProperty("resourceGraph");
+        });
+    });
+
+    describe("parseReporting", () => {
+        it("reads the installer's reporting currency and its rate", () => {
+            expect(parseReporting({ reporting: { currency: "eur", exchangeRate: 0.92 } })).toEqual({ currency: "EUR", exchangeRate: 0.92 });
+            expect(parseReporting({ reporting: { currency: "GBP", exchangeRate: "0.79" } })).toEqual({ currency: "GBP", exchangeRate: 0.79 });
+            expect(parseReporting({ reporting: { currency: "USD", exchangeRate: 2 } })).toEqual({ currency: "USD" });
+        });
+
+        it("leaves out a currency it doesn't offer, a bad rate, and older configs", () => {
+            expect(parseReporting(deployedModels)).toBeUndefined();
+            expect(parseReporting({ reporting: { currency: "XYZ" } })).toBeUndefined();
+            expect(parseReporting({ reporting: { currency: "GBP", exchangeRate: -1 } })).toEqual({ currency: "GBP" });
+            expect(parseReporting({ reporting: { currency: "GBP", exchangeRate: "abc" } })).toEqual({ currency: "GBP" });
         });
     });
 

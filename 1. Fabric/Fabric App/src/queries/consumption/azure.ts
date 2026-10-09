@@ -67,13 +67,7 @@ export function azureMode(row: SummaryRow | undefined): AzureMode {
     return { kind: "none" };
 }
 
-const SYMBOLS: Record<string, string> = { USD: "$", GBP: "£", EUR: "€", JPY: "¥", AUD: "A$", CAD: "C$" };
-
-/** A symbol for the common billing currencies, or the ISO code and a space for the rest. */
-export function currencyPrefix(currency: string | undefined): string {
-    if (!currency) return "";
-    return SYMBOLS[currency.toUpperCase()] ?? `${currency} `;
-}
+export { currencyPrefix } from "@/lib/currency";
 
 const solutionSummaryColumns: ColumnMetadataMap = {
     "[Selected Cost]": { name: "Selected Cost", displayName: "Azure cost", format: FORMAT_MONEY },

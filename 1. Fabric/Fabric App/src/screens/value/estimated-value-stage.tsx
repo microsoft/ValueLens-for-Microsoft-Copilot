@@ -12,11 +12,13 @@ import { KpiCard } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
+import { useReportingCurrency } from "@/hooks/reporting-currency";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useOrgAttribute } from "@/hooks/filter.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { SCENARIOS, useValueAssumptions } from "@/hooks/value-assumptions.context";
 import { gridHeight } from "@/lib/chart-height";
+import { currencySymbol } from "@/lib/currency";
 import { treatAs } from "@/lib/dax-filters";
 import { formatKpi } from "@/lib/format-kpi";
 import { columnHeat, heatRenderer } from "@/lib/heat";
@@ -49,8 +51,8 @@ function asNumber(value: unknown): number | undefined {
     return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-function formatCurrencyCell(value: unknown, currencySymbol: string): string {
-    return formatKpi(asNumber(value), "currency", { prefix: currencySymbol });
+function formatCurrencyCell(value: unknown, prefix: string): string {
+    return formatKpi(asNumber(value), "currency", { prefix });
 }
 
 function formatHoursCell(value: unknown): string {
@@ -111,14 +113,15 @@ export function EstimatedValueStage() {
         [organizationResult.data, organizations.columnMetadata],
     );
 
-    const currencySymbol = readText(summaryRow, "[Currency Symbol]") ?? "";
+    const currency = useReportingCurrency(readText(summaryRow, "[Currency Symbol]"));
+    const prefix = currency.prefix;
     const agentHeight = agentTable ? gridHeight(agentTable.rows.length, { max: TABLE_MAX_HEIGHT }) : TABLE_MAX_HEIGHT;
     const organizationHeight = organizationTable
         ? gridHeight(organizationTable.rows.length, { max: TABLE_MAX_HEIGHT })
         : TABLE_MAX_HEIGHT;
     // Side by side, both grids fill the same row, so size them to the longer list.
     const tablesHeight = Math.max(agentHeight, organizationHeight);
-    const assumption = `At ${currencySymbol}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort`;
+    const assumption = `At ${prefix}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort`;
 
     const commitRate = () => {
         const parsed = Number.parseFloat(draftRate);
@@ -164,16 +167,16 @@ export function EstimatedValueStage() {
             },
             {
                 id: "AI Assisted Value",
-                header: `Value (${currencySymbol || "currency"})`,
+                header: `Value (${currencySymbol(currency.code)})`,
                 width: 112,
                 numericStyling: true,
                 cellRenderer: heatRenderer({
                     domain: columnHeat(agentTable, "AI Assisted Value"),
-                    format: (value) => formatCurrencyCell(value, currencySymbol),
+                    format: (value) => formatCurrencyCell(value, prefix),
                 }),
             },
         ],
-        [currencySymbol, agentTable],
+        [prefix, currency.code, agentTable],
     );
 
     const organizationColumns: GridColumnDef[] = useMemo(
@@ -195,16 +198,16 @@ export function EstimatedValueStage() {
             },
             {
                 id: "AI Assisted Value",
-                header: `Value (${currencySymbol || "currency"})`,
+                header: `Value (${currencySymbol(currency.code)})`,
                 width: 112,
                 numericStyling: true,
                 cellRenderer: heatRenderer({
                     domain: columnHeat(organizationTable, "AI Assisted Value"),
-                    format: (value) => formatCurrencyCell(value, currencySymbol),
+                    format: (value) => formatCurrencyCell(value, prefix),
                 }),
             },
         ],
-        [currencySymbol, org.label, organizationTable],
+        [prefix, currency.code, org.label, organizationTable],
     );
 
     return (
@@ -218,7 +221,7 @@ export function EstimatedValueStage() {
                         <span>Hourly rate</span>
                         <span className="flex h-700 items-center rounded-md border border-border bg-card text-card-foreground focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring">
                             <span className="border-r border-border px-200 text-muted-foreground" aria-hidden="true">
-                                {currencySymbol}
+                                {currencySymbol(currency.code)}
                             </span>
                             <input
                                 aria-label="Hourly rate"
@@ -264,20 +267,20 @@ export function EstimatedValueStage() {
                         label="AI assisted value"
                         value={readNumber(summaryRow, "[AI Assisted Value]")}
                         format="currency"
-                        prefix={currencySymbol}
+                        prefix={prefix}
                         emphasis
                     />
                     <KpiCard
                         label="Annualised value"
                         value={readNumber(summaryRow, "[Projected Annualised Value]")}
                         format="currency"
-                        prefix={currencySymbol}
+                        prefix={prefix}
                     />
                     <KpiCard
                         label="Value per week"
                         value={readNumber(summaryRow, "[AI Assisted Value Per Week]")}
                         format="currency"
-                        prefix={currencySymbol}
+                        prefix={prefix}
                     />
                 </div>
             )}
@@ -286,7 +289,7 @@ export function EstimatedValueStage() {
                 {assumption}
             </p>
 
-            <TaskValueBreakdown extra={extra} currencySymbol={currencySymbol} assumption={assumption} />
+            <TaskValueBreakdown extra={extra} prefix={prefix} assumption={assumption} />
 
             <div className="grid gap-300 2xl:grid-cols-2">
                 <div className={TABLE_FRAME} style={tableFrameStyle(agentHeight, tablesHeight)}>

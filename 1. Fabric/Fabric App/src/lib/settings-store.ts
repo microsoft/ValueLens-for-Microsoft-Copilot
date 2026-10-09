@@ -9,6 +9,7 @@ import { runtimeConfig } from "@/lib/runtime-config";
 import { getAccessToken } from "@/services/rayfin-auth.service";
 import { taskTimeKey, type TaskTime, type TaskTimeOverride } from "@/queries/assumptions";
 import { COMMERCIAL_TERM_KEYS, type CommercialTermsValues } from "@/queries/consumption/commercial-terms";
+import { toCurrencyCode } from "@/lib/currency";
 
 /** The app keeps one set of terms for everyone, in this row. */
 export const COMMERCIAL_TERMS_ID = "00000000-0000-0000-0000-000000000001";
@@ -183,6 +184,7 @@ function commercialTermsPatch(patch: CommercialTermsValues): Record<string, unkn
     for (const key of COMMERCIAL_TERM_KEYS) {
         if (Object.hasOwn(patch, key)) changed[key] = patch[key] ?? null;
     }
+    if (Object.hasOwn(patch, "currency")) changed.currency = toCurrencyCode(patch.currency) ?? null;
     return changed;
 }
 
@@ -197,6 +199,7 @@ function commercialTermsFromRow(row: Record<string, unknown>): SavedCommercialTe
         budgetCowork: toOptionalNumber(row.budgetCowork),
         budgetStudio: toOptionalNumber(row.budgetStudio),
         budgetAzure: toOptionalNumber(row.budgetAzure),
+        currency: toCurrencyCode(row.currency),
         updatedBy: typeof row.updatedBy === "string" && row.updatedBy ? row.updatedBy : undefined,
         updatedAt: updatedAt && !Number.isNaN(updatedAt.getTime()) ? updatedAt : undefined,
     };

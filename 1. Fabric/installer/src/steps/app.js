@@ -240,12 +240,18 @@ export async function ensureFabricApp(ctx) {
     const ws = /** @type {string} */ (config.fabric.workspaceId);
     const item = await api.fabric.getItem(ws, fa.itemId).catch((err) => (err instanceof HttpError && err.status === 404 ? null : Promise.reject(err)));
     if (item) {
-      const changed = (fa.models ?? [APP_ALIAS]).join(',') !== appModels(config).join(',');
-      // A prebuilt app reads its models when it loads, so it only needs deploying.
+      const pagesChanged = (fa.models ?? [APP_ALIAS]).join(',') !== appModels(config).join(',');
+      // A prebuilt app reads its models and currency when it loads, so it only needs deploying.
       const prebuilt = !!ctx.sources.appDir && isPrebuilt(ctx.sources.appDir);
+      const currencyChanged = prebuilt && !!config.reporting && reportingKey(fa.reporting) !== reportingKey(config.reporting);
+      const changed = pagesChanged || currencyChanged;
       const again = prebuilt ? 'Deploy it again?' : 'Build and deploy it again?';
+      const why = [
+        pagesChanged ? pagesChange(fa.models ?? [APP_ALIAS], appModels(config)) : '',
+        currencyChanged ? `show the Value page in ${config.reporting?.currency}` : '',
+      ].filter(Boolean).join(' and ');
       const question = changed
-        ? `The app "${item.displayName}" needs ${prebuilt ? 'redeploying' : 'rebuilding'} to ${pagesChange(fa.models ?? [APP_ALIAS], appModels(config))}. ${again}`
+        ? `The app "${item.displayName}" needs ${prebuilt ? 'redeploying' : 'rebuilding'} to ${why}. ${again}`
         : `The app "${item.displayName}" is deployed. ${again}`;
       if (!(await ui.confirm(question, changed))) {
         const name = await keepAppName(ctx, ws, item);
@@ -259,6 +265,9 @@ export async function ensureFabricApp(ctx) {
   }
   await deployApp(ctx);
 }
+
+/** @param {import('../currency.js').ReportingConfig | undefined} r */
+const reportingKey = (r) => (r ? `${r.currency}:${r.exchangeRate ?? ''}` : '');
 
 /**
  * Renames a deployed app that still has an old name, without rebuilding it.
@@ -304,7 +313,8 @@ export async function deployApp(ctx) {
   if (!nodeVersionOk()) throw new Error(`Building the app needs Node.js ${MIN_NODE.join('.')} or later; this is ${process.versions.node}.`);
 
   const models = appModels(config);
-  const { record, profile } = isPrebuilt(dir) ? await deployPrebuilt(ctx, dir, ws, models) : await buildAndDeploy(ctx, dir, ws, models);
+  const prebuilt = isPrebuilt(dir);
+  const { record, profile } = prebuilt ? await deployPrebuilt(ctx, dir, ws, models) : await buildAndDeploy(ctx, dir, ws, models);
 
   const item = await api.fabric.getItem(ws, record.fabricItemId).catch(() => null);
   const name = item ? await nameApp(ctx, ws, record.fabricItemId, item.displayName) : yamlValue(readText(join(dir, 'rayfin', 'rayfin.yml')), 'name');
@@ -317,6 +327,7 @@ export async function deployApp(ctx) {
     models,
     deployedAt: record.deployedAt ?? ctx.now().toISOString(),
   });
+  if (prebuilt && config.reporting) fa.reporting = { ...config.reporting };
   ctx.save();
   ui.ok(`Deployed the app "${name}"`);
 }
@@ -429,7 +440,7 @@ export function fabricConfigFile(config, ws, models) {
     [CONSUMPTION_ALIAS]: config.consumption.model.id,
     [EVALUATOR_ALIAS]: config.agentEvaluator.model.id,
   };
-  /** @type {{ semanticModels: Record<string, { workspaceId: string, itemId: string | undefined }>, modules?: Record<string, boolean> }} */
+  /** @type {{ semanticModels: Record<string, { workspaceId: string, itemId: string | undefined }>, modules?: Record<string, boolean>, reporting?: import('../currency.js').ReportingConfig }} */
   const body = { semanticModels: Object.fromEntries(models.map((alias) => [alias, { workspaceId: ws, itemId: ids[alias] }])) };
   if (config.modules) {
     body.modules = {
@@ -439,6 +450,7 @@ export function fabricConfigFile(config, ws, models) {
       resourceGraph: config.dataSources?.resourceGraph === 'api',
     };
   }
+  if (config.reporting) body.reporting = { ...config.reporting };
   return body;
 }
 

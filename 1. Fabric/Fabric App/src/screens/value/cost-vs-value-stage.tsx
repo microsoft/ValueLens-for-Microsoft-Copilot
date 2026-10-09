@@ -21,8 +21,10 @@ import { useThemeContext } from "@/hooks/theme.context";
 import { SCENARIOS, useValueAssumptions } from "@/hooks/value-assumptions.context";
 import { gridHeight, rowChartHeight } from "@/lib/chart-height";
 import { formatDateRange } from "@/lib/filters";
+import { currencyPrefix, currencySymbol, DEFAULT_CURRENCY } from "@/lib/currency";
 import { formatKpi } from "@/lib/format-kpi";
 import { columnHeat, heatRenderer } from "@/lib/heat";
+import { runtimeConfig } from "@/lib/runtime-config";
 import { SMALL } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 import { LICENSE_LIST_PRICE } from "@/queries/consumption";
@@ -86,7 +88,7 @@ function creditsNote(data: CostVsValue): string {
 }
 
 function howNotes(data: CostVsValue): Note[] {
-    const { span, symbol, rate, scenario, users, licencePrice, listPrice, credits, azure, dollar, exchangeRate } = data;
+    const { span, prefix, code, rate, scenario, users, licencePrice, listPrice, credits, azure, dollar, exchangeRate } = data;
     const counted = credits.kind === "ready";
     return [
         {
@@ -105,7 +107,7 @@ function howNotes(data: CostVsValue): Note[] {
         { term: "Credits", text: creditsNote(data) },
         {
             term: "Value",
-            text: `Expert-equivalent hours at ${symbol}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort. The rate is set under Estimated value; the scenario here or there. The range under Return uses the conservative and optimistic scenarios at the same rate.`,
+            text: `Expert-equivalent hours at ${prefix}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort. The rate is set under Estimated value; the scenario here or there. The range under Return uses the conservative and optimistic scenarios at the same rate.`,
         },
         {
             term: "Pairing",
@@ -117,28 +119,28 @@ function howNotes(data: CostVsValue): Note[] {
             term: "Left out",
             text: `${
                 data.comparison.unlicensedChat !== undefined && data.comparison.unlicensedChat > 0
-                    ? `Copilot Chat by people without a licence (${formatKpi(data.comparison.unlicensedChat, "currency", { prefix: symbol })} of value), as it's free with Microsoft 365 and no cost here pays for it. `
+                    ? `Copilot Chat by people without a licence (${formatKpi(data.comparison.unlicensedChat, "currency", { prefix })} of value), as it's free with Microsoft 365 and no cost here pays for it. `
                     : ""
             }${
                 azure.cost !== undefined
-                    ? `Azure AI Foundry (${formatKpi(azure.cost, "money", { prefix: azure.currency === "USD" || !azure.currency ? "$" : `${azure.currency} ` })} over these dates), as ValueLens doesn't record the work it does. `
+                    ? `Azure AI Foundry (${formatKpi(azure.cost, "money", { prefix: currencyPrefix(azure.currency ?? "USD") })} over these dates, as billed), as ValueLens doesn't record the work it does. `
                     : "Azure AI Foundry, as ValueLens doesn't record the work it does. "
             }GitHub Copilot, which neither model holds. Filters other than dates, as costs aren't split that way.`,
         },
         {
-            term: "Exchange rate",
+            term: "Currency",
             text: dollar
-                ? undefined
+                ? "US dollars, as licences and credits are billed. Choose another reporting currency under Prices."
                 : exchangeRate !== undefined
-                  ? `$1 = ${symbol}${exchangeRate}, set under Prices. Licences and credits are billed in US dollars.`
-                  : `Not set. Licences and credits are billed in US dollars, so set how many ${symbol || "units of the value's currency"} make $1 under Prices.`,
+                  ? `${code}, at $1 = ${prefix}${exchangeRate}, set under Prices. Licences and credits are billed in US dollars and converted at that rate.`
+                  : `${code}. Licences and credits are billed in US dollars, so set how many ${currencySymbol(code)} make $1 under Prices.`,
         },
     ];
 }
 
 function agentNotes(data: CostVsValue): Note[] {
-    const { symbol, rate, scenario, costs, agents } = data;
-    const studio = costs.studio !== undefined ? ` (${formatKpi(costs.studio, "currency", { prefix: symbol })})` : "";
+    const { prefix, rate, scenario, costs, agents } = data;
+    const studio = costs.studio !== undefined ? ` (${formatKpi(costs.studio, "currency", { prefix })})` : "";
     return [
         {
             term: "Cost",
@@ -146,7 +148,7 @@ function agentNotes(data: CostVsValue): Note[] {
         },
         {
             term: "Value",
-            text: `The work ValueLens records for the agent with the same name, at ${symbol}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort.`,
+            text: `The work ValueLens records for the agent with the same name, at ${prefix}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort.`,
         },
         {
             term: "Not found",
@@ -158,16 +160,28 @@ function agentNotes(data: CostVsValue): Note[] {
     ];
 }
 
+/** The rate typed in at install, offered as the default for its own currency. */
+function installRate(code: string): string | undefined {
+    const install = runtimeConfig().reporting;
+    return install?.currency === code && install.exchangeRate !== undefined ? String(install.exchangeRate) : undefined;
+}
+
+const rateLabel = (code: string) => `${currencySymbol(code)} per $1`;
+const rateHint = (code: string) =>
+    installRate(code) !== undefined
+        ? `How many ${currencySymbol(code)} make $1. Empty uses the rate set at install.`
+        : `How many ${currencySymbol(code)} make $1, to set dollar costs against value.`;
+
 /**
  * The prices the comparison's costs are worked out at, set for everyone who
- * opens the app: the licence price and, when value isn't in dollars, the
- * exchange rate.
+ * opens the app: the licence price, the reporting currency and, when that
+ * isn't US dollars, the exchange rate.
  */
 function PricesMenu({ data }: { data: CostVsValue }) {
     const { status } = useCommercialTerms();
-    const { dollar, symbol, listPrice, exchangeRate } = data;
-    const fields = useMemo<TermField[]>(() => {
-        const list: TermField[] = [
+    const { dollar, code, listPrice, exchangeRate } = data;
+    const fields = useMemo<TermField[]>(
+        () => [
             {
                 key: "licensePrice",
                 label: "Microsoft 365 Copilot licence",
@@ -175,31 +189,36 @@ function PricesMenu({ data }: { data: CostVsValue }) {
                 placeholder: String(LICENSE_LIST_PRICE),
                 inputMode: "decimal",
             },
-        ];
-        if (!dollar) {
-            list.push({
+            {
                 key: "exchangeRate",
-                label: "Exchange rate",
-                hint: `${symbol || "Value currency"} per $1, to set dollar costs against value.`,
+                label: rateLabel,
+                hint: rateHint,
+                placeholder: installRate,
                 inputMode: "decimal",
-            });
-        }
-        return list;
-    }, [dollar, symbol]);
+                showWhen: (currency) => currency !== DEFAULT_CURRENCY,
+            },
+        ],
+        [],
+    );
 
     const needsRate = !dollar && exchangeRate === undefined;
     const summary =
-        status === "loading" ? "Loading…" : needsRate ? "Exchange rate needed" : listPrice ? "List price" : "Set in this app";
+        status === "loading"
+            ? "Loading?"
+            : needsRate
+              ? "Exchange rate needed"
+              : `${listPrice ? "List price" : "Set in this app"} ? ${code}`;
 
     return (
-        <FilterMenu label="Prices" summary={summary} active={!listPrice || exchangeRate !== undefined} panelClassName="w-[320px]">
+        <FilterMenu label="Prices" summary={summary} active={!listPrice || !dollar} panelClassName="w-[320px]">
             {(close) => (
                 <TermsForm
                     fields={fields}
-                    intro="Microsoft 365 Copilot licences and Copilot credits are billed in US dollars."
+                    currency={{ value: code, choose: true }}
+                    intro="Microsoft 365 Copilot licences and Copilot credits are billed in US dollars. Value and cost here are shown in the reporting currency, converted at the exchange rate."
                     resetLabel="Use defaults"
                     unavailableText="Prices can't be saved here right now, so the US list price applies."
-                    note="They're used here only."
+                    note="They're used on the Value page only."
                     close={close}
                 />
             )}
@@ -215,19 +234,18 @@ const scenarioOptions = SCENARIOS.map((id) => ({ id, label: id }));
  * Stands in for the comparison until an exchange rate is set: the box to type
  * it in, right where the charts will appear.
  */
-function RatePrompt({ symbol }: { symbol: string }) {
+function RatePrompt({ code }: { code: string }) {
     const headingId = useId();
-    const unit = symbol || "units of the value's currency";
     const fields = useMemo<TermField[]>(
         () => [
             {
                 key: "exchangeRate",
-                label: `${symbol || "Value currency"} per $1`,
-                hint: `For example 0.75 if $1 buys ${symbol || ""}0.75.`,
+                label: rateLabel,
+                hint: (currency) => `For example 0.75 if $1 buys ${currencyPrefix(currency)}0.75.`,
                 inputMode: "decimal",
             },
         ],
-        [symbol],
+        [],
     );
     return (
         <section
@@ -240,7 +258,8 @@ function RatePrompt({ symbol }: { symbol: string }) {
             <div className="max-w-[360px]">
                 <TermsForm
                     fields={fields}
-                    intro={`Licences and credits are billed in US dollars and value is in ${symbol || "another currency"}. Type how many ${unit} make $1.`}
+                    currency={{ value: code, choose: false }}
+                    intro={`Licences and credits are billed in US dollars and this page reports in ${code}. Type how many ${currencySymbol(code)} make $1, or choose US dollars under Prices.`}
                     resetLabel="Clear"
                     unavailableText="The exchange rate can't be saved here right now."
                     note="It's also under Prices, above."
@@ -261,12 +280,12 @@ export function CostVsValueStage() {
     const data = useCostVsValue();
     const { setScenario } = useValueAssumptions();
     const { theme } = useThemeContext();
-    const { symbol, rate, scenario, span, comparison, costs, usd, convertible, credits, summary, agents } = data;
+    const { prefix, code, rate, scenario, span, comparison, costs, usd, convertible, credits, summary, agents } = data;
     const counted = credits.kind === "ready";
 
     const products = useMemo(() => pairTable(data.pairs), [data.pairs]);
     const agentRows = useMemo(() => agentTable(agents.lines), [agents.lines]);
-    const spec = useMemo(() => costValueSpec(symbol), [symbol]);
+    const spec = useMemo(() => costValueSpec(prefix), [prefix]);
 
     const productColumns: GridColumnDef[] = useMemo(
         () => [
@@ -274,24 +293,24 @@ export function CostVsValueStage() {
             // Each width fits its header beside the sort arrow, even with a three-letter currency code; the two text columns share the rest.
             {
                 id: "Cost",
-                header: `Cost (${symbol || "currency"})`,
+                header: `Cost (${currencySymbol(code)})`,
                 width: 108,
                 numericStyling: true,
-                cellRenderer: amountCell(symbol, "currency"),
+                cellRenderer: amountCell(prefix, "currency"),
             },
             { id: "Set Against", header: "Set against", minWidth: 180 },
             {
                 id: "Value",
-                header: `Estimated value (${symbol || "currency"})`,
+                header: `Estimated value (${currencySymbol(code)})`,
                 width: 168,
                 numericStyling: true,
-                cellRenderer: amountCell(symbol, "currency"),
+                cellRenderer: amountCell(prefix, "currency"),
             },
             { id: "Return", header: "Return", width: 96, numericStyling: true, cellRenderer: returnCell },
             { id: "Pair", header: "Pair", hidden: true },
             { id: "Sort", header: "Order", hidden: true },
         ],
-        [symbol],
+        [prefix, code],
     );
 
     const agentColumns: GridColumnDef[] = useMemo(
@@ -300,26 +319,26 @@ export function CostVsValueStage() {
             { id: "Share", header: "Share of credits", width: 136, numericStyling: true, cellRenderer: percentCell },
             {
                 id: "Cost",
-                header: `Allocated cost (${symbol || "currency"})`,
+                header: `Allocated cost (${currencySymbol(code)})`,
                 width: 168,
                 numericStyling: true,
-                cellRenderer: amountCell(symbol, "money"),
+                cellRenderer: amountCell(prefix, "money"),
             },
             { id: "Sessions", header: "Sessions", width: 96, numericStyling: true, cellRenderer: wholeCell },
             {
                 id: "Value",
-                header: `Estimated value (${symbol || "currency"})`,
+                header: `Estimated value (${currencySymbol(code)})`,
                 width: 172,
                 numericStyling: true,
                 cellRenderer: heatRenderer({
                     domain: columnHeat(agentRows, "Value"),
-                    format: (value) => amountCell(symbol, "currency")(value),
+                    format: (value) => amountCell(prefix, "currency")(value),
                 }),
             },
             { id: "Return", header: "Return", width: 96, numericStyling: true, cellRenderer: returnCell },
             { id: "Sort", header: "Order", hidden: true },
         ],
-        [symbol, agentRows],
+        [prefix, code, agentRows],
     );
 
     const needRate = "Needs an exchange rate, set below.";
@@ -369,7 +388,7 @@ export function CostVsValueStage() {
                 <>
                     <p className={cn(SMALL, "text-muted-foreground")}>
                         {span ? `${formatDateRange(span.from, span.to)} · ` : ""}
-                        {`At ${symbol}${formatKpi(rate, "whole")} an hour, as set under `}
+                        {`At ${prefix}${formatKpi(rate, "whole")} an hour, as set under `}
                         <a
                             href={`#${stageAnchor("estimated-value")}`}
                             className="text-foreground underline underline-offset-2 hover:text-primary"
@@ -377,7 +396,7 @@ export function CostVsValueStage() {
                             Estimated value
                         </a>
                         {`, ${scenario.toLowerCase()} effort`}
-                        {!data.dollar && data.exchangeRate !== undefined ? ` · $1 = ${symbol}${data.exchangeRate}` : ""}
+                        {!data.dollar && data.exchangeRate !== undefined ? ` · $1 = ${prefix}${data.exchangeRate}` : ""}
                     </p>
 
                     {summary.error !== undefined ? (
@@ -412,11 +431,11 @@ export function CostVsValueStage() {
                                 label="Estimated value"
                                 value={comparison.value}
                                 format="currency"
-                                prefix={symbol}
+                                prefix={prefix}
                                 detail={
                                     comparison.unlicensedChat !== undefined && comparison.unlicensedChat > 0
-                                        ? `${scenario} effort at ${symbol}${formatKpi(rate, "whole")} an hour. Leaves out ${formatKpi(comparison.unlicensedChat, "currency", { prefix: symbol })} of free Copilot Chat by people without a licence.`
-                                        : `${scenario} effort at ${symbol}${formatKpi(rate, "whole")} an hour`
+                                        ? `${scenario} effort at ${prefix}${formatKpi(rate, "whole")} an hour. Leaves out ${formatKpi(comparison.unlicensedChat, "currency", { prefix })} of free Copilot Chat by people without a licence.`
+                                        : `${scenario} effort at ${prefix}${formatKpi(rate, "whole")} an hour`
                                 }
                             />
                             {convertible ? (
@@ -424,12 +443,12 @@ export function CostVsValueStage() {
                                     label="Cost"
                                     value={comparison.cost}
                                     format="currency"
-                                    prefix={symbol}
+                                    prefix={prefix}
                                     detail={
                                         <div className="flex flex-col gap-100">
-                                            <KpiStat label="Licences" value={costs.licences} format="currency" prefix={symbol} />
+                                            <KpiStat label="Licences" value={costs.licences} format="currency" prefix={prefix} />
                                             {counted && (
-                                                <KpiStat label="Credits" value={comparison.credits} format="currency" prefix={symbol} />
+                                                <KpiStat label="Credits" value={comparison.credits} format="currency" prefix={prefix} />
                                             )}
                                         </div>
                                     }
@@ -447,7 +466,7 @@ export function CostVsValueStage() {
                                 label="Break-even hourly rate"
                                 value={comparison.breakEvenRate}
                                 format="money"
-                                prefix={symbol}
+                                prefix={prefix}
                                 detail={
                                     convertible
                                         ? `The value covers the cost at any rate above this, ${scenario.toLowerCase()} effort.`
@@ -467,7 +486,7 @@ export function CostVsValueStage() {
                                     height={productsHeight}
                                     title="Each cost and the work it pays for"
                                     headline={pairReturnHeadline}
-                                    subtitle={`Cost and estimated value, in ${symbol || "the value's currency"}`}
+                                    subtitle={`Cost and estimated value, in ${code}`}
                                     emptyTitle="Nothing to compare"
                                     emptyDescription="There's no cost or value over these dates."
                                 />
@@ -493,7 +512,7 @@ export function CostVsValueStage() {
                             </div>
                         ) : (
                             <div className="min-w-0">
-                                <RatePrompt symbol={symbol} />
+                                <RatePrompt code={code} />
                             </div>
                         )}
                         <NoteCard title="How this is worked out" notes={howNotes(data)} />

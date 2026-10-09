@@ -9,6 +9,7 @@ import { resolveRayfinConfig, type RayfinRuntimeConfig } from "@microsoft/rayfin
 import * as teams from "@microsoft/teams-js";
 import { fabricConfig } from "@/fabric.generated";
 import type { ModelReference, ModelReferences } from "@/lib/connections";
+import { toCurrencyCode, type InstallCurrency } from "@/lib/currency";
 
 /** Where an Azure install puts the host contract, next to the SPA. */
 export const APP_CONFIG_PATH = "/app.config.json";
@@ -36,6 +37,8 @@ export interface RuntimeConfig {
     semanticModels: ModelReferences;
     /** Optional installer modules chosen for this install. Undefined for older installs and Azure hosts that do not say. */
     modules?: RuntimeModules;
+    /** The reporting currency chosen at install, before anything is saved in the app. Undefined for older installs. */
+    reporting?: InstallCurrency;
 }
 
 export interface RuntimeModules {
@@ -91,6 +94,7 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
             azure: { ...azure.azure!, inTeams: azure.azure!.inTeams || await detectTeams() },
             semanticModels: azure.semanticModels,
             modules: azure.modules,
+            reporting: azure.reporting,
         };
         return loaded;
     }
@@ -104,6 +108,7 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
         rayfin: rayfin.runtimeConfig,
         semanticModels: fabric?.semanticModels ?? defaults.semanticModels,
         modules: fabric?.modules,
+        reporting: fabric?.reporting,
     };
     return loaded;
 }
@@ -146,7 +151,9 @@ export async function loadSemanticModels(path = FABRIC_CONFIG_PATH): Promise<Mod
     return config?.semanticModels ?? null;
 }
 
-export async function loadFabricConfig(path = FABRIC_CONFIG_PATH): Promise<Pick<RuntimeConfig, "semanticModels" | "modules"> | null> {
+export async function loadFabricConfig(
+    path = FABRIC_CONFIG_PATH,
+): Promise<Pick<RuntimeConfig, "semanticModels" | "modules" | "reporting"> | null> {
     let response: Response;
     try {
         response = await fetch(path, { cache: "no-store" });
@@ -170,7 +177,7 @@ export async function loadFabricConfig(path = FABRIC_CONFIG_PATH): Promise<Pick<
     } catch {
         throw new RuntimeConfigError(`${path} isn't valid JSON.`);
     }
-    return { semanticModels: parseSemanticModels(json, path), modules: parseModules(json) };
+    return { semanticModels: parseSemanticModels(json, path), modules: parseModules(json), reporting: parseReporting(json) };
 }
 
 /** Checks an Azure app.config.json body has the host contract shape. */
@@ -192,7 +199,23 @@ export function parseAzureConfig(json: unknown, path = APP_CONFIG_PATH): Runtime
         },
         semanticModels: parseSemanticModels(json, path),
         modules: parseModules(json),
+        reporting: parseReporting(json),
     };
+}
+
+/**
+ * Reads `{ reporting: { currency, exchangeRate? } }`: the installer's choice
+ * of reporting currency. An unknown currency or a rate that isn't a positive
+ * number is left out rather than failing the app.
+ */
+export function parseReporting(json: unknown): InstallCurrency | undefined {
+    const reporting = isRecord(json) ? json.reporting : undefined;
+    if (!isRecord(reporting)) return undefined;
+    const currency = toCurrencyCode(reporting.currency);
+    if (!currency) return undefined;
+    const rate = typeof reporting.exchangeRate === "string" ? Number(reporting.exchangeRate) : reporting.exchangeRate;
+    const exchangeRate = currency !== "USD" && typeof rate === "number" && Number.isFinite(rate) && rate > 0 ? rate : undefined;
+    return exchangeRate === undefined ? { currency } : { currency, exchangeRate };
 }
 
 /** Checks a config body has the `{ semanticModels: { alias: { workspaceId, itemId } } }` shape. */

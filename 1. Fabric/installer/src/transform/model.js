@@ -5,6 +5,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { SETUP_DIR } from '../catalog.js';
+import { currencySymbol } from '../currency.js';
 import { addDefender } from './defender.js';
 import { addM365Activity } from './m365.js';
 import { addCopilotPaygSpend } from './payg.js';
@@ -99,7 +100,23 @@ export function mParameter(model, name) {
  * @property {string} database  The Lakehouse name.
  * @property {import('../catalog.js').ModuleChoice} modules
  * @property {boolean} [resourceGraph]  Agent configuration and Foundry come from Azure Resource Graph.
+ * @property {string} [currency]  The reporting currency's ISO code. The template's symbol stays when absent.
  */
+
+/** The measure the report and the app read the reporting currency's symbol from. */
+export const CURRENCY_SYMBOL_MEASURE = 'Currency Symbol Value';
+
+/**
+ * Points the currency symbol measure at the reporting currency.
+ * @param {ModelBim['model']} model
+ * @param {string} code
+ */
+export function setCurrencySymbol(model, code) {
+  for (const table of model.tables ?? []) {
+    const measure = table.measures?.find((m) => m.name === CURRENCY_SYMBOL_MEASURE);
+    if (measure) measure.expression = `"${currencySymbol(code).replace(/"/g, '""')}"`;
+  }
+}
 
 /** Optional pages, switched by a model parameter. */
 const SWITCHES = /** @type {const} */ ([
@@ -123,6 +140,7 @@ export function buildModel(template, settings) {
   addM365Activity(model, !!settings.modules.m365Activity);
   addDefender(model, !!settings.modules.defender);
   addResourceGraph(model, !!settings.resourceGraph);
+  if (settings.currency) setCurrencySymbol(model, settings.currency);
   return { compatibilityLevel: template.compatibilityLevel, model };
 }
 

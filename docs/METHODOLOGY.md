@@ -908,11 +908,12 @@ saves exports emailed to an admin into that folder. With no export, the page sta
 | Penalty factor | 1 | `Assumptions` table | Optional extra multiplier on value |
 | AI PPUPM | 30 | `Assumptions` table | Licence price per user per month, for cost and ROI |
 | Monthly Licence Cost | 0 | `Assumptions` table | Prices dormant seats; 0 means not costed |
-| Currency symbol | £ | `Assumptions` table | Display only; it doesn't convert. Enter money settings in this currency |
+| Currency symbol | £ in the template; the installer sets it to the reporting currency | `Assumptions` table | Display only; it doesn't convert. Enter money settings in this currency |
 | Rates & packs | From `commercial_terms` | App Consumption page | Credit prices ([§8](#81-consumption)) |
 | Monthly budgets | Not set | App Consumption page, Rates, packs and budgets | Budget runway for Cowork, Copilot Studio and Azure ([§8.1](#81-consumption)) |
 | Licence price | $30, the US list price | App Value page, Prices | Licence cost on Cost vs value ([§8.3](#83-cost-vs-value)). The report uses AI PPUPM instead |
-| Exchange rate | Not set | App Value page, Prices | Converts dollar costs into the value's currency ([§8.3](#83-cost-vs-value)) |
+| Reporting currency | US dollars, or the one picked in the installer | App Value page, Prices | The currency of every figure on the Value page ([§8.3](#83-cost-vs-value)) |
+| Exchange rate | Not set; the installer can set one | App Value page, Prices | Units of the reporting currency per $1. Only asked for when that currency isn't US dollars ([§8.3](#83-cost-vs-value)) |
 | Time per task | The researched bands in the [appendix](#appendix-time-bands-and-sources) | App Assumptions page | Replaces a behaviour's Low, Typical and High minutes for everyone using the app. Cowork hours keep their task-category bands, and the report keeps the model's times |
 
 ---
@@ -998,8 +999,11 @@ tenant-wide, so the other filters don't apply to this stage.
 | Copilot Studio credits | Copilot Studio's cost over the dates, at the Consumption page's **Rates & packs** |
 | Cowork / Work IQ credits | Cowork / Work IQ's credits over the dates, priced as the Consumption page's Cowork section prices them: up to the **Capacity Pack balance** at the prepaid rate, the rest at pay-as-you-go. Pack credits left unused aren't counted |
 
-When the model's currency symbol isn't $, each cost is converted at the **exchange rate** set under
-**Prices**, in value currency per $1. Until one is set, the stage asks for it instead of comparing.
+**Currency.** The whole Value page uses one reporting currency, US dollars unless another is picked
+in the installer or under **Prices**. With US dollars nothing is converted. With another currency,
+each cost is converted at the **exchange rate** set under **Prices**, in that currency per $1, and
+until one is set the stage asks for it instead of comparing. The hourly value is entered in the
+reporting currency. Consumption figures stay in the currency they're billed in.
 
 **Pairing.** Each cost is set against the work it pays for, using the model's Activity column:
 

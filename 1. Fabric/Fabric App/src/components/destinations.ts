@@ -7,6 +7,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
+    Banknote,
     BookOpen,
     BotMessageSquare,
     Briefcase,
@@ -15,7 +16,6 @@ import {
     KeyRound,
     LayoutDashboard,
     MessageSquareQuote,
-    PoundSterling,
     ShieldCheck,
     Timer,
     TrendingUp,
@@ -158,7 +158,7 @@ export const destinations = [
         id: "value",
         label: "Value",
         blurb: "What the work was, and what it was worth",
-        icon: PoundSterling as LucideIcon,
+        icon: Banknote as LucideIcon,
         filters: ["dateRange", "organizations", "licence", "audience", "agentTypes", "agentNames"] as FilterKey[],
         stages: [
             { id: "task-breakdown", label: "Task breakdown", ready: true },

@@ -61,6 +61,10 @@ param webMinReplicas int = 0
 param webClientId string = ''
 @description('Identifier URI the web API exposes (api://<fqdn>/<clientId>); empty until the installer sets it.')
 param webAppIdUri string = ''
+@description('Reporting currency (ISO 4217 code) the Value page shows value and cost in until one is saved in the app.')
+param reportingCurrency string = 'USD'
+@description('Units of the reporting currency per US dollar, as text; empty when the currency is USD or the rate is left to the app.')
+param exchangeRate string = ''
 
 @description('Collection modules the run job executes (catalog ids), e.g. core,org,m365.')
 param modules string = 'core'
@@ -204,6 +208,8 @@ module apps 'modules/containerapps.bicep' = {
     webMinReplicas: webMinReplicas
     webClientId: webClientId
     webAppIdUri: webAppIdUri
+    reportingCurrency: reportingCurrency
+    exchangeRate: exchangeRate
     version: imageTag
     modules: modules
     auditHistoryDays: auditHistoryDays

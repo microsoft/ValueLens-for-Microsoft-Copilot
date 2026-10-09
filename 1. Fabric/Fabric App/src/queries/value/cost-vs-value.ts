@@ -90,18 +90,18 @@ export function licenceCost(users: number, pricePerMonth: number, span: DateSpan
     return users * pricePerMonth * spanMonths(span);
 }
 
-/** Whether the value's currency symbol is the US dollar, so dollar costs need no exchange rate. */
-export function isDollar(symbol: string): boolean {
-    return /^(\$|US\$|USD)$/i.test(symbol.trim());
+/** Whether the reporting currency is the US dollar, so dollar costs need no exchange rate. Takes an ISO code. */
+export function isDollar(currency: string): boolean {
+    return /^(\$|US\$|USD)$/i.test(currency.trim());
 }
 
 /**
- * A US-dollar cost in the value's currency: as it is when that is dollars,
+ * A US-dollar cost in the reporting currency: as it is when that is dollars,
  * at the exchange rate otherwise, and undefined when there is no rate.
  */
-export function toValueCurrency(usd: number | undefined, symbol: string, exchangeRate: number | undefined): number | undefined {
+export function toValueCurrency(usd: number | undefined, currency: string, exchangeRate: number | undefined): number | undefined {
     if (usd === undefined) return undefined;
-    if (isDollar(symbol)) return usd;
+    if (isDollar(currency)) return usd;
     return exchangeRate === undefined ? undefined : usd * exchangeRate;
 }
 
@@ -375,10 +375,10 @@ export function agentTable(lines: readonly AgentLine[]): DataTable {
 
 /**
  * Cost and value as two dots joined by a line, one row per pair, labelled in
- * the value's currency. Reads the `Pair`, `Cost`, `Value` and `Sort` columns.
+ * the reporting currency. Reads the `Pair`, `Cost`, `Value` and `Sort` columns.
  */
-export function costValueSpec(currencySymbol: string): VisualizationSpec {
-    // The symbol lands inside a single-quoted Vega expression string.
-    const symbol = currencySymbol.replace(/['"\\]/g, "");
+export function costValueSpec(currencyPrefix: string): VisualizationSpec {
+    // The prefix lands inside a single-quoted Vega expression string.
+    const symbol = currencyPrefix.replace(/['"\\]/g, "");
     return JSON.parse(JSON.stringify(costValueSpecTemplate).replaceAll("__CURRENCY__", symbol)) as VisualizationSpec;
 }

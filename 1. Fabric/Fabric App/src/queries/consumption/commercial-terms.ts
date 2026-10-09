@@ -26,7 +26,7 @@ export interface CommercialTermsValues {
     prepaidCreditBalance?: number;
     /** Microsoft 365 Copilot licence price per user per month, in US dollars. Empty uses the list price. */
     licensePrice?: number;
-    /** How much of ValueLens's currency one US dollar buys. Empty leaves costs in dollars. */
+    /** How much of the reporting currency one US dollar buys. Unused when that is US dollars. */
     exchangeRate?: number;
     /** Monthly budget for Cowork and Work IQ, in US dollars. Empty means no budget. */
     budgetCowork?: number;
@@ -34,6 +34,11 @@ export interface CommercialTermsValues {
     budgetStudio?: number;
     /** Monthly budget for Azure solution and AI Foundry spend, in Azure's billing currency. Empty means no budget. */
     budgetAzure?: number;
+    /**
+     * ISO code of the currency the Value page reports value and cost in.
+     * Empty uses the installer's choice, or US dollars.
+     */
+    currency?: string;
 }
 
 /** The Microsoft 365 Copilot US list price, per user per month, used when no licence price is typed in. */
@@ -45,9 +50,10 @@ export const EXCHANGE_RATE_MAX = 100000;
 /** The highest monthly budget the app accepts, in the budget's currency. */
 export const BUDGET_MAX = 1e11;
 
-export type CommercialTermKey = keyof CommercialTermsValues;
+/** A term typed in as a number: every term but the reporting currency. */
+export type CommercialTermKey = Exclude<keyof CommercialTermsValues, "currency">;
 
-/** Every term the app saves, in the order they are stored. */
+/** Every numeric term the app saves, in the order they are stored. The currency is saved beside them. */
 export const COMMERCIAL_TERM_KEYS: readonly CommercialTermKey[] = [
     "creditRate",
     "prepaidCreditRate",

@@ -7,6 +7,7 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useCommercialTerms } from "@/hooks/commercial-terms.context";
+import { CURRENCIES } from "@/lib/currency";
 import { INPUT, PRIMARY, SECONDARY } from "@/lib/form-controls";
 import { SMALL } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
@@ -18,14 +19,33 @@ import {
 } from "@/queries/consumption/commercial-terms";
 import type { SavedCommercialTerms } from "@/services/commercial-terms.service";
 
+/** Text that can depend on the reporting currency chosen in the form. */
+type CurrencyText = string | ((currency: string) => string);
+
+function textFor(text: string | ((currency: string) => string | undefined) | undefined, currency: string): string | undefined {
+    return typeof text === "function" ? text(currency) : text;
+}
+
 export interface TermField {
     key: CommercialTermKey;
-    label: string;
+    label: CurrencyText;
     /** What the box takes, and what applies when it is left empty. */
-    hint: string;
+    hint: CurrencyText;
     /** Shown in the empty box: the value that applies when nothing is typed. */
-    placeholder?: string;
+    placeholder?: string | ((currency: string) => string | undefined);
     inputMode: "decimal" | "numeric";
+    /** Shown, checked and saved only while this holds for the chosen currency. Hidden fields are cleared on save. */
+    showWhen?: (currency: string) => boolean;
+}
+
+/**
+ * The reporting currency, saved with the other fields. `choose` shows a
+ * picker for it; otherwise `value` is saved as it is, so a rate typed in
+ * stays tied to the currency it was typed for.
+ */
+export interface TermsCurrency {
+    value: string;
+    choose: boolean;
 }
 
 interface TermsFormProps {
@@ -39,6 +59,7 @@ interface TermsFormProps {
     /** The closing line: where else these terms do, or don't, apply. */
     note: string;
     close: () => void;
+    currency?: TermsCurrency;
 }
 
 type Draft = Partial<Record<CommercialTermKey, string>>;
@@ -64,14 +85,18 @@ function formatChanged(saved: SavedCommercialTerms): string | undefined {
  * Sits in a {@link FilterMenu} panel, and starts again from what is saved
  * each time the panel opens.
  */
-export function TermsForm({ fields, intro, resetLabel, unavailableText, note, close }: TermsFormProps) {
+export function TermsForm({ fields, intro, resetLabel, unavailableText, note, close, currency }: TermsFormProps) {
     const { status, unavailableReason, saved, save } = useCommercialTerms();
     const [draft, setDraft] = useState<Draft>(() => toDraft(fields, saved));
+    const [picked, setChosen] = useState(currency?.value ?? "");
     const [touched, setTouched] = useState(false);
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState<string>();
     const formRef = useRef<HTMLFormElement>(null);
     const baseId = useId();
+    const startCurrency = currency?.value ?? "";
+    // Without a picker the currency is the page's; with one, the panel resets it each time it opens.
+    const chosen = currency?.choose ? picked : startCurrency;
 
     useEffect(() => {
         const panel = formRef.current?.closest("[popover]");
@@ -79,24 +104,31 @@ export function TermsForm({ fields, intro, resetLabel, unavailableText, note, cl
         const onToggle = (event: Event) => {
             if ((event as ToggleEvent).newState !== "open") return;
             setDraft(toDraft(fields, saved));
+            setChosen(startCurrency);
             setTouched(false);
             setSaveError(undefined);
         };
         panel.addEventListener("toggle", onToggle);
         return () => panel.removeEventListener("toggle", onToggle);
-    }, [fields, saved]);
+    }, [fields, saved, startCurrency]);
 
+    const shown = fields.filter((field) => !field.showWhen || field.showWhen(chosen));
     const values: CommercialTermsValues = {};
     const errors: Partial<Record<CommercialTermKey, string>> = {};
     for (const field of fields) {
+        if (!shown.includes(field)) {
+            values[field.key] = undefined;
+            continue;
+        }
         const value = parseTerm(draft[field.key] ?? "");
         const error = validateTerm(field.key, value);
         if (error) errors[field.key] = error;
         else values[field.key] = value;
     }
+    if (currency) values.currency = chosen;
     const valid = Object.keys(errors).length === 0;
     const editable = status === "ready";
-    const anySaved = fields.some((field) => saved?.[field.key] !== undefined);
+    const anySaved = fields.some((field) => saved?.[field.key] !== undefined) || (!!currency?.choose && saved?.currency !== undefined);
 
     const commit = async (next: CommercialTermsValues) => {
         setSaving(true);
@@ -120,10 +152,26 @@ export function TermsForm({ fields, intro, resetLabel, unavailableText, note, cl
     const reset = () => {
         const cleared: CommercialTermsValues = {};
         for (const field of fields) cleared[field.key] = undefined;
+        if (currency?.choose) cleared.currency = undefined;
         void commit(cleared);
     };
 
+    const chooseCurrency = (code: string) => {
+        setChosen(code);
+        // A rate is per dollar in one currency, so it doesn't carry over to another.
+        setDraft((current) => {
+            const next = { ...current };
+            for (const field of fields) {
+                if (!field.showWhen) continue;
+                const keep = code === startCurrency ? saved?.[field.key] : undefined;
+                next[field.key] = keep === undefined ? "" : String(keep);
+            }
+            return next;
+        });
+    };
+
     const changed = saved ? formatChanged(saved) : undefined;
+    const currencyId = `${baseId}-currency`;
 
     return (
         <form ref={formRef} noValidate onSubmit={onSubmit} className="flex flex-col gap-300">
@@ -135,13 +183,39 @@ export function TermsForm({ fields, intro, resetLabel, unavailableText, note, cl
                 </p>
             )}
 
-            {fields.map((field, index) => {
+            {currency?.choose && (
+                <div className="flex flex-col gap-100">
+                    <label htmlFor={currencyId} className={cn(SMALL, "font-semibold text-foreground")}>
+                        Reporting currency
+                    </label>
+                    <select
+                        id={currencyId}
+                        value={chosen}
+                        disabled={!editable || saving}
+                        data-autofocus
+                        aria-describedby={`${currencyId}-hint`}
+                        onChange={(event) => chooseCurrency(event.target.value)}
+                        className={INPUT}
+                    >
+                        {CURRENCIES.map((option) => (
+                            <option key={option.code} value={option.code}>
+                                {option.code} · {option.name}
+                            </option>
+                        ))}
+                    </select>
+                    <span id={`${currencyId}-hint`} className={cn(SMALL, "text-muted-foreground")}>
+                        Value and cost on this page are shown in it.
+                    </span>
+                </div>
+            )}
+
+            {shown.map((field, index) => {
                 const id = `${baseId}-${field.key}`;
                 const error = touched ? errors[field.key] : undefined;
                 return (
                     <div key={field.key} className="flex flex-col gap-100">
                         <label htmlFor={id} className={cn(SMALL, "font-semibold text-foreground")}>
-                            {field.label}
+                            {textFor(field.label, chosen)}
                         </label>
                         <input
                             id={id}
@@ -149,9 +223,9 @@ export function TermsForm({ fields, intro, resetLabel, unavailableText, note, cl
                             inputMode={field.inputMode}
                             autoComplete="off"
                             spellCheck={false}
-                            data-autofocus={index === 0 || undefined}
+                            data-autofocus={(index === 0 && !currency?.choose) || undefined}
                             value={draft[field.key] ?? ""}
-                            placeholder={field.placeholder ?? ""}
+                            placeholder={textFor(field.placeholder, chosen) ?? ""}
                             disabled={!editable || saving}
                             aria-invalid={error ? true : undefined}
                             aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`}
@@ -160,7 +234,7 @@ export function TermsForm({ fields, intro, resetLabel, unavailableText, note, cl
                             className={INPUT}
                         />
                         <span id={`${id}-hint`} className={cn(SMALL, "text-muted-foreground")}>
-                            {field.hint}
+                            {textFor(field.hint, chosen)}
                         </span>
                         {error && (
                             <span id={`${id}-error`} className={cn(SMALL, "text-destructive")}>
