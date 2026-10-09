@@ -17,7 +17,14 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
-## Unreleased
+## 2026-10-09 — Analytics Hub installer 0.3.9
+
+**Update an existing install:** download installer 0.3.9, open it and choose **Repair or change**.
+On Azure, run `update` first if you want to load more audit history: older job images ignore
+`VALUELENS_AUDIT_BACKFILL_DAYS`.
+
+The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.3.9`, which the
+Azure install pulls.
 
 ### Docs: a disclaimer in the README
 
