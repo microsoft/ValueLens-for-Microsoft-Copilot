@@ -52,33 +52,33 @@ function isGroup(row: Row): boolean {
     return typeof row._id === "string" && row._id.startsWith("group:");
 }
 
-function formatter(measure: Measure, currencySymbol: string): (value: unknown) => string {
+function formatter(measure: Measure, prefix: string): (value: unknown) => string {
     switch (measure) {
         case ACTIVITY_SHARE_COLUMN:
             return (value) => formatKpi(asNumber(value), "percent");
         case HOURS_PER_WEEK_COLUMN:
             return (value) => formatKpi(asNumber(value), "hours");
         case VALUE_PER_WEEK_COLUMN:
-            return (value) => formatKpi(asNumber(value), "currency", { prefix: currencySymbol });
+            return (value) => formatKpi(asNumber(value), "currency", { prefix });
     }
 }
 
-function header(measure: Measure, currencySymbol: string): string {
+function header(measure: Measure, prefix: string): string {
     switch (measure) {
         case ACTIVITY_SHARE_COLUMN:
             return "Activity share";
         case HOURS_PER_WEEK_COLUMN:
             return "Expert hours per week";
         case VALUE_PER_WEEK_COLUMN:
-            return `Value per week${currencySymbol ? ` (${currencySymbol})` : ""}`;
+            return `Value per week${prefix.trim() ? ` (${prefix.trim()})` : ""}`;
     }
 }
 
 interface TaskValueBreakdownProps {
     /** The hourly-rate and effort-scenario filters the rest of the stage uses. */
     extra: readonly string[];
-    currencySymbol: string;
-    /** "At £50 an hour, typical effort", carried into the subtitles. */
+    prefix: string;
+    /** "At $50 an hour, typical effort", carried into the subtitles. */
     assumption: string;
 }
 
@@ -88,7 +88,7 @@ interface TaskValueBreakdownProps {
  * share, weekly expert-equivalent hours and weekly assisted value, shaded
  * lightly by size.
  */
-export function TaskValueBreakdown({ extra, currencySymbol, assumption }: TaskValueBreakdownProps) {
+export function TaskValueBreakdown({ extra, prefix, assumption }: TaskValueBreakdownProps) {
     const [view, setView] = useState<View>("table");
     const [detail, setDetail] = useState<Detail>("categories");
     const { theme } = useThemeContext();
@@ -157,18 +157,18 @@ export function TaskValueBreakdown({ extra, currencySymbol, assumption }: TaskVa
             ...MEASURES.map(
                 (measure): GridColumnDef => ({
                     id: measure,
-                    header: header(measure, currencySymbol),
+                    header: header(measure, prefix),
                     width: measure === ACTIVITY_SHARE_COLUMN ? 140 : 184,
                     numericStyling: true,
                     cellRenderer: heatRenderer({
                         // Task Categories and their Task Breakdown sit on different scales, so each level heats against its peers.
                         domain: (row) => (isGroup(row) ? domains[measure].group : domains[measure].task),
-                        format: formatter(measure, currencySymbol),
+                        format: formatter(measure, prefix),
                     }),
                 }),
             ),
         ],
-        [currencySymbol, domains],
+        [prefix, domains],
     );
 
     // A supplied totals row is formatted with its own column formats, so it
@@ -178,9 +178,9 @@ export function TaskValueBreakdown({ extra, currencySymbol, assumption }: TaskVa
         if (!first) return undefined;
         return {
             columns: [{ name: TASK_LABEL_COLUMN }, ...MEASURES.map((name) => ({ name }))],
-            rows: [["Total", ...MEASURES.map((measure, i) => formatter(measure, currencySymbol)(first[i + 1]))]],
+            rows: [["Total", ...MEASURES.map((measure, i) => formatter(measure, prefix)(first[i + 1]))]],
         };
-    }, [tree, currencySymbol]);
+    }, [tree, prefix]);
 
     const timeSaved = useMemo(() => (tree ? TIME_SAVED_HEADLINE(tree.tasks) : undefined), [tree]);
 

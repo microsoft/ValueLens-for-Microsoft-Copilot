@@ -12,10 +12,22 @@ export function loadConfig(env = process.env) {
     version: env.VALUELENS_VERSION || '0.0.0',
     releasesUrl: env.VALUELENS_RELEASES_URL || 'https://api.github.com/repos/microsoft/ValueLens-for-Microsoft-Copilot/releases?per_page=20',
     settingsWriters: (env.VALUELENS_SETTINGS_WRITERS || 'admin').toLowerCase(),
+    reporting: parseReporting(env.VALUELENS_CURRENCY, env.VALUELENS_EXCHANGE_RATE),
     azureClientId: env.AZURE_CLIENT_ID || '',
     publicDir: env.VALUELENS_PUBLIC_DIR || path.resolve('/app/public'),
     webClientCertPath: env.VALUELENS_WEB_CLIENT_CERT_PATH || ''
   };
+}
+
+/**
+ * The reporting currency chosen at install, and its rate per US dollar. It
+ * is only the default: a currency saved in the app's settings wins.
+ */
+export function parseReporting(currency, exchangeRate) {
+  const code = String(currency || '').trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(code)) return undefined;
+  const rate = Number.parseFloat(String(exchangeRate ?? ''));
+  return code !== 'USD' && Number.isFinite(rate) && rate > 0 ? { currency: code, exchangeRate: rate } : { currency: code };
 }
 
 export function parseSemanticModels(value) {

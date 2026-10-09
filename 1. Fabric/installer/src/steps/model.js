@@ -122,7 +122,7 @@ export async function ensureSemanticModel(ctx, opts = {}) {
     signature: modelSignature(server, database, config.modules),
     definition: () =>
       semanticModelDefinition(
-        buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { server, database, modules: config.modules, resourceGraph: config.dataSources?.resourceGraph === 'api' }),
+        buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { server, database, modules: config.modules, resourceGraph: config.dataSources?.resourceGraph === 'api', currency: config.reporting?.currency }),
         PBISM,
       ),
     force: opts.force,

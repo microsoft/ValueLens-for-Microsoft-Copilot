@@ -11,6 +11,7 @@ import { APP_ROLES, CONSENT_ROLES } from '../clients/graph.js';
 import { HttpError } from '../http.js';
 import { commandLine } from '../launch.js';
 import { c } from '../ui.js';
+import { CURRENCIES, DEFAULT_CURRENCY, describeReporting, parseRate } from '../currency.js';
 import { AGENT_EVALUATOR_MODEL_NAME, CONSUMPTION_MODEL_NAME, flowIdentity, MODEL_NAME, secretMode } from '../config.js';
 import { MIN_NODE, nodeVersionOk } from './app.js';
 import { agentEvaluatorModelWanted, planAgentEvaluator } from './agent-evaluator.js';
@@ -465,6 +466,41 @@ export async function plan(ctx, pre) {
   config.schedule.time = await ui.input(`Time (${config.schedule.timeZone}, 24-hour)`, { default: config.schedule.time, validate: validateTime });
 
   ctx.runFirstLoad = config.firstRun?.status === 'Completed' ? false : await ui.confirm('Run the first load as soon as setup finishes?', true);
+
+  await askReportingCurrency(ctx);
+}
+
+/**
+ * The currency the Value page reports value and cost in, and optionally its rate to the US
+ * dollar. It is the app's default until someone saves another under Prices in the app.
+ * @param {Ctx} ctx
+ */
+export async function askReportingCurrency(ctx) {
+  const { ui, config } = ctx;
+  ui.heading('Value page');
+  const saved = config.reporting;
+  const currency = await ui.select(
+    'Which currency should the Value page report in?',
+    CURRENCIES.map((cur) => ({
+      name: `${cur.code} ? ${cur.name}`,
+      value: cur.code,
+      ...(cur.code === DEFAULT_CURRENCY ? { description: 'Licences and credits are billed in US dollars, so no exchange rate is needed.' } : {}),
+    })),
+    saved?.currency ?? DEFAULT_CURRENCY,
+  );
+  if (currency === 'USD') {
+    config.reporting = { currency };
+    return;
+  }
+  const typed = await ui.input(`How many ${currency} to 1 US dollar? Leave blank to set it later under Prices in the app.`, {
+    default: saved?.currency === currency && saved.exchangeRate ? String(saved.exchangeRate) : '',
+    validate: (v) => {
+      const rate = parseRate(v);
+      return typeof rate === 'string' ? rate : true;
+    },
+  });
+  const rate = parseRate(typed);
+  config.reporting = typeof rate === 'number' ? { currency, exchangeRate: rate } : { currency };
 }
 
 /**
@@ -847,7 +883,7 @@ export function planReview(ctx, pre) {
       isNew: !sm.connectionId,
       detail: 'Lets the models read the Lakehouse, with a second client secret that only the connection holds.',
     });
-    if (fa.enabled) creates.push({ kind: 'Fabric app', name: fa.name ?? 'Analytics Hub', isNew: !fa.itemId, detail: 'A web app in the workspace, built on the semantic model.' });
+    if (fa.enabled) creates.push({ kind: 'Fabric app', name: fa.name ?? 'Analytics Hub', isNew: !fa.itemId, detail: `A web app in the workspace, built on the semantic model. ${describeReporting(config.reporting)}` });
     for (const w of reportsWanted(ctx)) {
       creates.push({ kind: 'Report', name: w.model.report?.name ?? w.name, isNew: !w.model.report?.id, detail: `From its Power BI template, reading ${w.model.name}.` });
     }

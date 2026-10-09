@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.47.16.16243",
-      "templateHash": "15843918731225926170"
+      "templateHash": "2191988917001526862"
     }
   },
   "parameters": {
@@ -160,6 +160,20 @@
       "defaultValue": "",
       "metadata": {
         "description": "Identifier URI the web API exposes (api://<fqdn>/<clientId>); empty until the installer sets it."
+      }
+    },
+    "reportingCurrency": {
+      "type": "string",
+      "defaultValue": "USD",
+      "metadata": {
+        "description": "Reporting currency (ISO 4217 code) the Value page shows value and cost in until one is saved in the app."
+      }
+    },
+    "exchangeRate": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Units of the reporting currency per US dollar, as text; empty when the currency is USD or the rate is left to the app."
       }
     },
     "modules": {
@@ -1174,6 +1188,12 @@
           "webAppIdUri": {
             "value": "[parameters('webAppIdUri')]"
           },
+          "reportingCurrency": {
+            "value": "[parameters('reportingCurrency')]"
+          },
+          "exchangeRate": {
+            "value": "[parameters('exchangeRate')]"
+          },
           "version": {
             "value": "[parameters('imageTag')]"
           },
@@ -1227,7 +1247,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.47.16.16243",
-              "templateHash": "5425547390839044773"
+              "templateHash": "4619963685139658686"
             }
           },
           "parameters": {
@@ -1295,6 +1315,14 @@
               "defaultValue": ""
             },
             "webAppIdUri": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "reportingCurrency": {
+              "type": "string",
+              "defaultValue": "USD"
+            },
+            "exchangeRate": {
               "type": "string",
               "defaultValue": ""
             },
@@ -1542,7 +1570,7 @@
                     {
                       "name": "web",
                       "image": "[parameters('webImage')]",
-                      "env": "[concat(variables('commonEnv'), createArray(createObject('name', 'VALUELENS_WEB_CLIENT_ID', 'value', parameters('webClientId')), createObject('name', 'VALUELENS_APP_ID_URI', 'value', parameters('webAppIdUri'))))]",
+                      "env": "[concat(variables('commonEnv'), createArray(createObject('name', 'VALUELENS_WEB_CLIENT_ID', 'value', parameters('webClientId')), createObject('name', 'VALUELENS_APP_ID_URI', 'value', parameters('webAppIdUri')), createObject('name', 'VALUELENS_CURRENCY', 'value', parameters('reportingCurrency')), createObject('name', 'VALUELENS_EXCHANGE_RATE', 'value', parameters('exchangeRate'))))]",
                       "resources": {
                         "cpu": "[json('0.5')]",
                         "memory": "1Gi"

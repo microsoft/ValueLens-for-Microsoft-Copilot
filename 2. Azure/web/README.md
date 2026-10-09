@@ -4,7 +4,7 @@
 
 ## Routes
 
-- `GET /app.config.json` returns Azure host configuration for the SPA and is never cached.
+- `GET /app.config.json` returns Azure host configuration for the SPA and is never cached. Its `reporting` object carries the Value page's default currency and exchange rate from `VALUELENS_CURRENCY` (an ISO code, default `USD`) and `VALUELENS_EXCHANGE_RATE` (units of that currency per $1, optional). A currency or rate saved under **Prices** in the app overrides them.
 - `GET /api/health` returns `{ "status": "ok", "version" }` for Container Apps probes.
 - `POST /api/query` validates an Analytics Hub JWT, checks the configured semantic-model allow-list, acquires a Power BI OBO token, and proxies `executeQueries` JSON verbatim. It coalesces identical requests, caches per user for 10 minutes, limits each user to four upstream calls, and preserves 429 `Retry-After`.
 - `GET/PUT/DELETE /api/settings/:entity[/:id]` stores `CommercialTerms` and `TaskTime` rows in Azure Table Storage table `appsettings` using managed identity. Writes require `AnalyticsHub.Admin` unless `VALUELENS_SETTINGS_WRITERS=all`.

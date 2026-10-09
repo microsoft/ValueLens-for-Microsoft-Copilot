@@ -76,7 +76,7 @@ function BudgetsMenu({ azureCurrency }: { azureCurrency: string | undefined }) {
             {(close) => (
                 <TermsForm
                     fields={fields}
-                    intro="What each product may spend in a calendar month. Budget runway tracks this month's spend against them. Leave a box empty for no budget."
+                    intro="What each product may spend in a calendar month, in the currency it's billed in. Budget runway tracks this month's spend against them. Leave a box empty for no budget."
                     resetLabel="Clear budgets"
                     unavailableText="Budgets can't be saved here right now."
                     note="The Power BI report has no budgets."
@@ -129,7 +129,7 @@ export function RatesBar({ azureCurrency }: { azureCurrency?: string }) {
                 {(close) => (
                     <TermsForm
                         fields={fields}
-                        intro="Every cost on this page is worked out at these prices. Leave a box empty to use the model's."
+                        intro="Every credit cost on this page is worked out at these prices, in US dollars as credits are billed. Leave a box empty to use the model's."
                         resetLabel="Use model values"
                         unavailableText="Rates can't be saved here right now, so costs use the model's."
                         note="The Power BI report keeps the model's."

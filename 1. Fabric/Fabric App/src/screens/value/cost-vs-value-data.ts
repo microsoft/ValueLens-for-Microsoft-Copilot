@@ -8,6 +8,7 @@
 import { useMemo } from "react";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { useCommercialTerms } from "@/hooks/commercial-terms.context";
+import { useReportingCurrency } from "@/hooks/reporting-currency";
 import { useConsumptionSummary, useConsumptionTable } from "@/hooks/use-consumption-query";
 import { useSummaryQuery, useTableQuery, type TableResult } from "@/hooks/use-table-query";
 import { useValueAssumptions, type Scenario } from "@/hooks/value-assumptions.context";
@@ -33,7 +34,6 @@ import {
     costValueAgents,
     costValueBySource,
     costValueWindow,
-    isDollar,
     licenceCost,
     matchAgents,
     overlapSpan,
@@ -90,11 +90,13 @@ const SKIP = { connection: "", query: "" };
 export interface CostVsValue {
     rate: number;
     scenario: Scenario;
-    /** The value's currency symbol, as the model shows it. */
-    symbol: string;
+    /** ISO code of the reporting currency every figure here is in. */
+    code: string;
+    /** Printed before an amount in the reporting currency. */
+    prefix: string;
     /** Whether that is the US dollar, so costs need no exchange rate. */
     dollar: boolean;
-    /** The value currency per US dollar, when one is set. */
+    /** The reporting currency per US dollar, when one is set. */
     exchangeRate: number | undefined;
     /** Whether a cost in dollars can be set against value: the value is in dollars or a rate is set. */
     convertible: boolean;
@@ -109,7 +111,7 @@ export interface CostVsValue {
     listPrice: boolean;
     /** Each cost in US dollars, as billed. */
     usd: { licences: number | undefined; studio: number | undefined; cowork: number | undefined; total: number | undefined };
-    /** Each cost in the value's currency, undefined until it can be converted. */
+    /** Each cost in the reporting currency, undefined until it can be converted. */
     costs: Costs;
     comparison: Comparison;
     pairs: PairLine[];
@@ -138,7 +140,8 @@ export function useCostVsValue(): CostVsValue {
         () => (firstActivity && lastActivity ? { from: firstActivity, to: lastActivity } : undefined),
         [firstActivity, lastActivity],
     );
-    const symbol = readText(activityWindow.row, "[Currency Symbol]") ?? "";
+    const modelSymbol = readText(activityWindow.row, "[Currency Symbol]");
+    const currency = useReportingCurrency(modelSymbol);
     const users = readNumber(activityWindow.row, "[Licensed Users]");
 
     const dates = useConsumptionSummary(CONSUMPTION_CONFIGURED ? consumptionDates() : { ...consumptionDates(), ...SKIP });
@@ -198,8 +201,9 @@ export function useCostVsValue(): CostVsValue {
 
     const saved = terms.saved;
     const licencePrice = saved?.licensePrice ?? LICENSE_LIST_PRICE;
-    const exchangeRate = saved?.exchangeRate;
-    const dollar = isDollar(symbol);
+    const exchangeRate = currency.exchangeRate;
+    const dollar = currency.isUsd;
+    const code = currency.code;
 
     const usd = useMemo(() => {
         const licences = users !== undefined && span ? licenceCost(users, licencePrice, span) : undefined;
@@ -210,11 +214,11 @@ export function useCostVsValue(): CostVsValue {
 
     const costs = useMemo<Costs>(
         () => ({
-            licences: toValueCurrency(usd.licences, symbol, exchangeRate),
-            studio: toValueCurrency(usd.studio, symbol, exchangeRate),
-            cowork: toValueCurrency(usd.cowork, symbol, exchangeRate),
+            licences: toValueCurrency(usd.licences, code, exchangeRate),
+            studio: toValueCurrency(usd.studio, code, exchangeRate),
+            cowork: toValueCurrency(usd.cowork, code, exchangeRate),
         }),
-        [usd, symbol, exchangeRate],
+        [usd, code, exchangeRate],
     );
 
     const sourceValues = useMemo(() => readSourceValues(bySource.table), [bySource.table]);
@@ -265,7 +269,8 @@ export function useCostVsValue(): CostVsValue {
     return {
         rate,
         scenario,
-        symbol,
+        code,
+        prefix: currency.prefix,
         dollar,
         exchangeRate,
         convertible: dollar || exchangeRate !== undefined,

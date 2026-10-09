@@ -206,6 +206,11 @@ Azure commands:
       can add the secret. See [Where the secret goes](#where-the-secret-goes).
    7. **Schedule:** daily or weekly, and the time (UTC).
    8. **Whether to run the first load** now.
+   9. **Currency for the Value page:** US dollars (the default) or another, such as euros or
+      pounds. For another currency you can type how many of it make $1, or leave it blank and set
+      it under **Prices** in the app. Licences and credits are billed in dollars, so this rate
+      converts the costs. It also sets the Power BI model's currency symbol. Nothing is looked up
+      online. The Azure setup asks the same question.
 6. Check the plan and approve it. Nothing is created until you do.
 7. When it finishes, open the link to the app.
 

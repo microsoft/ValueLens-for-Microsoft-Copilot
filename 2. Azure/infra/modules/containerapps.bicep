@@ -22,6 +22,8 @@ param sqlDatabaseName string
 param webMinReplicas int = 0
 param webClientId string = ''
 param webAppIdUri string = ''
+param reportingCurrency string = 'USD'
+param exchangeRate string = ''
 param version string
 param modules string
 param auditHistoryDays int
@@ -167,6 +169,8 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = if (deployWeb) {
         env: concat(commonEnv, [
           { name: 'VALUELENS_WEB_CLIENT_ID', value: webClientId }
           { name: 'VALUELENS_APP_ID_URI', value: webAppIdUri }
+          { name: 'VALUELENS_CURRENCY', value: reportingCurrency }
+          { name: 'VALUELENS_EXCHANGE_RATE', value: exchangeRate }
         ])
         resources: { cpu: json('0.5'), memory: '1Gi' }
         probes: [{ type: 'Liveness', httpGet: { path: '/api/health', port: 8080 } }]

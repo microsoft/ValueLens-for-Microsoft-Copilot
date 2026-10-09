@@ -60,6 +60,29 @@ describe("HttpSettingsStore", () => {
         expect(body.budgetStudio ?? null).toBeNull();
     });
 
+    it("round-trips the reporting currency beside the exchange rate, and drops a code it doesn't offer", async () => {
+        const row = { id: "00000000-0000-0000-0000-000000000001", exchangeRate: 0.75, currency: "gbp" };
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(new Response(JSON.stringify([row])))
+            .mockResolvedValueOnce(new Response(JSON.stringify([row])))
+            .mockImplementationOnce((_url: string, init: RequestInit) => Promise.resolve(new Response(init.body as string)))
+            .mockResolvedValueOnce(new Response(JSON.stringify([row])))
+            .mockImplementationOnce((_url: string, init: RequestInit) => Promise.resolve(new Response(init.body as string)));
+        vi.stubGlobal("fetch", fetchMock);
+        const { getSettingsStore } = await import("@/lib/settings-store");
+
+        await expect(getSettingsStore().loadCommercialTerms()).resolves.toMatchObject({ currency: "GBP", exchangeRate: 0.75 });
+        await expect(getSettingsStore().saveCommercialTerms({ currency: "EUR", exchangeRate: 0.9 }, undefined)).resolves.toMatchObject({
+            currency: "EUR",
+            exchangeRate: 0.9,
+        });
+        expect(JSON.parse(fetchMock.mock.calls[2][1].body as string)).toMatchObject({ currency: "EUR", exchangeRate: 0.9 });
+
+        const cleared = await getSettingsStore().saveCommercialTerms({ currency: "XYZ" }, undefined);
+        expect(cleared.currency).toBeUndefined();
+        expect(JSON.parse(fetchMock.mock.calls[4][1].body as string).currency).toBeNull();
+    });
+
     it("upserts and deletes task times through the settings API", async () => {
         const fetchMock = vi.fn()
             .mockResolvedValueOnce(new Response(JSON.stringify({ task: "Email Drafting", minLow: 1, minTypical: 2, minHigh: 3 })))

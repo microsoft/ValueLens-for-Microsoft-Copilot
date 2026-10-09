@@ -55,8 +55,9 @@ only with people who should.
   balance. Leave a box empty to keep the model's value.
 - **Monthly budgets** (Consumption page): an optional monthly budget for Cowork / Work IQ, Copilot
   Studio and Azure, for the Budget runway section. Leave a box empty for no budget.
-- **Prices** (Value page, Cost vs value): the Copilot licence price ($30 if empty) and, if your
-  model doesn't use $, the exchange rate.
+- **Prices** (Value page, Cost vs value): the Copilot licence price ($30 if empty), the reporting
+  currency for the Value page (US dollars unless the installer set another) and, for any other
+  currency, the exchange rate per $1.
 - **Time per task** (Assumptions page): the minutes each task would take without Copilot.
   **Use research** puts them back.
 

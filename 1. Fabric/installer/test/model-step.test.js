@@ -688,6 +688,25 @@ test('app: a prebuilt app is offered a redeploy, not a rebuild, when its pages c
   }
 });
 
+test('app: a prebuilt app is offered a redeploy when the Value page currency changes, and records it', async () => {
+  const t = prebuiltSetup();
+  try {
+    const item = t.fabric.add('AppBackend', 'Analytics Hub', null);
+    Object.assign(t.config.fabricApp, { itemId: item.id, models: ['vl'], reporting: { currency: 'USD' } });
+    t.config.reporting = { currency: 'EUR', exchangeRate: 0.92 };
+    await ensureFabricApp(t.ctx);
+    assert.match(t.ui.asked.join('\n'), /needs redeploying to show the Value page in EUR\. Deploy it again\?/);
+    assert.deepEqual(t.config.fabricApp.reporting, { currency: 'EUR', exchangeRate: 0.92 });
+    assert.deepEqual(JSON.parse(readFileSync(join(t.dir, PREBUILT_STATIC, FABRIC_CONFIG), 'utf8')).reporting, { currency: 'EUR', exchangeRate: 0.92 });
+
+    t.ui.asked.length = 0;
+    await ensureFabricApp(t.ctx);
+    assert.match(t.ui.asked.join('\n'), /is deployed\. Deploy it again\?/, 'the same currency needs no redeploy');
+  } finally {
+    t.cleanup();
+  }
+});
+
 test('app: fabricConfigFile lists only the models the app is built with', () => {
   const t = setup({ answers: [] });
   Object.assign(t.config.semanticModel, { id: 'm' });

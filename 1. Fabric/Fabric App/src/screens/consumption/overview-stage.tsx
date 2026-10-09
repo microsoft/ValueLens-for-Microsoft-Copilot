@@ -160,7 +160,7 @@ export function OverviewStage() {
         <Section
             id={stageAnchor("consumption-overview")}
             title="All products"
-            description="Where credit spend is going: each product's credits and cost over the same dates."
+            description="Where credit spend is going: each product's credits and cost over the same dates, as billed: credits in US dollars, Azure in its billing currency."
             actions={
                 presetOptions.length > 1 ? (
                     <SegmentedControl label="Date" options={presetOptions} value={preset} onChange={setPreset} />

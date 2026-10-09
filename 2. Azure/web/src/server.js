@@ -23,7 +23,7 @@ export function createServer(deps = {}) {
       const url = new URL(req.url || '/', 'http://localhost');
       if (req.method === 'GET' && url.pathname === '/app.config.json') {
         res.setHeader('Cache-Control', 'no-store');
-        return sendJson(res, 200, { host: 'azure', tenantId: config.tenantId, clientId: config.webClientId, apiScope: `${config.appIdUri}/access_as_user`, semanticModels: config.semanticModels, version: config.version });
+        return sendJson(res, 200, { host: 'azure', tenantId: config.tenantId, clientId: config.webClientId, apiScope: `${config.appIdUri}/access_as_user`, semanticModels: config.semanticModels, reporting: config.reporting, version: config.version });
       }
       if (req.method === 'GET' && url.pathname === '/api/health') return sendJson(res, 200, { status: 'ok', version: config.version });
       if (url.pathname === '/api/query' && req.method === 'POST') {

@@ -19,6 +19,13 @@ test('app.config.json and health expose expected public shape', async () => {
   } finally { server.close(); }
 });
 
+test('app.config.json carries the reporting currency chosen at install', async () => {
+  const { server, baseUrl } = await startTestServer({ config: { reporting: { currency: 'EUR', exchangeRate: 0.92 } } });
+  try {
+    assert.deepEqual((await (await request(baseUrl, '/app.config.json')).json()).reporting, { currency: 'EUR', exchangeRate: 0.92 });
+  } finally { server.close(); }
+});
+
 test('auth returns 401 for missing or invalid tokens and 403 for missing roles', async () => {
   const { server, baseUrl } = await startTestServer();
   try {
@@ -84,6 +91,18 @@ test('settings keep monthly budgets on the commercial terms row as sent', async 
     assert.equal(put.status, 200);
     const [row] = await (await request(baseUrl, '/api/settings/CommercialTerms', { headers: authHeader() })).json();
     assert.deepEqual({ creditRate: row.creditRate, budgetCowork: row.budgetCowork, budgetStudio: row.budgetStudio, budgetAzure: row.budgetAzure }, { creditRate: 0.01, budgetCowork: 5000, budgetStudio: 2500.5, budgetAzure: null });
+  } finally { server.close(); }
+});
+
+test('settings API round-trips the reporting currency beside the exchange rate', async () => {
+  const { server, baseUrl } = await startTestServer({ settingsStore: new MemorySettingsStore() });
+  const id = '00000000-0000-0000-0000-000000000001';
+  try {
+    const terms = { id, currency: 'EUR', exchangeRate: 0.92, licensePrice: 30 };
+    const put = await request(baseUrl, `/api/settings/CommercialTerms/${id}`, { method: 'PUT', headers: { ...authHeader('admin'), 'Content-Type': 'application/json' }, body: JSON.stringify(terms) });
+    assert.equal(put.status, 200);
+    const [row] = await (await request(baseUrl, '/api/settings/CommercialTerms', { headers: authHeader() })).json();
+    assert.deepEqual({ currency: row.currency, exchangeRate: row.exchangeRate, licensePrice: row.licensePrice }, { currency: 'EUR', exchangeRate: 0.92, licensePrice: 30 });
   } finally { server.close(); }
 });
 
