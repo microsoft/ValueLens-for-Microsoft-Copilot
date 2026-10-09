@@ -12,6 +12,7 @@ import { CostVsValueStage } from "./cost-vs-value-stage";
 import { SurfacesStage } from "./surfaces-stage";
 import { TasksStage } from "./tasks-stage";
 import { EstimatedValueStage } from "./estimated-value-stage";
+import { ValueByHabitStage } from "./value-by-habit-stage";
 
 /**
  * What the work was, read top to bottom: how much got done and what kind,
@@ -27,6 +28,7 @@ export function ValueScreen() {
                     <TasksStage />
                     <SurfacesStage />
                     <EstimatedValueStage />
+                    <ValueByHabitStage />
                     <CostVsValueStage />
                 </div>
             </ValueAssumptionsProvider>

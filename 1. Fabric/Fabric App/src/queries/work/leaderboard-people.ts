@@ -21,6 +21,9 @@ import template from "./leaderboard-people.dax?raw";
 const ORG_COLUMN = "Chat + Agent Org DataOrganization";
 const USER_COLUMN = "Chat + Agent Interactions (Audit Logs)Audit_UserId";
 
+/** The person column on the leaderboard's leaf rows. */
+export const LEADERBOARD_USER_COLUMN = USER_COLUMN;
+
 /** The grid's first column in both leaderboard trees: the group on group rows, the leaf on leaf rows. */
 export const LEADERBOARD_LABEL_COLUMN = "Who";
 export const LEADERBOARD_FIELDS = ["Active Users", "Sessions", "Sessions Per User Per Week"] as const;

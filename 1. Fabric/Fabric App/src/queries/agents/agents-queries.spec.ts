@@ -12,6 +12,7 @@ import { toSummaryRow } from "@/lib/summary-row";
 import {
     agentActivitySummary,
     agentEstateSummary,
+    agentFunctions,
     agentLeaderboard,
     agentLifecycle,
     agentSurfaces,
@@ -45,6 +46,7 @@ const modules = [
     { name: "coworkReadinessByOrg", factory: () => coworkReadinessByOrg(), columns: liveColumns.coworkReadinessByOrg },
     { name: "coworkCandidates", factory: () => coworkCandidates(), columns: liveColumns.coworkCandidates },
     { name: "coworkFitSummary", factory: () => coworkFitSummary(), columns: liveColumns.coworkFitSummary },
+    { name: "agentFunctions", factory: () => agentFunctions(), columns: liveColumns.agentFunctions },
 ];
 
 const specModules = [
@@ -238,6 +240,26 @@ describe("agent leaderboard", () => {
                 expect(entry.surfaces.length).toBeGreaterThan(0);
             }
         }
+    });
+});
+
+describe("agent functions", () => {
+    const { query } = agentFunctions();
+
+    it("names agents as the leaderboard does, joining the registry one way", () => {
+        expect(query).toMatch(
+            /CROSSFILTER\(\s*'Chat \+ Agent Interactions \(Audit Logs\)'\[Agent_LinkID\],\s*'Agents 365'\[Title ID\],\s*OneWay\s*\)/,
+        );
+        expect(query).toContain("'Agents 365'[Agent name]");
+        expect(query).toContain('<> "Draft as 1P Agent"');
+        expect(query).toContain('"Unnamed agent"');
+    });
+
+    it("counts the non-blank job functions behind agent sessions only", () => {
+        expect(query).toContain("SUMMARIZE('Chat + Agent Interactions (Audit Logs)', 'Chat + Agent Org Data'[Function])");
+        expect(query).toContain("LEN(TRIM('Chat + Agent Org Data'[Function])) > 0");
+        expect(query).toContain("[Agent Filter (Normalized)] = \"Agents\"");
+        expect(query).toMatch(/NOT ISBLANK\(\[@Sessions\]\)/);
     });
 });
 

@@ -1,0 +1,4 @@
+EVALUATE
+// The last day product feedback was given. Its own query, so a model without
+// the table fails here alone.
+ROW("Last Date", MAX('ProductFeedback'[FeedbackDate]))

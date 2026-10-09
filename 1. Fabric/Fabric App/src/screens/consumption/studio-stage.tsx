@@ -8,12 +8,14 @@
 import { useMemo, useState } from "react";
 import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
 import { ChoiceMenu } from "@/components/choice-menu";
+import { ConcentrationPanel } from "@/components/concentration-panel";
 import { stageAnchor } from "@/components/destinations";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useThemeContext } from "@/hooks/theme.context";
 import { gridHeight, rowChartHeight } from "@/lib/chart-height";
+import { personValues } from "@/lib/concentration";
 import { columnHeat, heatRenderer } from "@/lib/heat";
 import { readNumber, readText } from "@/lib/summary-row";
 import { formatCell } from "@/lib/tree-grid";
@@ -28,6 +30,7 @@ import {
     studioPeriodFilter,
     studioUsers,
     STUDIO_LABEL_COLUMN,
+    STUDIO_USER_COLUMN,
     toStudioUserTree,
     type ConsumptionLens,
     type ConsumptionOptions,
@@ -94,6 +97,10 @@ export function StudioStage({ options, rates }: StudioStageProps) {
     const breakdown = useConsumptionTable(breakdownSource, extra);
     const agents = useConsumptionTable(studioAgents(), extra);
     const users = useConsumptionTable(studioUsers(), extra);
+    const userCredits = useMemo(
+        () => personValues(users.table, STUDIO_USER_COLUMN, "Credits Used", ["Is Grand Total", "Is Group Total"]),
+        [users.table],
+    );
 
     const row = summary.row;
     const cost = lens === "cost";
@@ -303,6 +310,18 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                     variant={lens}
                     title={cost ? "Users — estimated cost" : "Top users by consumption"}
                     subtitle="From the user snapshot, largest first"
+                    emptyTitle="No users in the snapshot"
+                    emptyDescription="The user snapshot has no one with Copilot Studio credits."
+                />
+            </div>
+
+            <div className="max-w-[960px]">
+                <ConcentrationPanel
+                    result={users}
+                    values={userCredits}
+                    noun="credits"
+                    title="How concentrated credits are"
+                    subtitle="Each user's share of credits, busiest first, from the month-to-date user snapshot"
                     emptyTitle="No users in the snapshot"
                     emptyDescription="The user snapshot has no one with Copilot Studio credits."
                 />
