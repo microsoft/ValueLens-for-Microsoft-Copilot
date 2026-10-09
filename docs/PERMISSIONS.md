@@ -98,6 +98,24 @@ No per-project agent sweep: Foundry is read at account and project level only.
 
 ---
 
+## Viewing Analytics Hub (paths 1 and 2)
+
+The installer creates one Entra security group, **Analytics Hub Viewers**, with you as its owner (or uses a group you name). Sharing is adding people to it, from the installer's `access` command, **Share** in the app, or [My Groups](https://myaccount.microsoft.com/groups).
+
+| What | Role / requirement |
+|---|---|
+| Create the viewer group | The installing person can create security groups (users can by default; some tenants turn it off). Otherwise an Entra admin creates one and you pick it with `access` |
+| Query the models | The group gets **Build** (ReadExplore) on each model the app reads: `Analytics Hub Model`, and Consumption Central and Agent Evaluator when they're on. The installer grants it as a workspace Admin or Member |
+| Open the Power BI models below F64 | Viewers need a **Power BI Pro** (or PPU) licence unless the workspace is on an F64 or larger capacity |
+| Open the Fabric app (path 1) | Share the app item with the group once (**Share** on the item). After that, membership is enough |
+| Open the Azure web app (path 2) | Membership of the group (the token's `groups` claim, checked with `checkMemberGroups` when a user is in too many groups), or the **AnalyticsHub.User** app role |
+| Add and remove viewers in the Azure app | Group **owners** and **AnalyticsHub.Admin**. The web app calls Graph as the signed-in person with the delegated **GroupMember.ReadWrite.All** scope (admin-consented by the installer); Graph still only lets owners and admins change the group |
+| Add and remove viewers on Fabric | Group owners, in My Groups |
+
+> **Keep viewers off workspace roles.** Even a workspace Viewer can query the Lakehouse's SQL endpoint, and Admins, Members and Contributors skip any row-level security the models add later. Share the app and models through the group instead. Organizational apps (preview) can be an optional landing page that bundles the app and the reports.
+
+---
+
 ## Quick "who do I ask?" summary
 
 - **Just the core dashboard:** one Entra app reg (3 Graph perms, admin-consented) + Contributor on the workspace.
