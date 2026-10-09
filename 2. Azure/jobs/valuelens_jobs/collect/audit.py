@@ -95,6 +95,11 @@ class AuditCollector:
             start = audit.determine_incremental_start(self.end, hw, self.lookback)
         else:
             start = self.end - timedelta(days=max(int(self.settings.audit_history_days), self.lookback, 1))
+        # A one-off reload of more history (set on a single run by the installer): the high-water mark
+        # would otherwise keep the run to the days since the last one. Windows already loaded are reused.
+        backfill = int(getattr(self.settings, "audit_backfill_days", 0) or 0)
+        if backfill > 0:
+            start = min(start, self.end - timedelta(days=backfill))
         return audit.build_windows(start, self.end, self.chunk_hours)
 
     def _files(self, key):

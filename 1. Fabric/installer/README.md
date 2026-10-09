@@ -21,6 +21,14 @@ and the Analytics Hub app. Then it loads the first data and checks it.
 
 The Graph permissions are listed in [`/docs/PERMISSIONS.md`](../../docs/PERMISSIONS.md).
 
+**Check what you have.** Once you sign in, the home page's **Prerequisites** panel checks the
+list above for you, and says what each one is for and how to get it. It only reads; nothing is
+changed. Each one shows as met, missing, or couldn't check (for example, the Fabric tenant
+settings, which only a Fabric administrator can read). Only roles that are active count. A role
+you're eligible for in Privileged Identity Management shows as **eligible, activate first**:
+activate it, then choose **Check again**. Azure access is checked for each subscription, and
+Power Platform access for each environment. In the terminal, run `prereqs`.
+
 ### Where the secret goes
 
 The notebooks sign in as the app registration with its client secret. The installer offers three
@@ -186,7 +194,7 @@ Azure commands:
       model and reports, the model and app, the model only, or neither. See
       [Power BI reports](#power-bi-reports).
    3. **How much audit history** to load first: 30 (the default), 90 or 180 days. You can load
-      more later with `run --backfill-days <n>`.
+      more later. See [Load more audit history](#load-more-audit-history).
    4. **Capacity, workspace and Lakehouse.** Spaces and hyphens in the Lakehouse name become
       underscores, because Fabric doesn't allow them. With the capacity comes **how many people
       are in the tenant**: up to 10,000, or more. See [A large tenant](#a-large-tenant).
@@ -334,9 +342,29 @@ people are in the tenant. It's chosen for you on an F64 or larger capacity. Then
   on from where it stopped. Windows already read aren't read again. `run` does the same.
 
 Expect the first load to take several hours. Start with 30 days, use an F64 or larger capacity,
-and load more history later with `run --backfill-days <n>`. Don't run audit searches in the
+and [load more history](#load-more-audit-history) later. Don't run audit searches in the
 Purview portal while it loads. To change the tenant size, choose **Repair or change** and answer
 again. An install from an earlier version keeps its audit windows and time limits until you do.
+
+### Load more audit history
+
+The first load reads the history you chose: 30, 90 or 180 days. To load more later, any of these
+work:
+
+- **Repair or change** asks *Load more audit history?* once the first load has finished, offering
+  only more than you have. Keep is the default. The plan shows the reload, and it runs once,
+  straight after the repair. Later runs load only what's new.
+- On the home page, the **Run** row has an **Audit history** picker: the usual run, or 30, 90 or
+  180 days.
+- In the terminal: `run --backfill-days <n>`, with `<n>` from 1 to 180.
+
+The record keeps the most history loaded, once the reload has started. On Fabric, windows already
+read are reused, so a reload only queries what's missing. On a large tenant, 90 or 180 days can
+take many hours.
+
+On the [Azure target](#azure-target-preview), the reload starts the run job once with
+`VALUELENS_AUDIT_BACKFILL_DAYS` set, and leaves its usual settings alone. Job images older than
+this installer ignore it and run as usual: run `update` first if yours is.
 
 ## Data sources and exports
 
@@ -419,8 +447,11 @@ Vault, not in the notebooks.
 If a flow can't be created (no environment, or no maker rights), the installer writes it to a file
 beside your answers in `Documents\Analytics Hub`. Create a cloud flow and paste the file's
 `definition` in. The [Manual setup flows](../Manual%20setup/flows/README.md) describe the feedback
-flow by hand. **Repair or change** updates existing flows. If an update adds a connection, the
-installer turns the flow off and tells you which one to sign in to.
+flow by hand. **Repair or change** updates existing flows and keeps the connections you signed in
+to. If an update adds a connection, the installer turns the flow off and tells you which one to
+sign in to. Dataverse won't update a flow that still has a connection to sign in to, so a flow
+whose connections were never signed in to is replaced with the new version instead, and so is one
+Dataverse refuses to update. Its connections are still there to pick when you sign in again.
 
 The Studio flow only sees environments that have Copilot Studio credits allocated, and its
 per-user figures come from an undocumented API route, so they're best effort. Exports are still
@@ -559,7 +590,7 @@ npx valuelens-install --ui
 ```
 
 Leave out `--ui` to answer the questions in the terminal. Other commands: `run`, `check`,
-`refresh`, `status`, `update`, `deploy-app`, `rotate-secret`, `upload` and `preview`. Add `--help` for
+`refresh`, `status`, `update`, `deploy-app`, `rotate-secret`, `upload`, `prereqs` and `preview`. Add `--help` for
 options. The exe takes the same commands, for example `AnalyticsHubInstaller.exe status`.
 `install --yes --secret-in-notebook` keeps the secret in the notebooks without asking; only use it
 for [quick tests](#where-the-secret-goes).

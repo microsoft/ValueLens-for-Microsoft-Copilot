@@ -17,6 +17,44 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased
+
+### New: Repair or change can load more audit history
+
+**What changed.** Once the first load has finished, **Repair or change** asks *Load more audit
+history?* and offers only more than is loaded (90 or 180 days after 30, for example); keeping what
+you have is the default (#158). The plan shows the reload, which runs once straight after the
+repair; later runs load only what's new. The record keeps the larger figure once the reload has
+started. This works for Fabric and Azure installs, in the terminal and in `--ui`. On the `--ui`
+home page, the **Run** row also gets an **Audit history** picker, and the installed record shows
+how much history is loaded. `run --backfill-days <n>` still works.
+
+On Azure, the reload starts the run job once with the new `VALUELENS_AUDIT_BACKFILL_DAYS` setting,
+leaving the job's usual settings alone. Job images older than this release ignore it, so run
+`update` first.
+
+### New: a Prerequisites check on the installer's home page
+
+**What changed.** After you sign in, the home page shows a **Prerequisites** panel: the roles,
+licences, capacities and access the install needs, each as met, missing, eligible or couldn't
+check, with what it's for and how to get it. It checks the consent roles (Global or Privileged Role
+Administrator), Fabric and Power Platform administrator, app registration, Power BI Pro, Fabric
+capacities, Azure access per subscription (Owner, or Contributor plus User Access Administrator),
+Key Vault, System Administrator in each Power Platform environment, and the Fabric tenant settings.
+Only active roles count; a role you're eligible for in Privileged Identity Management shows as
+**eligible, activate first**. Everything is read-only. In the terminal, run `prereqs`.
+
+### Fixed: Repair failed with `FlowMissingConnection` when a flow had changed
+
+**What changed.** Dataverse refuses to update a flow while any of its connections is still to be
+signed in to (400 `0x80060467 FlowMissingConnection`), even when the flow is off. So **Repair or
+change** failed on a flow created by an earlier version whose connections were never signed in to,
+when the new version changed it. Now a flow with no connections signed in to is replaced with the
+new version. Bindings made in the Power Automate designer are recognised and kept. A flow that gains
+a connection is turned off first, and replaced if Dataverse refuses the update.
+
+---
+
 ## 2026-10-09 — Analytics Hub installer 0.3.8
 
 ### New: credit consumption on the Azure path, with the Studio licensing API as the default

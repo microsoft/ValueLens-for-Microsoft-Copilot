@@ -17,6 +17,9 @@ export const ROLES = {
   costManagementReader: '72fafb9e-0641-4937-9268-a91bfd8191a3',
   monitoringReader: '43d0d8ad-25c7-4714-9337-8ba259a9fe05',
   storageBlobDataContributor: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe',
+  owner: '8e3af657-a8ff-443c-a75c-2fe8c4bcb635',
+  contributor: 'b24988ac-6180-42a0-ab88-20f7382dd24c',
+  userAccessAdministrator: '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9',
 };
 
 /**
@@ -139,6 +142,35 @@ export function armApi(http, opts = {}) {
     permissions: (scope) => http.list(`${scope}/providers/Microsoft.Authorization/permissions`, { query: { 'api-version': AUTHORIZATION_API } }),
 
     /**
+     * Role assignments at or above `scope` for these principals (the user and their groups).
+     * The assignedTo filter is re-checked here: only rows whose principalId is one of `principalIds` are kept.
+     * @param {string} scope
+     * @param {string[]} principalIds  The user's ID first.
+     * @returns {Promise<{ properties: { roleDefinitionId: string, principalId: string, scope?: string } }[]>}
+     */
+    myRoleAssignments: async (scope, principalIds) => {
+      const ids = new Set(principalIds);
+      const rows = await http.list(`${scope}/providers/Microsoft.Authorization/roleAssignments`, {
+        query: { 'api-version': AUTHORIZATION_API, $filter: `assignedTo('${principalIds[0]}')` },
+      });
+      return rows.filter((r) => ids.has(r.properties?.principalId));
+    },
+
+    /**
+     * Azure roles at `scope` the user could activate through PIM, kept only for these principals.
+     * @param {string} scope
+     * @param {string[]} principalIds
+     * @returns {Promise<{ properties: { roleDefinitionId: string, principalId: string } }[]>}
+     */
+    myEligibleRoles: async (scope, principalIds) => {
+      const ids = new Set(principalIds);
+      const rows = await http.list(`${scope}/providers/Microsoft.Authorization/roleEligibilityScheduleInstances`, {
+        query: { 'api-version': '2020-10-01', $filter: 'asTarget()' },
+      });
+      return rows.filter((r) => ids.has(r.properties?.principalId));
+    },
+
+    /**
      * Registers a resource provider in the subscription. Returns true if it had to.
      * @param {string} subscriptionId
      * @param {string} namespace  e.g. Microsoft.KeyVault
@@ -235,8 +267,19 @@ export function armApi(http, opts = {}) {
     },
 
     /** @param {string} subscriptionId @param {string} resourceGroup @param {string} name */
-    startContainerAppJob: (subscriptionId, resourceGroup, name) =>
-      http.post(`/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}/providers/Microsoft.App/jobs/${name}/start`, undefined, {
+    getContainerAppJob: (subscriptionId, resourceGroup, name) =>
+      http.get(`/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}/providers/Microsoft.App/jobs/${name}`, {
+        query: { 'api-version': CONTAINER_APPS_API },
+      }),
+
+    /**
+     * Starts one execution of a job. With a template, this execution runs those containers instead
+     * of the job's own: Container Apps doesn't merge them.
+     * @param {string} subscriptionId @param {string} resourceGroup @param {string} name
+     * @param {{ containers: any[], initContainers?: any[] }} [template]
+     */
+    startContainerAppJob: (subscriptionId, resourceGroup, name, template) =>
+      http.post(`/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}/providers/Microsoft.App/jobs/${name}/start`, template, {
         query: { 'api-version': CONTAINER_APPS_API },
       }),
 

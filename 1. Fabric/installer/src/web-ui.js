@@ -196,6 +196,10 @@ export function createWebUi(opts = {}) {
     loads: (cards) => {
       emit({ type: 'loads', cards });
     },
+    /** @param {import('./prereqs.js').Prereq[]} items */
+    prereqs: (items) => {
+      emit({ type: 'prereqs', items });
+    },
 
     /**
      * @template T

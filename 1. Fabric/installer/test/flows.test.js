@@ -10,6 +10,7 @@ import { ensureWorkspaceRole } from '../src/steps/model.js';
 import {
   BACKFILL_MARKER,
   connectionReferencesOf,
+  isBound,
   CONNECTORS,
   connectorsUsed,
   FEEDBACK_FLOW_NAME,
@@ -294,11 +295,20 @@ function fakeDataverse(fail = false) {
       },
       async updateFlow(/** @type {string} */ id, /** @type {string} */ clientdata) {
         calls.push(`updateFlow ${flows.get(id).name}`);
+        const refs = Object.values(connectionReferencesOf(clientdata));
+        if (refs.some((r) => !isBound(r))) {
+          throw new HttpError(`PATCH https://org/api/data/v9.2/workflows(${id}) returned 400 0x80060467 FlowMissingConnection: The flow is missing a connection for api '${refs.find((r) => !isBound(r)).api.name}'.`, { method: 'PATCH', url: `https://org/api/data/v9.2/workflows(${id})`, status: 400, code: '0x80060467' });
+        }
         flows.get(id).clientdata = clientdata;
       },
       async turnOffFlow(/** @type {string} */ id) {
         calls.push(`turnOffFlow ${flows.get(id).name}`);
         flows.get(id).statecode = 0;
+      },
+      async deleteFlow(/** @type {string} */ id) {
+        calls.push(`deleteFlow ${flows.get(id).name}`);
+        if (flows.get(id).statecode === 1) throw new HttpError('400 Cannot delete an active workflow definition', { method: 'DELETE', url: 'https://org/api/data/v9.2/workflows', status: 400 });
+        flows.delete(id);
       },
     },
   };
@@ -359,11 +369,71 @@ test('ensureFlows: a repair moves an app flow to the user identity, turning it o
 
   delete config.uploads.flowIdentity;
   await ensureFlows(ctx);
-  assert.deepEqual(dv.calls.slice(1), [`turnOffFlow ${STUDIO_FLOW_NAME}`, `updateFlow ${STUDIO_FLOW_NAME}`]);
-  const refs = connectionReferencesOf(dv.flows.get('flow-1').clientdata);
-  assert.deepEqual(refs.shared_webcontents.connection, { name: 'shared_webcontents-conn' }, 'the Power Platform API sign-in is kept');
+  assert.deepEqual(dv.calls.slice(1), [
+    `turnOffFlow ${STUDIO_FLOW_NAME}`, `updateFlow ${STUDIO_FLOW_NAME}`, `deleteFlow ${STUDIO_FLOW_NAME}`, `createFlow ${STUDIO_FLOW_NAME}`,
+  ], 'turned off, then replaced when Dataverse turns down an update with a connection still to sign in to');
+  assert.equal(config.uploads.flowIds?.studio, 'flow-2');
+  const refs = connectionReferencesOf(dv.flows.get('flow-2').clientdata);
+  assert.ok(refs.shared_webcontents && !isBound(refs.shared_webcontents));
   assert.equal(refs.shared_keyvault, undefined);
-  assert.match(text(), /turned it off\. Sign in to: HTTP with Microsoft Entra ID \(preauthorized\), for OneLake\. Then turn it on\./);
+  assert.equal(dv.flows.get('flow-2').statecode, 0);
+  assert.match(text(), /so Analytics Hub - Copilot Studio credits was replaced\. Sign in to all its connections again .*HTTP with Microsoft Entra ID \(preauthorized\), for OneLake.*Then turn it on\./);
+});
+
+test('ensureFlows: a changed flow with nothing signed in to yet is replaced, not patched (FlowMissingConnection)', async () => {
+  const dv = fakeDataverse();
+  const { ui, text } = fakeUi();
+  const { ctx, config } = fakeCtx({ ui, fabric: fakeFabric().api, dataverse: () => dv.api });
+  config.dataSources.studioCredits = 'api';
+  config.uploads = { flowEnvironment: { url: 'https://org1.crm.dynamics.com', id: 'env-1', name: 'Default' } };
+  await ensureFlows(ctx);
+  assert.equal(dv.flows.get('flow-1').statecode, 0, 'created off, and never signed in to');
+
+  config.schedule.time = '05:00';
+  await ensureFlows(ctx);
+  assert.deepEqual(dv.calls.slice(1), [`deleteFlow ${STUDIO_FLOW_NAME}`, `createFlow ${STUDIO_FLOW_NAME}`]);
+  assert.equal(config.uploads.flowIds?.studio, 'flow-2');
+  assert.equal(dv.flows.size, 1);
+  assert.match(text(), /Replaced the flow Analytics Hub - Copilot Studio credits with the new version/);
+  assert.doesNotMatch(text(), /Couldn't create the flow/);
+});
+
+test('ensureFlows: sign-ins made in the designer are kept, whatever their shape, and the flow stays on', async () => {
+  const dv = fakeDataverse();
+  const { ui } = fakeUi();
+  const { ctx, config } = fakeCtx({ ui, fabric: fakeFabric().api, dataverse: () => dv.api });
+  config.dataSources.studioCredits = 'api';
+  config.uploads = { flowEnvironment: { url: 'https://org1.crm.dynamics.com', id: 'env-1', name: 'Default' } };
+  await ensureFlows(ctx);
+  const flow = dv.flows.get('flow-1');
+  const data = JSON.parse(flow.clientdata);
+  const refs = data.properties.connectionReferences;
+  const names = Object.keys(refs);
+  assert.ok(names.length >= 2);
+  // As the designer saves them: one by connectionName with api.id only, the rest by a solution reference.
+  const [first, ...rest] = names;
+  const api = refs[first].api.name;
+  refs[first] = { runtimeSource: 'embedded', connection: { connectionName: 'shared-conn-1', source: 'Invoker', id: `/providers/Microsoft.PowerApps/apis/${api}/connections/shared-conn-1` }, api: { id: `/providers/Microsoft.PowerApps/apis/${api}` } };
+  for (const n of rest) refs[n].connection = { connectionReferenceLogicalName: `cr_${n}` };
+  flow.clientdata = JSON.stringify(data);
+  flow.statecode = 1;
+
+  config.schedule.time = '05:00';
+  await ensureFlows(ctx);
+  assert.deepEqual(dv.calls.slice(1), [`updateFlow ${STUDIO_FLOW_NAME}`]);
+  const after = connectionReferencesOf(dv.flows.get('flow-1').clientdata);
+  assert.equal(after[first].connection.connectionName, 'shared-conn-1');
+  for (const n of rest) assert.equal(after[n].connection.connectionReferenceLogicalName, `cr_${n}`);
+  assert.equal(dv.flows.get('flow-1').statecode, 1);
+});
+
+test('isBound: the designer\'s shapes count, the installer\'s empty connection doesn\'t', () => {
+  assert.equal(isBound({ connection: {} }), false);
+  assert.equal(isBound({ connection: { connectionName: '' } }), false);
+  assert.equal(isBound(undefined), false);
+  assert.equal(isBound({ connection: { connectionName: 'shared-x' } }), true);
+  assert.equal(isBound({ connection: { connectionReferenceLogicalName: 'cr_x' } }), true);
+  assert.equal(isBound({ connection: { name: 'x-conn' } }), true);
 });
 
 test('ensureFlows: when the flow can\'t be created, it is written to a file to import', async () => {

@@ -16,6 +16,7 @@ import { writeTeamsPackage } from '../../azure/teams.js';
 import { APP_ALIAS, CONSUMPTION_ALIAS } from '../app.js';
 import { AZURE_AI_ROLES, ensureAzureAiAccess, planConsumption } from '../consumption.js';
 import { AZURE_LANDING_DIRS, azureDropLabel, azureDropsToSharePoint, ensureFlows, flowsSummary, flowsWanted, planFlows } from '../flows.js';
+import { askMoreHistory, HISTORY_CHOICES, reloadDetail, reloadLine } from '../plan.js';
 
 /** @typedef {import('../../install.js').Ctx} Ctx */
 
@@ -202,15 +203,54 @@ export async function planAzure(ctx, pre) {
   if (wsChoice === 'new') az.workspaceName = await ui.input('New Power BI workspace name', { default: az.workspaceName ?? 'Analytics Hub' });
   else az.powerBi.workspaceId = wsChoice;
 
-  config.history.days = await ui.select('Audit history', [30, 90, 180].map((d) => ({ name: `${d} days`, value: d })), config.history.days);
+  if (azureHistoryLoaded(az)) await askMoreHistory(ctx);
+  else {
+    delete ctx.reloadHistoryDays;
+    config.history.days = await ui.select('How much audit history should the first load pull?', HISTORY_CHOICES, config.history.days);
+  }
   ui.heading('Schedule');
   config.schedule.frequency = await ui.select('How often should the job run?', [{ name: 'Daily', value: 'daily' }, { name: 'Weekly', value: 'weekly' }], config.schedule.frequency);
   if (config.schedule.frequency === 'weekly') config.schedule.weekday = await ui.select('Which day?', ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d) => ({ name: d, value: d })), config.schedule.weekday);
   config.schedule.timeZone = 'UTC';
   config.schedule.time = await ui.input('Time (UTC, 24-hour)', { default: config.schedule.time, validate: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? true : 'Use HH:MM.') });
   await planAzureConsumption(ctx, subs);
-  ctx.runFirstLoad = await ui.confirm('Run the first load as soon as setup finishes?', true);
+  // A reload runs the job straight after setup anyway.
+  ctx.runFirstLoad = ctx.reloadHistoryDays ? false : await ui.confirm('Run the first load as soon as setup finishes?', true);
   await azurePreflight(ctx);
+}
+
+/**
+ * The run job has run: its collector keeps a high-water mark, so more history needs a reload.
+ * @param {import('../../config.js').AzureConfig} az
+ */
+export const azureHistoryLoaded = (az) => !!(az.outputs?.runJobName && az.status?.lastRun);
+
+/** The setting the run job's collector reads to load more history once, despite its high-water mark. */
+export const BACKFILL_ENV = 'VALUELENS_AUDIT_BACKFILL_DAYS';
+
+/**
+ * The job's containers, with extra settings, for one execution. Container Apps runs a start request's
+ * template instead of the job's, so each container keeps its image, command, resources and settings.
+ * @param {any} job  The job resource.
+ * @param {{ name: string, value: string }[]} env
+ * @returns {{ containers: any[], initContainers?: any[] } | undefined}  undefined when the job has no containers to copy.
+ */
+export function jobTemplateWith(job, env) {
+  const template = job?.properties?.template;
+  const containers = template?.containers ?? [];
+  if (!containers.length) return undefined;
+  const names = new Set(env.map((e) => e.name));
+  return {
+    containers: containers.map((/** @type {any} */ ct) => ({
+      name: ct.name,
+      image: ct.image,
+      ...(ct.command ? { command: ct.command } : {}),
+      ...(ct.args ? { args: ct.args } : {}),
+      ...(ct.resources ? { resources: ct.resources } : {}),
+      env: [...(ct.env ?? []).filter((/** @type {any} */ e) => !names.has(e.name)), ...env],
+    })),
+    ...(template.initContainers?.length ? { initContainers: template.initContainers } : {}),
+  };
 }
 
 /** Credit consumption is collected: the module is on and the jobs read tenant data. @param {import('../../config.js').InstallConfig} config */
@@ -466,7 +506,7 @@ export async function azureDeployment(ctx, o) {
     sqlMinCapacity: param(String(liveSql.minCapacity ?? '0.5')), sqlMaxCapacity: param(liveSql.capacity ?? 2), sqlAutoPauseDelayMinutes: param(liveSql.autoPauseDelay ?? 60), sqlUseFreeLimit: param(liveSql.useFreeLimit ?? true),
     publicNetworkAccess: param(az.publicNetworkAccess === false ? 'Disabled' : 'Enabled'), deployWeb: param(true), webMinReplicas: param(0),
     webClientId: param(o.pass === 2 ? (az.webApp?.clientId ?? '') : ''), webAppIdUri: param(o.pass === 2 ? (az.webApp?.appIdUri ?? '') : ''),
-    modules: param(enabledAzureModuleIds(config.modules, az).join(',')), auditHistoryDays: param(config.history.days), powerBiWorkspaceId: param(az.powerBi?.workspaceId ?? ''),
+    modules: param(enabledAzureModuleIds(config.modules, az).join(',')), auditHistoryDays: param(Math.max(config.history.days, ctx.reloadHistoryDays ?? 0)), powerBiWorkspaceId: param(az.powerBi?.workspaceId ?? ''),
     semanticModels: param(JSON.stringify(azureSemanticModels(az))),
     sqlReaderName: param(SQL_READER_NAME), sqlReaderClientId: param(o.pass === 2 ? (az.sqlReader?.clientId ?? '') : ''),
     ...consumptionParameters(config),
@@ -559,6 +599,7 @@ export function azurePlanReview(ctx) {
       { what: 'Azure resources', where: `${az.subscriptionName ?? az.subscriptionId} / ${az.resourceGroup} / ${az.location}`, detail: `Incremental ARM deployment. Deletes are not applied by the template.${az.sqlLocation ? ` Azure SQL goes in ${az.sqlLocation}.` : ''}` },
       { what: 'Scheduled jobs', where: `Container Apps job, ${ctx.config.schedule.frequency} at ${ctx.config.schedule.time} UTC`, ...(az.sampleData ? { detail: 'Demo mode: each run publishes the synthetic sample instead of tenant data.' } : {}) },
       { what: 'Cost', where: `Indicative Azure cost: about $5-40/month small tenants or $60-160/month large tenants, plus Power BI Pro/PPU licences.${isPrivate(az) ? ' Private networking adds about $30-40/month (4 private endpoints and DNS zones); the VNet data gateway uses capacity units on your Fabric/Premium capacity while refreshing.' : ''}` },
+      ...(ctx.reloadHistoryDays ? [{ what: 'History reload', where: reloadLine(ctx.reloadHistoryDays), detail: `The run job, once, with ${BACKFILL_ENV}=${ctx.reloadHistoryDays}. ${reloadDetail(ctx.reloadHistoryDays)}` }] : []),
     ],
   };
 }
@@ -583,6 +624,7 @@ export async function confirmAzurePlan(ctx) {
     ui.info(`Cowork:      ${ds.coworkCredits === 'csv' ? 'CSV export' : 'Left out'}`);
     ui.info(`Azure AI:    ${ds.azureAi === 'api' && config.consumption.azureSubscriptionId ? config.consumption.azureSubscriptionName ?? config.consumption.azureSubscriptionId : 'Left out'}`);
   }
+  if (ctx.reloadHistoryDays) ui.info(`History:     ${reloadLine(ctx.reloadHistoryDays)}`);
   ui.review(azurePlanReview(ctx));
   return ui.confirm('Go ahead?', true);
 }
@@ -596,7 +638,7 @@ export async function installAzure(ctx, opts) {
   const consumption = azureConsumptionOn(config);
   const titles = [
     'Resource group', 'Azure resources', 'Entra applications', 'Microsoft Graph permissions', ...(consumption ? ['Credit consumption'] : []), 'Power BI model', 'Azure resources (final)', 'Database migration',
-    ...(consumption && flowsWanted(config).length ? ['Power Automate flow'] : []), 'Teams package', ...(ctx.runFirstLoad ? ['First load'] : []),
+    ...(consumption && flowsWanted(config).length ? ['Power Automate flow'] : []), 'Teams package', ...(ctx.reloadHistoryDays ? ['Reload audit history'] : ctx.runFirstLoad ? ['First load'] : []),
   ];
   let n = 0;
   const step = (/** @type {string} */ title) => ui.step(++n, titles.length, title);
@@ -654,7 +696,18 @@ export async function installAzure(ctx, opts) {
   step('Teams package');
   await writeAzureTeamsPackage(ctx);
 
-  if (ctx.runFirstLoad) {
+  if (ctx.reloadHistoryDays) {
+    step('Reload audit history');
+    const days = ctx.reloadHistoryDays;
+    try {
+      await startAndWaitJob(ctx, 'run', { wait: false, backfillDays: days });
+      config.history.days = days;
+      ctx.save();
+    } catch (err) {
+      ui.fail(`The history reload didn't start: ${/** @type {Error} */ (err).message}`);
+      ui.info(`Try again with "${commandLine(`run --backfill-days ${days}`)}".`);
+    }
+  } else if (ctx.runFirstLoad) {
     step('First load');
     await startAndWaitJob(ctx, 'run', { wait: false });
   }
@@ -1032,14 +1085,24 @@ function refreshScheduleBody(ctx) {
   return { value: { enabled: true, localTimeZoneId: 'UTC', times: [`${String((hour + 1) % 24).padStart(2, '0')}:${String(minute).padStart(2, '0')}`], days: ctx.config.schedule.frequency === 'weekly' ? [ctx.config.schedule.weekday] : undefined } };
 }
 
-/** @param {Ctx} ctx @param {'run' | 'migrate'} kind @param {{ wait: boolean, timeoutMs?: number }} opts */
+/** @param {Ctx} ctx @param {'run' | 'migrate'} kind @param {{ wait: boolean, timeoutMs?: number, backfillDays?: number }} opts */
 async function startAndWaitJob(ctx, kind, opts) {
   const az = /** @type {import('../../config.js').AzureConfig} */ (ctx.config.azure);
   const name = kind === 'run' ? az.outputs?.runJobName : az.outputs?.migrateJobName;
   if (!name) throw new Error(`The ARM deployment did not return ${kind} job name.`);
-  const started = await ctx.api.arm.startContainerAppJob(/** @type {string} */ (az.subscriptionId), /** @type {string} */ (az.resourceGroup), name);
+  const sub = /** @type {string} */ (az.subscriptionId);
+  const rg = /** @type {string} */ (az.resourceGroup);
+  let template;
+  if (opts.backfillDays) {
+    template = jobTemplateWith(await ctx.api.arm.getContainerAppJob(sub, rg, name), [{ name: BACKFILL_ENV, value: String(opts.backfillDays) }]);
+    if (!template) throw new Error(`Couldn't read the ${name} job's containers, so it can't be started with ${opts.backfillDays} days of history.`);
+  }
+  const started = await ctx.api.arm.startContainerAppJob(sub, rg, name, template);
   const executionName = started?.name ?? started?.properties?.name ?? started?.id?.split('/').pop();
-  ctx.ui.ok(`Started ${kind} job${executionName ? ` (${executionName})` : ''}`);
+  ctx.ui.ok(`Started ${kind} job${executionName ? ` (${executionName})` : ''}${opts.backfillDays ? ` with ${opts.backfillDays} days of audit history` : ''}`);
+  if (opts.backfillDays) {
+    ctx.ui.note(`${reloadDetail(opts.backfillDays)} Job images older than this installer ignore ${BACKFILL_ENV} and run as usual: run "${commandLine('update')}" first if yours is.`);
+  }
   az.status ??= {};
   az.status[kind === 'run' ? 'lastRun' : 'lastMigrate'] = { name: executionName, status: 'Running', startedAt: ctx.now().toISOString() };
   ctx.save();
@@ -1086,7 +1149,19 @@ async function writeAzureTeamsPackage(ctx) {
   ctx.ui.info('Teams: upload the ZIP as a custom app, or send it to a Teams admin for approval in the Teams admin center.');
 }
 
-export const azureRun = (/** @type {Ctx} */ ctx) => startAndWaitJob(ctx, 'run', { wait: false });
+/**
+ * Starts the run job. With `backfillDays` it reloads that much audit history, once.
+ * @param {Ctx} ctx
+ * @param {{ backfillDays?: number }} [opts]
+ */
+export async function azureRun(ctx, opts = {}) {
+  const result = await startAndWaitJob(ctx, 'run', { wait: false, backfillDays: opts.backfillDays });
+  if (opts.backfillDays && opts.backfillDays > ctx.config.history.days) {
+    ctx.config.history.days = opts.backfillDays;
+    ctx.save();
+  }
+  return result;
+}
 
 /** @param {Ctx} ctx */
 export async function azureRefresh(ctx) {

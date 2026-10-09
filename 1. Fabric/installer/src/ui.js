@@ -77,6 +77,20 @@ export function createUi(opts = {}) {
         for (const fix of card.fix) line(`    ${c.dim(fix)}`);
       }
     },
+    /**
+     * What the user has and lacks: met, missing, eligible (activate first) or couldn't check.
+     * @param {import('./prereqs.js').Prereq[]} items
+     */
+    prereqs: (items) => {
+      const glyph = { met: c.green('✓'), missing: c.red('✗'), eligible: c.yellow('◐'), unknown: c.dim('?') };
+      for (const it of items) {
+        line(`  ${glyph[it.status]} ${it.label}${it.optional ? c.dim(' (optional)') : ''}`);
+        line(`    ${it.detail}`);
+        for (const r of it.rows ?? []) line(`      ${glyph[r.status]} ${r.name}${r.detail ? c.dim(`: ${r.detail}`) : ''}`);
+        line(`    ${c.dim(`Needed for: ${it.neededFor}`)}`);
+        if (it.status !== 'met') line(`    ${c.dim(`How to get it: ${it.howTo}`)}`);
+      }
+    },
 
     /**
      * @template T

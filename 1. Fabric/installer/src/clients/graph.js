@@ -16,6 +16,9 @@ export const APP_ROLES = {
   '158c047a-c907-4556-b7ef-446551a6b5f7': 'Cloud Application Administrator',
 };
 
+export const FABRIC_ADMIN_ROLE = 'a9ea8996-122f-4c74-9520-8edcd192826c';
+export const POWER_PLATFORM_ADMIN_ROLE = '11648597-926c-4cf3-9c36-bcebb0ba8dcc';
+
 export const POWER_BI_APP_ID = '00000009-0000-0000-c000-000000000000';
 
 /**
@@ -87,6 +90,21 @@ export function graphApi(http) {
       const policy = await http.get('/policies/authorizationPolicy');
       return policy?.defaultUserRolePermissions?.allowedToCreateApps !== false;
     },
+    /** IDs of the groups the signed-in user is in, directly or through other groups. */
+    myGroupIds: async () =>
+      (await http.list('/me/transitiveMemberOf/microsoft.graph.group', { query: { $select: 'id' } })).map((g) => String(g.id)),
+    /** @returns {Promise<{ skuPartNumber?: string, servicePlans?: { servicePlanName: string, provisioningStatus: string }[] }[]>} */
+    myLicenseDetails: () => http.list('/me/licenseDetails'),
+    /**
+     * Directory roles the user could activate through PIM. Only rows for this principal are kept,
+     * whatever the filter returned.
+     * @param {string} principalId
+     * @returns {Promise<{ roleDefinitionId: string, principalId: string }[]>}
+     */
+    myEligibleRoles: async (principalId) =>
+      (await http.list('/roleManagement/directory/roleEligibilityScheduleInstances', {
+        query: { $filter: `principalId eq '${principalId}'`, $select: 'roleDefinitionId,principalId' },
+      })).filter((r) => r.principalId === principalId),
 
     graphServicePrincipal: () =>
       http.get(`/servicePrincipals(appId='${GRAPH_APP_ID}')`, { query: { $select: 'id,appId,appRoles' } }),

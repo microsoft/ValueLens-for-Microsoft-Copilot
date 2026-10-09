@@ -5,14 +5,17 @@
  */
 import { collectedLabels } from './catalog.js';
 import { loadConfig, secretMode } from './config.js';
-import { connect as realConnect, createCtx, runCommand } from './install.js';
+import { connect as realConnect, createCtx, runCommand, showPrereqs } from './install.js';
 import { fromExe } from './launch.js';
+import { checkPrereqs } from './prereqs.js';
 import { loadSources } from './sources.js';
 import { describeSchedule, modelDeployed } from './steps/fabric.js';
 import { isResumeLater } from './steps/identity.js';
 import { routerWanted } from './uploads.js';
 
-export const WEB_COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'upload', 'uninstall'];
+export const WEB_COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'upload', 'uninstall', 'prereqs'];
+/** Commands that work before anything is installed. */
+const NO_RECORD = ['install', 'prereqs'];
 const METHODS = ['browser', 'device-code', 'azure-cli'];
 
 /** @typedef {'browser' | 'device-code' | 'azure-cli'} Method */
@@ -41,6 +44,7 @@ export function describeRecord(config) {
     app: azure && az?.outputs?.webUrl ? { name: 'Analytics Hub', url: az.outputs.webUrl } : fa.itemId ? { name: fa.name ?? 'Analytics Hub', url: fa.url } : undefined,
     secretExpires: (azure ? az?.sqlReader?.secretExpiry : config.app.secretExpires)?.slice(0, 10),
     firstRun: config.firstRun?.status,
+    historyDays: config.history?.days,
     can: {
       update: installed,
       run: installed && (azure || !!f.pipelineId),
@@ -84,6 +88,26 @@ export function createSession(o) {
   let running = null;
   /** @type {Promise<void>} */
   let current = Promise.resolve();
+  /** The last prerequisites check for this sign-in. @type {{ at: string, upn: string, items: import('./prereqs.js').Prereq[] } | null} */
+  let prereqs = null;
+  /** @type {Promise<void>} */
+  let checking = Promise.resolve();
+
+  /**
+   * Checks the prerequisites in the background after a sign-in, without holding up the command.
+   * @param {import('./config.js').InstallConfig} config
+   */
+  function checkInBackground(config) {
+    if (!signedIn) return;
+    const { api, user } = signedIn;
+    checking = checkPrereqs({ api, user, config })
+      .then((items) => {
+        if (signedIn?.user !== user) return;
+        prereqs = { at: new Date().toISOString(), upn: user.upn, items };
+        o.ui.emit({ type: 'prereqs-ready' });
+      })
+      .catch((err) => o.debug?.(`Prerequisites check failed: ${describeError(err)}`));
+  }
 
   function state() {
     /** @type {ReturnType<typeof describeRecord> | null} */
@@ -104,6 +128,7 @@ export function createSession(o) {
       recordError,
       running,
       user: signedIn ? { upn: signedIn.user.upn, displayName: signedIn.user.displayName, tenantId: signedIn.user.tenantId, method: signedIn.method } : null,
+      prereqs,
       defaults: { tenant: o.tenantId ?? record?.tenantId ?? '', method: o.method ?? 'browser' },
     };
   }
@@ -118,19 +143,25 @@ export function createSession(o) {
     ui.emit({ type: 'command', command, state: 'running' });
     try {
       const { config, existed } = loadConfig(o.configFile);
-      if (command !== 'install' && !existed) throw new Error(`No install record at ${o.configFile}. Set up Analytics Hub first.`);
+      if (!NO_RECORD.includes(command) && !existed) throw new Error(`No install record at ${o.configFile}. Set up Analytics Hub first.`);
       const sources = loadSources(o.sourceDir);
       const tenant = (req.tenant ?? '').trim() || config.tenantId || '';
       const reuse = signedIn && signedIn.method === method && (!tenant || tenant === signedIn.tenant || tenant === signedIn.user.tenantId);
       if (!reuse || !signedIn) {
         signedIn = null;
+        prereqs = null;
         ui.emit({ type: 'signin', state: 'started', method });
         const { api, user } = await connect({ tenantId: tenant || undefined, method, ui, debug: o.debug });
         signedIn = { api, user, method, tenant };
+        if (command !== 'prereqs') checkInBackground(config);
       }
       ui.emit({ type: 'signin', state: reuse ? 'reused' : 'done', user: { upn: signedIn.user.upn, displayName: signedIn.user.displayName, tenantId: signedIn.user.tenantId } });
       const ctx = createCtx({ ui, config, file: o.configFile, api: signedIn.api, user: signedIn.user, sources });
-      const ok = await runCommand(ctx, command, { wait: req.wait !== false, backfillDays: req.backfillDays });
+      let ok = true;
+      if (command === 'prereqs') {
+        const items = await showPrereqs(ctx);
+        prereqs = { at: new Date().toISOString(), upn: signedIn.user.upn, items };
+      } else ok = await runCommand(ctx, command, { wait: req.wait !== false, backfillDays: req.backfillDays });
       ui.emit({ type: 'command', command, state: ok ? 'done' : 'failed', ...(ok ? {} : { error: 'It didn\'t finish successfully. The details are above.' }) });
     } catch (err) {
       if (/** @type {any} */ (err)?.name === 'ExitPromptError') ui.emit({ type: 'command', command, state: 'cancelled' });
@@ -148,8 +179,11 @@ export function createSession(o) {
     get running() {
       return running;
     },
-    /** Resolves when the command that is running now has finished. */
-    settled: () => current,
+    /** Resolves when the command that is running now, and any background prerequisites check, have finished. */
+    settled: async () => {
+      await current;
+      await checking;
+    },
     /**
      * Starts a command and returns straight away; its progress arrives as events.
      * @param {StartRequest} req

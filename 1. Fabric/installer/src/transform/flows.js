@@ -710,9 +710,38 @@ export function connectorsUsed(definition) {
 }
 
 /**
+ * Whether a connection reference is signed in to. The installer leaves `connection: {}`; a
+ * sign-in in the designer fills it with `connectionName` (and `id`), or with
+ * `connectionReferenceLogicalName` in a solution.
+ * @param {any} ref
+ */
+export function isBound(ref) {
+  const c = ref?.connection;
+  return !!c && ['connectionName', 'connectionReferenceLogicalName', 'name', 'id'].some((k) => typeof c[k] === 'string' && c[k] !== '');
+}
+
+/** The connector a reference points at: `api.name`, or the last part of `api.id`. @param {any} ref */
+function refApi(ref) {
+  return ref?.api?.name ?? (typeof ref?.api?.id === 'string' ? ref.api.id.split('/').pop() : undefined);
+}
+
+/**
+ * The signed-in reference to keep for `name`: the one with that name, for the same connector.
+ * Only the name matches: two references can share a connector with different sign-ins (the
+ * Power Platform API and storage both use HTTP with Microsoft Entra ID).
+ * @param {string} name
+ * @param {Record<string, any>} keep
+ */
+function keptBinding(name, keep) {
+  const api = connectorByName(name)?.api ?? name;
+  const ref = keep[name];
+  return isBound(ref) && (refApi(ref) ?? api) === api ? ref : undefined;
+}
+
+/**
  * The `clientdata` of a Dataverse `workflow` row for a cloud flow. Connection references are left
- * unbound, for the owner to sign in to, unless `keep` has a binding for the same reference and
- * connector: an update then keeps the sign-in.
+ *  unbound, for the owner to sign in to, unless `keep` has a binding for the same reference and
+  * connector: an update then keeps the sign-in.
  * @param {any} definition
  * @param {Record<string, any>} [keep]  The current flow's connection references.
  */
@@ -720,9 +749,7 @@ export function flowClientData(definition, keep = {}) {
   const connectionReferences = Object.fromEntries(
     connectorsUsed(definition).map((name) => {
       const api = connectorByName(name)?.api ?? name;
-      const old = keep[name];
-      const bound = old && (old.api?.name ?? api) === api && old.connection && Object.keys(old.connection).length;
-      return [name, bound ? old : { runtimeSource: 'embedded', connection: {}, api: { name: api } }];
+      return [name, keptBinding(name, keep) ?? { runtimeSource: 'embedded', connection: {}, api: { name: api } }];
     }),
   );
   return JSON.stringify({ properties: { connectionReferences, definition }, schemaVersion: '1.0.0.0' });
@@ -747,10 +774,7 @@ export function connectionReferencesOf(clientdata) {
  * @param {Record<string, any>} current
  */
 export function newConnections(definition, current) {
-  return connectorsUsed(definition).filter((name) => {
-    const old = current[name];
-    return !(old && old.connection && Object.keys(old.connection).length && (old.api?.name ?? connectorByName(name)?.api) === connectorByName(name)?.api);
-  });
+  return connectorsUsed(definition).filter((name) => !keptBinding(name, current));
 }
 
 /**

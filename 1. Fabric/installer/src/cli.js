@@ -15,7 +15,7 @@ import { isVivaId } from './transform/dataflow.js';
 import { c, createUi } from './ui.js';
 import { DATA_SOURCE_IDS, modulesFromSources, parseDataFlags } from './uploads.js';
 
-const COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'upload', 'uninstall', 'preview'];
+const COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'upload', 'uninstall', 'prereqs', 'preview'];
 
 /** The `--help` text, naming the command the way it was started. */
 export const help = () => `Sets up Analytics Hub in Microsoft Fabric: the data pipeline, the semantic model and the app.
@@ -35,6 +35,8 @@ Commands:
   rotate-secret    Create new client secrets for Key Vault and the model's connection
   upload [files]   Upload CSV exports to the drop folder (Files/analytics_hub_uploads)
   uninstall        Azure target only: remove the resource group if created, or only tagged resources
+  prereqs          Check the roles, licences, capacities and Azure access you have and lack.
+                   Read-only; works before anything is installed
   preview          Write what would be deployed to a folder, without signing in
 
 Options:
@@ -240,7 +242,7 @@ export async function main(argv) {
       preview({ ui, config, sources, outDir: args.outDir });
       return 0;
     }
-    if (args.command !== 'install' && !existed) throw new Error(`No install record at ${args.configFile}. Run the installer first, or pass --config.`);
+    if (args.command !== 'install' && args.command !== 'prereqs' && !existed) throw new Error(`No install record at ${args.configFile}. Run the installer first, or pass --config.`);
     if (existed) ui.note(`Install record: ${args.configFile}`);
 
     ui.note(args.method === 'azure-cli' ? 'Using your Azure CLI sign-in…' : 'Signing in…');

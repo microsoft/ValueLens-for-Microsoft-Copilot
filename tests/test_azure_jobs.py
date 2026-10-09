@@ -638,6 +638,27 @@ def test_settings_from_env():
         Settings.from_env({"VALUELENS_AUDIT_HISTORY_DAYS": "lots"})
 
 
+def test_backfill_days_setting_from_env():
+    assert Settings.from_env({"VALUELENS_AUDIT_BACKFILL_DAYS": "90"}).audit_backfill_days == 90
+    assert Settings.from_env({}).audit_backfill_days == 0
+    with pytest.raises(ValueError):
+        Settings.from_env({"VALUELENS_AUDIT_BACKFILL_DAYS": "lots"})
+
+
+def test_audit_backfill_reloads_older_days_despite_high_water_mark(tmp_path):
+    store = LocalStore(tmp_path)
+    store.write_json(audit_collect.STATE, {"high_water_mark": (NOW - timedelta(hours=2)).isoformat()})
+    usual = audit_collect.AuditCollector(None, store, settings(audit_history_days=30, audit_lookback_days=1), now=NOW)
+    assert usual.plan()[0][0] >= NOW - timedelta(days=2)
+    backfill = audit_collect.AuditCollector(None, store, settings(audit_history_days=30, audit_lookback_days=1,
+                                                                   audit_backfill_days=90), now=NOW)
+    windows = backfill.plan()
+    assert windows[0][0] <= NOW - timedelta(days=90) and windows[-1][1] == NOW
+    # The reload never asks for less than the usual run would.
+    short = audit_collect.AuditCollector(None, store, settings(audit_lookback_days=7, audit_backfill_days=1), now=NOW)
+    assert short.plan()[0][0] <= NOW - timedelta(days=7)
+
+
 def test_publish_targets_follow_modules():
     assert jobs_main.publish_targets(settings(modules=frozenset({"core"}))) == ["curated", "licensed"]
     assert jobs_main.publish_targets(settings()) == ["curated", "licensed", "org", "m365"]

@@ -21,6 +21,7 @@ class Settings:
     modules: frozenset = frozenset(DEFAULT_MODULES)
     audit_history_days: int = 30
     audit_lookback_days: int = 7
+    audit_backfill_days: int = 0
     sql_reader_name: str = ""
     sql_reader_client_id: str = ""
     sample_data: bool = False
@@ -56,6 +57,7 @@ class Settings:
             modules=frozenset(modules or DEFAULT_MODULES),
             audit_history_days=_int(env, "VALUELENS_AUDIT_HISTORY_DAYS", 30),
             audit_lookback_days=_int(env, "VALUELENS_AUDIT_LOOKBACK_DAYS", 7),
+            audit_backfill_days=_int(env, "VALUELENS_AUDIT_BACKFILL_DAYS", 0),
             sql_reader_name=env.get("VALUELENS_SQL_READER_NAME", ""),
             sql_reader_client_id=env.get("VALUELENS_SQL_READER_CLIENT_ID", ""),
             sample_data=(env.get("VALUELENS_SAMPLE_DATA") or "").strip().lower() in ("true", "1", "yes"),

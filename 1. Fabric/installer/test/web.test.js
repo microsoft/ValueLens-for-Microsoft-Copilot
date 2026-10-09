@@ -616,10 +616,11 @@ test('page: the stages and the finish it waits for are headings the installer pr
   assert.deepEqual(done.filter((s) => !printed.has(s)), []);
 });
 
-test('page: every command has a row; Check the data needs the data check notebook', async () => {
+test('page: every command has a row, or for prerequisites its own panel; Check the data needs the data check notebook', async () => {
   const app = await readFile(new URL('web/app.js', SRC), 'utf8');
   const rows = /const ROW_ORDER = \[([^\]]*)\]/.exec(app)?.[1] ?? '';
-  assert.deepEqual(WEB_COMMANDS.filter((c) => !rows.includes(`'${c}'`)), []);
+  assert.deepEqual(WEB_COMMANDS.filter((c) => c !== 'prereqs' && !rows.includes(`'${c}'`)), []);
+  assert.match(app, /start\('prereqs'\)/, 'the Prerequisites panel starts the check');
 
   const config = emptyConfig();
   config.fabric.workspaceId = 'ws-1';
@@ -627,4 +628,7 @@ test('page: every command has a row; Check the data needs the data check noteboo
   assert.equal(describeRecord(config).can.check, false);
   config.fabric.notebooks.dataCheck = 'nb-check';
   assert.equal(describeRecord(config).can.check, true);
+  config.history.days = 90;
+  assert.equal(describeRecord(config).historyDays, 90, 'the installed view shows how much audit history is loaded');
+  assert.match(app, /backfillDays/, 'the Run row can load more history');
 });

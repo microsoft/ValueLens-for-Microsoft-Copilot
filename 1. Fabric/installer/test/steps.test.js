@@ -527,7 +527,7 @@ test("run doesn't start a second run while one is going, but ignores one stuck f
   config.fabric.pipelineId = 'pipe-1';
 
   const result = await runPipeline(ctx, { backfillDays: 90, wait: true, first: true });
-  assert.deepEqual(result, { jobId: 'j-running', status: 'InProgress', ok: false });
+  assert.deepEqual(result, { jobId: 'j-running', status: 'InProgress', ok: false, started: false });
   assert.deepEqual(fabric.calls, []);
   assert.equal(config.firstRun, undefined);
   assert.match(ui.text(), /already running, so this didn't start another/);

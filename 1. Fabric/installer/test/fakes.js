@@ -365,6 +365,8 @@ export function fakeArm() {
   const restrictedSqlRegions = new Set();
   /** @type {any[]} */
   const executions = [];
+  /** @type {any[]} */
+  const jobTemplates = [];
   /** @type {Record<string, Error[]>} */
   const failures = {};
   const fail = (/** @type {string} */ method) => {
@@ -430,10 +432,15 @@ export function fakeArm() {
       fail('assignRole');
     },
     getSqlDatabase: async () => null,
-    startContainerAppJob: async (/** @type {string} */ _sub, /** @type {string} */ _rg, /** @type {string} */ name) => {
+    startContainerAppJob: async (/** @type {string} */ _sub, /** @type {string} */ _rg, /** @type {string} */ name, /** @type {any} */ template) => {
       calls.push(`startJob ${name}`);
+      if (template) jobTemplates.push(template);
       return { name: `${name}-exec` };
     },
+    getContainerAppJob: async (/** @type {string} */ _sub, /** @type {string} */ _rg, /** @type {string} */ name) => ({
+      name,
+      properties: { template: { containers: [{ name: 'jobs', image: 'img:1', command: ['python'], env: [{ name: 'VALUELENS_AUDIT_HISTORY_DAYS', value: '30' }, { name: 'VALUELENS_AUDIT_BACKFILL_DAYS', value: '7' }] }] } },
+    }),
     getContainerAppJobExecution: async () => executions.shift() ?? { properties: { status: 'Succeeded' } },
     listContainerAppJobExecutions: async () => executions,
     deleteResourceGroup: async (/** @type {string} */ _sub, /** @type {string} */ rg) => {
@@ -444,7 +451,7 @@ export function fakeArm() {
       calls.push(`deleteResource ${id}`);
     },
   };
-  return { api, calls, resources, groups, executions, failures, restrictedSqlRegions };
+  return { api, calls, resources, groups, executions, jobTemplates, failures, restrictedSqlRegions };
 }
 
 /** Rich Graph fake for Azure app registration work. */
