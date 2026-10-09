@@ -17,7 +17,7 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
-## Unreleased — Analytics Hub installer 0.3.8
+## 2026-10-09 — Analytics Hub installer 0.3.8
 
 ### New: credit consumption on the Azure path, with the Studio licensing API as the default
 
@@ -50,6 +50,9 @@ without a CSV, and `--flow-identity app`.
 flow on.
 
 Other variants (CSV/SharePoint, Power Automate + Dataverse) are unchanged.
+
+The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.3.8`, which the
+Azure install pulls.
 
 ---
 
