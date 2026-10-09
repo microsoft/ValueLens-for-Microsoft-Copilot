@@ -52,16 +52,18 @@ export function createOboTokenAcquirer(config) {
     });
     return certConfigPromise;
   }
-  return async function acquirePowerBiToken(userJwt) {
+  return async function acquireOboToken(userJwt, _claims, scopes = POWER_BI_SCOPES) {
     const cert = await getCertificateConfig();
     const cca = new ConfidentialClientApplication({
       auth: cert
         ? { clientId: config.webClientId, authority, clientCertificate: cert }
         : { clientId: config.webClientId, authority, clientAssertion: getClientAssertion }
     });
-    const result = await cca.acquireTokenOnBehalfOf({ oboAssertion: userJwt, scopes: ['https://analysis.windows.net/powerbi/api/.default'] });
-    if (!result?.accessToken) throw new Error('Power BI OBO token acquisition failed');
+    const result = await cca.acquireTokenOnBehalfOf({ oboAssertion: userJwt, scopes });
+    if (!result?.accessToken) throw new Error('OBO token acquisition failed');
     return result.accessToken;
   };
 }
+export const POWER_BI_SCOPES = ['https://analysis.windows.net/powerbi/api/.default'];
+export const GRAPH_SCOPES = ['https://graph.microsoft.com/.default'];
 export { USER_ROLE, ADMIN_ROLE };

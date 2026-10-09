@@ -9,6 +9,7 @@ export function loadConfig(env = process.env) {
     appIdUri: env.VALUELENS_APP_ID_URI || '',
     storageAccount: env.VALUELENS_STORAGE_ACCOUNT || '',
     semanticModels,
+    access: parseAccess(env.VALUELENS_ACCESS),
     version: env.VALUELENS_VERSION || '0.0.0',
     releasesUrl: env.VALUELENS_RELEASES_URL || 'https://api.github.com/repos/microsoft/ValueLens-for-Microsoft-Copilot/releases?per_page=20',
     settingsWriters: (env.VALUELENS_SETTINGS_WRITERS || 'admin').toLowerCase(),
@@ -40,6 +41,16 @@ export function parseSemanticModels(value) {
     return { vl: valueLensModel, ...rest };
   }
   return parsed;
+}
+
+/** The viewer group and who to ask for access, written by the installer; null when there is no group. */
+export function parseAccess(value) {
+  if (!value) return null;
+  const parsed = JSON.parse(value);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('VALUELENS_ACCESS must be a JSON object');
+  if (typeof parsed.groupId !== 'string' || !parsed.groupId) return null;
+  const pick = (key) => (typeof parsed[key] === 'string' && parsed[key] ? { [key]: parsed[key] } : {});
+  return { groupId: parsed.groupId, ...pick('groupName'), ...pick('contact'), ...(/^https:\/\//i.test(parsed.requestUrl || '') ? { requestUrl: parsed.requestUrl } : {}) };
 }
 
 export function isAllowedSemanticModel(semanticModels, workspaceId, itemId) {
