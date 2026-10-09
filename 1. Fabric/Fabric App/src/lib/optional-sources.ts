@@ -13,7 +13,7 @@ import { isMissingFromModelError } from "@/lib/model-errors";
  * ValueLens model. An install can leave any of them off, or tick one before
  * its first load has run, and the app then leaves out what would be blank.
  */
-export type OptionalSource = "m365Activity" | "productFeedback" | "agentRegistry" | "defender";
+export type OptionalSource = "m365Activity" | "productFeedback" | "agentRegistry" | "defender" | "resourceGraph";
 
 /**
  * - `checking`: the probe hasn't answered yet, so everything stays in view.
@@ -26,20 +26,29 @@ export type SourceState = "checking" | "present" | "absent" | "notConfigured" | 
 
 export type SourceAvailability = Readonly<Record<OptionalSource, SourceState>>;
 
-export const OPTIONAL_SOURCES: readonly OptionalSource[] = ["m365Activity", "productFeedback", "agentRegistry", "defender"];
+export const OPTIONAL_SOURCES: readonly OptionalSource[] = [
+    "m365Activity",
+    "productFeedback",
+    "agentRegistry",
+    "defender",
+    "resourceGraph",
+];
 
 /**
  * One unfiltered row count per source, each its own query so a model missing
  * one table still answers for the others. The registry is counted by the
  * model's own measure, as the Agent registry stage reports it. Defender is
  * counted by its status table, which holds a row per probe once the source
- * has run at all, even when every probe was refused.
+ * has run at all, even when every probe was refused. Resource Graph counts
+ * agent configuration and Foundry resources together, since an identity may
+ * be able to read only one of them.
  */
 export const SOURCE_PROBES: Readonly<Record<OptionalSource, string>> = {
     m365Activity: `EVALUATE ROW("Rows", COUNTROWS('M365 Activity'))`,
     productFeedback: `EVALUATE ROW("Rows", COUNTROWS('ProductFeedback'))`,
     agentRegistry: `EVALUATE ROW("Rows", [Agent Registry Records])`,
     defender: `EVALUATE ROW("Rows", COUNTROWS('Defender Status'))`,
+    resourceGraph: `EVALUATE ROW("Rows", COUNTROWS('Agent Configuration') + COUNTROWS('Foundry Resources'))`,
 };
 
 /** Nothing hidden: for screens rendered outside the app, and installs whose probes can't run. */
@@ -48,6 +57,7 @@ export const ALL_UNKNOWN: SourceAvailability = {
     productFeedback: "unknown",
     agentRegistry: "unknown",
     defender: "unknown",
+    resourceGraph: "unknown",
 };
 
 /** Reads one probe's answer. */

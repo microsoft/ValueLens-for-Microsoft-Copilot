@@ -337,6 +337,50 @@ export async function checkPrereqs(ctx) {
           : { status: 'met', detail: 'The settings Analytics Hub needs are on.' };
       },
     ),
+    ...(config.dataSources?.resourceGraph === 'api' ? [resourceGraphPrereq(api, config, guard)] : []),
   ];
   return Promise.all(checks);
+}
+
+const ARG_PROBES = {
+  agents: { name: 'Copilot Studio agents', query: "PowerPlatformResources | where type =~ 'microsoft.copilotstudio/agents' | take 1" },
+  foundry: { name: 'Foundry resources', query: "resources | where type in~ ('microsoft.cognitiveservices/accounts','microsoft.cognitiveservices/accounts/projects') | take 1" },
+};
+
+/**
+ * What you can see in Resource Graph. The load runs as the app or the jobs' identity, which needs the
+ * same roles, so this is a guide rather than proof.
+ * @param {import('./install.js').Apis} api
+ * @param {import('./config.js').InstallConfig} config
+ * @param {(base: Omit<Prereq, 'status' | 'detail'>, fn: () => Promise<Pick<Prereq, 'status' | 'detail'> & Partial<Prereq>>) => Promise<Prereq>} guard
+ */
+function resourceGraphPrereq(api, config, guard) {
+  const rg = config.resourceGraph;
+  return guard(
+    {
+      id: 'resource-graph',
+      label: 'Azure Resource Graph: agents and Foundry',
+      neededFor: 'Agent configuration and Foundry resources. This checks what you can see; whoever runs the load needs the same.',
+      howTo: 'For agents: Global Reader, Power Platform Administrator or AI Administrator in Entra. For Foundry: Reader on the management group, or the tenant root group.',
+      optional: true,
+    },
+    async () => {
+      const probes = [...(rg?.agents !== false ? [ARG_PROBES.agents] : []), ...(rg?.foundry !== false ? [ARG_PROBES.foundry] : [])];
+      const rows = await Promise.all(
+        probes.map(async (p) => {
+          try {
+            const found = (await api.arm.resourceGraph(p.query, rg?.managementGroup || undefined))?.data?.length ?? 0;
+            return found
+              ? { name: p.name, status: /** @type {PrereqStatus} */ ('met'), detail: 'You can see them.' }
+              : { name: p.name, status: /** @type {PrereqStatus} */ ('unknown'), detail: 'None you can see: there may be none, or you lack the role.' };
+          } catch (err) {
+            const refused = [401, 403].includes(/** @type {any} */ (err)?.status);
+            return { name: p.name, status: /** @type {PrereqStatus} */ (refused ? 'missing' : 'unknown'), detail: refused ? 'Refused: you lack the role.' : `Couldn't check: ${why(err)}` };
+          }
+        }),
+      );
+      const status = /** @type {PrereqStatus} */ (['missing', 'unknown', 'met'].find((st) => rows.some((r) => r.status === st)) ?? 'unknown');
+      return { status, detail: rows.map((r) => `${r.name}: ${r.detail}`).join(' '), rows };
+    },
+  );
 }

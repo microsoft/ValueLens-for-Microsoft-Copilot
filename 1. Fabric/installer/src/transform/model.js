@@ -8,6 +8,7 @@ import { SETUP_DIR } from '../catalog.js';
 import { addDefender } from './defender.js';
 import { addM365Activity } from './m365.js';
 import { addCopilotPaygSpend } from './payg.js';
+import { addFoundryResources, addResourceGraph } from './resource-graph.js';
 import { readZipEntry } from './zip.js';
 
 /** The ValueLens report, relative to `1. Fabric`. */
@@ -97,6 +98,7 @@ export function mParameter(model, name) {
  * @property {string} server  The Lakehouse's SQL analytics endpoint.
  * @property {string} database  The Lakehouse name.
  * @property {import('../catalog.js').ModuleChoice} modules
+ * @property {boolean} [resourceGraph]  Agent configuration and Foundry come from Azure Resource Graph.
  */
 
 /** Optional pages, switched by a model parameter. */
@@ -120,6 +122,7 @@ export function buildModel(template, settings) {
   }
   addM365Activity(model, !!settings.modules.m365Activity);
   addDefender(model, !!settings.modules.defender);
+  addResourceGraph(model, !!settings.resourceGraph);
   return { compatibilityLevel: template.compatibilityLevel, model };
 }
 
@@ -127,7 +130,7 @@ export function buildModel(template, settings) {
  * The credit consumption model. Every table in it is optional, so it deploys and
  * refreshes before any consumption data has landed.
  * @param {ModelBim} template
- * @param {{ server: string, database: string }} settings
+ * @param {{ server: string, database: string, resourceGraph?: boolean }} settings
  * @returns {ModelBim}
  */
 export function buildConsumptionModel(template, settings) {
@@ -135,6 +138,7 @@ export function buildConsumptionModel(template, settings) {
   setMParameter(model, 'FabricSQLEndpoint', settings.server);
   setMParameter(model, 'LakehouseName', settings.database);
   addCopilotPaygSpend(model);
+  addFoundryResources(model, !!settings.resourceGraph);
   return { compatibilityLevel: template.compatibilityLevel, model };
 }
 

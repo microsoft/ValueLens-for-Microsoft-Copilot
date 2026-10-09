@@ -30,6 +30,17 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {AzureConfig} [azure]
  * @property {ConsumptionConfig} consumption
  * @property {AgentEvaluatorConfig} agentEvaluator
+ * @property {ResourceGraphConfig} resourceGraph
+ */
+
+/**
+ * Agent configuration and Foundry from Azure Resource Graph.
+ * @typedef {object} ResourceGraphConfig
+ * @property {string} [managementGroup]  The management group to read. Empty: the tenant root group.
+ * @property {boolean} agents  Read Copilot Studio agents, environments and agent flows.
+ * @property {boolean} foundry  Read Foundry resources and projects.
+ * @property {boolean} [access]  The app has Reader on the management group.
+ * @property {boolean} [azureAccess]  The jobs' managed identity has Reader on the management group.
  */
 
 /**
@@ -72,9 +83,9 @@ export const flowIdentity = (config) => (config.target !== 'azure' && config.upl
  * @property {boolean} [folders]  The drop folder and the folders the loads read exist in the Lakehouse.
  * @property {FlowIdentity} [flowIdentity]  Who the flows write to OneLake as. Default user.
  * @property {FlowEnvironment} [flowEnvironment]  The Power Platform environment the flows are created in.
- * @property {Partial<Record<'feedback' | 'studio', string>>} [flowIds]  The flows, once created.
- * @property {Partial<Record<'feedback' | 'studio', string>>} [flowSignatures]  What each created flow was built from.
- * @property {Partial<Record<'feedback' | 'studio', string>>} [flowFiles]  Where a flow was written when it couldn't be created.
+ * @property {Partial<Record<'feedback' | 'studio' | 'agents', string>>} [flowIds]  The flows, once created.
+ * @property {Partial<Record<'feedback' | 'studio' | 'agents', string>>} [flowSignatures]  What each created flow was built from.
+ * @property {Partial<Record<'feedback' | 'studio' | 'agents', string>>} [flowFiles]  Where a flow was written when it couldn't be created.
  */
 
 /**
@@ -252,6 +263,7 @@ export function emptyConfig() {
     azure: { tags: {}, deployments: [], outputs: {}, graphRoles: { assigned: [], pending: [] }, publicNetworkAccess: true, namePrefix: 'vlens' },
     consumption: { model: { name: CONSUMPTION_MODEL_NAME } },
     agentEvaluator: { environments: [], model: { name: AGENT_EVALUATOR_MODEL_NAME } },
+    resourceGraph: { managementGroup: '', agents: true, foundry: true },
   };
 }
 
@@ -305,9 +317,25 @@ export function loadConfig(file) {
       environments: [...(raw.agentEvaluator?.environments ?? [])],
       model: { ...base.agentEvaluator.model, ...(raw.agentEvaluator?.model ?? {}) },
     },
+    resourceGraph: normaliseResourceGraph(raw.resourceGraph),
   };
   assertNoSecrets(config);
   return { config, existed: true };
+}
+
+/**
+ * Fills the gaps in a saved Resource Graph choice: both kinds on, the tenant root group.
+ * @param {any} raw
+ * @returns {ResourceGraphConfig}
+ */
+export function normaliseResourceGraph(raw) {
+  const r = raw && typeof raw === 'object' ? raw : {};
+  return {
+    ...r,
+    managementGroup: typeof r.managementGroup === 'string' ? r.managementGroup.trim() : '',
+    agents: r.agents !== false,
+    foundry: r.foundry !== false,
+  };
 }
 
 /**

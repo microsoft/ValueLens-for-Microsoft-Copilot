@@ -46,6 +46,8 @@ export interface RuntimeModules {
     agentEvaluator: boolean;
     /** Absent from installs made before the Defender module existed. */
     defender?: boolean;
+    /** Azure Resource Graph. Absent from configs written before it was a choice. */
+    resourceGraph?: boolean;
 }
 
 export class RuntimeConfigError extends Error {
@@ -215,7 +217,11 @@ export function parseModules(json: unknown): RuntimeModules | undefined {
     const keys = ["m365Activity", "agent365", "productFeedback", "consumption", "agentEvaluator"] as const;
     if (!keys.every((key) => typeof modules[key] === "boolean")) return undefined;
     const parsed = Object.fromEntries(keys.map((key) => [key, modules[key]])) as unknown as RuntimeModules;
-    return typeof modules.defender === "boolean" ? { ...parsed, defender: modules.defender } : parsed;
+    return {
+        ...parsed,
+        ...(typeof modules.defender === "boolean" ? { defender: modules.defender } : {}),
+        ...(typeof modules.resourceGraph === "boolean" ? { resourceGraph: modules.resourceGraph } : {}),
+    };
 }
 
 function queryRequestsTeams(): boolean {

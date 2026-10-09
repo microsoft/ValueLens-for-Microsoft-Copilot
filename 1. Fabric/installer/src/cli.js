@@ -4,13 +4,14 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { orgUrl } from './clients/dataverse.js';
-import { DEFAULT_CONFIG_FILE, loadConfig } from './config.js';
+import { DEFAULT_CONFIG_FILE, loadConfig, normaliseResourceGraph } from './config.js';
 import { HttpError } from './http.js';
 import { connect, createCtx, preview, runCommand } from './install.js';
 import { commandLine } from './launch.js';
 import { runWizard } from './server.js';
 import { loadSources } from './sources.js';
 import { isResumeLater } from './steps/identity.js';
+import { isManagementGroupId, managementGroupId } from './steps/resource-graph.js';
 import { isVivaId } from './transform/dataflow.js';
 import { c, createUi } from './ui.js';
 import { DATA_SOURCE_IDS, modulesFromSources, parseDataFlags } from './uploads.js';
@@ -70,6 +71,11 @@ Options:
   --viva-partition <id>
   --viva-query <id>    With install: the Viva Insights partition and query the Cowork credits
                        Dataflow reads (needs coworkCredits=api)
+  --arg-management-group <id>
+                       With install: the Azure management group Resource Graph reads agents
+                       and Foundry from (needs resourceGraph=api). Default: the whole tenant
+  --no-arg-agents      With install: leave Copilot Studio agents out of Resource Graph
+  --no-arg-foundry     With install: leave Foundry resources out of Resource Graph
   --run                 With upload: run the pipeline straight after, to load the files now
   --secret-in-notebook With install: store the client secret in plain text in the notebooks instead
                        of Key Vault. Not recommended: for quick tests only. Needed with --yes.
@@ -110,6 +116,9 @@ export function parseCli(argv) {
       'flow-identity': { type: 'string' },
       'viva-partition': { type: 'string' },
       'viva-query': { type: 'string' },
+      'arg-management-group': { type: 'string' },
+      'no-arg-agents': { type: 'boolean' },
+      'no-arg-foundry': { type: 'boolean' },
       run: { type: 'boolean' },
       'secret-in-notebook': { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
@@ -123,7 +132,7 @@ export function parseCli(argv) {
   if (values.run && command !== 'upload') throw new Error('--run goes with upload.');
   if (values['secret-in-notebook'] && command !== 'install') throw new Error('--secret-in-notebook goes with install.');
   if (values['secret-in-notebook'] && values.target === 'azure') throw new Error('--secret-in-notebook is for the Fabric target only.');
-  const installOnly = ['feedback-flow', 'studio-flow', 'flow-environment', 'flow-identity', 'viva-partition', 'viva-query'].filter((k) => values[/** @type {'feedback-flow'} */ (k)] !== undefined);
+  const installOnly = ['feedback-flow', 'studio-flow', 'flow-environment', 'flow-identity', 'viva-partition', 'viva-query', 'arg-management-group', 'no-arg-agents', 'no-arg-foundry'].filter((k) => values[/** @type {'feedback-flow'} */ (k)] !== undefined);
   if ((values.data?.length || values.csv?.length || installOnly.length) && !['install', 'preview'].includes(command)) {
     throw new Error(`--data, --csv${installOnly.map((k) => ` and --${k}`).join('')} go with install. To add exports later, use upload.`);
   }
@@ -134,6 +143,9 @@ export function parseCli(argv) {
   for (const k of /** @type {const} */ (['viva-partition', 'viva-query'])) {
     if (values[k] !== undefined && !isVivaId(values[k])) throw new Error(`--${k} should be a GUID, as Viva Insights shows it.`);
   }
+  const argManagementGroup = values['arg-management-group'] === undefined ? undefined : managementGroupId(values['arg-management-group']);
+  if (argManagementGroup && !isManagementGroupId(argManagementGroup)) throw new Error('--arg-management-group should be a management group ID, as the Azure portal shows it under Management groups.');
+  if (values['no-arg-agents'] && values['no-arg-foundry']) throw new Error('--no-arg-agents and --no-arg-foundry together leave Resource Graph nothing to read. Use --data resourceGraph=skip.');
   /** @type {string | undefined} */
   let flowEnvironment;
   if (values['flow-environment'] !== undefined) {
@@ -176,6 +188,9 @@ export function parseCli(argv) {
     flowIdentity: /** @type {import('./config.js').FlowIdentity | undefined} */ (identity),
     vivaPartition: values['viva-partition']?.trim(),
     vivaQuery: values['viva-query']?.trim(),
+    argManagementGroup,
+    argAgents: values['no-arg-agents'] ? false : undefined,
+    argFoundry: values['no-arg-foundry'] ? false : undefined,
     files,
     run: values.run,
     secretInNotebook: !!values['secret-in-notebook'],
@@ -193,7 +208,7 @@ export function version() {
  * Applies --data, the flow flags and the Viva IDs to the install record's answers. The Data
  * sources screen then opens with them, and --yes takes them as they are.
  * @param {import('./config.js').InstallConfig} config
- * @param {{ dataSources: Partial<import('./uploads.js').DataSourceModes>, feedbackFlow?: boolean, studioFlow?: boolean, flowEnvironment?: string, flowIdentity?: import('./config.js').FlowIdentity, vivaPartition?: string, vivaQuery?: string }} args
+ * @param {{ dataSources: Partial<import('./uploads.js').DataSourceModes>, feedbackFlow?: boolean, studioFlow?: boolean, flowEnvironment?: string, flowIdentity?: import('./config.js').FlowIdentity, vivaPartition?: string, vivaQuery?: string, argManagementGroup?: string, argAgents?: boolean, argFoundry?: boolean }} args
  */
 export function applyDataFlags(config, args) {
   // --studio-flow and --feedback-flow are from before each flow was its source's api mode: with csv (as the old docs had it) or alone, they mean api.
@@ -208,6 +223,16 @@ export function applyDataFlags(config, args) {
   if (args.flowIdentity) config.uploads.flowIdentity = args.flowIdentity;
   if (args.vivaPartition) config.consumption.vivaPartition = args.vivaPartition;
   if (args.vivaQuery) config.consumption.vivaQuery = args.vivaQuery;
+  if (args.argManagementGroup !== undefined || args.argAgents !== undefined || args.argFoundry !== undefined) {
+    const rg = (config.resourceGraph = normaliseResourceGraph(config.resourceGraph));
+    if (args.argManagementGroup !== undefined && args.argManagementGroup !== rg.managementGroup) {
+      rg.managementGroup = args.argManagementGroup;
+      delete rg.access;
+      delete rg.azureAccess;
+    }
+    if (args.argAgents !== undefined) rg.agents = args.argAgents;
+    if (args.argFoundry !== undefined) rg.foundry = args.argFoundry;
+  }
 }
 
 /**

@@ -33,6 +33,7 @@ import {
     foundryByModel,
     foundryDaily,
     foundryResources,
+    foundryResourceSpend,
     foundrySummary,
     groupByChoices,
     groupByFilter,
@@ -49,6 +50,7 @@ import {
     studioCreditsSummary,
     studioDaily,
     studioUsers,
+    summariseFoundryInventory,
     toCoworkGroupTree,
     toStudioUserTree,
 } from "./index";
@@ -87,6 +89,7 @@ const modules = [
     { name: "foundryDaily", factory: () => foundryDaily(), columns: liveColumns.foundryDaily },
     { name: "foundryByModel", factory: () => foundryByModel(), columns: liveColumns.foundryByModel },
     { name: "foundryResources", factory: () => foundryResources(), columns: liveColumns.foundryResources },
+    { name: "foundryResourceSpend", factory: () => foundryResourceSpend(), columns: liveColumns.foundryResourceSpend },
 ];
 
 type SpecFactory = () => { columnMetadata: ColumnMetadataMap; vegaLiteSpec: unknown };
@@ -352,5 +355,43 @@ describe("azure source", () => {
         expect(currencyPrefix("USD")).toBe("$");
         expect(currencyPrefix("CHF")).toBe("CHF ");
         expect(currencyPrefix(undefined)).toBe("");
+    });
+});
+
+describe("Foundry inventory from Azure Resource Graph", () => {
+    const { query, columnMetadata } = foundryResourceSpend();
+
+    it("reads the latest snapshot and matches resource ids without a relationship", () => {
+        expect(query).toContain("MAX('Foundry Resources'[SnapshotDate])");
+        expect(query).toContain("LOWER('AzureSolutionSpend'[ResourceId])");
+        expect(query).toContain('LEFT([@Id], LEN(__Id) + 1) = __Id & "/"');
+        expect(query).toContain("[Azure Selected Cost]");
+    });
+
+    it("checks subscription coverage across every currency", () => {
+        expect(query).toContain("REMOVEFILTERS('AzureSolutionSpend'[Currency])");
+        expect(query).toContain("'Foundry Resources'[SubscriptionId] IN __Covered");
+    });
+
+    it("sums the accounts and lists the subscriptions the cost export misses", () => {
+        const columns = liveColumns.foundryResourceSpend;
+        const table = fixtureTable(
+            [
+                { "[Resource]": "a", "[Subscription]": "s1", "[Projects]": 2, "[Network]": "Public", "[Cost Export]": "Covered", "[Cost]": 10.5 },
+                { "[Resource]": "b", "[Subscription]": "s2", "[Projects]": 0, "[Network]": "Private", "[Cost Export]": "Not covered", "[Cost]": null },
+                { "[Resource]": "c", "[Subscription]": "s2", "[Projects]": 1, "[Network]": "Public", "[Cost Export]": "Not covered", "[Cost]": null },
+            ],
+            columns,
+            columnMetadata,
+        );
+        expect(summariseFoundryInventory(table)).toEqual({
+            accounts: 3,
+            projects: 3,
+            publicNetwork: 2,
+            cost: 10.5,
+            uncoveredSubscriptions: ["s2"],
+            uncoveredAccounts: 2,
+        });
+        expect(summariseFoundryInventory(fixtureTable([], columns, columnMetadata))).toBeUndefined();
     });
 });

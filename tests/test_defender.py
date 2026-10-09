@@ -365,6 +365,17 @@ class TemplateTests(unittest.TestCase):
                 for kept in ("Owner has left", "No owner on record", "Org-wide with org data", "Shared, no recorded use"):
                     self.assertIn(kept, flags)
 
+    def test_resource_graph_is_asked_before_defender(self):
+        for relative in self.tpl.TEMPLATES:
+            with self.subTest(template=relative.name):
+                query = self.tpl.joined(self._table(relative)["partitions"][0]["source"]["expression"])
+                sources = query.split("__signInSources = {", 1)[1].split("}", 1)[0]
+                arg = sources.index('FabricTable("arg_agent_config")')
+                self.assertLess(arg, sources.index('FabricTable("defender_ai_agents")'))
+                self.assertIn('{{"EntraAppId", "AppId"}}', query)
+                self.assertIn('"NoSignIn"', query)
+                self.assertNotIn(self.tpl.PREVIOUS_STEP, query)
+
     def test_core_writes_the_columns_the_template_reads(self):
         written = {name for name, _ in d.COLUMNS["agents"]}
         self.assertEqual(d.TABLES["agents"], "defender_ai_agents")

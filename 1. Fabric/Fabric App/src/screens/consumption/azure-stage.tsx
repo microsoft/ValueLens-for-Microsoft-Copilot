@@ -35,6 +35,7 @@ import {
     type ConsumptionOptions,
 } from "@/queries/consumption";
 import { moneyCell, SMALL, useConsumptionSummary, useConsumptionTable, type TableResult } from "./data";
+import { FoundryInventory } from "./foundry-inventory";
 import { ChartPanel, KpiRowState, NoteCard, Panel } from "@/components/report-panels";
 
 const KPI_GRID = "grid gap-300 md:grid-cols-2 xl:grid-cols-5";
@@ -278,6 +279,8 @@ function SolutionView({ filters, prefix }: { filters: readonly string[]; prefix:
                 title="Azure resources"
                 subtitle="Each resource's cost, and the department its tags allocate it to"
             />
+
+            <FoundryInventory filters={filters} prefix={prefix} />
         </>
     );
 }

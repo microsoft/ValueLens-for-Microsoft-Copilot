@@ -141,4 +141,14 @@ export const liveColumns = {
     foundryDaily: ["[Usage Date]", "[Component]", "[Component Sort]", "[Cost]"],
     foundryByModel: ["[Item]", "[Cost]", "[Tokens M]"],
     foundryResources: ["[Resource]", "[Resource Group]", "[Model]", "[Department Tag]", "[Cost]", "[Tokens M]"],
+    foundryResourceSpend: [
+        "[Resource]",
+        "[Kind]",
+        "[Resource Group]",
+        "[Subscription]",
+        "[Projects]",
+        "[Network]",
+        "[Cost Export]",
+        "[Cost]",
+    ],
 } as const;

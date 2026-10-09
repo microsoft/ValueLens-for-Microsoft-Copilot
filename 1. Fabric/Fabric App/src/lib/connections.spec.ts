@@ -59,7 +59,13 @@ describe("availableDestinations", () => {
     it("leaves out a page only once its source is confirmed empty", () => {
         const withSources = (sources: SourceAvailability) =>
             availableDestinations(valuelensOnly, sources).map((destination) => destination.id);
-        const empty = { m365Activity: "absent", productFeedback: "absent", agentRegistry: "absent", defender: "absent" } as const;
+        const empty = {
+            m365Activity: "absent",
+            productFeedback: "absent",
+            agentRegistry: "absent",
+            defender: "absent",
+            resourceGraph: "absent",
+        } as const;
 
         expect(withSources(empty)).not.toContain("feedback");
         expect(withSources(empty)).not.toContain("work-patterns");

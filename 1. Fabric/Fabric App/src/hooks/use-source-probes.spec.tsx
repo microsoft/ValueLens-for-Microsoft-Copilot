@@ -10,12 +10,17 @@ import { describe, expect, it, vi } from "vitest";
 
 const mocked = vi.hoisted(() => ({
     calls: [] as string[],
+    modules: {
+        m365Activity: true,
+        agent365: false,
+        productFeedback: false,
+        consumption: false,
+        agentEvaluator: false,
+    } as Record<string, boolean>,
 }));
 
 vi.mock("@/lib/runtime-config", () => ({
-    runtimeConfig: () => ({
-        modules: { m365Activity: true, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false },
-    }),
+    runtimeConfig: () => ({ modules: mocked.modules }),
 }));
 
 vi.mock("./use-semantic-model-query", () => ({
@@ -39,7 +44,17 @@ describe("useSourceProbes", () => {
             productFeedback: "notConfigured",
             agentRegistry: "notConfigured",
             defender: "present",
+            resourceGraph: "present",
         });
-        expect(mocked.calls).toEqual([SOURCE_PROBES.m365Activity, "", "", SOURCE_PROBES.defender]);
+        expect(mocked.calls).toEqual([SOURCE_PROBES.m365Activity, "", "", SOURCE_PROBES.defender, SOURCE_PROBES.resourceGraph]);
+    });
+
+    it("leaves Resource Graph unprobed when the installer turned it off", () => {
+        mocked.calls = [];
+        mocked.modules = { ...mocked.modules, resourceGraph: false };
+        const { result } = renderHook(() => useSourceProbes());
+
+        expect(result.current.resourceGraph).toBe("notConfigured");
+        expect(mocked.calls).toEqual([SOURCE_PROBES.m365Activity, "", "", SOURCE_PROBES.defender, ""]);
     });
 });

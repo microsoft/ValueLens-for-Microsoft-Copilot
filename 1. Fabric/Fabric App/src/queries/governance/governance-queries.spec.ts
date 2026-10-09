@@ -7,8 +7,13 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    AGENT_INVENTORY_FORBIDDEN,
+    describeResourceGraph,
+    FOUNDRY_FORBIDDEN,
     governanceExposure,
     governanceOwners,
+    governancePublicWeb,
+    governanceResourceGraph,
     governanceReviewQueue,
     governanceSummary,
     shadowAiStatus,
@@ -18,6 +23,8 @@ import {
     OWNER_STATUSES,
     SHADOW_AI_LAYERS,
     SHADOW_AI_POSTURES,
+    PUBLIC_WEB,
+    withPublicWeb,
 } from "./index";
 import { liveColumns } from "./live-columns.fixture";
 
@@ -30,6 +37,12 @@ const modules = [
         factory: () => governanceReviewQueue(),
         columns: liveColumns.governanceReviewQueue,
     },
+    {
+        name: "governanceResourceGraph",
+        factory: () => governanceResourceGraph(),
+        columns: liveColumns.governanceResourceGraph,
+    },
+    { name: "governancePublicWeb", factory: () => governancePublicWeb(), columns: liveColumns.governanceExposure },
 ];
 
 /**
@@ -123,6 +136,15 @@ describe("governance flags", () => {
         }
     });
 
+    it("reads each Resource Graph table at its own latest snapshot", () => {
+        const { query } = governanceResourceGraph();
+        expect(query).toContain("MAX('Agent Configuration'[SnapshotDate])");
+        expect(query).toContain("MAX('Foundry Resources'[SnapshotDate])");
+        expect(query).toContain("'Foundry Resources'[PublicNetwork] = TRUE()");
+        expect(governancePublicWeb().query).toContain("'Agent Configuration'[WebSearchEnabled] = TRUE()");
+        expect(governancePublicWeb().query).toContain(`"Data Access", "${PUBLIC_WEB}"`);
+    });
+
     it.each([
         ["exposure", governanceExposure().query],
         ["owners", governanceOwners().query],
@@ -186,5 +208,51 @@ describe("governance spec field references", () => {
 
     it.each(specModules)("$name never relies on timeUnit to parse dates", ({ factory }) => {
         expect(JSON.stringify(factory().vegaLiteSpec)).not.toMatch(/"timeUnit"/);
+    });
+});
+
+describe("Resource Graph on the governance page", () => {
+    const ready = { "[Configured Agents]": 4, "[Foundry Resources]": 2, "[Agent Status]": "ok", "[Foundry Status]": "ok" };
+
+    it("reads as not set up when the install left it off or the model lacks the tables", () => {
+        expect(describeResourceGraph({ loaded: false }, "notConfigured").kind).toBe("notSetUp");
+        const missing = "Query (2, 10) Cannot find table 'Agent Configuration'.";
+        expect(describeResourceGraph({ loaded: false, error: missing }, "unknown").kind).toBe("notSetUp");
+        expect(describeResourceGraph({ loaded: false, error: "Timeout" }, "present")).toEqual({
+            kind: "error",
+            message: "Timeout",
+        });
+        expect(describeResourceGraph({ loaded: false }, "present").kind).toBe("loading");
+    });
+
+    it("says no data until either side has rows", () => {
+        const row = { "[Configured Agents]": 0, "[Foundry Resources]": 0 };
+        expect(describeResourceGraph({ row, loaded: true }, "present")).toEqual({ kind: "noData", notes: [] });
+        expect(describeResourceGraph({ row: ready, loaded: true }, "present")).toEqual({
+            kind: "ready",
+            agents: true,
+            foundry: true,
+            notes: [],
+        });
+    });
+
+    it("names the role the identity lacks when a probe was forbidden", () => {
+        const row = { ...ready, "[Configured Agents]": 0, "[Agent Status]": "forbidden", "[Foundry Status]": "Forbidden" };
+        const view = describeResourceGraph({ row, loaded: true }, "present");
+        expect(view).toEqual({ kind: "ready", agents: false, foundry: true, notes: [AGENT_INVENTORY_FORBIDDEN, FOUNDRY_FORBIDDEN] });
+        expect(AGENT_INVENTORY_FORBIDDEN).toMatch(/Global Reader|Power Platform Administrator/);
+        expect(AGENT_INVENTORY_FORBIDDEN).toContain("Analytics Hub - Agent inventory");
+        expect(FOUNDRY_FORBIDDEN).toContain("Reader at the management group");
+    });
+
+    it("adds public web cells to the exposure grid by column name", () => {
+        const columns = Object.values(governanceExposure().columnMetadata);
+        const exposure = { columns, rows: [[1, "Whole organisation", 1, "Organisation content", 3, 1]] };
+        const reordered = { columns: [...columns].reverse(), rows: [[0, 2, PUBLIC_WEB, 5, "Whole organisation", 1]] };
+        expect(withPublicWeb(exposure, undefined)).toBe(exposure);
+        expect(withPublicWeb(exposure, reordered).rows).toEqual([
+            [1, "Whole organisation", 1, "Organisation content", 3, 1],
+            [1, "Whole organisation", 5, PUBLIC_WEB, 2, 0],
+        ]);
     });
 });

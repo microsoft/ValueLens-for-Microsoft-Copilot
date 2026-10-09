@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.47.16.16243",
-      "templateHash": "13744013049464516222"
+      "templateHash": "15843918731225926170"
     }
   },
   "parameters": {
@@ -234,6 +234,27 @@
     "dropFolder": {
       "type": "string",
       "defaultValue": ""
+    },
+    "argManagementGroup": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure Resource Graph (module resourceGraph): management group the run job queries. Empty = every subscription the identity can read."
+      }
+    },
+    "argAgents": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Azure Resource Graph: read Copilot Studio agent configuration from PowerPlatformResources."
+      }
+    },
+    "argFoundry": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Azure Resource Graph: read Foundry accounts and projects from resources."
+      }
     }
   },
   "variables": {
@@ -1188,6 +1209,15 @@
           },
           "dropFolder": {
             "value": "[parameters('dropFolder')]"
+          },
+          "argManagementGroup": {
+            "value": "[parameters('argManagementGroup')]"
+          },
+          "argAgents": {
+            "value": "[parameters('argAgents')]"
+          },
+          "argFoundry": {
+            "value": "[parameters('argFoundry')]"
           }
         },
         "template": {
@@ -1197,7 +1227,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.47.16.16243",
-              "templateHash": "16356171400828608952"
+              "templateHash": "5425547390839044773"
             }
           },
           "parameters": {
@@ -1310,6 +1340,18 @@
               "type": "string",
               "defaultValue": ""
             },
+            "argManagementGroup": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "argAgents": {
+              "type": "bool",
+              "defaultValue": true
+            },
+            "argFoundry": {
+              "type": "bool",
+              "defaultValue": true
+            },
             "registryServer": {
               "type": "string",
               "defaultValue": ""
@@ -1357,7 +1399,7 @@
                 "value": "[parameters('semanticModels')]"
               }
             ],
-            "jobEnv": "[concat(variables('commonEnv'), createArray(createObject('name', 'VALUELENS_MODULES', 'value', parameters('modules')), createObject('name', 'VALUELENS_AUDIT_HISTORY_DAYS', 'value', string(parameters('auditHistoryDays'))), createObject('name', 'VALUELENS_SQL_READER_NAME', 'value', parameters('sqlReaderName')), createObject('name', 'VALUELENS_SQL_READER_CLIENT_ID', 'value', parameters('sqlReaderClientId')), createObject('name', 'VALUELENS_SAMPLE_DATA', 'value', if(parameters('sampleData'), 'true', 'false')), createObject('name', 'VALUELENS_AZURE_AI_SUBSCRIPTION', 'value', parameters('azureAiSubscriptionId')), createObject('name', 'VALUELENS_PAYG_SUBSCRIPTIONS', 'value', parameters('paygSubscriptionIds')), createObject('name', 'VALUELENS_DROP_SITE_ID', 'value', parameters('dropSiteId')), createObject('name', 'VALUELENS_DROP_DRIVE_ID', 'value', parameters('dropDriveId')), createObject('name', 'VALUELENS_DROP_FOLDER', 'value', parameters('dropFolder'))))]",
+            "jobEnv": "[concat(variables('commonEnv'), createArray(createObject('name', 'VALUELENS_MODULES', 'value', parameters('modules')), createObject('name', 'VALUELENS_AUDIT_HISTORY_DAYS', 'value', string(parameters('auditHistoryDays'))), createObject('name', 'VALUELENS_SQL_READER_NAME', 'value', parameters('sqlReaderName')), createObject('name', 'VALUELENS_SQL_READER_CLIENT_ID', 'value', parameters('sqlReaderClientId')), createObject('name', 'VALUELENS_SAMPLE_DATA', 'value', if(parameters('sampleData'), 'true', 'false')), createObject('name', 'VALUELENS_AZURE_AI_SUBSCRIPTION', 'value', parameters('azureAiSubscriptionId')), createObject('name', 'VALUELENS_PAYG_SUBSCRIPTIONS', 'value', parameters('paygSubscriptionIds')), createObject('name', 'VALUELENS_DROP_SITE_ID', 'value', parameters('dropSiteId')), createObject('name', 'VALUELENS_DROP_DRIVE_ID', 'value', parameters('dropDriveId')), createObject('name', 'VALUELENS_DROP_FOLDER', 'value', parameters('dropFolder')), createObject('name', 'VALUELENS_ARG_MANAGEMENT_GROUP', 'value', parameters('argManagementGroup')), createObject('name', 'VALUELENS_ARG_AGENTS', 'value', if(parameters('argAgents'), 'true', 'false')), createObject('name', 'VALUELENS_ARG_FOUNDRY', 'value', if(parameters('argFoundry'), 'true', 'false'))))]",
             "registries": "[if(empty(parameters('registryServer')), createArray(), createArray(createObject('server', parameters('registryServer'), 'identity', parameters('identityId'))))]",
             "identity": {
               "type": "UserAssigned",

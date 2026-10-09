@@ -15,6 +15,8 @@ import { formatKpi } from "@/lib/format-kpi";
 import { readNumber } from "@/lib/summary-row";
 import { BODY } from "@/lib/type-scale";
 import { agentEstateSummary, agentLifecycle, describeRegistryLinkage, type RegistryLinkage } from "@/queries/agents";
+import { ResourceGraphPanel } from "./resource-graph-panel";
+import { useResourceGraphSummary } from "./resource-graph-summary";
 
 const ESTATE = agentEstateSummary();
 const LIFECYCLE = agentLifecycle();
@@ -46,7 +48,7 @@ function linkageMessage(linkage: RegistryLinkage): string | undefined {
 const FLAG_NOTES = [
     {
         term: "No sign-in required",
-        text: "The agent answers anyone who reaches it without asking them to sign in, so nothing ties a conversation to a person. Needs the optional Defender source.",
+        text: "The agent answers anyone who reaches it without asking them to sign in, so nothing ties a conversation to a person. Needs Azure Resource Graph or the optional Defender source; Resource Graph wins where both know the agent.",
     },
     {
         term: "Owner has left",
@@ -79,6 +81,7 @@ interface EstateHealthStageProps {
 export function EstateHealthStage({ summary }: EstateHealthStageProps) {
     const estate = useSummaryQuery(ESTATE);
     const lifecycle = useTableQuery(LIFECYCLE);
+    const resourceGraph = useResourceGraphSummary();
     const row = summary.row;
     const message = linkageMessage(describeRegistryLinkage(estate.row));
 
@@ -138,6 +141,8 @@ export function EstateHealthStage({ summary }: EstateHealthStageProps) {
                     detail={<KpiStat label="No owner on record" value={readNumber(row, "[No Owner]")} />}
                 />
             </KpiRowState>
+
+            <ResourceGraphPanel summary={resourceGraph} className="grid gap-300 md:grid-cols-3" />
 
             {message && (
                 <p className={`flex max-w-[80ch] items-start gap-200 ${BODY} text-muted-foreground`}>

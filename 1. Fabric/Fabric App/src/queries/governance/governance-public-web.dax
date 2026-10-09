@@ -1,0 +1,44 @@
+EVALUATE
+VAR __ConfigDate = MAX('Agent Configuration'[SnapshotDate])
+VAR __WebSearch =
+    DISTINCT(
+        SELECTCOLUMNS(
+            FILTER(
+                'Agent Configuration',
+                'Agent Configuration'[SnapshotDate] = __ConfigDate
+                    && 'Agent Configuration'[WebSearchEnabled] = TRUE()
+                    && 'Agent Configuration'[TitleId] <> ""
+            ),
+            "Title ID", 'Agent Configuration'[TitleId]
+        )
+    )
+VAR __Live =
+    FILTER(
+        'Agents 365',
+        NOT (LOWER(TRIM(COALESCE('Agents 365'[Created in], ""))) IN {"", "not available"})
+            && NOT (LOWER(TRIM(COALESCE('Agents 365'[Is Blocked], ""))) IN {"true", "yes", "1"})
+            && 'Agents 365'[Title ID] IN __WebSearch
+    )
+RETURN
+    SELECTCOLUMNS(
+        GROUPBY(
+            __Live,
+            'Agents 365'[Sharing Scope],
+            "@Agents", COUNTX(CURRENTGROUP(), 1),
+            "@Unused", SUMX(CURRENTGROUP(), IF(COALESCE('Agents 365'[Total Users], 0) = 0, 1, 0))
+        ),
+        "Scope Order",
+            SWITCH(
+                'Agents 365'[Sharing Scope],
+                "Whole organisation", 1,
+                "Specific people or groups", 2,
+                "Not shared", 3,
+                4
+            ),
+        "Sharing Scope", COALESCE('Agents 365'[Sharing Scope], "Not stated"),
+        "Access Order", 5,
+        "Data Access", "Public web",
+        "Agents", [@Agents],
+        "Unused Agents", [@Unused]
+    )
+ORDER BY [Scope Order]

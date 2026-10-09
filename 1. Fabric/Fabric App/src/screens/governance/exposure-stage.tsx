@@ -10,10 +10,22 @@ import { stageAnchor } from "@/components/destinations";
 import { ChartPanel, NoteCard } from "@/components/report-panels";
 import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";
+import { useSourceAvailability } from "@/hooks/source-availability.context";
 import { useTableQuery } from "@/hooks/use-table-query";
-import { applyExposureTheme, completeExposureGrid, governanceExposure, soleExposureAccess } from "@/queries/governance";
+import {
+    applyExposureTheme,
+    completeExposureGrid,
+    EXPOSURE_ACCESS_WITH_WEB,
+    governanceExposure,
+    governancePublicWeb,
+    PUBLIC_WEB,
+    soleExposureAccess,
+    withPublicWeb,
+} from "@/queries/governance";
 
 const EXPOSURE = governanceExposure();
+const PUBLIC_WEB_QUERY = governancePublicWeb();
+const NO_PUBLIC_WEB = { ...PUBLIC_WEB_QUERY, query: "" };
 
 /** Said when every agent sits in one data access column, so the empty columns read as a finding, not a fault. */
 function soleAccessNote(access: string): string {
@@ -37,6 +49,11 @@ const NOTES = [
     },
 ];
 
+const PUBLIC_WEB_NOTE = {
+    term: PUBLIC_WEB,
+    text: "Agents with web search turned on as a knowledge source, from Azure Resource Graph. They also appear under whatever else they can read.",
+};
+
 /**
  * How widely each tenant-built agent is shared against what it can read,
  * so the agents that could surface organisation content to everyone stand
@@ -45,7 +62,13 @@ const NOTES = [
 export function ExposureStage() {
     const { theme } = useThemeContext();
     const exposure = useTableQuery(EXPOSURE);
-    const gridTable = useMemo(() => exposure.table && completeExposureGrid(exposure.table), [exposure.table]);
+    const resourceGraph = useSourceAvailability().resourceGraph === "present";
+    const publicWeb = useTableQuery(resourceGraph ? PUBLIC_WEB_QUERY : NO_PUBLIC_WEB).table;
+    const gridTable = useMemo(() => {
+        if (!exposure.table) return undefined;
+        if (!resourceGraph || !publicWeb) return completeExposureGrid(exposure.table);
+        return completeExposureGrid(withPublicWeb(exposure.table, publicWeb), EXPOSURE_ACCESS_WITH_WEB);
+    }, [exposure.table, publicWeb, resourceGraph]);
     const sole = soleExposureAccess(exposure.table);
 
     const spec = useMemo(
@@ -80,7 +103,7 @@ export function ExposureStage() {
                     emptyDescription="The registry holds no agents built in this tenant for these filters."
                 />
                 <div className="self-start">
-                    <NoteCard title="Reading the map" notes={NOTES} />
+                    <NoteCard title="Reading the map" notes={resourceGraph ? [...NOTES, PUBLIC_WEB_NOTE] : NOTES} />
                 </div>
             </div>
         </Section>

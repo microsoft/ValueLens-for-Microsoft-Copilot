@@ -763,7 +763,7 @@ this tenant** and not blocked: catalogue listings are Microsoft's or a publisher
 | Sharing Scope | *Whole organisation* (available to or acquired for all), *Specific people or groups* (for some, or a non-empty share list), *Not shared*, or *Not stated* when the registry doesn't say |
 | Data Access | *Organisation content* (reads SharePoint sites, OneDrive files or a Graph connector), *Uploaded files only*, *None declared*, or *Not reported* when the registry gives no capability flags |
 | Owner account | *Active*, *Disabled* or *Not found*: the creator's Entra ID account at the last registry ingester run. Blank when not checked |
-| Sign-in Required | *Yes*, *No* or *Unknown*: whether the agent asks its users to sign in. It comes from the optional Defender source today; the first source that knows the agent wins, so a more direct source can be put ahead of it. *Unknown* without one |
+| Sign-in Required | *Yes*, *No* or *Unknown*: whether the agent asks its users to sign in. The first source that knows the agent wins: the agent's own authentication setting from the optional Azure Resource Graph source, then the optional Defender source's agent inventory. *Unknown* without either |
 
 An agent needs a review when one or more flags apply:
 
@@ -784,8 +784,9 @@ Agents are sorted by the sum of their weights, then by number of flags, then by 
 - **Sharing and data access are what the registry declares**, not what the agent has actually
   surfaced. A CSV export may leave them *Not stated* or *Not reported*.
 - *Shared, no recorded use* inherits the usage matching above, so a renamed agent can be flagged.
-- *No sign-in required* needs the Defender source with its agent probe; without it no agent gets
-  the flag. It is what Defender records about the agent's authentication, not a test of it.
+- *No sign-in required* needs the Azure Resource Graph source (agent configuration) or the
+  Defender source with its agent probe; without either no agent gets the flag. It is what the
+  agent's configuration, or Defender, records about its authentication, not a test of it.
 
 ### Shadow AI: what other AI tools are in use?
 

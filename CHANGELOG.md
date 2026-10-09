@@ -47,6 +47,30 @@ Defender for Cloud Apps (`CloudApp-Discovery.Read.All`). Fabric runs the new
   defender=api`), the optional permissions, a licence prerequisite (Defender for Endpoint P2, Defender
   XDR or Defender for Cloud Apps) and the `EnableDefender` pipeline parameter.
 
+### New: agent configuration and Foundry from Azure Resource Graph (optional)
+
+**What changed.** A new optional data source, **Agent configuration and Foundry (Azure Resource
+Graph)**, off by default, on both the Fabric and the Azure path (#162). Fabric runs the new
+`Copilot_Resource_Graph_Ingester` notebook; Azure runs the `resourceGraph` jobs module, and
+`V004__resource_graph.sql` creates the Azure SQL tables.
+
+- **Agent configuration.** Copilot Studio agents from `PowerPlatformResources` (authentication,
+  connectors, sharing, model and channels), Power Platform environments and agent flows. Resource
+  Graph returns agents only to an identity with an Entra role such as Global Reader, so when it
+  returns none the load reads the newest file from the new **Analytics Hub - Agent inventory** flow,
+  which calls the Power Platform inventory API with a delegated sign-in.
+- **Sign-in Required, Resource Graph first.** The `Agents 365` sign-in lookup now asks Resource
+  Graph's agent configuration before Defender's agent inventory, so *No sign-in required* works with
+  either source. The review queue weights are unchanged.
+- **The Foundry estate.** Foundry accounts and projects across the management group (or the whole
+  tenant), with public network access and region, on the Governance page. The Consumption page
+  joins them to Azure AI spend on resource ID to show spend per Foundry project.
+- **Fail-soft probes.** Each probe runs on its own and records what it couldn't read, and why, in
+  `arg_status`. The Governance page shows empty states that say how to turn the source on.
+- **Installer.** An *Agent configuration and Foundry* choice on both targets (`--data
+  resourceGraph=api`, `--arg-management-group`), the Reader role assignment (or the command to run),
+  the optional flow, and the `resourceGraph` module on Azure.
+
 ### New: Fabric App concentration, value by habit, agent spotlights and chart actions
 
 **What changed.** More additions to the Fabric App, for both the Fabric and Azure paths (#163).

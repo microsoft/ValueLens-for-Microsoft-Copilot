@@ -43,6 +43,7 @@ import { checkPrereqs } from './prereqs.js';
 import { ensureReports, reportsOn, reportsSummary } from './steps/report.js';
 import { dataSourcesSummary, ensureUploads, uploadCommand } from './steps/data-sources.js';
 import { ensureFlows, FLOW_FILES, flowDefinitions, flowsSummary, flowsWanted, offerStudioRun } from './steps/flows.js';
+import { ensureAppResourceGraphAccess, resourceGraphOn } from './steps/resource-graph.js';
 import { routerWanted } from './uploads.js';
 import { checkData, chooseLoad, runDataCheck, runPipeline, status } from './steps/run.js';
 import { rerunFailed } from './steps/rerun.js';
@@ -276,6 +277,7 @@ export async function install(ctx, opts) {
   const withConsumption = !!config.modules.consumption;
   const withAgentEvaluator = !!config.modules.agentEvaluator;
   const withUploads = routerWanted(config.dataSources) || !!ctx.pendingUploads?.length || flowsWanted(config).length > 0;
+  const withResourceGraph = resourceGraphOn(config);
   const withReports = reportsOn(config);
   const titles = [
     'Key Vault',
@@ -285,6 +287,7 @@ export async function install(ctx, opts) {
     ...(withModel ? ['Semantic model'] : []),
     ...(withConsumption ? ['Credit consumption'] : []),
     ...(withAgentEvaluator ? ['Copilot Studio transcripts'] : []),
+    ...(withResourceGraph ? ['Resource Graph access'] : []),
     ...(withReports ? ['Power BI reports'] : []),
     ...(withUploads ? ['Data uploads'] : []),
     'Notebooks, pipeline and schedule',
@@ -316,6 +319,10 @@ export async function install(ctx, opts) {
   if (withAgentEvaluator) {
     step('Copilot Studio transcripts');
     await agentEvaluatorSteps(ctx);
+  }
+  if (withResourceGraph) {
+    step('Resource Graph access');
+    await ensureAppResourceGraphAccess(ctx);
   }
   if (withReports) {
     step('Power BI reports');
@@ -482,6 +489,7 @@ export async function update(ctx, opts = {}) {
   }
   if (config.modules.consumption) await consumptionSteps(ctx, { force: true });
   if (config.modules.agentEvaluator) await agentEvaluatorSteps(ctx, { force: true });
+  if (resourceGraphOn(config)) await ensureAppResourceGraphAccess(ctx);
   if (reportsOn(config)) await ensureReports(ctx);
   if (routerWanted(config.dataSources)) await ensureUploads(ctx);
   await ensureFlows(ctx);
@@ -777,6 +785,7 @@ export function preview(o) {
     agentTranscripts: withTranscripts,
     agentEvaluatorModelId: withAgentEvaluatorModel ? ctx.config.agentEvaluator.model.id : undefined,
     coworkDataflowId: withDataflow ? cc.dataflowId ?? fake(7) : undefined,
+    resourceGraph: config.dataSources.resourceGraph === 'api',
   });
   writeFileSync(join(out, 'pipeline-content.json'), `${JSON.stringify(pipeline, null, 2)}\n`, 'utf8');
   if (withDataflow) {
@@ -806,6 +815,7 @@ export function preview(o) {
       server: sm.server ?? 'your-endpoint.datawarehouse.fabric.microsoft.com',
       database: /** @type {string} */ (ctx.config.fabric.lakehouseName),
       modules: config.modules,
+      resourceGraph: config.dataSources.resourceGraph === 'api',
     });
     writeFileSync(join(out, 'model.bim'), `${JSON.stringify(bim, null, 2)}\n`, 'utf8');
   }
@@ -813,6 +823,7 @@ export function preview(o) {
     const bim = buildConsumptionModel(loadTemplateModel(/** @type {string} */ (sources.consumptionModelFile)), {
       server: sm.server ?? 'your-endpoint.datawarehouse.fabric.microsoft.com',
       database: /** @type {string} */ (ctx.config.fabric.lakehouseName),
+      resourceGraph: config.dataSources.resourceGraph === 'api',
     });
     writeFileSync(join(out, 'consumption-model.bim'), `${JSON.stringify(bim, null, 2)}\n`, 'utf8');
   }
