@@ -17,7 +17,15 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
-## Unreleased — 0.3.5
+## 2026-10-09 — Analytics Hub installer 0.3.5
+
+**Update an existing install:** download installer 0.3.5, open it and choose **Repair or change**.
+Repair pushes the new org data notebook when the client secret is in Key Vault. If you chose to
+keep the secret in the notebooks, run `AnalyticsHubInstaller.exe update` instead: Repair doesn't
+rewrite those notebooks, and `update` writes them with a new secret.
+
+The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.3.5`, which the
+Azure install pulls.
 
 ### Fix: org data load stops with "Cycle detected in manager hierarchy"
 
