@@ -38,6 +38,7 @@ import {
 } from './steps/fabric.js';
 import { ensureModelConnection, ensureSemanticModel, modelUrl, refreshModel, rotateModelSecret, verifyModel } from './steps/model.js';
 import { confirmPlan, plan, preflight } from './steps/plan.js';
+import { checkPrereqs } from './prereqs.js';
 import { ensureReports, reportsOn, reportsSummary } from './steps/report.js';
 import { dataSourcesSummary, ensureUploads, uploadCommand } from './steps/data-sources.js';
 import { ensureFlows, FLOW_FILES, flowDefinitions, flowsSummary, flowsWanted } from './steps/flows.js';
@@ -78,6 +79,7 @@ import { askTarget, azureRefresh, azureRotateSecret, azureRun, azureStatus, azur
  * @property {boolean} [secretInNotebook]  --secret-in-notebook: store the secret in the notebooks instead of Key Vault.
  * @property {Apis} [liveApi]  While the plan's answers can be rewound, the clients without the cache, for checks the user repeats.
  * @property {boolean} [runFirstLoad]
+ * @property {number} [reloadHistoryDays]  Repair or change: reload this many days of audit history after setup.
  * @property {{ sp: any, roles: { id: string, value: string }[] }} [graphRoles]
  * @property {import('./steps/app.js').Runner} [runner]  Runs the app's build tools; tests replace it.
  * @property {import('./staging.js').PendingUpload[]} [pendingUploads]  Exports to upload to the drop folder during the install.
@@ -213,7 +215,7 @@ export async function rewindable(ctx, fn) {
   // save() writes this object, so it's put back in place rather than replaced.
   const config = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (ctx.config));
   const snapshot = structuredClone(config);
-  const { pendingSecret, runFirstLoad, pendingUploads } = ctx;
+  const { pendingSecret, runFirstLoad, reloadHistoryDays, pendingUploads } = ctx;
   const real = ctx.api;
   ctx.api = memoApi(real);
   ctx.liveApi = real;
@@ -228,6 +230,7 @@ export async function rewindable(ctx, fn) {
         Object.assign(config, structuredClone(snapshot));
         ctx.pendingSecret = pendingSecret;
         ctx.runFirstLoad = runFirstLoad;
+        ctx.reloadHistoryDays = reloadHistoryDays;
         ctx.pendingUploads = pendingUploads;
       }
     }
@@ -283,7 +286,7 @@ export async function install(ctx, opts) {
     ...(withUploads ? ['Data uploads'] : []),
     'Notebooks, pipeline and schedule',
     ...(withApp ? ['Analytics Hub app'] : []),
-    ...(ctx.runFirstLoad ? ['First load'] : withModel ? ['Model refresh'] : []),
+    ...(ctx.runFirstLoad ? ['First load'] : ctx.reloadHistoryDays ? ['Reload audit history'] : withModel ? ['Model refresh'] : []),
   ];
   let n = 0;
   const step = (/** @type {string} */ title) => ui.step(++n, titles.length, title);
@@ -344,6 +347,26 @@ export async function install(ctx, opts) {
         await runDataCheck(ctx);
         if (modelDeployed(config)) ok = (await verifyModel(ctx)).ok;
       }
+    }
+  } else if (ctx.reloadHistoryDays) {
+    step('Reload audit history');
+    const days = ctx.reloadHistoryDays;
+    const later = commandLine(`run --backfill-days ${days}`);
+    if (!consented) {
+      ui.warn(`Skipped until admin consent is granted. Then run: ${later}`);
+    } else if (!vaultReachable) {
+      ui.warn(`Skipped until the private endpoint to ${config.keyVault.name} is approved. Then run: ${later}`);
+    } else {
+      if (modelDeployed(config)) ui.note(`The pipeline refreshes ${joinNames(deployedModels(config).map((m) => m.name))} as its last step.`);
+      const result = await runPipeline(ctx, { backfillDays: days, wait: opts.wait });
+      if (result.started) {
+        config.history.days = days;
+        ctx.save();
+      }
+      if (result.status === 'Completed') {
+        await runDataCheck(ctx);
+        if (modelDeployed(config)) ok = (await verifyModel(ctx)).ok;
+      } else if (opts.wait) ok = false;
     }
   } else if (withModel) {
     step('Model refresh');
@@ -479,8 +502,14 @@ export async function update(ctx, opts = {}) {
  * @param {{ backfillDays?: number, wait: boolean }} opts
  */
 export async function run(ctx, opts) {
-  if (ctx.config.target === 'azure') return azureRun(ctx);
-  const result = await runPipeline(ctx, await chooseLoad(ctx, opts));
+  if (ctx.config.target === 'azure') return azureRun(ctx, opts);
+  const load = await chooseLoad(ctx, opts);
+  const result = await runPipeline(ctx, load);
+  // Asking for more history than the record has: later repairs offer more than this.
+  if (result.started && opts.backfillDays && (load.first || opts.backfillDays > ctx.config.history.days)) {
+    ctx.config.history.days = opts.backfillDays;
+    ctx.save();
+  }
   if (result.status === 'Completed') await runDataCheck(ctx);
   return result;
 }
@@ -497,6 +526,18 @@ export async function refresh(ctx, opts) {
   if (!ctx.config.semanticModel.id) throw new Error('There is no semantic model yet. Run the installer and choose to deploy it.');
   if (deployedModels(ctx.config).length < 2) return refreshModel(ctx, opts);
   return refreshModels(ctx, opts);
+}
+
+/**
+ * Prints what the signed-in user has and lacks for an install. Changes nothing.
+ * @param {Ctx} ctx
+ */
+export async function showPrereqs(ctx) {
+  ctx.ui.heading('Prerequisites');
+  ctx.ui.ok(`Signed in as ${ctx.user.upn} (tenant ${ctx.user.tenantId})`);
+  const items = await checkPrereqs(ctx);
+  ctx.ui.prereqs(items);
+  return items;
 }
 
 /**
@@ -544,6 +585,9 @@ export async function runCommand(ctx, command, opts) {
       return true;
     case 'upload':
       return uploadCommand(ctx, { files: opts.files ?? [], run: opts.run, wait: opts.wait }, (c2, o) => run(c2, o));
+    case 'prereqs':
+      await showPrereqs(ctx);
+      return true;
     default:
       throw new Error(`Unknown command "${command}".`);
   }

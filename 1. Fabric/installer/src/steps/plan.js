@@ -269,6 +269,46 @@ export function collectChoices(modules) {
   ];
 }
 
+/** The audit history the first load can pull, and how long each takes. */
+export const HISTORY_CHOICES = [
+  { name: '30 days (quickest; you can load more later)', value: 30 },
+  { name: '90 days (a few hours; longer on a large tenant)', value: 90 },
+  { name: '180 days (the most the audit log keeps by default; many hours)', value: 180 },
+];
+
+/**
+ * Repair or change, once the history has loaded: offers to reload more of it after setup. Only
+ * more than is loaded is offered. The answer goes on `ctx.reloadHistoryDays`; the install record
+ * keeps the old number until the reload has started.
+ * @param {Ctx} ctx
+ */
+export async function askMoreHistory(ctx) {
+  const { ui, config } = ctx;
+  delete ctx.reloadHistoryDays;
+  const current = config.history.days;
+  const more = HISTORY_CHOICES.filter((ch) => ch.value > current);
+  if (!more.length) {
+    ui.ok(`Audit history: ${current} days loaded, the most the installer loads`);
+    return;
+  }
+  const days = await ui.select(
+    `Load more audit history? ${current} days are loaded now.`,
+    [
+      { name: `Keep ${current} days (the usual runs carry on from here)`, value: 0 },
+      ...more.map((ch) => ({
+        name: `Reload ${ch.value} days after setup`,
+        value: ch.value,
+        description:
+          ch.value > 30
+            ? `Runs the pipeline once with ${ch.value} days of history: a few hours, and many hours on a large tenant. The scheduled runs carry on after it.`
+            : `Runs the pipeline once with ${ch.value} days of history, usually in under an hour.`,
+      })),
+    ],
+    0,
+  );
+  if (days) ctx.reloadHistoryDays = days;
+}
+
 /**
  * @param {Ctx} ctx
  * @param {Preflight} pre
@@ -287,15 +327,10 @@ export async function plan(ctx, pre) {
   if (config.modules.agentEvaluator) await planAgentEvaluator(ctx);
 
   if (config.firstRun?.status !== 'Completed') {
-    config.history.days = await ui.select(
-      'How much audit history should the first load pull?',
-      [
-        { name: '30 days (quickest; you can load more later)', value: 30 },
-        { name: '90 days (a few hours; longer on a large tenant)', value: 90 },
-        { name: '180 days (the most the audit log keeps by default; many hours)', value: 180 },
-      ],
-      config.history.days,
-    );
+    delete ctx.reloadHistoryDays;
+    config.history.days = await ui.select('How much audit history should the first load pull?', HISTORY_CHOICES, config.history.days);
+  } else {
+    await askMoreHistory(ctx);
   }
 
   ui.heading('Fabric');
@@ -888,8 +923,19 @@ export function planReview(ctx, pre) {
     },
   ];
   if (ctx.runFirstLoad) runsOn.push({ what: 'First load', where: `${config.history.days} days of audit history, straight after setup` });
+  if (ctx.reloadHistoryDays) runsOn.push({ what: 'History reload', where: reloadLine(ctx.reloadHistoryDays), detail: reloadDetail(ctx.reloadHistoryDays) });
   return { creates, grants, runsOn };
 }
+
+/** @param {number} days */
+export const reloadLine = (days) => `Reload ${days} days of history after setup`;
+
+/**
+ * How long a reload takes.
+ * @param {number} days
+ */
+export const reloadDetail = (days) =>
+  days > 30 ? 'One pipeline run: a few hours, and many hours on a large tenant. The scheduled runs carry on after it.' : 'One pipeline run, usually under an hour.';
 
 /**
  * Prints the plan and asks to go ahead.
@@ -935,6 +981,7 @@ export async function confirmPlan(ctx, pre) {
     ui.info(`Agents:      ${envs.length ? `${names}${waiting}` : c.dim('no environments chosen')}`);
   }
   if (ctx.runFirstLoad) ui.info(`First load:  ${config.history.days} days of history, straight after setup`);
+  if (ctx.reloadHistoryDays) ui.info(`History:     ${reloadLine(ctx.reloadHistoryDays)} ${c.dim(`(${reloadDetail(ctx.reloadHistoryDays)})`)}`);
   ui.review(planReview(ctx, pre));
   return ui.confirm('Go ahead?', true);
 }

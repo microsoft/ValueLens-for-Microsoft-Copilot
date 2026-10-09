@@ -107,6 +107,7 @@ function reportJob(ctx, job, what, again) {
 /**
  * @typedef {object} RunResult
  * @property {string} [jobId]
+ * @property {boolean} [started]  This call started the run; false when one was already going.
  * @property {string} [status]  The job's status. NotStarted when it didn't wait.
  * @property {boolean} [ok]  The run completed and none of its loads failed.
  * @property {string[]} [failed]  The activities that failed.
@@ -150,7 +151,7 @@ export async function runPipeline(ctx, opts) {
   if (running) {
     ui.warn('The pipeline is already running, so this didn\'t start another.');
     ui.note(`Check on it with "${commandLine('status')}". Once it has finished, run "${commandLine('run')}" to start a new run.`);
-    return { jobId: running.id, status: running.status, ok: false };
+    return { jobId: running.id, status: running.status, ok: false, started: false };
   }
   const days = opts.backfillDays;
   const parameters = days ? firstRunParameters(days) : undefined;
@@ -166,7 +167,7 @@ export async function runPipeline(ctx, opts) {
   else ui.ok(`Started the pipeline with ${days} days of audit history`);
   if (!opts.wait) {
     ui.note(`It runs in Fabric. Check on it with "${commandLine('status')}".`);
-    return { jobId, status: 'NotStarted' };
+    return { jobId, status: 'NotStarted', started: true };
   }
   ui.note(`${days ? firstLoadEstimate(days, config.scale) : ''}You can press Ctrl+C; the run carries on in Fabric.`);
   const job = await waitForJob(ctx, url, 'Pipeline');
@@ -181,7 +182,7 @@ export async function runPipeline(ctx, opts) {
     config.firstRun = { ...config.firstRun, status: job?.status, finishedAt: TERMINAL.has(job?.status) ? ctx.now().toISOString() : undefined };
     ctx.save();
   }
-  return { jobId, status: job?.status, ok: ok && !failed.length, failed: failed.map((r) => r.activity) };
+  return { jobId, started: true, status: job?.status, ok: ok && !failed.length, failed: failed.map((r) => r.activity) };
 }
 
 /**

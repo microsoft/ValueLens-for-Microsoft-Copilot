@@ -131,6 +131,9 @@ function fakeFlowEnvironment() {
         flows.get(id).clientdata = clientdata;
       },
       turnOffFlow: async () => {},
+      deleteFlow: async (/** @type {string} */ id) => {
+        flows.delete(id);
+      },
     },
   };
 }

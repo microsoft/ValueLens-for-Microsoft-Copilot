@@ -30,6 +30,7 @@ const ICONS = {
   down: 'M12 5v14M6 13l6 6 6-6',
   back: 'M19 12H5M11 6l-6 6 6 6',
   link: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
+  shield: 'M12 3 4.5 6v6c0 4.5 3.2 7.8 7.5 9 4.3-1.2 7.5-4.5 7.5-9V6zM8.5 12l2.5 2.5 4.5-4.5',
 };
 
 const COMMANDS = {
@@ -96,6 +97,11 @@ const COMMANDS = {
     row: 'Uninstall', button: 'Uninstall',
     desc: 'Azure target only: delete the resource group the installer created, or only tagged resources in an existing group.',
     off: 'Only available for Azure installations.',
+  },
+  prereqs: {
+    title: 'Check prerequisites', short: 'Prerequisites', icon: 'shield', section: 'Prerequisites',
+    row: 'Check prerequisites', button: 'Check prerequisites',
+    desc: 'See which roles, licences, capacities and Azure access you have and which are missing. Changes nothing.',
   },
 };
 const ROW_ORDER = ['run', 'rerun-failed', 'refresh', 'status', 'upload', 'check', 'update', 'deploy-app', 'rotate-secret', 'uninstall', 'install'];
@@ -315,7 +321,7 @@ async function refreshState() {
   if (app.view === 'home') byId('view').replaceChildren(renderHome());
 }
 
-async function start(command) {
+async function start(command, extra = {}) {
   const st = app.state;
   if (!st || app.starting) return;
   const installed = !!st.record?.installed;
@@ -324,7 +330,7 @@ async function start(command) {
   app.starting = true;
   app.startError = '';
   byId('view').replaceChildren(renderHome());
-  const r = await post('/api/start', { command, method, ...(tenant ? { tenant } : {}) });
+  const r = await post('/api/start', { command, method, ...(tenant ? { tenant } : {}), ...extra });
   app.starting = false;
   if (!r.ok) {
     app.startError = r.body?.error ?? 'It didn\'t start. Try again.';
@@ -484,6 +490,10 @@ function onEvent(e) {
   app.replay = Date.now() - e.at > 1500 || app.rewinding || !!e.replayed;
   if (e.type === 'command') return onCommand(e);
   if (e.type === 'rewind') return onRewind(e);
+  if (e.type === 'prereqs-ready') {
+    if (!app.replay) refreshState();
+    return;
+  }
   app.run?.events.push(e);
   if (e.type === 'signin') return onSignin(e);
   apply(e);
@@ -544,6 +554,10 @@ function apply(e) {
       ensureRoot(run, e.at);
       add(run, { t: 'loads', cards: e.cards ?? [] });
       run.failedLoads = (e.cards ?? []).some((card) => card.state === 'failed');
+      return;
+    case 'prereqs':
+      ensureRoot(run, e.at);
+      add(run, { t: 'prereqs', items: e.items ?? [] });
       return;
     case 'auto':
       ensureRoot(run, e.at);
@@ -840,9 +854,33 @@ function renderItem(it) {
       return renderReview(it.plan);
     case 'loads':
       return renderLoads(it.cards);
+    case 'prereqs':
+      return renderPrereqs(it.items);
     default:
       return null;
   }
+}
+
+const PREREQ_GLYPH = { met: 'check', missing: 'x', eligible: 'clock', unknown: 'circle' };
+const PREREQ_STATE = { met: 'You have it', missing: 'Missing', eligible: 'Eligible, activate first', unknown: 'Couldn\'t check' };
+
+/** What the signed-in user has and lacks, each with what it's for and how to get it. */
+function renderPrereqs(items) {
+  return h('ul', { class: 'prereqs', 'aria-label': 'Prerequisites' },
+    items.map((it) => h('li', { class: `prereq ${it.status}` },
+      h('span', { class: 'gl' }, icon(PREREQ_GLYPH[it.status] ?? 'circle')),
+      h('div', null,
+        h('span', { class: 'prereq-name' }, it.label),
+        ' ',
+        h('span', { class: 'prereq-state' }, PREREQ_STATE[it.status] ?? it.status, it.optional ? ', optional' : ''),
+        h('p', null, it.detail),
+        (it.rows ?? []).length
+          ? h('ul', { class: 'prereq-rows' }, it.rows.map((r) => h('li', { class: r.status },
+            h('span', { class: 'gl' }, icon(PREREQ_GLYPH[r.status] ?? 'circle')),
+            h('span', null, h('strong', null, r.name), r.detail ? `: ${r.detail}` : ''))))
+          : null,
+        h('p', { class: 'prereq-why' }, h('strong', null, 'Needed for: '), it.neededFor),
+        it.status !== 'met' ? h('p', { class: 'prereq-how' }, h('strong', null, 'How to get it: '), it.howTo) : null))));
 }
 
 const LOAD_GLYPH = { ok: 'check', failed: 'x', skipped: 'minus', running: 'clock' };
@@ -1253,9 +1291,7 @@ function renderHome() {
       start('install');
     });
     kids.push(h('section', { class: 'panel' }, h('div', { class: 'panel-head' }, h('h2', null, 'Sign in to your tenant')), form));
-    kids.push(h('section', { class: 'panel' },
-      h('div', { class: 'panel-head' }, h('h2', null, 'Before you start')),
-      h('div', { class: 'panel-body' }, h('ul', { class: 'needs' }, needs().map((n) => h('li', null, n))))));
+    kids.push(prereqsPanel(busy));
     return h('div', { class: 'page' }, kids);
   }
 
@@ -1276,6 +1312,7 @@ function renderHome() {
     ['Schedule', rec.schedule ?? 'Not set'],
     ['Client secret expires', rec.secretExpires ? h('span', { class: soon ? 'soon' : null }, `${rec.secretExpires} (${days < 0 ? 'expired' : `in ${days} days`})`) : 'Unknown'],
     ['First load', firstRun],
+    ['Audit history', rec.historyDays ? `${rec.historyDays} days` : null],
   ].filter(([, v]) => v != null && v !== '');
   kids.push(h('section', { class: 'panel' },
     h('div', { class: 'panel-head' }, h('h2', null, 'Your installation'),
@@ -1286,18 +1323,81 @@ function renderHome() {
   const actions = ROW_ORDER.map((cmd) => {
     const c = COMMANDS[cmd];
     const can = cmd === 'install' || !!rec.can[cmd];
+    const history = cmd === 'run' && can ? historyPicker(busy) : null;
     return h('li', { class: 'row' }, icon(c.icon),
       h('div', { class: 'row-text' },
         h('span', { class: 'row-title' }, c.row),
         h('span', { class: 'row-desc' }, c.desc),
-        !can && c.off ? h('span', { class: 'row-why' }, c.off) : null),
-      h('button', { type: 'button', class: cmd === primary ? 'btn primary' : 'btn', disabled: !can || busy, onclick: () => start(cmd) }, c.button));
+        !can && c.off ? h('span', { class: 'row-why' }, c.off) : null,
+        history),
+      h('button', {
+        type: 'button', class: cmd === primary ? 'btn primary' : 'btn', disabled: !can || busy,
+        onclick: () => start(cmd, cmd === 'run' && app.backfill ? { backfillDays: Number(app.backfill) } : {}),
+      }, c.button));
   });
   kids.push(h('section', { class: 'panel' },
     h('div', { class: 'panel-head' }, h('h2', null, 'Actions')),
     h('div', { class: 'panel-body' }, st.user ? signedInNote() : methodPicker(), startError()),
     h('ul', { class: 'rows' }, actions)));
+  kids.push(prereqsPanel(busy));
   return h('div', { class: 'page' }, kids);
+}
+
+const BACKFILL = [
+  { value: '', name: 'Usual run' },
+  { value: '30', name: 'Reload the last 30 days of audit history' },
+  { value: '90', name: 'Reload the last 90 days of audit history' },
+  { value: '180', name: 'Reload the last 180 days of audit history' },
+];
+
+/** Run now can reload older audit history, like run --backfill-days. */
+function historyPicker(busy) {
+  const hint = h('span', { class: 'row-desc', id: 'backfill-hint' });
+  const paint = () => {
+    const n = Number(app.backfill || 0);
+    hint.textContent = n >= 90
+      ? `In a large tenant, ${n} days can take several hours to load. The usual schedule carries on afterwards.`
+      : n ? 'Reloads these days and rebuilds the curated table, then runs the data check.' : '';
+    hint.hidden = !n;
+  };
+  const sel = h('select', { id: 'backfill', class: 'field', disabled: busy, 'aria-describedby': 'backfill-hint' },
+    BACKFILL.map((o) => h('option', { value: o.value, selected: (app.backfill ?? '') === o.value }, o.name)));
+  sel.addEventListener('change', () => {
+    app.backfill = sel.value;
+    paint();
+  });
+  paint();
+  return h('div', { class: 'history-pick' }, h('label', { class: 'label', for: 'backfill' }, 'Audit history'), sel, hint);
+}
+
+/**
+ * Roles, licences, capacities and Azure access: what the signed-in user has and lacks.
+ * Before sign-in it lists what's needed, with a button that signs in and checks.
+ */
+function prereqsPanel(busy) {
+  const st = app.state;
+  const p = st.prereqs;
+  const when = p ? new Date(p.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  const button = h('button', { type: 'button', class: 'btn', disabled: busy, onclick: () => start('prereqs') },
+    p ? 'Check again' : st.user ? 'Check prerequisites' : 'Sign in and check');
+  let body;
+  if (p) {
+    const counts = ['met', 'eligible', 'missing', 'unknown'].map((s) => [s, p.items.filter((i) => i.status === s).length]).filter(([, n]) => n);
+    body = [
+      h('p', { class: 'hint' }, `Checked as ${p.upn} at ${when}. ${counts.map(([s, n]) => `${n} ${PREREQ_STATE[s].toLowerCase()}`).join(', ')}. Only active roles count; a PIM-eligible role must be activated first.`),
+      renderPrereqs(p.items),
+    ];
+  } else if (st.user) {
+    body = [h('p', { class: 'hint' }, 'Checking your roles, licences and access in the background. This takes a few seconds.')];
+  } else {
+    body = [
+      h('p', { class: 'hint' }, 'Sign in to check which of these you have. The check only reads; it changes nothing.'),
+      h('ul', { class: 'needs' }, needs().map((n) => h('li', null, n))),
+    ];
+  }
+  return h('section', { class: 'panel' },
+    h('div', { class: 'panel-head' }, h('h2', null, 'Prerequisites'), button),
+    h('div', { class: 'panel-body' }, body));
 }
 
 /* ---------- Rendering: rail ---------- */
@@ -1538,6 +1638,14 @@ function itemMarkdown(it, depth) {
         `- ${{ ok: '✓', failed: '✗', skipped: '⚠', running: '…' }[card.state] ?? ''} ${card.name}: ${LOAD_STATE[card.state] ?? card.state}${card.attempts ? ` (${card.attempts} attempts)` : ''}`,
         ...(card.reason ? [`  - ${card.reason}`] : []),
         ...(card.fix ?? []).map((f) => `  - ${f.trim()}`),
+      ]);
+    case 'prereqs':
+      return it.items.flatMap((p) => [
+        `- ${{ met: '✓', missing: '✗', eligible: '◐', unknown: '?' }[p.status] ?? ''} ${p.label}: ${PREREQ_STATE[p.status] ?? p.status}${p.optional ? ' (optional)' : ''}`,
+        `  - ${p.detail}`,
+        ...(p.rows ?? []).map((r) => `  - ${r.name}: ${r.detail ?? PREREQ_STATE[r.status]}`),
+        `  - Needed for: ${p.neededFor}`,
+        ...(p.status !== 'met' ? [`  - How to get it: ${p.howTo}`] : []),
       ]);
     default:
       return [];

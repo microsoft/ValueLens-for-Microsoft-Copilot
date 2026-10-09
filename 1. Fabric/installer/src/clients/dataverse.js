@@ -135,6 +135,11 @@ export function dataverseApi(http, url) {
      * @param {string} id
      */
     turnOffFlow: (id) => http.request('PATCH', `/workflows(${id})`, { headers: ODATA, body: { statecode: 0, statuscode: 1 } }),
+    /**
+     * Deletes a flow. Dataverse won't delete one that's on, so turn it off first.
+     * @param {string} id
+     */
+    deleteFlow: (id) => http.request('DELETE', `/workflows(${id})`, { headers: ODATA }),
   };
 }
 

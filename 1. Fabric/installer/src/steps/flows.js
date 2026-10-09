@@ -20,6 +20,7 @@ import {
   feedbackFlowDefinition,
   flowClientData,
   flowFile,
+  isBound,
   newConnections,
   ONELAKE_DFS,
   oneLakeEndpoint,
@@ -199,8 +200,9 @@ const connectorLabel = (name, config) => {
 
 /**
  * Creates the flows chosen, or brings them up to date. An update keeps the connections already
- * signed in to; when it adds one, the flow is turned off until the user signs in. A flow that
- * can't be created is written to a file beside the install record.
+ * signed in to; when it adds one, the flow is turned off until the user signs in, and replaced
+ * when Dataverse won't update it. A flow that can't be created is written to a file beside the
+ * install record.
  * @param {Ctx} ctx
  */
 export async function ensureFlows(ctx) {
@@ -228,13 +230,7 @@ export async function ensureFlows(ctx) {
         const existing = id ? await dv.getFlow(id) : undefined;
         if (existing) {
           if (up.flowSignatures[kind] !== signature) {
-            const current = connectionReferencesOf(existing.clientdata);
-            const fresh = newConnections(definition, current);
-            const wasOn = existing.statecode === 1;
-            if (fresh.length && wasOn) await dv.turnOffFlow(existing.workflowid);
-            await dv.updateFlow(existing.workflowid, flowClientData(definition, current));
-            if (fresh.length) ui.warn(`Updated the flow ${existing.name}${wasOn ? ' and turned it off' : ''}. Sign in to: ${labels(fresh, config)}. Then turn it on.`);
-            else ui.ok(`Updated the flow ${existing.name}`);
+            up.flowIds[kind] = await updateFlow(ctx, dv, existing, defs[kind]);
           } else ui.ok(`Flow ${existing.name} is in place`);
         } else {
           if (id) ui.warn(`The flow ${name} was deleted. Creating it again.`);
@@ -251,6 +247,56 @@ export async function ensureFlows(ctx) {
     }
     writeFlowFile(ctx, kind, name, definition);
   }
+}
+
+/**
+ * Brings an existing flow up to date and returns its ID, which changes when it has to be replaced.
+ * Every connection already signed in to is kept. Dataverse rejects an update that leaves any
+ * connection unsigned (FlowMissingConnection), even on a flow that's off, though a create accepts
+ * one. So a flow with nothing signed in to yet is replaced, and one that gains a connection is
+ * turned off, then replaced if Dataverse turns the update down.
+ * @param {Ctx} ctx
+ * @param {import('../clients/dataverse.js').DataverseApi} dv
+ * @param {{ workflowid: string, name: string, statecode: number, clientdata?: string }} existing
+ * @param {{ name: string, description: string, definition: any }} def
+ */
+async function updateFlow(ctx, dv, existing, { name, description, definition }) {
+  const { ui, config } = ctx;
+  const current = connectionReferencesOf(existing.clientdata);
+  const fresh = newConnections(definition, current);
+  const wasOn = existing.statecode === 1;
+  const replace = async () => {
+    if (wasOn) await dv.turnOffFlow(existing.workflowid);
+    await dv.deleteFlow(existing.workflowid);
+    return dv.createFlow({ name, description, clientdata: flowClientData(definition) });
+  };
+  if (!fresh.length) {
+    await dv.updateFlow(existing.workflowid, flowClientData(definition, current));
+    ui.ok(`Updated the flow ${existing.name}, keeping its connections`);
+    return existing.workflowid;
+  }
+  if (!Object.values(current).some(isBound)) {
+    const id = await replace();
+    ui.ok(`Replaced the flow ${name} with the new version, turned off until you sign in to its connections`);
+    return id;
+  }
+  if (wasOn) await dv.turnOffFlow(existing.workflowid);
+  try {
+    await dv.updateFlow(existing.workflowid, flowClientData(definition, current));
+    ui.warn(`Updated the flow ${existing.name}${wasOn ? ' and turned it off' : ''}. Sign in to: ${labels(fresh, config)}. Then turn it on.`);
+    return existing.workflowid;
+  } catch (err) {
+    if (!missingConnection(err)) throw err;
+  }
+  const id = await dv.deleteFlow(existing.workflowid).then(() => dv.createFlow({ name, description, clientdata: flowClientData(definition) }));
+  ui.warn(`Dataverse won't update a flow with a connection still to sign in to, so ${name} was replaced. Sign in to all its connections again (your existing connections are still there to pick): ${labels(connectorsUsed(definition), config)}. Then turn it on.`);
+  return id;
+}
+
+/** Dataverse's 400 for a flow update that leaves a connection unsigned. @param {unknown} err */
+function missingConnection(err) {
+  const e = /** @type {any} */ (err);
+  return e?.status === 400 && /FlowMissingConnection|0x80060467/i.test(`${e.code ?? ''} ${e.message ?? ''}`);
 }
 
 /**

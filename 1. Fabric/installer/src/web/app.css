@@ -288,6 +288,21 @@ a { overflow-wrap: anywhere; }
 .load.failed .gl { color: var(--fail); }
 .load.skipped, .load.running { background: var(--warn-tint); }
 .load.skipped .gl, .load.running .gl { color: var(--warn); }
+.prereqs { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-width: calc(76ch + 20px); }
+.prereq { display: flex; gap: 8px; align-items: flex-start; padding: 6px 10px; margin-left: -10px; border-radius: 4px; overflow-wrap: anywhere; }
+.prereq p { margin: 2px 0 0; }
+.prereq-name { font-weight: 600; }
+.prereq-state { color: var(--muted-fg); }
+.prereq-why, .prereq-how { color: var(--muted-fg); }
+.prereq.met .gl, .prereq-rows .met .gl { color: var(--ok); }
+.prereq.missing { background: var(--fail-tint); }
+.prereq.missing .gl, .prereq-rows .missing .gl { color: var(--fail); }
+.prereq.eligible { background: var(--warn-tint); }
+.prereq.eligible .gl, .prereq-rows .eligible .gl { color: var(--warn); }
+.prereq.unknown .gl, .prereq-rows .unknown .gl { color: var(--muted-fg); }
+.prereq-rows { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.prereq-rows li { display: flex; gap: 6px; align-items: flex-start; }
+.history-pick { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; max-width: 46ch; }
 .kv-row { display: grid; grid-template-columns: minmax(120px, 180px) 1fr; gap: 16px; max-width: 76ch; overflow-wrap: anywhere; }
 .kv-row .k { color: var(--muted-fg); }
 .subhead { font-size: 14px; line-height: 20px; font-weight: 600; margin-top: 12px; }
