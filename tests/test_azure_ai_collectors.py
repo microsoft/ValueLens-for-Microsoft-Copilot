@@ -14,6 +14,7 @@ import notebook_source
 ROOT = notebook_source.ROOT
 NOTEBOOK = "credit-consumption/Ingest_Azure_AI.ipynb"
 CSV_SCRIPT = ROOT / "5. Local CSV" / "Add Credit Consumption" / "pull_azure_ai.py"
+JOBS_COLLECTOR = ROOT / "2. Azure" / "jobs" / "valuelens_jobs" / "collect" / "azure_ai.py"
 SAMPLES = ROOT / "5. Local CSV" / "Add Credit Consumption" / "sample-data"
 DATAVERSE = ROOT / "3. Power Automate + Dataverse" / "Add Credit Consumption" / "dataverse-schema.json"
 SHARED_START = "# --- Shared with the Fabric notebook Ingest_Azure_AI.ipynb (section 4); keep identical. ---\n"
@@ -58,6 +59,8 @@ def test_shared_block_is_identical_in_notebook_and_csv_script():
     assert cell.startswith("import re\n")
     assert cell[len("import re\n"):].strip() == shared
     assert not any(isinstance(n, (ast.Import, ast.ImportFrom)) for n in ast.parse(shared).body)
+    jobs = JOBS_COLLECTOR.read_text(encoding="utf-8").replace("\r\n", "\n")
+    assert jobs.split(SHARED_START, 1)[1].split(SHARED_END, 1)[0].strip() == shared
 
 
 @pytest.mark.parametrize("table", TABLES)

@@ -78,6 +78,15 @@ param sqlReaderName string = ''
 @description('Client (app) ID of the SQL reader app registration. The migrate job creates its database user by SID, so the SQL server needs no Graph access.')
 param sqlReaderClientId string = ''
 
+@description('Credit consumption: subscription whose Azure OpenAI and AI Foundry costs the run job reads. Empty = Azure AI left out.')
+param azureAiSubscriptionId string = ''
+@description('Credit consumption: other subscriptions (comma-separated) that Copilot pay-as-you-go billing policies charge.')
+param paygSubscriptionIds string = ''
+@description('Credit consumption, private networking: SharePoint site, drive and folder the Copilot Studio flow and the Viva export are dropped in. Empty = the storage account\'s landing container.')
+param dropSiteId string = ''
+param dropDriveId string = ''
+param dropFolder string = ''
+
 var allTags = union(tags, { 'valuelens-install-id': installId, 'valuelens-component': 'analytics-hub' })
 var privateNetworking = publicNetworkAccess == 'Disabled'
 var suffix = substring(uniqueString(resourceGroup().id, installId), 0, 6)
@@ -196,6 +205,11 @@ module apps 'modules/containerapps.bicep' = {
     semanticModels: semanticModels
     sqlReaderName: sqlReaderName
     sqlReaderClientId: sqlReaderClientId
+    azureAiSubscriptionId: azureAiSubscriptionId
+    paygSubscriptionIds: paygSubscriptionIds
+    dropSiteId: dropSiteId
+    dropDriveId: dropDriveId
+    dropFolder: dropFolder
   }
 }
 

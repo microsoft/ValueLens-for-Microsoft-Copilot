@@ -27,6 +27,17 @@ RUN pip install /src/shared && rm -rf /src/shared
 COPY ["2. Azure/sql/migrations", "/app/sql/migrations"]
 # Synthetic demo data for VALUELENS_SAMPLE_DATA=true (valuelens_jobs/sample.py).
 COPY ["5. Local CSV/sample-data/copilot_interactions_sample.csv", "5. Local CSV/sample-data/copilot_users_sample.csv", "/app/sample-data/"]
+COPY ["5. Local CSV/Add Credit Consumption/sample-data/StudioTenantDaily.csv", \
+      "5. Local CSV/Add Credit Consumption/sample-data/StudioPerAgent.csv", \
+      "5. Local CSV/Add Credit Consumption/sample-data/StudioPerUser.csv", \
+      "5. Local CSV/Add Credit Consumption/sample-data/PersonServiceCreditsMetrics.csv", \
+      "5. Local CSV/Add Credit Consumption/sample-data/SpendingPolicyMetadata.csv", \
+      "5. Local CSV/Add Credit Consumption/sample-data/AzureAiSpendDaily.csv", \
+      "5. Local CSV/Add Credit Consumption/sample-data/AzureAiTokensDaily.csv", \
+      "5. Local CSV/Add Credit Consumption/sample-data/AzureDeploymentHealth.csv", \
+      "5. Local CSV/Add Credit Consumption/sample-data/AzureSolutionSpend.csv", \
+      "5. Local CSV/Add Credit Consumption/sample-data/AzureBillingReconciliation.csv", \
+      "/app/sample-data/consumption/"]
 COPY ["2. Azure/jobs/valuelens_jobs", "/app/valuelens_jobs"]
 
 RUN useradd --uid 10001 --create-home valuelens

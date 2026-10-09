@@ -9,6 +9,7 @@ log = logging.getLogger("valuelens_jobs.http")
 GRAPH = "https://graph.microsoft.com/.default"
 POWERBI = "https://analysis.windows.net/powerbi/api/.default"
 SQL = "https://database.windows.net/.default"
+ARM = "https://management.azure.com/.default"
 TRANSIENT = {429, 500, 502, 503, 504}
 
 

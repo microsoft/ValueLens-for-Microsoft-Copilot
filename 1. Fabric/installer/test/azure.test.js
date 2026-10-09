@@ -8,7 +8,11 @@ import { MODULES, azureGraphRolesFor } from '../src/catalog.js';
 import { HttpError } from '../src/http.js';
 import { waitForDeployment } from '../src/clients/azure.js';
 import { runCommand } from '../src/install.js';
-import { REQUIRED_ARM_PARAMETERS, armParameterNames, azureCron, azureDeployment, azureModuleChoices, azurePlanReview, azurePreflight, azureRotateSecret, installAzure, policyMessage, publicAccessMessage, regionCapacityMessage, supportsVnetGateway, whileSqlResumes, isSqlResuming, whatIfSummary } from '../src/steps/azure/index.js';
+import { REQUIRED_ARM_PARAMETERS, armParameterNames, azureConsumptionOn, azureCron, azureDeployment, azureGraphRoles, azureModuleChoices, azurePlanReview, azurePreflight, azureRotateSecret, azureSemanticModels, consumptionParameters, installAzure, parseDropFolder, policyMessage, publicAccessMessage, regionCapacityMessage, supportsVnetGateway, whileSqlResumes, isSqlResuming, whatIfSummary } from '../src/steps/azure/index.js';
+import { AZURE_AI_ROLES } from '../src/steps/consumption.js';
+import { azureFlowTarget, connectionSteps, flowDefinitions, flowsWanted } from '../src/steps/flows.js';
+import { CONNECTORS, connectorsUsed } from '../src/transform/flows.js';
+import { ROLES } from '../src/clients/azure.js';
 import { buildModel, mParameter } from '../src/transform/model.js';
 import { fakeArm, fakeAzureGraph, fakeCtx, fakeFabric, fakePowerBi, fakeUi } from './fakes.js';
 
@@ -23,7 +27,204 @@ test('Azure target gates modules and mirrors Graph roles', () => {
     'Reports.Read.All',
     'User.Read.All',
   ]);
-  assert.equal(MODULES.consumption.azure.supported, false);
+  assert.equal(MODULES.consumption.azure.supported, true);
+});
+
+test('parseDropFolder: a folder address or its AllItems link gives the site, the Graph site ID and the path in the library', () => {
+  const want = {
+    folderUrl: 'https://contoso.sharepoint.com/sites/Analytics/Shared Documents/ValueLens',
+    siteUrl: 'https://contoso.sharepoint.com/sites/Analytics',
+    sitePath: '/Shared Documents/ValueLens',
+    siteId: 'contoso.sharepoint.com:/sites/Analytics',
+    driveId: '',
+    drivePath: 'Shared Documents/ValueLens',
+  };
+  assert.deepEqual(parseDropFolder('https://contoso.sharepoint.com/sites/Analytics/Shared%20Documents/ValueLens/'), want);
+  assert.deepEqual(parseDropFolder(' https://contoso.sharepoint.com/sites/Analytics/Shared Documents/ValueLens '), want);
+  assert.deepEqual(parseDropFolder('https://contoso.sharepoint.com/sites/Analytics/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FAnalytics%2FShared%20Documents%2FValueLens&viewid=abc'), want);
+  assert.equal(parseDropFolder('https://contoso.sharepoint.com/teams/Ops/Documents/Credits').siteId, 'contoso.sharepoint.com:/teams/Ops');
+  const root = parseDropFolder('https://contoso.sharepoint.com/Shared Documents/Credits');
+  assert.equal(root.siteId, 'contoso.sharepoint.com');
+  assert.equal(root.siteUrl, 'https://contoso.sharepoint.com');
+  assert.equal(root.drivePath, 'Shared Documents/Credits');
+  assert.throws(() => parseDropFolder('not a url'), /https:\/\/ address/);
+  assert.throws(() => parseDropFolder('http://contoso.sharepoint.com/sites/A/Docs'), /SharePoint Online/);
+  assert.throws(() => parseDropFolder('https://example.com/sites/A/Docs'), /SharePoint Online/);
+  assert.throws(() => parseDropFolder('https://contoso.sharepoint.com/sites/Analytics'), /site, not a folder/);
+});
+
+/** @param {import('../src/config.js').InstallConfig} config @param {Partial<import('../src/config.js').AzureConfig>} [az] */
+function withAzureConsumption(config, az = {}) {
+  config.target = 'azure';
+  config.modules.consumption = true;
+  config.azure = { subscriptionId: 'sub-1', resourceGroup: 'rg', location: 'uksouth', namePrefix: 'vlens', installId: 'install-1', tags: {}, deployments: [], outputs: {}, graphRoles: { assigned: [], pending: [] }, publicNetworkAccess: true, workspaceName: 'Analytics Hub', ...az };
+  Object.assign(config.dataSources, { studioCredits: 'api', coworkCredits: 'csv', azureAi: 'api' });
+  Object.assign(config.consumption, { azureSubscriptionId: 'ai-sub', azureSubscriptionName: 'AI', paygSubscriptions: [{ subscriptionId: 'payg-1', access: true }, { subscriptionId: 'payg-2' }] });
+  config.uploads = { flowEnvironment: { url: 'https://org1.crm.dynamics.com', id: 'env-1', name: 'Default' } };
+}
+
+test('credit consumption on Azure: the job reads only what it was given access to, and the app gets the cc model', () => {
+  const { config } = fakeCtx();
+  withAzureConsumption(config);
+  assert.equal(azureConsumptionOn(config), true);
+  const off = Object.fromEntries(Object.entries(consumptionParameters(config)).map(([k, v]) => [k, v.value]));
+  assert.deepEqual(off, { azureAiSubscriptionId: '', paygSubscriptionIds: 'payg-1', dropSiteId: '', dropDriveId: '', dropFolder: '' }, 'no Azure AI until its roles are in');
+  config.consumption.azureAccess = true;
+  config.azure = { ...config.azure, drop: parseDropFolder('https://contoso.sharepoint.com/sites/Analytics/Shared Documents/ValueLens') };
+  const on = Object.fromEntries(Object.entries(consumptionParameters(config)).map(([k, v]) => [k, v.value]));
+  assert.deepEqual(on, { azureAiSubscriptionId: 'ai-sub', paygSubscriptionIds: 'payg-1', dropSiteId: 'contoso.sharepoint.com:/sites/Analytics', dropDriveId: '', dropFolder: 'Shared Documents/ValueLens' });
+  assert.ok(azureGraphRoles(config).includes('Sites.Selected'));
+
+  assert.deepEqual(azureSemanticModels({ powerBi: { workspaceId: 'ws', datasetId: 'vl-1', consumptionDatasetId: 'cc-1' } }), { vl: { workspaceId: 'ws', itemId: 'vl-1' }, cc: { workspaceId: 'ws', itemId: 'cc-1' } });
+
+  // Demo mode collects nothing from the tenant.
+  /** @type {any} */ (config.azure).sampleData = true;
+  assert.equal(azureConsumptionOn(config), false);
+  assert.ok(Object.values(consumptionParameters(config)).every((v) => v.value === ''));
+  assert.ok(!azureGraphRoles(config).includes('Sites.Selected'));
+});
+
+test('Azure Studio flow: signed in as the user, it writes to the landing container, or to SharePoint with private networking', () => {
+  const { config } = fakeCtx();
+  withAzureConsumption(config, { outputs: { storageAccountName: 'vlensst' } });
+  config.uploads.flowIdentity = 'app';
+  config.uploads.feedbackFlow = true;
+  config.dataSources.productFeedback = 'csv';
+  assert.deepEqual(flowsWanted(config), ['studio'], 'no feedback flow on Azure, and the app identity is Fabric only');
+  assert.equal(azureFlowTarget(config.azure).identity, 'user');
+  const pub = flowDefinitions(config, 'tenant-1').studio;
+  assert.deepEqual(connectorsUsed(pub.definition), [CONNECTORS.entra.name, CONNECTORS.storage.name].sort());
+  const text = JSON.stringify(pub.definition);
+  assert.match(text, /https:\/\/vlensst\.dfs\.core\.windows\.net\/landing\/studio\//);
+  assert.match(text, /https:\/\/vlensst\.dfs\.core\.windows\.net\/landing\/flows\//, 'the backfill marker stays out of the folder the jobs read');
+  assert.doesNotMatch(text, /keyvault|onelake/i);
+  assert.match(pub.description, /vlensst > landing\/studio/);
+  assert.match(connectionSteps(config, 'studio')[1], /for Azure Storage: Base Resource URL https:\/\/vlensst\.dfs\.core\.windows\.net, .*Storage Blob Data Contributor on vlensst/);
+
+  config.azure = { ...config.azure, publicNetworkAccess: false, drop: parseDropFolder('https://contoso.sharepoint.com/sites/Analytics/Shared Documents/ValueLens') };
+  const priv = flowDefinitions(config, 'tenant-1').studio;
+  assert.deepEqual(connectorsUsed(priv.definition), [CONNECTORS.entra.name, CONNECTORS.sharePoint.name].sort());
+  const ptext = JSON.stringify(priv.definition);
+  assert.match(ptext, /"dataset":"https:\/\/contoso\.sharepoint\.com\/sites\/Analytics"/);
+  assert.match(ptext, /"folderPath":"\/Shared Documents\/ValueLens\/studio"/);
+  assert.match(ptext, /"path":"\/Shared Documents\/ValueLens\/flows\//);
+  assert.doesNotMatch(ptext, /dfs\.core\.windows\.net/);
+  assert.match(priv.description, /ValueLens\/studio/);
+  assert.match(connectionSteps(config, 'studio')[1], /^SharePoint: .*https:\/\/contoso\.sharepoint\.com\/sites\/Analytics\/Shared Documents\/ValueLens/);
+});
+
+/** A Dataverse environment that keeps the flows it creates. */
+function fakeFlowEnvironment() {
+  /** @type {Map<string, any>} */
+  const flows = new Map();
+  let n = 0;
+  return {
+    flows,
+    api: {
+      createFlow: async (/** @type {any} */ f) => {
+        const id = `flow-${++n}`;
+        flows.set(id, { workflowid: id, name: f.name, statecode: 0, clientdata: f.clientdata });
+        return id;
+      },
+      getFlow: async (/** @type {string} */ id) => flows.get(id),
+      updateFlow: async (/** @type {string} */ id, /** @type {string} */ clientdata) => {
+        flows.get(id).clientdata = clientdata;
+      },
+      turnOffFlow: async () => {},
+    },
+  };
+}
+
+test('Azure install with credit consumption: roles for the jobs, landing write for the user, the cc model and the Studio flow', async () => {
+  const arm = fakeArm();
+  /** @type {any[]} */
+  const deployments = [];
+  const deploy = /** @type {(...a: any[]) => Promise<any>} */ (arm.api.deployTemplate);
+  arm.api.deployTemplate = async (/** @type {any[]} */ ...args) => {
+    deployments.push(args[3]);
+    return deploy(...args);
+  };
+  const graph = fakeAzureGraph();
+  const fabric = fakeFabric();
+  const powerBi = fakePowerBi();
+  powerBi.setDatasources([{ datasourceType: 'Sql', gatewayId: 'gw', datasourceId: 'ds', connectionDetails: { server: 'vlens-sql.database.windows.net', database: 'valuelens' } }]);
+  const env = fakeFlowEnvironment();
+  const ui = fakeUi();
+  const { ctx, config } = fakeCtx({ arm: arm.api, graph: graph.api, fabric: fabric.api, powerBi: powerBi.api, ui: ui.ui, dataverse: () => env.api });
+  withAzureConsumption(config);
+  ctx.runFirstLoad = false;
+
+  await installAzure(ctx, { wait: true });
+  for (const r of AZURE_AI_ROLES) assert.ok(arm.calls.includes(`assignRole /subscriptions/ai-sub ${r.id} mi-sp ServicePrincipal`), r.name);
+  assert.ok(arm.calls.includes(`assignRole /subscriptions/payg-2 ${ROLES.costManagementReader} mi-sp ServicePrincipal`));
+  assert.ok(arm.calls.includes(`assignRole /subscriptions/sub-1/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/vlensstabc ${ROLES.storageBlobDataContributor} user-1 User`));
+  const az = /** @type {any} */ (config.azure);
+  assert.equal(az.storageRole, true);
+  assert.ok(!graph.calls.some((c) => c.startsWith('grantSiteRead')));
+  assert.ok(!az.graphRoles.assigned.includes('Sites.Selected'));
+
+  const last = deployments.at(-1).properties.parameters;
+  assert.equal(last.azureAiSubscriptionId.value, 'ai-sub');
+  assert.equal(last.paygSubscriptionIds.value, 'payg-1,payg-2');
+  assert.equal(last.dropSiteId.value, '');
+  assert.deepEqual(Object.keys(JSON.parse(last.semanticModels.value)).sort(), ['cc', 'vl']);
+
+  assert.equal(az.powerBi.consumptionDatasetId, config.consumption.model.id);
+  assert.ok(az.powerBi.consumptionDatasetId && az.powerBi.consumptionDatasetId !== az.powerBi.datasetId);
+  assert.equal(powerBi.calls.filter((c) => c === 'updateDatasource gw ds ServicePrincipal').length, 2, 'both models are bound');
+  assert.ok(powerBi.calls.includes(`setRefreshSchedule ${az.powerBi.workspaceId} ${az.powerBi.consumptionDatasetId}`));
+
+  assert.equal(env.flows.size, 1);
+  assert.match(env.flows.get('flow-1').clientdata, /vlensstabc\.dfs\.core\.windows\.net\/landing\/studio/);
+  assert.match(ui.text(), /Power Automate flows/);
+  assert.match(ui.text(), /for Azure Storage/);
+
+  // A repair reuses the role and the flow.
+  arm.calls.length = 0;
+  await installAzure(ctx, { wait: true });
+  assert.ok(!arm.calls.some((c) => c.startsWith('assignRole')));
+  assert.equal(env.flows.size, 1);
+});
+
+test('Azure install with credit consumption: a SharePoint drop folder gets a site grant for the jobs, or an admin action', async () => {
+  const drop = parseDropFolder('https://contoso.sharepoint.com/sites/Analytics/Shared Documents/ValueLens');
+  const run = async (/** @type {boolean} */ fail) => {
+    const arm = fakeArm();
+    const graph = fakeAzureGraph();
+    if (fail) graph.siteGrantFailures.push(new Error('Forbidden'));
+    const powerBi = fakePowerBi();
+    powerBi.setDatasources([{ datasourceType: 'Sql', gatewayId: 'gw', datasourceId: 'ds' }]);
+    const env = fakeFlowEnvironment();
+    const { ctx, config } = fakeCtx({ arm: arm.api, graph: graph.api, fabric: fakeFabric().api, powerBi: powerBi.api, ui: fakeUi().ui, dataverse: () => env.api });
+    withAzureConsumption(config, { drop: { ...drop } });
+    ctx.runFirstLoad = false;
+    await installAzure(ctx, { wait: true });
+    return { arm, graph, env, az: /** @type {any} */ (config.azure) };
+  };
+  const ok = await run(false);
+  assert.ok(ok.graph.calls.some((c) => c.startsWith('grantSiteRead site:contoso.sharepoint.com:/sites/Analytics')));
+  assert.equal(ok.az.drop.granted, true);
+  assert.ok(ok.az.graphRoles.assigned.includes('Sites.Selected'));
+  assert.ok(!ok.arm.calls.some((c) => c.includes('storageAccounts/')), 'no storage role for the user when files go to SharePoint');
+  assert.match(ok.env.flows.get('flow-1').clientdata, /shared_sharepointonline/);
+
+  const denied = await run(true);
+  assert.ok(!denied.az.drop.granted);
+  assert.ok(denied.az.status.pendingAdminActions.some((/** @type {string} */ a) => /^Grant-PnPAzureADAppSitePermission -AppId \S+ .* -Site https:\/\/contoso\.sharepoint\.com\/sites\/Analytics -Permissions Read$/.test(a)));
+});
+
+test('Azure install with credit consumption in demo mode leaves it all out', async () => {
+  const arm = fakeArm();
+  const powerBi = fakePowerBi();
+  powerBi.setDatasources([{ datasourceType: 'Sql', gatewayId: 'gw', datasourceId: 'ds' }]);
+  const env = fakeFlowEnvironment();
+  const { ctx, config } = fakeCtx({ arm: arm.api, graph: fakeAzureGraph().api, fabric: fakeFabric().api, powerBi: powerBi.api, ui: fakeUi().ui, dataverse: () => env.api });
+  withAzureConsumption(config, { sampleData: true });
+  ctx.runFirstLoad = false;
+  await installAzure(ctx, { wait: true });
+  assert.ok(!arm.calls.some((c) => c.startsWith('assignRole')));
+  assert.equal(config.azure?.powerBi?.consumptionDatasetId, undefined);
+  assert.equal(env.flows.size, 0);
 });
 
 test('Azure preflight surfaces policy denial and what-if plan grouping', async () => {

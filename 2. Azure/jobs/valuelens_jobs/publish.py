@@ -1,8 +1,8 @@
 """Publish curated/raw Parquet into Azure SQL for the Power BI model.
 
 * Columns are created/added NULLable from the DuckDB types; a column is never dropped or narrowed.
-* Snapshot tables (licensed users, org data) are replaced in one transaction.
-* Date-partitioned tables (curated interactions, M365 activity) are compared day by day against a
+* Snapshot tables (licensed users, org data, most consumption tables) are replaced in one transaction.
+* Date-partitioned tables (curated interactions, M365 activity, daily consumption) are compared day by day against a
   fingerprint (row count + order-independent row hash + column list) kept in `valuelens_publish_state`;
   only changed days are rewritten (DELETE + INSERT in one transaction), vanished days are deleted.
 
@@ -46,6 +46,9 @@ class Target:
     table: str
     prefix: str
     partition: str | None = None
+    # False: rewritten days don't count towards the semantic models' incremental-refresh window
+    # (the consumption tables are plain imports, so they never force a full refresh).
+    incremental: bool = True
 
 
 TARGETS = {
@@ -54,6 +57,22 @@ TARGETS = {
     "org": Target("copilot_org_data", "raw/copilot_org_data"),
     "m365": Target("m365_activity_daily", "raw/m365_activity_daily", "ActivityDate"),
 }
+# Consumption Central (module `consumption`): the Lakehouse table names, so the model's navigation
+# works unchanged. Daily tables are published day by day; the rest are replaced each run.
+CONSUMPTION_PARTITIONED = {
+    "studio_tenant_daily": "usage_date",
+    "studio_agent_daily": "usage_date",
+    "studio_user_daily": "usage_date",
+    "viva_credits_weekly": "metric_date",
+}
+CONSUMPTION_CURATED = ["studio_tenant_daily", "studio_agent", "studio_user", "studio_agent_daily",
+                       "studio_user_daily", "viva_credits_weekly", "viva_spending_policy"]
+CONSUMPTION_RAW = ["azure_ai_spend", "azure_ai_tokens", "copilot_payg_spend", "azure_deployment_health",
+                   "azure_solution_spend", "azure_billing_reconciliation"]
+CONSUMPTION = CONSUMPTION_CURATED + CONSUMPTION_RAW
+for _name in CONSUMPTION:
+    TARGETS[_name] = Target(_name, f"{'curated' if _name in CONSUMPTION_CURATED else 'raw'}/{_name}",
+                            CONSUMPTION_PARTITIONED.get(_name), incremental=False)
 
 
 def b(name: str) -> str:
@@ -198,7 +217,7 @@ def publish_table(conn, store_root, target: Target, *, now=None) -> dict:
         changed += 1
     log.info("publish %s: %s day(s) rewritten (%s rows), %s removed, %s unchanged", target.table, changed, rows,
              removed, len(fresh) - changed)
-    days = [k for k in touched if k != "null"]
+    days = [k for k in touched if k != "null"] if target.incremental else []
     return {"table": target.table, "days_changed": changed, "days_removed": removed, "rows": rows,
             "added_columns": added, "oldest_day": min(days) if days else None}
 

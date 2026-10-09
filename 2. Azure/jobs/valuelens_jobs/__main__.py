@@ -15,6 +15,9 @@ Data layout (same under a local directory or the ADLS account; first segment = c
     raw/m365_activity_daily/day-YYYYMMDD.parquet
     raw/agents_365/*.parquet                                   (Phase 2, optional)
     curated/copilot_interactions_curated/part-0.parquet
+    curated/<studio_* | viva_*>/part-0.parquet                 (module consumption, merged state)
+    raw/<azure_ai_* | copilot_payg_spend | ...>/part-0.parquet (module consumption, Azure AI)
+    landing/studio/*.csv, landing/viva/*.csv                   (consumption drop folder, read only)
 """
 from __future__ import annotations
 
@@ -82,6 +85,18 @@ def collect(store, settings, api=None) -> dict:
         jobs.append(("org", collect_org))
     if settings.has("m365Activity"):
         jobs.append(("m365", collect_m365))
+    if settings.has("consumption"):
+        from .collect.studio import collect_studio
+        from .collect.viva import collect_viva
+
+        jobs += [("studio", collect_studio), ("viva", collect_viva)]
+        if settings.azure_ai_subscription:
+            from .collect.azure_ai import collect_azure_ai
+
+            jobs.append(("azure_ai", collect_azure_ai))
+        else:
+            # As in Fabric: without the Azure AI subscription, Copilot pay-as-you-go isn't read either.
+            log.info("collect azure_ai: VALUELENS_AZURE_AI_SUBSCRIPTION not set; Azure AI and PAYG skipped")
     out, errors = {}, {}
     for name, fn in jobs:
         try:
@@ -95,9 +110,12 @@ def collect(store, settings, api=None) -> dict:
 
 
 def publish_targets(settings) -> list[str]:
+    from .publish import CONSUMPTION
+
+    consumption = list(CONSUMPTION) if settings.has("consumption") else []
     if settings.sample_data:
-        # The sample replaces the people and Copilot tables; tenant M365 activity is left as it is.
-        return ["curated", "licensed", "org"]
+        # The sample replaces the people, Copilot and consumption tables; tenant M365 activity is left as it is.
+        return ["curated", "licensed", "org", *consumption]
     targets = []
     if settings.has("core"):
         targets += ["curated", "licensed"]
@@ -105,7 +123,7 @@ def publish_targets(settings) -> list[str]:
         targets.append("org")
     if settings.has("m365Activity"):
         targets.append("m365")
-    return targets
+    return targets + consumption
 
 
 def _sql(settings):
@@ -196,7 +214,7 @@ def main(argv=None, env=None) -> int:
             if settings.sample_data:
                 from .sample import load
 
-                load(store)
+                load(store, consumption=settings.has("consumption"))
             else:
                 collect_errors = collect(store, settings).get("errors", {})
         elif step == "process":

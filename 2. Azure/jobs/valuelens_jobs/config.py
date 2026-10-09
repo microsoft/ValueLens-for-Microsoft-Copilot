@@ -24,6 +24,11 @@ class Settings:
     sql_reader_name: str = ""
     sql_reader_client_id: str = ""
     sample_data: bool = False
+    azure_ai_subscription: str = ""
+    payg_subscriptions: tuple = ()
+    drop_site_id: str = ""
+    drop_drive_id: str = ""
+    drop_folder: str = ""
 
     def has(self, module: str) -> bool:
         return module in self.modules
@@ -54,6 +59,12 @@ class Settings:
             sql_reader_name=env.get("VALUELENS_SQL_READER_NAME", ""),
             sql_reader_client_id=env.get("VALUELENS_SQL_READER_CLIENT_ID", ""),
             sample_data=(env.get("VALUELENS_SAMPLE_DATA") or "").strip().lower() in ("true", "1", "yes"),
+            azure_ai_subscription=(env.get("VALUELENS_AZURE_AI_SUBSCRIPTION") or "").strip(),
+            payg_subscriptions=tuple(s.strip() for s in (env.get("VALUELENS_PAYG_SUBSCRIPTIONS") or "").split(",")
+                                     if s.strip()),
+            drop_site_id=(env.get("VALUELENS_DROP_SITE_ID") or "").strip(),
+            drop_drive_id=(env.get("VALUELENS_DROP_DRIVE_ID") or "").strip(),
+            drop_folder=(env.get("VALUELENS_DROP_FOLDER") or "").strip().strip("/"),
         )
 
 

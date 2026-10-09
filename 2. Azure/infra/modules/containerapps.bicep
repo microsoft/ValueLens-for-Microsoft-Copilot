@@ -29,6 +29,11 @@ param powerBiWorkspaceId string
 param semanticModels string
 param sqlReaderName string
 param sqlReaderClientId string = ''
+param azureAiSubscriptionId string = ''
+param paygSubscriptionIds string = ''
+param dropSiteId string = ''
+param dropDriveId string = ''
+param dropFolder string = ''
 param registryServer string = ''
 @description('Subnet delegated to Microsoft.App/environments (private networking). Empty = no VNet.')
 param infrastructureSubnetId string = ''
@@ -71,6 +76,11 @@ var jobEnv = concat(commonEnv, [
   { name: 'VALUELENS_SQL_READER_NAME', value: sqlReaderName }
   { name: 'VALUELENS_SQL_READER_CLIENT_ID', value: sqlReaderClientId }
   { name: 'VALUELENS_SAMPLE_DATA', value: sampleData ? 'true' : 'false' }
+  { name: 'VALUELENS_AZURE_AI_SUBSCRIPTION', value: azureAiSubscriptionId }
+  { name: 'VALUELENS_PAYG_SUBSCRIPTIONS', value: paygSubscriptionIds }
+  { name: 'VALUELENS_DROP_SITE_ID', value: dropSiteId }
+  { name: 'VALUELENS_DROP_DRIVE_ID', value: dropDriveId }
+  { name: 'VALUELENS_DROP_FOLDER', value: dropFolder }
 ])
 var registries = empty(registryServer) ? [] : [{ server: registryServer, identity: identityId }]
 var identity = {

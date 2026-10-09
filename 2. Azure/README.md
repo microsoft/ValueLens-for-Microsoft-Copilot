@@ -4,9 +4,10 @@ Analytics Hub running in **your own Azure subscription**, without Microsoft Fabr
 same data, the same ValueLens Model and measures, and the same app pages as `1. Fabric`.
 The design and the roadmap are in [`docs/plans/AZURE-HOSTED-PLAN.md`](../docs/plans/AZURE-HOSTED-PLAN.md).
 
-> **Status: preview (Phase 1 MVP).** The installer deploys it end to end: Azure SQL, the Container Apps
-> jobs, the Power BI model, the web app and a Teams package. It collects Copilot interactions, licences and
-> org data, and Microsoft 365 activity. The other modules are coming. Try it in a demo or test tenant first.
+> **Status: preview.** The installer deploys it end to end: Azure SQL, the Container Apps jobs, the Power BI
+> models, the web app and a Teams package. It collects Copilot interactions, licences and org data, Microsoft
+> 365 activity, and credit consumption (Copilot Studio, Cowork, Azure AI and pay-as-you-go). The other modules
+> are coming. Try it in a demo or test tenant first.
 
 ## Install it
 
@@ -24,6 +25,31 @@ The design and the roadmap are in [`docs/plans/AZURE-HOSTED-PLAN.md`](../docs/pl
 What you need, networking, regions and the commands are in the installer's
 [Azure target section](../1.%20Fabric/installer/README.md#azure-target-preview). The images come from
 `ghcr.io/microsoft/valuelens-jobs` and `valuelens-web`, tagged with the installer's version.
+
+## Credit consumption
+
+Tick **Credit consumption** to get the Consumption Central pages, from a second Power BI model
+(*Consumption Central*) that reads the same Azure SQL database.
+
+- **Copilot Studio credits** come from the Power Platform licensing API by default, as on Fabric. The
+  installer creates a daily Power Automate flow, signed in as you through **HTTP with Microsoft Entra ID**.
+  Its first run loads about six months, then it reads the last ten days. Per-user credits are best effort.
+  You can choose the PPAC CSV exports instead.
+- **Cowork credits**: drop the Consumption Dashboard's Viva Insights export in the `viva` folder.
+- **Azure AI and pay-as-you-go**: the jobs read Cost Management and Azure Monitor with their managed
+  identity. The installer gives it the roles on the subscriptions you pick, if you can assign them.
+
+Where the files land depends on networking:
+
+| Networking | Credit files go to | Who needs what |
+|---|---|---|
+| Public endpoints | The storage account's `landing` container: `studio/`, `viva/` (the flow keeps its own state in `flows/`) | Whoever signs the flow's storage connection in needs **Storage Blob Data Contributor** on the account. The installer gives it to you |
+| Private networking | A SharePoint folder you choose, with `studio/` and `viva/` under it. Power Automate can't reach private storage | The jobs' managed identity needs **Sites.Selected** with read on that site. The installer grants it if you're a SharePoint or Global administrator; otherwise it prints the `Grant-PnPAzureADAppSitePermission` command for one |
+
+The jobs read the files where they land and don't move them, the same as the Fabric notebooks.
+
+Not on Azure yet: GitHub Copilot consumption, the dated Agent Daily table, Viva without a CSV, and
+`--flow-identity app` (the flow always signs in as you; the option warns and is ignored).
 
 ## What's here
 
@@ -68,4 +94,6 @@ ARM can't do these, so the installer:
 - Grant the managed identity its Graph app roles (`AuditLogsQuery.Read.All`, `Reports.Read.All`,
   `User.Read.All` and module extras).
 - Run the migrate job, which creates the database users.
-- Create the web app registration with a federated credential, and the Power BI workspace, model and refresh.
+- Create the web app registration with a federated credential, and the Power BI workspace, models and refresh.
+- With credit consumption: the managed identity's Cost Management and Azure AI roles, write access to
+  where the credit files land, the Consumption Central model, and the Copilot Studio Power Automate flow.

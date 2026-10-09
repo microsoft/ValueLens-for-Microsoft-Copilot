@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.47.16.16243",
-      "templateHash": "13160135517887713590"
+      "templateHash": "13744013049464516222"
     }
   },
   "parameters": {
@@ -205,6 +205,35 @@
       "metadata": {
         "description": "Client (app) ID of the SQL reader app registration. The migrate job creates its database user by SID, so the SQL server needs no Graph access."
       }
+    },
+    "azureAiSubscriptionId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Credit consumption: subscription whose Azure OpenAI and AI Foundry costs the run job reads. Empty = Azure AI left out."
+      }
+    },
+    "paygSubscriptionIds": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Credit consumption: other subscriptions (comma-separated) that Copilot pay-as-you-go billing policies charge."
+      }
+    },
+    "dropSiteId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Credit consumption, private networking: SharePoint site, drive and folder the Copilot Studio flow and the Viva export are dropped in. Empty = the storage account's landing container."
+      }
+    },
+    "dropDriveId": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "dropFolder": {
+      "type": "string",
+      "defaultValue": ""
     }
   },
   "variables": {
@@ -1144,6 +1173,21 @@
           },
           "sqlReaderClientId": {
             "value": "[parameters('sqlReaderClientId')]"
+          },
+          "azureAiSubscriptionId": {
+            "value": "[parameters('azureAiSubscriptionId')]"
+          },
+          "paygSubscriptionIds": {
+            "value": "[parameters('paygSubscriptionIds')]"
+          },
+          "dropSiteId": {
+            "value": "[parameters('dropSiteId')]"
+          },
+          "dropDriveId": {
+            "value": "[parameters('dropDriveId')]"
+          },
+          "dropFolder": {
+            "value": "[parameters('dropFolder')]"
           }
         },
         "template": {
@@ -1153,7 +1197,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.47.16.16243",
-              "templateHash": "13284548157189845414"
+              "templateHash": "16356171400828608952"
             }
           },
           "parameters": {
@@ -1246,6 +1290,26 @@
               "type": "string",
               "defaultValue": ""
             },
+            "azureAiSubscriptionId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "paygSubscriptionIds": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "dropSiteId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "dropDriveId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "dropFolder": {
+              "type": "string",
+              "defaultValue": ""
+            },
             "registryServer": {
               "type": "string",
               "defaultValue": ""
@@ -1293,7 +1357,7 @@
                 "value": "[parameters('semanticModels')]"
               }
             ],
-            "jobEnv": "[concat(variables('commonEnv'), createArray(createObject('name', 'VALUELENS_MODULES', 'value', parameters('modules')), createObject('name', 'VALUELENS_AUDIT_HISTORY_DAYS', 'value', string(parameters('auditHistoryDays'))), createObject('name', 'VALUELENS_SQL_READER_NAME', 'value', parameters('sqlReaderName')), createObject('name', 'VALUELENS_SQL_READER_CLIENT_ID', 'value', parameters('sqlReaderClientId')), createObject('name', 'VALUELENS_SAMPLE_DATA', 'value', if(parameters('sampleData'), 'true', 'false'))))]",
+            "jobEnv": "[concat(variables('commonEnv'), createArray(createObject('name', 'VALUELENS_MODULES', 'value', parameters('modules')), createObject('name', 'VALUELENS_AUDIT_HISTORY_DAYS', 'value', string(parameters('auditHistoryDays'))), createObject('name', 'VALUELENS_SQL_READER_NAME', 'value', parameters('sqlReaderName')), createObject('name', 'VALUELENS_SQL_READER_CLIENT_ID', 'value', parameters('sqlReaderClientId')), createObject('name', 'VALUELENS_SAMPLE_DATA', 'value', if(parameters('sampleData'), 'true', 'false')), createObject('name', 'VALUELENS_AZURE_AI_SUBSCRIPTION', 'value', parameters('azureAiSubscriptionId')), createObject('name', 'VALUELENS_PAYG_SUBSCRIPTIONS', 'value', parameters('paygSubscriptionIds')), createObject('name', 'VALUELENS_DROP_SITE_ID', 'value', parameters('dropSiteId')), createObject('name', 'VALUELENS_DROP_DRIVE_ID', 'value', parameters('dropDriveId')), createObject('name', 'VALUELENS_DROP_FOLDER', 'value', parameters('dropFolder'))))]",
             "registries": "[if(empty(parameters('registryServer')), createArray(), createArray(createObject('server', parameters('registryServer'), 'identity', parameters('identityId'))))]",
             "identity": {
               "type": "UserAssigned",
