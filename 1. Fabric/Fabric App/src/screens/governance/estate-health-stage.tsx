@@ -45,16 +45,20 @@ function linkageMessage(linkage: RegistryLinkage): string | undefined {
 /** What each governance flag means, in the order the review queue weighs them. */
 const FLAG_NOTES = [
     {
+        term: "No sign-in required",
+        text: "The agent answers anyone who reaches it without asking them to sign in, so nothing ties a conversation to a person. Needs the optional Defender source.",
+    },
+    {
         term: "Owner has left",
         text: "The creator's Entra account is disabled or no longer exists, so nobody is accountable for the agent.",
     },
     {
-        term: "No owner on record",
-        text: "The registry names no creator for a tenant-built agent.",
-    },
-    {
         term: "Org-wide with org data",
         text: "Anyone in the organisation can use the agent, and it can read SharePoint sites, OneDrive files or Graph connectors.",
+    },
+    {
+        term: "No owner on record",
+        text: "The registry names no creator for a tenant-built agent.",
     },
     {
         term: "Shared, no recorded use",
@@ -116,7 +120,12 @@ export function EstateHealthStage({ summary }: EstateHealthStageProps) {
                     label="Need a review"
                     value={readNumber(row, "[Needs Review]")}
                     emphasis
-                    detail={<KpiStat label="Of those built here" value={readNumber(row, "[Tenant Agents]")} />}
+                    detail={
+                        <div className="flex flex-col gap-100">
+                            <KpiStat label="Of those built here" value={readNumber(row, "[Tenant Agents]")} />
+                            <KpiStat label="No sign-in required" value={readNumber(row, "[No Sign In]")} />
+                        </div>
+                    }
                 />
                 <KpiCard
                     label="Shared org-wide"

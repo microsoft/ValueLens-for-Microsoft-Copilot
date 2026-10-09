@@ -433,7 +433,7 @@ export function fabricConfigFile(config, ws, models) {
   const body = { semanticModels: Object.fromEntries(models.map((alias) => [alias, { workspaceId: ws, itemId: ids[alias] }])) };
   if (config.modules) {
     body.modules = Object.fromEntries(
-      ['m365Activity', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator'].map((id) => [id, Boolean(config.modules[id])]),
+      ['m365Activity', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator', 'defender'].map((id) => [id, Boolean(config.modules[id])]),
     );
   }
   return body;

@@ -29,6 +29,7 @@ import { SOURCE_PROBES } from "@/lib/optional-sources";
 import { useSourceProbes } from "./use-source-probes";
 
 describe("useSourceProbes", () => {
+    // An install from before the Defender module says nothing about it, so it is probed and the data decides.
     it("marks modules the installer left off without probing them", () => {
         mocked.calls = [];
         const { result } = renderHook(() => useSourceProbes());
@@ -37,7 +38,8 @@ describe("useSourceProbes", () => {
             m365Activity: "present",
             productFeedback: "notConfigured",
             agentRegistry: "notConfigured",
+            defender: "present",
         });
-        expect(mocked.calls).toEqual([SOURCE_PROBES.m365Activity, "", ""]);
+        expect(mocked.calls).toEqual([SOURCE_PROBES.m365Activity, "", "", SOURCE_PROBES.defender]);
     });
 });

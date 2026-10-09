@@ -19,7 +19,7 @@ export const UPLOAD_FOLDERS = [UPLOAD_DIR, FEEDBACK_DIR, AGENT365_DIR, WORKDAY_D
 export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 
 /** @typedef {'api' | 'csv' | 'skip'} SourceMode */
-/** @typedef {'core' | 'orgData' | 'workday' | 'm365Activity' | 'agent365' | 'productFeedback' | 'studioCredits' | 'coworkCredits' | 'azureAi' | 'agentEvaluator'} DataSourceId */
+/** @typedef {'core' | 'orgData' | 'workday' | 'm365Activity' | 'agent365' | 'productFeedback' | 'studioCredits' | 'coworkCredits' | 'azureAi' | 'agentEvaluator' | 'defender'} DataSourceId */
 /** @typedef {Record<DataSourceId, SourceMode>} DataSourceModes */
 
 /**
@@ -157,6 +157,13 @@ export const DATA_SOURCES = [
     modes: ['api', 'skip'],
     defaultMode: 'skip',
     page: 'Agent Evaluator',
+  },
+  {
+    id: 'defender',
+    label: 'Defender (shadow AI and agent risk)',
+    description: 'Other AI tools on your devices and network, and agents that answer without sign-in, from Microsoft Defender. Needs Defender for Endpoint P2 or Defender for Cloud Apps.',
+    modes: ['api', 'skip'],
+    defaultMode: 'skip',
   },
 ];
 
@@ -412,6 +419,7 @@ export function normaliseDataSources(saved, modules, consumption = {}, uploads =
         coworkCredits: modules.consumption ? 'csv' : 'skip',
         azureAi: modules.consumption && consumption.azureSubscriptionId ? 'api' : 'skip',
         agentEvaluator: modules.agentEvaluator ? 'api' : 'skip',
+        defender: modules.defender ? 'api' : 'skip',
       };
   const out = { ...defaultDataSources(), ...legacy };
   for (const s of DATA_SOURCES) {
@@ -438,6 +446,7 @@ export function modulesFromSources(ds) {
     productFeedback: on('productFeedback'),
     consumption: on('studioCredits') || on('coworkCredits') || on('azureAi'),
     agentEvaluator: on('agentEvaluator'),
+    defender: on('defender'),
   };
 }
 

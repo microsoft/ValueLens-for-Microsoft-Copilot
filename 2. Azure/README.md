@@ -6,7 +6,8 @@ The design and the roadmap are in [`docs/plans/AZURE-HOSTED-PLAN.md`](../docs/pl
 
 > **Status: preview.** The installer deploys it end to end: Azure SQL, the Container Apps jobs, the Power BI
 > models, the web app and a Teams package. It collects Copilot interactions, licences and org data, Microsoft
-> 365 activity, and credit consumption (Copilot Studio, Cowork, Azure AI and pay-as-you-go). The other modules
+> 365 activity, credit consumption (Copilot Studio, Cowork, Azure AI and pay-as-you-go), and optionally
+> Defender shadow AI and agent risk. The other modules
 > are coming. Try it in a demo or test tenant first.
 
 ## Install it

@@ -1,0 +1,13 @@
+EVALUATE
+VAR __LastRun = MAX('Defender Status'[RunAt])
+RETURN
+    SELECTCOLUMNS(
+        FILTER('Defender Status', 'Defender Status'[RunAt] = __LastRun),
+        "Probe", 'Defender Status'[Probe],
+        "Status", 'Defender Status'[Status],
+        "Source", 'Defender Status'[Source],
+        "Rows", 'Defender Status'[Rows] + 0,
+        "Message", 'Defender Status'[Message],
+        "Run At", 'Defender Status'[RunAt]
+    )
+ORDER BY [Probe] ASC

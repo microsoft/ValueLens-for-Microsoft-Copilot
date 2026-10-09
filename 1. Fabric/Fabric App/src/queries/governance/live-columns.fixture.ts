@@ -16,6 +16,7 @@ export const liveColumns = {
     governanceSummary: [
         "[Tenant Agents]",
         "[Needs Review]",
+        "[No Sign In]",
         "[Owner Left]",
         "[No Owner]",
         "[Org Wide Org Data]",
@@ -42,6 +43,20 @@ export const liveColumns = {
         "[Users]",
         "[Owner Account]",
         "[Flag Count]",
+        "[Priority]",
         "[Flags]",
     ],
+    // Shadow AI reads the optional Defender tables and measures.
+    shadowAiSummary: [
+        "[Tools Watched]",
+        "[Unsanctioned Tools]",
+        "[Tools Found]",
+        "[Tools This Week]",
+        "[Devices]",
+        "[Users]",
+        "[Cloud Users]",
+        "[Status]",
+    ],
+    shadowAiTools: ["[Tool]", "[Layer]", "[Posture]", "[Devices]", "[Users]"],
+    shadowAiStatus: ["[Probe]", "[Status]", "[Source]", "[Rows]", "[Message]", "[Run At]"],
 } as const;

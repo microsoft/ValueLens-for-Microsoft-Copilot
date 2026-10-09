@@ -5,6 +5,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { SETUP_DIR } from '../catalog.js';
+import { addDefender } from './defender.js';
 import { addM365Activity } from './m365.js';
 import { addCopilotPaygSpend } from './payg.js';
 import { readZipEntry } from './zip.js';
@@ -118,6 +119,7 @@ export function buildModel(template, settings) {
     if (model.expressions?.some((e) => e.name === parameter)) setMParameter(model, parameter, settings.modules[module] ? 'Include' : 'Exclude');
   }
   addM365Activity(model, !!settings.modules.m365Activity);
+  addDefender(model, !!settings.modules.defender);
   return { compatibilityLevel: template.compatibilityLevel, model };
 }
 

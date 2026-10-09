@@ -73,6 +73,13 @@ CONSUMPTION = CONSUMPTION_CURATED + CONSUMPTION_RAW
 for _name in CONSUMPTION:
     TARGETS[_name] = Target(_name, f"{'curated' if _name in CONSUMPTION_CURATED else 'raw'}/{_name}",
                             CONSUMPTION_PARTITIONED.get(_name), incremental=False)
+# Defender (module `defender`): the two daily tables are published day by day, the rest replaced each run.
+# They are plain imports in the model, so rewritten days never force an incremental refresh.
+DEFENDER_PARTITIONED = {"defender_shadow_ai_daily": "Day", "defender_shadow_ai_totals_daily": "Day"}
+DEFENDER = ["defender_ai_watchlist", "defender_shadow_ai_daily", "defender_shadow_ai_totals_daily",
+            "defender_ai_installed", "defender_cloud_discovery_ai", "defender_ai_agents", "defender_status"]
+for _name in DEFENDER:
+    TARGETS[_name] = Target(_name, f"raw/{_name}", DEFENDER_PARTITIONED.get(_name), incremental=False)
 
 
 def b(name: str) -> str:

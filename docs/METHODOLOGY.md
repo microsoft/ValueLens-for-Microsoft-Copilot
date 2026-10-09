@@ -664,7 +664,7 @@ The Fabric App gathers the report's pages into eight of its thirteen pages:
 |---|---|
 | Adoption | Activation, Adoption, Habit Formation, Trend Heatmap |
 | Leaderboards | Leaderboard, plus the most-used agents |
-| Governance | Agent Registry, plus exposure, accountability and a review queue, which are app only ([Governance](#governance-which-agents-need-a-review)) |
+| Governance | Agent Registry, plus exposure, accountability, a review queue and Shadow AI from the optional Defender source, which are app only ([Governance](#governance-which-agents-need-a-review), [Shadow AI](#shadow-ai-what-other-ai-tools-are-in-use)) |
 | Readiness | License Readiness, License Allocation, Cowork Readiness |
 | Value | Task Breakdown, Estimated Value, plus Cost vs value, which is app only ([§8.3](#83-cost-vs-value)) |
 | Efficiency | Cowork Fit, Model Fit |
@@ -763,6 +763,7 @@ this tenant** and not blocked: catalogue listings are Microsoft's or a publisher
 | Sharing Scope | *Whole organisation* (available to or acquired for all), *Specific people or groups* (for some, or a non-empty share list), *Not shared*, or *Not stated* when the registry doesn't say |
 | Data Access | *Organisation content* (reads SharePoint sites, OneDrive files or a Graph connector), *Uploaded files only*, *None declared*, or *Not reported* when the registry gives no capability flags |
 | Owner account | *Active*, *Disabled* or *Not found*: the creator's Entra ID account at the last registry ingester run. Blank when not checked |
+| Sign-in Required | *Yes*, *No* or *Unknown*: whether the agent asks its users to sign in. It comes from the optional Defender source today; the first source that knows the agent wins, so a more direct source can be put ahead of it. *Unknown* without one |
 
 An agent needs a review when one or more flags apply:
 
@@ -772,14 +773,42 @@ An agent needs a review when one or more flags apply:
 | No owner on record | No creator could be attributed ([Data Dictionary](DATA-DICTIONARY.md#agent-creator-attribution-agent-creator-upn--agent-creator-source)) |
 | Org-wide with org data | Sharing Scope is Whole organisation and Data Access is Organisation content |
 | Shared, no recorded use | Shared with anyone, and no matched users in the audit data |
+| No sign-in required | Sign-in Required is No: anyone who can reach the agent can use it without signing in |
 
-The review queue lists flagged agents, most flags first, then most users.
+The review queue puts the riskiest agents first. Each flag has a weight: *No sign-in required* and
+*Owner has left* 3, *Org-wide with org data* and *No owner on record* 2, *Shared, no recorded use* 1.
+Agents are sorted by the sum of their weights, then by number of flags, then by most users.
 
 - **The owner check needs the Fabric registry ingester** with `CHECK_OWNER_ACCOUNT` on, and
   `User.Read.All`. A registry loaded from a CSV export leaves every owner *Not checked*.
 - **Sharing and data access are what the registry declares**, not what the agent has actually
   surfaced. A CSV export may leave them *Not stated* or *Not reported*.
 - *Shared, no recorded use* inherits the usage matching above, so a renamed agent can be flagged.
+- *No sign-in required* needs the Defender source with its agent probe; without it no agent gets
+  the flag. It is what Defender records about the agent's authentication, not a test of it.
+
+### Shadow AI: what other AI tools are in use?
+
+Also on the Fabric App's Governance page, from the optional Defender source
+([Data Dictionary](DATA-DICTIONARY.md#6-defender-shadow-ai-and-agent-risk)). It doesn't read the
+agent registry, so it shows with or without one.
+
+- **The watchlist.** A list of AI tools with their app process names, web domains and install names.
+  Each has a posture: *Sanctioned*, *Unsanctioned* or *Not reviewed*. A tool starts as *Not reviewed*;
+  only an admin marks it otherwise. Shadow AI is any watched tool not marked *Sanctioned*.
+- **Ran.** Devices that started a watched tool's process, from Defender for Endpoint process events.
+- **Reached.** Devices that connected to a watched tool's domain, from network events.
+- **Installed.** Devices with a watched tool installed, from Defender Vulnerability Management.
+- **Cloud Discovery.** Generative AI apps that Defender for Cloud Apps saw in firewall and proxy
+  logs over 30 days, with people per app. People can't be added up across apps, so this stays a
+  separate figure and isn't added to the device counts.
+- **Headline figures.** Tools found (30 days and this week), devices and people that ran or reached
+  one, over the last 30 days. Devices and people are distinct across tools.
+
+It is a **floor, not a census**. Defender sees only devices onboarded to Defender for Endpoint and
+only tools on the watchlist; personal devices, unmanaged browsers and unlisted tools are missed. A
+part of Defender the tenant isn't licensed for, or can't read, is skipped: the page says which part
+didn't load and shows the rest.
 
 ### Task Breakdown: what was the work?
 
@@ -1072,6 +1101,8 @@ may be incomplete.
 - **Model fit has no cost data.** It compares tiers, many surfaces log no model, and tiers are
   matched on the model name.
 - **Dates are UTC.** Days and weeks can shift by one for people far from UTC.
+- **Shadow AI is a lower bound.** It sees only Defender-onboarded devices and watched tools, and
+  advanced hunting's distinct counts are approximate.
 - **Feedback categories use English keywords.** Other languages mostly land in General.
 - **Agent user counts can differ from the agent builder's own view.** Copilot Studio analytics also
   counts test-pane, evaluation and autonomous runs, which are dropped here ([§2.1](#21-which-audit-records-count)),

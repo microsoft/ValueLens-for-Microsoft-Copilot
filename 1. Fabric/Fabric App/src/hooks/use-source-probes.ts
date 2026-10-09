@@ -37,8 +37,9 @@ export function useSourceProbes(): SourceAvailability {
     const m365Activity = useProbe(SOURCE_PROBES.m365Activity, modules?.m365Activity);
     const productFeedback = useProbe(SOURCE_PROBES.productFeedback, modules?.productFeedback);
     const agentRegistry = useProbe(SOURCE_PROBES.agentRegistry, modules?.agent365);
+    const defender = useProbe(SOURCE_PROBES.defender, modules?.defender);
     return useMemo(
-        () => ({ m365Activity, productFeedback, agentRegistry }),
-        [m365Activity, productFeedback, agentRegistry],
+        () => ({ m365Activity, productFeedback, agentRegistry, defender }),
+        [m365Activity, productFeedback, agentRegistry, defender],
     );
 }

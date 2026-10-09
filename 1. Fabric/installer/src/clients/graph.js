@@ -95,6 +95,8 @@ export function graphApi(http) {
       (await http.list('/me/transitiveMemberOf/microsoft.graph.group', { query: { $select: 'id' } })).map((g) => String(g.id)),
     /** @returns {Promise<{ skuPartNumber?: string, servicePlans?: { servicePlanName: string, provisioningStatus: string }[] }[]>} */
     myLicenseDetails: () => http.list('/me/licenseDetails'),
+    /** @returns {Promise<{ skuPartNumber?: string, capabilityStatus?: string, servicePlans?: { servicePlanName: string, provisioningStatus?: string }[] }[]>} */
+    subscribedSkus: () => http.list('/subscribedSkus'),
     /**
      * Directory roles the user could activate through PIM. Only rows for this principal are kept,
      * whatever the filter returned.

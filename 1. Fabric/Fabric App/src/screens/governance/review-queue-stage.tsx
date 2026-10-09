@@ -22,8 +22,9 @@ const REVIEW_QUEUE = governanceReviewQueue();
 const whole = formatCell("whole");
 
 /**
- * Every tenant-built agent with at least one governance flag, the most
- * flagged and most used first, so the review starts where it matters most.
+ * Every tenant-built agent with at least one governance flag, the weightiest
+ * flags first, then the most flagged and most used, so the review starts
+ * where it matters most.
  */
 export function ReviewQueueStage() {
     const { theme } = useThemeContext();
@@ -54,7 +55,7 @@ export function ReviewQueueStage() {
         <Section
             id={stageAnchor("review-queue")}
             title="Review queue"
-            description="Every agent built here that needs a look, the most flagged and most used first."
+            description="Every agent built here that needs a look, the most serious flags first, then the most used."
         >
             <Panel
                 result={queue}

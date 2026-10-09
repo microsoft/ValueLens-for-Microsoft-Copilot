@@ -15,6 +15,7 @@ in step with the Fabric notebooks by the golden tests in `tests/`. No Spark or J
 | | Org data from `/users` (`User.Read.All`) | orgData |
 | | Microsoft 365 daily activity reports (`Reports.Read.All`) | m365Activity |
 | | Copilot Studio credits and Viva (Copilot Chat) credits from the drop folder; Azure AI spend, tokens and Copilot pay-as-you-go from Azure Resource Manager | consumption |
+| | Shadow AI and agent risk from Microsoft Defender (`ThreatHunting.Read.All`, `CloudApp-Discovery.Read.All`) | defender |
 | process | Curates interactions with `valuelens_core.curate()` into `curated/copilot_interactions_curated` | core |
 | publish | Loads curated and raw tables into Azure SQL, rewriting only the days that changed | per module |
 | refresh | Refreshes the configured Power BI semantic models and waits for them to finish | — |
@@ -89,6 +90,30 @@ state is ignored. Where the folder lives depends on the networking mode:
 the first collection finds empty tables. A table whose source has never run is skipped at
 publish. The consumption tables never trigger the full refresh of the incremental Copilot model.
 
+## Defender (module `defender`)
+
+Optional and off by default. It mirrors `Copilot_Defender_Ingester.ipynb` on Fabric; both run
+`valuelens_core.defender`. It reads advanced hunting through Microsoft Graph
+`POST /security/runHuntingQuery` and Cloud Discovery through the Graph beta
+`security/dataDiscovery/cloudAppDiscovery`, as the managed identity.
+
+- **Each probe fails on its own.** Device activity, installed software, AI agents and Cloud
+  Discovery each write a row to `defender_status` (`ok`, `empty`, `forbidden`, `unlicensed` or
+  `error`). A probe that didn't answer keeps its last good data, and the run carries on. Only
+  storage errors fail the step.
+- **The watchlist** is `landing/defender/ai_watchlist.csv`. The first run writes the starting list
+  there; edit it to add tools or set their posture. If it can't be read, the run uses the starting
+  list and logs a warning.
+- **First run** loads 29 days; later runs reload from the day before the last loaded day.
+
+| Table | Publish |
+|---|---|
+| `defender_shadow_ai_daily`, `defender_shadow_ai_totals_daily` | by `Day` |
+| `defender_ai_watchlist`, `defender_ai_installed`, `defender_cloud_discovery_ai`, `defender_ai_agents`, `defender_status` | snapshot |
+
+`2. Azure/sql/migrations/V003__defender.sql` creates them up front, so the model loads empty tables
+until the first run.
+
 ## Settings
 
 The job reads its settings from environment variables. Bicep sets them.
@@ -99,7 +124,7 @@ The job reads its settings from environment variables. Bicep sets them.
 | `VALUELENS_TENANT_ID` | The customer tenant |
 | `VALUELENS_STORAGE_ACCOUNT` | The ADLS Gen2 account (containers `raw`, `curated`, `landing`) |
 | `VALUELENS_SQL_SERVER`, `VALUELENS_SQL_DATABASE` | The Azure SQL target. Auth is Entra-only, with an access token. |
-| `VALUELENS_MODULES` | A comma list such as `core,orgData,m365Activity,consumption`. The default is `core,orgData`. |
+| `VALUELENS_MODULES` | A comma list such as `core,orgData,m365Activity,consumption,defender`. The default is `core,orgData`. |
 | `VALUELENS_AZURE_AI_SUBSCRIPTION` | consumption: the subscription for Azure OpenAI / AI Foundry costs and metrics. When it is empty, Azure AI and pay-as-you-go are skipped. |
 | `VALUELENS_PAYG_SUBSCRIPTIONS` | consumption: other subscriptions, as a comma list, whose Copilot pay-as-you-go costs are read |
 | `VALUELENS_DROP_SITE_ID`, `VALUELENS_DROP_DRIVE_ID`, `VALUELENS_DROP_FOLDER` | consumption, private networking: the SharePoint drop folder (see above). When unset, the job reads the `landing` container. |
@@ -121,6 +146,8 @@ The job reads its settings from environment variables. Bicep sets them.
 | `curated/studio_*/`, `curated/viva_*/` | consumption: the merged Studio and Viva tables, rewritten atomically each run |
 | `raw/azure_ai_*/`, `raw/copilot_payg_spend/`, `raw/azure_deployment_health/`, `raw/azure_solution_spend/`, `raw/azure_billing_reconciliation/` | consumption: Azure AI snapshots |
 | `landing/studio/`, `landing/viva/` | consumption: the drop folder in public networking. It is read only. |
+| `raw/defender_*/` | defender: one parquet file per day for the two daily tables, a snapshot for the rest |
+| `landing/defender/ai_watchlist.csv` | defender: the AI watchlist. The first run writes it; after that it is only read |
 
 The SQL tables have the same names as the Fabric Lakehouse tables, so the ValueLens Model only
 changes its connection parameters.

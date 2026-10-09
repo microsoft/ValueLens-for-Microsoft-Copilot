@@ -17,6 +17,7 @@ import { AccountabilityStage } from "./accountability-stage";
 import { EstateHealthStage } from "./estate-health-stage";
 import { ExposureStage } from "./exposure-stage";
 import { ReviewQueueStage } from "./review-queue-stage";
+import { ShadowAiStage } from "./shadow-ai-stage";
 
 const SUMMARY = governanceSummary();
 
@@ -27,13 +28,21 @@ const SUMMARY = governanceSummary();
  * sort out first. The registry is a catalogue rather than activity, so only
  * the agent-type filter applies.
  *
- * Every stage reads the registry, so once the app has found it empty the page
- * says how to connect it instead of running four sets of empty queries.
+ * The registry stages all read the registry, so once the app has found it
+ * empty the page says how to connect it instead of running four sets of empty
+ * queries. Shadow AI reads the optional Defender source instead, so it sits
+ * below them on its own, whether or not the registry is connected or the
+ * model is current enough for the registry stages.
  */
 export function GovernanceScreen() {
     const sources = useSourceAvailability();
     const registry = !isAbsent(sources, "agentRegistry");
-    return registry ? <GovernanceRequirements /> : <ConnectRegistry configured={sources.agentRegistry !== "notConfigured"} />;
+    return (
+        <div className="flex flex-col gap-800">
+            {registry ? <GovernanceRequirements /> : <ConnectRegistry configured={sources.agentRegistry !== "notConfigured"} />}
+            <ShadowAiStage source={sources.defender} />
+        </div>
+    );
 }
 
 function GovernanceRequirements() {

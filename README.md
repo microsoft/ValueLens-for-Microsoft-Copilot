@@ -61,6 +61,10 @@ A page-by-page guide to reading the ValueLens report — 15 report pages, with t
   `Add Credit Consumption` folder.
 - **Copilot Studio agent conversations:** in Fabric, choose *Agent Evaluator* in the installer, or
   [set it up by hand](1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/).
+- **Shadow AI and agent risk:** in Fabric or Azure, choose *Defender (shadow AI and agent risk)* in
+  the installer. It reads Microsoft Defender, needs Defender for Endpoint P2 or Defender for Cloud
+  Apps, and fills the Shadow AI section of the app's Governance page
+  ([details](1.%20Fabric/installer/README.md#defender-shadow-ai-and-agent-risk)).
 
 ## Reference
 
