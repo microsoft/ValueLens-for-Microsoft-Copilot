@@ -4,6 +4,7 @@
 //        Licensed under the MIT license. See LICENSE file in the project root for full license information.
 // </copyright>
 //-----------------------------------------------------------------------
+import { errorCode, reportAccessDenied } from "@/lib/access";
 import { getRayfinClient } from "@/lib/rayfin-client";
 import { runtimeConfig } from "@/lib/runtime-config";
 import { getAccessToken } from "@/services/rayfin-auth.service";
@@ -169,8 +170,14 @@ class HttpSettingsStore implements SettingsStore {
         // A cached token can predate a role assignment, so retry once with a fresh one.
         if (response.status === 401 || response.status === 403)
             response = await send(true);
-        if (response.status === 403)
+        if (response.status === 403) {
+            const code = errorCode(await response.text());
+            if (code === "NotAViewer") {
+                reportAccessDenied(code);
+                throw new Error("You don't have access to Analytics Hub.");
+            }
             throw new Error(ADMIN_WRITE_MESSAGE);
+        }
         if (!response.ok)
             throw new Error(`Settings API returned ${response.status}.`);
         if (response.status === 204)

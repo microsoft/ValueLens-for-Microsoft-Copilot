@@ -28,6 +28,7 @@ import {
 } from "./destinations";
 import { FilterBar } from "./filter-bar";
 import { FreshnessLabel } from "./freshness-label";
+import { SharePanel } from "./share-panel";
 
 interface VersionResponse {
     latest?: string;
@@ -244,6 +245,8 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                         </ul>
                     </div>
                 )}
+
+                <SharePanel />
 
                 <UpdateNotice />
 

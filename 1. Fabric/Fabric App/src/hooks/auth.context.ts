@@ -7,6 +7,7 @@
 import { createContext, useContext } from "react";
 import type { OpaqueSession } from "@microsoft/rayfin-auth";
 import type { AnalyticsHubUser } from "@/services/rayfin-auth.service";
+import type { AccessDeniedReason } from "@/lib/access";
 
 export interface AuthContextValue {
     /** The current auth session, or `null` if not authenticated. */
@@ -27,6 +28,8 @@ export interface AuthContextValue {
     signInError: Error | null;
     /** True when the API rejected the user before the app could load. */
     accessDenied: boolean;
+    /** The API's reason for turning the user away, when it gave one. */
+    accessDeniedReason?: AccessDeniedReason;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
