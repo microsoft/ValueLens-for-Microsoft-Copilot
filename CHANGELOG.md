@@ -17,7 +17,15 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
-## Unreleased
+## 2026-10-09 — Analytics Hub installer 0.4.0
+
+**Update an existing install:** download installer 0.4.0, open it and choose **Repair or change**.
+To turn on the new optional sources, tick **Defender (shadow AI and agent risk)** or **Agent
+configuration and Foundry (Azure Resource Graph)** there, and grant the permissions or roles the
+installer lists.
+
+The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.4.0`, which the
+Azure install pulls.
 
 ### New: Defender shadow AI and agent risk (optional)
 
