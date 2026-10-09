@@ -41,7 +41,9 @@ dialog point at a multi-table result this template can't read, and fail with
 ### Other products *(optional)*
 
 Set **`DataFolder`** to a folder of Copilot Studio, GitHub or Azure AI exports (file names as in the
-[Local CSV add-on](../../5.%20Local%20CSV/Add%20Credit%20Consumption/)). Add
+[Local CSV add-on](../../5.%20Local%20CSV/Add%20Credit%20Consumption/)). Its
+[`pull_azure_ai.py`](../../5.%20Local%20CSV/Add%20Credit%20Consumption/pull_azure_ai.py) writes the
+Azure AI files, including deployment health, solution spend and billing reconciliation. Add
 `M365SpendingPolicyMetaData.csv` from the Viva query download to show policy names instead of IDs.
 
 `DataFolder` is a local folder path, so a scheduled refresh in the Power BI service then needs an

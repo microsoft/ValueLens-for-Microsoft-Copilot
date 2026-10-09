@@ -25,6 +25,10 @@ The other commands are:
 
 Any failure is logged and the job exits with code 1, so Container Apps records the run as failed.
 
+The job has no credit consumption (Consumption Central) collector yet. Azure AI spend, deployment
+health, solution spend and billing reconciliation come from the Fabric notebook `Ingest_Azure_AI`,
+or from the Local CSV script `5. Local CSV/Add Credit Consumption/pull_azure_ai.py`.
+
 ## Settings
 
 The job reads its settings from environment variables. Bicep sets them.

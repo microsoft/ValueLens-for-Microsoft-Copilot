@@ -19,11 +19,47 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ## Unreleased
 
-**Update an existing install:** open the installer and choose **Repair or change**. Repair
-updates the flows in place and keeps the connections already signed in to. Because the flows now
-need a OneLake connection, Repair turns each flow off and lists the connection to sign in to. Sign
-in, then turn the flow back on. A saved choice of *Upload CSV* for Copilot Studio credits with the
-flow chosen becomes **Connected**, which behaves the same.
+**Update an existing install:** open the installer and choose **Repair or change**. If you keep
+the client secret in the notebooks, run `AnalyticsHubInstaller.exe update` instead: Repair
+doesn't rewrite those notebooks.
+
+Both update the Power Automate flows in place and keep the connections already signed in to.
+Because the flows now need a OneLake connection, each flow is turned off and the connection to
+sign in to is listed. Sign in, then turn the flow back on. A saved choice of *Upload CSV* for
+Copilot Studio credits with the flow chosen becomes **Connected**, which behaves the same.
+
+### Fix: Azure capacity, reconciliation and solution spend pages are blank
+
+**Symptom.** In Consumption Central, **10. Azure: Capacity & Health**, **10.1 Billing:
+Reconciliation** and the Foundry solution spend visuals are empty on a real install, even with
+Azure OpenAI deployments in the subscription. `AzureAiSpend` and `AzureAiTokens` have rows;
+`AzureDeploymentHealth`, `AzureBillingReconciliation` and `AzureSolutionSpend` have none.
+
+**Cause.** Nothing wrote `azure_deployment_health`, `azure_billing_reconciliation` or
+`azure_solution_spend`. Only the sample data had them.
+
+**Fix.** `Ingest_Azure_AI` now writes all three after its existing tables, best-effort:
+
+- **Deployment health**, by month and deployment: model, version, SKU, region and PTU capacity
+  from ARM, then requests, 429s, 5xx, latency and provisioned utilisation from Azure Monitor. The
+  metric calls are batched per account and window, and a failed batch is retried one metric at a
+  time. Standard and GlobalStandard deployments have no PTU capacity or utilisation.
+- **Solution spend**, by day, resource and service: actual and amortized cost from Cost
+  Management for the AI services and the resources in the AI accounts' resource groups, with
+  pay-as-you-go token cost, Monitor tokens and requests, and tags.
+- **Billing reconciliation**, by month, service and pool: metered quantity times the public
+  Retail Prices API list rate, compared with the actual cost. List prices exclude negotiated
+  discounts. Meters with no retail price show as `Unpriced`.
+
+An account, deployment or metric that fails is logged as a `WARNING` and skipped. A table whose
+source fails entirely is left as it was, and the existing three tables are unaffected. The
+existing Reader, Cost Management Reader and Monitoring Reader roles are enough.
+
+The Local CSV and SharePoint script `pull_azure_ai.py` writes the same three files with the same
+logic. The Azure (preview) path has no Consumption Central collector yet, and the Power Automate +
+Dataverse flows don't fill these tables; import the script's CSVs there. Speech hours, document
+pages and images aren't collected. The reconciliation page's context text still describes the
+sample data.
 
 ### Change: Power Automate flows write to OneLake as a signed-in person, with no Key Vault
 
