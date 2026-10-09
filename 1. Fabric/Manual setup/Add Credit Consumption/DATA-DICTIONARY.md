@@ -2,6 +2,8 @@
 
 The nine Delta tables Consumption Central reads, and what each column means. A tenth,
 [`copilot_payg_spend`](#copilot_payg_spend), is read only by the model the Fabric installer deploys.
+`Ingest_Azure_AI` also writes the [Azure capacity, solution spend and reconciliation](#azure-capacity-solution-spend-and-reconciliation)
+tables.
 
 If you build your own pipeline instead of using the notebooks, match this and the template works
 unchanged. The tables are deliberately close to the source exports — renamed to `snake_case` and
@@ -330,6 +332,65 @@ Grain: day × subscription × meter × `ServiceTag` × currency.
 
 It has no per-policy or per-environment detail: Cost Management doesn't split these charges that
 way.
+
+---
+
+## Azure capacity, solution spend and reconciliation
+
+Three more tables written by `Ingest_Azure_AI` for the **Azure: Capacity & Health**, **Billing:
+Reconciliation** and Foundry solution spend pages. They're **best-effort**: the notebook writes
+`azure_ai_spend`, `azure_ai_tokens` and `copilot_payg_spend` first, then these. An account,
+deployment or metric that fails is logged as a `WARNING` and skipped. If a table's source fails
+entirely, that table is left as it was. The app registration's Reader, Cost Management Reader and
+Monitoring Reader roles on the subscription are enough. The column names, order and types match
+the [Local CSV sample data](../../../5.%20Local%20CSV/Add%20Credit%20Consumption/sample-data/).
+
+### `azure_deployment_health`
+
+From ARM (each Azure OpenAI / AI Services account's `/deployments`) and Azure Monitor daily metrics.
+Grain: month × deployment. `MetricDate` is the month end and `SnapshotDate` is the last day the
+month covers so far (yesterday, for the current month). The current month lists every deployment;
+earlier months list deployments with telemetry, including deleted ones (their model fields are
+blank).
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `ResourceId`, `DeploymentId`, `DeploymentName` | string | Lower-case account resource ID, and the deployment name. The report joins them into `Deployment Identity`. |
+| `Application` | string | First of the `Application`, `App`, `Solution`, `Workload` or `Project` tags: deployment, then account. |
+| `ModelName`, `ModelVersion`, `SkuName`, `Region` | string | From the deployment, e.g. `GlobalStandard` or `ProvisionedManaged`. |
+| `PtuCapacity` | double | Deployment capacity, for provisioned SKUs only. Blank for Standard and GlobalStandard. |
+| `MeanUtilizationPct`, `PeakUtilizationPct` | double | `ProvisionedUtilization` (or V2): the mean of daily averages, and the highest daily maximum. Provisioned SKUs only. |
+| `Requests` | double | `ModelRequests` (or `AzureOpenAIRequests`), total. |
+| `Throttles429`, `ServerErrors5xx` | double | Requests by `StatusCode`. Blank when the metric has no status split. |
+| `MeanLatencyMs` | double | `TimeToLastByte` (or the closest latency metric), weighted by daily requests. |
+
+### `azure_solution_spend`
+
+Cost Management, actual and amortized, by day × resource × service. It covers the Foundry, Azure
+OpenAI, AI Services, Machine Learning and AI Search services, plus every other resource in the
+resource groups that hold the AI accounts (`ServiceCategory` `Supporting`). Copilot Studio
+pay-as-you-go is excluded: it has its own table.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `ServiceCategory` | string | `Model`, `AI service` or `Supporting`. |
+| `ActualCost`, `AmortizedCost` | double | In `Currency`. Amortized spreads reservations and PTU commitments. |
+| `PaygTokensM`, `InputPaygCost`, `OutputPaygCost`, `CachedPaygCost` | double | From token meters in `azure_ai_spend`. Meters that name no unit (for example `gpt 4.1 Inp glbl Tokens`) are billed per 1K tokens, matching the retail price sheet. |
+| `TotalTokensM`, `Requests` | double | From Azure Monitor, on one row per account and day. A day with usage but no cost gets a zero-cost `Foundry Models` row. |
+| `SpeechHours`, `DocumentPages`, `Images` | double | Not collected yet; always blank. |
+| `AllocationStatus` | string | `Tagged` when the resource has an application or department tag. |
+| `PricingModel` | string | `PAYG`, `Provisioned` or `PAYG + Provisioned`, from the meters. |
+
+### `azure_billing_reconciliation`
+
+Two rows per month × service × pool: `UsageEstimate`, the metered quantity times the public
+[Retail Prices API](https://learn.microsoft.com/rest/api/cost-management/retail-prices/azure-retail-prices)
+list rate for each meter, and `AzureActual`, the actual cost from Cost Management. List prices
+exclude negotiated discounts, so a discounted agreement shows up as variance. `Status` is
+`Reconciled` (within 1%), `Variance within tolerance` (within 5%), `Unexplained variance` or
+`Unpriced` (no retail price found; the estimate is blank). Meters whose name contains
+`Provisioned` or `PTU` go to `Foundry Provisioned Pool`; the rest go to `Foundry PAYG Pool`. The
+report's context text on this page still describes the sample data.
 
 ---
 

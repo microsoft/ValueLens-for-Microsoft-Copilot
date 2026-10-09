@@ -74,10 +74,13 @@ admin centre → **Settings** → **Features**).
 
 Flows fill `studio_tenant_daily`, `studio_agent`, `azure_ai_spend` and `github_ai_usage`. The other
 eight tables the script creates (Cowork credits, Studio per-user, GitHub seat map, spending policies
-and four Azure detail tables) have no API. Import them by hand with **Data → Import** in
+and four Azure detail tables) have no flow. Import them by hand with **Data → Import** in
 [make.powerapps.com](https://make.powerapps.com); the files in the
 [Local CSV sample data](../../5.%20Local%20CSV/Add%20Credit%20Consumption/sample-data/) show the
-columns.
+columns. For the Azure detail tables, the Local CSV
+[`pull_azure_ai.py`](../../5.%20Local%20CSV/Add%20Credit%20Consumption/pull_azure_ai.py) writes
+`AzureAiTokensDaily.csv`, `AzureDeploymentHealth.csv`, `AzureSolutionSpend.csv` and
+`AzureBillingReconciliation.csv` in those columns.
 
 **Cowork / Work IQ** goes into `viva_credits_weekly`: import `PersonServiceCreditsMetrics.csv` from
 the [Viva Insights export ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot/blob/main/docs/DATA-SOURCES.md#files-and-columns)

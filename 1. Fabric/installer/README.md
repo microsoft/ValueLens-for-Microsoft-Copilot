@@ -426,7 +426,12 @@ Microsoft 365 admin center, go to **Settings** > **Org settings** > **Services**
 
 Optional. It fills the app's Consumption pages. See [Consumption Central](../Manual%20setup/Add%20Credit%20Consumption/).
 
-The installer reads Azure AI and Copilot pay-as-you-go costs for you. For the other two:
+The installer reads Azure AI and Copilot pay-as-you-go costs for you. `Ingest_Azure_AI` also fills
+the Azure capacity and health, billing reconciliation and Foundry solution spend pages from ARM,
+Azure Monitor, Cost Management and the public Retail Prices API. It needs no extra roles. Installs
+from 0.3.5 or earlier get it with **Repair or change** when the client secret is in Key Vault. If
+you keep the secret in the notebooks, run `AnalyticsHubInstaller.exe update` instead: Repair
+doesn't rewrite those notebooks. For the other two:
 
 - **Copilot Studio credits.** In the Power Platform admin center, go to **Licensing** >
   **Products** > **Copilot Studio**. Download the `EntitlementConsumption…_MCSMessages…csv` files

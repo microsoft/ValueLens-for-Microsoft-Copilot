@@ -13,7 +13,7 @@ No product is required. Load what you have; the other pages stay empty.
 |---|---|
 | `Consumption Central - Local CSV.pbit` | The report. One parameter that matters: `DataFolder`. |
 | [`sample-data/`](sample-data/) | Synthetic dataset for all four products. Every path's add-on uses it. |
-| [`pull_azure_ai.py`](pull_azure_ai.py) | *Optional.* Writes the Azure AI Foundry CSVs into your folder. |
+| [`pull_azure_ai.py`](pull_azure_ai.py) | *Optional.* Writes the Azure AI Foundry CSVs into your folder, including deployment health, solution spend and billing reconciliation. |
 
 ---
 

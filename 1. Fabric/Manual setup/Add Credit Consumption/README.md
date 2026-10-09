@@ -60,7 +60,7 @@ Set the workspace and Lakehouse at the top of each notebook, then run it.
 | `Ingest_Studio` | Power Platform admin centre exports in `Files/landing/studio/`, and the optional licensing API flow's files there | `studio_*` |
 | `Ingest_GitHub_API` | GitHub REST API *(preferred: runs unattended)* | `github_*` |
 | `Ingest_GitHub` | The emailed AI usage report in `Files/landing/github/` | `github_*` |
-| `Ingest_Azure_AI` | Azure Cost Management and Monitor ([setup ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot/blob/main/docs/ADVANCED-SETUP.md#azure-ingestion-in-fabric)) | `azure_ai_spend`, `azure_ai_tokens`, and `copilot_payg_spend` for Copilot Studio and Cowork pay-as-you-go billed in Azure |
+| `Ingest_Azure_AI` | Azure Cost Management, Monitor, ARM and the public Retail Prices API ([setup ↗](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot/blob/main/docs/ADVANCED-SETUP.md#azure-ingestion-in-fabric)) | `azure_ai_spend`, `azure_ai_tokens`, and `copilot_payg_spend` for Copilot Studio and Cowork pay-as-you-go billed in Azure; then, best-effort, `azure_deployment_health`, `azure_solution_spend` and `azure_billing_reconciliation` ([details](DATA-DICTIONARY.md#azure-capacity-solution-spend-and-reconciliation)) |
 | `Ingest_CommercialTerms` | Your negotiated rates *(optional; the [Fabric App](../../Fabric%20App/README.md#settings-in-the-app) can also take them)* | `commercial_terms` |
 | `Ingest_Org` | Viva attributes, optionally overridden by files in `Files/landing/org/` | `org_attributes` |
 | `Ingest_Viva_Consumption` | The Dataflow's `viva_credits_dataflow` table, and Viva CSV exports in `Files/landing/viva/`. For weeks both cover, the Dataflow wins | `viva_credits_weekly`, `viva_spending_policy` |
