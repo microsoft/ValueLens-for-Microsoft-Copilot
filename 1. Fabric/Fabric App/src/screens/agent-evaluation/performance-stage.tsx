@@ -35,6 +35,7 @@ import {
     type EvaluationOptions,
 } from "@/queries/agent-evaluation";
 import { ModelRead } from "./model-read";
+import { ERROR_HEADLINE, WEEKLY_OUTCOME_HEADLINE } from "./headlines";
 
 const SUMMARY = performanceSummary();
 const WEEKLY = performanceWeekly();
@@ -227,6 +228,7 @@ export function PerformanceStage({ options, extra }: PerformanceStageProps) {
                     spec={weeklySpec}
                     capabilities={NO_STACK_LABELS}
                     height={380}
+                    headline={WEEKLY_OUTCOME_HEADLINE}
                     title="How conversations ended"
                     subtitle="Conversations each week, by how they ended"
                     emptyTitle="No weekly conversations"
@@ -271,6 +273,7 @@ export function PerformanceStage({ options, extra }: PerformanceStageProps) {
                     table={errorsTable}
                     spec={errorsSpec}
                     height={rowChartHeight(errorsTable?.rows.length ?? 6, { perRow: 36, chrome: 148 })}
+                    headline={ERROR_HEADLINE}
                     title="What went wrong"
                     subtitle="The most common errors, and whether the agent or the person hit them"
                     emptyTitle="No errors"

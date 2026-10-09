@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { VegaVisual } from "@/components/vega-visual";
+import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
 import { stageAnchor } from "@/components/destinations";
 import { FilterNote } from "@/components/filter-note";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
@@ -22,6 +23,7 @@ import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import { habitStages, habitSummary, habitThresholds, habitTrend, habitTrendMonths, inactiveNotMeasuredFor } from "@/queries/adoption";
 import { formatMonth } from "./habit-month";
+import { habitMixHeadline } from "./headlines";
 
 /** Stages place every licensed person, so narrowing to one agent would call everyone else inactive. */
 const AGENT_FILTERS: FilterKey[] = ["agentTypes", "agentNames"];
@@ -64,6 +66,10 @@ export function HabitStage() {
 
     const month = formatMonth(readText(summaryRow, "[Month]"));
     const notMeasuredFor = inactiveNotMeasuredFor(filters, applicable);
+    const trendHeadline = useMemo(
+        () => (trendTable ? habitMixHeadline(scale)(trendTable) : undefined),
+        [trendTable, scale],
+    );
 
     return (
         <Section
@@ -135,7 +141,7 @@ export function HabitStage() {
                 </div>
             )}
 
-            <div className="h-[380px]">
+            <div style={{ height: 380 + (trendHeadline ? HEADLINE_SPACE : 0) }}>
                 {trendResult.data?.status === "error" ? (
                     <QueryError
                         className="h-full"
@@ -151,18 +157,20 @@ export function HabitStage() {
                         description="At least two complete months in the selected dates are needed before the habit mix can be trended."
                     />
                 ) : (
-                    <VegaVisual
-                        spec={trend.vegaLiteSpec}
-                        data={trendTable}
-                        theme={theme}
-                        header={{
-                            title: "How the mix is moving",
-                            subtitle:
-                                scale === "share"
-                                    ? "Share of users in each stage by complete month, Power on top"
-                                    : "Users in each stage by complete month, Power on top",
-                        }}
-                    />
+                    <Headlined text={trendHeadline}>
+                        <VegaVisual
+                            spec={trend.vegaLiteSpec}
+                            data={trendTable}
+                            theme={theme}
+                            header={{
+                                title: "How the mix is moving",
+                                subtitle:
+                                    scale === "share"
+                                        ? "Share of users in each stage by complete month, Power on top"
+                                        : "Users in each stage by complete month, Power on top",
+                            }}
+                        />
+                    </Headlined>
                 )}
             </div>
         </Section>

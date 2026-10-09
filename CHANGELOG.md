@@ -19,6 +19,26 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ## Unreleased
 
+### New: Fabric App budget runway, chart headlines and heavy users without a licence
+
+**What changed.** Three additions to the Fabric App, which serves both the Fabric and Azure paths
+(#163).
+
+- **Budget runway.** On Consumption, **Monthly budgets** sits next to Rates & packs. It takes an
+  optional monthly budget for Cowork / Work IQ, Copilot Studio and Azure. A new *Budget runway*
+  section shows each source's spend so far this month against its budget, projects the month-end
+  in a straight line, and says whether it is on track, at risk (with the date it would pass the
+  budget) or already over. The budgets are stored with the rates: in the app's SQL database on
+  Fabric, and in Table Storage through `/api/settings` on Azure.
+- **Chart headlines.** Most charts now have one plain sentence above them, worked out from the
+  rows they draw, such as the largest category and its share or the peak week. A headline is left
+  out when the data is too thin to support one, and it never claims a cause.
+- **Heavy users without a licence.** Readiness has a new section that splits last month's active
+  people by habit (Power, Habitual, Developing, Beginner) and by licence, and lists the ten
+  unlicensed people active on the most days.
+
+The Power BI templates are unchanged.
+
 ### Docs: a disclaimer in the README
 
 **What changed.** The README has a short **Disclaimer** section above *Pick a path*, and each path

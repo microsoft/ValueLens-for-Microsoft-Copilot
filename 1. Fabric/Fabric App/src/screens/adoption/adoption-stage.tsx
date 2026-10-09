@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { VegaVisual } from "@/components/vega-visual";
+import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
 import { stageAnchor } from "@/components/destinations";
 import { FilterNote } from "@/components/filter-note";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
@@ -20,6 +21,7 @@ import { selectedCohort, unshownActivity, type FilterKey } from "@/lib/filters";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import { adoptionSummary, adoptionTrend, type AdoptionTrendMeasure } from "@/queries/adoption";
+import { adoptionTrendHeadline } from "./headlines";
 
 /** The four surfaces usage is reported across. */
 const surfaces = [
@@ -75,6 +77,20 @@ export function AdoptionStage() {
 
     const topOutcome = readText(summaryRow, "[Overall Top Outcome]");
     const coworkUsers = readNumber(summaryRow, "[Cowork Users]");
+    const licensedUsers = readNumber(summaryRow, "[Licensed Users]");
+    const unlicensedUsers = readNumber(summaryRow, "[Unlicensed Users]");
+    const agentUsers = readNumber(summaryRow, "[Agent Users]");
+    const trendHeadline = useMemo(
+        () =>
+            trendTable
+                ? adoptionTrendHeadline(measure, {
+                      Licensed: licensedUsers,
+                      Unlicensed: unlicensedUsers,
+                      Agents: agentUsers,
+                  })(trendTable)
+                : undefined,
+        [trendTable, measure, licensedUsers, unlicensedUsers, agentUsers],
+    );
 
     return (
         <Section
@@ -164,7 +180,7 @@ export function AdoptionStage() {
                 </>
             )}
 
-            <div className="h-[420px]">
+            <div style={{ height: 420 + (trendHeadline ? HEADLINE_SPACE : 0) }}>
                 {trendResult.data?.status === "error" ? (
                     <QueryError
                         className="h-full"
@@ -180,15 +196,17 @@ export function AdoptionStage() {
                         description="There are no dated interactions in the current selection, so there is nothing to trend."
                     />
                 ) : (
-                    <VegaVisual
-                        spec={trend.vegaLiteSpec}
-                        data={trendTable}
-                        theme={theme}
-                        header={{
-                            title: "Weekly adoption trend",
-                            subtitle: "Each point is a calendar week",
-                        }}
-                    />
+                    <Headlined text={trendHeadline}>
+                        <VegaVisual
+                            spec={trend.vegaLiteSpec}
+                            data={trendTable}
+                            theme={theme}
+                            header={{
+                                title: "Weekly adoption trend",
+                                subtitle: "Each point is a calendar week",
+                            }}
+                        />
+                    </Headlined>
                 )}
             </div>
         </Section>

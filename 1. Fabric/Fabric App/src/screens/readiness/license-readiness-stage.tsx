@@ -11,6 +11,8 @@ import { VegaVisual } from "@/components/vega-visual";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { stageAnchor } from "@/components/destinations";
 import { FilterNote } from "@/components/filter-note";
+import { HEADLINE_SPACE, Headlined } from "@/components/headlined";
+import { leaderHeadline } from "@/lib/headline";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
@@ -37,6 +39,13 @@ import {
 } from "@/queries/licensing";
 
 const LICENSE_ESTATE_IGNORES: FilterKey[] = ["dateRange", "organizations"];
+
+const BY_ORG_HEADLINE = leaderHeadline({
+    label: "Organization",
+    value: "Active Unlicensed Users",
+    of: "active unlicensed users",
+});
+const DORMANCY_HEADLINE = leaderHeadline({ label: "Dormancy Bucket", value: "Licensed Users", of: "licensed users" });
 
 function candidateColumns(orgLabel: string, table: DataTable | undefined, withBreadth: boolean): GridColumnDef[] {
     const columns: GridColumnDef[] = [
@@ -128,6 +137,15 @@ export function LicenseReadinessStage() {
         [dormancyResult.data, dormancy.columnMetadata],
     );
 
+    const byOrgHeadline = useMemo(
+        () => (byOrgTable ? BY_ORG_HEADLINE(byOrgTable) : undefined),
+        [byOrgTable],
+    );
+    const dormancyHeadline = useMemo(
+        () => (dormancyTable ? DORMANCY_HEADLINE(dormancyTable) : undefined),
+        [dormancyTable],
+    );
+
     const summaryError =
         demand.data?.status === "error"
             ? { message: demand.data.error.message, retry: demand.refetch }
@@ -216,7 +234,7 @@ export function LicenseReadinessStage() {
 
             <div
                 className="h-[340px]"
-                style={byOrgTable ? { height: rowChartHeight(byOrgTable.rows.length, { perRow: 40, chrome: 100 }) } : undefined}
+                style={byOrgTable ? { height: rowChartHeight(byOrgTable.rows.length, { perRow: 40, chrome: 100 }) + (byOrgHeadline ? HEADLINE_SPACE : 0) } : undefined}
             >
                 {byOrgResult.data?.status === "error" ? (
                     <QueryError
@@ -233,15 +251,17 @@ export function LicenseReadinessStage() {
                         description={`No ${org.noun} has active unlicensed Copilot use in the current selection.`}
                     />
                 ) : (
-                    <VegaVisual
-                        spec={byOrg.vegaLiteSpec}
-                        data={byOrgTable}
-                        theme={theme}
-                        header={{
-                            title: `Priority by ${org.noun}`,
-                            subtitle: "Sessions per user per week among active unlicensed users",
-                        }}
-                    />
+                    <Headlined text={byOrgHeadline}>
+                        <VegaVisual
+                            spec={byOrg.vegaLiteSpec}
+                            data={byOrgTable}
+                            theme={theme}
+                            header={{
+                                title: `Priority by ${org.noun}`,
+                                subtitle: "Sessions per user per week among active unlicensed users",
+                            }}
+                        />
+                    </Headlined>
                 )}
             </div>
 
@@ -280,7 +300,7 @@ export function LicenseReadinessStage() {
 
             <div
                 className="h-[340px]"
-                style={dormancyTable ? { height: rowChartHeight(dormancyTable.rows.length, { perRow: 40, chrome: 100 }) } : undefined}
+                style={dormancyTable ? { height: rowChartHeight(dormancyTable.rows.length, { perRow: 40, chrome: 100 }) + (dormancyHeadline ? HEADLINE_SPACE : 0) } : undefined}
             >
                 {dormancyResult.data?.status === "error" ? (
                     <QueryError
@@ -301,15 +321,17 @@ export function LicenseReadinessStage() {
                         }
                     />
                 ) : (
-                    <VegaVisual
-                        spec={dormancy.vegaLiteSpec}
-                        data={dormancyTable}
-                        theme={theme}
-                        header={{
-                            title: "Dormancy of the license estate",
-                            subtitle: "Licensed users by last activity bucket",
-                        }}
-                    />
+                    <Headlined text={dormancyHeadline}>
+                        <VegaVisual
+                            spec={dormancy.vegaLiteSpec}
+                            data={dormancyTable}
+                            theme={theme}
+                            header={{
+                                title: "Dormancy of the license estate",
+                                subtitle: "Licensed users by last activity bucket",
+                            }}
+                        />
+                    </Headlined>
                 )}
             </div>
 

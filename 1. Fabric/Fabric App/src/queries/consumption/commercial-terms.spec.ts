@@ -218,4 +218,20 @@ describe("parseTerm and validateTerm", () => {
         expect(validateTerm("exchangeRate", 0)).toMatch(/above zero/);
         expect(validateTerm("exchangeRate", 1e6)).toMatch(/smaller/);
     });
+
+    it("accepts monthly budgets above zero, in dollars and cents", () => {
+        expect(validateTerm("budgetCowork", undefined)).toBeUndefined();
+        expect(validateTerm("budgetCowork", 5000)).toBeUndefined();
+        expect(validateTerm("budgetStudio", 1234.56)).toBeUndefined();
+        expect(validateTerm("budgetAzure", 0)).toMatch(/above zero/);
+        expect(validateTerm("budgetAzure", 1e12)).toMatch(/smaller/);
+        expect(validateTerm("budgetStudio", Number.NaN)).toMatch(/number/);
+    });
+
+    it("never treats a budget as a price", () => {
+        expect(hasCommercialTerms({ budgetCowork: 100, budgetStudio: 100, budgetAzure: 100 })).toBe(false);
+        expect(withCommercialTerms("EVALUATE ROW(\"Cost\", [Cowork Total Cost])", { budgetCowork: 100 })).toBe(
+            "EVALUATE ROW(\"Cost\", [Cowork Total Cost])",
+        );
+    });
 });

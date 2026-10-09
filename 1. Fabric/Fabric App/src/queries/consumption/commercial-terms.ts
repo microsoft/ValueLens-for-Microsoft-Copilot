@@ -28,6 +28,12 @@ export interface CommercialTermsValues {
     licensePrice?: number;
     /** How much of ValueLens's currency one US dollar buys. Empty leaves costs in dollars. */
     exchangeRate?: number;
+    /** Monthly budget for Cowork and Work IQ, in US dollars. Empty means no budget. */
+    budgetCowork?: number;
+    /** Monthly budget for Copilot Studio, in US dollars. Empty means no budget. */
+    budgetStudio?: number;
+    /** Monthly budget for Azure solution and AI Foundry spend, in Azure's billing currency. Empty means no budget. */
+    budgetAzure?: number;
 }
 
 /** The Microsoft 365 Copilot US list price, per user per month, used when no licence price is typed in. */
@@ -36,8 +42,28 @@ export const LICENSE_LIST_PRICE = 30;
 /** The highest licence price and exchange rate the app accepts. */
 export const LICENSE_PRICE_MAX = 1000;
 export const EXCHANGE_RATE_MAX = 100000;
+/** The highest monthly budget the app accepts, in the budget's currency. */
+export const BUDGET_MAX = 1e11;
 
 export type CommercialTermKey = keyof CommercialTermsValues;
+
+/** Every term the app saves, in the order they are stored. */
+export const COMMERCIAL_TERM_KEYS: readonly CommercialTermKey[] = [
+    "creditRate",
+    "prepaidCreditRate",
+    "prepaidCreditBalance",
+    "licensePrice",
+    "exchangeRate",
+    "budgetCowork",
+    "budgetStudio",
+    "budgetAzure",
+];
+
+export type BudgetKey = "budgetCowork" | "budgetStudio" | "budgetAzure";
+
+export function isBudgetKey(term: CommercialTermKey): term is BudgetKey {
+    return term === "budgetCowork" || term === "budgetStudio" || term === "budgetAzure";
+}
 
 /**
  * The model's rate inputs, all on its Settings table, and the term each
@@ -166,6 +192,11 @@ export function withCommercialTerms(query: string, terms: CommercialTermsValues 
 export function validateTerm(term: CommercialTermKey, value: number | undefined): string | undefined {
     if (value === undefined) return undefined;
     if (!Number.isFinite(value)) return "Enter a number.";
+    if (isBudgetKey(term)) {
+        if (value <= 0) return "Enter a budget above zero, or leave it empty.";
+        if (value > BUDGET_MAX) return "Enter a smaller budget.";
+        return undefined;
+    }
     if (term === "licensePrice") {
         if (value < 0 || value > LICENSE_PRICE_MAX) return `Enter a price between $0 and $${LICENSE_PRICE_MAX}.`;
         return undefined;

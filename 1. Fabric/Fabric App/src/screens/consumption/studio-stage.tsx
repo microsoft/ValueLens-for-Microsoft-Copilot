@@ -34,6 +34,7 @@ import {
 } from "@/queries/consumption";
 import { AzureBilledPanel } from "./azure-billed";
 import { CREDIT_CURRENCY, LENSES, moneyCell, standalone, useConsumptionSummary, useConsumptionTable } from "./data";
+import { BREAKDOWN_COST_HEADLINE, BREAKDOWN_CREDITS_HEADLINE, STUDIO_COST_HEADLINE, STUDIO_CREDITS_HEADLINE } from "./headlines";
 import { ChartPanel, KpiRowState, NoteCard, Panel, RollupGrid, type TreeColumn } from "@/components/report-panels";
 
 const KPI_GRID = "grid gap-300 md:grid-cols-2 xl:grid-cols-5";
@@ -227,6 +228,7 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                     capabilities={NO_STACK_LABELS}
                     height={340}
                     title={cost ? "Cost over time" : "Consumption over time"}
+                    headline={cost ? STUDIO_COST_HEADLINE : STUDIO_CREDITS_HEADLINE}
                     subtitle={cost ? "Tenant cost each day, prepaid then pay-as-you-go" : "Tenant credits each day, prepaid then pay-as-you-go"}
                     emptyTitle="No daily credits"
                     emptyDescription="The tenant data has no days with Copilot Studio credits in this period."
@@ -252,6 +254,7 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                     spec={breakdownSource.vegaLiteSpec}
                     height={breakdownHeight}
                     title={cost ? "Cost by model" : "Consumption by model"}
+                    headline={cost ? BREAKDOWN_COST_HEADLINE : BREAKDOWN_CREDITS_HEADLINE}
                     subtitle="The model behind each agent's credits"
                     emptyTitle="No model detail"
                     emptyDescription="The agent detail does not name a model for these credits."
@@ -262,6 +265,7 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                     spec={breakdownSource.vegaLiteSpec}
                     height={breakdownHeight}
                     title={cost ? "Cost by feature" : "Consumption by feature"}
+                    headline={cost ? BREAKDOWN_COST_HEADLINE : BREAKDOWN_CREDITS_HEADLINE}
                     subtitle="The billable feature each credit was spent on"
                     emptyTitle="No feature detail"
                     emptyDescription="The agent detail does not name a billable feature for these credits."

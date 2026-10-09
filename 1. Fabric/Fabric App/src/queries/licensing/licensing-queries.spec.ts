@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    habitLicenceMatrix,
     LICENSE_BREADTH_FULL_MARKS,
     licenseCandidates,
     licenseCandidatesM365,
@@ -14,6 +15,7 @@ import {
     licenseDormancy,
     licenseEstateSummary,
     licensePriorityByOrg,
+    unlicensedHeavyUsers,
 } from "./index";
 import { liveColumns } from "./live-columns.fixture";
 import candidateRows from "./__fixtures__/license-candidates.rows.json";
@@ -27,6 +29,8 @@ const modules = [
     { name: "licenseCandidates", factory: () => licenseCandidates(), columns: liveColumns.licenseCandidates },
     { name: "licenseCandidatesM365", factory: () => licenseCandidatesM365(), columns: liveColumns.licenseCandidatesM365 },
     { name: "licenseDormancy", factory: () => licenseDormancy(), columns: liveColumns.licenseDormancy },
+    { name: "habitLicenceMatrix", factory: () => habitLicenceMatrix(), columns: liveColumns.habitLicenceMatrix },
+    { name: "unlicensedHeavyUsers", factory: () => unlicensedHeavyUsers(), columns: liveColumns.unlicensedHeavyUsers },
 ];
 
 const specModules = [
@@ -75,6 +79,15 @@ describe("licensing query contract", () => {
         const raw = factory().query;
         expect(raw.charCodeAt(0)).not.toBe(0xfeff);
         expect(raw.trim()).toMatch(/^(EVALUATE|DEFINE)\b/);
+    });
+
+    it("bands habits by the same active days as the Adoption page", () => {
+        const { query } = habitLicenceMatrix();
+        expect(query).toContain('{ "Power", 1, 16, 31 }');
+        expect(query).toContain('{ "Habitual", 2, 11, 15 }');
+        expect(query).toContain('{ "Developing", 3, 6, 10 }');
+        expect(query).toContain('{ "Beginner", 4, 1, 5 }');
+        expect(unlicensedHeavyUsers().query).toContain("[@Days] >= 11");
     });
 
     it("ranks license candidates at user grain", () => {

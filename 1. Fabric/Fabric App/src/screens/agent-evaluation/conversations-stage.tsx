@@ -32,6 +32,7 @@ import {
     topicHealth,
     TOPIC_LABEL_COLUMN,
 } from "@/queries/agent-evaluation";
+import { ARCHETYPE_HEADLINE, SOURCE_HEADLINE, THEME_HEADLINE } from "./headlines";
 
 const SUMMARY = conversationsSummary();
 const THEMES = themeOutcomes();
@@ -166,6 +167,7 @@ export function ConversationsStage({ extra }: { extra: readonly string[] }) {
                     spec={themeSpec}
                     capabilities={NO_STACK_LABELS}
                     height={rowChartHeight(themeCount || 6, RANKED_BARS)}
+                    headline={THEME_HEADLINE}
                     title="How each theme ended"
                     subtitle="Conversations in each topic theme, the busiest first"
                     emptyTitle="No topic themes"
@@ -203,6 +205,7 @@ export function ConversationsStage({ extra }: { extra: readonly string[] }) {
                     result={sources}
                     spec={SOURCES.vegaLiteSpec}
                     height={rowChartHeight(sources.table?.rows.length ?? 6, RANKED_BARS)}
+                    headline={SOURCE_HEADLINE}
                     title="Where answers came from"
                     subtitle="The ten knowledge sources agents cited most"
                     emptyTitle="No citations"
@@ -214,6 +217,7 @@ export function ConversationsStage({ extra }: { extra: readonly string[] }) {
                         table={archetypeTable}
                         spec={ARCHETYPES.vegaLiteSpec}
                         height={rowChartHeight(archetypeTable?.rows.length ?? 4, RANKED_BARS)}
+                        headline={ARCHETYPE_HEADLINE}
                         title="How each conversation was answered"
                         subtitle="From your content, from the model alone, by a person, or not at all"
                         emptyTitle="No answers"

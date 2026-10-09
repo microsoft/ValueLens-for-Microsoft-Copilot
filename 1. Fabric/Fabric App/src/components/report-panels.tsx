@@ -11,9 +11,11 @@ import { VegaVisual, type VisualizationSpec } from "@/components/vega-visual";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { TreeFrame } from "@/components/tree-frame";
+import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useRowToggles } from "@/hooks/use-row-toggles";
 import { gridHeight } from "@/lib/chart-height";
+import type { Headline } from "@/lib/headline";
 import { heatDomain, heatRenderer, type HeatDomain } from "@/lib/heat";
 import { isGroupRow, visibleRowCount, type RollupTree } from "@/lib/rollup-tree";
 import { textCell, totalsRow, TREE_GRID, withExpansion } from "@/lib/tree-grid";
@@ -82,14 +84,20 @@ interface ChartPanelProps extends Omit<PanelProps, "children"> {
     title: string;
     subtitle: string;
     capabilities?: ComponentProps<typeof VegaVisual>["capabilities"];
+    /** One plain sentence above the chart, worked out from its rows; see `lib/headline`. */
+    headline?: Headline;
 }
 
-export function ChartPanel({ spec, title, subtitle, capabilities, ...panel }: ChartPanelProps) {
+export function ChartPanel({ spec, title, subtitle, capabilities, headline, ...panel }: ChartPanelProps) {
     const { theme } = useThemeContext();
+    const shown = panel.table ?? panel.result.table;
+    const text = useMemo(() => (headline && shown ? headline(shown) : undefined), [headline, shown]);
     return (
-        <Panel {...panel}>
+        <Panel {...panel} height={panel.height + (text ? HEADLINE_SPACE : 0)}>
             {(table) => (
-                <VegaVisual spec={spec} data={table} theme={theme} capabilities={capabilities} header={{ title, subtitle }} />
+                <Headlined text={text}>
+                    <VegaVisual spec={spec} data={table} theme={theme} capabilities={capabilities} header={{ title, subtitle }} />
+                </Headlined>
             )}
         </Panel>
     );

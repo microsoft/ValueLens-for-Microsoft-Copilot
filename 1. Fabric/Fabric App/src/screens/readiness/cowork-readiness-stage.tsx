@@ -10,6 +10,8 @@ import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
 import { VegaVisual } from "@/components/vega-visual";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { stageAnchor } from "@/components/destinations";
+import { HEADLINE_SPACE, Headlined } from "@/components/headlined";
+import { leaderHeadline } from "@/lib/headline";
 import { KpiCard } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
@@ -28,6 +30,12 @@ import {
     coworkReadinessSummary,
     isDepthUniform,
 } from "@/queries/agents";
+
+const BY_ORG_HEADLINE = leaderHeadline({
+    label: "Organization",
+    value: "Eligible Users",
+    of: "people yet to try Cowork",
+});
 
 function candidateColumns(orgLabel: string, table: DataTable | undefined): GridColumnDef[] {
     return [
@@ -90,6 +98,7 @@ export function CoworkReadinessStage() {
     const columns = useMemo(() => candidateColumns(org.label, candidatesTable), [org.label, candidatesTable]);
 
     const depthUniform = candidatesTable ? isDepthUniform(candidatesTable) : false;
+    const byOrgHeadline = useMemo(() => (byOrgTable ? BY_ORG_HEADLINE(byOrgTable) : undefined), [byOrgTable]);
 
     return (
         <Section
@@ -139,7 +148,7 @@ export function CoworkReadinessStage() {
                 </p>
             )}
 
-            <div className="h-[340px]" style={byOrgTable ? { height: rowChartHeight(byOrgTable.rows.length, { perRow: 40, chrome: 100 }) } : undefined}>
+            <div className="h-[340px]" style={byOrgTable ? { height: rowChartHeight(byOrgTable.rows.length, { perRow: 40, chrome: 100 }) + (byOrgHeadline ? HEADLINE_SPACE : 0) } : undefined}>
                 {byOrgResult.data?.status === "error" ? (
                     <QueryError
                         className="h-full"
@@ -155,15 +164,17 @@ export function CoworkReadinessStage() {
                         description="Nobody without Cowork has recorded Copilot use in this period."
                     />
                 ) : (
-                    <VegaVisual
-                        spec={byOrg.vegaLiteSpec}
-                        data={byOrgTable}
-                        theme={theme}
-                        header={{
-                            title: `Breadth of use by ${org.noun}`,
-                            subtitle: "Apps used per active day, among people who have not tried Cowork",
-                        }}
-                    />
+                    <Headlined text={byOrgHeadline}>
+                        <VegaVisual
+                            spec={byOrg.vegaLiteSpec}
+                            data={byOrgTable}
+                            theme={theme}
+                            header={{
+                                title: `Breadth of use by ${org.noun}`,
+                                subtitle: "Apps used per active day, among people who have not tried Cowork",
+                            }}
+                        />
+                    </Headlined>
                 )}
             </div>
 

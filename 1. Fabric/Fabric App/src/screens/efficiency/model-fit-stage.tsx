@@ -8,6 +8,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { DataGrid, type GridColumnDef, type Row } from "@microsoft/fabric-datagrid";
 import { VegaVisual } from "@/components/vega-visual";
+import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { stageAnchor } from "@/components/destinations";
 import { FilterNote } from "@/components/filter-note";
@@ -38,6 +39,7 @@ import {
     modelMatchByTool,
     modelUsage,
 } from "@/queries/efficiency";
+import { MATCH_BY_TOOL_HEADLINE, MODEL_USAGE_HEADLINE } from "./headlines";
 
 type ModelFitView = "task" | "organization" | "person";
 
@@ -224,6 +226,8 @@ export function ModelFitStage() {
 
     const notice = readText(summaryRow, "[Coverage Notice]");
     const shares = judgedShares(summaryRow);
+    const usageHeadline = useMemo(() => (usageTable ? MODEL_USAGE_HEADLINE(usageTable) : undefined), [usageTable]);
+    const matchHeadline = useMemo(() => (matchTable ? MATCH_BY_TOOL_HEADLINE(matchTable) : undefined), [matchTable]);
 
     return (
         <Section
@@ -279,7 +283,11 @@ export function ModelFitStage() {
             <div className="grid grid-cols-1 gap-500 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <div
                     className="h-[340px]"
-                    style={usageTable ? { height: rowChartHeight(usageTable.rows.length, LEGEND_CHART) } : undefined}
+                    style={
+                        usageTable
+                            ? { height: rowChartHeight(usageTable.rows.length, LEGEND_CHART) + (usageHeadline ? HEADLINE_SPACE : 0) }
+                            : undefined
+                    }
                 >
                     {usageResult.data?.status === "error" ? (
                         <QueryError
@@ -296,12 +304,14 @@ export function ModelFitStage() {
                             description="No sessions in this selection carry a model name yet."
                         />
                     ) : (
-                        <VegaVisual
-                            spec={usage.vegaLiteSpec}
-                            data={usageTable}
-                            theme={theme}
-                            header={{ title: "Model usage", subtitle: "Sessions by logged model and cost tier" }}
-                        />
+                        <Headlined text={usageHeadline}>
+                            <VegaVisual
+                                spec={usage.vegaLiteSpec}
+                                data={usageTable}
+                                theme={theme}
+                                header={{ title: "Model usage", subtitle: "Sessions by logged model and cost tier" }}
+                            />
+                        </Headlined>
                     )}
                 </div>
 
@@ -312,7 +322,15 @@ export function ModelFitStage() {
                     />
                     <div
                         className="h-[340px]"
-                        style={matchTable ? { height: rowChartHeight(distinctValues(matchTable, "Activity"), LEGEND_CHART) } : undefined}
+                        style={
+                            matchTable
+                                ? {
+                                      height:
+                                          rowChartHeight(distinctValues(matchTable, "Activity"), LEGEND_CHART) +
+                                          (matchHeadline ? HEADLINE_SPACE : 0),
+                                  }
+                                : undefined
+                        }
                     >
                         {matchResult.data?.status === "error" ? (
                             <QueryError
@@ -329,13 +347,15 @@ export function ModelFitStage() {
                                 description="There is no Copilot or agent activity in this selection."
                             />
                         ) : (
-                            <VegaVisual
-                                spec={matchSpec}
-                                data={matchTable}
-                                theme={theme}
-                                capabilities={NO_STACK_LABELS}
-                                header={{ title: "Match by tool", subtitle: "Good matches, the two exceptions, and unjudged sessions" }}
-                            />
+                            <Headlined text={matchHeadline}>
+                                <VegaVisual
+                                    spec={matchSpec}
+                                    data={matchTable}
+                                    theme={theme}
+                                    capabilities={NO_STACK_LABELS}
+                                    header={{ title: "Match by tool", subtitle: "Good matches, the two exceptions, and unjudged sessions" }}
+                                />
+                            </Headlined>
                         )}
                     </div>
                 </div>

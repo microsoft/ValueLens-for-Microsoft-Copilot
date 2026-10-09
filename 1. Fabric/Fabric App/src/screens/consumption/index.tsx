@@ -11,6 +11,8 @@ import { stageAnchor } from "@/components/destinations";
 import { SourceEmpty, SourceError } from "@/components/source-states";
 import { readText } from "@/lib/summary-row";
 import {
+    azureMode,
+    azureSource,
     consumptionNotes,
     consumptionOptions,
     consumptionSources,
@@ -19,6 +21,7 @@ import {
 } from "@/queries/consumption";
 import { consumptionConnection } from "@/queries/shared";
 import { AzureStage } from "./azure-stage";
+import { BudgetRunwayStage } from "./budget-runway-stage";
 import { CoworkStage } from "./cowork-stage";
 import { OverviewStage } from "./overview-stage";
 import { useConsumptionSummary, useConsumptionTable } from "./data";
@@ -50,6 +53,10 @@ function ConsumptionPage() {
     const notes = useConsumptionSummary(consumptionNotes());
     const rates = readText(notes.row, "[Rates In Use]");
     const sources = useConsumptionSummary(consumptionSources());
+    const azureSourceRow = useConsumptionSummary(azureSource()).row;
+    const azure = useMemo(() => azureMode(azureSourceRow), [azureSourceRow]);
+    const azureCurrency =
+        azure.kind === "solution" ? azure.currencies[0] : azure.kind === "foundry" ? azure.currency : undefined;
 
     if (optionsResult.error !== undefined) {
         return (
@@ -74,8 +81,9 @@ function ConsumptionPage() {
 
     return (
         <div className="flex flex-col gap-800">
-            <RatesBar />
+            <RatesBar azureCurrency={azureCurrency} />
             <OverviewStage />
+            <BudgetRunwayStage options={options} azure={azure} sources={sources.row} />
             <CoworkStage options={options} rates={rates} />
             <StudioStage options={options} rates={rates} />
             <AzureStage options={options} />

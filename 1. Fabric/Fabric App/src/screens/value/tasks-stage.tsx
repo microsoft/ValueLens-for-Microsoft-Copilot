@@ -6,6 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { useMemo, useState } from "react";
+import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
 import { VegaVisual } from "@/components/vega-visual";
 import { stageAnchor } from "@/components/destinations";
 import { FilterNote } from "@/components/filter-note";
@@ -20,6 +21,10 @@ import { selectedCohort, unshownActivity, type FilterKey } from "@/lib/filters";
 import { readNumber, readText, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import { taskBreakdown, taskDimensions, topOutcome, workSummary, type TaskDimension } from "@/queries/work";
+import { TASK_BREAKDOWN_HEADLINES } from "./headlines";
+
+/** The breakdown chart's plot height; a headline adds its own room above. */
+const BREAKDOWN_HEIGHT = 460;
 
 /** Which summary columns each cohort card reads. */
 const cards = [
@@ -85,6 +90,15 @@ export function TasksStage() {
         [outcome.data],
     );
 
+    // The benefit sentence above already names the leading value outcome, so that lens isn't headlined twice.
+    const breakdownHeadline = useMemo(
+        () =>
+            breakdownTable && !(dimension === "outcome" && benefit)
+                ? TASK_BREAKDOWN_HEADLINES[dimension](breakdownTable)
+                : undefined,
+        [breakdownTable, dimension, benefit],
+    );
+
     return (
         <Section
             id={stageAnchor("task-breakdown")}
@@ -147,7 +161,7 @@ export function TasksStage() {
                     />
                 </div>
 
-                <div className="h-[460px]">
+                <div style={{ height: BREAKDOWN_HEIGHT + (breakdownHeadline ? HEADLINE_SPACE : 0) }}>
                     {breakdownResult.data?.status === "error" ? (
                         <QueryError
                             className="h-full"
@@ -163,15 +177,17 @@ export function TasksStage() {
                             description="No rows carry a classification. Enrichment has to run before tasks can be grouped this way."
                         />
                     ) : (
-                        <VegaVisual
-                            spec={breakdown.vegaLiteSpec}
-                            data={breakdownTable}
-                            theme={theme}
-                            header={{
-                                title: breakdown.title,
-                                subtitle: breakdown.subtitle,
-                            }}
-                        />
+                        <Headlined text={breakdownHeadline}>
+                            <VegaVisual
+                                spec={breakdown.vegaLiteSpec}
+                                data={breakdownTable}
+                                theme={theme}
+                                header={{
+                                    title: breakdown.title,
+                                    subtitle: breakdown.subtitle,
+                                }}
+                            />
+                        </Headlined>
                     )}
                 </div>
             </div>

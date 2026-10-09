@@ -12,6 +12,7 @@ import { Section } from "@/components/section";
 import { formatKpi } from "@/lib/format-kpi";
 import { readNumber } from "@/lib/summary-row";
 import { CONSUMPTION_CONFIGURED } from "@/screens/value/cost-vs-value-data";
+import { CREDITS_HEADLINE, HOURS_HEADLINE } from "./headlines";
 import type { ExecutiveData } from "./use-executive-data";
 
 const CHART_HEIGHT = 340;
@@ -44,6 +45,7 @@ export function GrowingStage({ data }: { data: ExecutiveData }) {
                         spec={monthsSource.vegaLiteSpec}
                         height={CHART_HEIGHT}
                         title="Work delivered by month"
+                        headline={HOURS_HEADLINE}
                         subtitle={`Expert-equivalent hours. ${TREND_SUBTITLE}`}
                         emptyTitle="No work in these months"
                         emptyDescription="There's no Copilot activity in the six months to the end of the date range."
@@ -54,6 +56,7 @@ export function GrowingStage({ data }: { data: ExecutiveData }) {
                             spec={creditsSource.vegaLiteSpec}
                             height={CHART_HEIGHT}
                             title="Credits consumed by month"
+                            headline={CREDITS_HEADLINE}
                             subtitle={`Whole tenant. ${TREND_SUBTITLE}`}
                             emptyTitle="No credits in these months"
                             emptyDescription="Consumption Central has no Copilot Studio or Cowork credits in the six months to the end of the date range."

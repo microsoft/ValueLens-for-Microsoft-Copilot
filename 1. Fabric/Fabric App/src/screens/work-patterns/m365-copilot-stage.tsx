@@ -10,6 +10,7 @@ import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
 import { VegaVisual } from "@/components/vega-visual";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { stageAnchor } from "@/components/destinations";
+import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { NoteCard, type Note } from "@/components/report-panels";
@@ -25,6 +26,7 @@ import { readNumber, toSummaryRow } from "@/lib/summary-row";
 import { toDataTable } from "@/lib/to-data-table";
 import { m365ByOrg, m365CopilotIndex, m365CopilotSummary, SMALL_GROUP_MIN_PEOPLE } from "@/queries/work-patterns";
 import { CONCEALED_FIX } from "./copy";
+import { copilotGapHeadline } from "./headlines";
 
 const SUMMARY = m365CopilotSummary();
 const INDEX = m365CopilotIndex();
@@ -155,6 +157,12 @@ function CopilotComparison() {
 
     const m365People = readNumber(summaryRow, "[M365 People]");
     const licensed = readNumber(summaryRow, "[Licensed People]");
+    const copilotPeople = readNumber(summaryRow, "[Copilot People]");
+    const otherPeople = m365People !== undefined && copilotPeople !== undefined ? m365People - copilotPeople : undefined;
+    const indexHeadline = useMemo(
+        () => (indexTable ? copilotGapHeadline(copilotPeople, otherPeople)(indexTable) : undefined),
+        [indexTable, copilotPeople, otherPeople],
+    );
 
     return (
         <Section id={stageAnchor("m365-copilot")} title={TITLE} description={DESCRIPTION}>
@@ -211,7 +219,11 @@ function CopilotComparison() {
                     className="h-[340px] 2xl:col-span-2"
                     style={
                         indexTable?.rows.length
-                            ? { height: rowChartHeight(indexTable.rows.length, { perRow: 44, chrome: 116 }) }
+                            ? {
+                                  height:
+                                      rowChartHeight(indexTable.rows.length, { perRow: 44, chrome: 116 }) +
+                                      (indexHeadline ? HEADLINE_SPACE : 0),
+                              }
                             : undefined
                     }
                 >
@@ -226,16 +238,18 @@ function CopilotComparison() {
                             description="The comparison needs people who use Copilot and people who don't in the same selection."
                         />
                     ) : (
-                        <VegaVisual
-                            spec={INDEX.vegaLiteSpec}
-                            data={indexTable}
-                            theme={theme}
-                            header={{
-                                title: "A Copilot user's week, against everyone else's",
-                                subtitle:
-                                    "Per person, per week. Right of 1× means Copilot users do more of it. This compares the two groups; it doesn't show Copilot caused the gap.",
-                            }}
-                        />
+                        <Headlined text={indexHeadline}>
+                            <VegaVisual
+                                spec={INDEX.vegaLiteSpec}
+                                data={indexTable}
+                                theme={theme}
+                                header={{
+                                    title: "A Copilot user's week, against everyone else's",
+                                    subtitle:
+                                        "Per person, per week. Right of 1× means Copilot users do more of it. This compares the two groups; it doesn't show Copilot caused the gap.",
+                                }}
+                            />
+                        </Headlined>
                     )}
                 </div>
 

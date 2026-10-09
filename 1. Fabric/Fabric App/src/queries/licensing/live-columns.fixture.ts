@@ -50,4 +50,7 @@ export const liveColumns = {
         "[Workloads Per Day]",
     ],
     licenseDormancy: ["[Dormancy Bucket Order]", "[Dormancy Bucket]", "[Licensed Users]"],
+    // Authored, not yet captured live: no published model was reachable when these were written.
+    habitLicenceMatrix: ["[Month]", "[Cohort]", "[Cohort Order]", "[Licensed]", "[Unlicensed]"],
+    unlicensedHeavyUsers: ["[User]", "[Organization]", "[Active Days]", "[Cohort]"],
 } as const;
