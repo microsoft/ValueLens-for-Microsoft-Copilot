@@ -1,6 +1,6 @@
 {
   "name": "valuelens-fabric-installer",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "Analytics Hub installer. Sets up the ValueLens data pipeline in Microsoft Fabric: app registration, Key Vault secret, workspace, Lakehouse, notebooks, pipeline, schedule and first load.",
   "license": "MIT",
   "private": true,
