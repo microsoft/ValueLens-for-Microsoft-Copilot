@@ -64,15 +64,6 @@ Defender for Cloud Apps (`CloudApp-Discovery.Read.All`). Fabric runs the new
 
 The Power BI templates are unchanged; #167 tracks porting the read-only visuals to them.
 
-## 2026-10-09 — Analytics Hub installer 0.3.9
-
-**Update an existing install:** download installer 0.3.9, open it and choose **Repair or change**.
-On Azure, run `update` first if you want to load more audit history: older job images ignore
-`VALUELENS_AUDIT_BACKFILL_DAYS`.
-
-The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.3.9`, which the
-Azure install pulls.
-
 ### New: Fabric App budget runway, chart headlines and heavy users without a licence
 
 **What changed.** Three additions to the Fabric App, which serves both the Fabric and Azure paths
@@ -92,6 +83,15 @@ Azure install pulls.
   unlicensed people active on the most days.
 
 The Power BI templates are unchanged.
+
+## 2026-10-09 — Analytics Hub installer 0.3.9
+
+**Update an existing install:** download installer 0.3.9, open it and choose **Repair or change**.
+On Azure, run `update` first if you want to load more audit history: older job images ignore
+`VALUELENS_AUDIT_BACKFILL_DAYS`.
+
+The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.3.9`, which the
+Azure install pulls.
 
 ### Docs: a disclaimer in the README
 
