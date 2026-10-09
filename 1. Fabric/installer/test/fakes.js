@@ -420,9 +420,14 @@ export function fakeArm() {
             webFqdn: { value: 'vlens.example.com' },
             webUrl: { value: 'https://vlens.example.com' },
             webName: { value: 'vlens-web' },
+            storageAccountName: { value: 'vlensstabc' },
           },
         },
       };
+    },
+    assignRole: async (/** @type {string} */ scope, /** @type {string} */ role, /** @type {string} */ principal, /** @type {string} */ type) => {
+      calls.push(`assignRole ${scope} ${role} ${principal} ${type}`);
+      fail('assignRole');
     },
     getSqlDatabase: async () => null,
     startContainerAppJob: async (/** @type {string} */ _sub, /** @type {string} */ _rg, /** @type {string} */ name) => {
@@ -458,7 +463,10 @@ export function fakeAzureGraph() {
     { id: 'r-reports', value: 'Reports.Read.All' },
     { id: 'r-users', value: 'User.Read.All' },
     { id: 'r-settings', value: 'ReportSettings.Read.All' },
+    { id: 'r-sites', value: 'Sites.Selected' },
   ], oauth2PermissionScopes: [{ id: 's-user-read', value: 'User.Read' }] };
+  /** @type {Error[]} */
+  const siteGrantFailures = [];
   const pbiSp = { id: 'pbi-sp', appId: '00000009-0000-0000-c000-000000000000', oauth2PermissionScopes: [{ id: 's-dataset', value: 'Dataset.Read.All' }] };
   const api = {
     servicePrincipalByAppId: async (/** @type {string} */ appId) => (appId === pbiSp.appId ? pbiSp : graphSp),
@@ -510,8 +518,14 @@ export function fakeAzureGraph() {
     deleteApplication: async (/** @type {string} */ id) => {
       calls.push(`deleteApplication ${id}`);
     },
+    site: async (/** @type {string} */ id) => ({ id: `site:${id}`, webUrl: `https://${id.replace(':', '')}` }),
+    grantSiteRead: async (/** @type {string} */ siteId, /** @type {string} */ appId, /** @type {string} */ name) => {
+      calls.push(`grantSiteRead ${siteId} ${appId} ${name}`);
+      const err = siteGrantFailures.shift();
+      if (err) throw err;
+    },
   };
-  return { api, calls, applications, servicePrincipals };
+  return { api, calls, applications, servicePrincipals, siteGrantFailures };
 }
 
 /** Power BI refreshes. `states` scripts what each poll of a refresh returns. */

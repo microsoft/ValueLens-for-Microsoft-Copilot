@@ -59,8 +59,12 @@ export const secretMode = (config) => config.keyVault?.mode ?? 'keyvault';
  * @typedef {'user' | 'app'} FlowIdentity
  */
 
-/** @param {InstallConfig} config @returns {FlowIdentity} */
-export const flowIdentity = (config) => (config.uploads?.flowIdentity === 'app' ? 'app' : 'user');
+/**
+ * Who the flows write as. Azure installs always use the user: the managed identity has no secret
+ * for a flow to sign in with.
+ * @param {InstallConfig} config @returns {FlowIdentity}
+ */
+export const flowIdentity = (config) => (config.target !== 'azure' && config.uploads?.flowIdentity === 'app' ? 'app' : 'user');
 
 /**
  * The upload drop folder and the optional extras around it.
@@ -200,12 +204,27 @@ export const flowIdentity = (config) => (config.uploads?.flowIdentity === 'app' 
  * @property {Record<string, any>} [outputs]
  * @property {{ clientId?: string, objectId?: string, servicePrincipalId?: string, created?: boolean, appIdUri?: string }} [webApp]
  * @property {{ clientId?: string, objectId?: string, servicePrincipalId?: string, secretKeyId?: string, secretExpiry?: string, created?: boolean }} [sqlReader]
- * @property {{ workspaceId?: string, createdWorkspace?: boolean, datasetId?: string, capacityId?: string, gatewayId?: string, createdGateway?: boolean, connectionId?: string }} [powerBi]
+ * @property {{ workspaceId?: string, createdWorkspace?: boolean, datasetId?: string, consumptionDatasetId?: string, capacityId?: string, gatewayId?: string, createdGateway?: boolean, connectionId?: string }} [powerBi]
  *   `capacityId` hosts the workspace (semantic model definition APIs need a Fabric/Premium capacity) and, in private
  *   networking mode, the VNet data gateway `gatewayId` whose SQL connection `connectionId` the model is bound to.
+ *   `consumptionDatasetId` is the Consumption model, deployed with credit consumption.
+ * @property {AzureDrop} [drop] Private networking with credit consumption: the SharePoint folder the Studio flow and CSV uploads land in.
+ * @property {boolean} [storageRole] The installer gave the signed-in user Storage Blob Data Contributor on the landing container, for the Studio flow.
  * @property {{ assigned: string[], pending: string[] }} [graphRoles]
  * @property {string} [teamsPackage]
  * @property {{ whatIf?: any[], pendingAdminActions?: string[], lastRun?: any, lastMigrate?: any }} [status]
+ */
+
+/**
+ * A SharePoint folder the Azure jobs read landing files from, for installs whose storage takes no public traffic.
+ * @typedef {object} AzureDrop
+ * @property {string} folderUrl  The folder as the user gave it, e.g. https://contoso.sharepoint.com/sites/Analytics/Shared Documents/ValueLens.
+ * @property {string} [siteUrl]  The site, for the flow's SharePoint connector.
+ * @property {string} [sitePath]  The folder's path under the site, e.g. /Shared Documents/ValueLens, for the flow.
+ * @property {string} [siteId]  For the jobs: a Graph site ID, or the path form contoso.sharepoint.com:/sites/Analytics.
+ * @property {string} [driveId]  Graph drive ID. Empty when drivePath starts with the library's name.
+ * @property {string} [drivePath]  The folder for the jobs: under the drive's root, or library/folder when driveId is empty.
+ * @property {boolean} [granted]  The managed identity has read on the site (Sites.Selected).
  */
 
 // Names for items a new install creates. An existing install keeps the names saved in its record.
@@ -277,6 +296,7 @@ export function loadConfig(file) {
       ...(raw.azure?.webApp ? { webApp: { ...raw.azure.webApp } } : {}),
       ...(raw.azure?.sqlReader ? { sqlReader: { ...raw.azure.sqlReader } } : {}),
       ...(raw.azure?.powerBi ? { powerBi: { ...raw.azure.powerBi } } : {}),
+      ...(raw.azure?.drop ? { drop: { ...raw.azure.drop } } : {}),
       graphRoles: { assigned: [...(raw.azure?.graphRoles?.assigned ?? [])], pending: [...(raw.azure?.graphRoles?.pending ?? [])] },
       ...(raw.azure?.status ? { status: { ...raw.azure.status } } : {}),
     },

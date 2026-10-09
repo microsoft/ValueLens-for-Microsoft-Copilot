@@ -10,6 +10,11 @@ publishes it again, replacing the sample in SQL.
 
 Dates move forward by whole weeks so the latest sample day falls in the past week (weekday
 patterns are kept, and the "last 30 days" measures have data).
+
+With the `consumption` module on, the synthetic Consumption Central sample
+(`5. Local CSV/Add Credit Consumption/sample-data`, bundled at /app/sample-data/consumption) goes
+through the same Studio and Viva ingest as drop-folder files, and its Azure AI CSVs become the
+Azure AI tables. Its dates are left as they are.
 """
 from __future__ import annotations
 
@@ -29,6 +34,15 @@ from .tables import q, write_rows
 log = logging.getLogger("valuelens_jobs.sample")
 
 DEFAULT_DIR = "/app/sample-data"
+CONSUMPTION_DIR = "consumption"
+# Consumption sample CSV -> Azure AI table (the CSV headers are the table columns).
+AZURE_SAMPLES = {
+    "AzureAiSpendDaily.csv": "azure_ai_spend",
+    "AzureAiTokensDaily.csv": "azure_ai_tokens",
+    "AzureDeploymentHealth.csv": "azure_deployment_health",
+    "AzureSolutionSpend.csv": "azure_solution_spend",
+    "AzureBillingReconciliation.csv": "azure_billing_reconciliation",
+}
 INTERACTIONS = "copilot_interactions_sample.csv"
 PEOPLE = "copilot_users_sample.csv"
 PARSED = "raw/copilot_interactions_parsed/part-0.parquet"
@@ -52,6 +66,38 @@ CARRIED = [c for c in audit.PARSED_COLUMNS
 
 def sample_dir() -> Path:
     return Path(os.environ.get("VALUELENS_SAMPLE_DIR") or DEFAULT_DIR)
+
+
+def consumption_dir() -> Path:
+    return Path(os.environ.get("VALUELENS_SAMPLE_CONSUMPTION_DIR") or sample_dir() / CONSUMPTION_DIR)
+
+
+def load_consumption(store, folder: Path | None = None) -> dict:
+    """The synthetic Consumption Central sample into the consumption tables in `store`."""
+    from .collect import azure_ai, studio, viva
+
+    folder = Path(folder or consumption_dir())
+    if not folder.is_dir():
+        log.warning("sample: no consumption sample in %s; Consumption Central tables stay empty", folder)
+        return {}
+    files = {f.name: f for f in folder.glob("*.csv")}
+    studio_files = {n: f for n, f in files.items() if n.lower().startswith("studio")}
+    out = {"studio": studio.ingest(store, studio_files), "viva": viva.ingest(store, files)}
+    con = duckdb.connect()
+    con.execute("SET TimeZone = 'UTC'")
+    for name, table in AZURE_SAMPLES.items():
+        if name not in files:
+            continue
+        schema = azure_ai.SCHEMAS[table]
+        spec = "{" + ", ".join(f"'{c}': '{t}'" for c, t in schema) + "}"
+        target = store.path(f"raw/{table}/part-0.parquet")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        con.execute(f"COPY (SELECT {', '.join(chr(34) + c + chr(34) for c, _ in schema)} "
+                    f"FROM read_csv({q(files[name])}, header=true, columns={spec})) TO {q(target)} (FORMAT PARQUET)")
+        out[table] = con.execute(f"SELECT count(*) FROM read_parquet({q(target)})").fetchone()[0]
+    con.close()
+    log.info("sample: consumption %s", out)
+    return out
 
 
 def _true(value) -> bool:
@@ -102,7 +148,8 @@ def week_shift(latest: date, today: date) -> int:
     return max(0, ((today - latest).days - 1) // 7 * 7)
 
 
-def load(store, *, folder: Path | None = None, today: date | None = None) -> dict:
+def load(store, *, folder: Path | None = None, today: date | None = None, consumption: bool = False,
+         consumption_folder: Path | None = None) -> dict:
     folder = Path(folder or sample_dir())
     today = today or datetime.now(timezone.utc).date()
     if not (folder / INTERACTIONS).is_file():
@@ -135,4 +182,7 @@ def load(store, *, folder: Path | None = None, today: date | None = None) -> dic
     con.close()
     log.info("sample: %s people, %s interaction rows; dates moved forward %s day(s) to end %s",
              len(people), count, shift, latest + timedelta(days=shift))
-    return {"people": len(people), "interactions": count, "shift_days": shift}
+    out = {"people": len(people), "interactions": count, "shift_days": shift}
+    if consumption:
+        out["consumption"] = load_consumption(store, consumption_folder)
+    return out

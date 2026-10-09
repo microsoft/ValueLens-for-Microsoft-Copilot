@@ -267,6 +267,18 @@ export function graphApi(http) {
 
     /** Users, groups and apps assigned to this service principal's app roles. @param {string} resourceId */
     appRoleAssignedTo: (resourceId) => http.list(`/servicePrincipals/${resourceId}/appRoleAssignedTo`),
+
+    /** A SharePoint site by Graph ID or path form (contoso.sharepoint.com:/sites/Analytics). @param {string} siteId */
+    site: (siteId) => http.get(`/sites/${siteId}`, { query: { $select: 'id,webUrl,displayName' } }),
+
+    /**
+     * Gives an app read on one site, for apps holding Sites.Selected. Needs a SharePoint admin (Sites.FullControl.All).
+     * @param {string} siteId  Graph site ID.
+     * @param {string} appId
+     * @param {string} displayName
+     */
+    grantSiteRead: (siteId, appId, displayName) =>
+      http.post(`/sites/${siteId}/permissions`, { roles: ['read'], grantedToIdentities: [{ application: { id: appId, displayName } }] }),
   };
 }
 

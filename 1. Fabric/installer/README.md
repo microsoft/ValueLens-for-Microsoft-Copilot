@@ -102,8 +102,14 @@ Azure SQL Database serverless, Container Apps jobs, and the web app from the ARM
 registration, a Power BI workspace and model, and an `AnalyticsHub-Teams.zip` package (the app as a
 Teams tab, built by `src/azure/teams/build-package.mjs`) next to the install record.
 
-Only `core`, `orgData`, and `m365Activity` are supported on Azure in this preview. Other modules are
-shown as coming soon and cannot be selected. Re-runs are incremental and use the same
+`core`, `orgData`, `m365Activity` and `consumption` are supported on Azure in this preview. Other modules
+are shown as coming soon and cannot be selected. Credit consumption deploys the Consumption Central model,
+gives the jobs' managed identity Cost Management and Azure AI roles, and creates the Copilot Studio flow,
+signed in as you (`--flow-identity app` is Fabric only). With public endpoints the flow writes to the
+storage account's `landing` container and you get **Storage Blob Data Contributor** on it. With private
+networking it writes to a SharePoint folder you name, and the managed identity gets **Sites.Selected** read
+on that site (a SharePoint or Global administrator grants it). See
+[2. Azure](../../2.%20Azure/README.md#credit-consumption). Re-runs are incremental and use the same
 `valuelens-install.json`, with `target: "azure"` and an `azure` block. The installer tags every Azure
 resource with `valuelens-install-id` and stops rather than modifying untagged resources with colliding
 names.

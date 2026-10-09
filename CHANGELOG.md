@@ -17,6 +17,42 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased — Analytics Hub installer 0.3.8
+
+### New: credit consumption on the Azure path, with the Studio licensing API as the default
+
+**What changed.** **Credit consumption** can now be ticked on an Azure install (#149), matching what
+#150 did for Fabric. The Azure install deploys the Consumption Central model next to the ValueLens
+Model, both reading the same Azure SQL database, and the app shows the Consumption Central pages.
+
+- **Copilot Studio credits** come from the Power Platform licensing API by default. The installer
+  creates the same daily Power Automate flow as on Fabric: the first run loads about 180 days, later
+  runs the last ten, and per-user credits (`studio_user_daily`) are best effort. The flow signs in as
+  the person installing; `--flow-identity app` is Fabric only for now, so on Azure it warns and is
+  ignored. The PPAC CSV exports remain an option.
+- **Where the files land.** With public endpoints the flow writes to the storage account's `landing`
+  container (`studio/`, with its own state in `flows/`), and the installer gives the person installing
+  **Storage Blob Data Contributor** on the account. With private networking, where Power Automate can't
+  reach the storage account, the flow writes to a SharePoint folder you name instead. The jobs'
+  managed identity reads it with **Sites.Selected**, which the installer grants if you're a SharePoint
+  or Global administrator, or prints the `Grant-PnPAzureADAppSitePermission` command for one.
+- **Cowork credits**: drop the Consumption Dashboard's Viva Insights export in the `viva` folder.
+- **Azure AI and pay-as-you-go**: the jobs read Cost Management and Azure Monitor with their managed
+  identity. The installer assigns the roles on the subscriptions you choose.
+- `valuelens-jobs` gains a consumption step that reads the files where they land (it doesn't move them,
+  the same as the Fabric notebooks), and a `V002` migration adds the consumption tables.
+
+**Not on Azure yet** (follow-up issues): GitHub Copilot consumption, the dated Agent Daily table, Viva
+without a CSV, and `--flow-identity app`.
+
+**Update an existing Azure install:** run installer 0.3.8, choose **Repair or change** and tick
+**Credit consumption**. Sign in to the flow's connections when the installer lists them, then turn the
+flow on.
+
+Other variants (CSV/SharePoint, Power Automate + Dataverse) are unchanged.
+
+---
+
 ## 2026-10-09 — Analytics Hub installer 0.3.7
 
 **Update an existing install:** download installer 0.3.7, open it and choose **Repair or change**.

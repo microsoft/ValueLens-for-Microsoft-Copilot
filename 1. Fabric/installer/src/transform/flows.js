@@ -9,6 +9,8 @@
  * to storage that a person signs in to: no secret, no Key Vault. With the `app` identity they
  * write as the installer's app registration instead, reading its secret from Key Vault at run time.
  * The writer only needs a DFS base URL, so the same flows can target OneLake or an ADLS container.
+ * Where storage takes no public traffic (an Azure install on private networking), they write to a
+ * SharePoint folder through the SharePoint connector instead.
  */
 import { UPLOAD_DIR } from '../uploads.js';
 
@@ -46,12 +48,13 @@ const ANY = ['Succeeded', 'Failed', 'Skipped', 'TimedOut'];
  * @property {string} label  What the user sees.
  */
 
-/** @type {Record<'outlook' | 'keyVault' | 'entra' | 'storage', Connector>} */
+/** @type {Record<'outlook' | 'keyVault' | 'entra' | 'storage' | 'sharePoint', Connector>} */
 export const CONNECTORS = {
   outlook: { name: 'shared_office365', api: 'shared_office365', label: 'Office 365 Outlook' },
   keyVault: { name: 'shared_keyvault', api: 'shared_keyvault', label: 'Azure Key Vault' },
   entra: { name: 'shared_webcontents', api: 'shared_webcontents', label: 'HTTP with Microsoft Entra ID (preauthorized), for the Power Platform API' },
   storage: { name: 'shared_webcontents_storage', api: 'shared_webcontents', label: 'HTTP with Microsoft Entra ID (preauthorized), for OneLake' },
+  sharePoint: { name: 'shared_sharepointonline', api: 'shared_sharepointonline', label: 'SharePoint' },
 };
 
 /** @param {string} name  A connection reference key. */
@@ -65,6 +68,8 @@ export const connectorByName = (name) => Object.values(CONNECTORS).find((k) => k
  *   or https://{account}.dfs.core.windows.net/{container}. GUIDs for OneLake: it rejects a mix of a GUID and a name.
  * @property {string} [dropDir]  The drop folder under the endpoint. Default the Lakehouse's.
  * @property {string} [stateDir]  Where the flow keeps its state. Default {@link FLOW_STATE_DIR}.
+ * @property {{ siteUrl: string, folder: string }} [sharePoint]  Write to this SharePoint folder (its
+ *   server-relative path, e.g. /sites/Analytics/Shared Documents/ValueLens) instead of the endpoint. User identity only.
  * @property {string} [tenantId]  The app identity's tenant, app and Key Vault secret.
  * @property {string} [clientId]
  * @property {string} [secretName]
@@ -78,7 +83,7 @@ export const connectorByName = (name) => Object.values(CONNECTORS).find((k) => k
 export const oneLakeEndpoint = (workspaceId, lakehouseId) => `${ONELAKE_DFS}/${workspaceId}/${lakehouseId}`;
 
 /** @param {FlowTarget} t */
-const asApp = (t) => t.identity === 'app';
+const asApp = (t) => t.identity === 'app' && !t.sharePoint;
 
 /**
  * @param {Connector} connector
@@ -140,6 +145,27 @@ function storageCall(method, url, body) {
 }
 
 /**
+ * A SharePoint connector call on the target's site.
+ * @param {FlowTarget} t
+ * @param {string} operationId
+ * @param {Record<string, any>} parameters
+ */
+function sharePointCall(t, operationId, parameters) {
+  return {
+    type: 'OpenApiConnection',
+    inputs: {
+      host: host(CONNECTORS.sharePoint, operationId),
+      parameters: { dataset: t.sharePoint?.siteUrl, ...parameters },
+      authentication: "@parameters('$authentication')",
+    },
+    runtimeConfiguration: SECURE_INPUTS,
+  };
+}
+
+/** A folder under the target's SharePoint folder. @param {FlowTarget} t @param {string} dir */
+const sharePointFolder = (t, dir) => `${String(t.sharePoint?.folder).replace(/\/+$/, '')}/${dir}`;
+
+/**
  * Saves text to a file under the endpoint. As a user it creates the file then appends and flushes
  * the text (the DFS API: the connector sends text bodies, which suits CSV). As the app it writes
  * one block blob. The name is worked out once, so both calls hit the same file.
@@ -151,6 +177,9 @@ function storageCall(method, url, body) {
  * @param {Record<string, string[]>} runAfter
  */
 function saveFile(t, name, dir, fileName, body, runAfter) {
+  if (t.sharePoint) {
+    return { [name]: { ...sharePointCall(t, 'CreateFile', { folderPath: sharePointFolder(t, dir), name: fileName, body }), runAfter } };
+  }
   if (asApp(t)) {
     return {
       [name]: {
@@ -190,6 +219,7 @@ function saveFile(t, name, dir, fileName, body, runAfter) {
  * @param {string} path
  */
 function readFile(t, path) {
+  if (t.sharePoint) return sharePointCall(t, 'GetFileContentByPath', { path: sharePointFolder(t, path), inferContentType: false });
   if (asApp(t)) {
     return {
       type: 'Http',
@@ -206,6 +236,10 @@ function readFile(t, path) {
  * @param {string} path
  */
 function touchFile(t, path) {
+  if (t.sharePoint) {
+    const at = path.lastIndexOf('/');
+    return sharePointCall(t, 'CreateFile', { folderPath: sharePointFolder(t, path.slice(0, at)), name: path.slice(at + 1), body: '' });
+  }
   if (asApp(t)) {
     return {
       type: 'Http',

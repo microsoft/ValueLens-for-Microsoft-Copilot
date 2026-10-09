@@ -68,6 +68,18 @@ right (next section) — the data itself must be exported by an admin (or a sche
 
 ---
 
+## Credit consumption on Azure (path 2)
+
+| What | Role / requirement |
+|---|---|
+| Copilot Studio flow (the default source) | As on Fabric: **Environment Maker** in the environment, a **Power Automate Premium** licence for the flow owner, and a Power Platform API connection signed in as a **Power Platform Administrator**, **Billing Administrator** or **Global Administrator**. The flow always signs in as the person installing; `--flow-identity app` is Fabric only |
+| The flow writes to the `landing` container (public endpoints) | Whoever signs the flow's storage connection in (resource `https://storage.azure.com`) needs **Storage Blob Data Contributor** on the storage account. The installer assigns it to the person installing if they can assign roles |
+| The flow writes to a SharePoint folder (private networking) | Whoever signs the flow's SharePoint connection in needs to add files to the folder. The jobs' managed identity needs the Graph app role **Sites.Selected** plus **Read** on that site, granted by a SharePoint or Global administrator (the installer does it, or prints the `Grant-PnPAzureADAppSitePermission` command) |
+| Azure AI and pay-as-you-go spend | The jobs' managed identity gets **Reader**, **Cost Management Reader** and **Monitoring Reader** on the Azure AI subscription, and **Cost Management Reader** on each pay-as-you-go subscription. The installer assigns them when the person installing can assign roles there |
+| Cowork credits | No automated pull on Azure yet. Drop the Consumption Dashboard's Viva Insights export (**Insights Analyst**) in the `viva` folder |
+
+---
+
 ## Quick "who do I ask?" summary
 
 - **Just the core dashboard:** one Entra app reg (3 Graph perms, admin-consented) + Contributor on the workspace.

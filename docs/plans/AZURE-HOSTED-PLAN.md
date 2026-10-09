@@ -436,7 +436,7 @@ tests/fixtures/valuelens-golden/
 | CI: installer, web, ARM drift, and image builds (pushed to GHCR on `installer-v*` tags) | `.github/workflows/tests.yml`, `azure-images.yml` | Done |
 | End-to-end deployment to a real tenant and the 101-query parity check | Contoso demo tenant | **Done for core.** Deployed end to end in private networking mode: migrate, a 30-day first load, publish to SQL, and a Power BI refresh through the VNet data gateway. Parity (`2. Azure/tools/parity.mjs`) against the Fabric install: 25 match and 29 empty on both sides. The 7 diffs are Agent 365 registry data (Phase 2) and a one-day difference in the M365 activity report window. 35 queries target the separate consumption and Agent Evaluator models and 5 are templates. The demo tenant has very little Copilot activity, so re-run parity on a busier tenant before GA |
 | Private networking (VNet, private endpoints, VNet data gateway) | `2. Azure/infra/modules/network.bicep`, `src/steps/azure` | Done: pulled forward from Phase 2 because MCAPS policy forces public access off |
-| Phase 2 modules (Agent 365, feedback, credit consumption, Agent Evaluator, Workday) | | Not started |
+| Phase 2 modules (Agent 365, feedback, credit consumption, Agent Evaluator, Workday) | | **Credit consumption done** (#149): Studio by the licensing API flow (signed in as the user, into `landing/studio` or a SharePoint folder with private networking), Cowork by CSV, Azure AI and PAYG through Cost Management, and the Consumption Central model. GitHub, the dated Agent Daily table and Viva automation follow. The rest not started |
 
 ### 10.1 Findings from the first real deployment (Contoso, MCAPS subscription)
 

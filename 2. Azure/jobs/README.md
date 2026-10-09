@@ -14,6 +14,7 @@ in step with the Fabric notebooks by the golden tests in `tests/`. No Spark or J
 | collect | Licensed users (`Reports.Read.All`), then Copilot interactions from the Purview audit log (`AuditLogsQuery.Read.All`) | core |
 | | Org data from `/users` (`User.Read.All`) | orgData |
 | | Microsoft 365 daily activity reports (`Reports.Read.All`) | m365Activity |
+| | Copilot Studio credits and Viva (Copilot Chat) credits from the drop folder; Azure AI spend, tokens and Copilot pay-as-you-go from Azure Resource Manager | consumption |
 | process | Curates interactions with `valuelens_core.curate()` into `curated/copilot_interactions_curated` | core |
 | publish | Loads curated and raw tables into Azure SQL, rewriting only the days that changed | per module |
 | refresh | Refreshes the configured Power BI semantic models and waits for them to finish | — |
@@ -25,9 +26,68 @@ The other commands are:
 
 Any failure is logged and the job exits with code 1, so Container Apps records the run as failed.
 
-The job has no credit consumption (Consumption Central) collector yet. Azure AI spend, deployment
-health, solution spend and billing reconciliation come from the Fabric notebook `Ingest_Azure_AI`,
-or from the Local CSV script `5. Local CSV/Add Credit Consumption/pull_azure_ai.py`.
+## Credit consumption (module `consumption`)
+
+These collectors port the Fabric notebooks `Ingest_Studio`, `Ingest_Viva_Consumption` (its CSV path)
+and `Ingest_Azure_AI`. They write the same tables, with the same columns, so the Consumption Central
+model reads `dbo.<table>` in Azure SQL. Each collector fails on its own, and the others still run.
+
+- **studio** (`collect/studio.py`) reads `studio/*.csv` from the drop folder. These are the Power
+  Platform admin center exports (`*Tenant*`, `*PerAgent*`/`*Agent*` and `*PerUser*`/`*User*`, where
+  the first pattern that matches wins) and the flow's licensing-API files (`StudioApiEntitlement*`,
+  `StudioApiAgentDaily*`, `StudioApiUserDaily*`). An export takes precedence over API rows for the
+  same month (agent and user) or the same day and environment (tenant).
+  - The per-user API rows get UPNs from Graph `$batch` on a best-effort basis: a failure is logged,
+    and the user is kept without a UPN.
+- **viva** (`collect/viva.py`) reads `viva/PersonServiceCreditsMetrics*.csv`, merging on person,
+  service, policy and week. `viva/SpendingPolicyMetadata*.csv` replaces `viva_spending_policy`, but
+  only when a file is present.
+- **azure_ai** (`collect/azure_ai.py`) runs only when `VALUELENS_AZURE_AI_SUBSCRIPTION` is set. It
+  collects the last 90 complete UTC days, in two groups:
+  - Strict:
+    - `azure_ai_spend` (Cost Management)
+    - `azure_ai_tokens` (Azure Monitor)
+    - `copilot_payg_spend` (Copilot Studio and Cowork pay-as-you-go, for the AI subscription plus
+      `VALUELENS_PAYG_SUBSCRIPTIONS`)
+  - Best effort; a failure leaves the table as it was:
+    - `azure_deployment_health`
+    - `azure_solution_spend`
+    - `azure_billing_reconciliation`
+  - Without that subscription, pay-as-you-go isn't read either, as in Fabric.
+  - The managed identity needs Cost Management Reader and Monitoring Reader (or Reader) on each
+    subscription.
+  - The block of pure helpers is a verbatim copy of the one in `pull_azure_ai.py` and the notebook,
+    and `tests/test_azure_ai_collectors.py` keeps the copies identical.
+
+Files in the drop folder are never moved or deleted. Every run re-reads all of them and merges the
+results idempotently into the state kept in `curated/<table>/part-0.parquet`, as Fabric does with
+its Delta tables.
+
+The drop folder has the subfolders `studio/` and `viva/`. The Power Automate flow's `flows/`
+state is ignored. Where the folder lives depends on the networking mode:
+
+- Public networking uses the storage account's `landing` container (`landing/studio/`,
+  `landing/viva/`).
+- Private networking uses SharePoint when `VALUELENS_DROP_SITE_ID` is set. The job reads it
+  through Microsoft Graph with the managed identity, which needs `Sites.Selected` and a read grant
+  on the site.
+  - The site is either a Graph site id (`host,guid,guid`) or `host:/sites/Name`. Both are resolved
+    with `GET /sites/{value}`.
+  - With `VALUELENS_DROP_DRIVE_ID` set, `VALUELENS_DROP_FOLDER` is a path from that drive's root.
+  - With it empty, the folder's first segment names the document library (for example
+    `Shared Documents/ValueLens`).
+
+| Table | Source | Publish |
+|---|---|---|
+| `studio_tenant_daily`, `studio_agent_daily`, `studio_user_daily` | studio | by `usage_date` |
+| `studio_agent`, `studio_user` | studio | snapshot |
+| `viva_credits_weekly` | viva | by `metric_date` |
+| `viva_spending_policy` | viva | snapshot |
+| `azure_ai_spend`, `azure_ai_tokens`, `copilot_payg_spend`, `azure_deployment_health`, `azure_solution_spend`, `azure_billing_reconciliation` | azure_ai | snapshot |
+
+`2. Azure/sql/migrations/V002__consumption.sql` creates every table up front, so a refresh before
+the first collection finds empty tables. A table whose source has never run is skipped at
+publish. The consumption tables never trigger the full refresh of the incremental Copilot model.
 
 ## Settings
 
@@ -39,12 +99,15 @@ The job reads its settings from environment variables. Bicep sets them.
 | `VALUELENS_TENANT_ID` | The customer tenant |
 | `VALUELENS_STORAGE_ACCOUNT` | The ADLS Gen2 account (containers `raw`, `curated`, `landing`) |
 | `VALUELENS_SQL_SERVER`, `VALUELENS_SQL_DATABASE` | The Azure SQL target. Auth is Entra-only, with an access token. |
-| `VALUELENS_MODULES` | A comma list such as `core,orgData,m365Activity`. The default is `core,orgData`. |
+| `VALUELENS_MODULES` | A comma list such as `core,orgData,m365Activity,consumption`. The default is `core,orgData`. |
+| `VALUELENS_AZURE_AI_SUBSCRIPTION` | consumption: the subscription for Azure OpenAI / AI Foundry costs and metrics. When it is empty, Azure AI and pay-as-you-go are skipped. |
+| `VALUELENS_PAYG_SUBSCRIPTIONS` | consumption: other subscriptions, as a comma list, whose Copilot pay-as-you-go costs are read |
+| `VALUELENS_DROP_SITE_ID`, `VALUELENS_DROP_DRIVE_ID`, `VALUELENS_DROP_FOLDER` | consumption, private networking: the SharePoint drop folder (see above). When unset, the job reads the `landing` container. |
 | `VALUELENS_AUDIT_HISTORY_DAYS` / `VALUELENS_AUDIT_LOOKBACK_DAYS` | The first-run backfill (default 30) and the re-read window on later runs (default 7) |
 | `VALUELENS_POWERBI_WORKSPACE_ID`, `VALUELENS_SEMANTIC_MODELS` | The Power BI workspace, and a JSON object of the models to refresh |
 | `VALUELENS_SQL_READER_NAME`, `VALUELENS_SQL_READER_CLIENT_ID` | The web app's identity, granted read access by `migrate` |
 | `VALUELENS_MIGRATIONS_DIR` | Where the migrations are. The image sets this to `/app/sql/migrations`. |
-| `VALUELENS_SAMPLE_DATA` | Demo mode, set to `true` to turn it on. Collect loads the synthetic sample bundled at `/app/sample-data` into a temporary store instead of calling the tenant APIs, with its dates moved forward by whole weeks to end last week. Publish then replaces only the interactions, licensed and org tables. Remove the setting, and the next run republishes the tenant's data. |
+| `VALUELENS_SAMPLE_DATA` | Demo mode, set to `true` to turn it on. Collect loads the synthetic sample bundled at `/app/sample-data` into a temporary store instead of calling the tenant APIs, with its dates moved forward by whole weeks to end last week. Publish then replaces only the interactions, licensed and org tables. With `consumption` on, it also loads the synthetic Consumption Central sample from `/app/sample-data/consumption` (dates unchanged) and publishes the consumption tables. Remove the setting, and the next run republishes the tenant's data. |
 
 ## Storage layout
 
@@ -54,6 +117,9 @@ The job reads its settings from environment variables. Bicep sets them.
 | `raw/_audit_staging/`, `raw/_state/audit.json` | Audit queries that are still running, and the high-water mark |
 | `raw/copilot_licensed_users/`, `raw/copilot_org_data/`, `raw/m365_activity_daily/` | Collector snapshots |
 | `curated/copilot_interactions_curated/part-0.parquet` | The curated fact. It is written atomically. |
+| `curated/studio_*/`, `curated/viva_*/` | consumption: the merged Studio and Viva tables, rewritten atomically each run |
+| `raw/azure_ai_*/`, `raw/copilot_payg_spend/`, `raw/azure_deployment_health/`, `raw/azure_solution_spend/`, `raw/azure_billing_reconciliation/` | consumption: Azure AI snapshots |
+| `landing/studio/`, `landing/viva/` | consumption: the drop folder in public networking. It is read only. |
 
 The SQL tables have the same names as the Fabric Lakehouse tables, so the ValueLens Model only
 changes its connection parameters.

@@ -6,13 +6,16 @@ import { readFileSync } from 'node:fs';
 import { GRAPH_APP_ID, azureGraphRolesFor, collectedLabels, ESSENTIAL_MODULES, MODULES, OPTIONAL_MODULES } from '../../catalog.js';
 import { semanticModelDefinition } from '../../clients/fabric.js';
 import { POWER_BI_APP_ID, adminConsentUrl, apiPermissionsUrl, resolveAppRoles } from '../../clients/graph.js';
+import { ROLES } from '../../clients/azure.js';
 import { HttpError } from '../../http.js';
 import { commandLine } from '../../launch.js';
-import { buildModel, loadTemplateModel, PBISM } from '../../transform/model.js';
+import { buildConsumptionModel, buildModel, loadTemplateModel, PBISM } from '../../transform/model.js';
 import { deployModel, modelSignature, REFRESH_POLL_MS } from '../model.js';
 import { addMonths, SECRET_LIFETIME_MONTHS } from '../identity.js';
 import { writeTeamsPackage } from '../../azure/teams.js';
-import { APP_ALIAS } from '../app.js';
+import { APP_ALIAS, CONSUMPTION_ALIAS } from '../app.js';
+import { AZURE_AI_ROLES, ensureAzureAiAccess, planConsumption } from '../consumption.js';
+import { AZURE_LANDING_DIRS, azureDropLabel, azureDropsToSharePoint, ensureFlows, flowsSummary, flowsWanted, planFlows } from '../flows.js';
 
 /** @typedef {import('../../install.js').Ctx} Ctx */
 
@@ -23,7 +26,7 @@ export const PRIVATE_FEATURE = /** @type {[string, string]} */ (['Microsoft.Netw
 /** Capacities that can host a Power BI VNet data gateway: F (including trial), P and A4+; not PPU, EM or A1-A3. */
 export const supportsVnetGateway = (/** @type {{ sku?: string }} */ cap) => /^(F|FT|P\d|A[4-9])/i.test(String(cap.sku ?? '')) && !/^PP/i.test(String(cap.sku ?? ''));
 export const isPrivate = (/** @type {import('../../config.js').AzureConfig | undefined} */ az) => az?.publicNetworkAccess === false;
-export const AZURE_SUPPORTED_MODULES = /** @type {const} */ (['core', 'orgData', 'm365Activity']);
+export const AZURE_SUPPORTED_MODULES = /** @type {const} */ (['core', 'orgData', 'm365Activity', 'consumption']);
 export const WEB_APP_NAME = 'Analytics Hub (Azure)';
 export const SQL_READER_NAME = 'Analytics Hub SQL Reader';
 export const TEAMS_CLIENTS = ['1fec8e78-bce4-4aaf-ab1b-5451cc387264', '5e3ce6c0-2b1f-4285-8d4b-75ee78787346'];
@@ -31,7 +34,8 @@ const ARM = JSON.parse(readFileSync(new URL('../../azure/main.arm.json', import.
 export const REQUIRED_ARM_PARAMETERS = [
   'location', 'sqlLocation', 'namePrefix', 'installId', 'tags', 'imageRegistry', 'imageTag', 'imageRegistryResourceId', 'runSchedule', 'runSteps', 'sampleData', 'sqlAdminLogin', 'sqlAdminObjectId',
   'sqlAdminPrincipalType', 'sqlMinCapacity', 'sqlMaxCapacity', 'sqlAutoPauseDelayMinutes', 'sqlUseFreeLimit', 'publicNetworkAccess', 'deployWeb',
-  'webMinReplicas', 'webClientId', 'webAppIdUri', 'modules', 'auditHistoryDays', 'powerBiWorkspaceId',   'semanticModels', 'sqlReaderName', 'sqlReaderClientId',
+  'webMinReplicas', 'webClientId', 'webAppIdUri', 'modules', 'auditHistoryDays', 'powerBiWorkspaceId', 'semanticModels', 'sqlReaderName', 'sqlReaderClientId',
+  'azureAiSubscriptionId', 'paygSubscriptionIds', 'dropSiteId', 'dropDriveId', 'dropFolder',
 ];
 
 const last = (/** @type {string} */ path) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -141,7 +145,8 @@ export async function planAzure(ctx, pre) {
 
   ui.heading('What to collect');
   const picked = await ui.checkbox('Tick the data you want. Unsupported modules are coming soon on Azure.', azureModuleChoices(config.modules));
-  config.modules = /** @type {import('../../catalog.js').ModuleChoice} */ ({ orgData: true, m365Activity: picked.includes('m365Activity'), agent365: false, productFeedback: false, consumption: false, agentEvaluator: false });
+  config.modules = /** @type {import('../../catalog.js').ModuleChoice} */ ({ orgData: true, m365Activity: picked.includes('m365Activity'), agent365: false, productFeedback: false, consumption: picked.includes('consumption'), agentEvaluator: false });
+  config.dataSources.productFeedback = 'skip';
   az.sampleData = await ui.select('Which data should the dashboard show?', [
     { name: "Your tenant's data", value: false, description: 'Collect from the audit log, Microsoft Graph and the modules you ticked.' },
     { name: 'Demo mode (sample data)', value: true, description: 'Show a synthetic sample, moved forward to end last week, to try Analytics Hub before connecting tenant data. Run the installer again and pick your tenant\'s data to switch.' },
@@ -203,8 +208,169 @@ export async function planAzure(ctx, pre) {
   if (config.schedule.frequency === 'weekly') config.schedule.weekday = await ui.select('Which day?', ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d) => ({ name: d, value: d })), config.schedule.weekday);
   config.schedule.timeZone = 'UTC';
   config.schedule.time = await ui.input('Time (UTC, 24-hour)', { default: config.schedule.time, validate: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? true : 'Use HH:MM.') });
+  await planAzureConsumption(ctx, subs);
   ctx.runFirstLoad = await ui.confirm('Run the first load as soon as setup finishes?', true);
   await azurePreflight(ctx);
+}
+
+/** Credit consumption is collected: the module is on and the jobs read tenant data. @param {import('../../config.js').InstallConfig} config */
+export const azureConsumptionOn = (config) => !!config.modules.consumption && config.azure?.sampleData !== true;
+
+/** Microsoft Graph application permissions the jobs' managed identity needs. @param {import('../../config.js').InstallConfig} config */
+export const azureGraphRoles = (config) => [...azureGraphRolesFor(config.modules), ...(azureConsumptionOn(config) && azureDropsToSharePoint(config.azure) ? ['Sites.Selected'] : [])];
+
+/**
+ * Credit consumption on Azure: where Copilot Studio and Cowork credits come from, the subscriptions the
+ * jobs read Azure AI and pay-as-you-go costs from, the Studio flow's environment, and, with private
+ * networking, the SharePoint folder the flow and uploads land in.
+ * @param {Ctx} ctx
+ * @param {{ subscriptionId: string, displayName: string }[]} subs
+ */
+export async function planAzureConsumption(ctx, subs) {
+  const { ui, config } = ctx;
+  const ds = config.dataSources;
+  const az = /** @type {import('../../config.js').AzureConfig} */ (config.azure);
+  if (config.modules.consumption && az.sampleData) ui.note('Demo mode has no credit consumption sample, so credit consumption is collected once you switch to your tenant\'s data.');
+  if (!azureConsumptionOn(config)) {
+    ds.studioCredits = 'skip';
+    ds.coworkCredits = 'skip';
+    ds.azureAi = 'skip';
+    config.uploads.feedbackFlow = false;
+    return;
+  }
+  ui.heading('Credit consumption');
+  ds.studioCredits = await ui.select('Where should Copilot Studio credits come from?', [
+    { name: 'Power Platform licensing API (recommended)', value: 'api', description: 'A daily Power Automate flow, signed in as you, saves them for the jobs. The first run loads about six months.' },
+    { name: 'CSV exports', value: 'csv', description: `Drop the Power Platform admin center's Copilot Studio exports in the ${AZURE_LANDING_DIRS.studio} folder yourself.` },
+    { name: 'Leave Copilot Studio out', value: 'skip' },
+  ], ds.studioCredits === 'csv' || ds.studioCredits === 'skip' ? ds.studioCredits : 'api');
+  ds.coworkCredits = await ui.select('Cowork credits', [
+    { name: 'CSV export', value: 'csv', description: `Drop the Consumption Dashboard's Viva Insights export in the ${AZURE_LANDING_DIRS.viva} folder.` },
+    { name: 'Leave Cowork out', value: 'skip' },
+  ], ds.coworkCredits === 'skip' ? 'skip' : 'csv');
+  ds.azureAi = 'api';
+  await planConsumption(ctx, /** @type {import('../plan.js').Preflight} */ (/** @type {unknown} */ ({ subscriptions: subs })));
+  if (config.uploads.flowIdentity === 'app' && ds.studioCredits === 'api') ui.warn('On Azure the Studio flow signs in as you; --flow-identity app is Fabric only for now.');
+  await planFlows(ctx);
+  if (isPrivate(az) && (ds.studioCredits !== 'skip' || ds.coworkCredits !== 'skip')) {
+    ui.note(`Private networking keeps ${az.namePrefix ?? 'the'} storage off the internet, where Power Automate runs, so the flow and your uploads go to a SharePoint folder the jobs read instead.`);
+    const folderUrl = await ui.input('SharePoint folder for credit files (the address of a folder in a document library)', {
+      default: az.drop?.folderUrl ?? '',
+      validate: (v) => {
+        try {
+          parseDropFolder(v);
+          return true;
+        } catch (err) {
+          return /** @type {Error} */ (err).message;
+        }
+      },
+    });
+    const parsed = parseDropFolder(folderUrl);
+    az.drop = { ...parsed, granted: az.drop?.siteId === parsed.siteId ? az.drop?.granted : false };
+  } else delete az.drop;
+}
+
+/**
+ * Works out, offline, where a SharePoint folder lives: the site for the flow's connector and the jobs'
+ * Graph calls, and the folder's path. Accepts the folder's address or an AllItems.aspx link to it.
+ * @param {string} input
+ * @returns {import('../../config.js').AzureDrop}
+ */
+export function parseDropFolder(input) {
+  const text = String(input ?? '').trim();
+  /** @type {URL} */
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    throw new Error('Paste the folder\'s https:// address, like https://contoso.sharepoint.com/sites/Analytics/Shared Documents/ValueLens.');
+  }
+  if (url.protocol !== 'https:' || !/\.sharepoint\.com$/i.test(url.hostname)) throw new Error('Use a SharePoint Online folder address (https://<tenant>.sharepoint.com/...).');
+  const fromId = url.searchParams.get('id');
+  let path = (fromId ?? decodeURIComponent(url.pathname)).replace(/\/+$/, '');
+  path = path.replace(/\/Forms\/[^/]+\.aspx$/i, '').replace(/\/[^/]+\.aspx$/i, '');
+  const site = /^\/(sites|teams)\/[^/]+/i.exec(path)?.[0] ?? '';
+  const rest = path.slice(site.length).replace(/^\/+/, '');
+  if (!rest) throw new Error('That is a site, not a folder. Open a document library folder and copy its address.');
+  return {
+    folderUrl: `${url.origin}${site}/${rest}`,
+    siteUrl: `${url.origin}${site}`,
+    sitePath: `/${rest}`,
+    siteId: site ? `${url.hostname}:${site}` : url.hostname,
+    driveId: '',
+    drivePath: rest,
+  };
+}
+
+/**
+ * Credit consumption access: Azure roles for the jobs' managed identity to read Azure AI and
+ * pay-as-you-go costs, and write access to wherever the credit files land.
+ * @param {Ctx} ctx
+ */
+async function ensureAzureConsumptionAccess(ctx) {
+  const { config } = ctx;
+  const az = /** @type {import('../../config.js').AzureConfig} */ (config.azure);
+  const principalId = az.outputs?.identityPrincipalId;
+  if (!principalId) throw new Error('The ARM deployment did not return identityPrincipalId.');
+  if (config.dataSources.azureAi === 'api') await ensureAzureAiAccess(ctx, { id: principalId, name: 'The jobs\' managed identity', appId: az.outputs?.identityClientId });
+  else ctx.ui.note('Azure AI is left out.');
+  if (config.dataSources.studioCredits === 'skip' && config.dataSources.coworkCredits === 'skip') return;
+  if (azureDropsToSharePoint(az)) await grantDropSite(ctx);
+  else await grantLandingWrite(ctx);
+}
+
+/**
+ * Gives the jobs' managed identity read on the drop folder's site (Sites.Selected). Needs a SharePoint
+ * or Global administrator; otherwise it's left as an admin action.
+ * @param {Ctx} ctx
+ */
+async function grantDropSite(ctx) {
+  const { ui, api } = ctx;
+  const az = /** @type {import('../../config.js').AzureConfig} */ (ctx.config.azure);
+  const drop = az.drop;
+  const appId = az.outputs?.identityClientId;
+  if (!drop?.siteId || !appId) return;
+  const name = `${az.namePrefix ?? 'vlens'} jobs`;
+  if (drop.granted) {
+    ui.ok(`The jobs can read ${drop.siteUrl}`);
+    return;
+  }
+  const action = `Grant-PnPAzureADAppSitePermission -AppId ${appId} -DisplayName "${name}" -Site ${drop.siteUrl} -Permissions Read`;
+  try {
+    const site = await api.graph.site(drop.siteId);
+    await api.graph.grantSiteRead(site.id, appId, name);
+    drop.granted = true;
+    az.status ??= {};
+    az.status.pendingAdminActions = (az.status.pendingAdminActions ?? []).filter((a) => a !== action);
+    ui.ok(`Gave the jobs read on ${drop.siteUrl}`);
+  } catch (err) {
+    ui.warn(`Couldn't give the jobs read on ${drop.siteUrl} (${/** @type {Error} */ (err).message.split('\n')[0]}). A SharePoint administrator can run: ${action}`);
+    az.status ??= {};
+    az.status.pendingAdminActions = [...new Set([...(az.status.pendingAdminActions ?? []), action])];
+  }
+  ctx.save();
+}
+
+/**
+ * Gives the person installing Storage Blob Data Contributor on the storage account, so the Studio
+ * flow's storage connection, signed in as them, can write to the landing container.
+ * @param {Ctx} ctx
+ */
+async function grantLandingWrite(ctx) {
+  const { ui, api, user } = ctx;
+  const az = /** @type {import('../../config.js').AzureConfig} */ (ctx.config.azure);
+  const account = az.outputs?.storageAccountName;
+  if (!account || az.storageRole) return;
+  const scope = `/subscriptions/${az.subscriptionId}/resourceGroups/${az.resourceGroup}/providers/Microsoft.Storage/storageAccounts/${account}`;
+  try {
+    await api.arm.assignRole(scope, ROLES.storageBlobDataContributor, user.id, 'User');
+    az.storageRole = true;
+    ui.ok(`Gave you Storage Blob Data Contributor on ${account}, for the Studio flow`);
+  } catch (err) {
+    if (!(err instanceof HttpError) || err.status !== 403) throw err;
+    ui.warn(`You can't assign roles on ${account}. Whoever signs the Studio flow in needs Storage Blob Data Contributor on it.`);
+  }
+  ctx.save();
 }
 
 /** @param {Ctx} ctx */
@@ -300,16 +466,47 @@ export async function azureDeployment(ctx, o) {
     sqlMinCapacity: param(String(liveSql.minCapacity ?? '0.5')), sqlMaxCapacity: param(liveSql.capacity ?? 2), sqlAutoPauseDelayMinutes: param(liveSql.autoPauseDelay ?? 60), sqlUseFreeLimit: param(liveSql.useFreeLimit ?? true),
     publicNetworkAccess: param(az.publicNetworkAccess === false ? 'Disabled' : 'Enabled'), deployWeb: param(true), webMinReplicas: param(0),
     webClientId: param(o.pass === 2 ? (az.webApp?.clientId ?? '') : ''), webAppIdUri: param(o.pass === 2 ? (az.webApp?.appIdUri ?? '') : ''),
-    modules: param(enabledAzureModuleIds(config.modules).join(',')), auditHistoryDays: param(config.history.days), powerBiWorkspaceId: param(az.powerBi?.workspaceId ?? ''),
-    semanticModels: param(az.powerBi?.datasetId ? JSON.stringify({ [APP_ALIAS]: { workspaceId: az.powerBi.workspaceId, itemId: az.powerBi.datasetId } }) : '{}'),
+    modules: param(enabledAzureModuleIds(config.modules, az).join(',')), auditHistoryDays: param(config.history.days), powerBiWorkspaceId: param(az.powerBi?.workspaceId ?? ''),
+    semanticModels: param(JSON.stringify(azureSemanticModels(az))),
     sqlReaderName: param(SQL_READER_NAME), sqlReaderClientId: param(o.pass === 2 ? (az.sqlReader?.clientId ?? '') : ''),
+    ...consumptionParameters(config),
   };
   return { properties: { mode: 'Incremental', template: ARM, parameters: params } };
 }
 
-/** @param {import('../../catalog.js').ModuleChoice} modules */
-export function enabledAzureModuleIds(modules) {
-  return AZURE_SUPPORTED_MODULES.filter((id) => id === 'core' || modules[/** @type {keyof import('../../catalog.js').ModuleChoice} */ (id)]);
+/**
+ * The models the web app may query, by the alias the pages use.
+ * @param {import('../../config.js').AzureConfig} az
+ */
+export function azureSemanticModels(az) {
+  const pbi = az.powerBi ?? {};
+  return {
+    ...(pbi.datasetId ? { [APP_ALIAS]: { workspaceId: pbi.workspaceId, itemId: pbi.datasetId } } : {}),
+    ...(pbi.consumptionDatasetId ? { [CONSUMPTION_ALIAS]: { workspaceId: pbi.workspaceId, itemId: pbi.consumptionDatasetId } } : {}),
+  };
+}
+
+/**
+ * What the run job reads for credit consumption: the Azure AI and pay-as-you-go subscriptions it has
+ * access to, and with private networking, the SharePoint drop folder.
+ * @param {import('../../config.js').InstallConfig} config
+ */
+export function consumptionParameters(config) {
+  const on = azureConsumptionOn(config);
+  const cc = config.consumption;
+  const drop = on ? config.azure?.drop : undefined;
+  return {
+    azureAiSubscriptionId: param(on && config.dataSources.azureAi === 'api' && cc.azureAccess && cc.azureSubscriptionId ? cc.azureSubscriptionId : ''),
+    paygSubscriptionIds: param(on && config.dataSources.azureAi === 'api' ? (cc.paygSubscriptions ?? []).filter((p) => p.access).map((p) => p.subscriptionId).join(',') : ''),
+    dropSiteId: param(drop?.siteId ?? ''),
+    dropDriveId: param(drop?.driveId ?? ''),
+    dropFolder: param(drop?.drivePath ?? ''),
+  };
+}
+
+/** @param {import('../../catalog.js').ModuleChoice} modules @param {import('../../config.js').AzureConfig} [az] */
+export function enabledAzureModuleIds(modules, az) {
+  return AZURE_SUPPORTED_MODULES.filter((id) => id === 'core' || (id === 'consumption' && az?.sampleData === true ? false : modules[/** @type {keyof import('../../catalog.js').ModuleChoice} */ (id)]));
 }
 
 /** @param {Ctx} ctx */
@@ -340,12 +537,23 @@ export function azurePlanReview(ctx) {
     creates.push({ kind: 'Power BI VNet data gateway', name: gatewayName(az), isNew: !az.powerBi?.gatewayId, detail: `On capacity ${az.powerBi?.capacityId ?? 'not chosen'}, in the VNet's Power BI subnet.` });
     creates.push({ kind: 'Power BI connection', name: connectionName(az), isNew: !az.powerBi?.connectionId, detail: 'Azure SQL through the VNet data gateway, signed in as the SQL reader app.' });
   }
+  const consumption = azureConsumptionOn(ctx.config);
+  const cc = ctx.config.consumption;
+  if (consumption && ctx.sources.consumptionModelFile) creates.push({ kind: 'Semantic model', name: cc.model.name, isNew: !az.powerBi?.consumptionDatasetId, detail: 'Credit consumption, reading Azure SQL like the main model.' });
+  if (consumption && flowsWanted(ctx.config).length) creates.push({ kind: 'Power Automate flow', name: 'Copilot Studio credits', isNew: !ctx.config.uploads.flowIds?.studio, detail: `Daily, signed in as you; saves to ${azureDropLabel(az)}. Turned off until you sign in to its connections.` });
+  /** @type {{ who: string, what: string, where: string, detail?: string }[]} */
+  const consumptionGrants = [];
+  if (consumption && cc.azureSubscriptionId && ctx.config.dataSources.azureAi === 'api') consumptionGrants.push({ who: 'Collector managed identity', what: AZURE_AI_ROLES.map((r) => r.name).join(', '), where: `Subscription ${cc.azureSubscriptionName ?? cc.azureSubscriptionId}`, detail: 'Azure AI costs and metrics.' });
+  if (consumption && cc.paygSubscriptions?.length) consumptionGrants.push({ who: 'Collector managed identity', what: 'Cost Management Reader', where: cc.paygSubscriptions.map((p) => p.name ?? p.subscriptionId).join(', '), detail: 'Copilot pay-as-you-go billed in Azure.' });
+  if (consumption && az.drop) consumptionGrants.push({ who: 'Collector managed identity', what: 'Sites.Selected (read)', where: az.drop.siteUrl ?? az.drop.folderUrl, detail: 'Reads the credit files. Needs a SharePoint or Global administrator.' });
+  else if (consumption && (ctx.config.dataSources.studioCredits !== 'skip' || ctx.config.dataSources.coworkCredits !== 'skip')) consumptionGrants.push({ who: 'You', what: 'Storage Blob Data Contributor', where: 'The storage account', detail: 'So the Studio flow, signed in as you, and your uploads can write to the landing container.' });
   return {
     creates,
     grants: [
-      { who: 'Collector managed identity', what: `Microsoft Graph application permissions: ${azureGraphRolesFor(ctx.config.modules).join(', ')}`, where: 'Microsoft Graph', detail: 'Installer assigns app roles or records admin action if blocked.' },
+      { who: 'Collector managed identity', what: `Microsoft Graph application permissions: ${azureGraphRoles(ctx.config).join(', ')}`, where: 'Microsoft Graph', detail: 'Installer assigns app roles or records admin action if blocked.' },
       { who: WEB_APP_NAME, what: 'Delegated Power BI Dataset.Read.All and Graph User.Read; app roles AnalyticsHub.User and AnalyticsHub.Admin', where: 'Entra ID' },
       { who: 'Managed identity', what: 'Member', where: az.powerBi?.workspaceId ? `Power BI workspace ${az.powerBi.workspaceId}` : `Power BI workspace ${az.workspaceName ?? 'Analytics Hub'}` },
+      ...consumptionGrants,
     ],
     runsOn: [
       { what: 'Azure resources', where: `${az.subscriptionName ?? az.subscriptionId} / ${az.resourceGroup} / ${az.location}`, detail: `Incremental ARM deployment. Deletes are not applied by the template.${az.sqlLocation ? ` Azure SQL goes in ${az.sqlLocation}.` : ''}` },
@@ -368,6 +576,13 @@ export async function confirmAzurePlan(ctx) {
   ui.info(`Prefix:      ${az.namePrefix}`);
   ui.info(`Power BI:    ${az.powerBi?.workspaceId ? `Workspace ${az.powerBi.workspaceId}` : `New workspace ${az.workspaceName ?? 'Analytics Hub'}`}`);
   ui.info(`Schedule:    ${config.schedule.frequency === 'weekly' ? `${config.schedule.weekday}s` : 'Daily'} at ${config.schedule.time} UTC`);
+  if (azureConsumptionOn(config)) {
+    const ds = config.dataSources;
+    const studio = { api: 'Power Platform licensing API (daily flow)', csv: 'CSV exports', skip: 'Left out' }[ds.studioCredits] ?? ds.studioCredits;
+    ui.info(`Studio:      ${studio}${ds.studioCredits === 'skip' ? '' : `, in ${azureDropLabel(az)}`}`);
+    ui.info(`Cowork:      ${ds.coworkCredits === 'csv' ? 'CSV export' : 'Left out'}`);
+    ui.info(`Azure AI:    ${ds.azureAi === 'api' && config.consumption.azureSubscriptionId ? config.consumption.azureSubscriptionName ?? config.consumption.azureSubscriptionId : 'Left out'}`);
+  }
   ui.review(azurePlanReview(ctx));
   return ui.confirm('Go ahead?', true);
 }
@@ -378,7 +593,11 @@ export async function installAzure(ctx, opts) {
   const az = /** @type {import('../../config.js').AzureConfig} */ (config.azure ??= {});
   az.installId ??= randomUUID();
   az.imageTag = imageTag(az);
-  const titles = ['Resource group', 'Azure resources', 'Entra applications', 'Microsoft Graph permissions', 'Power BI model', 'Azure resources (final)', 'Database migration', 'Teams package', ...(ctx.runFirstLoad ? ['First load'] : [])];
+  const consumption = azureConsumptionOn(config);
+  const titles = [
+    'Resource group', 'Azure resources', 'Entra applications', 'Microsoft Graph permissions', ...(consumption ? ['Credit consumption'] : []), 'Power BI model', 'Azure resources (final)', 'Database migration',
+    ...(consumption && flowsWanted(config).length ? ['Power Automate flow'] : []), 'Teams package', ...(ctx.runFirstLoad ? ['First load'] : []),
+  ];
   let n = 0;
   const step = (/** @type {string} */ title) => ui.step(++n, titles.length, title);
 
@@ -404,6 +623,12 @@ export async function installAzure(ctx, opts) {
   await assignManagedIdentityGraphRoles(ctx);
   ctx.save();
 
+  if (consumption) {
+    step('Credit consumption');
+    await ensureAzureConsumptionAccess(ctx);
+    ctx.save();
+  }
+
   step('Power BI model');
   await ensureAzurePowerBi(ctx, sqlSecret.value);
   await retireSecret(ctx, sqlSecret.previousKeyId);
@@ -419,6 +644,11 @@ export async function installAzure(ctx, opts) {
     throw new Error(`The database migration job did not succeed (${migration.status}), so setup stopped before the first load. ` +
       `See its logs with: az containerapp job logs show -g ${az.resourceGroup} -n ${az.outputs?.migrateJobName} --execution ${az.status?.lastMigrate?.name} --container migrate. ` +
       'Re-run install once it is fixed; finished steps are skipped.');
+  }
+
+  if (consumption && flowsWanted(config).length) {
+    step('Power Automate flow');
+    await ensureFlows(ctx);
   }
 
   step('Teams package');
@@ -558,7 +788,8 @@ async function assignManagedIdentityGraphRoles(ctx) {
   const principalId = az.outputs?.identityPrincipalId;
   if (!principalId) throw new Error('The ARM deployment did not return identityPrincipalId.');
   const graphSp = await api.graph.graphServicePrincipal();
-  const { roles } = resolveAppRoles(graphSp, azureGraphRolesFor(config.modules));
+  const wanted = azureGraphRoles(config);
+  const { roles } = resolveAppRoles(graphSp, wanted);
   az.graphRoles ??= { assigned: [], pending: [] };
   for (const role of roles) {
     if (az.graphRoles.assigned.includes(role.value)) continue;
@@ -603,15 +834,50 @@ async function ensureAzurePowerBi(ctx, sqlReaderSecret) {
   });
   az.powerBi.datasetId = sm.id;
   Object.assign(sm, { server, database, bound: true });
+  const cc = await ensureAzureConsumptionModel(ctx, server, database);
   if (isPrivate(az)) await bindThroughVnetGateway(ctx, sqlReaderSecret);
-  else await bindPowerBiCredential(ctx, sqlReaderSecret);
-  await api.powerBi.setRefreshSchedule(/** @type {string} */ (az.powerBi.workspaceId), /** @type {string} */ (az.powerBi.datasetId), refreshScheduleBody(ctx));
+  else await bindPowerBiCredentials(ctx, sqlReaderSecret);
+  for (const id of [az.powerBi.datasetId, cc]) if (id) await api.powerBi.setRefreshSchedule(/** @type {string} */ (az.powerBi.workspaceId), id, refreshScheduleBody(ctx));
 }
 
+/**
+ * The Consumption model, reading Azure SQL like the main model. Returns its ID, or undefined when
+ * credit consumption is off or this checkout has no template.
+ * @param {Ctx} ctx @param {string} server @param {string} database
+ */
+async function ensureAzureConsumptionModel(ctx, server, database) {
+  const { config, sources } = ctx;
+  const az = /** @type {import('../../config.js').AzureConfig} */ (config.azure);
+  const pbi = /** @type {NonNullable<import('../../config.js').AzureConfig['powerBi']>} */ (az.powerBi);
+  if (!azureConsumptionOn(config)) return undefined;
+  const file = sources.consumptionModelFile;
+  if (!file) {
+    ctx.ui.note('This checkout has no credit consumption report, so only the jobs collect credit consumption.');
+    return undefined;
+  }
+  const m = config.consumption.model;
+  await deployModel(ctx, m, {
+    signature: `azure;${server};${database}`,
+    definition: () => semanticModelDefinition(buildConsumptionModel(loadTemplateModel(file), { server, database }), PBISM),
+  });
+  pbi.consumptionDatasetId = m.id;
+  ctx.save();
+  return m.id;
+}
+
+/** The Power BI models on this install. @param {import('../../config.js').AzureConfig} az */
+const azureDatasetIds = (az) => /** @type {string[]} */ ([az.powerBi?.datasetId, az.powerBi?.consumptionDatasetId].filter(Boolean));
+
 /** @param {Ctx} ctx @param {string} secret */
-async function bindPowerBiCredential(ctx, secret) {
+async function bindPowerBiCredentials(ctx, secret) {
   const az = /** @type {import('../../config.js').AzureConfig} */ (ctx.config.azure);
-  const sources = await ctx.api.powerBi.datasources(/** @type {string} */ (az.powerBi?.workspaceId), /** @type {string} */ (az.powerBi?.datasetId));
+  for (const id of azureDatasetIds(az)) await bindPowerBiCredential(ctx, secret, id);
+}
+
+/** @param {Ctx} ctx @param {string} secret @param {string} datasetId */
+async function bindPowerBiCredential(ctx, secret, datasetId) {
+  const az = /** @type {import('../../config.js').AzureConfig} */ (ctx.config.azure);
+  const sources = await ctx.api.powerBi.datasources(/** @type {string} */ (az.powerBi?.workspaceId), datasetId);
   const ds = sources.find((d) => String(d.datasourceType).toLowerCase() === 'sql') ?? sources[0];
   if (!ds?.gatewayId || !ds?.datasourceId) throw new Error('Power BI did not return a SQL data source to bind.');
   await whileSqlResumes(ctx.ui, () => ctx.api.powerBi.updateDatasource(/** @type {string} */ (ds.gatewayId), /** @type {string} */ (ds.datasourceId), {
@@ -756,8 +1022,8 @@ async function bindThroughVnetGateway(ctx, secret) {
   }
   pbi.connectionId = conn.id;
   ctx.save();
-  await api.powerBi.bindToGateway(/** @type {string} */ (pbi.workspaceId), /** @type {string} */ (pbi.datasetId), { gatewayObjectId: gatewayId, datasourceObjectIds: [/** @type {string} */ (conn.id)] });
-  ui.ok('Bound the model to the VNet data gateway');
+  for (const id of azureDatasetIds(az)) await api.powerBi.bindToGateway(/** @type {string} */ (pbi.workspaceId), id, { gatewayObjectId: gatewayId, datasourceObjectIds: [/** @type {string} */ (conn.id)] });
+  ui.ok(`Bound the model${azureDatasetIds(az).length > 1 ? 's' : ''} to the VNet data gateway`);
 }
 
 /** @param {Ctx} ctx */
@@ -828,6 +1094,10 @@ export async function azureRefresh(ctx) {
   if (!az?.powerBi?.workspaceId || !az.powerBi.datasetId) throw new Error('No Azure Power BI model is recorded.');
   const requestId = await ctx.api.powerBi.refresh(az.powerBi.workspaceId, az.powerBi.datasetId, { type: 'full', commitMode: 'transactional', retryCount: 1 });
   ctx.ui.ok(`Started a refresh of ${ctx.config.semanticModel.name}`);
+  if (az.powerBi.consumptionDatasetId) {
+    await ctx.api.powerBi.refresh(az.powerBi.workspaceId, az.powerBi.consumptionDatasetId, { type: 'full', commitMode: 'transactional', retryCount: 1 });
+    ctx.ui.ok(`Started a refresh of ${ctx.config.consumption.model.name}`);
+  }
   return { ok: true, status: requestId };
 }
 
@@ -840,6 +1110,8 @@ export async function azureStatus(ctx) {
   ui.info(`Resource group: ${az.resourceGroup} (${az.location})`);
   if (az.outputs?.webUrl) ui.info(`Web app:        ${az.outputs.webUrl}`);
   if (az.powerBi?.workspaceId) ui.info(`Power BI:       ${az.powerBi.workspaceId}${az.powerBi.datasetId ? ` / ${az.powerBi.datasetId}` : ''}`);
+  if (az.powerBi?.consumptionDatasetId) ui.info(`Consumption:    ${az.powerBi.consumptionDatasetId}`);
+  if (azureConsumptionOn(config) && config.dataSources.studioCredits !== 'skip') ui.info(`Credit files:   ${azureDropLabel(az)}`);
   expiry(ctx, 'SQL reader secret', az.sqlReader?.secretExpiry);
   for (const p of az.graphRoles?.pending ?? []) ui.warn(`Pending admin action: grant ${p} to the managed identity.`);
   for (const action of az.status?.pendingAdminActions ?? []) ui.warn(`Pending admin action: ${action}`);
@@ -855,7 +1127,7 @@ export async function azureStatus(ctx) {
 export async function azureRotateSecret(ctx) {
   const secret = await ensureSqlReader(ctx);
   if (isPrivate(ctx.config.azure)) await bindThroughVnetGateway(ctx, secret.value);
-  else await bindPowerBiCredential(ctx, secret.value);
+  else await bindPowerBiCredentials(ctx, secret.value);
   await retireSecret(ctx, secret.previousKeyId);
   ctx.save();
   ctx.ui.ok('Rotated the SQL reader secret and rebound the Power BI data source credential.');
@@ -900,7 +1172,9 @@ export async function azureSummary(ctx) {
   ui.info(`Azure:      ${az.resourceGroup} in ${az.location}`);
   if (az.outputs?.webUrl) ui.info(`App:        ${az.outputs.webUrl}`);
   if (az.powerBi?.workspaceId) ui.info(`Power BI:   workspace ${az.powerBi.workspaceId}, model ${az.powerBi.datasetId ?? 'not deployed'}`);
+  if (az.powerBi?.consumptionDatasetId) ui.info(`Credits:    model ${az.powerBi.consumptionDatasetId}`);
   if (az.teamsPackage) ui.info(`Teams:      ${az.teamsPackage}`);
+  if (azureConsumptionOn(config)) flowsSummary(ctx);
   ui.info('Record:     Keep valuelens-install.json. It holds no secrets.');
 }
 

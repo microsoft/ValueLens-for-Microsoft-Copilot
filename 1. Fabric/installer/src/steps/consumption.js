@@ -149,7 +149,9 @@ export async function planConsumption(ctx, pre) {
   const { ui, config, api, sources } = ctx;
   const cc = config.consumption;
   ui.heading('Credit consumption');
-  if (!config.semanticModel.enabled) {
+  if (config.target === 'azure') {
+    // The Azure path deploys its own copy of the model; the Fabric notes below don't apply.
+  } else if (!config.semanticModel.enabled) {
     ui.note('The credit consumption model shares the main semantic model\'s connection, so it is only deployed with it.');
     ui.note('The notebooks still load the data; publish the credit consumption report ("Consumption Central - Fabric.pbit") yourself.');
   } else if (!sources.consumptionModelFile) {
@@ -274,12 +276,27 @@ const paygName = (p) => p.name ?? p.subscriptionId;
 const joinList = (names) => (names.length < 3 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
 
 /**
- * Gives the app's service principal read access to Azure costs and metrics in the chosen subscription.
- * @param {Ctx} ctx
- * @returns {Promise<boolean>}  Whether the Azure AI notebook can run.
+ * A service principal to give Azure roles to.
+ * @typedef {{ id: string, name: string, appId?: string }} Principal
  */
-export async function ensureAzureAiAccess(ctx) {
+
+/** @param {Ctx} ctx @returns {Principal} */
+const appPrincipal = (ctx) => ({
+  id: /** @type {string} */ (ctx.config.app.servicePrincipalId),
+  name: ctx.config.app.displayName ?? 'the app',
+  appId: ctx.config.app.appId,
+});
+
+/**
+ * Gives the app's service principal, or another principal such as the Azure jobs' managed identity,
+ * read access to Azure costs and metrics in the chosen subscription.
+ * @param {Ctx} ctx
+ * @param {Principal} [principal]  Defaults to the app.
+ * @returns {Promise<boolean>}  Whether the Azure AI pipeline can run.
+ */
+export async function ensureAzureAiAccess(ctx, principal) {
   const { ui, config, api } = ctx;
+  const who = principal ?? appPrincipal(ctx);
   const cc = config.consumption;
   const sub = cc.azureSubscriptionId;
   if (!sub) {
@@ -287,19 +304,19 @@ export async function ensureAzureAiAccess(ctx) {
     return false;
   }
   const where = cc.azureSubscriptionName ?? sub;
-  const app = config.app.displayName ?? 'the app';
+  const app = who.name;
   const names = AZURE_AI_ROLES.map((r) => r.name).join(', ');
   if (cc.azureAccess) {
     ui.ok(`${app} can read Azure AI costs in ${where}`);
-    await ensurePaygAccess(ctx);
+    await ensurePaygAccess(ctx, who);
     return true;
   }
   try {
-    for (const r of AZURE_AI_ROLES) await api.arm.assignRole(`/subscriptions/${sub}`, r.id, /** @type {string} */ (config.app.servicePrincipalId), 'ServicePrincipal');
+    for (const r of AZURE_AI_ROLES) await api.arm.assignRole(`/subscriptions/${sub}`, r.id, who.id, 'ServicePrincipal');
   } catch (err) {
     if (!(err instanceof HttpError) || err.status !== 403) throw err;
     ui.warn(`You can't assign Azure roles in ${where}, so Azure AI is left out of the pipeline for now.`);
-    ui.info(`An Owner or User Access Administrator can give ${app} (${config.app.appId}) ${names} on the subscription.`);
+    ui.info(`An Owner or User Access Administrator can give ${app} (${who.appId}) ${names} on the subscription.`);
     if (!ui.yes) {
       const done = await ui.select('Then:', [
         { name: 'Leave Azure AI out for now', value: false, description: 'Run the installer again once the roles are there.' },
@@ -308,7 +325,7 @@ export async function ensureAzureAiAccess(ctx) {
       if (done) {
         cc.azureAccess = true;
         ctx.save();
-        await ensurePaygAccess(ctx);
+        await ensurePaygAccess(ctx, who);
         return true;
       }
     }
@@ -319,7 +336,7 @@ export async function ensureAzureAiAccess(ctx) {
   ctx.save();
   ui.ok(`Gave ${app} ${names} on ${where}`);
   ui.note('New Azure roles can take a few minutes to apply. The notebook retries if they haven\'t yet.');
-  await ensurePaygAccess(ctx);
+  await ensurePaygAccess(ctx, who);
   return true;
 }
 
@@ -327,10 +344,11 @@ export async function ensureAzureAiAccess(ctx) {
  * Cost Management Reader on the other subscriptions that billing policies charge Copilot pay-as-you-go to.
  * One the user can't grant is left out of the notebook rather than failing every run.
  * @param {Ctx} ctx
+ * @param {Principal} who
  */
-async function ensurePaygAccess(ctx) {
+async function ensurePaygAccess(ctx, who) {
   const { ui, config, api } = ctx;
-  const app = config.app.displayName ?? 'the app';
+  const app = who.name;
   for (const p of config.consumption.paygSubscriptions ?? []) {
     const where = paygName(p);
     if (p.access) {
@@ -338,11 +356,11 @@ async function ensurePaygAccess(ctx) {
       continue;
     }
     try {
-      await api.arm.assignRole(`/subscriptions/${p.subscriptionId}`, ROLES.costManagementReader, /** @type {string} */ (config.app.servicePrincipalId), 'ServicePrincipal');
+      await api.arm.assignRole(`/subscriptions/${p.subscriptionId}`, ROLES.costManagementReader, who.id, 'ServicePrincipal');
     } catch (err) {
       if (!(err instanceof HttpError) || ![403, 404].includes(err.status)) throw err;
       ui.warn(`You can't assign Azure roles in ${where}, so its Copilot pay-as-you-go is left out for now.`);
-      ui.info(`An Owner or User Access Administrator can give ${app} (${config.app.appId}) Cost Management Reader on it.`);
+      ui.info(`An Owner or User Access Administrator can give ${app} (${who.appId}) Cost Management Reader on it.`);
       const done = !ui.yes && (await ui.select('Then:', [
         { name: 'Leave it out for now', value: false, description: 'Run the installer again once the role is there.' },
         { name: 'It already has this role', value: true },
