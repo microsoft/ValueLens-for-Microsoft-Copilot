@@ -19,6 +19,18 @@ open it and follow the steps in your browser. Check
 
 **New here?** Read the [📖 Report Interpretation Guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf) — a page-by-page walkthrough of every report page.
 
+## Disclaimer
+
+- **This isn't the official Copilot report.** The official sources are the
+  [Microsoft 365 admin center Copilot usage reports](https://learn.microsoft.com/en-us/microsoft-365/admin/activity-reports/microsoft-365-copilot-usage)
+  and the [Viva Insights Copilot Dashboard](https://learn.microsoft.com/en-us/viva/insights/org-team-insights/copilot-dashboard).
+  ValueLens takes its Copilot figures mainly from the Purview audit log, which isn't the
+  authoritative source, so its numbers may not always match those reports exactly.
+- **You're responsible for the data once it's extracted.** ValueLens copies data into your own
+  Fabric, Azure, Dataverse, SharePoint or CSV files. The retention, deletion and other policies you
+  set in Purview, Microsoft 365, Entra ID, Dataverse and the other sources don't apply to those
+  copies. Managing that data and meeting your organisation's requirements is up to you.
+
 ## Pick a path
 
 Every path gives you the same dashboard. Pick the one that matches what you have, then follow the

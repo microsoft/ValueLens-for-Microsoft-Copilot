@@ -11,6 +11,9 @@ Use this path when you want ValueLens in Power BI Pro with scheduled refresh fro
 - A SharePoint document library and folder for the CSVs. The examples use `/AIBV`.
 - Optional: an Agent 365 licence for `-IncludeAgent365Info`, or an admin-centre Agents export for `-Agents365Csv`.
 
+Read the [disclaimer](../README.md#disclaimer) too: these aren't the official Copilot reports, and
+you're responsible for the CSVs once they're in SharePoint.
+
 ## Setup
 
 Use [`scripts/README.md`](scripts/README.md) for the full parameter reference. Run scripts with PowerShell 7, not Windows PowerShell.

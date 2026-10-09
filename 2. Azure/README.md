@@ -26,6 +26,9 @@ What you need, networking, regions and the commands are in the installer's
 [Azure target section](../1.%20Fabric/installer/README.md#azure-target-preview). The images come from
 `ghcr.io/microsoft/valuelens-jobs` and `valuelens-web`, tagged with the installer's version.
 
+Read the [disclaimer](../README.md#disclaimer) too: these aren't the official Copilot reports, and
+you're responsible for the data once it's in your Azure SQL database.
+
 ## Credit consumption
 
 Tick **Credit consumption** to get the Consumption Central pages, from a second Power BI model

@@ -9,6 +9,9 @@ This preview path is for customers who use a compatible Power Automate `CopilotI
 - A deployment user, Entra app, and Dataverse application user with the full least-privilege access in [`../docs/PERMISSIONS.md`](../docs/PERMISSIONS.md).
 - PowerShell 7+, Python 3.10+, Power BI Desktop, and a commercial-cloud Dataverse URL such as `https://contoso.crm.dynamics.com`.
 
+Read the [disclaimer](../README.md#disclaimer) too: these aren't the official Copilot reports, and
+you're responsible for the data once it's in Dataverse.
+
 ## Setup
 Run the commands from this folder:
 

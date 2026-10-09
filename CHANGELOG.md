@@ -19,6 +19,16 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ## Unreleased
 
+### Docs: a disclaimer in the README
+
+**What changed.** The README has a short **Disclaimer** section above *Pick a path*, and each path
+README points to it. It says two things. ValueLens isn't the official Copilot report: that's the
+Microsoft 365 admin center Copilot usage reports and the Viva Insights Copilot Dashboard, and
+because ValueLens reads mainly the Purview audit log its numbers may not always match them. And
+once data is extracted into Fabric, Azure, Dataverse, SharePoint or CSV files, the retention,
+deletion and other policies set in the source systems don't apply to those copies, so managing
+them is up to you.
+
 ### New: Repair or change can load more audit history
 
 **What changed.** Once the first load has finished, **Repair or change** asks *Load more audit
