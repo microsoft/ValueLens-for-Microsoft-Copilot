@@ -13,7 +13,7 @@ import { isMissingFromModelError } from "@/lib/model-errors";
  * ValueLens model. An install can leave any of them off, or tick one before
  * its first load has run, and the app then leaves out what would be blank.
  */
-export type OptionalSource = "m365Activity" | "productFeedback" | "agentRegistry";
+export type OptionalSource = "m365Activity" | "productFeedback" | "agentRegistry" | "defender";
 
 /**
  * - `checking`: the probe hasn't answered yet, so everything stays in view.
@@ -26,17 +26,20 @@ export type SourceState = "checking" | "present" | "absent" | "notConfigured" | 
 
 export type SourceAvailability = Readonly<Record<OptionalSource, SourceState>>;
 
-export const OPTIONAL_SOURCES: readonly OptionalSource[] = ["m365Activity", "productFeedback", "agentRegistry"];
+export const OPTIONAL_SOURCES: readonly OptionalSource[] = ["m365Activity", "productFeedback", "agentRegistry", "defender"];
 
 /**
  * One unfiltered row count per source, each its own query so a model missing
  * one table still answers for the others. The registry is counted by the
- * model's own measure, as the Agent registry stage reports it.
+ * model's own measure, as the Agent registry stage reports it. Defender is
+ * counted by its status table, which holds a row per probe once the source
+ * has run at all, even when every probe was refused.
  */
 export const SOURCE_PROBES: Readonly<Record<OptionalSource, string>> = {
     m365Activity: `EVALUATE ROW("Rows", COUNTROWS('M365 Activity'))`,
     productFeedback: `EVALUATE ROW("Rows", COUNTROWS('ProductFeedback'))`,
     agentRegistry: `EVALUATE ROW("Rows", [Agent Registry Records])`,
+    defender: `EVALUATE ROW("Rows", COUNTROWS('Defender Status'))`,
 };
 
 /** Nothing hidden: for screens rendered outside the app, and installs whose probes can't run. */
@@ -44,6 +47,7 @@ export const ALL_UNKNOWN: SourceAvailability = {
     m365Activity: "unknown",
     productFeedback: "unknown",
     agentRegistry: "unknown",
+    defender: "unknown",
 };
 
 /** Reads one probe's answer. */

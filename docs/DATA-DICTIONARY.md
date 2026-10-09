@@ -32,6 +32,7 @@ parameter.
 | 3 | Chat + Agent Org Data | `copilot_org_data` | **Core** | `Copilot_Org_Data_Direct_Ingester` *(+ optional `notebooks/workday-org-data/` overlay)* | `Get-EntraOrgData*` |
 | 4 | Agents 365 | `agents_365` | *Optional* | `Copilot_Agent365_Registry_Ingester` *(API, primary)* → `Copilot_Agent365_Lander` *(CSV fallback if the API step fails)* | `Get-Agents365Registry.ps1` *(API)*, or an admin centre export via `-Agents365Csv` *(fallback)* → `Agent 365` CSV (also Local CSV and the Dataverse template) |
 | 5 | ProductFeedback | `user_feedback` | *Optional* | `Copilot_ProductFeedback_Ingester` | OCV feedback CSV (`Feedback File`) |
+| 6 | Defender AI Watchlist, Shadow AI Daily, Shadow AI Totals, Defender AI Installed, Defender Cloud Discovery, Defender AI Agents, Defender Status | `defender_*` (7 tables) | *Optional* (off by default) | `Copilot_Defender_Ingester` | None. Fabric and Azure only (Azure: the `defender` jobs module) |
 
 > **Delta table names are lower-case** throughout (`copilot_interactions_parsed`,
 > `copilot_interactions_curated`, …). The dashboard table names in column 2 are the *model* names and
@@ -470,7 +471,7 @@ switchable via a `RESOLVE_VIA_*` flag at the top of the notebook:
 Because attribution is best-effort, always surface `Agent creator source` alongside any
 creator-based visual — filtering out `unattributed` silently understates your builder counts.
 
-#### Governance columns (`Owner account`, `Sharing Scope`, `Data Access`, `Governance Flags`)
+#### Governance columns (`Owner account`, `Sharing Scope`, `Data Access`, `Sign-in Required`, `Governance Flags`)
 
 These back the Fabric App's Governance page ([Methodology](METHODOLOGY.md#governance-which-agents-need-a-review)).
 
@@ -480,7 +481,8 @@ These back the Fabric App's Governance page ([Methodology](METHODOLOGY.md#govern
 | `Sharing Scope` | Power Query, from `Availability`, `Status` and the share count: `Whole organisation`, `Specific people or groups`, `Not shared` or `Not stated` |
 | `Shared With Count` | Power Query: distinct people and groups across the share lists. The lists themselves are not loaded |
 | `Data Access` | DAX calculated column, from the SharePoint, OneDrive, Graph connector and uploaded-file capability flags |
-| `Governance Flags` | DAX calculated column: the review flags that apply, separated by `; `. Blank for catalogue and blocked agents |
+| `Sign-in Required` | Power Query, from the optional Defender agents table (`defender_ai_agents`): `Yes`, `No` or `Unknown`. It matches the agent on its Entra agent ID, bot ID, app ID or agent ID. The lookup is an ordered list of sources, so a more direct source, such as agent configuration from Azure Resource Graph, can go ahead of Defender; the first source that knows the agent wins. `Unknown` when no source does, or Defender is off |
+| `Governance Flags` | DAX calculated column: the review flags that apply, separated by `; `. Blank for catalogue and blocked agents. `Sign-in Required = No` adds *No sign-in required* |
 
 Only the two Fabric templates carry these columns so far. The CSV, SharePoint and Dataverse
 templates will gain `Sharing Scope`, `Data Access` and `Governance Flags` later; they have no
@@ -524,3 +526,34 @@ Survey Question, Survey Response Option, Additional Metadata,
 Date Submitted Date, Sentiment
 ```
 *(The model should also keep `MissingField.Ignore` on `Table.RenameColumns` so partial OCV exports remain tolerant.)*
+
+### 6. Defender (shadow AI and agent risk)
+
+Optional, off by default. `Copilot_Defender_Ingester` (Fabric) or the `defender` module of the Azure
+jobs reads Microsoft Defender through Microsoft Graph: advanced hunting
+(`POST /security/runHuntingQuery`) and, in beta, Cloud Discovery in Defender for Cloud Apps. Both
+paths share one module, `valuelens_core.defender`, so the tables match. Each probe fails on its own:
+a probe the tenant can't read writes its status to `defender_status` and leaves its table empty.
+When the source is off, the model loads every table empty with the right columns.
+
+| Model table | Delta / SQL table | Grain | Columns |
+| --- | --- | --- | --- |
+| Defender AI Watchlist | `defender_ai_watchlist` | One row per watched tool, from the watchlist CSV | `Tool`, `Category`, `Vendor`, `Posture` (`Sanctioned`, `Unsanctioned`, `Not reviewed`), `ProcessNames`, `Domains`, `InstallPrefixes` (`;`-separated) |
+| Shadow AI Daily | `defender_shadow_ai_daily` | Day ? window ? layer ? tool | `Day`, `Window` (`1d`, `7d`, `30d`), `Layer` (`Ran`, `Network`), `Tool`, `Devices`, `Users`, `Events`, `LoadedAt` |
+| Shadow AI Totals | `defender_shadow_ai_totals_daily` | Day ? window ? layer, across tools not marked Sanctioned | As the daily table without `Tool`; `Layer` adds `Any` (ran or reached) |
+| Defender AI Installed | `defender_ai_installed` | Snapshot, one row per tool | `SnapshotDate`, `Tool`, `Devices`, `SoftwareNames`, `LoadedAt` |
+| Defender Cloud Discovery | `defender_cloud_discovery_ai` | Snapshot, one row per stream and AI app (last 30 days) | `SnapshotDate`, `StreamId`, `StreamName`, `AppId`, `AppName`, `Category`, `RiskScore`, `Users`, `Devices`, `IpAddresses`, `Transactions`, `UploadBytes`, `DownloadBytes`, `LastSeen`, `Tags`, `Posture`, `WatchlistTool`, `LoadedAt` |
+| Defender AI Agents | `defender_ai_agents` | Snapshot, one row per agent Defender knows | `SnapshotDate`, `AgentId`, `AgentName`, `Platform`, `SourceTable`, `EntraAgentId`, `BotId`, `AppId`, `AuthenticationType`, `SignInRequired` (`Yes`, `No`, `Unknown`), `UsesWebKnowledge`, `PublishedStatus`, `LifecycleStatus`, `Availability`, `LoadedAt` |
+| Defender Status | `defender_status` | One row per probe per run | `RunAt`, `Probe` (`device_activity`, `installed`, `agents`, `cloud_discovery`), `Status` (`ok`, `empty`, `forbidden`, `unlicensed`, `error`), `Source`, `Rows`, `Message` |
+
+- **Counts are distinct per window.** `1d` rows hold each day; `7d` and `30d` rows hold the windows
+  ending on the last loaded day. `Devices` and `Users` are distinct within a row, so they don't add
+  across days, windows or tools. Advanced hunting's `dcount` is approximate.
+- **History.** The two daily tables keep one row set per `Day` (the Azure publish replaces by `Day`);
+  the first load backfills up to 29 days. The other tables are snapshots, replaced each run.
+- **Service accounts** (`S-1-5-18`, `-19`, `-20`) are left out of `Users`.
+- **Relationships.** `Day` on both daily tables to `Calendar`; `Tool` on the daily and installed tables
+  to the watchlist.
+- **Measures** (on Shadow AI Totals): `AI Tools Watched`, `Unsanctioned AI Tools`,
+  `Shadow AI Tools Found` (30 days), `Shadow AI Tools This Week`, `Shadow AI Devices`,
+  `Shadow AI Users`, `Shadow AI Users (Cloud Discovery)` and `Shadow AI Status`.

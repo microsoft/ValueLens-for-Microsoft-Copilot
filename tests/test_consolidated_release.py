@@ -15,10 +15,10 @@ CORE = SETUP / "notebooks"
 # separately against its canonical source.
 SCHEMA_HASHES = {
     "ValueLens - Fabric.pbit": {
-        "DataModelSchema": "f34bc9b58e0454f3c029b99d47ab02170a671f1c8e60b08fd6d3549fcfec7bf5",
+        "DataModelSchema": "48b7d553e9a776fc9f65ac6353e018db7e63a55d2ca2fbd209a66719c97cb457",
     },
     "ValueLens - Fabric OneLake.pbit": {
-        "DataModelSchema": "e7911dc56605bd51c5740c1bf0ffff7fbefadbf9472f3494233e82221201b552",
+        "DataModelSchema": "478a1fa2be0671c83e29c03a3a55059cb2ab8281209745e3e727262544e37ee3",
     },
 }
 
@@ -55,6 +55,7 @@ class ConsolidatedReleaseTests(unittest.TestCase):
         for name in (
             "Copilot_Agent365_Lander.ipynb",
             "Copilot_Agent365_Registry_Ingester.ipynb",
+            "Copilot_Defender_Ingester.ipynb",
             "Copilot_Licensed_Users_Direct_Ingester.ipynb",
             "Copilot_M365_Activity_Ingester.ipynb",
             "ValueLens_Data_Check.ipynb",

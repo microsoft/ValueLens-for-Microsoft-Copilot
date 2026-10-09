@@ -13,6 +13,8 @@ Data layout (same under a local directory or the ADLS account; first segment = c
     raw/copilot_licensed_users/part-0.parquet
     raw/copilot_org_data/part-0.parquet
     raw/m365_activity_daily/day-YYYYMMDD.parquet
+    raw/defender_*/...                                         (module defender, optional)
+    landing/defender/ai_watchlist.csv                          (module defender: the AI watchlist, admin-edited)
     raw/agents_365/*.parquet                                   (Phase 2, optional)
     curated/copilot_interactions_curated/part-0.parquet
     curated/<studio_* | viva_*>/part-0.parquet                 (module consumption, merged state)
@@ -85,6 +87,10 @@ def collect(store, settings, api=None) -> dict:
         jobs.append(("org", collect_org))
     if settings.has("m365Activity"):
         jobs.append(("m365", collect_m365))
+    if settings.has("defender"):
+        from .collect.defender import collect_defender
+
+        jobs.append(("defender", collect_defender))
     if settings.has("consumption"):
         from .collect.studio import collect_studio
         from .collect.viva import collect_viva
@@ -110,7 +116,7 @@ def collect(store, settings, api=None) -> dict:
 
 
 def publish_targets(settings) -> list[str]:
-    from .publish import CONSUMPTION
+    from .publish import CONSUMPTION, DEFENDER
 
     consumption = list(CONSUMPTION) if settings.has("consumption") else []
     if settings.sample_data:
@@ -123,6 +129,8 @@ def publish_targets(settings) -> list[str]:
         targets.append("org")
     if settings.has("m365Activity"):
         targets.append("m365")
+    if settings.has("defender"):
+        targets += list(DEFENDER)
     return targets + consumption
 
 

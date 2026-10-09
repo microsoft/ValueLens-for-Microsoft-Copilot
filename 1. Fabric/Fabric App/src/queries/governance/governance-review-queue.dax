@@ -13,6 +13,13 @@ SELECTCOLUMNS(
         LEN('Agents 365'[Governance Flags])
             - LEN(SUBSTITUTE('Agents 365'[Governance Flags], ";", ""))
             + 1,
+    "Priority",
+        IF(CONTAINSSTRING('Agents 365'[Governance Flags], "No sign-in required"), 3)
+            + IF(CONTAINSSTRING('Agents 365'[Governance Flags], "Owner has left"), 3)
+            + IF(CONTAINSSTRING('Agents 365'[Governance Flags], "Org-wide with org data"), 2)
+            + IF(CONTAINSSTRING('Agents 365'[Governance Flags], "No owner on record"), 2)
+            + IF(CONTAINSSTRING('Agents 365'[Governance Flags], "Shared, no recorded use"), 1)
+            + 0,
     "Flags", 'Agents 365'[Governance Flags]
 )
-ORDER BY [Flag Count] DESC, [Users] DESC, [Agent] ASC
+ORDER BY [Priority] DESC, [Flag Count] DESC, [Users] DESC, [Agent] ASC

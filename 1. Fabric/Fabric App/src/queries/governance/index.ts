@@ -9,3 +9,4 @@ export * from "./governance-summary";
 export * from "./governance-exposure";
 export * from "./governance-owners";
 export * from "./governance-review-queue";
+export * from "./shadow-ai";

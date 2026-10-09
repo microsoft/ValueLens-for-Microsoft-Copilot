@@ -17,6 +17,36 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased
+
+### New: Defender shadow AI and agent risk (optional)
+
+**What changed.** A new optional data source, **Defender (shadow AI and agent risk)**, off by default,
+on both the Fabric and the Azure path (#160). It reads Microsoft Defender through Microsoft Graph:
+advanced hunting (`POST /security/runHuntingQuery`, `ThreatHunting.Read.All`) and Cloud Discovery in
+Defender for Cloud Apps (`CloudApp-Discovery.Read.All`). Fabric runs the new
+`Copilot_Defender_Ingester` notebook; Azure runs the `defender` jobs module. Both share
+`valuelens_core.defender`, and `V003__defender.sql` creates the Azure SQL tables.
+
+- **Shadow AI on the Governance page.** AI tools other than Copilot that people ran, reached on the
+  network or installed on Defender-onboarded devices, plus generative AI apps from Cloud Discovery.
+  Tools come from an editable watchlist (`defender/ai_watchlist.csv`), each *Sanctioned*,
+  *Unsanctioned* or *Not reviewed* (the default). The section shows with or without the Agent 365
+  registry, and says how to turn Defender on when it's off. It is a floor, not a census.
+- **Fail-soft probes.** Device activity, installed software, AI agents and Cloud Discovery run on
+  their own. One the tenant isn't licensed for, or can't read, is logged in `defender_status` and
+  skipped; the rest of the load, and the rest of Governance, carry on, and the page names what
+  didn't load.
+- **Agent risk.** The two Fabric templates' `Agents 365` table gains `Sign-in Required` (*Yes*, *No*
+  or *Unknown*). It takes the first source that knows the agent, Defender's agent inventory for now,
+  so a more direct source can go ahead of it. *No* adds a **No sign-in required** governance flag.
+- **A weighted review queue.** Flags now carry weights (*No sign-in required* and *Owner has left*
+  3, *Org-wide with org data* and *No owner on record* 2, *Shared, no recorded use* 1), and the queue
+  sorts by their sum, then flag count, then users.
+- **Installer.** A *Defender (shadow AI and agent risk)* choice on both targets (`--data
+  defender=api`), the optional permissions, a licence prerequisite (Defender for Endpoint P2, Defender
+  XDR or Defender for Cloud Apps) and the `EnableDefender` pipeline parameter.
+
 ## 2026-10-09 — Analytics Hub installer 0.3.9
 
 **Update an existing install:** download installer 0.3.9, open it and choose **Repair or change**.

@@ -8,7 +8,7 @@ import { routerWanted } from './uploads.js';
 /** Microsoft Graph's application ID. Same in every tenant. */
 export const GRAPH_APP_ID = '00000003-0000-0000-c000-000000000000';
 
-/** @typedef {'core' | 'orgData' | 'm365Activity' | 'agent365' | 'productFeedback' | 'consumption' | 'agentEvaluator'} ModuleId */
+/** @typedef {'core' | 'orgData' | 'm365Activity' | 'agent365' | 'productFeedback' | 'consumption' | 'agentEvaluator' | 'defender'} ModuleId */
 
 /**
  * @typedef {object} ModuleInfo
@@ -94,18 +94,28 @@ export const MODULES = {
     azure: { supported: false, graphRoles: [] },
     pipelineParameter: null,
   },
+  defender: {
+    id: 'defender',
+    label: 'Defender (shadow AI and agent risk)',
+    description: 'From Microsoft Defender advanced hunting and Cloud Discovery. Shows AI tools other than Copilot in use on your devices and network, and agents that answer without sign-in. Needs Defender for Endpoint P2 or Defender for Cloud Apps; probes you aren\'t licensed for are skipped.',
+    required: false,
+    defaultOn: false,
+    permissions: ['ThreatHunting.Read.All', 'CloudApp-Discovery.Read.All'],
+    azure: { supported: true, graphRoles: ['ThreatHunting.Read.All', 'CloudApp-Discovery.Read.All'] },
+    pipelineParameter: 'EnableDefender',
+  },
 };
 
 /** Modules that change the ValueLens semantic model. The others have their own model or none. */
-export const MODEL_MODULES = /** @type {const} */ (['core', 'orgData', 'm365Activity', 'agent365', 'productFeedback']);
+export const MODEL_MODULES = /** @type {const} */ (['core', 'orgData', 'm365Activity', 'agent365', 'productFeedback', 'defender']);
 
 /** Always collected: the dashboard is built on them. Shown locked on the Data sources screen. */
 export const ESSENTIAL_MODULES = /** @type {const} */ (['core', 'orgData']);
 
 /** Modules the Data sources screen can switch on, in order. */
-export const OPTIONAL_MODULES = /** @type {const} */ (['m365Activity', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator']);
+export const OPTIONAL_MODULES = /** @type {const} */ (['m365Activity', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator', 'defender']);
 
-/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'm365Activity' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts' | 'uploadRouter' | 'workdayLander' | 'loadStatus'} NotebookKey */
+/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'm365Activity' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts' | 'uploadRouter' | 'workdayLander' | 'loadStatus' | 'defender'} NotebookKey */
 
 /**
  * A text change the installer makes to its copy of a notebook. `find` must occur exactly once.
@@ -281,6 +291,15 @@ export const NOTEBOOKS = [
     expressions: { ALLOW_EMPTY_FIRST_SNAPSHOT: 'True' },
   },
   {
+    key: 'defender',
+    file: 'Copilot_Defender_Ingester.ipynb',
+    displayName: 'Copilot_Defender_Ingester',
+    module: 'defender',
+    credentials: true,
+    parameters: [],
+    placeholder: 'REPLACE_WITH_DEFENDER_NOTEBOOK_ID',
+  },
+  {
     key: 'refreshModel',
     file: 'ValueLens_Refresh_Model.ipynb',
     displayName: 'AnalyticsHub_Refresh_Model',
@@ -334,7 +353,7 @@ export const NOTEBOOKS = [
   },
 ];
 
-/** @typedef {{ orgData: boolean, m365Activity: boolean, agent365: boolean, productFeedback: boolean, consumption: boolean, agentEvaluator: boolean }} ModuleChoice */
+/** @typedef {{ orgData: boolean, m365Activity: boolean, agent365: boolean, productFeedback: boolean, consumption: boolean, agentEvaluator: boolean, defender?: boolean }} ModuleChoice */
 
 /** @returns {ModuleChoice} */
 export function defaultModules() {
@@ -345,6 +364,7 @@ export function defaultModules() {
     productFeedback: MODULES.productFeedback.defaultOn,
     consumption: MODULES.consumption.defaultOn,
     agentEvaluator: MODULES.agentEvaluator.defaultOn,
+    defender: MODULES.defender.defaultOn,
   };
 }
 
@@ -379,6 +399,7 @@ export function enabledModules(modules) {
   if (modules.productFeedback) out.push('productFeedback');
   if (modules.consumption) out.push('consumption');
   if (modules.agentEvaluator) out.push('agentEvaluator');
+  if (modules.defender) out.push('defender');
   return out;
 }
 

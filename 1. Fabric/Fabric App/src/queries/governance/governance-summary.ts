@@ -12,6 +12,7 @@ import query from "./governance-summary.dax?raw";
 const columnMetadata: ColumnMetadataMap = {
     "[Tenant Agents]": { name: "Tenant Agents", displayName: "Built in this tenant", format: FORMAT_WHOLE },
     "[Needs Review]": { name: "Needs Review", displayName: "Need a review", format: FORMAT_WHOLE },
+    "[No Sign In]": { name: "No Sign In", displayName: "No sign-in required", format: FORMAT_WHOLE },
     "[Owner Left]": { name: "Owner Left", displayName: "Owner has left", format: FORMAT_WHOLE },
     "[No Owner]": { name: "No Owner", displayName: "No owner on record", format: FORMAT_WHOLE },
     "[Org Wide Org Data]": {

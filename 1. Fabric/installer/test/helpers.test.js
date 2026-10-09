@@ -194,7 +194,7 @@ test('install record round-trips, fills defaults and refuses secrets', () => {
   const partial = loadConfig(file).config;
   assert.equal(partial.schedule.time, '05:00');
   assert.equal(partial.schedule.frequency, 'daily');
-  assert.deepEqual(partial.modules, { orgData: true, m365Activity: true, agent365: true, productFeedback: false, consumption: false, agentEvaluator: false });
+  assert.deepEqual(partial.modules, { orgData: true, m365Activity: true, agent365: true, productFeedback: false, consumption: false, agentEvaluator: false, defender: false });
   assert.deepEqual(partial.fabric.notebooks, {});
 
   const leaky = /** @type {any} */ (emptyConfig());

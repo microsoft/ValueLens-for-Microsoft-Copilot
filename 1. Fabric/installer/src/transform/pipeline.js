@@ -15,6 +15,7 @@ const MODULE_BRANCHES = {
   m365Activity: { activities: ['Conditionally_Run_M365_Activity'], parameter: 'EnableM365Activity' },
   agent365: { activities: ['Conditionally_Run_Agent365', 'Run_Agent365_CSV_Fallback'], parameter: 'EnableAgent365' },
   productFeedback: { activities: ['Conditionally_Run_Product_Feedback'], parameter: 'EnableProductFeedback' },
+  defender: { activities: ['Conditionally_Run_Defender'], parameter: 'EnableDefender' },
 };
 
 /**
@@ -164,6 +165,7 @@ export const LANE_ORDER = [
   WORKDAY_ACTIVITY,
   'Conditionally_Run_M365_Activity',
   'Conditionally_Run_Product_Feedback',
+  'Conditionally_Run_Defender',
   ...ARCHIVED_ACTIVITIES,
   ...CONSUMPTION_ACTIVITIES.slice(0, 2).map((a) => a.name),
   COWORK_DATAFLOW_ACTIVITY,
@@ -302,7 +304,7 @@ function refreshStep(settings, o) {
 function refreshActivity(activities, settings) {
   const has = (/** @type {string} */ name) => activities.some((a) => a.name === name);
   const dependsOn = [{ activity: 'Run_Audit_Log_Processor', dependencyConditions: ['Succeeded'] }];
-  for (const name of ['Conditionally_Run_Org_Data', WORKDAY_ACTIVITY, 'Conditionally_Run_M365_Activity', 'Conditionally_Run_Product_Feedback']) {
+  for (const name of ['Conditionally_Run_Org_Data', WORKDAY_ACTIVITY, 'Conditionally_Run_M365_Activity', 'Conditionally_Run_Product_Feedback', 'Conditionally_Run_Defender']) {
     if (has(name)) dependsOn.push({ activity: name, dependencyConditions: ['Completed'] });
   }
   return refreshStep(settings, {

@@ -18,6 +18,7 @@ INPUTS = {
 ORG = "Conditionally_Run_Org_Data"
 M365 = "Conditionally_Run_M365_Activity"
 FEEDBACK = "Conditionally_Run_Product_Feedback"
+DEFENDER = "Conditionally_Run_Defender"
 DATAVERSE = "Conditionally_Run_Dataverse_Transcripts"
 # Lane 2 in run order: (step, the step it waits for, the outcomes it waits for).
 LANE_2 = [
@@ -26,7 +27,8 @@ LANE_2 = [
     (ORG, FALLBACK, ["Completed", "Skipped"]),
     (M365, ORG, ["Completed"]),
     (FEEDBACK, M365, ["Completed"]),
-    (DATAVERSE, FEEDBACK, ["Completed"]),
+    (DEFENDER, FEEDBACK, ["Completed"]),
+    (DATAVERSE, DEFENDER, ["Completed"]),
     ("Conditionally_Run_Credit_Consumption", DATAVERSE, ["Completed"]),
 ]
 
@@ -165,6 +167,7 @@ class PipelineTests(unittest.TestCase):
                 "EnableDataverse": False,
                 "EnableConsumption": False,
                 "EnableProductFeedback": False,
+                "EnableDefender": False,
                 "EnableAgent365": False,
             },
         )

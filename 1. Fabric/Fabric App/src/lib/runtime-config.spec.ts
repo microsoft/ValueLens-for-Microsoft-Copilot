@@ -202,6 +202,12 @@ describe("parseSemanticModels", () => {
             expect(parseModules({ modules: { m365Activity: true } })).toBeUndefined();
             expect(parseModules({ modules: { ...deployedModels.modules, productFeedback: "no" } })).toBeUndefined();
         });
+
+        it("reads the Defender choice when the install records it, and leaves it out of older configs", () => {
+            expect(parseModules({ modules: { ...deployedModels.modules, defender: true } })).toEqual({ ...deployedModels.modules, defender: true });
+            expect(parseModules({ modules: { ...deployedModels.modules, defender: "yes" } })).toEqual(deployedModels.modules);
+            expect(parseModules(deployedModels)).not.toHaveProperty("defender");
+        });
     });
 
     it("accepts an install that set up no models", () => {

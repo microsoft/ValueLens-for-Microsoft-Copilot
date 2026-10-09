@@ -35,8 +35,9 @@ import { consumptionConnection, evaluatorConnection } from "@/queries/shared";
  * `connection` is optional: without it in `fabric.yaml` they are left out.
  * A destination with a `source` reads an optional module of the ValueLens
  * model, and is left out once the app has checked that source has no data.
- * Governance reads only the Agent 365 registry, but stays listed without it
- * and says how to connect it.
+ * Governance reads the Agent 365 registry, plus the optional Defender source
+ * for its Shadow AI stage, and stays listed without either, saying how to
+ * connect them.
  *
  * A stage that is not built yet stays listed so the shape of the destination
  * is visible; a destination is reachable once any of its stages is built.
@@ -123,6 +124,7 @@ export const destinations = [
             { id: "exposure", label: "Exposure", ready: true },
             { id: "accountability", label: "Accountability", ready: true },
             { id: "review-queue", label: "Review queue", ready: true },
+            { id: "shadow-ai", label: "Shadow AI", ready: true },
         ],
     },
     {

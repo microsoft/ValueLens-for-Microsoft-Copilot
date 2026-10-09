@@ -40,7 +40,8 @@ The app also leaves out pages and sections whose optional data hasn't arrived. W
 counts the rows in the ValueLens model's optional sources (unfiltered). **Feedback** needs
 `ProductFeedback` and **Work patterns** needs `M365 Activity`. Without registry data, **Governance**
 shows how to connect the Agent 365 registry instead of empty sections, and the **Agents** leaderboard
-drops its registry columns. Newer installer builds also write which optional modules were switched
+drops its registry columns. Governance's **Shadow AI** section needs `Defender Status`, and says how to
+turn Defender on without it; it doesn't depend on the registry. Newer installer builds also write which optional modules were switched
 off into `fabric.config.json`; those pages stay hidden without probing until the admin turns the
 module on. Everything shows while the check runs, or if it fails, and a page comes back on the next
 open once its data loads.

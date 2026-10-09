@@ -594,6 +594,7 @@ test('app: the prebuilt app is deployed as it is, with its models in fabric.conf
         productFeedback: false,
         consumption: true,
         agentEvaluator: false,
+        defender: false,
       },
     });
     const fa = t.config.fabricApp;
@@ -698,6 +699,7 @@ test('app: fabricConfigFile lists only the models the app is built with', () => 
       productFeedback: false,
       consumption: false,
       agentEvaluator: false,
+      defender: false,
     },
   });
 });

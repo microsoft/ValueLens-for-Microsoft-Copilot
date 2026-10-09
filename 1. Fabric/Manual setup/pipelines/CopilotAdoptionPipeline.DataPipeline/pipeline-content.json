@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/pipeline/definition/pipeline/1.0.0/schema.json",
   "properties": {
-    "description": "Orchestrates ingestion followed by the Audit Log Processor, which writes copilot_interactions_curated before semantic-model refresh. Core: Audit log + Licensed Users always run; Org Data is optional via EnableOrgDataPull. The processor waits for audit log, licensed users and the Agents 365 branch (Graph API first, CSV fallback if the API step fails) to succeed. Optional sources (M365 activity, Dataverse transcripts, credit consumption, product feedback, Agents 365) are opt-in via their Enable* parameters (default false). Export-only sources (consumption, feedback) require their CSVs to be landed first (manually or via the flows in flows/). Semantic-model refresh is scheduled separately after pipeline success. The loads run in two lanes so a trial or small capacity isn't overloaded: lane 1 loads the audit log, then runs the processor; lane 2 runs the other loads one after another, and a load that fails there doesn't stop the next. Each load retries up to 3 times, 5 minutes apart. See docs/PERMISSIONS.md for roles.",
+    "description": "Orchestrates ingestion followed by the Audit Log Processor, which writes copilot_interactions_curated before semantic-model refresh. Core: Audit log + Licensed Users always run; Org Data is optional via EnableOrgDataPull. The processor waits for audit log, licensed users and the Agents 365 branch (Graph API first, CSV fallback if the API step fails) to succeed. Optional sources (M365 activity, Dataverse transcripts, credit consumption, product feedback, Defender, Agents 365) are opt-in via their Enable* parameters (default false). Export-only sources (consumption, feedback) require their CSVs to be landed first (manually or via the flows in flows/). Semantic-model refresh is scheduled separately after pipeline success. The loads run in two lanes so a trial or small capacity isn't overloaded: lane 1 loads the audit log, then runs the processor; lane 2 runs the other loads one after another, and a load that fails there doesn't stop the next. Each load retries up to 3 times, 5 minutes apart. See docs/PERMISSIONS.md for roles.",
     "activities": [
       {
         "name": "Run_Audit_Log_Ingester",
@@ -152,7 +152,7 @@
         "type": "IfCondition",
         "dependsOn": [
           {
-            "activity": "Conditionally_Run_Product_Feedback",
+            "activity": "Conditionally_Run_Defender",
             "dependencyConditions": ["Completed"]
           }
         ],
@@ -258,6 +258,44 @@
         }
       },
       {
+        "name": "Conditionally_Run_Defender",
+        "description": "Optional. Runs the Defender Ingester (Microsoft Defender advanced hunting through Graph runHuntingQuery, and Defender for Cloud Apps Cloud Discovery -> defender_* Delta tables) only when EnableDefender = true. Needs admin-consented ThreatHunting.Read.All and CloudApp-Discovery.Read.All. Each probe is skipped and recorded in defender_status when the tenant isn't licensed for it, so it never fails the run on its own.",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Conditionally_Run_Product_Feedback",
+            "dependencyConditions": ["Completed"]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@pipeline().parameters.EnableDefender",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Run_Defender_Ingester",
+              "description": "Counts devices and people using AI tools on the watchlist (Files/defender/ai_watchlist.csv), AI apps installed, AI apps seen by Cloud Discovery and agents' sign-in settings. Writes aggregate counts only, no device names or user principal names. Usually a few minutes.",
+              "type": "TridentNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:30:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 300,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "notebookId": "REPLACE_WITH_DEFENDER_NOTEBOOK_ID",
+                "workspaceId": "REPLACE_WITH_WORKSPACE_ID",
+                "parameters": {}
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
         "name": "Conditionally_Run_Agent365",
         "description": "Optional. When EnableAgent365 = true, runs the Agent 365 Registry Ingester (Graph API -> agents_365 Delta table), the primary source. Needs an Agent 365 licence and admin-consented CopilotPackages.Read.All + Application.Read.All + User.Read.All. If it fails (for example 403 with no Agent 365 licence), Run_Agent365_CSV_Fallback lands the exported CSV instead.",
         "type": "IfCondition",
@@ -337,6 +375,10 @@
         "defaultValue": false
       },
       "EnableProductFeedback": {
+        "type": "Boolean",
+        "defaultValue": false
+      },
+      "EnableDefender": {
         "type": "Boolean",
         "defaultValue": false
       },

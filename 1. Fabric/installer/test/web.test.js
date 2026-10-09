@@ -149,6 +149,7 @@ test('what to collect: the essentials are ticked and locked, every extra has a d
     ['productFeedback', false, false],
     ['consumption', false, false],
     ['agentEvaluator', false, false],
+    ['defender', false, false],
   ]);
   for (const ch of choices) assert.match(ch.description, /^From .+\. (Shows|Adds|Lists) /, ch.value);
 

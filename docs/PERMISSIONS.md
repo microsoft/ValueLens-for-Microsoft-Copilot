@@ -41,6 +41,8 @@ reports** is off (Microsoft 365 admin center → Settings → Org settings → S
 | **Cowork credits** | ✅ Viva Insights query via Dataflow Gen2 | The person who signs in to the Dataflow needs the Viva Insights **Insights Analyst** role, and the query on Auto-refresh. | Insights Analyst, for the Consumption Dashboard export |
 | **Agents 365** | ✅ Graph | `CopilotPackages.Read.All` + `Application.Read.All` (+ `User.Read.All` to resolve creators and, on Fabric, check whether each owner's account is still active), admin-consented, **and an Agent 365 licence** in the tenant (else `403`). Used by `Copilot_Agent365_Registry_Ingester` (Fabric) and `Get-Agents365Registry.ps1` (every other path). | Global Administrator or Reports Reader (with **AI Admin** in a Frontier-enrolled tenant), for the CSV fallback via the admin centre |
 
+| **Defender** (shadow AI and agent risk) | ? Graph | `ThreatHunting.Read.All` for advanced hunting (`POST /security/runHuntingQuery`: devices, installed software and AI agents), and `CloudApp-Discovery.Read.All` for Cloud Discovery, admin-consented. **Licences:** Defender for Endpoint P2 (or Microsoft Defender XDR) for the device and agent probes, Defender for Cloud Apps for Cloud Discovery. A probe without its permission or licence is skipped and logged in `defender_status`; the rest of the load carries on. Used by `Copilot_Defender_Ingester` (Fabric) and the `defender` module of the Azure jobs. | None: there is no export |
+
 For the **export-only** source, the only "permission" to automate landing is the automation's **OneLake write**
 right (next section) — the data itself must be exported by an admin (or a scheduled portal export) first.
 

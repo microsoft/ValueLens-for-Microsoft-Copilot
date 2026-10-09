@@ -278,7 +278,8 @@ turned on:
     "agent365": false,
     "productFeedback": false,
     "consumption": false,
-    "agentEvaluator": false
+    "agentEvaluator": false,
+    "defender": false
   }
 }
 ```
@@ -380,6 +381,7 @@ this installer ignore it and run as usual: run `update` first if yours is.
 | Copilot Cowork credits | **Connected (Dataflow)**: a Dataflow Gen2 reads your Viva Insights query | Viva Insights > Copilot Consumption Dashboard > **Export** | Consumption Central |
 | Azure AI costs | Yes | | Consumption Central |
 | Agent Evaluator | Yes | | Agent Evaluator |
+| Defender (shadow AI and agent risk) | Yes, through Microsoft Graph. Needs Defender for Endpoint P2 or Defender for Cloud Apps | | Governance: Shadow AI and the *No sign-in required* flag |
 
 A skipped source leaves its table empty and its page blank. Nothing fails. To turn one on later,
 choose **Repair or change**.
@@ -480,7 +482,8 @@ addresses, the M365 Copilot licence flag and the exact prepaid split.
 | Run only the loads that failed last time | `rerun-failed` |
 
 Source IDs for `--data`: `workday`, `m365Activity`, `agent365`, `productFeedback`,
-`studioCredits`, `coworkCredits`, `azureAi`, `agentEvaluator`. Modes: `api`, `csv` or `skip`.
+`studioCredits`, `coworkCredits`, `azureAi`, `agentEvaluator`, `defender`. Modes: `api`, `csv` or
+`skip` (`defender` has no CSV).
 For `productFeedback` and `studioCredits`, `flow` is the same as `api`. `--feedback-flow` still
 works: it's the same as `productFeedback=flow`.
 Without `--flow-environment`, the installer asks which environment to use.
@@ -528,6 +531,29 @@ doesn't rewrite those notebooks. For the other two:
 If you can't assign Azure roles, ask an Owner or User Access Administrator to give the app
 registration Reader, Cost Management Reader and Monitoring Reader on the subscription. Then
 choose **Repair or change**.
+
+## Defender (shadow AI and agent risk)
+
+Optional and off by default, on the Fabric and the Azure target. It fills the **Shadow AI** section of
+the app's **Governance** page, and gives the Agent 365 registry a *No sign-in required* flag.
+
+- **What it reads.** Microsoft Defender advanced hunting, through Microsoft Graph
+  `POST /security/runHuntingQuery` (`ThreatHunting.Read.All`), and Cloud Discovery in Defender for
+  Cloud Apps (`CloudApp-Discovery.Read.All`). The installer asks for both permissions; a tenant that
+  doesn't offer one yet gets a warning and that part is skipped.
+- **Four probes, each on its own.** Devices that ran or reached a watched AI tool, devices with one
+  installed, AI agents and whether they need sign-in, and generative AI apps in Cloud Discovery. A
+  probe the tenant isn't licensed for, or can't read, is recorded in `defender_status` and skipped.
+  The rest of the load carries on, and the page says what didn't load.
+- **Licences.** The device and agent probes need Defender for Endpoint P2 (or Microsoft Defender
+  XDR); Cloud Discovery needs Defender for Cloud Apps. The prerequisite check looks for them.
+- **The watchlist.** The first run writes a starting list of AI tools to
+  `Files/defender/ai_watchlist.csv` (Fabric) or the `landing` container's
+  `defender/ai_watchlist.csv` (Azure). Edit it to add tools, and set each tool's `Posture` to
+  `Sanctioned`, `Unsanctioned` or `Not reviewed` (the default). Sanctioned tools aren't shadow AI, so
+  the page leaves them out.
+- **It's a floor, not a census.** Defender sees only onboarded devices and the tools on the
+  watchlist. See [Methodology](../../docs/METHODOLOGY.md#shadow-ai-what-other-ai-tools-are-in-use).
 
 ## Agent Evaluator
 

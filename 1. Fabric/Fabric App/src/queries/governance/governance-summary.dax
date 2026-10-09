@@ -8,6 +8,7 @@ RETURN
     ROW(
         "Tenant Agents", COUNTROWS(__Tenant) + 0,
         "Needs Review", COUNTROWS(FILTER(__Tenant, NOT ISBLANK('Agents 365'[Governance Flags]))) + 0,
+        "No Sign In", COUNTROWS(FILTER(__Tenant, CONTAINSSTRING('Agents 365'[Governance Flags], "No sign-in required"))) + 0,
         "Owner Left", COUNTROWS(FILTER(__Tenant, CONTAINSSTRING('Agents 365'[Governance Flags], "Owner has left"))) + 0,
         "No Owner", COUNTROWS(FILTER(__Tenant, CONTAINSSTRING('Agents 365'[Governance Flags], "No owner on record"))) + 0,
         "Org Wide Org Data", COUNTROWS(FILTER(__Tenant, CONTAINSSTRING('Agents 365'[Governance Flags], "Org-wide with org data"))) + 0,

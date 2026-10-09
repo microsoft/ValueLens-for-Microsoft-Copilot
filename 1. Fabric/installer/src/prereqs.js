@@ -30,6 +30,9 @@ const MAX_ENVIRONMENTS = 20;
 /** Power BI Pro and Premium Per User service plans. */
 const PRO_PLANS = { BI_AZURE_P2: 'Power BI Pro', BI_AZURE_P3: 'Power BI Premium Per User' };
 
+/** Service plans that give Defender advanced hunting over devices, or Cloud Discovery. */
+export const DEFENDER_PLANS = { WINDEFATP: 'Defender for Endpoint P2', MTP: 'Microsoft Defender XDR', ADALLOM_S_STANDALONE: 'Defender for Cloud Apps' };
+
 const AZURE_ROLE_NAMES = {
   [ROLES.owner]: 'Owner',
   [ROLES.contributor]: 'Contributor',
@@ -290,6 +293,29 @@ export async function checkPrereqs(ctx) {
         return { status, detail: `System Administrator in ${admin} of ${rows.length} ${rows.length === 1 ? 'environment' : 'environments'}.${more}`, rows };
       },
     ),
+    ...(config.modules.defender
+      ? [
+          guard(
+            {
+              id: 'defender-licence',
+              label: 'Microsoft Defender for Endpoint P2 or Defender for Cloud Apps',
+              neededFor: 'The Defender source: shadow AI on devices needs Defender for Endpoint P2, Cloud Discovery needs Defender for Cloud Apps.',
+              howTo: 'Carry on without it: probes the tenant isn\'t licensed for are skipped, and the Shadow AI section says which.',
+              optional: true,
+            },
+            async () => {
+              const found = (await api.graph.subscribedSkus())
+                .filter((s) => (s.capabilityStatus ?? 'Enabled') === 'Enabled')
+                .flatMap((s) => s.servicePlans ?? [])
+                .map((p) => DEFENDER_PLANS[/** @type {keyof typeof DEFENDER_PLANS} */ (p.servicePlanName)])
+                .filter(Boolean);
+              return found.length
+                ? { status: 'met', detail: [...new Set(found)].join(', ') }
+                : { status: 'missing', detail: 'No Defender for Endpoint P2, Defender XDR or Defender for Cloud Apps plan found in this tenant.' };
+            },
+          ),
+        ]
+      : []),
     guard(
       {
         id: 'tenant-settings',

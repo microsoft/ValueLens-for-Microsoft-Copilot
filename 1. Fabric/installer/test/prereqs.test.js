@@ -27,6 +27,7 @@ function fakeApis(over = {}) {
       myEligibleRoles: over.eligible ?? (async () => []),
       myGroupIds: async () => ['group-1'],
       myLicenseDetails: async () => over.licences ?? [{ servicePlans: [{ servicePlanName: 'BI_AZURE_P2', provisioningStatus: 'Success' }] }],
+      subscribedSkus: over.skusFn ?? (async () => over.skus ?? []),
       usersCanRegisterApps: async () => over.usersCanRegister ?? true,
     },
     arm: {
@@ -190,4 +191,21 @@ test('graph and ARM lookups keep only rows for the signed-in user\'s principals,
   assert.equal(queries[1][1].$filter, "assignedTo('user-1')");
   assert.deepEqual((await arm.myEligibleRoles('/subscriptions/s', ids)).map((r) => r.properties.principalId), [USER.id, 'group-1']);
   assert.equal(queries[2][1].$filter, 'asTarget()');
+});
+
+test('checkPrereqs: the Defender licence check only shows when Defender is picked, and is optional', async () => {
+  assert.equal((await run({}))['defender-licence'], undefined);
+  const config = emptyConfig();
+  config.modules.defender = true;
+  const none = await run({}, config);
+  assert.equal(none['defender-licence'].status, 'missing');
+  assert.equal(none['defender-licence'].optional, true);
+  assert.match(none['defender-licence'].howTo, /skipped/);
+  const p2 = await run({ skus: [{ capabilityStatus: 'Enabled', servicePlans: [{ servicePlanName: 'WINDEFATP' }, { servicePlanName: 'ADALLOM_S_STANDALONE' }] }] }, config);
+  assert.equal(p2['defender-licence'].status, 'met');
+  assert.match(p2['defender-licence'].detail, /Defender for Endpoint P2, Defender for Cloud Apps/);
+  const lapsed = await run({ skus: [{ capabilityStatus: 'Suspended', servicePlans: [{ servicePlanName: 'WINDEFATP' }] }] }, config);
+  assert.equal(lapsed['defender-licence'].status, 'missing');
+  const unreadable = await run({ skusFn: async () => { throw new HttpError('403', { method: 'GET', url: 'x', status: 403 }); } }, config);
+  assert.equal(unreadable['defender-licence'].status, 'unknown');
 });

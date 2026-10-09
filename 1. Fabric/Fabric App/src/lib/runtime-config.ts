@@ -44,6 +44,8 @@ export interface RuntimeModules {
     productFeedback: boolean;
     consumption: boolean;
     agentEvaluator: boolean;
+    /** Absent from installs made before the Defender module existed. */
+    defender?: boolean;
 }
 
 export class RuntimeConfigError extends Error {
@@ -212,7 +214,8 @@ export function parseModules(json: unknown): RuntimeModules | undefined {
 
     const keys = ["m365Activity", "agent365", "productFeedback", "consumption", "agentEvaluator"] as const;
     if (!keys.every((key) => typeof modules[key] === "boolean")) return undefined;
-    return Object.fromEntries(keys.map((key) => [key, modules[key]])) as unknown as RuntimeModules;
+    const parsed = Object.fromEntries(keys.map((key) => [key, modules[key]])) as unknown as RuntimeModules;
+    return typeof modules.defender === "boolean" ? { ...parsed, defender: modules.defender } : parsed;
 }
 
 function queryRequestsTeams(): boolean {

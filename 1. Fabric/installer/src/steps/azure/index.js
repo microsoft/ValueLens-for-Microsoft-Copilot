@@ -11,7 +11,7 @@ import { HttpError } from '../../http.js';
 import { commandLine } from '../../launch.js';
 import { buildConsumptionModel, buildModel, loadTemplateModel, PBISM } from '../../transform/model.js';
 import { deployModel, modelSignature, REFRESH_POLL_MS } from '../model.js';
-import { addMonths, SECRET_LIFETIME_MONTHS } from '../identity.js';
+import { addMonths, OPTIONAL_PERMISSION_EFFECTS, OPTIONAL_PERMISSIONS, SECRET_LIFETIME_MONTHS } from '../identity.js';
 import { writeTeamsPackage } from '../../azure/teams.js';
 import { APP_ALIAS, CONSUMPTION_ALIAS } from '../app.js';
 import { AZURE_AI_ROLES, ensureAzureAiAccess, planConsumption } from '../consumption.js';
@@ -27,7 +27,7 @@ export const PRIVATE_FEATURE = /** @type {[string, string]} */ (['Microsoft.Netw
 /** Capacities that can host a Power BI VNet data gateway: F (including trial), P and A4+; not PPU, EM or A1-A3. */
 export const supportsVnetGateway = (/** @type {{ sku?: string }} */ cap) => /^(F|FT|P\d|A[4-9])/i.test(String(cap.sku ?? '')) && !/^PP/i.test(String(cap.sku ?? ''));
 export const isPrivate = (/** @type {import('../../config.js').AzureConfig | undefined} */ az) => az?.publicNetworkAccess === false;
-export const AZURE_SUPPORTED_MODULES = /** @type {const} */ (['core', 'orgData', 'm365Activity', 'consumption']);
+export const AZURE_SUPPORTED_MODULES = /** @type {const} */ (['core', 'orgData', 'm365Activity', 'consumption', 'defender']);
 export const WEB_APP_NAME = 'Analytics Hub (Azure)';
 export const SQL_READER_NAME = 'Analytics Hub SQL Reader';
 export const TEAMS_CLIENTS = ['1fec8e78-bce4-4aaf-ab1b-5451cc387264', '5e3ce6c0-2b1f-4285-8d4b-75ee78787346'];
@@ -146,8 +146,9 @@ export async function planAzure(ctx, pre) {
 
   ui.heading('What to collect');
   const picked = await ui.checkbox('Tick the data you want. Unsupported modules are coming soon on Azure.', azureModuleChoices(config.modules));
-  config.modules = /** @type {import('../../catalog.js').ModuleChoice} */ ({ orgData: true, m365Activity: picked.includes('m365Activity'), agent365: false, productFeedback: false, consumption: picked.includes('consumption'), agentEvaluator: false });
+  config.modules = /** @type {import('../../catalog.js').ModuleChoice} */ ({ orgData: true, m365Activity: picked.includes('m365Activity'), agent365: false, productFeedback: false, consumption: picked.includes('consumption'), agentEvaluator: false, defender: picked.includes('defender') });
   config.dataSources.productFeedback = 'skip';
+  config.dataSources.defender = config.modules.defender ? 'api' : 'skip';
   az.sampleData = await ui.select('Which data should the dashboard show?', [
     { name: "Your tenant's data", value: false, description: 'Collect from the audit log, Microsoft Graph and the modules you ticked.' },
     { name: 'Demo mode (sample data)', value: true, description: 'Show a synthetic sample, moved forward to end last week, to try Analytics Hub before connecting tenant data. Run the installer again and pick your tenant\'s data to switch.' },
@@ -842,7 +843,10 @@ async function assignManagedIdentityGraphRoles(ctx) {
   if (!principalId) throw new Error('The ARM deployment did not return identityPrincipalId.');
   const graphSp = await api.graph.graphServicePrincipal();
   const wanted = azureGraphRoles(config);
-  const { roles } = resolveAppRoles(graphSp, wanted);
+  const { roles, missing } = resolveAppRoles(graphSp, wanted, OPTIONAL_PERMISSIONS);
+  for (const m of missing) {
+    ui.warn(`Microsoft Graph in this tenant has no ${m} permission yet. ${OPTIONAL_PERMISSION_EFFECTS[/** @type {keyof typeof OPTIONAL_PERMISSION_EFFECTS} */ (m)] ?? ''}`.trim());
+  }
   az.graphRoles ??= { assigned: [], pending: [] };
   for (const role of roles) {
     if (az.graphRoles.assigned.includes(role.value)) continue;

@@ -164,7 +164,7 @@ test('product feedback: the Power Automate route is its own mode; a record with 
 test('modulesFromSources, routedSources and routerWanted', () => {
   const ds = defaultDataSources();
   assert.equal(routerWanted(ds), false, 'nothing arrives as a CSV by default');
-  assert.deepEqual(modulesFromSources(ds), { orgData: true, m365Activity: true, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false });
+  assert.deepEqual(modulesFromSources(ds), { orgData: true, m365Activity: true, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false, defender: false });
   ds.productFeedback = 'csv';
   ds.agent365 = 'api';
   assert.deepEqual(routedSources(ds), ['productFeedback', 'agent365'], 'Agent 365 on the API still takes its export');

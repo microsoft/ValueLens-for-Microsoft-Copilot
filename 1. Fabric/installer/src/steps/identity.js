@@ -33,8 +33,13 @@ export class ResumeLater extends Error {
 /** @param {unknown} err */
 export const isResumeLater = (err) => /** @type {Error | undefined} */ (err)?.name === 'ResumeLater';
 
-/** Preview permissions that some tenants don't have yet. Their module falls back gracefully. */
-export const OPTIONAL_PERMISSIONS = ['CopilotPackages.Read.All'];
+/** Permissions some tenants don't have yet, and what happens without them. Their module falls back gracefully. */
+export const OPTIONAL_PERMISSION_EFFECTS = {
+  'CopilotPackages.Read.All': 'The Agent 365 registry will fall back to its CSV export.',
+  'ThreatHunting.Read.All': "Defender's device and agent probes will be skipped.",
+  'CloudApp-Discovery.Read.All': "Defender's Cloud Discovery probe will be skipped.",
+};
+export const OPTIONAL_PERMISSIONS = Object.keys(OPTIONAL_PERMISSION_EFFECTS);
 
 /** @param {unknown} err @param {number} status */
 const isStatus = (err, status) => err instanceof HttpError && err.status === status;
@@ -61,7 +66,7 @@ export async function graphRoles(ctx) {
     const sp = await ctx.api.graph.graphServicePrincipal();
     const { roles, missing } = resolveAppRoles(sp, permissionsFor(ctx.config.modules, ctx.config.dataSources), OPTIONAL_PERMISSIONS);
     for (const m of missing) {
-      ctx.ui.warn(`Microsoft Graph in this tenant has no ${m} permission yet. The Agent 365 registry will fall back to its CSV export.`);
+      ctx.ui.warn(`Microsoft Graph in this tenant has no ${m} permission yet. ${OPTIONAL_PERMISSION_EFFECTS[/** @type {keyof typeof OPTIONAL_PERMISSION_EFFECTS} */ (m)] ?? ''}`.trim());
     }
     ctx.graphRoles = { sp, roles };
   }
