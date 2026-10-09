@@ -123,6 +123,7 @@ Open `ValueLens - Power Automate + Dataverse.pbit` and set:
 | Parameter | Setting |
 |---|---|
 | `Dataverse URL` | Your Dataverse environment origin. |
+| `SharePoint Site URL` | The SharePoint site that holds `Agent 365`, `Feedback File` and any CSV fallback files. If you use no SharePoint files, set it to the `Dataverse URL` value. |
 | `Core Snapshot ID` | The successful run ID from step 4. |
 | `Use SharePoint CSV fallback` | `false`. |
 | `Copilot Interactions File` | Leave blank unless you intentionally use CSV fallback. |
@@ -130,7 +131,9 @@ Open `ValueLens - Power Automate + Dataverse.pbit` and set:
 | `Agent 365` | Optional SharePoint URL to `agents_365.csv` from [`Get-Agents365Registry.ps1`](../4.%20SharePoint/scripts/Get-Agents365Registry.ps1) or [`Upload-Rollups-SharePoint.ps1 -Agents365Csv`](../4.%20SharePoint/scripts/Upload-Rollups-SharePoint.ps1). |
 | `Feedback File` | Optional SharePoint URL to the Microsoft 365 admin centre feedback export. |
 
-Publish the report. Set organizational credentials for Dataverse, and for SharePoint only if you use optional SharePoint URLs or CSV fallback.
+For scheduled refresh in the Power BI service, set both `Dataverse URL` and `SharePoint Site URL`. The service needs a value for every data source URL, even one a refresh doesn't read. With CSV fallback and no Dataverse, set `Dataverse URL` to the `SharePoint Site URL` value. Then one credential covers both.
+
+Publish the report. Set organizational credentials for each data source listed in the semantic model settings.
 
 ## Refresh and keep it running
 
@@ -156,6 +159,7 @@ The runner does not update Power BI parameters, trigger Power BI refresh, or del
 | PBIT refuses a snapshot | Use a completed `Core Snapshot ID` from `poc_valuelensruns`; all core tables must have matching row counts for that run. |
 | Dashboard does not change after the schedule runs | Manually advance `Core Snapshot ID` to the new run ID, then refresh Power BI. |
 | Agent catalogue details are blank | Provide an `Agent 365` URL to `agents_365.csv`; audit data alone does not create that catalogue. |
+| "You can't schedule refresh ... don't support refresh: Data source for Query1" | Republish from the current template, and set both `Dataverse URL` and `SharePoint Site URL` (the same value if you use only one source). |
 | A large audit row fails to write | Dataverse memo fields reject payloads above 1,048,576 characters. The helper fails rather than truncates. |
 | `Invoke-CopilotAuditRawCapture.ps1` says the audit query `did not succeed after N attempt(s)` | Purview ended the query as failed or cancelled, or it timed out, and each new query did too. Run it again later with a shorter `-StartDate`/`-EndDate` window, and no other audit searches running. `-QueryRetries` (default 2) sets how many new queries it sends. |
 

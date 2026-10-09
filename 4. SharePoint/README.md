@@ -67,8 +67,11 @@ Use [`scripts/README.md`](scripts/README.md) for the full parameter reference. R
    |---|---|
    | Copilot Interactions File | `https://<tenant>.sharepoint.com/.../copilot_interactions_rollup.csv` |
    | Org Data File | `https://<tenant>.sharepoint.com/.../copilot_users_rollup.csv` |
+   | SharePoint Site URL | The site that holds the optional files, for example `https://<tenant>.sharepoint.com/sites/<site>`, or `https://<tenant>.sharepoint.com` for files in the root site |
    | Agent 365 | Blank, or `https://<tenant>.sharepoint.com/.../agents_365.csv` |
    | Feedback File | Blank, or a SharePoint URL to the admin-centre feedback export |
+
+   The optional files are read through **SharePoint Site URL**, so scheduled refresh works in the Power BI service whether they're blank or set. They must be in that site. Set **SharePoint Site URL** even when both optional files are blank.
 
 7. Select **Load**, then **Publish** to your Power BI workspace.
 
@@ -89,7 +92,7 @@ Use [`scripts/README.md`](scripts/README.md) for the full parameter reference. R
 
    Add `-IncludeAgent365Info`, `-Agents365Csv <admin-centre-agents-export.csv>`, or `-RunAsUser DOMAIN\svc_aibv` if needed. The task name is `AIBV-Rollup-Refresh`; it runs `Run-PAX-AIBV.ps1` and then `Upload-Rollups-SharePoint.ps1`.
 
-2. In Power BI Service, open the semantic model **Settings**. Under **Data source credentials**, sign in to SharePoint and set **Privacy level** to **None**. Under **Scheduled refresh**, turn it on and schedule it after the extract, for example extract at `02:00` and refresh at `04:00`.
+2. In Power BI Service, open the semantic model **Settings**. Under **Data source credentials**, sign in to SharePoint (**OAuth2**) for each listed source and set **Privacy level** to **None**. If the tenant-root site URL fails the connection test, tick **Skip test connection** for it. Under **Scheduled refresh**, turn it on and schedule it after the extract, for example extract at `02:00` and refresh at `04:00`.
 
 3. Check or run the scheduled task when needed.
 
@@ -110,6 +113,8 @@ Use [`scripts/README.md`](scripts/README.md) for the full parameter reference. R
 | `403 Forbidden` on upload | Re-run `ProvisionSiteAccess-SP-AppReg.ps1` and confirm the app has write access to the target site. |
 | `404 Not Found` on upload | Create the `-FolderPath` in SharePoint, or use `/` for the library root. |
 | Power BI refresh cannot authenticate | Re-enter SharePoint credentials in the semantic model settings and set privacy level to **None**. |
+| "You can't schedule refresh for this semantic model because the following data sources currently don't support refresh: Data source for Query1" | The model was published from a template older than this fix, which built the feedback file URL in M. Republish from the current `ValueLens - SharePoint.pbit` and set **SharePoint Site URL**, then set credentials for each listed source. |
+| Refresh error `FileOutsideSharePointSite` or `MissingSharePointSiteUrl` | Set **SharePoint Site URL** to the https site that holds the `Agent 365` and `Feedback File` files, with no spaces around it. |
 | Agent 365 export returns `403` | Add the Agent 365 licence and permissions, or use `-Agents365Csv <admin-centre-agents-export.csv>`. |
 | Refresh hits the 1 GB or 2-hour Power BI Pro limit | Move to [`../1. Fabric/README.md`](../1.%20Fabric/README.md). |
 
