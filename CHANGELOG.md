@@ -17,6 +17,47 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased
+
+**Update an existing install:** choose **Repair or change** when the client secret is in Key Vault.
+If you keep the secret in the notebooks, run `AnalyticsHubInstaller.exe update` instead: Repair
+doesn't rewrite those notebooks.
+
+### Fix: Azure capacity, reconciliation and solution spend pages are blank
+
+**Symptom.** In Consumption Central, **10. Azure: Capacity & Health**, **10.1 Billing:
+Reconciliation** and the Foundry solution spend visuals are empty on a real install, even with
+Azure OpenAI deployments in the subscription. `AzureAiSpend` and `AzureAiTokens` have rows;
+`AzureDeploymentHealth`, `AzureBillingReconciliation` and `AzureSolutionSpend` have none.
+
+**Cause.** Nothing wrote `azure_deployment_health`, `azure_billing_reconciliation` or
+`azure_solution_spend`. Only the sample data had them.
+
+**Fix.** `Ingest_Azure_AI` now writes all three after its existing tables, best-effort:
+
+- **Deployment health**, by month and deployment: model, version, SKU, region and PTU capacity
+  from ARM, then requests, 429s, 5xx, latency and provisioned utilisation from Azure Monitor. The
+  metric calls are batched per account and window, and a failed batch is retried one metric at a
+  time. Standard and GlobalStandard deployments have no PTU capacity or utilisation.
+- **Solution spend**, by day, resource and service: actual and amortized cost from Cost
+  Management for the AI services and the resources in the AI accounts' resource groups, with
+  pay-as-you-go token cost, Monitor tokens and requests, and tags.
+- **Billing reconciliation**, by month, service and pool: metered quantity times the public
+  Retail Prices API list rate, compared with the actual cost. List prices exclude negotiated
+  discounts. Meters with no retail price show as `Unpriced`.
+
+An account, deployment or metric that fails is logged as a `WARNING` and skipped. A table whose
+source fails entirely is left as it was, and the existing three tables are unaffected. The
+existing Reader, Cost Management Reader and Monitoring Reader roles are enough.
+
+The Local CSV and SharePoint script `pull_azure_ai.py` writes the same three files with the same
+logic. The Azure (preview) path has no Consumption Central collector yet, and the Power Automate +
+Dataverse flows don't fill these tables; import the script's CSVs there. Speech hours, document
+pages and images aren't collected. The reconciliation page's context text still describes the
+sample data.
+
+---
+
 ## 2026-10-09 — Analytics Hub installer 0.3.5
 
 **Update an existing install:** download installer 0.3.5, open it and choose **Repair or change**.

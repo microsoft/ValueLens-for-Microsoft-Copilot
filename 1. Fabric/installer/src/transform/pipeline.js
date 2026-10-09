@@ -111,7 +111,7 @@ export const CONSUMPTION_ACTIVITIES = /** @type {const} */ ([
   {
     key: 'azureAi',
     name: 'Run_Consumption_Azure_AI',
-    description: 'Azure AI spend from Cost Management and token use from Azure Monitor for one subscription, plus Copilot pay-as-you-go from each billing policy\'s subscription. Writes azure_ai_spend, azure_ai_tokens and copilot_payg_spend.',
+    description: 'Azure AI spend from Cost Management and token use from Azure Monitor for one subscription, plus Copilot pay-as-you-go from each billing policy\'s subscription. Writes azure_ai_spend, azure_ai_tokens and copilot_payg_spend, then best-effort azure_deployment_health, azure_solution_spend and azure_billing_reconciliation.',
     timeout: '0.01:00:00',
   },
   {
