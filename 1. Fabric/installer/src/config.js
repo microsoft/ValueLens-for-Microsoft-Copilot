@@ -30,6 +30,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {SemanticModelConfig} semanticModel
  * @property {FabricAppConfig} fabricApp
  * @property {AzureConfig} [azure]
+ * @property {AccessConfig} [access]  Who can view Analytics Hub. Absent until the installer has set it up.
  * @property {ConsumptionConfig} consumption
  * @property {AgentEvaluatorConfig} agentEvaluator
  * @property {ResourceGraphConfig} resourceGraph
@@ -43,6 +44,17 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {boolean} foundry  Read Foundry resources and projects.
  * @property {boolean} [access]  The app has Reader on the management group.
  * @property {boolean} [azureAccess]  The jobs' managed identity has Reader on the management group.
+ */
+
+/**
+ * The one Entra group whose members can view Analytics Hub, on either target.
+ * @typedef {object} AccessConfig
+ * @property {string} [groupId]
+ * @property {string} [groupName]
+ * @property {boolean} [createdGroup]  The installer created the group, rather than being given one.
+ * @property {string} [contact]  Who people ask for access. Defaults to the installer.
+ * @property {string} [requestUrl]  Optional link for access requests, e.g. a My Access package or a form.
+ * @property {string[]} [grantedModels]  Semantic model IDs the group has Build (ReadExplore) on.
  */
 
 /**
@@ -302,6 +314,7 @@ export function loadConfig(file) {
     fabric: { ...base.fabric, ...(raw.fabric ?? {}), notebooks: { ...(raw.fabric?.notebooks ?? {}) } },
     semanticModel: { ...base.semanticModel, ...(raw.semanticModel ?? {}) },
     fabricApp: { ...(raw.fabricApp ?? {}) },
+    ...(raw.access ? { access: { ...raw.access, grantedModels: [...(raw.access.grantedModels ?? [])] } } : {}),
     azure: {
       ...base.azure,
       ...(raw.azure ?? {}),

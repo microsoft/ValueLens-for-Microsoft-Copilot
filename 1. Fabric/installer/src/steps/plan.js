@@ -23,6 +23,7 @@ import { describeSchedule, displayNames, freeName, PIPELINE_NAME } from './fabri
 import { connectionName } from './model.js';
 import { reportsWanted } from './report.js';
 import { planDataSources } from './data-sources.js';
+import { accessReview, planAccess } from './access.js';
 import { DATA_SOURCES, modulesFromSources, routerWanted, UPLOAD_DIR } from '../uploads.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
@@ -320,6 +321,7 @@ export async function plan(ctx, pre) {
   await planDataSources(ctx);
 
   await planPowerBi(ctx, pre);
+  if (config.semanticModel.enabled) await planAccess(ctx);
   if (config.modules.consumption) {
     await planConsumption(ctx, pre);
     await planCowork(ctx);
@@ -888,6 +890,8 @@ export function planReview(ctx, pre) {
       creates.push({ kind: 'Report', name: w.model.report?.name ?? w.name, isNew: !w.model.report?.id, detail: `From its Power BI template, reading ${w.model.name}.` });
     }
   }
+  const access = sm.enabled ? accessReview(config, `Semantic models in workspace ${f.workspaceName ?? f.workspaceId}`) : { creates: [], grants: [] };
+  creates.push(...access.creates);
 
   const appWho = `${appName} (app)`;
   /** @type {ReviewGrant[]} */
@@ -919,6 +923,7 @@ export function planReview(ctx, pre) {
     });
   }
   if (sm.enabled) grants.push({ who: appWho, what: 'Viewer', where: `Workspace ${f.workspaceName ?? f.workspaceId}`, detail: 'So the semantic models can read the Lakehouse.' });
+  grants.push(...access.grants);
   const flows = flowsWanted(config);
   if (flows.length && flowIdentity(config) === 'app') {
     grants.push({ who: appWho, what: 'Contributor', where: `Workspace ${f.workspaceName ?? f.workspaceId}`, detail: 'So the Power Automate flows can save files to the drop folder.' });

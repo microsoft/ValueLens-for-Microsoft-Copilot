@@ -86,6 +86,12 @@ const COMMANDS = {
     desc: 'Replace the app\'s client secret in Key Vault (or show a vault admin the steps), or in the notebooks, and the model connection\'s.',
     off: 'There is no app registration or client secret yet.',
   },
+  access: {
+    title: 'Manage access', short: 'Access', icon: 'shield', section: 'Viewer access',
+    row: 'Manage access', button: 'Manage access',
+    desc: 'Choose the viewer group, add viewers or owners, and give the group Build on the models again. To share Analytics Hub, add people to the group.',
+    off: 'Viewers need the semantic model first.',
+  },
   upload: {
     title: 'Upload data', short: 'Upload', icon: 'upload', section: 'Upload',
     row: 'Upload exports', button: 'Upload',
@@ -104,7 +110,7 @@ const COMMANDS = {
     desc: 'See which roles, licences, capacities and Azure access you have and which are missing. Changes nothing.',
   },
 };
-const ROW_ORDER = ['run', 'rerun-failed', 'refresh', 'status', 'upload', 'check', 'update', 'deploy-app', 'rotate-secret', 'uninstall', 'install'];
+const ROW_ORDER = ['run', 'rerun-failed', 'refresh', 'status', 'upload', 'check', 'update', 'deploy-app', 'access', 'rotate-secret', 'uninstall', 'install'];
 
 const INSTALL_STAGES = [
   'Sign in', 'Checking your tenant', 'Data sources', 'Power BI', 'Fabric', 'App registration',

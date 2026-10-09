@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { HttpError } from '../http.js';
+import { publicAccess } from './access.js';
 import { agentEvaluatorModelDeployed, consumptionModelDeployed, createdId, displayNames, freeName, noteRenamed } from './fabric.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
@@ -440,7 +441,7 @@ export function fabricConfigFile(config, ws, models) {
     [CONSUMPTION_ALIAS]: config.consumption.model.id,
     [EVALUATOR_ALIAS]: config.agentEvaluator.model.id,
   };
-  /** @type {{ semanticModels: Record<string, { workspaceId: string, itemId: string | undefined }>, modules?: Record<string, boolean>, reporting?: import('../currency.js').ReportingConfig }} */
+  /** @type {{ semanticModels: Record<string, { workspaceId: string, itemId: string | undefined }>, modules?: Record<string, boolean>, reporting?: import('../currency.js').ReportingConfig, access?: Record<string, string> }} */
   const body = { semanticModels: Object.fromEntries(models.map((alias) => [alias, { workspaceId: ws, itemId: ids[alias] }])) };
   if (config.modules) {
     body.modules = {
@@ -451,6 +452,8 @@ export function fabricConfigFile(config, ws, models) {
     };
   }
   if (config.reporting) body.reporting = { ...config.reporting };
+  const access = publicAccess(config);
+  if (access) body.access = access;
   return body;
 }
 

@@ -79,6 +79,17 @@ export function graphApi(http) {
     }
   }
 
+  /** @param {string} path @param {string} objectId */
+  async function addRef(path, objectId) {
+    try {
+      await http.post(path, { '@odata.id': `https://graph.microsoft.com/v1.0/directoryObjects/${objectId}` });
+      return true;
+    } catch (err) {
+      if (err instanceof HttpError && err.status === 400 && /already exist/i.test(JSON.stringify(err.body ?? err.message))) return false;
+      throw err;
+    }
+  }
+
   return {
     me: () => http.get('/me', { query: { $select: 'id,displayName,userPrincipalName' } }),
     organization: async () => (await http.get('/organization', { query: { $select: 'id,displayName' } })).value?.[0],
@@ -132,7 +143,7 @@ export function graphApi(http) {
       }),
     /**
      * Creates the Azure-hosted web application registration.
-     * @param {{ displayName: string, fqdn: string, pbiScopeId: string, graphUserReadScopeId: string, teamsClientIds: string[] }} o
+     * @param {{ displayName: string, fqdn: string, pbiScopeId: string, graphUserReadScopeId: string, graphGroupScopeId?: string, groupClaims?: boolean, teamsClientIds: string[] }} o
      */
     createAzureWebApplication(o) {
       const scopeId = crypto.randomUUID();
@@ -163,21 +174,24 @@ export function graphApi(http) {
         ],
         requiredResourceAccess: [
           { resourceAppId: POWER_BI_APP_ID, resourceAccess: [{ id: o.pbiScopeId, type: 'Scope' }] },
-          { resourceAppId: GRAPH_APP_ID, resourceAccess: [{ id: o.graphUserReadScopeId, type: 'Scope' }] },
+          { resourceAppId: GRAPH_APP_ID, resourceAccess: [o.graphUserReadScopeId, ...(o.graphGroupScopeId ? [o.graphGroupScopeId] : [])].map((id) => ({ id, type: 'Scope' })) },
         ],
+        ...(o.groupClaims ? { groupMembershipClaims: 'SecurityGroup' } : {}),
         notes: 'Created by the Analytics Hub installer for the Azure-hosted web app.',
       });
     },
 
     /**
      * @param {any} application
-     * @param {{ fqdn: string, clientId: string, pbiScopeId: string, graphUserReadScopeId: string, teamsClientIds: string[] }} o
+     * @param {{ fqdn: string, clientId: string, pbiScopeId: string, graphUserReadScopeId: string, graphGroupScopeId?: string, groupClaims?: boolean, teamsClientIds: string[] }} o
      */
     async updateAzureWebApplication(application, o) {
       const scope = application.api?.oauth2PermissionScopes?.find((s) => s.value === 'access_as_user') ?? { id: crypto.randomUUID() };
       await http.patch(`/applications/${application.id}`, {
         spa: { redirectUris: [`https://${o.fqdn}/`, `https://${o.fqdn}/?host=teams&auth=popup`] },
         identifierUris: [`api://${o.fqdn}/${o.clientId}`],
+        // The web app lets the viewer group in by the groups claim.
+        groupMembershipClaims: o.groupClaims ? 'SecurityGroup' : application.groupMembershipClaims ?? null,
         api: {
           ...(application.api ?? {}),
           oauth2PermissionScopes: [
@@ -202,7 +216,7 @@ export function graphApi(http) {
             ],
         requiredResourceAccess: [
           { resourceAppId: POWER_BI_APP_ID, resourceAccess: [{ id: o.pbiScopeId, type: 'Scope' }] },
-          { resourceAppId: GRAPH_APP_ID, resourceAccess: [{ id: o.graphUserReadScopeId, type: 'Scope' }] },
+          { resourceAppId: GRAPH_APP_ID, resourceAccess: [o.graphUserReadScopeId, ...(o.graphGroupScopeId ? [o.graphGroupScopeId] : [])].map((id) => ({ id, type: 'Scope' })) },
         ],
       });
       return scope.id;
@@ -252,6 +266,48 @@ export function graphApi(http) {
 
     /** A user by UPN or email-style sign-in name. Null when there's no such user. @param {string} upn */
     getUser: (upn) => getOrNull(`/users/${encodeURIComponent(upn)}?$select=id,displayName,userPrincipalName`),
+
+    /** @param {string} id */
+    getGroup: (id) => getOrNull(`/groups/${encodeURIComponent(id)}?$select=id,displayName,securityEnabled`),
+    /** The first group with this exact display name, or null. @param {string} name */
+    findGroupByName: async (name) =>
+      (await http.list('/groups', { query: { $filter: `displayName eq '${name.replace(/'/g, "''")}'`, $select: 'id,displayName,securityEnabled' } }))[0] ?? null,
+    /**
+     * Creates a security group (not mail-enabled) with the given owner.
+     * @param {{ displayName: string, description: string, ownerId: string }} o
+     */
+    createSecurityGroup: (o) =>
+      http.post('/groups', {
+        displayName: o.displayName,
+        description: o.description,
+        mailEnabled: false,
+        mailNickname: o.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'analytics-hub-viewers',
+        securityEnabled: true,
+        'owners@odata.bind': [`https://graph.microsoft.com/v1.0/users/${o.ownerId}`],
+      }),
+    /** Direct members of a group. @param {string} groupId @returns {Promise<{ id: string, displayName?: string, userPrincipalName?: string }[]>} */
+    groupMembers: (groupId) => http.list(`/groups/${groupId}/members`, { query: { $select: 'id,displayName,userPrincipalName' } }),
+    /** @param {string} groupId @returns {Promise<{ id: string, displayName?: string, userPrincipalName?: string }[]>} */
+    groupOwners: (groupId) => http.list(`/groups/${groupId}/owners`, { query: { $select: 'id,displayName,userPrincipalName' } }),
+    /** Adds a user or group to a group. Already being a member is fine. @param {string} groupId @param {string} memberId */
+    addGroupMember: (groupId, memberId) => addRef(`/groups/${groupId}/members/$ref`, memberId),
+    /** @param {string} groupId @param {string} ownerId */
+    addGroupOwner: (groupId, ownerId) => addRef(`/groups/${groupId}/owners/$ref`, ownerId),
+    /**
+     * A user by UPN, or else a group by display name.
+     * @param {string} name
+     * @returns {Promise<{ id: string, displayName: string, kind: 'user' | 'group' } | null>}
+     */
+    async resolvePrincipal(name) {
+      if (name.includes('@')) {
+        const user = await getOrNull(`/users/${encodeURIComponent(name)}?$select=id,displayName,userPrincipalName`);
+        if (user) return { id: user.id, displayName: user.userPrincipalName ?? user.displayName, kind: 'user' };
+      }
+      const group = /^[0-9a-f-]{36}$/i.test(name)
+        ? await getOrNull(`/groups/${name}?$select=id,displayName`)
+        : (await http.list('/groups', { query: { $filter: `displayName eq '${name.replace(/'/g, "''")}'`, $select: 'id,displayName' } }))[0];
+      return group ? { id: group.id, displayName: group.displayName, kind: 'group' } : null;
+    },
 
     /** Makes a user an owner of the app registration. @param {string} applicationObjectId @param {string} userId */
     addOwner: (applicationObjectId, userId) =>
