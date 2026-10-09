@@ -14,7 +14,7 @@ USERS_URL = ('https://graph.microsoft.com/v1.0/users?$select=userPrincipalName,d
 MAX_ORG_LEVELS = 14
 BASE_COLUMNS = ['PersonId', 'displayName', 'Organization', 'JobTitle', 'companyName', 'officeLocation',
                 'city', 'country', 'accountEnabled', 'managerUPN']
-HIER_FIXED = ['OrgLevel', 'HierarchyPath', 'TopOfChain_Name', 'IsManager', 'DirectReports']
+HIER_FIXED = ['OrgLevel', 'HierarchyPath', 'TopOfChain_Name', 'IsManager', 'DirectReports', 'HierarchyError']
 HIER_LEVELS = [f'Level{i}_Name' for i in range(MAX_ORG_LEVELS + 1)]
 HIER_COLUMNS = HIER_FIXED + HIER_LEVELS
 COLUMNS = BASE_COLUMNS + HIER_COLUMNS + ['PersonId_Normalized', 'TotalEmployees']
@@ -88,7 +88,11 @@ def _dedupe_org_rows(rows):
 
 
 def build_hierarchy(rows, max_levels=MAX_ORG_LEVELS):
-    """Flatten each person's managerUPN chain into Level0..N + org metadata."""
+    """Flatten each person's managerUPN chain into Level0..N + org metadata.
+
+    Cycle-tolerant: a cycle truncates the chain and is recorded in HierarchyError.
+    Someone who is their own manager is the top of their chain, not an error.
+    """
     def _n(v):
         return (v or '').strip().lower()
 
@@ -102,27 +106,30 @@ def build_hierarchy(rows, max_levels=MAX_ORG_LEVELS):
 
     direct = {user: 0 for user in name_of}
     for user, manager in mgr_of.items():
-        if manager and manager in direct:
+        if manager and manager != user and manager in direct:
             direct[manager] += 1
 
     out = {}
     for user in name_of:
-        chain, seen_chain, cur = [], set(), user
+        chain, seen_chain, cur, error = [], set(), user, ''
         while cur and cur in name_of:
             if cur in seen_chain:
-                raise ValueError(f'Cycle detected in manager hierarchy at {cur!r}.')
+                error = f'Cycle detected at {cur!r}'
+                break
             seen_chain.add(cur)
             chain.append(cur)
-            cur = mgr_of.get(cur, '')
+            manager = mgr_of.get(cur, '')
+            cur = '' if manager == cur else manager
         chain = list(reversed(chain))
         rec = {column: '' for column in HIER_COLUMNS}
         for idx in range(max_levels + 1):
             rec[f'Level{idx}_Name'] = name_of.get(chain[idx], '') if idx < len(chain) else ''
-        rec['OrgLevel'] = str(len(chain) - 1)
+        rec['OrgLevel'] = str(max(len(chain) - 1, 0))
         rec['HierarchyPath'] = ' > '.join(name_of.get(node, node) for node in chain)
         rec['TopOfChain_Name'] = name_of.get(chain[0], '') if chain else ''
         rec['IsManager'] = 'TRUE' if direct.get(user, 0) > 0 else 'FALSE'
         rec['DirectReports'] = str(direct.get(user, 0))
+        rec['HierarchyError'] = error
         out[user] = rec
     return out
 

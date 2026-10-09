@@ -104,7 +104,7 @@ class SnapshotSafetyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Duplicate licensed-user row conflict"):
             ns["_validate_report_rows"](rows, upn_col)
 
-    def test_org_helpers_reject_malformed_pages_conflicts_and_cycles(self):
+    def test_org_helpers_reject_malformed_pages_and_conflicts_but_tolerate_cycles(self):
         page = extract(
             "Copilot_Org_Data_Direct_Ingester.ipynb",
             6,
@@ -137,13 +137,18 @@ class SnapshotSafetyTests(unittest.TestCase):
             functions=("build_hierarchy",),
             assigns=("MAX_ORG_LEVELS", "HIER_FIXED", "HIER_LEVELS", "HIER_COLUMNS"),
         )
-        with self.assertRaisesRegex(ValueError, "Cycle detected"):
-            hier["build_hierarchy"](
-                [
-                    {"PersonId": "a@example.com", "displayName": "A", "managerUPN": "b@example.com"},
-                    {"PersonId": "b@example.com", "displayName": "B", "managerUPN": "a@example.com"},
-                ]
-            )
+        hier_out = hier["build_hierarchy"](
+            [
+                {"PersonId": "a@example.com", "displayName": "A", "managerUPN": "b@example.com"},
+                {"PersonId": "b@example.com", "displayName": "B", "managerUPN": "a@example.com"},
+                {"PersonId": "top@example.com", "displayName": "Top", "managerUPN": "TOP@example.com"},
+            ]
+        )
+        self.assertEqual(hier_out["a@example.com"]["HierarchyError"], "Cycle detected at 'a@example.com'")
+        self.assertEqual(hier_out["a@example.com"]["HierarchyPath"], "B > A")
+        self.assertEqual(hier_out["top@example.com"]["HierarchyError"], "")
+        self.assertEqual(hier_out["top@example.com"]["OrgLevel"], "0")
+        self.assertEqual(hier_out["top@example.com"]["DirectReports"], "0")
 
     def test_registry_helpers_validate_pages_tolerate_bad_elements_and_reject_duplicate_keys(self):
         page = extract(

@@ -68,6 +68,11 @@ def collect_org(api, store, settings, *, allow_empty=False) -> int:
             raise RuntimeError(f"Graph /users returned a non-Graph nextLink: {url}")
         users.extend(value)
     columns, rows = org.build_snapshot(users, table_exists=bool(store.list(prefix)), allow_empty=allow_empty)
+    err = columns.index("HierarchyError")
+    cycles = sorted({row[err] for row in rows if row[err]})
+    if cycles:
+        log.warning("org: %s distinct manager cycle(s); rows kept, chain truncated. Examples: %s",
+                    len(cycles), "; ".join(cycles[:20]))
     count = _replace_snapshot(store, prefix, columns, rows)
     log.info("org: %s people written from %s page(s)", count, page)
     return count

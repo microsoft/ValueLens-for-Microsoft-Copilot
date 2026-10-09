@@ -92,24 +92,81 @@ def test_org_matches_notebook():
     assert nb_rows == org._dedupe_org_rows([org._canonical_org_row(u) for u in USERS])
     assert nb["build_hierarchy"](nb_rows) == org.build_hierarchy(nb_rows)
     assert nb["HIER_COLUMNS"] == org.HIER_COLUMNS
+    assert nb["build_hierarchy"](CYCLE_ROWS) == org.build_hierarchy(CYCLE_ROWS)
 
 
 def test_org_snapshot_shape():
     cols, rows = org.build_snapshot(USERS)
     by = {r[0]: dict(zip(cols, r)) for r in rows}
     assert len(rows) == 4 and len(cols) == len(org.COLUMNS)
+    assert "HierarchyError" in cols
     assert by["ic@contoso.com"]["HierarchyPath"] == "Ceo > Vp > ic@contoso.com"
     assert by["ic@contoso.com"]["OrgLevel"] == "2" and by["vp@contoso.com"]["IsManager"] == "TRUE"
     assert by["orphan@contoso.com"]["Level0_Name"] == "Orphan"
     assert {r["TotalEmployees"] for r in by.values()} == {"4"}
+    assert {r["HierarchyError"] for r in by.values()} == {""}
     assert by["ceo@contoso.com"]["accountEnabled"] == "True" and by["vp@contoso.com"]["accountEnabled"] == ""
 
 
-def test_org_cycle_rejected():
+# A tenant whose manager data contains a cycle: a self-managed CEO at the top, a normal chain
+# under them, and a two-person loop (a <-> b) with someone reporting into it.
+CYCLE_ROWS = [
+    {"PersonId": "ceo@contoso.com", "displayName": "Ceo", "managerUPN": " CEO@contoso.com "},
+    {"PersonId": "vp@contoso.com", "displayName": "Vp", "managerUPN": "ceo@contoso.com"},
+    {"PersonId": "ic@contoso.com", "displayName": "Ic", "managerUPN": "vp@contoso.com"},
+    {"PersonId": "a@contoso.com", "displayName": "A", "managerUPN": "b@contoso.com"},
+    {"PersonId": "b@contoso.com", "displayName": "B", "managerUPN": "a@contoso.com"},
+    {"PersonId": "c@contoso.com", "displayName": "C", "managerUPN": "a@contoso.com"},
+]
+
+
+def test_org_self_manager_is_root_without_error():
+    hier = org.build_hierarchy(CYCLE_ROWS)
+    ceo = hier["ceo@contoso.com"]
+    assert ceo["HierarchyError"] == ""
+    assert ceo["OrgLevel"] == "0" and ceo["HierarchyPath"] == "Ceo"
+    assert ceo["TopOfChain_Name"] == "Ceo" and ceo["Level0_Name"] == "Ceo" and ceo["Level1_Name"] == ""
+    assert hier["ic@contoso.com"]["HierarchyError"] == ""
+    assert hier["ic@contoso.com"]["TopOfChain_Name"] == "Ceo"
+
+
+def test_org_normal_chain_unchanged():
+    hier = org.build_hierarchy(CYCLE_ROWS)
+    ic = hier["ic@contoso.com"]
+    assert ic["OrgLevel"] == "2" and ic["HierarchyPath"] == "Ceo > Vp > Ic"
+    assert [ic[f"Level{i}_Name"] for i in range(4)] == ["Ceo", "Vp", "Ic", ""]
+    assert ic["IsManager"] == "FALSE" and ic["DirectReports"] == "0"
+    assert hier["vp@contoso.com"]["OrgLevel"] == "1" and hier["vp@contoso.com"]["DirectReports"] == "1"
+
+
+def test_org_two_person_cycle_kept_and_flagged():
+    hier = org.build_hierarchy(CYCLE_ROWS)
+    a, b, c = hier["a@contoso.com"], hier["b@contoso.com"], hier["c@contoso.com"]
+    assert a["HierarchyError"] == "Cycle detected at 'a@contoso.com'"
+    assert a["HierarchyPath"] == "B > A" and a["OrgLevel"] == "1"
+    assert b["HierarchyError"] == "Cycle detected at 'b@contoso.com'"
+    assert b["HierarchyPath"] == "A > B"
+    assert c["HierarchyError"] == "Cycle detected at 'a@contoso.com'"
+    assert c["HierarchyPath"] == "B > A > C" and c["OrgLevel"] == "2"
+
+
+def test_org_direct_reports_exclude_self():
+    hier = org.build_hierarchy(CYCLE_ROWS)
+    assert hier["ceo@contoso.com"]["DirectReports"] == "1"
+    assert hier["a@contoso.com"]["DirectReports"] == "2" and hier["b@contoso.com"]["DirectReports"] == "1"
+    solo = org.build_hierarchy([{"PersonId": "solo@contoso.com", "displayName": "Solo",
+                                 "managerUPN": "solo@contoso.com"}])["solo@contoso.com"]
+    assert solo["DirectReports"] == "0" and solo["IsManager"] == "FALSE" and solo["HierarchyError"] == ""
+
+
+def test_org_cycle_snapshot_keeps_rows():
     users = [{"userPrincipalName": "a@x", "manager": {"userPrincipalName": "b@x"}},
              {"userPrincipalName": "b@x", "manager": {"userPrincipalName": "a@x"}}]
-    with pytest.raises(ValueError, match="Cycle"):
-        org.build_snapshot(users)
+    cols, rows = org.build_snapshot(users)
+    by = {r[0]: dict(zip(cols, r)) for r in rows}
+    assert set(by) == {"a@x", "b@x"}
+    assert by["a@x"]["HierarchyError"] == "Cycle detected at 'a@x'"
+    assert by["b@x"]["HierarchyError"] == "Cycle detected at 'b@x'"
 
 
 def test_m365_matches_notebook():
