@@ -13,6 +13,7 @@ import {
   CONSUMPTION_REFRESH_ACTIVITY,
   COWORK_DATAFLOW_ACTIVITY,
   REFRESH_ACTIVITY,
+  RESOURCE_GRAPH_ACTIVITY,
   STATUS_ACTIVITY,
   UPLOAD_ROUTER_ACTIVITY,
   WORKDAY_ACTIVITY,
@@ -39,6 +40,7 @@ export const LOAD_LABELS = /** @type {Record<string, string>} */ ({
   [CONSUMPTION_REFRESH_ACTIVITY]: 'Consumption model refresh',
   [AGENT_EVALUATOR_ACTIVITY]: 'Agent transcripts',
   [AGENT_EVALUATOR_REFRESH_ACTIVITY]: 'Agent Evaluator model refresh',
+  [RESOURCE_GRAPH_ACTIVITY]: 'Agent configuration and Foundry (Resource Graph)',
   [STATUS_ACTIVITY]: 'Load status record',
 });
 

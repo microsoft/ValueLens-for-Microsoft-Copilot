@@ -15,9 +15,9 @@ import { AGENT_EVALUATOR_MODEL_NAME, CONSUMPTION_MODEL_NAME, flowIdentity, MODEL
 import { MIN_NODE, nodeVersionOk } from './app.js';
 import { agentEvaluatorModelWanted, planAgentEvaluator } from './agent-evaluator.js';
 import { AZURE_AI_ROLES, consumptionModelWanted, COWORK_DATAFLOW_NAME, planConsumption, planCowork } from './consumption.js';
-import { flowsSkipped, flowsWanted } from './flows.js';
+import { FLOW_NAMES, flowsSkipped, flowsWanted } from './flows.js';
 import { adminPack, canWriteSecrets, checkExistingApp, reportAppCheck, ResumeLater, writeAdminPack } from './identity.js';
-import { FEEDBACK_FLOW_NAME, STUDIO_FLOW_NAME } from '../transform/flows.js';
+import { resourceGraphGrants, resourceGraphKinds, resourceGraphOn, scopeName } from './resource-graph.js';
 import { describeSchedule, displayNames, freeName, PIPELINE_NAME } from './fabric.js';
 import { connectionName } from './model.js';
 import { reportsWanted } from './report.js';
@@ -832,7 +832,7 @@ export function planReview(ctx, pre) {
   for (const kind of flowsWanted(config)) {
     creates.push({
       kind: 'Power Automate flow',
-      name: kind === 'feedback' ? FEEDBACK_FLOW_NAME : STUDIO_FLOW_NAME,
+      name: FLOW_NAMES[kind],
       isNew: !config.uploads.flowIds?.[kind],
       detail: env ? `In ${env.name ?? env.url}, turned off until you sign in to its connections.` : 'Written to a file to import.',
     });
@@ -897,6 +897,7 @@ export function planReview(ctx, pre) {
   if (withAzureAi && !cc.azureAccess) {
     grants.push({ who: appWho, what: AZURE_AI_ROLES.map((r) => r.name).join(', '), where: `Azure subscription ${cc.azureSubscriptionName ?? cc.azureSubscriptionId}`, detail: 'So the notebook can read Azure AI usage and cost.' });
   }
+  grants.push(...resourceGraphGrants(config, user.tenantId, appWho, 'access'));
   const waiting = ae.environments.filter((e) => !e.access);
   if (config.modules.agentEvaluator && waiting.length) {
     grants.push({
@@ -980,6 +981,7 @@ export async function confirmPlan(ctx, pre) {
     const waiting = envs.some((e) => !e.access) ? c.dim(' (the app is added to each with the Bot Transcript Viewer role)') : '';
     ui.info(`Agents:      ${envs.length ? `${names}${waiting}` : c.dim('no environments chosen')}`);
   }
+  if (resourceGraphOn(config)) ui.info(`Governance:  ${resourceGraphKinds(config)} from Azure Resource Graph, in ${scopeName(config)}`);
   if (ctx.runFirstLoad) ui.info(`First load:  ${config.history.days} days of history, straight after setup`);
   if (ctx.reloadHistoryDays) ui.info(`History:     ${reloadLine(ctx.reloadHistoryDays)} ${c.dim(`(${reloadDetail(ctx.reloadHistoryDays)})`)}`);
   ui.review(planReview(ctx, pre));

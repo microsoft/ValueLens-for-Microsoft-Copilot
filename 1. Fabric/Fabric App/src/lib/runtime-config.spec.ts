@@ -208,6 +208,12 @@ describe("parseSemanticModels", () => {
             expect(parseModules({ modules: { ...deployedModels.modules, defender: "yes" } })).toEqual(deployedModels.modules);
             expect(parseModules(deployedModels)).not.toHaveProperty("defender");
         });
+
+        it("reads the Resource Graph choice only when the config states it", () => {
+            expect(parseModules({ modules: { ...deployedModels.modules, resourceGraph: false } })?.resourceGraph).toBe(false);
+            expect(parseModules({ modules: { ...deployedModels.modules, resourceGraph: "yes" } })).toEqual(deployedModels.modules);
+            expect(parseModules(deployedModels)).not.toHaveProperty("resourceGraph");
+        });
     });
 
     it("accepts an install that set up no models", () => {

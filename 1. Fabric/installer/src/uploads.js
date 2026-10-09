@@ -19,7 +19,7 @@ export const UPLOAD_FOLDERS = [UPLOAD_DIR, FEEDBACK_DIR, AGENT365_DIR, WORKDAY_D
 export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 
 /** @typedef {'api' | 'csv' | 'skip'} SourceMode */
-/** @typedef {'core' | 'orgData' | 'workday' | 'm365Activity' | 'agent365' | 'productFeedback' | 'studioCredits' | 'coworkCredits' | 'azureAi' | 'agentEvaluator' | 'defender'} DataSourceId */
+/** @typedef {'core' | 'orgData' | 'workday' | 'm365Activity' | 'agent365' | 'productFeedback' | 'studioCredits' | 'coworkCredits' | 'azureAi' | 'agentEvaluator' | 'defender' | 'resourceGraph'} DataSourceId */
 /** @typedef {Record<DataSourceId, SourceMode>} DataSourceModes */
 
 /**
@@ -164,6 +164,17 @@ export const DATA_SOURCES = [
     description: 'Other AI tools on your devices and network, and agents that answer without sign-in, from Microsoft Defender. Needs Defender for Endpoint P2 or Defender for Cloud Apps.',
     modes: ['api', 'skip'],
     defaultMode: 'skip',
+  },
+  {
+    id: 'resourceGraph',
+    label: 'Agent configuration and Foundry (Azure Resource Graph)',
+    description: 'How each Copilot Studio agent is set up (sign-in, connectors, sharing, model) and your Foundry resources and projects, from Azure Resource Graph.',
+    modes: ['api', 'skip'],
+    defaultMode: 'skip',
+    page: 'Governance',
+    hints: {
+      api: 'Read each day from Azure Resource Graph. Foundry needs Reader on a management group; agents need an Entra role such as Global Reader. What can\'t be read is reported, not failed.',
+    },
   },
 ];
 

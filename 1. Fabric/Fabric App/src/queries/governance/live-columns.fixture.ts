@@ -59,4 +59,16 @@ export const liveColumns = {
     ],
     shadowAiTools: ["[Tool]", "[Layer]", "[Posture]", "[Devices]", "[Users]"],
     shadowAiStatus: ["[Probe]", "[Status]", "[Source]", "[Rows]", "[Message]", "[Run At]"],
+    governanceResourceGraph: [
+        "[Configured Agents]",
+        "[Matched Agents]",
+        "[No Sign In]",
+        "[No Sign In Configured]",
+        "[Web Search]",
+        "[Foundry Resources]",
+        "[Foundry Public]",
+        "[Foundry Public Projects]",
+        "[Agent Status]",
+        "[Foundry Status]",
+    ],
 } as const;

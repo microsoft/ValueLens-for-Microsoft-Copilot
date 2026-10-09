@@ -17,6 +17,9 @@ import { APP_ALIAS, CONSUMPTION_ALIAS } from '../app.js';
 import { AZURE_AI_ROLES, ensureAzureAiAccess, planConsumption } from '../consumption.js';
 import { AZURE_LANDING_DIRS, azureDropLabel, azureDropsToSharePoint, ensureFlows, flowsSummary, flowsWanted, offerStudioRun, planFlows } from '../flows.js';
 import { askMoreHistory, HISTORY_CHOICES, reloadDetail, reloadLine } from '../plan.js';
+import { ensureResourceGraphAccess, planResourceGraph, resourceGraphGrants, resourceGraphKinds, resourceGraphOn, scopeName } from '../resource-graph.js';
+import { DATA_SOURCES } from '../../uploads.js';
+import { normaliseResourceGraph } from '../../config.js';
 
 /** @typedef {import('../../install.js').Ctx} Ctx */
 
@@ -36,7 +39,7 @@ export const REQUIRED_ARM_PARAMETERS = [
   'location', 'sqlLocation', 'namePrefix', 'installId', 'tags', 'imageRegistry', 'imageTag', 'imageRegistryResourceId', 'runSchedule', 'runSteps', 'sampleData', 'sqlAdminLogin', 'sqlAdminObjectId',
   'sqlAdminPrincipalType', 'sqlMinCapacity', 'sqlMaxCapacity', 'sqlAutoPauseDelayMinutes', 'sqlUseFreeLimit', 'publicNetworkAccess', 'deployWeb',
   'webMinReplicas', 'webClientId', 'webAppIdUri', 'modules', 'auditHistoryDays', 'powerBiWorkspaceId', 'semanticModels', 'sqlReaderName', 'sqlReaderClientId',
-  'azureAiSubscriptionId', 'paygSubscriptionIds', 'dropSiteId', 'dropDriveId', 'dropFolder',
+  'azureAiSubscriptionId', 'paygSubscriptionIds', 'dropSiteId', 'dropDriveId', 'dropFolder', 'argManagementGroup', 'argAgents', 'argFoundry',
 ];
 
 const last = (/** @type {string} */ path) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -215,6 +218,7 @@ export async function planAzure(ctx, pre) {
   config.schedule.timeZone = 'UTC';
   config.schedule.time = await ui.input('Time (UTC, 24-hour)', { default: config.schedule.time, validate: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? true : 'Use HH:MM.') });
   await planAzureConsumption(ctx, subs);
+  await planAzureResourceGraph(ctx);
   // A reload runs the job straight after setup anyway.
   ctx.runFirstLoad = ctx.reloadHistoryDays ? false : await ui.confirm('Run the first load as soon as setup finishes?', true);
   await azurePreflight(ctx);
@@ -311,6 +315,34 @@ export async function planAzureConsumption(ctx, subs) {
 }
 
 /**
+ * Agent configuration and Foundry from Azure Resource Graph: whether the jobs read them, where, and the
+ * agent inventory flow for when Resource Graph returns no agents.
+ * @param {Ctx} ctx
+ */
+export async function planAzureResourceGraph(ctx) {
+  const { ui, config } = ctx;
+  const ds = config.dataSources;
+  const az = /** @type {import('../../config.js').AzureConfig} */ (config.azure);
+  if (az.sampleData) {
+    ds.resourceGraph = 'skip';
+    return;
+  }
+  const source = DATA_SOURCES.find((s) => s.id === 'resourceGraph');
+  ui.heading('Agent configuration and Foundry');
+  ds.resourceGraph = await ui.select(`${source?.label ?? 'Azure Resource Graph'}?`, [
+    { name: 'Read from Azure Resource Graph', value: 'api', description: source?.hints?.api },
+    { name: 'Leave it out', value: 'skip' },
+  ], ds.resourceGraph === 'api' ? 'api' : 'skip');
+  await planResourceGraph(ctx);
+  if (!resourceGraphOn(config) || config.resourceGraph?.agents === false) return;
+  if (isPrivate(az) && !azureDropsToSharePoint(az)) {
+    ui.note('With private networking and no SharePoint drop folder, there is no agent inventory flow: the jobs read agents from Resource Graph only.');
+    return;
+  }
+  if (!config.uploads.flowEnvironment) await planFlows(ctx);
+}
+
+/**
  * Works out, offline, where a SharePoint folder lives: the site for the flow's connector and the jobs'
  * Graph calls, and the folder's path. Accepts the folder's address or an AllItems.aspx link to it.
  * @param {string} input
@@ -357,6 +389,20 @@ async function ensureAzureConsumptionAccess(ctx) {
   if (config.dataSources.studioCredits === 'skip' && config.dataSources.coworkCredits === 'skip') return;
   if (azureDropsToSharePoint(az)) await grantDropSite(ctx);
   else await grantLandingWrite(ctx);
+}
+
+/**
+ * Resource Graph access: Reader on the management group for the jobs' managed identity, so they can
+ * list Foundry, and write access for the agent inventory flow to wherever its files land.
+ * @param {Ctx} ctx
+ */
+async function ensureAzureResourceGraphAccess(ctx) {
+  const { config } = ctx;
+  const az = /** @type {import('../../config.js').AzureConfig} */ (config.azure);
+  const principalId = az.outputs?.identityPrincipalId;
+  if (!principalId) throw new Error('The ARM deployment did not return identityPrincipalId.');
+  await ensureResourceGraphAccess(ctx, { id: principalId, name: 'The jobs\' managed identity', appId: az.outputs?.identityClientId }, 'azureAccess');
+  if (flowsWanted(config).includes('agents') && !azureDropsToSharePoint(az)) await grantLandingWrite(ctx);
 }
 
 /**
@@ -506,10 +552,11 @@ export async function azureDeployment(ctx, o) {
     sqlMinCapacity: param(String(liveSql.minCapacity ?? '0.5')), sqlMaxCapacity: param(liveSql.capacity ?? 2), sqlAutoPauseDelayMinutes: param(liveSql.autoPauseDelay ?? 60), sqlUseFreeLimit: param(liveSql.useFreeLimit ?? true),
     publicNetworkAccess: param(az.publicNetworkAccess === false ? 'Disabled' : 'Enabled'), deployWeb: param(true), webMinReplicas: param(0),
     webClientId: param(o.pass === 2 ? (az.webApp?.clientId ?? '') : ''), webAppIdUri: param(o.pass === 2 ? (az.webApp?.appIdUri ?? '') : ''),
-    modules: param(enabledAzureModuleIds(config.modules, az).join(',')), auditHistoryDays: param(Math.max(config.history.days, ctx.reloadHistoryDays ?? 0)), powerBiWorkspaceId: param(az.powerBi?.workspaceId ?? ''),
+    modules: param([...enabledAzureModuleIds(config.modules, az), ...(azureResourceGraphOn(config) ? ['resourceGraph'] : [])].join(',')), auditHistoryDays: param(Math.max(config.history.days, ctx.reloadHistoryDays ?? 0)), powerBiWorkspaceId: param(az.powerBi?.workspaceId ?? ''),
     semanticModels: param(JSON.stringify(azureSemanticModels(az))),
     sqlReaderName: param(SQL_READER_NAME), sqlReaderClientId: param(o.pass === 2 ? (az.sqlReader?.clientId ?? '') : ''),
     ...consumptionParameters(config),
+    ...argParameters(config),
   };
   return { properties: { mode: 'Incremental', template: ARM, parameters: params } };
 }
@@ -541,6 +588,25 @@ export function consumptionParameters(config) {
     dropSiteId: param(drop?.siteId ?? ''),
     dropDriveId: param(drop?.driveId ?? ''),
     dropFolder: param(drop?.drivePath ?? ''),
+  };
+}
+
+/**
+ * The jobs read agent configuration and Foundry from Azure Resource Graph: the source is on and they read tenant data.
+ * @param {import('../../config.js').InstallConfig} config
+ */
+export const azureResourceGraphOn = (config) => resourceGraphOn(config) && config.azure?.sampleData !== true;
+
+/**
+ * What the run job reads from Azure Resource Graph: the management group (blank for the tenant root) and what to read there.
+ * @param {import('../../config.js').InstallConfig} config
+ */
+export function argParameters(config) {
+  const rg = normaliseResourceGraph(config.resourceGraph);
+  return {
+    argManagementGroup: param(rg.managementGroup ?? ''),
+    argAgents: param(rg.agents),
+    argFoundry: param(rg.foundry),
   };
 }
 
@@ -580,13 +646,16 @@ export function azurePlanReview(ctx) {
   const consumption = azureConsumptionOn(ctx.config);
   const cc = ctx.config.consumption;
   if (consumption && ctx.sources.consumptionModelFile) creates.push({ kind: 'Semantic model', name: cc.model.name, isNew: !az.powerBi?.consumptionDatasetId, detail: 'Credit consumption, reading Azure SQL like the main model.' });
-  if (consumption && flowsWanted(ctx.config).length) creates.push({ kind: 'Power Automate flow', name: 'Copilot Studio credits', isNew: !ctx.config.uploads.flowIds?.studio, detail: `Daily, signed in as you; saves to ${azureDropLabel(az)}. Turned off until you sign in to its connections.` });
+  if (consumption && flowsWanted(ctx.config).includes('studio')) creates.push({ kind: 'Power Automate flow', name: 'Copilot Studio credits', isNew: !ctx.config.uploads.flowIds?.studio, detail: `Daily, signed in as you; saves to ${azureDropLabel(az)}. Turned off until you sign in to its connections.` });
+  if (flowsWanted(ctx.config).includes('agents')) creates.push({ kind: 'Power Automate flow', name: 'Agent inventory', isNew: !ctx.config.uploads.flowIds?.agents, detail: `Daily, signed in as an admin; saves to ${azureDropLabel(az, AZURE_LANDING_DIRS.argInventory)} for when Resource Graph returns no agents. Turned off until you sign in to its connections.` });
   /** @type {{ who: string, what: string, where: string, detail?: string }[]} */
   const consumptionGrants = [];
   if (consumption && cc.azureSubscriptionId && ctx.config.dataSources.azureAi === 'api') consumptionGrants.push({ who: 'Collector managed identity', what: AZURE_AI_ROLES.map((r) => r.name).join(', '), where: `Subscription ${cc.azureSubscriptionName ?? cc.azureSubscriptionId}`, detail: 'Azure AI costs and metrics.' });
   if (consumption && cc.paygSubscriptions?.length) consumptionGrants.push({ who: 'Collector managed identity', what: 'Cost Management Reader', where: cc.paygSubscriptions.map((p) => p.name ?? p.subscriptionId).join(', '), detail: 'Copilot pay-as-you-go billed in Azure.' });
   if (consumption && az.drop) consumptionGrants.push({ who: 'Collector managed identity', what: 'Sites.Selected (read)', where: az.drop.siteUrl ?? az.drop.folderUrl, detail: 'Reads the credit files. Needs a SharePoint or Global administrator.' });
   else if (consumption && (ctx.config.dataSources.studioCredits !== 'skip' || ctx.config.dataSources.coworkCredits !== 'skip')) consumptionGrants.push({ who: 'You', what: 'Storage Blob Data Contributor', where: 'The storage account', detail: 'So the Studio flow, signed in as you, and your uploads can write to the landing container.' });
+  else if (flowsWanted(ctx.config).includes('agents') && !az.drop) consumptionGrants.push({ who: 'You', what: 'Storage Blob Data Contributor', where: 'The storage account', detail: 'So the agent inventory flow can write to the landing container.' });
+  const argGrants = azureResourceGraphOn(ctx.config) ? resourceGraphGrants(ctx.config, ctx.user?.tenantId ?? '', 'Collector managed identity', 'azureAccess') : [];
   return {
     creates,
     grants: [
@@ -594,6 +663,7 @@ export function azurePlanReview(ctx) {
       { who: WEB_APP_NAME, what: 'Delegated Power BI Dataset.Read.All and Graph User.Read; app roles AnalyticsHub.User and AnalyticsHub.Admin', where: 'Entra ID' },
       { who: 'Managed identity', what: 'Member', where: az.powerBi?.workspaceId ? `Power BI workspace ${az.powerBi.workspaceId}` : `Power BI workspace ${az.workspaceName ?? 'Analytics Hub'}` },
       ...consumptionGrants,
+      ...argGrants,
     ],
     runsOn: [
       { what: 'Azure resources', where: `${az.subscriptionName ?? az.subscriptionId} / ${az.resourceGroup} / ${az.location}`, detail: `Incremental ARM deployment. Deletes are not applied by the template.${az.sqlLocation ? ` Azure SQL goes in ${az.sqlLocation}.` : ''}` },
@@ -624,6 +694,7 @@ export async function confirmAzurePlan(ctx) {
     ui.info(`Cowork:      ${ds.coworkCredits === 'csv' ? 'CSV export' : 'Left out'}`);
     ui.info(`Azure AI:    ${ds.azureAi === 'api' && config.consumption.azureSubscriptionId ? config.consumption.azureSubscriptionName ?? config.consumption.azureSubscriptionId : 'Left out'}`);
   }
+  if (azureResourceGraphOn(config)) ui.info(`Governance:  ${resourceGraphKinds(config)} from Azure Resource Graph, in ${scopeName(config)}`);
   if (ctx.reloadHistoryDays) ui.info(`History:     ${reloadLine(ctx.reloadHistoryDays)}`);
   ui.review(azurePlanReview(ctx));
   return ui.confirm('Go ahead?', true);
@@ -636,9 +707,12 @@ export async function installAzure(ctx, opts) {
   az.installId ??= randomUUID();
   az.imageTag = imageTag(az);
   const consumption = azureConsumptionOn(config);
+  const resourceGraph = azureResourceGraphOn(config);
+  const flows = flowsWanted(config).length > 0;
   const titles = [
-    'Resource group', 'Azure resources', 'Entra applications', 'Microsoft Graph permissions', ...(consumption ? ['Credit consumption'] : []), 'Power BI model', 'Azure resources (final)', 'Database migration',
-    ...(consumption && flowsWanted(config).length ? ['Power Automate flow'] : []), 'Teams package', ...(ctx.reloadHistoryDays ? ['Reload audit history'] : ctx.runFirstLoad ? ['First load'] : []),
+    'Resource group', 'Azure resources', 'Entra applications', 'Microsoft Graph permissions', ...(consumption ? ['Credit consumption'] : []), ...(resourceGraph ? ['Resource Graph access'] : []),
+    'Power BI model', 'Azure resources (final)', 'Database migration',
+    ...(flows ? ['Power Automate flow'] : []), 'Teams package', ...(ctx.reloadHistoryDays ? ['Reload audit history'] : ctx.runFirstLoad ? ['First load'] : []),
   ];
   let n = 0;
   const step = (/** @type {string} */ title) => ui.step(++n, titles.length, title);
@@ -671,6 +745,12 @@ export async function installAzure(ctx, opts) {
     ctx.save();
   }
 
+  if (resourceGraph) {
+    step('Resource Graph access');
+    await ensureAzureResourceGraphAccess(ctx);
+    ctx.save();
+  }
+
   step('Power BI model');
   await ensureAzurePowerBi(ctx, sqlSecret.value);
   await retireSecret(ctx, sqlSecret.previousKeyId);
@@ -688,7 +768,7 @@ export async function installAzure(ctx, opts) {
       'Re-run install once it is fixed; finished steps are skipped.');
   }
 
-  if (consumption && flowsWanted(config).length) {
+  if (flows) {
     step('Power Automate flow');
     await ensureFlows(ctx);
   }
@@ -696,7 +776,7 @@ export async function installAzure(ctx, opts) {
   step('Teams package');
   await writeAzureTeamsPackage(ctx);
 
-  if (consumption && flowsWanted(config).length) await offerStudioRun(ctx, { pipelineNext: !!(ctx.reloadHistoryDays || ctx.runFirstLoad), quietWhenOff: true });
+  if (consumption && flows) await offerStudioRun(ctx, { pipelineNext: !!(ctx.reloadHistoryDays || ctx.runFirstLoad), quietWhenOff: true });
   if (ctx.reloadHistoryDays) {
     step('Reload audit history');
     const days = ctx.reloadHistoryDays;
@@ -884,7 +964,7 @@ async function ensureAzurePowerBi(ctx, sqlReaderSecret) {
   const database = String(az.outputs?.sqlDatabaseName ?? 'valuelens');
   await deployModel(ctx, sm, {
     signature: `azure;${modelSignature(server, database, config.modules)}`,
-    definition: () => semanticModelDefinition(buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { server, database, modules: config.modules }), PBISM),
+    definition: () => semanticModelDefinition(buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { server, database, modules: config.modules, resourceGraph: azureResourceGraphOn(config) }), PBISM),
   }).catch((err) => {
     if (err instanceof HttpError && err.status >= 400 && /FeatureNotAvailable|capacity|Premium|Fabric/i.test(JSON.stringify(err.body ?? err.message))) throw new Error('Power BI semantic model definition APIs are not available in this Pro workspace. The .pbix Imports fallback is planned but not implemented in this preview.');
     throw err;
@@ -915,7 +995,7 @@ async function ensureAzureConsumptionModel(ctx, server, database) {
   const m = config.consumption.model;
   await deployModel(ctx, m, {
     signature: `azure;${server};${database}`,
-    definition: () => semanticModelDefinition(buildConsumptionModel(loadTemplateModel(file), { server, database }), PBISM),
+    definition: () => semanticModelDefinition(buildConsumptionModel(loadTemplateModel(file), { server, database, resourceGraph: azureResourceGraphOn(config) }), PBISM),
   });
   pbi.consumptionDatasetId = m.id;
   ctx.save();
@@ -1254,7 +1334,7 @@ export async function azureSummary(ctx) {
   if (az.powerBi?.workspaceId) ui.info(`Power BI:   workspace ${az.powerBi.workspaceId}, model ${az.powerBi.datasetId ?? 'not deployed'}`);
   if (az.powerBi?.consumptionDatasetId) ui.info(`Credits:    model ${az.powerBi.consumptionDatasetId}`);
   if (az.teamsPackage) ui.info(`Teams:      ${az.teamsPackage}`);
-  if (azureConsumptionOn(config)) flowsSummary(ctx);
+  if (flowsWanted(config).length) flowsSummary(ctx);
   ui.info('Record:     Keep valuelens-install.json. It holds no secrets.');
 }
 

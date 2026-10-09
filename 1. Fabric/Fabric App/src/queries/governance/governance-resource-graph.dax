@@ -1,0 +1,63 @@
+EVALUATE
+VAR __ConfigDate = MAX('Agent Configuration'[SnapshotDate])
+VAR __Config = FILTER('Agent Configuration', 'Agent Configuration'[SnapshotDate] = __ConfigDate)
+VAR __NoSignIn =
+    DISTINCT(
+        SELECTCOLUMNS(
+            FILTER(
+                __Config,
+                'Agent Configuration'[NoSignIn] = TRUE()
+                    && NOT ('Agent Configuration'[IsQuarantined] = TRUE())
+                    && 'Agent Configuration'[TitleId] <> ""
+            ),
+            "Title ID", 'Agent Configuration'[TitleId]
+        )
+    )
+VAR __WebSearch =
+    DISTINCT(
+        SELECTCOLUMNS(
+            FILTER(__Config, 'Agent Configuration'[WebSearchEnabled] = TRUE() && 'Agent Configuration'[TitleId] <> ""),
+            "Title ID", 'Agent Configuration'[TitleId]
+        )
+    )
+VAR __Tenant =
+    FILTER(
+        'Agents 365',
+        NOT (LOWER(TRIM(COALESCE('Agents 365'[Created in], ""))) IN {"", "not available"})
+    )
+VAR __Live =
+    FILTER(
+        __Tenant,
+        NOT (LOWER(TRIM(COALESCE('Agents 365'[Is Blocked], ""))) IN {"true", "yes", "1"})
+    )
+VAR __Open = SELECTCOLUMNS(FILTER(__Live, 'Agents 365'[Title ID] IN __NoSignIn), "Title ID", 'Agents 365'[Title ID])
+VAR __FoundryDate = MAX('Foundry Resources'[SnapshotDate])
+VAR __Foundry = FILTER('Foundry Resources', 'Foundry Resources'[SnapshotDate] = __FoundryDate)
+VAR __AgentProbe = FILTER('Resource Graph Status', 'Resource Graph Status'[Probe] = "arg_agent_config")
+VAR __AgentProbeDate = MAXX(__AgentProbe, 'Resource Graph Status'[SnapshotDate])
+VAR __FoundryProbe = FILTER('Resource Graph Status', 'Resource Graph Status'[Probe] = "arg_foundry_resources")
+VAR __FoundryProbeDate = MAXX(__FoundryProbe, 'Resource Graph Status'[SnapshotDate])
+RETURN
+    ROW(
+        "Configured Agents", COUNTROWS(__Config) + 0,
+        "Matched Agents", COUNTROWS(FILTER(__Config, 'Agent Configuration'[TitleId] <> "")) + 0,
+        "No Sign In", COUNTROWS(__Open) + 0,
+        "No Sign In Configured",
+            COUNTROWS(
+                FILTER(
+                    __Config,
+                    'Agent Configuration'[NoSignIn] = TRUE() && NOT ('Agent Configuration'[IsQuarantined] = TRUE())
+                )
+            ) + 0,
+        "Web Search", COUNTROWS(FILTER(__Live, 'Agents 365'[Title ID] IN __WebSearch)) + 0,
+        "Foundry Resources", COUNTROWS(__Foundry) + 0,
+        "Foundry Public", COUNTROWS(FILTER(__Foundry, 'Foundry Resources'[PublicNetwork] = TRUE())) + 0,
+        "Foundry Public Projects",
+            COUNTROWS(
+                FILTER(__Foundry, 'Foundry Resources'[PublicNetwork] = TRUE() && 'Foundry Resources'[IsProject] = TRUE())
+            ) + 0,
+        "Agent Status",
+            MAXX(FILTER(__AgentProbe, 'Resource Graph Status'[SnapshotDate] = __AgentProbeDate), 'Resource Graph Status'[Status]),
+        "Foundry Status",
+            MAXX(FILTER(__FoundryProbe, 'Resource Graph Status'[SnapshotDate] = __FoundryProbeDate), 'Resource Graph Status'[Status])
+    )

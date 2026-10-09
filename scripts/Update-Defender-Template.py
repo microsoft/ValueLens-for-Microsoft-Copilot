@@ -2,8 +2,9 @@
 
 'Agents 365'[Sign-in Required] says whether an agent asks its users to sign in: Yes, No or
 Unknown. The Agents 365 query reads it from an ordered list of sources and keeps the first
-answer: Defender advanced hunting's agent inventory (defender_ai_agents) today. A source
-that is missing or empty is skipped, so the column is Unknown when none is connected.
+answer: Azure Resource Graph's agent configuration (arg_agent_config), then Defender advanced
+hunting's agent inventory (defender_ai_agents). A source that is missing or empty is skipped,
+so the column is Unknown when none is connected.
 Governance Flags then adds "No sign-in required".
 
 The script owns those three things only: the Sign-in Required step in the Agents 365
@@ -43,6 +44,58 @@ ANCHOR = (
     "    __lean = Table.RemoveColumns(__withScope, "
 )
 STEP = "\n".join((
+    "    // Sign-in Required: whether the agent asks its users to sign in (Yes, No or",
+    "    // Unknown). Each source is a lookup from a lowercase agent ID (Entra agent ID,",
+    "    // bot ID or app ID) to Yes or No, and the first source that knows the agent",
+    "    // wins, so put more authoritative sources first. A source that is missing or",
+    "    // empty is skipped. Azure Resource Graph's agent configuration comes first, as",
+    "    // it reads the agent's own authentication setting; Defender advanced hunting's",
+    "    // agent inventory is the fallback.",
+    "    __signInLookup = (t as nullable table) as record =>",
+    "        if t = null then [] else",
+    "        let",
+    "            cols = Table.ColumnNames(t),",
+    "            last = if List.Contains(cols, \"SnapshotDate\") then List.Max(Table.Column(t, \"SnapshotDate\")) else null,",
+    "            latest = if last = null then t else Table.SelectRows(t, each Record.Field(_, \"SnapshotDate\") = last),",
+    "            known = List.Select(Table.ToRecords(latest),",
+    "                (r) => List.Contains({\"Yes\", \"No\"}, Record.FieldOrDefault(r, \"SignInRequired\", null))),",
+    "            pairs = List.Combine(List.Transform(known, (r) =>",
+    "                List.Transform(",
+    "                    List.Select(",
+    "                        List.Transform({\"EntraAgentId\", \"BotId\", \"AppId\", \"AgentId\"},",
+    "                            (k) => Text.Lower(Text.Trim(Text.From(Record.FieldOrDefault(r, k, null) ?? \"\")))),",
+    "                        (k) => k <> \"\"),",
+    "                    (k) => {k, r[SignInRequired]}))),",
+    "            unique = List.Distinct(pairs, each _{0})",
+    "        in",
+    "            Record.FromList(List.Transform(unique, each _{1}), List.Transform(unique, each _{0})),",
+    "    // Resource Graph says NoSignIn (true when authentication is None) and EntraAppId;",
+    "    // map them onto the lookup's SignInRequired and AppId.",
+    "    __argSignIn = (t as table) as table =>",
+    "        Table.AddColumn(",
+    "            Table.RenameColumns(t, {{\"EntraAppId\", \"AppId\"}}, MissingField.Ignore),",
+    "            \"SignInRequired\",",
+    "            each let v = Record.FieldOrDefault(_, \"NoSignIn\", null) in",
+    "                if v = true then \"No\" else if v = false then \"Yes\" else null),",
+    "    __signInSources = {",
+    "        __signInLookup(try __argSignIn(FabricTable(\"arg_agent_config\")) otherwise null),",
+    "        __signInLookup(try FabricTable(\"defender_ai_agents\") otherwise null)",
+    "    },",
+    "    __withSignIn = Table.AddColumn(__withScope, \"Sign-in Required\", each",
+    "        let",
+    "            keys = List.Select(",
+    "                List.Transform({[Entra Agent ID], [Bot Id], [App Id]}, (v) => Text.Lower(Text.Trim(Text.From(v ?? \"\")))),",
+    "                (k) => k <> \"\"),",
+    "            answers = List.RemoveNulls(List.Transform(__signInSources, (src) =>",
+    "                List.First(List.RemoveNulls(List.Transform(keys, (k) => Record.FieldOrDefault(src, k, null))), null)))",
+    "        in",
+    "            List.First(answers, \"Unknown\"), type text),",
+    "    // Lean pass: drop source columns nothing in the model reads.",
+    "    __lean = Table.RemoveColumns(__withSignIn, ",
+))
+
+# The step as first shipped, with Defender as the only source; replaced in place.
+PREVIOUS_STEP = "\n".join((
     "    // Sign-in Required: whether the agent asks its users to sign in (Yes, No or",
     "    // Unknown). Each source is a lookup from a lowercase agent ID (Entra agent ID,",
     "    // bot ID or app ID) to Yes or No, and the first source that knows the agent",
@@ -87,9 +140,9 @@ NEW_COLUMN = {
     "name": COLUMN,
     "dataType": "string",
     "sourceColumn": COLUMN,
-    "description": "Whether the agent asks its users to sign in: Yes, No or Unknown. From Defender advanced "
-                   "hunting's agent inventory when the Defender source is on; Unknown when no source knows "
-                   "the agent.",
+    "description": "Whether the agent asks its users to sign in: Yes, No or Unknown. From Azure Resource "
+                   "Graph's agent configuration first, then Defender advanced hunting's agent inventory, when "
+                   "those sources are on; Unknown when no source knows the agent.",
     "lineageTag": str(uuid.uuid5(uuid.NAMESPACE_URL, f"valuelens:defender:{TABLE}:column:{COLUMN}")),
     "summarizeBy": "none",
     "annotations": [{"name": "SummarizationSetBy", "value": "Automatic"}],
@@ -146,9 +199,13 @@ def apply(model):
     source = partitions[0]["source"]
     query = joined(source["expression"])
     if STEP not in query:
-        if query.count(ANCHOR) != 1 or "__withSignIn" in query:
+        if query.count(PREVIOUS_STEP) == 1:
+            query = query.replace(PREVIOUS_STEP, STEP)
+        elif query.count(ANCHOR) != 1 or "__withSignIn" in query:
             raise ValueError(f"{TABLE}: the lean-pass anchor was not found exactly once")
-        source["expression"] = model_text(query.replace(ANCHOR, STEP))
+        else:
+            query = query.replace(ANCHOR, STEP)
+        source["expression"] = model_text(query)
         changed.append(f"{TABLE} query")
 
     columns = table["columns"]

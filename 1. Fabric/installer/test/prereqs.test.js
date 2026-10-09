@@ -36,6 +36,7 @@ function fakeApis(over = {}) {
       myRoleAssignments: async (/** @type {string} */ scope) => over.assigned?.[scope] ?? [assignment(ROLES.owner)],
       myEligibleRoles: async (/** @type {string} */ scope) => over.armEligible?.[scope] ?? [],
       getVault: async () => ({ name: 'kv' }),
+      resourceGraph: over.resourceGraph ?? (async () => ({ data: [{ id: 'x' }] })),
     },
     fabric: {
       listCapacities: async () => over.capacities ?? [{ id: 'cap-1', displayName: 'F64', sku: 'F64', state: 'Active' }],
@@ -167,6 +168,30 @@ test('checkPrereqs: System Administrator per environment; a failing check is "co
   const env = items.find((i) => i.id === 'environments');
   assert.equal(env?.status, 'unknown');
   assert.match(env?.detail ?? '', /^Couldn't check: 503/);
+});
+
+test('checkPrereqs: with Resource Graph on, it says what you can see of agents and Foundry; a refusal is missing, none is unknown', async () => {
+  const config = emptyConfig();
+  config.dataSources.resourceGraph = 'api';
+  config.resourceGraph = { managementGroup: 'mg-1', agents: true, foundry: true };
+  /** @type {any[]} */
+  const asked = [];
+  const seen = await run({ resourceGraph: async (/** @type {string} */ q, /** @type {string} */ mg) => (asked.push([q, mg]), { data: [{ id: 'x' }] }) }, config);
+  assert.equal(seen['resource-graph'].status, 'met');
+  assert.equal(seen['resource-graph'].optional, true);
+  assert.deepEqual(asked.map((a) => a[1]), ['mg-1', 'mg-1']);
+  assert.match(asked[0][0], /PowerPlatformResources \| where type =~ 'microsoft\.copilotstudio\/agents'/);
+  assert.match(asked[1][0], /microsoft\.cognitiveservices\/accounts\/projects/);
+
+  const refused = await run({ resourceGraph: async (/** @type {string} */ q) => {
+    if (q.startsWith('PowerPlatformResources')) throw new HttpError('403 Forbidden', { method: 'POST', url: 'x', status: 403 });
+    return { data: [] };
+  } }, config);
+  assert.equal(refused['resource-graph'].status, 'missing');
+  assert.deepEqual(refused['resource-graph'].rows?.map((r) => r.status), ['missing', 'unknown']);
+  assert.match(refused['resource-graph'].detail, /Copilot Studio agents: Refused/);
+
+  assert.equal((await run({}))['resource-graph'], undefined, 'not checked when the source is off');
 });
 
 test('graph and ARM lookups keep only rows for the signed-in user\'s principals, whatever the filter returned', async () => {

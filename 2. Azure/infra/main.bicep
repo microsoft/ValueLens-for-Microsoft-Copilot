@@ -86,6 +86,12 @@ param paygSubscriptionIds string = ''
 param dropSiteId string = ''
 param dropDriveId string = ''
 param dropFolder string = ''
+@description('Azure Resource Graph (module resourceGraph): management group the run job queries. Empty = every subscription the identity can read.')
+param argManagementGroup string = ''
+@description('Azure Resource Graph: read Copilot Studio agent configuration from PowerPlatformResources.')
+param argAgents bool = true
+@description('Azure Resource Graph: read Foundry accounts and projects from resources.')
+param argFoundry bool = true
 
 var allTags = union(tags, { 'valuelens-install-id': installId, 'valuelens-component': 'analytics-hub' })
 var privateNetworking = publicNetworkAccess == 'Disabled'
@@ -210,6 +216,9 @@ module apps 'modules/containerapps.bicep' = {
     dropSiteId: dropSiteId
     dropDriveId: dropDriveId
     dropFolder: dropFolder
+    argManagementGroup: argManagementGroup
+    argAgents: argAgents
+    argFoundry: argFoundry
   }
 }
 

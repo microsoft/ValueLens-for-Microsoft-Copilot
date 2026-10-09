@@ -30,6 +30,9 @@ class Settings:
     drop_site_id: str = ""
     drop_drive_id: str = ""
     drop_folder: str = ""
+    arg_management_group: str = ""
+    arg_agents: bool = True
+    arg_foundry: bool = True
 
     def has(self, module: str) -> bool:
         return module in self.modules
@@ -67,7 +70,17 @@ class Settings:
             drop_site_id=(env.get("VALUELENS_DROP_SITE_ID") or "").strip(),
             drop_drive_id=(env.get("VALUELENS_DROP_DRIVE_ID") or "").strip(),
             drop_folder=(env.get("VALUELENS_DROP_FOLDER") or "").strip().strip("/"),
+            arg_management_group=(env.get("VALUELENS_ARG_MANAGEMENT_GROUP") or "").strip(),
+            arg_agents=_bool(env, "VALUELENS_ARG_AGENTS", True),
+            arg_foundry=_bool(env, "VALUELENS_ARG_FOUNDRY", True),
         )
+
+
+def _bool(env, name: str, default: bool) -> bool:
+    value = (env.get(name) or "").strip().lower()
+    if not value:
+        return default
+    return value in ("true", "1", "yes")
 
 
 def _int(env, name: str, default: int) -> int:

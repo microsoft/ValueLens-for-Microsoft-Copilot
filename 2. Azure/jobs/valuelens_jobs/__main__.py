@@ -103,6 +103,10 @@ def collect(store, settings, api=None) -> dict:
         else:
             # As in Fabric: without the Azure AI subscription, Copilot pay-as-you-go isn't read either.
             log.info("collect azure_ai: VALUELENS_AZURE_AI_SUBSCRIPTION not set; Azure AI and PAYG skipped")
+    if settings.has("resourceGraph"):
+        from .collect.resource_graph import collect_resource_graph
+
+        jobs.append(("resource_graph", collect_resource_graph))
     out, errors = {}, {}
     for name, fn in jobs:
         try:
@@ -116,9 +120,11 @@ def collect(store, settings, api=None) -> dict:
 
 
 def publish_targets(settings) -> list[str]:
-    from .publish import CONSUMPTION, DEFENDER
+    from .publish import CONSUMPTION, DEFENDER, RESOURCE_GRAPH
 
     consumption = list(CONSUMPTION) if settings.has("consumption") else []
+    if settings.has("resourceGraph") and not settings.sample_data:
+        consumption += list(RESOURCE_GRAPH)
     if settings.sample_data:
         # The sample replaces the people, Copilot and consumption tables; tenant M365 activity is left as it is.
         return ["curated", "licensed", "org", *consumption]

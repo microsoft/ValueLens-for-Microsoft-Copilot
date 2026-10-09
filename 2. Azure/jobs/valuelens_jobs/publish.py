@@ -80,6 +80,10 @@ DEFENDER = ["defender_ai_watchlist", "defender_shadow_ai_daily", "defender_shado
             "defender_ai_installed", "defender_cloud_discovery_ai", "defender_ai_agents", "defender_status"]
 for _name in DEFENDER:
     TARGETS[_name] = Target(_name, f"raw/{_name}", DEFENDER_PARTITIONED.get(_name), incremental=False)
+# Azure Resource Graph (module `resourceGraph`): daily snapshots, replaced each run.
+RESOURCE_GRAPH = ["arg_agent_config", "arg_environments", "arg_agent_flows", "arg_foundry_resources", "arg_status"]
+for _name in RESOURCE_GRAPH:
+    TARGETS[_name] = Target(_name, f"raw/{_name}", incremental=False)
 
 
 def b(name: str) -> str:

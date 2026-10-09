@@ -60,11 +60,27 @@ model reads `dbo.<table>` in Azure SQL. Each collector fails on its own, and the
   - The block of pure helpers is a verbatim copy of the one in `pull_azure_ai.py` and the notebook,
     and `tests/test_azure_ai_collectors.py` keeps the copies identical.
 
+- **resource_graph** (`collect/resource_graph.py`, module `resourceGraph`) ports the Fabric notebook
+  `Copilot_Resource_Graph_Ingester`. It writes daily snapshots of `arg_agent_config`,
+  `arg_environments` and `arg_agent_flows` (Copilot Studio agents, environments and agent flows, from
+  `PowerPlatformResources`), `arg_foundry_resources` (Foundry accounts and projects, from `resources`,
+  with lower-case ids that join to Azure AI spend) and `arg_status` (one row per probe: `ok`, `empty`,
+  `forbidden`, `error` or `skipped`).
+  - Each probe is best effort. A refused probe leaves its table as it was, and the job doesn't fail.
+  - The managed identity needs **Reader** at the management group (or the tenant root group) for
+    Foundry, and an Entra role such as **Global Reader** for agents. App-only access to
+    `PowerPlatformResources` isn't documented. When it's refused or empty, the newest
+    `arg_inventory/*.json` in the drop folder is read instead: the **Analytics Hub - Agent
+    inventory** flow writes it each day from the Power Platform inventory API, signed in as an admin.
+  - Agent 365 isn't collected on Azure, so `TitleId` stays blank.
+  - The shared block is a verbatim copy of the notebook's section 2; `tests/test_resource_graph.py`
+    keeps them identical.
+
 Files in the drop folder are never moved or deleted. Every run re-reads all of them and merges the
 results idempotently into the state kept in `curated/<table>/part-0.parquet`, as Fabric does with
 its Delta tables.
 
-The drop folder has the subfolders `studio/` and `viva/`. The Power Automate flow's `flows/`
+The drop folder has the subfolders `studio/`, `viva/` and `arg_inventory/`. The Power Automate flow's `flows/`
 state is ignored. Where the folder lives depends on the networking mode:
 
 - Public networking uses the storage account's `landing` container (`landing/studio/`,
@@ -85,8 +101,9 @@ state is ignored. Where the folder lives depends on the networking mode:
 | `viva_credits_weekly` | viva | by `metric_date` |
 | `viva_spending_policy` | viva | snapshot |
 | `azure_ai_spend`, `azure_ai_tokens`, `copilot_payg_spend`, `azure_deployment_health`, `azure_solution_spend`, `azure_billing_reconciliation` | azure_ai | snapshot |
+| `arg_agent_config`, `arg_environments`, `arg_agent_flows`, `arg_foundry_resources`, `arg_status` | resource_graph | snapshot |
 
-`2. Azure/sql/migrations/V002__consumption.sql` creates every table up front, so a refresh before
+`2. Azure/sql/migrations/V002__consumption.sql` and `V004__resource_graph.sql` create every table up front, so a refresh before
 the first collection finds empty tables. A table whose source has never run is skipped at
 publish. The consumption tables never trigger the full refresh of the incremental Copilot model.
 
@@ -124,7 +141,9 @@ The job reads its settings from environment variables. Bicep sets them.
 | `VALUELENS_TENANT_ID` | The customer tenant |
 | `VALUELENS_STORAGE_ACCOUNT` | The ADLS Gen2 account (containers `raw`, `curated`, `landing`) |
 | `VALUELENS_SQL_SERVER`, `VALUELENS_SQL_DATABASE` | The Azure SQL target. Auth is Entra-only, with an access token. |
-| `VALUELENS_MODULES` | A comma list such as `core,orgData,m365Activity,consumption,defender`. The default is `core,orgData`. |
+| `VALUELENS_MODULES` | A comma list such as `core,orgData,m365Activity,consumption,defender,resourceGraph`. The default is `core,orgData`. |
+| `VALUELENS_ARG_MANAGEMENT_GROUP` | resourceGraph: the management group Resource Graph reads. Empty reads everything the identity can see. |
+| `VALUELENS_ARG_AGENTS`, `VALUELENS_ARG_FOUNDRY` | resourceGraph: `false` turns off the agent or Foundry probes. Both default to `true`. |
 | `VALUELENS_AZURE_AI_SUBSCRIPTION` | consumption: the subscription for Azure OpenAI / AI Foundry costs and metrics. When it is empty, Azure AI and pay-as-you-go are skipped. |
 | `VALUELENS_PAYG_SUBSCRIPTIONS` | consumption: other subscriptions, as a comma list, whose Copilot pay-as-you-go costs are read |
 | `VALUELENS_DROP_SITE_ID`, `VALUELENS_DROP_DRIVE_ID`, `VALUELENS_DROP_FOLDER` | consumption, private networking: the SharePoint drop folder (see above). When unset, the job reads the `landing` container. |

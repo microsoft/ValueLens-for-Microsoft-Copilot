@@ -9,7 +9,7 @@ import { routedSources, routerSignaturesJson, routerWanted } from '../uploads.js
 import { statusConfigJson } from '../loads.js';
 import { parseResourceId } from '../clients/azure.js';
 import { scheduleBody } from '../clients/fabric.js';
-import { secretMode } from '../config.js';
+import { normaliseResourceGraph, secretMode } from '../config.js';
 import { HttpError } from '../http.js';
 import { INLINE_SECRET_NOTE, MARKER, prepareNotebook, pyString, serialiseNotebook } from '../transform/notebook.js';
 import { buildPipeline, PIPELINE_CHANGE, PIPELINE_VERSION } from '../transform/pipeline.js';
@@ -322,6 +322,13 @@ export function notebookSettings(ctx, nb) {
   if (nb.key === 'agentTranscripts') values = { SOURCE_MODE: 'dataverse', WRITE_MODE: 'merge', RAW_TABLE: '' };
   if (nb.key === 'uploadRouter') values = routerValues(config);
   if (nb.key === 'loadStatus') values = { STATUS_JSON: statusConfigJson() };
+  /** @type {Record<string, string> | undefined} */
+  let expressions = nb.expressions;
+  if (nb.key === 'resourceGraph') {
+    const rg = normaliseResourceGraph(config.resourceGraph);
+    values = { MANAGEMENT_GROUP: rg.managementGroup ?? '' };
+    expressions = { INCLUDE_AGENTS: rg.agents ? 'True' : 'False', INCLUDE_FOUNDRY: rg.foundry ? 'True' : 'False' };
+  }
   /** @type {import('../catalog.js').NotebookPatch[]} */
   const extra = [
     ...(nb.key === 'agentTranscripts' ? [environmentsPatch(config.agentEvaluator.environments)] : []),
@@ -338,7 +345,7 @@ export function notebookSettings(ctx, nb) {
       : {}),
     parameters: nb.parameters,
     ...(values ? { values } : {}),
-    ...(nb.expressions ? { expressions: nb.expressions } : {}),
+    ...(expressions ? { expressions } : {}),
     patches: extra.length ? [...(nb.patches ?? []), ...extra] : nb.patches,
     lakehouse: {
       id: /** @type {string} */ (f.lakehouseId),
@@ -641,9 +648,16 @@ export function pipelineSignature(config) {
   if (workdayOn(config)) parts.push('workday');
   if (agent365Csv(config)) parts.push('agent365=csv');
   if (coworkDataflowOn(config)) parts.push(`cowork=${config.consumption.dataflowId}`);
+  if (resourceGraphNotebookOn(config)) parts.push('resourceGraph');
   if (config.scale) parts.push(`scale=${config.scale}`);
   return parts.join(';');
 }
+
+/**
+ * Agent configuration and Foundry come from Azure Resource Graph, so its notebook runs after Agent 365.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const resourceGraphNotebookOn = (config) => config.dataSources?.resourceGraph === 'api';
 
 /**
  * Cowork credits come from the Viva Insights Dataflow, so the pipeline refreshes it before the Viva load.
@@ -717,6 +731,7 @@ export function pipelineSettings(config) {
     workday: workdayOn(config),
     agent365Csv: agent365Csv(config),
     coworkDataflowId: coworkDataflowOn(config) ? config.consumption.dataflowId : undefined,
+    resourceGraph: resourceGraphNotebookOn(config),
   };
 }
 

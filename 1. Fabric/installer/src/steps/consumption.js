@@ -412,7 +412,8 @@ export async function ensureConsumptionModel(ctx, opts = {}) {
   const { server, database } = await waitForSqlEndpoint(ctx);
   await deployModel(ctx, m, {
     signature: `${server.toLowerCase()};${database}`,
-    definition: () => semanticModelDefinition(buildConsumptionModel(loadTemplateModel(file), { server, database }), PBISM),
+    definition: () =>
+      semanticModelDefinition(buildConsumptionModel(loadTemplateModel(file), { server, database, resourceGraph: config.dataSources?.resourceGraph === 'api' }), PBISM),
     force: opts.force,
   });
   if (!m.bound && config.semanticModel.connectionId) await bindModel(ctx, m);

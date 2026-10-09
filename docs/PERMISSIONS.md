@@ -46,6 +46,21 @@ reports** is off (Microsoft 365 admin center → Settings → Org settings → S
 For the **export-only** source, the only "permission" to automate landing is the automation's **OneLake write**
 right (next section) — the data itself must be exported by an admin (or a scheduled portal export) first.
 
+### Azure Resource Graph
+
+Optional: agent configuration (sign-in, quarantine, connectors, web search, sharing) and Foundry accounts and
+projects. Used by `Copilot_Resource_Graph_Ingester` (Fabric, as the app registration) and the Azure jobs
+(module `resourceGraph`, as the managed identity). Each part is best effort: a refused probe is recorded in
+`arg_status`, and the dashboard shows why that part is empty.
+
+| Part | Needs | Notes |
+|---|---|---|
+| Foundry accounts and projects (`resources`) | Azure **Reader** at a management group, or the tenant root group to see every subscription | Resource Graph returns only what the identity can read. The installer assigns it when the person installing can assign roles there, or prints the `az role assignment create` command |
+| Copilot Studio agents, environments and agent flows (`PowerPlatformResources`) | An Entra role that can read the Power Platform inventory: **Global Reader**, **Power Platform Administrator** or **AI Administrator** | A directory role, so the installer only prints the step. Microsoft doesn't document app-only access to this table, so it may be refused or come back empty |
+| Fallback: the **Analytics Hub - Agent inventory** flow | The flow's Power Platform API connection (**HTTP with Microsoft Entra ID**, resource `https://api.powerplatform.com`) signed in as one of the roles above. Same flow licence and environment roles as the Copilot Studio credits flow | The Power Platform inventory API takes delegated sign-ins only. The flow writes the inventory as JSON to `arg_inventory/` in the drop folder each day, and the notebook or job reads the newest file when Resource Graph doesn't return agents |
+
+No per-project agent sweep: Foundry is read at account and project level only.
+
 > **Add-ons.** [Agent Evaluator](../1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/README.md) needs the app
 > registration as a Dataverse **application user**.
 > [Credit consumption](../1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/README.md) lists its own roles.
@@ -79,6 +94,7 @@ right (next section) — the data itself must be exported by an admin (or a sche
 | The flow writes to a SharePoint folder (private networking) | Whoever signs the flow's SharePoint connection in needs to add files to the folder. The jobs' managed identity needs the Graph app role **Sites.Selected** plus **Read** on that site, granted by a SharePoint or Global administrator (the installer does it, or prints the `Grant-PnPAzureADAppSitePermission` command) |
 | Azure AI and pay-as-you-go spend | The jobs' managed identity gets **Reader**, **Cost Management Reader** and **Monitoring Reader** on the Azure AI subscription, and **Cost Management Reader** on each pay-as-you-go subscription. The installer assigns them when the person installing can assign roles there |
 | Cowork credits | No automated pull on Azure yet. Drop the Consumption Dashboard's Viva Insights export (**Insights Analyst**) in the `viva` folder |
+| Azure Resource Graph (module `resourceGraph`) | The jobs' managed identity gets **Reader** at the management group, or the tenant root group, for Foundry, and needs an Entra role such as **Global Reader** for agents. See [Azure Resource Graph](#azure-resource-graph) |
 
 ---
 

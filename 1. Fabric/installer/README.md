@@ -117,7 +117,9 @@ signed in as you (`--flow-identity app` is Fabric only). With public endpoints t
 storage account's `landing` container and you get **Storage Blob Data Contributor** on it. With private
 networking it writes to a SharePoint folder you name, and the managed identity gets **Sites.Selected** read
 on that site (a SharePoint or Global administrator grants it). See
-[2. Azure](../../2.%20Azure/README.md#credit-consumption). Re-runs are incremental and use the same
+[2. Azure](../../2.%20Azure/README.md#credit-consumption). Agent configuration and Foundry from Azure
+Resource Graph also works on Azure: see [Agent configuration and Foundry](#agent-configuration-and-foundry).
+Re-runs are incremental and use the same
 `valuelens-install.json`, with `target: "azure"` and an `azure` block. The installer tags every Azure
 resource with `valuelens-install-id` and stops rather than modifying untagged resources with colliding
 names.
@@ -382,6 +384,7 @@ this installer ignore it and run as usual: run `update` first if yours is.
 | Azure AI costs | Yes | | Consumption Central |
 | Agent Evaluator | Yes | | Agent Evaluator |
 | Defender (shadow AI and agent risk) | Yes, through Microsoft Graph. Needs Defender for Endpoint P2 or Defender for Cloud Apps | | Governance: Shadow AI and the *No sign-in required* flag |
+| Agent configuration and Foundry (Azure Resource Graph) | Off by default. See [Agent configuration and Foundry](#agent-configuration-and-foundry) | | Governance: agent configuration, Foundry estate and the *No sign-in required* flag (ahead of Defender) |
 
 A skipped source leaves its table empty and its page blank. Nothing fails. To turn one on later,
 choose **Repair or change**.
@@ -414,14 +417,16 @@ The installer creates these flows in the Power Platform environment you pick, **
 |---|---|---|---|
 | `Analytics Hub - Copilot Studio credits` | Copilot Studio credits set to **Connected** (the default) | Each day, an hour before the pipeline, reads credits by agent, by user and the tenant's entitlement from the Power Platform licensing API. The first run loads about six months; later runs restate the last ten days | Power Platform API and OneLake |
 | `Analytics Hub - Product feedback` | Product feedback set to **Power Automate (emailed export)** | Saves product feedback exports emailed with the subject `Copilot Product Feedback` | Office 365 Outlook and OneLake |
+| `Analytics Hub - Agent inventory` | Agent configuration and Foundry set to **Connected**, with agents | Each day, an hour before the pipeline, saves the Power Platform inventory of Copilot Studio agents, environments and agent flows to `Files/arg_inventory`, for when Resource Graph won't give the app the agents | Power Platform API and OneLake |
 
-Both need Power Automate Premium. To finish each one:
+They need Power Automate Premium. To finish each one:
 
 1. Open it in Power Automate.
 2. Sign in to its connections:
    - **HTTP with Microsoft Entra ID (preauthorized), for the Power Platform API** (Studio flow):
      Base Resource URL and Resource URI `https://api.powerplatform.com`. Sign in as a Power
-     Platform, Billing or Global administrator.
+     Platform, Billing or Global administrator. For the agent inventory flow, sign in as a Power
+     Platform administrator or Global Reader: the inventory API takes delegated sign-ins only.
    - **Office 365 Outlook** (feedback flow): sign in as the mailbox the export is emailed to.
    - **HTTP with Microsoft Entra ID (preauthorized), for OneLake**: Base Resource URL
      `https://onelake.dfs.fabric.microsoft.com`, Resource URI `https://storage.azure.com`. Sign in
@@ -478,15 +483,18 @@ addresses, the M365 Copilot licence flag and the exact prepaid split.
 | Read Copilot Studio credits with the flow | `install --data studioCredits=api --flow-environment https://contoso.crm.dynamics.com` |
 | Have the flows write as the app, with its secret in Key Vault | `install --flow-identity app` |
 | Read Cowork credits with a Dataflow | `install --data coworkCredits=api --viva-partition <id> --viva-query <id>` |
+| Read agent configuration and Foundry from Resource Graph | `install --data resourceGraph=api --arg-management-group <id>` |
 | Upload exports later, then load them now | `upload feedback.csv agents.csv --run` |
 | Run only the loads that failed last time | `rerun-failed` |
 
 Source IDs for `--data`: `workday`, `m365Activity`, `agent365`, `productFeedback`,
-`studioCredits`, `coworkCredits`, `azureAi`, `agentEvaluator`, `defender`. Modes: `api`, `csv` or
-`skip` (`defender` has no CSV).
+`studioCredits`, `coworkCredits`, `azureAi`, `agentEvaluator`, `defender`, `resourceGraph`. Modes:
+`api`, `csv` or `skip` (`defender` and `resourceGraph` take `api` or `skip`).
 For `productFeedback` and `studioCredits`, `flow` is the same as `api`. `--feedback-flow` still
 works: it's the same as `productFeedback=flow`.
 Without `--flow-environment`, the installer asks which environment to use.
+With `resourceGraph=api`, `--arg-management-group <id>` reads one management group rather than the
+whole tenant, and `--no-arg-agents` or `--no-arg-foundry` leaves agents or Foundry out.
 
 ## Microsoft 365 activity
 
@@ -554,6 +562,39 @@ the app's **Governance** page, and gives the Agent 365 registry a *No sign-in re
   the page leaves them out.
 - **It's a floor, not a census.** Defender sees only onboarded devices and the tools on the
   watchlist. See [Methodology](../../docs/METHODOLOGY.md#shadow-ai-what-other-ai-tools-are-in-use).
+
+## Agent configuration and Foundry
+
+Optional and off by default. On the Data sources screen set **Agent configuration and Foundry
+(Azure Resource Graph)** to **Connected**, or use `--data resourceGraph=api`. Each day
+`Copilot_Resource_Graph_Ingester` reads Copilot Studio agents (authentication, connectors, sharing,
+model and channels), Power Platform environments, agent flows, and Foundry resources and projects,
+into `arg_agent_config`, `arg_environments`, `arg_agent_flows`, `arg_foundry_resources` and
+`arg_status`. An agent's authentication setting feeds the Agent 365 registry's *Sign-in Required*
+column, ahead of Defender when both are on. It reads one management group, or the tenant root group if you leave it blank. It
+never fails for want of a role: what it couldn't read is in `arg_status`, in plain words.
+
+Whoever runs the load (the app registration, or on Azure the jobs' managed identity) needs:
+
+- **Foundry:** Azure **Reader** on the management group, or on the tenant root group. The installer
+  gives it when you can assign roles there. If you can't, it prints the command for an Owner or
+  User Access Administrator:
+  `az role assignment create --assignee <app or identity client ID> --role Reader --scope /providers/Microsoft.Management/managementGroups/<group or tenant ID>`.
+- **Agents:** one of the Entra roles **Global Reader**, **Power Platform Administrator** or **AI
+  Administrator**. The installer doesn't assign directory roles: a Privileged Role Administrator
+  assigns it in the Entra admin center under **Roles and administrators**. Without it, Resource
+  Graph returns no agents.
+
+When Resource Graph won't return the agents, the load reads the newest file the
+`Analytics Hub - Agent inventory` [flow](#power-automate-flows) saved instead. The Power Platform
+inventory API it calls takes delegated sign-ins only, so the flow reads as the admin who signed in
+to its connection. It writes to `Files/arg_inventory` in the Lakehouse, or on Azure to
+`landing/arg_inventory`, or with private networking the `arg_inventory` subfolder of the
+SharePoint drop folder. Agent Title IDs are matched from the Agent 365 registry, so the load runs
+after it; on Azure, where Agent 365 isn't available yet, they stay blank.
+
+On Azure the installer adds `resourceGraph` to the jobs' modules and passes the management group
+and what to read (`argManagementGroup`, `argAgents`, `argFoundry`). Demo mode leaves it out.
 
 ## Agent Evaluator
 

@@ -12,6 +12,9 @@ import { orgUrl } from '../clients/dataverse.js';
 import { flowIdentity, secretMode } from '../config.js';
 import { commandLine } from '../launch.js';
 import {
+  AGENT_INVENTORY_DIR,
+  AGENT_INVENTORY_FLOW_NAME,
+  agentInventoryFlowDefinition,
   BACKFILL_MARKER,
   connectionReferencesOf,
   connectorByName,
@@ -37,24 +40,35 @@ import { UPLOAD_DIR } from '../uploads.js';
 import { ensureWorkspaceRole } from './model.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
-/** @typedef {'feedback' | 'studio'} FlowKind */
+/** @typedef {'feedback' | 'studio' | 'agents'} FlowKind */
 
 const MAKER = 'https://make.powerautomate.com/';
 export const FLOW_FILES = /** @type {Record<FlowKind, string>} */ ({
   feedback: 'analytics-hub-feedback-flow.json',
   studio: 'analytics-hub-studio-credits-flow.json',
+  agents: 'analytics-hub-agent-inventory-flow.json',
 });
 
+/** @type {Record<FlowKind, string>} */
+export const FLOW_NAMES = { feedback: FEEDBACK_FLOW_NAME, studio: STUDIO_FLOW_NAME, agents: AGENT_INVENTORY_FLOW_NAME };
+
 /** @param {import('../config.js').InstallConfig} config @returns {FlowKind[]} */
-const flowsChosen = (config) => [
-  ...(config.target !== 'azure' && config.dataSources.productFeedback === 'api' ? /** @type {const} */ (['feedback']) : []),
-  ...(config.dataSources.studioCredits === 'api' ? /** @type {const} */ (['studio']) : []),
-];
+const flowsChosen = (config) => {
+  const azure = config.target === 'azure';
+  const sample = azure && config.azure?.sampleData === true;
+  // On Azure with private networking, Power Automate can only write to the SharePoint drop folder.
+  const unreachable = azure && config.azure?.publicNetworkAccess === false && !azureDropsToSharePoint(config.azure);
+  return [
+    ...(!azure && config.dataSources.productFeedback === 'api' ? /** @type {const} */ (['feedback']) : []),
+    ...(config.dataSources.studioCredits === 'api' && (!azure || (!!config.modules.consumption && !sample)) ? /** @type {const} */ (['studio']) : []),
+    ...(config.dataSources.resourceGraph === 'api' && config.resourceGraph?.agents !== false && !sample && !unreachable ? /** @type {const} */ (['agents']) : []),
+  ];
+};
 
 /** The ADLS container an Azure install's flows and uploads land in. */
 export const AZURE_LANDING = 'landing';
 /** Folders under the Azure landing place: what the jobs read, and the flow's own state, which they don't. */
-export const AZURE_LANDING_DIRS = /** @type {const} */ ({ studio: 'studio', viva: 'viva', flows: 'flows' });
+export const AZURE_LANDING_DIRS = /** @type {const} */ ({ studio: 'studio', viva: 'viva', flows: 'flows', argInventory: 'arg_inventory' });
 
 /**
  * The credit files go to a SharePoint folder rather than the landing container. The plan sets the folder
@@ -78,12 +92,13 @@ export function azureFlowTarget(az) {
 }
 
 /**
- * Where an Azure install's Studio flow saves, for people.
+ * Where an Azure install's flow saves, for people: the Studio folder unless `dir` says otherwise.
  * @param {import('../config.js').AzureConfig | undefined} az
+ * @param {string} [dir]
  */
-export function azureDropLabel(az) {
-  if (azureDropsToSharePoint(az)) return az?.drop?.folderUrl ? `${az.drop.folderUrl.replace(/\/+$/, '')}/${AZURE_LANDING_DIRS.studio}` : 'the SharePoint drop folder';
-  return `${az?.outputs?.storageAccountName ?? 'the storage account'} > ${AZURE_LANDING}/${AZURE_LANDING_DIRS.studio}`;
+export function azureDropLabel(az, dir = AZURE_LANDING_DIRS.studio) {
+  if (azureDropsToSharePoint(az)) return az?.drop?.folderUrl ? `${az.drop.folderUrl.replace(/\/+$/, '')}/${dir}` : 'the SharePoint drop folder';
+  return `${az?.outputs?.storageAccountName ?? 'the storage account'} > ${AZURE_LANDING}/${dir}`;
 }
 
 /** The app identity reads its secret from Key Vault, which notebook mode doesn't use. @param {import('../config.js').InstallConfig} config */
@@ -96,7 +111,7 @@ export const flowsWanted = (config) => (appWithoutVault(config) ? [] : flowsChos
  * Flows the user asked for that can't be made: the app identity with the secret in the notebooks.
  * @param {import('../config.js').InstallConfig} config
  */
-export const flowsSkipped = (config) => (appWithoutVault(config) ? flowsChosen(config).map((k) => (k === 'feedback' ? FEEDBACK_FLOW_NAME : STUDIO_FLOW_NAME)) : []);
+export const flowsSkipped = (config) => (appWithoutVault(config) ? flowsChosen(config).map((k) => FLOW_NAMES[k]) : []);
 
 /** @param {string} v */
 function validateUrl(v) {
@@ -167,6 +182,9 @@ export function flowDefinitions(config, tenantId) {
         ...(identity === 'app' ? { tenantId, clientId: config.app.appId ?? '', secretName: config.keyVault.secretName } : {}),
       };
   const where = azure ? azureDropLabel(config.azure) : `${config.fabric.lakehouseName ?? 'the Lakehouse'} > ${UPLOAD_DIR}`;
+  const schedule = { time: config.schedule.time, timeZone: config.schedule.timeZone };
+  const inventoryDir = azure ? AZURE_LANDING_DIRS.argInventory : AGENT_INVENTORY_DIR;
+  const inventoryWhere = azure ? azureDropLabel(config.azure, AZURE_LANDING_DIRS.argInventory) : `${config.fabric.lakehouseName ?? 'the Lakehouse'} > ${AGENT_INVENTORY_DIR}`;
   return {
     feedback: {
       name: FEEDBACK_FLOW_NAME,
@@ -176,7 +194,12 @@ export function flowDefinitions(config, tenantId) {
     studio: {
       name: STUDIO_FLOW_NAME,
       description: `Saves Copilot Studio credits from the Power Platform licensing API to ${where} each day. Created by the Analytics Hub installer.`,
-      definition: studioFlowDefinition(t, { time: config.schedule.time, timeZone: config.schedule.timeZone }),
+      definition: studioFlowDefinition(t, schedule),
+    },
+    agents: {
+      name: AGENT_INVENTORY_FLOW_NAME,
+      description: `Saves the Power Platform inventory of Copilot Studio agents, environments and agent flows to ${inventoryWhere} each day, for when Azure Resource Graph won't return agents. The inventory API takes delegated sign-ins only, so its connection signs in as a Power Platform or Global Reader-type administrator. Created by the Analytics Hub installer.`,
+      definition: agentInventoryFlowDefinition(t, schedule, inventoryDir),
     },
   };
 }
@@ -327,9 +350,14 @@ export function connectionSteps(config, kind) {
       : flowIdentity(config) === 'app'
         ? `${CONNECTORS.keyVault.label}: vault ${config.keyVault.name ?? 'your Key Vault'}.`
         : `${CONNECTORS.storage.label}: Base Resource URL ${ONELAKE_DFS}, Resource URI ${STORAGE_RESOURCE}. Sign in as someone with Contributor or higher on ${workspace}.`;
-  return kind === 'feedback'
-    ? [`${CONNECTORS.outlook.label}: sign in as the mailbox the export is emailed to.`, storage]
-    : [`${CONNECTORS.entra.label}: Base Resource URL and Resource URI ${PPAPI}. Sign in as a Power Platform, Billing or Global administrator.`, storage];
+  if (kind === 'feedback') return [`${CONNECTORS.outlook.label}: sign in as the mailbox the export is emailed to.`, storage];
+  if (kind === 'agents') {
+    return [
+      `${CONNECTORS.entra.label}: Base Resource URL and Resource URI ${PPAPI}. Sign in as a Power Platform administrator, or an admin with Global Reader: the inventory API takes delegated sign-ins only.`,
+      storage,
+    ];
+  }
+  return [`${CONNECTORS.entra.label}: Base Resource URL and Resource URI ${PPAPI}. Sign in as a Power Platform, Billing or Global administrator.`, storage];
 }
 
 /**
@@ -357,7 +385,7 @@ export function flowsSummary(ctx) {
   const link = env?.id ? `${MAKER}environments/${env.id}/flows` : MAKER;
   ui.heading('Power Automate flows');
   for (const kind of kinds) {
-    const name = kind === 'feedback' ? FEEDBACK_FLOW_NAME : STUDIO_FLOW_NAME;
+    const name = FLOW_NAMES[kind];
     const file = up.flowFiles?.[kind];
     if (up.flowIds?.[kind] && !file) ui.info(c.bold(name) + c.dim(`  in ${env?.name ?? env?.url}, turned off`));
     else if (file) ui.info(c.bold(name) + c.dim(`  to import: ${file}`));
@@ -367,6 +395,7 @@ export function flowsSummary(ctx) {
     for (const step of connectionSteps(config, kind)) ui.info(`  ${n++}. ${step}`);
     ui.info(`  ${n++}. Save, then turn it on.`);
     if (kind === 'feedback') ui.info(`  ${n++}. In the Microsoft 365 admin center, schedule the product feedback export to that mailbox, subject "${FEEDBACK_SUBJECT}".`);
+    else if (kind === 'agents') ui.note('     It runs daily, an hour before the pipeline. The collector reads its newest file only when Azure Resource Graph returns no agents.');
     else {
       ui.info(`  ${n++}. To load about six months now rather than at its first daily run, click Run. Or use "${commandLine('run')}", which offers to run it before the pipeline.`);
       ui.note('     After that it runs daily, an hour before the pipeline.');

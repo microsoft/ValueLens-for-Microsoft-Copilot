@@ -41,9 +41,10 @@ export const EXPOSURE_SCOPES = ["Whole organisation", "Specific people or groups
 /**
  * The query only returns pairings that hold agents. This fills the rest of
  * the grid with empty cells, so every column and scope is always on show
- * and a missing column never reads as a chart fault.
+ * and a missing column never reads as a chart fault. `columns` lists the
+ * data access columns to always show, in risk order.
  */
-export function completeExposureGrid(table: DataTable): DataTable {
+export function completeExposureGrid(table: DataTable, columns: readonly string[] = EXPOSURE_ACCESS): DataTable {
     if (table.rows.length === 0) return table;
     const column = (name: string) => table.columns.findIndex((def) => def.name === name);
     const at = {
@@ -57,7 +58,7 @@ export function completeExposureGrid(table: DataTable): DataTable {
     if (Object.values(at).some((index) => index < 0)) return table;
 
     const scopes = new Map<string, unknown>(EXPOSURE_SCOPES.map((scope, index) => [scope, index + 1]));
-    const access = new Map<string, unknown>(EXPOSURE_ACCESS.map((level, index) => [level, index + 1]));
+    const access = new Map<string, unknown>(columns.map((level, index) => [level, index + 1]));
     const present = new Set<string>();
     for (const row of table.rows) {
         scopes.set(String(row[at.scope]), row[at.scopeOrder]);

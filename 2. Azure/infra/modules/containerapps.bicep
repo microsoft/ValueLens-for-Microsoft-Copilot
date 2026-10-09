@@ -34,6 +34,9 @@ param paygSubscriptionIds string = ''
 param dropSiteId string = ''
 param dropDriveId string = ''
 param dropFolder string = ''
+param argManagementGroup string = ''
+param argAgents bool = true
+param argFoundry bool = true
 param registryServer string = ''
 @description('Subnet delegated to Microsoft.App/environments (private networking). Empty = no VNet.')
 param infrastructureSubnetId string = ''
@@ -81,6 +84,9 @@ var jobEnv = concat(commonEnv, [
   { name: 'VALUELENS_DROP_SITE_ID', value: dropSiteId }
   { name: 'VALUELENS_DROP_DRIVE_ID', value: dropDriveId }
   { name: 'VALUELENS_DROP_FOLDER', value: dropFolder }
+  { name: 'VALUELENS_ARG_MANAGEMENT_GROUP', value: argManagementGroup }
+  { name: 'VALUELENS_ARG_AGENTS', value: argAgents ? 'true' : 'false' }
+  { name: 'VALUELENS_ARG_FOUNDRY', value: argFoundry ? 'true' : 'false' }
 ])
 var registries = empty(registryServer) ? [] : [{ server: registryServer, identity: identityId }]
 var identity = {

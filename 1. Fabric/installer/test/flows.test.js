@@ -685,12 +685,14 @@ test('offerStudioRun: --yes never runs it; an older record finds its environment
   const az = fakeFlowApi({ runs: [{ name: 'run-1', properties: { status: 'Succeeded' } }] });
   const { ctx: ctx3, config: c3, looked } = studioCtx({ flow: az.api });
   c3.target = 'azure';
+  c3.modules.consumption = true;
   assert.equal(await offerStudioRun(ctx3, { pipelineNext: true }), 'done');
   assert.deepEqual(looked, [], 'no OneLake on Azure');
 
   const fresh = fakeFlowApi();
   const { ctx: ctx4, config: c4 } = studioCtx({ flow: fresh.api });
   c4.target = 'azure';
+  c4.modules.consumption = true;
   assert.equal(await offerStudioRun(ctx4, { pipelineNext: true }), 'ran');
   assert.ok(fresh.calls.includes('runTrigger env-1 flow-1 Daily'));
 });

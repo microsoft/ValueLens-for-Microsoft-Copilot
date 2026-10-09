@@ -120,7 +120,11 @@ export async function ensureSemanticModel(ctx, opts = {}) {
   const { server, database } = await waitForSqlEndpoint(ctx);
   await deployModel(ctx, sm, {
     signature: modelSignature(server, database, config.modules),
-    definition: () => semanticModelDefinition(buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { server, database, modules: config.modules }), PBISM),
+    definition: () =>
+      semanticModelDefinition(
+        buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { server, database, modules: config.modules, resourceGraph: config.dataSources?.resourceGraph === 'api' }),
+        PBISM,
+      ),
     force: opts.force,
   });
   Object.assign(sm, { server, database });

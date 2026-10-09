@@ -595,6 +595,7 @@ test('app: the prebuilt app is deployed as it is, with its models in fabric.conf
         consumption: true,
         agentEvaluator: false,
         defender: false,
+        resourceGraph: false,
       },
     });
     const fa = t.config.fabricApp;
@@ -700,8 +701,15 @@ test('app: fabricConfigFile lists only the models the app is built with', () => 
       consumption: false,
       agentEvaluator: false,
       defender: false,
+      resourceGraph: false,
     },
   });
+});
+
+test('app: fabricConfigFile tells the app when Resource Graph is on', () => {
+  const t = setup({ answers: [] });
+  t.config.dataSources.resourceGraph = 'api';
+  assert.equal(fabricConfigFile(t.config, 'ws', ['vl']).modules?.resourceGraph, true);
 });
 
 test('app: fabricConfigFile omits module choices from older records that do not have them', () => {

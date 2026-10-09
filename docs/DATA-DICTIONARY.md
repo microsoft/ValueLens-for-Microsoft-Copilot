@@ -33,6 +33,7 @@ parameter.
 | 4 | Agents 365 | `agents_365` | *Optional* | `Copilot_Agent365_Registry_Ingester` *(API, primary)* → `Copilot_Agent365_Lander` *(CSV fallback if the API step fails)* | `Get-Agents365Registry.ps1` *(API)*, or an admin centre export via `-Agents365Csv` *(fallback)* → `Agent 365` CSV (also Local CSV and the Dataverse template) |
 | 5 | ProductFeedback | `user_feedback` | *Optional* | `Copilot_ProductFeedback_Ingester` | OCV feedback CSV (`Feedback File`) |
 | 6 | Defender AI Watchlist, Shadow AI Daily, Shadow AI Totals, Defender AI Installed, Defender Cloud Discovery, Defender AI Agents, Defender Status | `defender_*` (7 tables) | *Optional* (off by default) | `Copilot_Defender_Ingester` | None. Fabric and Azure only (Azure: the `defender` jobs module) |
+| 7 | Agent Configuration, Power Platform Environments, Agent Flows, Foundry Resources, Resource Graph Status | `arg_agent_config`, `arg_environments`, `arg_agent_flows`, `arg_foundry_resources`, `arg_status` | *Optional* | `Copilot_Resource_Graph_Ingester` *(Azure Resource Graph, with the Agent inventory flow's JSON as the fallback for agents)* | — *(Fabric and Azure only; the Azure jobs' module `resourceGraph`)* |
 
 > **Delta table names are lower-case** throughout (`copilot_interactions_parsed`,
 > `copilot_interactions_curated`, …). The dashboard table names in column 2 are the *model* names and
@@ -481,7 +482,7 @@ These back the Fabric App's Governance page ([Methodology](METHODOLOGY.md#govern
 | `Sharing Scope` | Power Query, from `Availability`, `Status` and the share count: `Whole organisation`, `Specific people or groups`, `Not shared` or `Not stated` |
 | `Shared With Count` | Power Query: distinct people and groups across the share lists. The lists themselves are not loaded |
 | `Data Access` | DAX calculated column, from the SharePoint, OneDrive, Graph connector and uploaded-file capability flags |
-| `Sign-in Required` | Power Query, from the optional Defender agents table (`defender_ai_agents`): `Yes`, `No` or `Unknown`. It matches the agent on its Entra agent ID, bot ID, app ID or agent ID. The lookup is an ordered list of sources, so a more direct source, such as agent configuration from Azure Resource Graph, can go ahead of Defender; the first source that knows the agent wins. `Unknown` when no source does, or Defender is off |
+| `Sign-in Required` | Power Query: `Yes`, `No` or `Unknown`. It matches the agent on its Entra agent ID, bot ID, app ID or agent ID against an ordered list of sources, and the first source that knows the agent wins: Azure Resource Graph's agent configuration (`arg_agent_config`, `NoSignIn`), then the optional Defender agents table (`defender_ai_agents`). `Unknown` when no source does, or both are off |
 | `Governance Flags` | DAX calculated column: the review flags that apply, separated by `; `. Blank for catalogue and blocked agents. `Sign-in Required = No` adds *No sign-in required* |
 
 Only the two Fabric templates carry these columns so far. The CSV, SharePoint and Dataverse
@@ -557,3 +558,54 @@ When the source is off, the model loads every table empty with the right columns
 - **Measures** (on Shadow AI Totals): `AI Tools Watched`, `Unsanctioned AI Tools`,
   `Shadow AI Tools Found` (30 days), `Shadow AI Tools This Week`, `Shadow AI Devices`,
   `Shadow AI Users`, `Shadow AI Users (Cloud Discovery)` and `Shadow AI Status`.
+
+### 7. Azure Resource Graph — agent configuration and the Foundry estate
+
+Daily snapshots from `Copilot_Resource_Graph_Ingester` (Fabric) or the Azure jobs' `resource_graph`
+collector (module `resourceGraph`). Same tables and columns on both paths; each run replaces a table
+with today's snapshot, and a probe that's refused or fails leaves its table as it was. The model
+tables use the same column names. Every model table exists, empty, when the source is off.
+Permissions: [PERMISSIONS](PERMISSIONS.md#azure-resource-graph).
+
+**`arg_agent_config`** → model `Agent Configuration`. One row per Copilot Studio agent, from
+`PowerPlatformResources` (type `microsoft.copilotstudio/agents`), or from the Agent inventory flow's
+file when Resource Graph refuses or returns nothing (`Source` says which).
+
+| Column | Meaning |
+|---|---|
+| `SnapshotDate` | The run's UTC date |
+| `AgentResourceId`, `BotId`, `AgentName` | The agent. `BotId` is lower case |
+| `EntraAgentId`, `EntraAppId` | The agent's Entra identities, when published with one |
+| `TitleId`, `MatchedOn` | The Agent 365 registry's Title ID, matched on `Bot Id` first, then `Entra Agent ID`. Blank when no match (always on Azure, which doesn't collect Agent 365). The model relates `TitleId` to `Agents 365[Title ID]` |
+| `EnvironmentId` | Lower case; relates to `Power Platform Environments` |
+| `Authentication`, `NoSignIn` | The agent's authentication setting. `NoSignIn` is true when it's *None*: anyone with the link can chat without signing in |
+| `IsQuarantined`, `IsManaged`, `WebSearchEnabled` | Admin quarantine, managed environment, and web search on for knowledge |
+| `ConnectorCount`, `McpConnectorCount`, `KnowledgeConnectorCount`, `Connectors` | Distinct Power Platform connectors (MCP servers are connectors whose id contains `mcp`), connector operations used as knowledge, and the connector ids |
+| `ConnectedAgentCount` | Agents it calls |
+| `SharedUsers`, `SharedGroups`, `SharedEntireTenant` | Who it's shared with to chat |
+| `Orchestration`, `Model`, `Channels`, `OwnerId`, `CreatedIn`, `LastPublishedAt` | As reported. Many inventory fields are in preview, so any may be blank |
+| `Source` | `Resource Graph` or `Inventory API (flow)` |
+
+**`arg_environments`** → `Power Platform Environments`: `SnapshotDate`, `EnvironmentId`,
+`EnvironmentName`, `EnvironmentType`, `IsDefault`, `IsManaged`, `Region`, `Source`.
+
+**`arg_agent_flows`** → `Agent Flows`: `SnapshotDate`, `FlowId`, `FlowName`, `EnvironmentId`,
+`OwnerId`, `ConnectorCount`, `Trigger`, `CreatedAt`, `LastModifiedAt`, `Source`.
+
+**`arg_foundry_resources`** → `Foundry Resources` (in both the ValueLens and Consumption models).
+Foundry accounts (`microsoft.cognitiveservices/accounts`), projects (`…/accounts/projects`) and
+Azure Machine Learning workspaces the identity can read. Accounts and projects only: there's no
+per-project agent sweep.
+
+| Column | Meaning |
+|---|---|
+| `ResourceId` | Lower case, so it joins to the Azure AI spend's resource ids |
+| `ResourceName`, `ResourceType`, `Kind`, `Location`, `SubscriptionId`, `ResourceGroup`, `Sku` | As reported. A project's name is its last segment |
+| `PublicNetworkAccess`, `PublicNetwork` | The setting, and whether it's open to the public network (Azure treats an unset value as enabled) |
+| `DisableLocalAuth` | True when key-based auth is off |
+| `IsProject`, `AccountId` | Whether it's a project, and its account's id (an account's own id) |
+
+**`arg_status`** → `Resource Graph Status`: one row per probe (`arg_agent_config`,
+`arg_environments`, `arg_agent_flows`, `arg_foundry_resources`) with `Status` *ok*, *empty*,
+*forbidden*, *error* or *skipped* (turned off), `Rows`, `Source` and `Detail` (the error, or which
+inventory file was read). The dashboard uses it to say why a section is empty.

@@ -115,7 +115,7 @@ export const ESSENTIAL_MODULES = /** @type {const} */ (['core', 'orgData']);
 /** Modules the Data sources screen can switch on, in order. */
 export const OPTIONAL_MODULES = /** @type {const} */ (['m365Activity', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator', 'defender']);
 
-/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'm365Activity' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts' | 'uploadRouter' | 'workdayLander' | 'loadStatus' | 'defender'} NotebookKey */
+/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'm365Activity' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts' | 'uploadRouter' | 'workdayLander' | 'loadStatus' | 'defender' | 'resourceGraph'} NotebookKey */
 
 /**
  * A text change the installer makes to its copy of a notebook. `find` must occur exactly once.
@@ -138,6 +138,7 @@ export const OPTIONAL_MODULES = /** @type {const} */ (['m365Activity', 'agent365
  * @property {boolean} [uploads]  Only deployed when a source arrives as an uploaded CSV.
  * @property {boolean} [workday]  Only deployed when Workday org data is uploaded.
  * @property {boolean} [registry]  Left out when Agent 365 comes from its CSV export instead of the API.
+ * @property {boolean} [resourceGraph]  Only deployed when agent configuration and Foundry come from Azure Resource Graph.
  * @property {Record<string, string>} [values]  String settings the installer's copy always has.
  * @property {Record<string, string>} [expressions]  Python expressions the installer's copy always has, e.g. `True`.
  * @property {NotebookPatch[]} [patches]
@@ -222,6 +223,16 @@ export const NOTEBOOKS = [
     parameters: [],
     placeholder: null,
     uploads: true,
+  },
+  {
+    key: 'resourceGraph',
+    file: 'Copilot_Resource_Graph_Ingester.ipynb',
+    displayName: 'Copilot_Resource_Graph_Ingester',
+    module: 'core',
+    credentials: true,
+    parameters: [],
+    placeholder: null,
+    resourceGraph: true,
   },
   {
     key: 'loadStatus',
@@ -420,7 +431,8 @@ export function notebooksFor(modules, opts = {}) {
       (!nb.dataverse || opts.dataverse) &&
       (!nb.uploads || (!!ds && routerWanted(ds))) &&
       (!nb.workday || ds?.workday === 'csv') &&
-      (!nb.registry || ds?.agent365 !== 'csv'),
+      (!nb.registry || ds?.agent365 !== 'csv') &&
+      (!nb.resourceGraph || ds?.resourceGraph === 'api'),
   );
 }
 

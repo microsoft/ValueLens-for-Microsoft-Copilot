@@ -11,3 +11,4 @@ export * from "./cowork";
 export * from "./studio";
 export * from "./azure";
 export * from "./commercial-terms";
+export * from "./foundry-resource-spend";

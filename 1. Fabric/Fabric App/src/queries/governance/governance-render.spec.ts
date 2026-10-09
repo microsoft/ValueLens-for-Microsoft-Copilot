@@ -23,6 +23,7 @@ import {
     soleExposureAccess,
 } from "./governance-exposure";
 import { governanceOwners } from "./governance-owners";
+import { EXPOSURE_ACCESS_WITH_WEB, PUBLIC_WEB, withPublicWeb } from "./governance-public-web";
 import exposureRows from "./__fixtures__/governance-exposure.rows.json";
 import ownerRows from "./__fixtures__/governance-owners.rows.json";
 
@@ -129,6 +130,19 @@ describe("governance exposure renders", () => {
             .map(([, access]) => access);
         expect(columns).toEqual([...EXPOSURE_ACCESS]);
         expect(cells.find((cell) => cell.bounds.x1 === left)?.datum.Agents).toBe(0);
+    });
+
+    it("adds a public web column last once Resource Graph reports web search", async () => {
+        const web = [{ "[Scope Order]": 1, "[Sharing Scope]": "Whole organisation", "[Access Order]": 5, "[Data Access]": PUBLIC_WEB, "[Agents]": 2, "[Unused Agents]": 0 }];
+        const table = withPublicWeb(exposureTable(rows), exposureTable(web));
+        const grid = asRows(completeExposureGrid(table, EXPOSURE_ACCESS_WITH_WEB));
+        const cells = await renderRects(governanceExposure().vegaLiteSpec, grid, {});
+
+        expectDrawable(cells, EXPOSURE_SCOPES.length * EXPOSURE_ACCESS_WITH_WEB.length);
+        const right = Math.max(...cells.map((cell) => cell.bounds.x1));
+        for (const cell of cells.filter((item) => item.bounds.x1 === right)) {
+            expect(cell.datum["Data Access"]).toBe(PUBLIC_WEB);
+        }
     });
 
     it("keeps a scope the registry adds, and labels only the cells that hold agents", async () => {

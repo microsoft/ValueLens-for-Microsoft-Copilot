@@ -97,6 +97,7 @@ export const scaleProfile = (scale) => (scale === 'large' || scale === 'standard
  * @property {boolean} [workday]  Enriches org data from the uploaded Workday export after the Entra ID load.
  * @property {boolean} [agent365Csv]  Agent 365 comes from its admin center export: the lander replaces the registry load.
  * @property {string} [coworkDataflowId]  Refreshes this Dataflow, which pulls Cowork credits from Viva Insights, before the Viva load.
+ * @property {boolean} [resourceGraph]  Reads agent configuration and Foundry from Azure Resource Graph, after Agent 365.
  */
 
 export const REFRESH_ACTIVITY = 'Refresh_Semantic_Model';
@@ -139,6 +140,8 @@ export const AGENT365_LANDER = 'Run_Agent365_Lander';
 export const UPLOAD_ROUTER_ACTIVITY = 'Run_Upload_Router';
 export const WORKDAY_ACTIVITY = 'Run_Org_Data_Workday';
 export const COWORK_DATAFLOW_ACTIVITY = 'Refresh_Cowork_Credits';
+/** Agent configuration and Foundry from Azure Resource Graph. It never fails for want of access: the notebook records that in arg_status. */
+export const RESOURCE_GRAPH_ACTIVITY = 'Run_Resource_Graph_Ingester';
 
 /** Bump when the pipeline's layout changes, so re-running the installer updates a pipeline an older version built. */
 export const PIPELINE_VERSION = 5;
@@ -161,6 +164,7 @@ export const LANE_ORDER = [
   UPLOAD_ROUTER_ACTIVITY,
   'Conditionally_Run_Agent365',
   AGENT365_FALLBACK,
+  RESOURCE_GRAPH_ACTIVITY,
   'Conditionally_Run_Org_Data',
   WORKDAY_ACTIVITY,
   'Conditionally_Run_M365_Activity',
@@ -304,7 +308,7 @@ function refreshStep(settings, o) {
 function refreshActivity(activities, settings) {
   const has = (/** @type {string} */ name) => activities.some((a) => a.name === name);
   const dependsOn = [{ activity: 'Run_Audit_Log_Processor', dependencyConditions: ['Succeeded'] }];
-  for (const name of ['Conditionally_Run_Org_Data', WORKDAY_ACTIVITY, 'Conditionally_Run_M365_Activity', 'Conditionally_Run_Product_Feedback', 'Conditionally_Run_Defender']) {
+  for (const name of [RESOURCE_GRAPH_ACTIVITY, 'Conditionally_Run_Org_Data', WORKDAY_ACTIVITY, 'Conditionally_Run_M365_Activity', 'Conditionally_Run_Product_Feedback', 'Conditionally_Run_Defender']) {
     if (has(name)) dependsOn.push({ activity: name, dependencyConditions: ['Completed'] });
   }
   return refreshStep(settings, {
@@ -537,6 +541,16 @@ export function buildPipeline(template, settings) {
     );
   }
   const workday = !!(settings.workday && settings.modules.orgData !== false);
+  if (settings.resourceGraph) {
+    filled.properties.activities.push(
+      notebookStep(settings, {
+        key: 'resourceGraph',
+        name: RESOURCE_GRAPH_ACTIVITY,
+        description: 'Reads Copilot Studio agent configuration, Power Platform environments, agent flows and Foundry resources from Azure Resource Graph, or the agent inventory flow\'s newest file in Files/arg_inventory. Writes arg_agent_config, arg_environments, arg_agent_flows, arg_foundry_resources and arg_status; what it can\'t read is recorded there, not failed.',
+        timeout: '0.00:30:00',
+      }),
+    );
+  }
   if (workday) {
     filled.properties.activities.push(
       notebookStep(settings, {
