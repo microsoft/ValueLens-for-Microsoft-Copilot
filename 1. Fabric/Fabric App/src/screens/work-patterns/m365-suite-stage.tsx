@@ -9,14 +9,17 @@ import { useMemo, type ReactNode } from "react";
 import { VegaVisual, type VisualizationSpec } from "@/components/vega-visual";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { stageAnchor } from "@/components/destinations";
+import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { NoteCard, type Note } from "@/components/report-panels";
 import { Section } from "@/components/section";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { rowChartHeight } from "@/lib/chart-height";
+import type { Headline } from "@/lib/headline";
 import { toDataTable } from "@/lib/to-data-table";
 import { m365Apps, m365Platforms, m365SuiteDepth } from "@/queries/work-patterns";
+import { APP_REACH_HEADLINE, PLATFORM_REACH_HEADLINE, SUITE_DEPTH_HEADLINE } from "./headlines";
 
 const APPS = m365Apps();
 const DEPTH = m365SuiteDepth();
@@ -59,12 +62,13 @@ interface BarChartProps {
     query: ReturnType<typeof useTable>;
     spec: VisualizationSpec;
     height: number | undefined;
+    headline: string | undefined;
     title: string;
     subtitle: string;
     empty: { title: string; description: string };
 }
 
-function BarChart({ query: { result, table }, spec, height, title, subtitle, empty }: BarChartProps): ReactNode {
+function BarChart({ query: { result, table }, spec, height, headline, title, subtitle, empty }: BarChartProps): ReactNode {
     const { theme } = useThemeContext();
     return (
         <div className="h-[340px]" style={height ? { height } : undefined}>
@@ -75,7 +79,9 @@ function BarChart({ query: { result, table }, spec, height, title, subtitle, emp
             ) : table.rows.length === 0 ? (
                 <QueryEmpty className="h-full" title={empty.title} description={empty.description} />
             ) : (
-                <VegaVisual spec={spec} data={table} theme={theme} header={{ title, subtitle }} />
+                <Headlined text={headline}>
+                    <VegaVisual spec={spec} data={table} theme={theme} header={{ title, subtitle }} />
+                </Headlined>
             )}
         </div>
     );
@@ -83,6 +89,10 @@ function BarChart({ query: { result, table }, spec, height, title, subtitle, emp
 
 function rowsOf(table: DataTable | undefined): number {
     return table?.rows.length ?? 0;
+}
+
+function headlineOf(headline: Headline, table: DataTable | undefined): string | undefined {
+    return table ? headline(table) : undefined;
 }
 
 /**
@@ -95,10 +105,19 @@ export function M365SuiteStage() {
     const depth = useTable(DEPTH);
     const platforms = useTable(PLATFORMS);
 
-    // The apps and depth charts sit side by side, so they share one height and their bars line up.
+    const appsHeadline = useMemo(() => headlineOf(APP_REACH_HEADLINE, apps.table), [apps.table]);
+    const depthHeadline = useMemo(() => headlineOf(SUITE_DEPTH_HEADLINE, depth.table), [depth.table]);
+    const platformHeadline = useMemo(() => headlineOf(PLATFORM_REACH_HEADLINE, platforms.table), [platforms.table]);
+
+    // The apps and depth charts sit side by side, so they share one height and their bars line up,
+    // plus a headline's line when either of them has one.
     const pairRows = Math.max(rowsOf(apps.table), rowsOf(depth.table));
-    const pairHeight = pairRows > 0 ? rowChartHeight(pairRows, ROW_CHART) : undefined;
-    const platformHeight = rowsOf(platforms.table) > 0 ? rowChartHeight(rowsOf(platforms.table), ROW_CHART) : undefined;
+    const pairHeight =
+        pairRows > 0 ? rowChartHeight(pairRows, ROW_CHART) + (appsHeadline || depthHeadline ? HEADLINE_SPACE : 0) : undefined;
+    const platformHeight =
+        rowsOf(platforms.table) > 0
+            ? rowChartHeight(rowsOf(platforms.table), ROW_CHART) + (platformHeadline ? HEADLINE_SPACE : 0)
+            : undefined;
 
     return (
         <Section id={stageAnchor("m365-suite")} title={TITLE} description={DESCRIPTION}>
@@ -107,6 +126,7 @@ export function M365SuiteStage() {
                     query={apps}
                     spec={APPS.vegaLiteSpec}
                     height={pairHeight}
+                    headline={appsHeadline}
                     title="Which apps people open"
                     subtitle="Share of active people, on desktop, web or mobile."
                     empty={{ title: "No app activity", description: "Nobody in the current selection opened a Microsoft 365 app." }}
@@ -115,6 +135,7 @@ export function M365SuiteStage() {
                     query={depth}
                     spec={DEPTH.vegaLiteSpec}
                     height={pairHeight}
+                    headline={depthHeadline}
                     title="How much of the suite each person uses"
                     subtitle="Share of active people by how many of the six apps they opened."
                     empty={{ title: "Nobody active", description: "No one in the current selection was active on Microsoft 365." }}
@@ -123,6 +144,7 @@ export function M365SuiteStage() {
                     query={platforms}
                     spec={PLATFORMS.vegaLiteSpec}
                     height={platformHeight}
+                    headline={platformHeadline}
                     title="Where people work from"
                     subtitle="Share of active people on each platform, with days per week in the tooltip."
                     empty={{

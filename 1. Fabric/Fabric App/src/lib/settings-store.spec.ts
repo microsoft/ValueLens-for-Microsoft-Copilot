@@ -37,6 +37,29 @@ describe("HttpSettingsStore", () => {
         }));
     });
 
+    it("round-trips monthly budgets alongside the rates", async () => {
+        const row = { id: "00000000-0000-0000-0000-000000000001", creditRate: 0.02, budgetCowork: "5000", budgetStudio: 2500.5, budgetAzure: null };
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(new Response(JSON.stringify([row])))
+            .mockResolvedValueOnce(new Response(JSON.stringify([row])))
+            .mockImplementationOnce((_url: string, init: RequestInit) => Promise.resolve(new Response(init.body as string)));
+        vi.stubGlobal("fetch", fetchMock);
+        const { getSettingsStore } = await import("@/lib/settings-store");
+
+        await expect(getSettingsStore().loadCommercialTerms()).resolves.toMatchObject({
+            creditRate: 0.02,
+            budgetCowork: 5000,
+            budgetStudio: 2500.5,
+            budgetAzure: undefined,
+        });
+        const saved = await getSettingsStore().saveCommercialTerms({ budgetAzure: 750, budgetStudio: undefined }, "a@example.com");
+        expect(saved).toMatchObject({ creditRate: 0.02, budgetCowork: 5000, budgetAzure: 750, budgetStudio: undefined });
+
+        const body = JSON.parse(fetchMock.mock.calls[2][1].body as string);
+        expect(body).toMatchObject({ creditRate: 0.02, budgetCowork: 5000, budgetAzure: 750 });
+        expect(body.budgetStudio ?? null).toBeNull();
+    });
+
     it("upserts and deletes task times through the settings API", async () => {
         const fetchMock = vi.fn()
             .mockResolvedValueOnce(new Response(JSON.stringify({ task: "Email Drafting", minLow: 1, minTypical: 2, minHigh: 3 })))

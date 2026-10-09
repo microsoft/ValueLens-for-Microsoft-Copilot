@@ -9,8 +9,9 @@ import { authenticated, date, decimal, entity, text, uuid } from "@microsoft/ray
 
 /**
  * The credit rates and Capacity Pack balance typed in on the Consumption
- * page, and the licence price and exchange rate typed in on the Value page,
- * shared by everyone who opens the app. There is only ever one row.
+ * page, the licence price and exchange rate typed in on the Value page, and
+ * the monthly budgets the Consumption page tracks spend against, shared by
+ * everyone who opens the app. There is only ever one row.
  *
  * Each credit value overrides the Consumption Central model's own, which
  * comes from the Lakehouse `commercial_terms` table or the template's
@@ -36,6 +37,12 @@ export class CommercialTerms {
     @decimal({ precision: 10, scale: 2, optional: true }) licensePrice?: number;
     /** How much of ValueLens's currency one US dollar buys, to set dollar costs against value. */
     @decimal({ precision: 14, scale: 6, optional: true }) exchangeRate?: number;
+    /** Monthly budget for Cowork and Work IQ, in US dollars. Empty means no budget. */
+    @decimal({ precision: 14, scale: 2, optional: true }) budgetCowork?: number;
+    /** Monthly budget for Copilot Studio, in US dollars. Empty means no budget. */
+    @decimal({ precision: 14, scale: 2, optional: true }) budgetStudio?: number;
+    /** Monthly budget for Azure solution and AI Foundry spend, in Azure's billing currency. Empty means no budget. */
+    @decimal({ precision: 14, scale: 2, optional: true }) budgetAzure?: number;
     @text({ max: 320, optional: true }) updatedBy?: string;
     @date({ optional: true }) updatedAt?: Date;
 }

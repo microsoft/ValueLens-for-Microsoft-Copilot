@@ -10,7 +10,7 @@ import { FilterMenu } from "@/components/filter-menu";
 import { TermsForm, type TermField } from "@/components/terms-form";
 import { useCommercialTerms } from "@/hooks/commercial-terms.context";
 import { cn } from "@/lib/utils";
-import { hasCommercialTerms, type CommercialTermKey } from "@/queries/consumption";
+import { hasCommercialTerms, type BudgetKey, type CommercialTermKey } from "@/queries/consumption";
 import { SMALL } from "./data";
 
 const FIELDS: readonly { key: CommercialTermKey; label: string; hint: string; unit: "rate" | "credits" }[] = [
@@ -36,12 +36,64 @@ function formatTerm(value: number | undefined, unit: "rate" | "credits"): string
         : `${value.toLocaleString("en-US", { maximumFractionDigits: 0 })} credits`;
 }
 
+const BUDGETS: readonly { key: BudgetKey; label: string }[] = [
+    { key: "budgetCowork", label: "Cowork / Work IQ" },
+    { key: "budgetStudio", label: "Copilot Studio" },
+    { key: "budgetAzure", label: "Azure" },
+];
+
+function budgetSummary(count: number): string {
+    if (count === 0) return "Not set";
+    return count === BUDGETS.length ? "All set" : `${count} of ${BUDGETS.length} set`;
+}
+
+/** Monthly budgets per product, for the budget runway, saved with the rates. */
+function BudgetsMenu({ azureCurrency }: { azureCurrency: string | undefined }) {
+    const { status, saved } = useCommercialTerms();
+    const count = BUDGETS.filter((budget) => saved?.[budget.key] !== undefined).length;
+    const fields = useMemo<TermField[]>(
+        () =>
+            BUDGETS.map((budget) => ({
+                key: budget.key,
+                label: budget.label,
+                hint:
+                    budget.key === "budgetAzure"
+                        ? `A month, in ${azureCurrency ?? "Azure's billing currency"}, for the solution and Foundry together`
+                        : budget.key === "budgetCowork"
+                          ? "$ a month, Cowork and Work IQ together"
+                          : "$ a month",
+                inputMode: "decimal",
+            })),
+        [azureCurrency],
+    );
+    return (
+        <FilterMenu
+            label="Monthly budgets"
+            summary={status === "loading" ? "Loading…" : budgetSummary(count)}
+            active={count > 0}
+            panelClassName="w-[320px]"
+        >
+            {(close) => (
+                <TermsForm
+                    fields={fields}
+                    intro="What each product may spend in a calendar month. Budget runway tracks this month's spend against them. Leave a box empty for no budget."
+                    resetLabel="Clear budgets"
+                    unavailableText="Budgets can't be saved here right now."
+                    note="The Power BI report has no budgets."
+                    close={close}
+                />
+            )}
+        </FilterMenu>
+    );
+}
+
 /**
  * The rates and pack balance every cost on the Consumption page is priced
- * at, with a form to set them for everyone who opens the app. Sits where the
- * filter bar does on the other destinations.
+ * at, with a form to set them for everyone who opens the app, and the
+ * monthly budgets the budget runway tracks. Sits where the filter bar does
+ * on the other destinations.
  */
-export function RatesBar() {
+export function RatesBar({ azureCurrency }: { azureCurrency?: string }) {
     const { status, saved, model } = useCommercialTerms();
     const overridden = hasCommercialTerms(saved ?? undefined);
     const summary = status === "loading" ? "Loading…" : overridden ? "Set in this app" : "From the model";
@@ -70,7 +122,7 @@ export function RatesBar() {
     return (
         <div
             role="group"
-            aria-label="Rates and packs"
+            aria-label="Rates, packs and budgets"
             className="sticky top-0 z-10 -mx-700 -mb-200 flex flex-wrap items-center gap-x-400 gap-y-200 border-b border-border bg-background px-700 py-300"
         >
             <FilterMenu label="Rates & packs" summary={summary} active={overridden} panelClassName="w-[320px]">
@@ -85,6 +137,7 @@ export function RatesBar() {
                     />
                 )}
             </FilterMenu>
+            <BudgetsMenu azureCurrency={azureCurrency} />
             {known && (
                 <dl className={cn(SMALL, "flex flex-wrap items-baseline gap-x-400 gap-y-100 text-muted-foreground")}>
                     {inUse.map((term) => (

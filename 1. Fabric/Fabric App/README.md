@@ -52,6 +52,8 @@ only with people who should.
 
 - **Rates & packs** (Consumption page): your pay-as-you-go rate, prepaid rate and Capacity Pack
   balance. Leave a box empty to keep the model's value.
+- **Monthly budgets** (Consumption page): an optional monthly budget for Cowork / Work IQ, Copilot
+  Studio and Azure, for the Budget runway section. Leave a box empty for no budget.
 - **Prices** (Value page, Cost vs value): the Copilot licence price ($30 if empty) and, if your
   model doesn't use $, the exchange rate.
 - **Time per task** (Assumptions page): the minutes each task would take without Copilot.

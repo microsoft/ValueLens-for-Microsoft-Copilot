@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { LICENSE_LIST_PRICE } from "@/queries/consumption";
 import { agentTable, costValueSpec, pairTable, spanDays, spanMonths, type DateSpan } from "@/queries/value";
 import { COST_IGNORED_FILTERS, useCostVsValue, type CostVsValue } from "./cost-vs-value-data";
+import { agentCoverageHeadline, pairReturnHeadline } from "./headlines";
 
 function asNumber(value: unknown): number | undefined {
     return typeof value === "number" && Number.isFinite(value) ? value : undefined;
@@ -465,6 +466,7 @@ export function CostVsValueStage() {
                                     spec={spec}
                                     height={productsHeight}
                                     title="Each cost and the work it pays for"
+                                    headline={pairReturnHeadline}
                                     subtitle={`Cost and estimated value, in ${symbol || "the value's currency"}`}
                                     emptyTitle="Nothing to compare"
                                     emptyDescription="There's no cost or value over these dates."
@@ -507,6 +509,7 @@ export function CostVsValueStage() {
                                         spec={spec}
                                         height={agentsChartHeight}
                                         title="Copilot Studio agents"
+                                        headline={agentCoverageHeadline}
                                         subtitle="Each agent's share of the credit cost and the value of its work"
                                         emptyTitle="No agents found by name"
                                         emptyDescription="None of the agents with Copilot Studio credits has activity under the same name in ValueLens over these dates."

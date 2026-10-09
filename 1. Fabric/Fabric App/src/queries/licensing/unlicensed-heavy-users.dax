@@ -1,0 +1,41 @@
+EVALUATE
+VAR __Month = [Last Full Month Start]
+VAR __People =
+    FILTER(
+        CALCULATETABLE(
+            ADDCOLUMNS(
+                VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                "@Days", CALCULATE(DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[InteractionDate])),
+                "@Licensed",
+                    CALCULATE(
+                        COUNTROWS('Chat + Agent Interactions (Audit Logs)'),
+                        KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[License Status] = "M365 Copilot Licensed")
+                    ) > 0,
+                "@Unlicensed",
+                    CALCULATE(
+                        COUNTROWS('Chat + Agent Interactions (Audit Logs)'),
+                        KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[License Status] = "Unlicensed")
+                    ) > 0
+            ),
+            REMOVEFILTERS('Calendar'),
+            'Chat + Agent Interactions (Audit Logs)'[MonthStart] = __Month
+        ),
+        LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Audit_UserId])) > 0
+            -- Power and Habitual: 11 or more active days in the month.
+            && [@Days] >= 11
+            && NOT [@Licensed]
+            && [@Unlicensed]
+    )
+RETURN
+    SELECTCOLUMNS(
+        TOPN(10, __People, [@Days], DESC, 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId], ASC),
+        "User", 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId],
+        "Organization",
+            LOOKUPVALUE(
+                'Chat + Agent Org Data'[Organization],
+                'Chat + Agent Org Data'[PersonId], 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId]
+            ),
+        "Active Days", [@Days],
+        "Cohort", IF([@Days] >= 16, "Power", "Habitual")
+    )
+ORDER BY [Active Days] DESC, [User]

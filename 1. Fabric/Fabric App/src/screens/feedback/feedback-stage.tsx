@@ -8,6 +8,7 @@
 import { useMemo } from "react";
 import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
 import { VegaVisual, type VisualizationSpec } from "@/components/vega-visual";
+import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
 import { stageAnchor } from "@/components/destinations";
 import { KpiCard } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
@@ -30,6 +31,7 @@ import {
     feedbackSurface,
     feedbackTrend,
 } from "@/queries/feedback";
+import { FEEDBACK_CATEGORY_HEADLINE, FEEDBACK_SURFACE_HEADLINE, FEEDBACK_TREND_HEADLINE } from "./headlines";
 
 const dateFormatter = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
@@ -203,10 +205,24 @@ function FeedbackContent() {
     );
     const columns = useMemo(() => commentColumns(colorRange), [colorRange]);
 
-    // The trend and topic charts sit side by side, so they share one height: enough for every topic label.
-    const pairStyle = categoryTable
-        ? { height: rowChartHeight(uniqueValues(categoryTable, "Category"), { perRow: 28, chrome: 116, min: 360 }) }
-        : undefined;
+    const trendHeadline = useMemo(() => (trendTable ? FEEDBACK_TREND_HEADLINE(trendTable) : undefined), [trendTable]);
+    const categoryHeadline = useMemo(
+        () => (categoryTable ? FEEDBACK_CATEGORY_HEADLINE(categoryTable) : undefined),
+        [categoryTable],
+    );
+    const surfaceHeadline = useMemo(
+        () => (surfaceTable ? FEEDBACK_SURFACE_HEADLINE(surfaceTable) : undefined),
+        [surfaceTable],
+    );
+    // The trend and topic charts sit side by side, so they share one height: enough for every topic label,
+    // plus a headline's line when either of them has one.
+    const pairHeadlineSpace = trendHeadline || categoryHeadline ? HEADLINE_SPACE : 0;
+    const pairStyle = {
+        height:
+            (categoryTable
+                ? rowChartHeight(uniqueValues(categoryTable, "Category"), { perRow: 28, chrome: 116, min: 360 })
+                : 360) + pairHeadlineSpace,
+    };
 
     const rawThemeSummary = readText(summaryRow, "[Theme Summary]");
     const themeSummary = rawThemeSummary ? withoutEmoji(rawThemeSummary) : undefined;
@@ -268,16 +284,18 @@ function FeedbackContent() {
                             description="No feedback was submitted in the selected date range."
                         />
                     ) : (
-                        <VegaVisual
-                            spec={trendSpec}
-                            data={trendTable}
-                            theme={theme}
-                            capabilities={NO_STACK_LABELS}
-                            header={{
-                                title: "Weekly feedback sentiment",
-                                subtitle: "Thumbs up above zero; thumbs down below.",
-                            }}
-                        />
+                        <Headlined text={trendHeadline}>
+                            <VegaVisual
+                                spec={trendSpec}
+                                data={trendTable}
+                                theme={theme}
+                                capabilities={NO_STACK_LABELS}
+                                header={{
+                                    title: "Weekly feedback sentiment",
+                                    subtitle: "Thumbs up above zero; thumbs down below.",
+                                }}
+                            />
+                        </Headlined>
                     )}
                 </div>
 
@@ -297,15 +315,17 @@ function FeedbackContent() {
                             description="Only testing or uncategorized feedback was submitted in this period."
                         />
                     ) : (
-                        <VegaVisual
-                            spec={categorySpec}
-                            data={categoryTable}
-                            theme={theme}
-                            header={{
-                                title: "What it's about",
-                                subtitle: "Testing and uncategorized rows are excluded to match the report.",
-                            }}
-                        />
+                        <Headlined text={categoryHeadline}>
+                            <VegaVisual
+                                spec={categorySpec}
+                                data={categoryTable}
+                                theme={theme}
+                                header={{
+                                    title: "What it's about",
+                                    subtitle: "Testing and uncategorized rows are excluded to match the report.",
+                                }}
+                            />
+                        </Headlined>
                     )}
                 </div>
             </div>
@@ -320,7 +340,11 @@ function FeedbackContent() {
                     className="h-[420px]"
                     style={
                         surfaceTable
-                            ? { height: rowChartHeight(surfaceTable.rows.length, { perRow: 40, chrome: 116 }) }
+                            ? {
+                                  height:
+                                      rowChartHeight(surfaceTable.rows.length, { perRow: 40, chrome: 116 }) +
+                                      (surfaceHeadline ? HEADLINE_SPACE : 0),
+                              }
                             : undefined
                     }
                 >
@@ -339,15 +363,17 @@ function FeedbackContent() {
                             description="No surface or agent reached the minimum sample size for a fair satisfaction comparison."
                         />
                     ) : (
-                        <VegaVisual
-                            spec={surface.vegaLiteSpec}
-                            data={surfaceTable}
-                            theme={theme}
-                            header={{
-                                title: "Satisfaction by surface or agent",
-                                subtitle: "Ranked by satisfaction, with feedback count in the tooltip.",
-                            }}
-                        />
+                        <Headlined text={surfaceHeadline}>
+                            <VegaVisual
+                                spec={surface.vegaLiteSpec}
+                                data={surfaceTable}
+                                theme={theme}
+                                header={{
+                                    title: "Satisfaction by surface or agent",
+                                    subtitle: "Ranked by satisfaction, with feedback count in the tooltip.",
+                                }}
+                            />
+                        </Headlined>
                     )}
                 </div>
 

@@ -8,6 +8,7 @@
 import { useMemo } from "react";
 import { VegaVisual } from "@/components/vega-visual";
 import { stageAnchor } from "@/components/destinations";
+import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { NoteCard, type Note } from "@/components/report-panels";
@@ -23,6 +24,7 @@ import { SMALL } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 import { m365Summary, m365WorkloadReach, m365WorkloadTrend, readM365Coverage, type M365Coverage } from "@/queries/work-patterns";
 import { CONCEALED_FIX, M365_ACTIVITY_DESCRIPTION, M365_ACTIVITY_TITLE } from "./copy";
+import { WORKLOAD_REACH_HEADLINE, WORKLOAD_TREND_HEADLINE } from "./headlines";
 
 const SUMMARY = m365Summary();
 const TREND = m365WorkloadTrend();
@@ -96,7 +98,11 @@ export function M365ActivityStage({ concealed }: M365ActivityStageProps) {
 
     const people = readNumber(summaryRow, "[People Active]");
     const coverage = readM365Coverage(summaryRow);
-    const reachHeight = reachTable?.rows.length ? rowChartHeight(reachTable.rows.length, ROW_CHART) : undefined;
+    const trendHeadline = useMemo(() => (trendTable ? WORKLOAD_TREND_HEADLINE(trendTable) : undefined), [trendTable]);
+    const reachHeadline = useMemo(() => (reachTable ? WORKLOAD_REACH_HEADLINE(reachTable) : undefined), [reachTable]);
+    const reachHeight = reachTable?.rows.length
+        ? rowChartHeight(reachTable.rows.length, ROW_CHART) + (reachHeadline ? HEADLINE_SPACE : 0)
+        : undefined;
 
     return (
         <Section id={stageAnchor("m365-activity")} title={M365_ACTIVITY_TITLE} description={M365_ACTIVITY_DESCRIPTION}>
@@ -174,7 +180,7 @@ export function M365ActivityStage({ concealed }: M365ActivityStageProps) {
                 </>
             )}
 
-            <div className="h-[360px]">
+            <div style={{ height: 360 + (trendHeadline ? HEADLINE_SPACE : 0) }}>
                 {trendResult.data?.status === "error" ? (
                     <QueryError className="h-full" message={trendResult.data.error.message} onRetry={trendResult.refetch} />
                 ) : trendResult.isLoading || !trendTable ? (
@@ -186,15 +192,17 @@ export function M365ActivityStage({ concealed }: M365ActivityStageProps) {
                         description="The trend only plots full Monday-to-Sunday weeks, and the selection doesn't cover one."
                     />
                 ) : (
-                    <VegaVisual
-                        spec={TREND.vegaLiteSpec}
-                        data={trendTable}
-                        theme={theme}
-                        header={{
-                            title: "Which workloads people use, week by week",
-                            subtitle: "Share of the people active on Microsoft 365 that week who used each workload.",
-                        }}
-                    />
+                    <Headlined text={trendHeadline}>
+                        <VegaVisual
+                            spec={TREND.vegaLiteSpec}
+                            data={trendTable}
+                            theme={theme}
+                            header={{
+                                title: "Which workloads people use, week by week",
+                                subtitle: "Share of the people active on Microsoft 365 that week who used each workload.",
+                            }}
+                        />
+                    </Headlined>
                 )}
             </div>
 
@@ -211,15 +219,17 @@ export function M365ActivityStage({ concealed }: M365ActivityStageProps) {
                             description="Nobody in the current selection used a Microsoft 365 workload."
                         />
                     ) : (
-                        <VegaVisual
-                            spec={REACH.vegaLiteSpec}
-                            data={reachTable}
-                            theme={theme}
-                            header={{
-                                title: "How far each workload reaches",
-                                subtitle: "Share of active people, with days per week in the tooltip.",
-                            }}
-                        />
+                        <Headlined text={reachHeadline}>
+                            <VegaVisual
+                                spec={REACH.vegaLiteSpec}
+                                data={reachTable}
+                                theme={theme}
+                                header={{
+                                    title: "How far each workload reaches",
+                                    subtitle: "Share of active people, with days per week in the tooltip.",
+                                }}
+                            />
+                        </Headlined>
                     )}
                 </div>
 

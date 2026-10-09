@@ -6,6 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { useMemo } from "react";
+import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
 import { VegaVisual } from "@/components/vega-visual";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
@@ -13,9 +14,13 @@ import { useThemeContext } from "@/hooks/theme.context";
 import { useFilteredQuery } from "@/hooks/use-filtered-query";
 import { toDataTable } from "@/lib/to-data-table";
 import { surfaceUsage } from "@/queries/work";
+import { MODEL_HEADLINE, SURFACE_HEADLINE } from "./headlines";
 
 const surface = surfaceUsage({ lens: "surface" });
 const model = surfaceUsage({ lens: "model" });
+
+/** Each chart's plot height; a headline adds its own room above. */
+const CHART_HEIGHT = 360;
 
 const charts = [
     {
@@ -23,12 +28,14 @@ const charts = [
         spec: surface.vegaLiteSpec,
         title: "Tasks by app",
         subtitle: "Which surface the request came from",
+        headline: SURFACE_HEADLINE,
     },
     {
         id: "model",
         spec: model.vegaLiteSpec,
         title: "Tasks by model",
         subtitle: "Which model answered the request",
+        headline: MODEL_HEADLINE,
     },
 ];
 
@@ -53,6 +60,11 @@ export function SurfacesStage() {
         [result.data],
     );
 
+    const headlines = useMemo(
+        () => Object.fromEntries(charts.map((chart) => [chart.id, table ? chart.headline(table) : undefined])),
+        [table],
+    );
+
     return (
         <Section
             title="Surfaces & models"
@@ -60,7 +72,10 @@ export function SurfacesStage() {
         >
             <div className="grid gap-300 lg:grid-cols-2">
                 {charts.map((chart) => (
-                    <div key={chart.id} className="h-[360px]">
+                    <div
+                        key={chart.id}
+                        style={{ height: CHART_HEIGHT + (headlines[chart.id] ? HEADLINE_SPACE : 0) }}
+                    >
                         {result.data?.status === "error" ? (
                             <QueryError
                                 className="h-full"
@@ -76,12 +91,14 @@ export function SurfacesStage() {
                                 description="No rows carry an app or model value in this selection."
                             />
                         ) : (
-                            <VegaVisual
-                                spec={chart.spec}
-                                data={table}
-                                theme={theme}
-                                header={{ title: chart.title, subtitle: chart.subtitle }}
-                            />
+                            <Headlined text={headlines[chart.id]}>
+                                <VegaVisual
+                                    spec={chart.spec}
+                                    data={table}
+                                    theme={theme}
+                                    header={{ title: chart.title, subtitle: chart.subtitle }}
+                                />
+                            </Headlined>
                         )}
                     </div>
                 ))}

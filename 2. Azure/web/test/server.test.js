@@ -75,6 +75,18 @@ test('settings CRUD uses store, enforces admin-only writes and sets audit fields
   } finally { server.close(); }
 });
 
+test('settings keep monthly budgets on the commercial terms row as sent', async () => {
+  const { server, baseUrl } = await startTestServer({ settingsStore: new MemorySettingsStore() });
+  const id = '00000000-0000-0000-0000-000000000001';
+  try {
+    const terms = { id, creditRate: 0.01, budgetCowork: 5000, budgetStudio: 2500.5, budgetAzure: null };
+    const put = await request(baseUrl, `/api/settings/CommercialTerms/${id}`, { method: 'PUT', headers: { ...authHeader('admin'), 'Content-Type': 'application/json' }, body: JSON.stringify(terms) });
+    assert.equal(put.status, 200);
+    const [row] = await (await request(baseUrl, '/api/settings/CommercialTerms', { headers: authHeader() })).json();
+    assert.deepEqual({ creditRate: row.creditRate, budgetCowork: row.budgetCowork, budgetStudio: row.budgetStudio, budgetAzure: row.budgetAzure }, { creditRate: 0.01, budgetCowork: 5000, budgetStudio: 2500.5, budgetAzure: null });
+  } finally { server.close(); }
+});
+
 test('settings entity whitelist returns 404', async () => {
   const { server, baseUrl } = await startTestServer();
   try { assert.equal((await request(baseUrl, '/api/settings/Other', { headers: authHeader() })).status, 404); } finally { server.close(); }

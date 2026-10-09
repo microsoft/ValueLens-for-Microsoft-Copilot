@@ -31,6 +31,7 @@ import {
 import { billedText, readAzureBilling } from "./azure-billing";
 import { coworkLimitState } from "./cowork-limit";
 import { CREDIT_CURRENCY, LENSES, moneyCell, standalone, useConsumptionSummary, useConsumptionTable } from "./data";
+import { COWORK_COST_HEADLINE, COWORK_CREDITS_HEADLINE } from "./headlines";
 import { ChartPanel, KpiRowState, NoteCard, RollupGrid, type TreeColumn } from "@/components/report-panels";
 
 const KPI_GRID = "grid gap-300 md:grid-cols-2 xl:grid-cols-5";
@@ -221,6 +222,7 @@ export function CoworkStage({ options, rates }: CoworkStageProps) {
                 capabilities={NO_STACK_LABELS}
                 height={340}
                 title={cost ? "Cost over time" : "Credit consumption over time"}
+                headline={cost ? COWORK_COST_HEADLINE : COWORK_CREDITS_HEADLINE}
                 subtitle={
                     cost
                         ? "Prepaid and pay-as-you-go cost for each week in the period"

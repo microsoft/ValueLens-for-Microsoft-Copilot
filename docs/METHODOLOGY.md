@@ -844,6 +844,13 @@ score = 60 × min(median tasks per active week ÷ 30, 1) + 40 × min(median acti
   Their reclaim value is dormant seats × Monthly Licence Cost, which defaults to 0 (not costed).
 - **License Allocation** ranks organisations by unlicensed sessions per person per week, then by
   active unlicensed users.
+- **Heavy users without a licence** (Fabric App) splits everyone active in the last full month by
+  habit, using the same active-day bands as [Habit Formation](#habit-formation-has-it-become-a-habit),
+  and by licence. Anyone with any licensed activity that month counts as licensed. It then lists
+  the ten unlicensed people active on the most days, among those active on 11 or more. Shares
+  appear only for groups of five or more people. If no activity matched a licence, the page says
+  the roster didn't match instead of reporting everyone as unlicensed. It compares groups; it
+  doesn't say what a licence would change.
 
 ### User Feedback: what do people say?
 
@@ -873,6 +880,7 @@ saves exports emailed to an admin into that folder. With no export, the page sta
 | Monthly Licence Cost | 0 | `Assumptions` table | Prices dormant seats; 0 means not costed |
 | Currency symbol | £ | `Assumptions` table | Display only; it doesn't convert. Enter money settings in this currency |
 | Rates & packs | From `commercial_terms` | App Consumption page | Credit prices ([§8](#81-consumption)) |
+| Monthly budgets | Not set | App Consumption page, Rates, packs and budgets | Budget runway for Cowork, Copilot Studio and Azure ([§8.1](#81-consumption)) |
 | Licence price | $30, the US list price | App Value page, Prices | Licence cost on Cost vs value ([§8.3](#83-cost-vs-value)). The report uses AI PPUPM instead |
 | Exchange rate | Not set | App Value page, Prices | Converts dollar costs into the value's currency ([§8.3](#83-cost-vs-value)) |
 | Time per task | The researched bands in the [appendix](#appendix-time-bands-and-sources) | App Assumptions page | Replaces a behaviour's Low, Typical and High minutes for everyone using the app. Cowork hours keep their task-category bands, and the report keeps the model's times |
@@ -906,6 +914,19 @@ and $0.05 per credit. A pack balance of 0 means no pack.
 **Cowork limits.** A person's monthly credit limit and a spending policy's plan limit only count
 when they are above 0. A blank or 0 limit means **no limit set**: allowance, headroom and allowance
 used are blank, and that person or policy is never over or near the limit.
+
+**Budget runway.** **Monthly budgets**, next to Rates & packs, takes an optional monthly budget for
+Cowork / Work IQ and Copilot Studio in dollars, and for Azure (the solution and Foundry together)
+in Azure's billing currency. The budgets are stored with the rates: in the app's SQL database on
+Fabric, and in Table Storage through `/api/settings` on Azure. For each source, the runway takes
+the latest month in the data, adds up the spend so far, and projects it in a straight line: spend
+so far ÷ days elapsed × days in the month. The days elapsed run to the newest date with data, so a
+late export doesn't read as a slowdown. Cowork arrives weekly, so each week's cost is spread
+evenly over its seven days and the month gets the days that fall in it. Azure uses the first cost
+basis the export offers, and only one currency. The card then says one of: no spend yet; too early
+to project (under three days in); on track; at risk, with the date spend would pass the budget; or
+over, with the date it passed. With no budget, it shows the projected month-end only. This is a
+straight line, not a forecast: it ignores seasonality, packs running out and price changes.
 
 ### 8.2 Agent Evaluation
 
@@ -1023,6 +1044,15 @@ how to turn the setting off. Once it's off, the next run reloads the concealed d
 next* adds breadth to the priority score ([License Readiness](#license-readiness-who-should-get-a-licence-next)).
 Breadth is a sign of how much of someone's work Copilot could reach, so a person who uses four or
 more workloads a day scores full marks for it.
+
+### 8.5 Chart headlines
+
+Most charts in the app have one sentence above them, worked out from the rows the chart draws: the
+largest category and its share, the peak period, or how a total splits. A headline says what the
+data shows and never why. It's left out rather than guessed when there are no rows, only one
+category or period, a tie for the lead, a zero or negative total, or fewer than five people behind
+a share or a ranking. A peak is never compared with the period before, because the latest period
+may be incomplete.
 
 ---
 

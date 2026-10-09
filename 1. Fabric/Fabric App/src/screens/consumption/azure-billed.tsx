@@ -9,6 +9,7 @@ import { ChartPanel, NoteCard } from "@/components/report-panels";
 import { studioAzureBilling, studioAzureDaily, type ConsumptionLens } from "@/queries/consumption";
 import { billedText, readAzureBilling, subscriptionText } from "./azure-billing";
 import { useConsumptionSummary, useConsumptionTable } from "./data";
+import { AZURE_BILLED_COST_HEADLINE, AZURE_BILLED_CREDITS_HEADLINE } from "./headlines";
 
 // A label on each daily bar can't fit; the tooltip carries the numbers.
 const NO_STACK_LABELS = { disableStackedDataLabels: true };
@@ -31,6 +32,8 @@ export function AzureBilledPanel({ lens, extra }: AzureBilledPanelProps) {
     if (!billing) return null;
 
     const cost = lens === "cost";
+    // Several currencies are added up as billed, unconverted, so no share of their cost is given.
+    const headline = cost ? (billing.currency ? AZURE_BILLED_COST_HEADLINE : undefined) : AZURE_BILLED_CREDITS_HEADLINE;
     const subtitle = [billing.window, subscriptionText(billing.subscriptions), billing.currency ?? billing.currencies]
         .filter(Boolean)
         .join(" · ");
@@ -43,6 +46,7 @@ export function AzureBilledPanel({ lens, extra }: AzureBilledPanelProps) {
                 capabilities={NO_STACK_LABELS}
                 height={300}
                 title={cost ? "Pay-as-you-go billed in Azure" : "Pay-as-you-go credits billed in Azure"}
+                headline={headline}
                 subtitle={subtitle}
                 emptyTitle="Nothing billed in Azure"
                 emptyDescription="Azure Cost Management has no Copilot pay-as-you-go charges in this period."

@@ -11,3 +11,5 @@ export * from "./license-priority-by-org";
 export * from "./license-candidates";
 export * from "./license-candidates-m365";
 export * from "./license-dormancy";
+export * from "./habit-licence-matrix";
+export * from "./unlicensed-heavy-users";

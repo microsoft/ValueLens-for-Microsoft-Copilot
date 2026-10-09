@@ -10,6 +10,7 @@ import { DataGrid, type GridColumnDef, type Row } from "@microsoft/fabric-datagr
 import { VegaVisual } from "@/components/vega-visual";
 import { ChevronDown } from "lucide-react";
 import { stageAnchor } from "@/components/destinations";
+import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
 import { KpiCard, KpiStat } from "@/components/kpi-card";
 import { OpenDestinationLink } from "@/components/open-destination-link";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
@@ -32,6 +33,7 @@ import {
     toAgentEntries,
     type AgentEntry,
 } from "@/queries/agents";
+import { AGENT_USAGE_HEADLINE } from "./headlines";
 
 const SMALL = "text-[length:var(--text-200)] leading-200";
 const BODY = "text-[length:var(--text-300)] leading-300";
@@ -500,6 +502,7 @@ export function AgentRegistryStage() {
                 : undefined,
         [usageResult.data, usage.columnMetadata],
     );
+    const usageHeadline = useMemo(() => (usageTable ? AGENT_USAGE_HEADLINE(usageTable) : undefined), [usageTable]);
 
     return (
         <Section
@@ -555,7 +558,7 @@ export function AgentRegistryStage() {
                 </OpenDestinationLink>
             )}
 
-            <div className="h-[420px]">
+            <div style={{ height: 420 + (usageHeadline ? HEADLINE_SPACE : 0) }}>
                 {usageResult.data?.status === "error" ? (
                     <QueryError
                         className="h-full"
@@ -571,15 +574,17 @@ export function AgentRegistryStage() {
                         description="The audit log records no agent use in this period."
                     />
                 ) : (
-                    <VegaVisual
-                        spec={usage.vegaLiteSpec}
-                        data={usageTable}
-                        theme={theme}
-                        header={{
-                            title: "Most-used agents",
-                            subtitle: "Sessions per agent, as the audit log names them",
-                        }}
-                    />
+                    <Headlined text={usageHeadline}>
+                        <VegaVisual
+                            spec={usage.vegaLiteSpec}
+                            data={usageTable}
+                            theme={theme}
+                            header={{
+                                title: "Most-used agents",
+                                subtitle: "Sessions per agent, as the audit log names them",
+                            }}
+                        />
+                    </Headlined>
                 )}
             </div>
 

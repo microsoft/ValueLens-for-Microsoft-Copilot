@@ -30,6 +30,7 @@ import {
     splitCoverage,
 } from "@/queries/consumption";
 import { CREDIT_CURRENCY, moneyCell, SMALL, useConsumptionSummary, useConsumptionTable, type TableResult } from "./data";
+import { PRODUCT_COST_CREDITS_ONLY, PRODUCT_COST_SAME_CURRENCY } from "./headlines";
 import { ChartPanel, NoteCard, Panel } from "@/components/report-panels";
 
 type OverviewPreset = Exclude<DatePreset, "custom">;
@@ -229,6 +230,7 @@ export function OverviewStage() {
                     height={rowChartHeight(byProduct.table?.rows.length ?? 3, { perRow: 48, chrome: 150 })}
                     title="Cost by product"
                     subtitle="The same dates for every product"
+                    headline={azurePrefix === CREDIT_CURRENCY ? PRODUCT_COST_SAME_CURRENCY : PRODUCT_COST_CREDITS_ONLY}
                     emptyTitle="No cost to compare"
                     emptyDescription="None of the products has a cost in these dates."
                 />

@@ -8,6 +8,7 @@
 import { useId, useMemo } from "react";
 import { ArrowDown } from "lucide-react";
 import { VegaVisual } from "@/components/vega-visual";
+import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
 import { stageAnchor } from "@/components/destinations";
 import { FilterNote } from "@/components/filter-note";
 import { GradeMark } from "@/components/grade-mark";
@@ -28,6 +29,7 @@ import { toDataTable } from "@/lib/to-data-table";
 import { coworkFitSummary } from "@/queries/agents";
 import { COWORK_GRADE_DOMAIN, coworkFitByTask, withGradeNames } from "@/queries/efficiency";
 import { PeopleTable, WorkShapeTable } from "./cowork-fit-tables";
+import { COWORK_TASK_HEADLINE } from "./headlines";
 
 /** Cowork fit reads Cowork sessions by definition, so activity and agent filters would only blank it. */
 const COWORK_ONLY: FilterKey[] = ["audience", "agentTypes", "agentNames"];
@@ -76,9 +78,13 @@ function FitByTaskChart() {
 
     const taskIndex = table?.columns.findIndex((column) => column.name === "Task") ?? -1;
     const tasks = table && taskIndex >= 0 ? distinctCount(table.rows.map((row) => row[taskIndex])) : 0;
+    const headline = useMemo(() => (table ? COWORK_TASK_HEADLINE(table) : undefined), [table]);
 
     return (
-        <div className="h-[400px]" style={table ? { height: rowChartHeight(tasks, LEGEND_CHART) } : undefined}>
+        <div
+            className="h-[400px]"
+            style={table ? { height: rowChartHeight(tasks, LEGEND_CHART) + (headline ? HEADLINE_SPACE : 0) } : undefined}
+        >
             {result.data?.status === "error" ? (
                 <QueryError className="h-full" message={result.data.error.message} onRetry={result.refetch} />
             ) : result.isLoading || !table ? (
@@ -90,16 +96,18 @@ function FitByTaskChart() {
                     description="No graded Cowork session in this selection carries a Task Breakdown."
                 />
             ) : (
-                <VegaVisual
-                    spec={spec}
-                    data={table}
-                    theme={theme}
-                    capabilities={NO_STACK_LABELS}
-                    header={{
-                        title: "What goes to Cowork",
-                        subtitle: "Graded sessions for each Task Breakdown, by fit. Busiest first.",
-                    }}
-                />
+                <Headlined text={headline}>
+                    <VegaVisual
+                        spec={spec}
+                        data={table}
+                        theme={theme}
+                        capabilities={NO_STACK_LABELS}
+                        header={{
+                            title: "What goes to Cowork",
+                            subtitle: "Graded sessions for each Task Breakdown, by fit. Busiest first.",
+                        }}
+                    />
+                </Headlined>
             )}
         </div>
     );

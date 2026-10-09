@@ -7,6 +7,7 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { DataGrid, type GridColumnDef, type Row } from "@microsoft/fabric-datagrid";
+import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
 import { VegaVisual } from "@/components/vega-visual";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
@@ -25,6 +26,7 @@ import {
     VALUE_PER_WEEK_COLUMN,
     valueByTask,
 } from "@/queries/value";
+import { TIME_SAVED_HEADLINE } from "./headlines";
 
 type View = "table" | "chart";
 type Detail = "categories" | "tasks";
@@ -180,11 +182,13 @@ export function TaskValueBreakdown({ extra, currencySymbol, assumption }: TaskVa
         };
     }, [tree, currencySymbol]);
 
+    const timeSaved = useMemo(() => (tree ? TIME_SAVED_HEADLINE(tree.tasks) : undefined), [tree]);
+
     const height = !tree
         ? undefined
         : view === "table"
           ? gridHeight(visibleRows + 1, { max: 760 })
-          : rowChartHeight(tree.tasks.rows.length, { perRow: 32, chrome: 190 });
+          : rowChartHeight(tree.tasks.rows.length, { perRow: 32, chrome: 190 }) + (timeSaved ? HEADLINE_SPACE : 0);
 
     return (
         <div className="flex flex-col gap-200">
@@ -227,16 +231,18 @@ export function TaskValueBreakdown({ extra, currencySymbol, assumption }: TaskVa
                         }}
                     />
                 ) : (
-                    <VegaVisual
-                        spec={source.vegaLiteSpec}
-                        data={tree.tasks}
-                        capabilities={source.capabilities}
-                        theme={theme}
-                        header={{
-                            title: "Time saved by Task Breakdown",
-                            subtitle: `Expert-equivalent hours per week, coloured by Task Category. ${assumption}.`,
-                        }}
-                    />
+                    <Headlined text={timeSaved}>
+                        <VegaVisual
+                            spec={source.vegaLiteSpec}
+                            data={tree.tasks}
+                            capabilities={source.capabilities}
+                            theme={theme}
+                            header={{
+                                title: "Time saved by Task Breakdown",
+                                subtitle: `Expert-equivalent hours per week, coloured by Task Category. ${assumption}.`,
+                            }}
+                        />
+                    </Headlined>
                 )}
             </div>
         </div>

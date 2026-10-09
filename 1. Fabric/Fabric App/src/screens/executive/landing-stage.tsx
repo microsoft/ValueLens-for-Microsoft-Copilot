@@ -21,6 +21,7 @@ import { columnFormat, columnHeat, heatRenderer } from "@/lib/heat";
 import { readNumber } from "@/lib/summary-row";
 import { DEPARTMENT_COLUMN, executiveWorkKinds, WORK_KINDS_SHOWN } from "@/queries/executive";
 import { mostUsedAgent, workRates } from "./executive-data";
+import { WORK_KINDS_HEADLINE } from "./headlines";
 import type { ExecutiveData } from "./use-executive-data";
 
 const SORT_COLUMN = "Hours Per Seat Month";
@@ -112,6 +113,7 @@ export function LandingStage({ data }: { data: ExecutiveData }) {
                         spec={workKindsSource.vegaLiteSpec}
                         height={rowChartHeight(workKinds.table?.rows.length ?? WORK_KINDS_SHOWN)}
                         title="What the work is"
+                        headline={WORK_KINDS_HEADLINE}
                         subtitle={`The ${WORK_KINDS_SHOWN} kinds of work with the most expert-equivalent hours`}
                         emptyTitle="No kinds of work to show"
                         emptyDescription="No task in the current selection has a kind of work other than General Chat or General Assistance."
