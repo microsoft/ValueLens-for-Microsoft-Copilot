@@ -1,23 +1,30 @@
 // @ts-check
 /**
- * The optional Power Automate flows: product feedback exports emailed to the admin, and Copilot
- * Studio credits from the Power Platform licensing API. The installer creates each flow, turned
- * off, in a Power Platform environment the user picks; the user signs in to its connections and
- * turns it on. When a flow can't be created, it is written to a file to import instead.
+ * The Power Automate flows: product feedback exports emailed to the admin, and Copilot Studio
+ * credits from the Power Platform licensing API. The installer creates each flow, turned off, in a
+ * Power Platform environment the user picks; the user signs in to its connections and turns it on.
+ * When a flow can't be created, it is written to a file to import instead.
  */
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { orgUrl } from '../clients/dataverse.js';
-import { secretMode } from '../config.js';
+import { flowIdentity, secretMode } from '../config.js';
 import {
-  CONNECTORS,
+  connectionReferencesOf,
+  connectorByName,
   connectorsUsed,
+  CONNECTORS,
   FEEDBACK_FLOW_NAME,
   FEEDBACK_SUBJECT,
   feedbackFlowDefinition,
   flowClientData,
   flowFile,
+  newConnections,
+  ONELAKE_DFS,
+  oneLakeEndpoint,
+  PPAPI,
+  STORAGE_RESOURCE,
   STUDIO_FLOW_NAME,
   studioFlowDefinition,
 } from '../transform/flows.js';
@@ -34,29 +41,23 @@ export const FLOW_FILES = /** @type {Record<FlowKind, string>} */ ({
   studio: 'analytics-hub-studio-credits-flow.json',
 });
 
-/**
- * The flows read the client secret from Key Vault, so none are made when it's in the notebooks.
- * @param {import('../config.js').InstallConfig} config @returns {FlowKind[]}
- */
-export const flowsWanted = (config) =>
-  secretMode(config) === 'notebook'
-    ? []
-    : [
-        ...(config.uploads.feedbackFlow && config.dataSources.productFeedback === 'csv' ? /** @type {const} */ (['feedback']) : []),
-        ...(config.uploads.studioFlow && config.dataSources.studioCredits === 'csv' ? /** @type {const} */ (['studio']) : []),
-      ];
+/** @param {import('../config.js').InstallConfig} config @returns {FlowKind[]} */
+const flowsChosen = (config) => [
+  ...(config.uploads.feedbackFlow && config.dataSources.productFeedback === 'csv' ? /** @type {const} */ (['feedback']) : []),
+  ...(config.dataSources.studioCredits === 'api' ? /** @type {const} */ (['studio']) : []),
+];
+
+/** The app identity reads its secret from Key Vault, which notebook mode doesn't use. @param {import('../config.js').InstallConfig} config */
+const appWithoutVault = (config) => flowIdentity(config) === 'app' && secretMode(config) === 'notebook';
+
+/** @param {import('../config.js').InstallConfig} config @returns {FlowKind[]} */
+export const flowsWanted = (config) => (appWithoutVault(config) ? [] : flowsChosen(config));
 
 /**
- * Flows the user asked for that notebook mode leaves out.
+ * Flows the user asked for that can't be made: the app identity with the secret in the notebooks.
  * @param {import('../config.js').InstallConfig} config
  */
-export const flowsSkipped = (config) =>
-  secretMode(config) !== 'notebook'
-    ? []
-    : [
-        ...(config.uploads.feedbackFlow && config.dataSources.productFeedback === 'csv' ? [FEEDBACK_FLOW_NAME] : []),
-        ...(config.uploads.studioFlow && config.dataSources.studioCredits === 'csv' ? [STUDIO_FLOW_NAME] : []),
-      ];
+export const flowsSkipped = (config) => (appWithoutVault(config) ? flowsChosen(config).map((k) => (k === 'feedback' ? FEEDBACK_FLOW_NAME : STUDIO_FLOW_NAME)) : []);
 
 /** @param {string} v */
 function validateUrl(v) {
@@ -69,25 +70,19 @@ function validateUrl(v) {
 }
 
 /**
- * Asks about the flows for the sources that take exports, and where to create them.
+ * Asks about the feedback flow, and where to create the flows. The Studio flow comes with the
+ * Studio credits api mode.
  * @param {Ctx} ctx
  */
 export async function planFlows(ctx) {
   const { ui, config } = ctx;
   const up = config.uploads;
-  const ds = config.dataSources;
-  if (ds.productFeedback === 'csv') {
+  if (config.dataSources.productFeedback === 'csv') {
     up.feedbackFlow = await ui.confirm(
-      `Also create a Power Automate flow that saves product feedback exports emailed to you (subject "${FEEDBACK_SUBJECT}") into the drop folder? It needs a Power Automate Premium licence.`,
+      `Also create a Power Automate flow that saves product feedback exports emailed to you (subject "${FEEDBACK_SUBJECT}")? It needs Power Automate Premium.`,
       up.feedbackFlow ?? false,
     );
   } else up.feedbackFlow = false;
-  if (ds.studioCredits === 'csv') {
-    up.studioFlow = await ui.confirm(
-      'Also create a Power Automate flow that reads Copilot Studio credits from the Power Platform licensing API each day? It signs in as you, so you need to be a Power Platform, Billing or Global administrator, and it needs Power Automate Premium.',
-      up.studioFlow ?? false,
-    );
-  } else up.studioFlow = false;
   if (flowsWanted(config).length) await pickFlowEnvironment(ctx);
 }
 
@@ -130,22 +125,23 @@ async function pickFlowEnvironment(ctx) {
  * @returns {Record<FlowKind, { name: string, description: string, definition: any }>}
  */
 export function flowDefinitions(config, tenantId) {
+  const identity = flowIdentity(config);
+  /** @type {import('../transform/flows.js').FlowTarget} */
   const t = {
-    tenantId,
-    clientId: config.app.appId ?? '',
-    secretName: config.keyVault.secretName,
-    workspaceId: config.fabric.workspaceId ?? '',
-    lakehouseId: config.fabric.lakehouseId ?? '',
+    identity,
+    endpoint: oneLakeEndpoint(config.fabric.workspaceId ?? '', config.fabric.lakehouseId ?? ''),
+    ...(identity === 'app' ? { tenantId, clientId: config.app.appId ?? '', secretName: config.keyVault.secretName } : {}),
   };
+  const where = `${config.fabric.lakehouseName ?? 'the Lakehouse'} > ${UPLOAD_DIR}`;
   return {
     feedback: {
       name: FEEDBACK_FLOW_NAME,
-      description: `Saves product feedback exports emailed with the subject "${FEEDBACK_SUBJECT}" to ${config.fabric.lakehouseName ?? 'the Lakehouse'} > ${UPLOAD_DIR}. Created by the Analytics Hub installer.`,
+      description: `Saves product feedback exports emailed with the subject "${FEEDBACK_SUBJECT}" to ${where}. Created by the Analytics Hub installer.`,
       definition: feedbackFlowDefinition(t),
     },
     studio: {
       name: STUDIO_FLOW_NAME,
-      description: `Saves Copilot Studio credits from the Power Platform licensing API to ${config.fabric.lakehouseName ?? 'the Lakehouse'} > ${UPLOAD_DIR} each day. Created by the Analytics Hub installer.`,
+      description: `Saves Copilot Studio credits from the Power Platform licensing API to ${where} each day. Created by the Analytics Hub installer.`,
       definition: studioFlowDefinition(t, { time: config.schedule.time, timeZone: config.schedule.timeZone }),
     },
   };
@@ -154,9 +150,13 @@ export function flowDefinitions(config, tenantId) {
 /** @param {any} definition */
 const signatureOf = (definition) => createHash('sha256').update(JSON.stringify(definition)).digest('hex').slice(0, 16);
 
+/** @param {string[]} names */
+const labels = (names) => names.map((n) => connectorByName(n)?.label ?? n).join('; ');
+
 /**
- * Creates the flows chosen, or brings them up to date. A flow that can't be created is written to
- * a file beside the install record.
+ * Creates the flows chosen, or brings them up to date. An update keeps the connections already
+ * signed in to; when it adds one, the flow is turned off until the user signs in. A flow that
+ * can't be created is written to a file beside the install record.
  * @param {Ctx} ctx
  */
 export async function ensureFlows(ctx) {
@@ -164,10 +164,12 @@ export async function ensureFlows(ctx) {
   const kinds = flowsWanted(config);
   if (!kinds.length) return;
   const up = config.uploads;
-  try {
-    await ensureWorkspaceRole(ctx, 'Contributor', 'so the Power Automate flows can write to the drop folder');
-  } catch (err) {
-    ui.warn(`Couldn't give ${config.app.displayName ?? 'the app'} Contributor on the workspace (${/** @type {Error} */ (err).message}). The flows can't save files until it has it.`);
+  if (flowIdentity(config) === 'app') {
+    try {
+      await ensureWorkspaceRole(ctx, 'Contributor', 'so the Power Automate flows can write to the drop folder');
+    } catch (err) {
+      ui.warn(`Couldn't give ${config.app.displayName ?? 'the app'} Contributor on the workspace (${/** @type {Error} */ (err).message}). The flows can't save files until it has it.`);
+    }
   }
   const defs = flowDefinitions(config, ctx.user.tenantId);
   const dv = up.flowEnvironment ? api.dataverse(up.flowEnvironment.url) : undefined;
@@ -182,8 +184,13 @@ export async function ensureFlows(ctx) {
         const existing = id ? await dv.getFlow(id) : undefined;
         if (existing) {
           if (up.flowSignatures[kind] !== signature) {
-            await dv.updateFlow(existing.workflowid, flowClientData(definition));
-            ui.ok(`Updated the flow ${existing.name}. Open it to check its connections are still signed in.`);
+            const current = connectionReferencesOf(existing.clientdata);
+            const fresh = newConnections(definition, current);
+            const wasOn = existing.statecode === 1;
+            if (fresh.length && wasOn) await dv.turnOffFlow(existing.workflowid);
+            await dv.updateFlow(existing.workflowid, flowClientData(definition, current));
+            if (fresh.length) ui.warn(`Updated the flow ${existing.name}${wasOn ? ' and turned it off' : ''}. Sign in to: ${labels(fresh)}. Then turn it on.`);
+            else ui.ok(`Updated the flow ${existing.name}`);
           } else ui.ok(`Flow ${existing.name} is in place`);
         } else {
           if (id) ui.warn(`The flow ${name} was deleted. Creating it again.`);
@@ -211,7 +218,7 @@ export async function ensureFlows(ctx) {
 function writeFlowFile(ctx, kind, name, definition) {
   const { ui, config } = ctx;
   const file = join(ctx.configFile ? dirname(ctx.configFile) : process.cwd(), FLOW_FILES[kind]);
-  const note = `Written by the Analytics Hub installer because the flow couldn't be created. In Power Automate, create an automated or scheduled cloud flow, open it in the code view (or use the Power Automate Management connector) and paste "definition". Then sign in to its connections: ${connectorsUsed(definition).map((n) => Object.values(CONNECTORS).find((k) => k.name === n)?.label ?? n).join(', ')}.`;
+  const note = `Written by the Analytics Hub installer because the flow couldn't be created. In Power Automate, create an automated or scheduled cloud flow, open it in the code view (or use the Power Automate Management connector) and paste "definition". Then sign in to its connections: ${labels(connectorsUsed(definition))}.`;
   try {
     writeFileSync(file, `${JSON.stringify(flowFile(name, definition, note), null, 2)}\n`);
     config.uploads.flowFiles = { ...config.uploads.flowFiles, [kind]: file };
@@ -223,7 +230,23 @@ function writeFlowFile(ctx, kind, name, definition) {
 }
 
 /**
- * What's left to do for each flow.
+ * The connection sign-ins a flow needs, one line each.
+ * @param {import('../config.js').InstallConfig} config
+ * @param {FlowKind} kind
+ */
+export function connectionSteps(config, kind) {
+  const workspace = config.fabric.workspaceName ?? 'the workspace';
+  const storage =
+    flowIdentity(config) === 'app'
+      ? `${CONNECTORS.keyVault.label}: vault ${config.keyVault.name ?? 'your Key Vault'}.`
+      : `${CONNECTORS.storage.label}: Base Resource URL ${ONELAKE_DFS}, Resource URI ${STORAGE_RESOURCE}. Sign in as someone with Contributor or higher on ${workspace}.`;
+  return kind === 'feedback'
+    ? [`${CONNECTORS.outlook.label}: sign in as the mailbox the export is emailed to.`, storage]
+    : [`${CONNECTORS.entra.label}: Base Resource URL and Resource URI ${PPAPI}. Sign in as a Power Platform, Billing or Global administrator.`, storage];
+}
+
+/**
+ * What's left to do for each flow, as short numbered steps.
  * @param {Ctx} ctx
  */
 export function flowsSummary(ctx) {
@@ -233,7 +256,6 @@ export function flowsSummary(ctx) {
   const up = config.uploads;
   const env = up.flowEnvironment;
   const link = env?.id ? `${MAKER}environments/${env.id}/flows` : MAKER;
-  const vault = config.keyVault.name ?? 'your Key Vault';
   ui.heading('Power Automate flows');
   for (const kind of kinds) {
     const name = kind === 'feedback' ? FEEDBACK_FLOW_NAME : STUDIO_FLOW_NAME;
@@ -241,13 +263,15 @@ export function flowsSummary(ctx) {
     if (up.flowIds?.[kind] && !file) ui.info(c.bold(name) + c.dim(`  in ${env?.name ?? env?.url}, turned off`));
     else if (file) ui.info(c.bold(name) + c.dim(`  to import: ${file}`));
     else continue;
-    ui.info(`  1. Open it in Power Automate (${link}) and sign in to each connection:`);
-    ui.info(`     ${CONNECTORS.keyVault.label} to ${vault}${kind === 'feedback' ? `, and ${CONNECTORS.outlook.label} as the mailbox the export is emailed to` : `, and ${CONNECTORS.entra.label} with Base Resource URL and Resource URI https://api.powerplatform.com`}.`);
-    if (kind === 'studio') ui.info('     Sign in as a Power Platform, Billing or Global administrator: the licensing API reads as you.');
-    ui.info('  2. Save, then turn the flow on.');
-    if (kind === 'feedback') ui.info(`  3. In the Microsoft 365 admin center, schedule the product feedback export to be emailed to that mailbox with the subject "${FEEDBACK_SUBJECT}".`);
-    else ui.info(`  3. It runs an hour before the pipeline each day and saves the last ten days. The exports still add per-user figures.`);
+    let n = 1;
+    ui.info(`  ${n++}. Open it: ${link}`);
+    for (const step of connectionSteps(config, kind)) ui.info(`  ${n++}. ${step}`);
+    ui.info(`  ${n++}. Save, then turn it on.`);
+    if (kind === 'feedback') ui.info(`  ${n++}. In the Microsoft 365 admin center, schedule the product feedback export to that mailbox, subject "${FEEDBACK_SUBJECT}".`);
+    else ui.note('     The first run loads about six months. Then it runs daily, an hour before the pipeline.');
   }
-  if (config.keyVault.private) ui.note(`  ${vault} only takes private connections, so the Key Vault connector can't reach it. Allow public access from trusted services or use a gateway.`);
-  ui.note(`  The flows write to ${config.fabric.lakehouseName ?? 'the Lakehouse'} > ${UPLOAD_DIR} as ${config.app.displayName ?? 'the app'}, which has Contributor on the workspace for it.`);
+  ui.note('  Tip: sign in with a dedicated admin account and add a co-owner, so the flows outlive any one person.');
+  if (flowIdentity(config) === 'app' && config.keyVault.private) {
+    ui.warn(`${config.keyVault.name ?? 'The Key Vault'} blocks public network access, which the Key Vault connector needs. Run install --flow-identity user so the flows sign in to OneLake instead.`);
+  }
 }

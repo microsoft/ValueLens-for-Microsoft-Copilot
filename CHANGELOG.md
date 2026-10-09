@@ -19,9 +19,14 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ## Unreleased
 
-**Update an existing install:** choose **Repair or change** when the client secret is in Key Vault.
-If you keep the secret in the notebooks, run `AnalyticsHubInstaller.exe update` instead: Repair
+**Update an existing install:** open the installer and choose **Repair or change**. If you keep
+the client secret in the notebooks, run `AnalyticsHubInstaller.exe update` instead: Repair
 doesn't rewrite those notebooks.
+
+Both update the Power Automate flows in place and keep the connections already signed in to.
+Because the flows now need a OneLake connection, each flow is turned off and the connection to
+sign in to is listed. Sign in, then turn the flow back on. A saved choice of *Upload CSV* for
+Copilot Studio credits with the flow chosen becomes **Connected**, which behaves the same.
 
 ### Fix: Azure capacity, reconciliation and solution spend pages are blank
 
@@ -56,6 +61,43 @@ Dataverse flows don't fill these tables; import the script's CSVs there. Speech 
 pages and images aren't collected. The reconciliation page's context text still describes the
 sample data.
 
+### Change: Power Automate flows write to OneLake as a signed-in person, with no Key Vault
+
+**Symptom.** The installer's flows (`Analytics Hub - Product feedback` and `Analytics Hub -
+Copilot Studio credits`) read the app's secret through the Azure Key Vault connector. That
+connector needs the vault to allow public network access. Where tenant policy keeps vaults
+private, the flows could never run. The installer's advice ("allow public access from trusted
+services or use a gateway") was wrong: Power Automate isn't an Azure trusted service, and a data
+gateway doesn't help this connector.
+
+**Fix.**
+
+- By default, the flows write to `Files/analytics_hub_uploads` through an **HTTP with Microsoft
+  Entra ID (preauthorized)** connection to OneLake (Base Resource URL
+  `https://onelake.dfs.fabric.microsoft.com`, Resource URI `https://storage.azure.com`). Whoever
+  signs in needs Contributor or higher on the workspace. No secret, no Key Vault connection, and
+  the flows now work when the secret is kept in the notebooks.
+- `install --flow-identity app` keeps the previous behaviour, for tenants that want writes made
+  by the app registration. It needs Key Vault, and the installer warns if the vault is private.
+- The private-vault warning now says only what's true, and appears only with `--flow-identity app`.
+- The installer's next steps for each flow are short numbered steps, with a tip to sign in with
+  a dedicated admin account and add a co-owner.
+- The manual-setup product feedback flow (`Manual setup/flows`) uses the same OneLake connection.
+- The flow writer accepts any ADLS Gen2 (DFS) endpoint, ready for the Azure path.
+
+### Change: Copilot Studio credits come from the licensing API by default
+
+- **Connected (Power Automate flow)** is now the default for Copilot Studio credits. Admin centre
+  exports are optional, and win for the months they cover.
+- The flow's first run loads about six months of history; then it restates the last ten days
+  each day.
+- It fills in environment names, which were blank on API rows.
+- It also saves per-user credits by day (`StudioApiUserDaily_*.csv`), best effort, from an
+  undocumented API route. `Ingest_Studio` loads them into the new `studio_user_daily` table,
+  resolves user IDs to UPNs, and fills `studio_user` for months no export covers.
+- Consumption Central and the Fabric App say which Studio figures are dated (API) and which are
+  month-to-date snapshots (export).
+
 ---
 
 ## 2026-10-09 — Analytics Hub installer 0.3.6
@@ -81,6 +123,8 @@ different `MetricOrder` on each, so `Metric` can't be sorted by `MetricOrder`.
 - A new test, `tests/test_dax_sort_by_columns.py`, checks every calculated `DATATABLE` that has a
   sort-by column in the shipped templates. It fails when a value has more than one sort key.
   Only the Agent Evaluator template was affected.
+
+---
 
 ## 2026-10-09 — Analytics Hub installer 0.3.5
 

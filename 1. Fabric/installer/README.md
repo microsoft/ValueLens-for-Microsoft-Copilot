@@ -53,7 +53,8 @@ defaults to no:
 
 The installer writes the value into each notebook that needs it instead of a Key Vault
 reference, and records `keyVault.mode: "notebook"`. It never logs the value. Power Automate flows
-are left out in this mode, because they read the secret from Key Vault. To move to Key Vault
+still work in this mode, because they sign in to OneLake rather than read the secret (unless you
+choose `--flow-identity app`). To move to Key Vault
 later, run the installer again and choose **Use Key Vault instead**. It rewrites the notebooks to
 read the secret from the vault and removes the secret they held from the app.
 
@@ -219,7 +220,7 @@ app registration. An install from an earlier version keeps the names it already 
 - **Own reports.** Connect Power BI Desktop to `Analytics Hub Model`, or use **Save a copy** on a
   published report.
 - **Flows and the Cowork Dataflow.** If you chose them, the end of the install lists what to sign
-  in to. See [Power Automate flows](#power-automate-flows-optional) and
+  in to. See [Power Automate flows](#power-automate-flows) and
   [Credit consumption](#credit-consumption).
 - **Someone else takes over the pipeline?** The notebooks run as the person who last changed the
   pipeline, or the schedule's owner. Give them Key Vault Secrets User on the vault and Contributor
@@ -341,7 +342,7 @@ again. An install from an earlier version keeps its audit windows and time limit
 | Microsoft 365 activity | Yes | | M365 activity |
 | Agent 365 registry | Needs an Agent 365 licence | Microsoft 365 admin center > **Agents** > **All agents** > **Export** | Agents |
 | Product feedback | No API. An optional flow saves exports emailed to you | Microsoft 365 admin center > **Health** > **Product feedback** > **Export** | User Feedback |
-| Copilot Studio credits | An optional daily flow reads the licensing API (environment and agent figures) | Power Platform admin center > **Licensing** > **Products** > **Copilot Studio** (Summary, Environments and Agents) | Consumption Central |
+| Copilot Studio credits | **Connected (Power Automate flow)**, the default: a daily flow reads the licensing API (tenant, environment, agent and per-user figures) | Power Platform admin center > **Licensing** > **Products** > **Copilot Studio** (Summary, Environments, Agents and Users) | Consumption Central |
 | Copilot Cowork credits | **Connected (Dataflow)**: a Dataflow Gen2 reads your Viva Insights query | Viva Insights > Copilot Consumption Dashboard > **Export** | Consumption Central |
 | Azure AI costs | Yes | | Consumption Central |
 | Agent Evaluator | Yes | | Agent Evaluator |
@@ -369,34 +370,56 @@ name the shortcut `sharepoint`. Files there are read where they are, loaded once
 place. Shortcuts need the Fabric tenant setting for OneDrive and SharePoint shortcuts. Without it,
 use the Lakehouse folder.
 
-### Power Automate flows (optional)
+### Power Automate flows
 
-For a source set to **Upload CSV**, the installer can create a flow that adds the files for you:
+The installer creates these flows in the Power Platform environment you pick, **turned off**:
 
-| Flow | What it does | Who can use it |
-|---|---|---|
-| `Analytics Hub - Product feedback` | Saves product feedback exports emailed with the subject `Copilot Product Feedback` | Anyone with Power Automate Premium |
-| `Analytics Hub - Copilot Studio credits` | Each day, an hour before the pipeline, reads the last ten days' credits by agent and the tenant's entitlement from the Power Platform licensing API | Power Platform, Billing or Global administrators with Power Automate Premium |
+| Flow | When | What it does | Sign in to |
+|---|---|---|---|
+| `Analytics Hub - Copilot Studio credits` | Copilot Studio credits set to **Connected** (the default) | Each day, an hour before the pipeline, reads credits by agent, by user and the tenant's entitlement from the Power Platform licensing API. The first run loads about six months; later runs restate the last ten days | Power Platform API and OneLake |
+| `Analytics Hub - Product feedback` | Product feedback set to **Upload CSV**, if you say yes | Saves product feedback exports emailed with the subject `Copilot Product Feedback` | Office 365 Outlook and OneLake |
 
-Both are off by default. The installer creates them in the Power Platform environment you pick,
-**turned off**. To finish:
+Both need Power Automate Premium. To finish each one:
 
-1. Open the flow in Power Automate. Sign in to **Azure Key Vault** (your vault), and to **Office 365
-   Outlook** (the mailbox the export goes to) or **HTTP with Microsoft Entra ID (preauthorized)**
-   (Base Resource URL and Resource URI `https://api.powerplatform.com`).
-2. Save, then turn the flow on.
-3. For product feedback, schedule the export in the Microsoft 365 admin center to be emailed to
+1. Open it in Power Automate.
+2. Sign in to its connections:
+   - **HTTP with Microsoft Entra ID (preauthorized), for the Power Platform API** (Studio flow):
+     Base Resource URL and Resource URI `https://api.powerplatform.com`. Sign in as a Power
+     Platform, Billing or Global administrator.
+   - **Office 365 Outlook** (feedback flow): sign in as the mailbox the export is emailed to.
+   - **HTTP with Microsoft Entra ID (preauthorized), for OneLake**: Base Resource URL
+     `https://onelake.dfs.fabric.microsoft.com`, Resource URI `https://storage.azure.com`. Sign in
+     as someone with Contributor or higher on the workspace.
+3. Save, then turn it on.
+4. For product feedback, schedule the export in the Microsoft 365 admin center to be emailed to
    that mailbox with the subject `Copilot Product Feedback`.
 
-The flows write to the drop folder as the app registration, with its secret from Key Vault, so
-the installer gives the app **Contributor** on the workspace. If a flow can't be created (no
-environment, or no maker rights), the installer writes it to a file beside your answers in
-`Documents\Analytics Hub`. Create a cloud flow and paste the file's `definition` in. The
-[Manual setup flows](../Manual%20setup/flows/README.md) describe the same flows by hand.
+The flows write to the drop folder as the person who signed in to the OneLake connection, so
+there's no secret and no Key Vault connection. That works when your Key Vault only takes private
+connections. The Fabric tenant setting **Users can access data stored in OneLake with apps
+external to Fabric** must be on (it is by default). Workspaces that block public inbound access
+can't take writes from Power Automate.
 
-The Studio flow only sees environments that have Copilot Studio credits allocated. The exports
-still add per-user figures and the exact prepaid split. For a month an export covers, the
-export's figures are used.
+**Keep them running.** A flow runs as the people who signed in to its connections. Sign in with a
+dedicated admin account rather than your own, and add a co-owner. Sign in again if the account's
+password is reset, the account is disabled, or the flow hasn't run for about 90 days.
+
+**Write as the app instead (optional).** `install --flow-identity app` makes the flows write as
+the app registration, with its secret read from Key Vault through an **Azure Key Vault**
+connection, and gives the app **Contributor** on the workspace. The Key Vault connector needs the
+vault to allow public network access, so use this only where it does. It needs the secret in Key
+Vault, not in the notebooks.
+
+If a flow can't be created (no environment, or no maker rights), the installer writes it to a file
+beside your answers in `Documents\Analytics Hub`. Create a cloud flow and paste the file's
+`definition` in. The [Manual setup flows](../Manual%20setup/flows/README.md) describe the feedback
+flow by hand. **Repair or change** updates existing flows. If an update adds a connection, the
+installer turns the flow off and tells you which one to sign in to.
+
+The Studio flow only sees environments that have Copilot Studio credits allocated, and its
+per-user figures come from an undocumented API route, so they're best effort. Exports are still
+accepted: for a month an export covers, its figures are used, and they add users' email
+addresses, the M365 Copilot licence flag and the exact prepaid split.
 
 ### Commands
 
@@ -405,7 +428,8 @@ export's figures are used.
 | Choose sources without the questions | `install --data productFeedback=csv,agent365=api --yes` |
 | Upload exports during the install | `install --data productFeedback=csv --csv feedback.csv` |
 | Create the product feedback email flow | `install --data productFeedback=csv --feedback-flow --flow-environment https://contoso.crm.dynamics.com` |
-| Create the Copilot Studio credits flow | `install --data studioCredits=csv --studio-flow --flow-environment https://contoso.crm.dynamics.com` |
+| Read Copilot Studio credits with the flow | `install --data studioCredits=api --flow-environment https://contoso.crm.dynamics.com` |
+| Have the flows write as the app, with its secret in Key Vault | `install --flow-identity app` |
 | Read Cowork credits with a Dataflow | `install --data coworkCredits=api --viva-partition <id> --viva-query <id>` |
 | Upload exports later, then load them now | `upload feedback.csv agents.csv --run` |
 | Run only the loads that failed last time | `rerun-failed` |
@@ -433,12 +457,12 @@ from 0.3.5 or earlier get it with **Repair or change** when the client secret is
 you keep the secret in the notebooks, run `AnalyticsHubInstaller.exe update` instead: Repair
 doesn't rewrite those notebooks. For the other two:
 
-- **Copilot Studio credits.** In the Power Platform admin center, go to **Licensing** >
-  **Products** > **Copilot Studio**. Download the `EntitlementConsumption…_MCSMessages…csv` files
-  from the Summary, Environments and Agents tabs, and add them as [exports](#data-sources-and-exports).
-  Do it each month; a new file replaces the last one of the same kind. To keep the environment and
-  agent figures up to date between exports, add the
-  [Copilot Studio credits flow](#power-automate-flows-optional).
+- **Copilot Studio credits.** Leave it on **Connected** and finish the
+  [Copilot Studio credits flow](#power-automate-flows). To add exports as well, or instead, in the
+  Power Platform admin center go to **Licensing** > **Products** > **Copilot Studio**. Download the
+  `EntitlementConsumption…_MCSMessages…csv` files from the Summary, Environments, Agents and Users
+  tabs, and add them as [exports](#data-sources-and-exports). A new file replaces the last one of
+  the same kind, and an export's figures win for the month it covers.
 - **Cowork credits.** Choose **Connected (Dataflow)** where you can. In Viva Insights > **Analysis**,
   build a query with the Copilot credit metrics and turn on **Auto-refresh**. In **Analysis
   results**, choose the link icon to copy its partition and query IDs, and give them to the
@@ -507,7 +531,7 @@ the endpoint, someone who manages the vault approves it under **Networking** >
 | `Fabric couldn't set up the model's connection` | Turn on *Service principals can call Fabric public APIs*, then choose **Repair or change**. |
 | `Couldn't connect Analytics Hub Model to …` | Open the link it shows. Under **Gateway and cloud connections**, pick `Analytics Hub SQL …` (`ValueLens SQL …` on earlier installs). Then choose **I've connected it myself**. |
 | A run notes that `Refresh_Cowork_Credits` failed | Most often the Dataflow has no saved connections. The refresh then fails within seconds with "Job instance failed without detail error", even if the editor's preview shows rows. Open `AnalyticsHub_Cowork_Credits`, choose **Edit dataflow** > **Home** > **Manage connections**, and sign in to Viva Insights and the Lakehouse. Then choose **Save**, wait until it's published, and choose **Refresh now**. Otherwise the Viva Insights query may have stopped refreshing. The rest of the run carries on either way. |
-| A flow doesn't save any files | Check it's turned on and its connections are signed in. The Copilot Studio credits flow must be signed in as a Power Platform, Billing or Global administrator. |
+| A flow doesn't save any files | Check it's turned on and all its connections are signed in. The Power Platform API connection must be a Power Platform, Billing or Global administrator, and the OneLake connection someone with Contributor or higher on the workspace. A 403 from OneLake usually means that person lacks the role, or the Fabric tenant setting for apps outside Fabric is off. |
 | A model refresh fails with `Login failed` | The connection's secret expired. Choose **Create new secrets**. |
 | `The app wasn't deployed` | Fix the cause it shows, then choose **Redeploy the app**. |
 | `The … report wasn't published` | Fix the cause it shows, then choose **Update**. The models and data aren't affected. |

@@ -442,15 +442,25 @@ test('notebook mode: an app the user brought gets its pasted secret; no vault ne
   assert.doesNotMatch(JSON.stringify(t.config), /pasted-value/);
 });
 
-test('notebook mode: Power Automate flows are left out, since they read the secret from Key Vault', () => {
+test('notebook mode: the flows sign in to OneLake, so only flows that write as the app are left out', () => {
   const { config } = fakeCtx();
   config.uploads.feedbackFlow = true;
   config.dataSources.productFeedback = 'csv';
+  config.keyVault.mode = 'notebook';
   assert.deepEqual(flowsWanted(config), ['feedback']);
   assert.deepEqual(flowsSkipped(config), []);
-  config.keyVault.mode = 'notebook';
+  config.uploads.flowIdentity = 'app';
   assert.deepEqual(flowsWanted(config), []);
   assert.equal(flowsSkipped(config).length, 1);
+});
+
+test('--flow-identity: install only, user or app, and app needs the secret in Key Vault', () => {
+  assert.equal(parseCli(['install']).flowIdentity, undefined);
+  assert.equal(parseCli(['install', '--flow-identity', 'app']).flowIdentity, 'app');
+  assert.equal(parseCli(['install', '--flow-identity', 'user']).flowIdentity, 'user');
+  assert.throws(() => parseCli(['install', '--flow-identity', 'robot']), /--flow-identity must be "user" or "app"/);
+  assert.throws(() => parseCli(['update', '--flow-identity', 'app']), /--flow-identity go with install/);
+  assert.throws(() => parseCli(['install', '--flow-identity', 'app', '--secret-in-notebook']), /can't go with --secret-in-notebook/);
 });
 
 test('notebook mode: --secret-in-notebook goes with a Fabric install only', () => {

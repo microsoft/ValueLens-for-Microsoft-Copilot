@@ -114,11 +114,11 @@ export function dataverseApi(http, url) {
     },
     /**
      * @param {string} id
-     * @returns {Promise<{ workflowid: string, name: string, statecode: number, workflowidunique?: string } | undefined>}
+     * @returns {Promise<{ workflowid: string, name: string, statecode: number, workflowidunique?: string, clientdata?: string } | undefined>}
      */
     async getFlow(id) {
       try {
-        return await http.get(`/workflows(${id})?$select=workflowid,name,statecode,workflowidunique`, { headers: ODATA });
+        return await http.get(`/workflows(${id})?$select=workflowid,name,statecode,workflowidunique,clientdata`, { headers: ODATA });
       } catch (err) {
         if (/** @type {any} */ (err).status === 404) return undefined;
         throw err;
@@ -130,6 +130,11 @@ export function dataverseApi(http, url) {
      * @param {string} clientdata
      */
     updateFlow: (id, clientdata) => http.request('PATCH', `/workflows(${id})`, { headers: ODATA, body: { clientdata } }),
+    /**
+     * Turns a flow off, so it doesn't run before its new connections are signed in to.
+     * @param {string} id
+     */
+    turnOffFlow: (id) => http.request('PATCH', `/workflows(${id})`, { headers: ODATA, body: { statecode: 0, statuscode: 1 } }),
   };
 }
 

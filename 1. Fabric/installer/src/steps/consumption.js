@@ -425,12 +425,16 @@ export function consumptionSummary(ctx) {
 
   const ds = config.dataSources;
   if (ds.studioCredits !== 'skip') {
-    const flow = !!config.uploads.studioFlow && !!(config.uploads.flowIds?.studio || config.uploads.flowFiles?.studio);
-    ui.info(c.bold('Copilot Studio credits') + c.dim(flow ? '  (a daily flow reads the environment and agent figures)' : '  (upload the exports)'));
-    if (flow) ui.info('  The flow saves the last ten days\' credits by agent each day. Exports still add per-user figures and the exact prepaid split.');
-    ui.info('  1. Power Platform admin center > Licensing > Products > Copilot Studio. On the Summary,');
-    ui.info('     Environments and Agents tabs, download the EntitlementConsumption*_MCSMessages*.csv files.');
-    ui.info(`  2. Drop them in ${lakehouse} > ${UPLOAD_DIR}. Each export counts as the month it is loaded in.`);
+    const api = ds.studioCredits === 'api';
+    ui.info(c.bold('Copilot Studio credits') + c.dim(api ? '  (a daily flow reads the licensing API)' : '  (upload the exports)'));
+    if (api) {
+      ui.info('  1. Sign in to the flow and turn it on: see Power Automate flows.');
+      ui.note(`     Optional: drop the Power Platform admin center exports in ${UPLOAD_DIR}. They add user emails and the exact prepaid split, and win for the months they cover.`);
+    } else {
+      ui.info('  1. Power Platform admin center > Licensing > Products > Copilot Studio. On the Summary,');
+      ui.info('     Environments and Agents tabs, download the EntitlementConsumption*_MCSMessages*.csv files.');
+      ui.info(`  2. Drop them in ${lakehouse} > ${UPLOAD_DIR}. Each export counts as the month it is loaded in.`);
+    }
   }
 
   if (coworkDataflowOn(config)) {

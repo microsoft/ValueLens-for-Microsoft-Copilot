@@ -1,5 +1,5 @@
 {
-  "$comment": "Power Automate / Logic Apps flow definition. Lands Microsoft 365 Copilot USER PRODUCT FEEDBACK CSV exports (from the Microsoft 365 Admin Center > Health > Product Feedback > Export) straight into the Fabric Lakehouse Files/product_feedback folder via the OneLake DFS (ADLS Gen2) API. MAC product feedback has NO API (export-only), so this clones the credit-consumption landing pattern. Import via Power Automate > My flows > Import, then fix up the connection + parameters. Pair with a feedback ingester notebook that reads Files/product_feedback and writes the `user_feedback` Delta table. See README.md.",
+  "$comment": "Power Automate / Logic Apps flow definition. Lands Microsoft 365 Copilot USER PRODUCT FEEDBACK CSV exports (from the Microsoft 365 Admin Center > Health > Product Feedback > Export) straight into the Fabric Lakehouse Files/product_feedback folder via the OneLake DFS (ADLS Gen2) API. MAC product feedback has NO API (export-only), so this clones the credit-consumption landing pattern. Writes as the person signed in to an HTTP with Microsoft Entra ID (preauthorized) connection (Base Resource URL https://onelake.dfs.fabric.microsoft.com, Resource URI https://storage.azure.com), so there is no client secret. Import via Power Automate > My flows > Import, then sign in to the connections and set the parameters. Pair with a feedback ingester notebook that reads Files/product_feedback and writes the `user_feedback` Delta table. See README.md.",
   "definition": {
     "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
     "contentVersion": "1.0.0.0",
@@ -30,9 +30,7 @@
         "type": "String",
         "metadata": { "description": "Only .csv attachments whose file name STARTS WITH this (case-insensitive) are landed. Default 'feedback' matches the MAC export 'feedback.csv' / 'feedback*.csv'. Set blank to accept any .csv on a subject-matched email." }
       },
-      "TenantId":     { "defaultValue": "<tenant-guid>", "type": "String" },
-      "ClientId":     { "defaultValue": "<app-reg-client-id>", "type": "String" },
-      "ClientSecret": { "defaultValue": "<keyvault-reference>", "type": "SecureString" }
+      "$authentication": { "defaultValue": {}, "type": "SecureObject" }
     },
     "triggers": {
       "When_a_new_email_arrives_V3": {
@@ -68,52 +66,37 @@
             },
             "actions": {
               "Create_file_PUT": {
-                "type": "Http",
+                "type": "OpenApiConnection",
                 "inputs": {
-                  "method": "PUT",
-                  "uri": "https://onelake.dfs.fabric.microsoft.com/@{encodeURIComponent(parameters('OneLakeWorkspace'))}/@{encodeURIComponent(concat(parameters('OneLakeLakehouse'), '.Lakehouse'))}/@{parameters('TargetFolder')}/@{items('For_each_attachment')?['name']}?resource=file",
-                  "authentication": {
-                    "type": "ActiveDirectoryOAuth",
-                    "authority": "https://login.microsoftonline.com",
-                    "tenant": "@parameters('TenantId')",
-                    "audience": "https://storage.azure.com/",
-                    "clientId": "@parameters('ClientId')",
-                    "secret": "@parameters('ClientSecret')"
-                  }
+                  "host": {
+                    "connectionName": "shared_webcontents_storage",
+                    "operationId": "InvokeHttp",
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_webcontents"
+                  },
+                  "parameters": {
+                    "request/method": "PUT",
+                    "request/url": "https://onelake.dfs.fabric.microsoft.com/@{encodeURIComponent(parameters('OneLakeWorkspace'))}/@{encodeURIComponent(concat(parameters('OneLakeLakehouse'), '.Lakehouse'))}/@{parameters('TargetFolder')}/@{items('For_each_attachment')?['name']}?resource=file",
+                    "request/headers": { "x-ms-version": "2023-11-03" }
+                  },
+                  "authentication": "@parameters('$authentication')"
                 }
               },
-              "Append_content_PATCH": {
-                "type": "Http",
+              "Append_and_flush_PATCH": {
+                "type": "OpenApiConnection",
                 "runAfter": { "Create_file_PUT": [ "Succeeded" ] },
                 "inputs": {
-                  "method": "PATCH",
-                  "uri": "https://onelake.dfs.fabric.microsoft.com/@{encodeURIComponent(parameters('OneLakeWorkspace'))}/@{encodeURIComponent(concat(parameters('OneLakeLakehouse'), '.Lakehouse'))}/@{parameters('TargetFolder')}/@{items('For_each_attachment')?['name']}?action=append&position=0",
-                  "headers": { "Content-Type": "application/octet-stream" },
-                  "body": "@items('For_each_attachment')?['contentBytes']",
-                  "authentication": {
-                    "type": "ActiveDirectoryOAuth",
-                    "authority": "https://login.microsoftonline.com",
-                    "tenant": "@parameters('TenantId')",
-                    "audience": "https://storage.azure.com/",
-                    "clientId": "@parameters('ClientId')",
-                    "secret": "@parameters('ClientSecret')"
-                  }
-                }
-              },
-              "Flush_content_PATCH": {
-                "type": "Http",
-                "runAfter": { "Append_content_PATCH": [ "Succeeded" ] },
-                "inputs": {
-                  "method": "PATCH",
-                  "uri": "https://onelake.dfs.fabric.microsoft.com/@{encodeURIComponent(parameters('OneLakeWorkspace'))}/@{encodeURIComponent(concat(parameters('OneLakeLakehouse'), '.Lakehouse'))}/@{parameters('TargetFolder')}/@{items('For_each_attachment')?['name']}?action=flush&position=@{length(items('For_each_attachment')?['contentBytes'])}",
-                  "authentication": {
-                    "type": "ActiveDirectoryOAuth",
-                    "authority": "https://login.microsoftonline.com",
-                    "tenant": "@parameters('TenantId')",
-                    "audience": "https://storage.azure.com/",
-                    "clientId": "@parameters('ClientId')",
-                    "secret": "@parameters('ClientSecret')"
-                  }
+                  "host": {
+                    "connectionName": "shared_webcontents_storage",
+                    "operationId": "InvokeHttp",
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_webcontents"
+                  },
+                  "parameters": {
+                    "request/method": "PATCH",
+                    "request/url": "https://onelake.dfs.fabric.microsoft.com/@{encodeURIComponent(parameters('OneLakeWorkspace'))}/@{encodeURIComponent(concat(parameters('OneLakeLakehouse'), '.Lakehouse'))}/@{parameters('TargetFolder')}/@{items('For_each_attachment')?['name']}?action=append&position=0&flush=true",
+                    "request/headers": { "x-ms-version": "2023-11-03", "Content-Type": "text/csv" },
+                    "request/body": "@base64ToString(items('For_each_attachment')?['contentBytes'])"
+                  },
+                  "authentication": "@parameters('$authentication')"
                 }
               }
             },

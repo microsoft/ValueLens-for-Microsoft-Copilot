@@ -103,11 +103,15 @@ export const DATA_SOURCES = [
   {
     id: 'studioCredits',
     label: 'Copilot Studio credits',
-    description: 'Copilot Studio credits by environment, agent and user. A Power Automate flow can keep the environment and agent figures up to date.',
-    modes: ['csv', 'skip'],
+    description: 'Copilot Studio credits by day, environment, agent and user, from the Power Platform licensing API.',
+    modes: ['api', 'csv', 'skip'],
     defaultMode: 'skip',
     page: 'Consumption Central',
-    hints: { csv: 'Upload the exports, and optionally let a daily Power Automate flow read the Power Platform licensing API for you. Per-user figures are export only.' },
+    modeLabels: { api: 'Connected (Power Automate flow)', csv: 'Upload CSV only' },
+    hints: {
+      api: 'A daily Power Automate flow reads the licensing API. You sign in to its connections once. Exports are optional and win for the months they cover.',
+      csv: 'Upload the exports each month. No flow.',
+    },
     export: {
       where: 'Power Platform admin center > Licensing > Products > Copilot Studio. Download the Summary, Environments and Agents exports (EntitlementConsumption*_MCSMessages*.csv).',
       url: 'https://admin.powerplatform.microsoft.com/',
@@ -236,6 +240,14 @@ export const UPLOAD_KINDS = [
     groups: [['usagedate'], ['agentid'], ['agentname'], ['billedcredit'], ['nonbilledcredit'], ['channel']],
     dir: 'Files/landing/studio',
     name: 'StudioApiAgentDaily_{stamp}.csv',
+    policy: 'replaceKind',
+  },
+  {
+    kind: 'studioUserDaily',
+    source: 'studioCredits',
+    groups: [['usagedate'], ['userid'], ['billedcredit'], ['nonbilledcredit'], ['unit']],
+    dir: 'Files/landing/studio',
+    name: 'StudioApiUserDaily_{stamp}.csv',
     policy: 'replaceKind',
   },
   {
@@ -378,9 +390,10 @@ export function defaultDataSources() {
  * @param {Partial<Record<string, string>> | undefined} saved
  * @param {import('./catalog.js').ModuleChoice} modules
  * @param {{ azureSubscriptionId?: string }} [consumption]
+ * @param {{ studioFlow?: boolean }} [uploads]  A saved Studio CSV choice with its flow is now the api mode.
  * @returns {DataSourceModes}
  */
-export function normaliseDataSources(saved, modules, consumption = {}) {
+export function normaliseDataSources(saved, modules, consumption = {}, uploads = {}) {
   /** @type {Partial<DataSourceModes>} */
   const legacy = saved
     ? {}
@@ -399,6 +412,7 @@ export function normaliseDataSources(saved, modules, consumption = {}) {
     if (v && s.modes.includes(v)) out[s.id] = v;
     if (s.locked) out[s.id] = s.modes[0];
   }
+  if (saved && out.studioCredits === 'csv' && uploads.studioFlow) out.studioCredits = 'api';
   return out;
 }
 

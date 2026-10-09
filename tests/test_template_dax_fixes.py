@@ -147,13 +147,29 @@ class CoworkNoLimit(unittest.TestCase):
                              "DIVIDE([Cowork Total Credits Used], [Person Allowance])")
 
     def test_consumption_templates_share_the_limit_measures(self):
-        names = {s["name"] for s in PATCHER.CONSUMPTION_OBJECTS}
+        names = {s["name"] for s in PATCHER.CONSUMPTION_OBJECTS if s["table"] == "CoworkBilling"}
         baseline = None
         for relative in PATCHER.CONSUMPTION:
             _, measures, _ = objects(load(relative), "CoworkBilling")
             current = {n: text(measures[n]["expression"]) for n in names}
             baseline = baseline or current
             self.assertEqual(current, baseline, relative)
+
+
+class StudioSnapshotNote(unittest.TestCase):
+    """Studio user and agent detail can come from the licensing API, not only an export."""
+
+    def test_every_consumption_template_names_both_sources(self):
+        baseline = None
+        for relative in PATCHER.CONSUMPTION:
+            _, measures, _ = objects(load(relative), "Settings")
+            expression = text(measures["Studio Snapshot Note"]["expression"])
+            self.assertIn("PPAC export", expression, relative)
+            self.assertIn("licensing API", expression, relative)
+            self.assertIn("Copilot Studio credits flow", expression, relative)
+            self.assertNotIn("undated export snapshot", expression, relative)
+            baseline = baseline or expression
+            self.assertEqual(expression, baseline, relative)
 
 
 if __name__ == "__main__":

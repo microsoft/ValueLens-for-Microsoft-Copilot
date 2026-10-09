@@ -43,6 +43,7 @@ const HEADERS = {
   studioAgent: 'Agent id,Agent name,Billed credit,Non billed credit,Channel',
   studioUser: 'User id,User email,Credits used,Billable credit used',
   studioAgentDaily: 'Usage date,Agent id,Agent name,Billed credit,Non billed credit,Channel,Environment id',
+  studioUserDaily: 'Usage date,User id,Environment id,Agent id,Billed credit,Non billed credit,Unit',
   studioEntitlement: 'Snapshot date,Environment id,Environment allocated,Tenant prepaid consumed,Tenant PAYG consumed',
   vivaCredits: 'ServiceId,ServiceName,SpendingPolicyId,MetricDate,TotalCopilotCreditsUsed',
   vivaPolicy: 'SpendingPolicyId,Name,PlanLimit,UserLimit,IncludedServices',
@@ -136,6 +137,15 @@ test('normaliseDataSources: an old record is read from its modules; locked sourc
   assert.equal(saved.core, 'api');
   assert.equal(saved.productFeedback, 'skip', 'a mode the source lacks falls back to its default');
   assert.equal(saved.workday, 'csv');
+});
+
+test('normaliseDataSources: a record with the Studio flow on reads as the api mode; exports alone stay csv', () => {
+  const none = { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: true, agentEvaluator: false };
+  assert.equal(normaliseDataSources({ studioCredits: 'csv' }, none, {}, { studioFlow: true }).studioCredits, 'api');
+  assert.equal(normaliseDataSources({ studioCredits: 'csv' }, none, {}, {}).studioCredits, 'csv');
+  assert.equal(normaliseDataSources({ studioCredits: 'skip' }, none, {}, { studioFlow: true }).studioCredits, 'skip');
+  const card = DATA_SOURCES.find((s) => s.id === 'studioCredits');
+  assert.deepEqual(card?.modes, ['api', 'csv', 'skip'], 'Connected first');
 });
 
 test('modulesFromSources, routedSources and routerWanted', () => {

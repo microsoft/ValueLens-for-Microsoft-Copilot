@@ -166,8 +166,8 @@ test('flags: --studio-flow, --flow-environment and the Viva IDs go with install 
 
   const config = emptyConfig();
   applyDataFlags(config, args);
-  assert.equal(config.dataSources.studioCredits, 'csv');
-  assert.equal(config.uploads.studioFlow, true);
+  assert.equal(config.dataSources.studioCredits, 'api', '--studio-flow is kept as another way to say studioCredits=api');
+  assert.equal(config.uploads.flowIdentity, undefined);
   assert.deepEqual(config.uploads.flowEnvironment, { url: 'https://contoso.crm.dynamics.com' });
   assert.equal(config.consumption.vivaPartition, PARTITION);
   assert.equal(config.consumption.vivaQuery, QUERY);

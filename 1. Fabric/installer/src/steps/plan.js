@@ -11,7 +11,7 @@ import { APP_ROLES, CONSENT_ROLES } from '../clients/graph.js';
 import { HttpError } from '../http.js';
 import { commandLine } from '../launch.js';
 import { c } from '../ui.js';
-import { AGENT_EVALUATOR_MODEL_NAME, CONSUMPTION_MODEL_NAME, MODEL_NAME, secretMode } from '../config.js';
+import { AGENT_EVALUATOR_MODEL_NAME, CONSUMPTION_MODEL_NAME, flowIdentity, MODEL_NAME, secretMode } from '../config.js';
 import { MIN_NODE, nodeVersionOk } from './app.js';
 import { agentEvaluatorModelWanted, planAgentEvaluator } from './agent-evaluator.js';
 import { AZURE_AI_ROLES, consumptionModelWanted, COWORK_DATAFLOW_NAME, planConsumption, planCowork } from './consumption.js';
@@ -399,7 +399,7 @@ export async function plan(ctx, pre) {
     await planKeyVault(ctx, pre, capacity ? armLocation(capacity.region) : 'westeurope');
   }
   const skipped = flowsSkipped(config);
-  if (skipped.length) ui.note(`${skipped.join(' and ')} won't be set up: the flows read the client secret from Key Vault. Upload those exports by hand instead.`);
+  if (skipped.length) ui.note(`${skipped.join(' and ')} won't be set up: --flow-identity app reads the client secret from Key Vault. Run install --flow-identity user to have them sign in to OneLake instead.`);
 
   if (packWanted) askSecret = await planAdminPack(ctx, pre);
   if (askSecret && secretMode(config) !== 'keyvault-admin') {
@@ -849,8 +849,15 @@ export function planReview(ctx, pre) {
   }
   if (sm.enabled) grants.push({ who: appWho, what: 'Viewer', where: `Workspace ${f.workspaceName ?? f.workspaceId}`, detail: 'So the semantic models can read the Lakehouse.' });
   const flows = flowsWanted(config);
-  if (flows.length) {
+  if (flows.length && flowIdentity(config) === 'app') {
     grants.push({ who: appWho, what: 'Contributor', where: `Workspace ${f.workspaceName ?? f.workspaceId}`, detail: 'So the Power Automate flows can save files to the drop folder.' });
+  } else if (flows.length) {
+    grants.push({
+      who: 'Whoever signs in to the flows\' OneLake connection',
+      what: 'Contributor or higher',
+      where: `Workspace ${f.workspaceName ?? f.workspaceId}`,
+      detail: 'Not granted by the installer. You have it already; give it to anyone else who signs in.',
+    });
   }
   if (withAzureAi && !cc.azureAccess) {
     grants.push({ who: appWho, what: AZURE_AI_ROLES.map((r) => r.name).join(', '), where: `Azure subscription ${cc.azureSubscriptionName ?? cc.azureSubscriptionId}`, detail: 'So the notebook can read Azure AI usage and cost.' });
