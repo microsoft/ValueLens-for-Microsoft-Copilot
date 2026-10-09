@@ -10,7 +10,9 @@ import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { orgUrl } from '../clients/dataverse.js';
 import { flowIdentity, secretMode } from '../config.js';
+import { commandLine } from '../launch.js';
 import {
+  BACKFILL_MARKER,
   connectionReferencesOf,
   connectorByName,
   connectorsUsed,
@@ -19,6 +21,7 @@ import {
   FEEDBACK_SUBJECT,
   feedbackFlowDefinition,
   flowClientData,
+  FLOW_STATE_DIR,
   flowFile,
   isBound,
   newConnections,
@@ -44,7 +47,7 @@ export const FLOW_FILES = /** @type {Record<FlowKind, string>} */ ({
 
 /** @param {import('../config.js').InstallConfig} config @returns {FlowKind[]} */
 const flowsChosen = (config) => [
-  ...(config.target !== 'azure' && config.uploads.feedbackFlow && config.dataSources.productFeedback === 'csv' ? /** @type {const} */ (['feedback']) : []),
+  ...(config.target !== 'azure' && config.dataSources.productFeedback === 'api' ? /** @type {const} */ (['feedback']) : []),
   ...(config.dataSources.studioCredits === 'api' ? /** @type {const} */ (['studio']) : []),
 ];
 
@@ -106,20 +109,12 @@ function validateUrl(v) {
 }
 
 /**
- * Asks about the feedback flow, and where to create the flows. The Studio flow comes with the
- * Studio credits api mode.
+ * Asks where to create the flows. Each comes with its source's api mode: product feedback's
+ * "Power Automate (emailed export)" and Studio credits' "Connected (Power Automate flow)".
  * @param {Ctx} ctx
  */
 export async function planFlows(ctx) {
-  const { ui, config } = ctx;
-  const up = config.uploads;
-  if (config.dataSources.productFeedback === 'csv') {
-    up.feedbackFlow = await ui.confirm(
-      `Also create a Power Automate flow that saves product feedback exports emailed to you (subject "${FEEDBACK_SUBJECT}")? It needs Power Automate Premium.`,
-      up.feedbackFlow ?? false,
-    );
-  } else up.feedbackFlow = false;
-  if (flowsWanted(config).length) await pickFlowEnvironment(ctx);
+  if (flowsWanted(ctx.config).length) await pickFlowEnvironment(ctx);
 }
 
 /**
@@ -372,10 +367,162 @@ export function flowsSummary(ctx) {
     for (const step of connectionSteps(config, kind)) ui.info(`  ${n++}. ${step}`);
     ui.info(`  ${n++}. Save, then turn it on.`);
     if (kind === 'feedback') ui.info(`  ${n++}. In the Microsoft 365 admin center, schedule the product feedback export to that mailbox, subject "${FEEDBACK_SUBJECT}".`);
-    else ui.note('     The first run loads about six months. Then it runs daily, an hour before the pipeline.');
+    else {
+      ui.info(`  ${n++}. To load about six months now rather than at its first daily run, click Run. Or use "${commandLine('run')}", which offers to run it before the pipeline.`);
+      ui.note('     After that it runs daily, an hour before the pipeline.');
+    }
   }
   ui.note('  Tip: sign in with a dedicated admin account and add a co-owner, so the flows outlive any one person.');
   if (flowIdentity(config) === 'app' && config.keyVault.private) {
     ui.warn(`${config.keyVault.name ?? 'The Key Vault'} blocks public network access, which the Key Vault connector needs. Run install --flow-identity user so the flows sign in to OneLake instead.`);
   }
+}
+
+/** How often, and how many times, to check on a Studio flow run before carrying on without it. */
+export const STUDIO_RUN_POLL_MS = 30_000;
+export const STUDIO_RUN_POLLS = 120;
+const RUN_ACTIVE = new Set(['Running', 'Waiting']);
+
+/**
+ * The Studio credits flow loads about six months on its first run, which is otherwise the next
+ * daily one. When the flow is on and hasn't done that yet, offers to run it now as the signed-in
+ * user, and to wait so the pipeline that follows picks up its files. When it's off, says how to.
+ * Never throws: anything that goes wrong ends in the steps to do it by hand.
+ * @param {Ctx} ctx
+ * @param {{ pipelineNext?: boolean, quietWhenOff?: boolean }} [opts]
+ *   pipelineNext: the pipeline runs straight after, so waiting is the default.
+ *   quietWhenOff: say nothing when the flow is off (the flows summary covers it).
+ * @returns {Promise<'ran' | 'started' | 'off' | 'done' | 'skipped' | 'failed'>}
+ */
+export async function offerStudioRun(ctx, opts = {}) {
+  const { ui, config } = ctx;
+  const up = config.uploads;
+  const id = up.flowIds?.studio;
+  if (!flowsWanted(config).includes('studio') || !id || up.flowFiles?.studio || !up.flowEnvironment) return 'skipped';
+  const steps = (/** @type {string} */ why) => {
+    const link = up.flowEnvironment?.id ? `${MAKER}environments/${up.flowEnvironment.id}/flows` : MAKER;
+    ui.info(`${why ? `${why} ` : ''}To load about six months of Copilot Studio credits now:`);
+    ui.info(`  1. Open ${link} and open ${STUDIO_FLOW_NAME}.`);
+    ui.info('  2. If it is off, sign in to its connections, save, and turn it on.');
+    ui.info('  3. Click Run. Otherwise it loads them at its next daily run, an hour before the pipeline.');
+  };
+  try {
+    const env = await flowEnvironmentId(ctx);
+    if (!env) {
+      steps("Couldn't find the Power Platform environment's ID.");
+      return 'failed';
+    }
+    const flow = await ctx.api.flow.getFlow(env, id);
+    const state = flow?.properties?.state;
+    if (state && state !== 'Started') {
+      if (!opts.quietWhenOff) steps(`${STUDIO_FLOW_NAME} is ${state === 'Suspended' ? 'suspended' : 'off'}.`);
+      return 'off';
+    }
+    if (await backfillDone(ctx, env, id)) return 'done';
+    const running = (await ctx.api.flow.listRuns(env, id)).find((r) => RUN_ACTIVE.has(r.properties?.status ?? ''));
+    if (running) {
+      if (!opts.pipelineNext || ui.yes || !(await ui.confirm(`${STUDIO_FLOW_NAME} is running now. Wait for it before starting the pipeline?`, true))) return 'started';
+      return await waitForStudioRun(ctx, env, id, running.name);
+    }
+    if (ui.yes) {
+      ui.note(`${STUDIO_FLOW_NAME} hasn't loaded its first six months yet. Run it in Power Automate, or run this without --yes to be offered it.`);
+      return 'skipped';
+    }
+    const choice = await ui.select(
+      `${STUDIO_FLOW_NAME} hasn't loaded its first six months of Copilot Studio credits yet. Run it now?`,
+      [
+        { name: `Run it now and wait${opts.pipelineNext ? ', so the pipeline picks up its files (recommended)' : ''}`, value: 'wait' },
+        { name: "Run it now, don't wait", value: 'start' },
+        { name: 'Not now (it runs at its next daily run)', value: 'no' },
+      ],
+      opts.pipelineNext ? 'wait' : 'start',
+    );
+    if (choice === 'no') return 'skipped';
+    const before = new Set((await ctx.api.flow.listRuns(env, id)).map((r) => r.name));
+    await ctx.api.flow.runTrigger(env, id, 'Daily');
+    ui.ok(`Started ${STUDIO_FLOW_NAME}`);
+    if (choice !== 'wait') return 'started';
+    return await waitForStudioRun(ctx, env, id, undefined, before);
+  } catch (err) {
+    const e = /** @type {any} */ (err);
+    ui.warn(/CannotRunUnpublishedSolutionFlow/i.test(`${e?.code ?? ''} ${e?.message ?? ''}`)
+      ? `${STUDIO_FLOW_NAME} can't run until it is turned on.`
+      : `Couldn't run ${STUDIO_FLOW_NAME} (${e?.message ?? err}).`);
+    steps('');
+    return 'failed';
+  }
+}
+
+/**
+ * The flow environment's ID, which Power Automate uses rather than the org URL. Looked up and saved
+ * when an older record only has the URL.
+ * @param {Ctx} ctx
+ */
+async function flowEnvironmentId(ctx) {
+  const env = ctx.config.uploads.flowEnvironment;
+  if (!env) return undefined;
+  if (env.id) return env.id;
+  const found = (await ctx.api.discovery.instances()).find((i) => i.Url && orgUrl(i.Url) === orgUrl(env.url));
+  if (!found?.EnvironmentId) return undefined;
+  env.id = found.EnvironmentId;
+  ctx.save();
+  return env.id;
+}
+
+/**
+ * Whether the flow has loaded its six months. On Fabric its marker file says so; on Azure, or if
+ * OneLake can't be read, any run that succeeded.
+ * @param {Ctx} ctx
+ * @param {string} env
+ * @param {string} id
+ */
+async function backfillDone(ctx, env, id) {
+  const { config, api } = ctx;
+  if (config.target !== 'azure' && config.fabric.workspaceId && config.fabric.lakehouseId) {
+    try {
+      return await api.oneLake.exists(config.fabric.workspaceId, config.fabric.lakehouseId, `${FLOW_STATE_DIR}/${BACKFILL_MARKER}`);
+    } catch {
+      // Fall back to the run history.
+    }
+  }
+  return (await api.flow.listRuns(env, id)).some((r) => r.properties?.status === 'Succeeded');
+}
+
+/**
+ * Waits for a Studio flow run: the named one, or the first not in `before`.
+ * @param {Ctx} ctx
+ * @param {string} env
+ * @param {string} id
+ * @param {string} [name]
+ * @param {Set<string>} [before]
+ * @returns {Promise<'ran' | 'started' | 'failed'>}
+ */
+async function waitForStudioRun(ctx, env, id, name, before) {
+  const { ui } = ctx;
+  const progress = ui.progress(STUDIO_FLOW_NAME);
+  /** @type {import('../clients/flow.js').FlowRun | undefined} */
+  let found;
+  try {
+    for (let i = 0; i < STUDIO_RUN_POLLS; i++) {
+      const runs = await ctx.api.flow.listRuns(env, id);
+      found = runs.find((r) => (name ? r.name === name : !before?.has(r.name))) ?? found;
+      const status = found?.properties?.status;
+      progress.update(status ?? 'Starting');
+      if (status && !RUN_ACTIVE.has(status)) break;
+      await ctx.sleep(STUDIO_RUN_POLL_MS);
+    }
+  } finally {
+    progress.done();
+  }
+  const status = found?.properties?.status;
+  if (status === 'Succeeded') {
+    ui.ok(`${STUDIO_FLOW_NAME} loaded its first six months`);
+    return 'ran';
+  }
+  if (!status || RUN_ACTIVE.has(status)) {
+    ui.warn(`${STUDIO_FLOW_NAME} is still running. Carrying on; the next pipeline run picks up whatever it hasn't saved yet.`);
+    return 'started';
+  }
+  ui.warn(`${STUDIO_FLOW_NAME} ${status.toLowerCase()}${found?.properties?.error?.message ? `: ${found.properties.error.message}` : ''}. Open its run history in Power Automate to see why.`);
+  return 'failed';
 }

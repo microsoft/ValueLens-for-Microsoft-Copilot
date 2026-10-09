@@ -88,8 +88,7 @@ test('Azure Studio flow: signed in as the user, it writes to the landing contain
   const { config } = fakeCtx();
   withAzureConsumption(config, { outputs: { storageAccountName: 'vlensst' } });
   config.uploads.flowIdentity = 'app';
-  config.uploads.feedbackFlow = true;
-  config.dataSources.productFeedback = 'csv';
+  config.dataSources.productFeedback = 'api';
   assert.deepEqual(flowsWanted(config), ['studio'], 'no feedback flow on Azure, and the app identity is Fabric only');
   assert.equal(azureFlowTarget(config.azure).identity, 'user');
   const pub = flowDefinitions(config, 'tenant-1').studio;

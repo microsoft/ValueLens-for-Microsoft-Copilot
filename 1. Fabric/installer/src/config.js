@@ -70,7 +70,6 @@ export const flowIdentity = (config) => (config.target !== 'azure' && config.upl
  * The upload drop folder and the optional extras around it.
  * @typedef {object} UploadsConfig
  * @property {boolean} [folders]  The drop folder and the folders the loads read exist in the Lakehouse.
- * @property {boolean} [feedbackFlow]  Create the product feedback email flow in Power Automate.
  * @property {FlowIdentity} [flowIdentity]  Who the flows write to OneLake as. Default user.
  * @property {FlowEnvironment} [flowEnvironment]  The Power Platform environment the flows are created in.
  * @property {Partial<Record<'feedback' | 'studio', string>>} [flowIds]  The flows, once created.
@@ -278,8 +277,8 @@ export function loadConfig(file) {
     target: raw.target ?? 'fabric',
     modules: normaliseModules(raw.modules),
     dataSources: normaliseDataSources(raw.dataSources, normaliseModules(raw.modules), raw.consumption, raw.uploads),
-    // studioFlow is read once, above: a Studio flow is now the api mode.
-    uploads: Object.fromEntries(Object.entries(raw.uploads ?? {}).filter(([k]) => k !== 'studioFlow')),
+    // studioFlow and feedbackFlow are read once, above: each flow is now its source's api mode.
+    uploads: Object.fromEntries(Object.entries(raw.uploads ?? {}).filter(([k]) => k !== 'studioFlow' && k !== 'feedbackFlow')),
     history: { ...base.history, ...(raw.history ?? {}) },
     schedule: { ...base.schedule, ...(raw.schedule ?? {}) },
     app: { ...(raw.app ?? {}) },

@@ -27,6 +27,22 @@ export function oneLakeApi(http) {
     },
 
     /**
+     * Whether a file or folder is there.
+     * @param {string} workspaceId
+     * @param {string} lakehouseId
+     * @param {string} path  Relative to the Lakehouse root.
+     */
+    async exists(workspaceId, lakehouseId, path) {
+      try {
+        await http.request('HEAD', url(workspaceId, lakehouseId, path), { headers });
+        return true;
+      } catch (err) {
+        if (err instanceof HttpError && err.status === 404) return false;
+        throw err;
+      }
+    },
+
+    /**
      * Creates a folder, and any missing parents. Returns false when it was already there.
      * @param {string} workspaceId
      * @param {string} lakehouseId

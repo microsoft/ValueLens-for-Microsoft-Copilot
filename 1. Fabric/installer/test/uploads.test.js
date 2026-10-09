@@ -119,7 +119,10 @@ test('uploadName: stamped, cleaned and kept a .csv', () => {
 test('parseDataFlags: comma-separated or repeated; unknown sources and modes are errors', () => {
   assert.deepEqual(parseDataFlags(['productFeedback=csv,agent365=api', 'workday=CSV']), { productFeedback: 'csv', agent365: 'api', workday: 'csv' });
   assert.throws(() => parseDataFlags(['nope=csv']), /unknown source "nope"/);
-  assert.throws(() => parseDataFlags(['productFeedback=api']), /productFeedback can be csv or skip, not "api"/);
+  assert.deepEqual(parseDataFlags(['productFeedback=flow', 'studioCredits=FLOW']), { productFeedback: 'api', studioCredits: 'api' });
+  assert.throws(() => parseDataFlags(['agent365=flow']), /agent365 can be api or csv or skip, not "flow"/);
+  assert.throws(() => parseDataFlags(['productFeedback=email']), /productFeedback can be api or csv or skip or flow, not "email"/);
+  assert.throws(() => parseDataFlags(['workday=api']), /workday can be csv or skip, not "api"/);
   assert.throws(() => parseDataFlags(['core=skip']), /core can be api/);
 });
 
@@ -133,10 +136,9 @@ test('normaliseDataSources: an old record is read from its modules; locked sourc
   const none = { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false };
   assert.equal(normaliseDataSources(undefined, { ...none, consumption: true }, { azureSubscriptionId: 'sub' }).azureAi, 'api');
 
-  const saved = normaliseDataSources({ core: 'skip', productFeedback: 'api', workday: 'csv' }, none);
+  const saved = normaliseDataSources({ core: 'skip', workday: 'api' }, none);
   assert.equal(saved.core, 'api');
-  assert.equal(saved.productFeedback, 'skip', 'a mode the source lacks falls back to its default');
-  assert.equal(saved.workday, 'csv');
+  assert.equal(saved.workday, DATA_SOURCES.find((s) => s.id === 'workday')?.defaultMode, 'a mode the source lacks falls back to its default');
 });
 
 test('normaliseDataSources: a record with the Studio flow on reads as the api mode; exports alone stay csv', () => {
@@ -146,6 +148,17 @@ test('normaliseDataSources: a record with the Studio flow on reads as the api mo
   assert.equal(normaliseDataSources({ studioCredits: 'skip' }, none, {}, { studioFlow: true }).studioCredits, 'skip');
   const card = DATA_SOURCES.find((s) => s.id === 'studioCredits');
   assert.deepEqual(card?.modes, ['api', 'csv', 'skip'], 'Connected first');
+});
+
+test('product feedback: the Power Automate route is its own mode; a record with the email flow on reads as it', () => {
+  const none = { orgData: true, m365Activity: false, agent365: false, productFeedback: true, consumption: false, agentEvaluator: false };
+  assert.equal(normaliseDataSources({ productFeedback: 'csv' }, none, {}, { feedbackFlow: true }).productFeedback, 'api');
+  assert.equal(normaliseDataSources({ productFeedback: 'csv' }, none, {}, {}).productFeedback, 'csv');
+  assert.equal(normaliseDataSources({ productFeedback: 'skip' }, none, {}, { feedbackFlow: true }).productFeedback, 'skip');
+  const card = sourceCards(defaultDataSources()).find((c) => c.id === 'productFeedback');
+  assert.deepEqual(card?.modes.map((m) => m.label), ['Power Automate (emailed export)', 'Upload CSV', 'Skip']);
+  assert.deepEqual(card?.exportModes, ['api', 'csv'], 'the flow saves the same export, so its location still shows');
+  assert.match(card?.modes[0].hint ?? '', /Power Automate Premium/);
 });
 
 test('modulesFromSources, routedSources and routerWanted', () => {
@@ -174,7 +187,8 @@ test('sourceCards and parseModes: locked sources fixed, modes checked', () => {
   const ok = parseModes({ productFeedback: 'csv', core: 'api' }, ds);
   assert.ok('modes' in ok && ok.modes.productFeedback === 'csv');
   assert.match(String(/** @type {any} */ (parseModes({ core: 'skip' }, ds)).error), /can't be changed/);
-  assert.match(String(/** @type {any} */ (parseModes({ productFeedback: 'api' }, ds)).error), /Upload CSV or Skip/);
+  assert.match(String(/** @type {any} */ (parseModes({ workday: 'api' }, ds)).error), /Upload CSV or Skip/);
+  assert.ok('modes' in parseModes({ productFeedback: 'api' }, ds), 'the emailed export flow is a mode of its own');
   assert.match(String(/** @type {any} */ (parseModes(null, ds)).error), /Choose how/);
 });
 
@@ -240,7 +254,7 @@ test('uploadFiles: each export goes to the drop folder; one that fails is report
 test('planDataSources sets the modules and keeps the exports; ensureUploads makes the folders and uploads them', async () => {
   const oneLake = fakeOneLake();
   const modes = { ...defaultDataSources(), productFeedback: 'csv', agentEvaluator: 'api' };
-  const { ui } = fakeUi({ answers: [{ modes, files: [] }, true] });
+  const { ui, asked } = fakeUi({ answers: [{ modes, files: [] }] });
   const { ctx, config } = fakeCtx({ ui, oneLake });
   ctx.csvFiles = [csvFile('fb.csv', HEADERS.productFeedback)];
   await planDataSources(ctx);
@@ -248,22 +262,19 @@ test('planDataSources sets the modules and keeps the exports; ensureUploads make
   assert.equal(config.modules.productFeedback, true);
   assert.equal(config.modules.agentEvaluator, true);
   assert.equal(config.modules.agent365, false);
-  assert.equal(config.uploads.feedbackFlow, true, 'the email flow question was asked and answered');
+  assert.ok(!asked.some((q) => /Power Automate/.test(q)), 'no follow-up about the email flow: it is its own mode');
   assert.equal(ctx.pendingUploads?.length, 1);
 
-  config.uploads.feedbackFlow = false;
   await ensureUploads(ctx);
   assert.ok(oneLake.dirs.includes(UPLOAD_DIR));
   assert.equal(oneLake.files.size, 1);
   assert.deepEqual(ctx.pendingUploads, []);
 });
 
-test('planDataSources: skipping product feedback turns off the email flow; an export for a skipped source is an error', async () => {
+test('planDataSources: with every source skipped there is no router; an export for a skipped source is an error', async () => {
   const { ui } = fakeUi();
   const { ctx, config } = fakeCtx({ ui });
-  config.uploads.feedbackFlow = true;
   await planDataSources(ctx);
-  assert.equal(config.uploads.feedbackFlow, false);
   assert.equal(routerWanted(config.dataSources), false);
 
   const { ctx: ctx2 } = fakeCtx({ ui: fakeUi().ui });
@@ -305,9 +316,13 @@ test('cli: upload takes files; --run, --data and --csv go where they belong', ()
 
   const config = emptyConfig();
   applyDataFlags(config, { dataSources: { productFeedback: 'csv', agent365: 'csv' }, feedbackFlow: true });
-  assert.equal(config.dataSources.productFeedback, 'csv');
+  assert.equal(config.dataSources.productFeedback, 'api', '--feedback-flow with csv, as the old docs had it, is the flow mode');
   assert.equal(config.modules.agent365, true);
-  assert.equal(config.uploads.feedbackFlow, true);
+  assert.equal(config.modules.productFeedback, true);
+  assert.equal(/** @type {any} */ (config.uploads).feedbackFlow, undefined);
+  const skipped = emptyConfig();
+  applyDataFlags(skipped, { dataSources: { productFeedback: 'skip' }, feedbackFlow: true });
+  assert.equal(skipped.dataSources.productFeedback, 'skip');
 });
 
 test('web ui: the Data sources answer checks its modes and staged files', async () => {

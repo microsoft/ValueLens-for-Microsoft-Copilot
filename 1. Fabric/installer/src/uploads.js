@@ -31,6 +31,7 @@ export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
  * @property {SourceMode} defaultMode
  * @property {boolean} [locked]  The dashboard is built on it, so it can't be skipped.
  * @property {{ where: string, url: string, files: string }} [export]  Where the admin downloads the CSV.
+ * @property {SourceMode[]} [exportModes]  The modes that still need the export. Default csv.
  * @property {string} [page]  The dashboard page that stays dormant when it is skipped.
  * @property {Partial<Record<SourceMode, string>>} [modeLabels]  Overrides MODE_LABELS, e.g. "Connected (Dataflow)".
  * @property {Partial<Record<SourceMode, string>>} [hints]  What the mode does, shown under the card.
@@ -90,10 +91,16 @@ export const DATA_SOURCES = [
   {
     id: 'productFeedback',
     label: 'Product feedback',
-    description: 'What people say about Copilot. There is no API for it.',
-    modes: ['csv', 'skip'],
+    description: 'What people say about Copilot, from the Microsoft 365 admin center export. There is no API for it.',
+    modes: ['api', 'csv', 'skip'],
     defaultMode: 'skip',
     page: 'User Feedback',
+    exportModes: ['api', 'csv'],
+    modeLabels: { api: 'Power Automate (emailed export)', csv: 'Upload CSV' },
+    hints: {
+      api: `Schedule the export to email you, and a Power Automate flow saves each one to the drop folder. Needs Power Automate Premium; you sign in to the flow's connections once.`,
+      csv: 'Download the export and upload it yourself. No flow.',
+    },
     export: {
       where: 'Microsoft 365 admin center > Health > Product feedback > Export.',
       url: 'https://admin.microsoft.com/',
@@ -390,7 +397,7 @@ export function defaultDataSources() {
  * @param {Partial<Record<string, string>> | undefined} saved
  * @param {import('./catalog.js').ModuleChoice} modules
  * @param {{ azureSubscriptionId?: string }} [consumption]
- * @param {{ studioFlow?: boolean }} [uploads]  A saved Studio CSV choice with its flow is now the api mode.
+ * @param {{ studioFlow?: boolean, feedbackFlow?: boolean }} [uploads]  A saved CSV choice with its flow is now the api mode.
  * @returns {DataSourceModes}
  */
 export function normaliseDataSources(saved, modules, consumption = {}, uploads = {}) {
@@ -413,6 +420,7 @@ export function normaliseDataSources(saved, modules, consumption = {}, uploads =
     if (s.locked) out[s.id] = s.modes[0];
   }
   if (saved && out.studioCredits === 'csv' && uploads.studioFlow) out.studioCredits = 'api';
+  if (saved && out.productFeedback === 'csv' && uploads.feedbackFlow) out.productFeedback = 'api';
   return out;
 }
 
@@ -466,6 +474,7 @@ export function routerSignaturesJson(ds) {
  * @property {boolean} uploadable  A CSV can be uploaded for it.
  * @property {string} [page]
  * @property {{ where: string, url: string, files: string }} [export]
+ * @property {SourceMode[]} [exportModes]  The modes that still need the export.
  */
 
 /**
@@ -483,9 +492,15 @@ export function sourceCards(ds) {
     locked: !!s.locked,
     uploadable: UPLOADABLE_SOURCES.includes(s.id),
     ...(s.page ? { page: s.page } : {}),
-    ...(s.export ? { export: s.export } : {}),
+    ...(s.export ? { export: s.export, exportModes: exportModesOf(s) } : {}),
   }));
 }
+
+/**
+ * The modes of a source that still need its export: csv, and for product feedback the emailed export its flow saves.
+ * @param {DataSourceInfo} s
+ */
+export const exportModesOf = (s) => (s.export ? s.exportModes ?? ['csv'] : []);
 
 /**
  * Checks the modes a Data sources answer gives: every source has one of its own, locked ones unchanged.
@@ -526,6 +541,12 @@ export function uploadName(original, now = new Date()) {
   return `${stamp}_${/\.csv$/i.test(clean) ? clean : `${clean}.csv`}`;
 }
 
+/** Other names `--data` accepts for a mode, e.g. productFeedback=flow for its Power Automate flow. */
+export const MODE_ALIASES = /** @type {Partial<Record<DataSourceId, Record<string, SourceMode>>>} */ ({
+  productFeedback: { flow: 'api' },
+  studioCredits: { flow: 'api' },
+});
+
 /**
  * Parses `--data` flags: `source=mode`, comma-separated or repeated.
  * @param {string[]} values
@@ -538,8 +559,12 @@ export function parseDataFlags(values) {
     const [rawId, rawMode] = part.split('=').map((x) => x?.trim());
     const s = DATA_SOURCES.find((d) => d.id.toLowerCase() === (rawId ?? '').toLowerCase());
     if (!s) throw new Error(`--data: unknown source "${rawId}". Use one of ${DATA_SOURCE_IDS.join(', ')}.`);
-    const mode = /** @type {SourceMode} */ ((rawMode ?? '').toLowerCase());
-    if (!s.modes.includes(mode)) throw new Error(`--data: ${s.id} can be ${s.modes.join(' or ')}, not "${rawMode ?? ''}".`);
+    const given = (rawMode ?? '').toLowerCase();
+    const mode = /** @type {SourceMode} */ (MODE_ALIASES[s.id]?.[given] ?? given);
+    if (!s.modes.includes(mode)) {
+      const aliases = Object.keys(MODE_ALIASES[s.id] ?? {});
+      throw new Error(`--data: ${s.id} can be ${[...s.modes, ...aliases].join(' or ')}, not "${rawMode ?? ''}".`);
+    }
     out[s.id] = mode;
   }
   return out;

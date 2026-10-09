@@ -375,7 +375,7 @@ this installer ignore it and run as usual: run `update` first if yours is.
 | Workday org data | | Workday: a report of active workers with **Primary Work Email** | Organisation filters |
 | Microsoft 365 activity | Yes | | M365 activity |
 | Agent 365 registry | Needs an Agent 365 licence | Microsoft 365 admin center > **Agents** > **All agents** > **Export** | Agents |
-| Product feedback | No API. An optional flow saves exports emailed to you | Microsoft 365 admin center > **Health** > **Product feedback** > **Export** | User Feedback |
+| Product feedback | No API. **Power Automate (emailed export)**: a flow saves exports emailed to you | Microsoft 365 admin center > **Health** > **Product feedback** > **Export** | User Feedback |
 | Copilot Studio credits | **Connected (Power Automate flow)**, the default: a daily flow reads the licensing API (tenant, environment, agent and per-user figures) | Power Platform admin center > **Licensing** > **Products** > **Copilot Studio** (Summary, Environments, Agents and Users) | Consumption Central |
 | Copilot Cowork credits | **Connected (Dataflow)**: a Dataflow Gen2 reads your Viva Insights query | Viva Insights > Copilot Consumption Dashboard > **Export** | Consumption Central |
 | Azure AI costs | Yes | | Consumption Central |
@@ -411,7 +411,7 @@ The installer creates these flows in the Power Platform environment you pick, **
 | Flow | When | What it does | Sign in to |
 |---|---|---|---|
 | `Analytics Hub - Copilot Studio credits` | Copilot Studio credits set to **Connected** (the default) | Each day, an hour before the pipeline, reads credits by agent, by user and the tenant's entitlement from the Power Platform licensing API. The first run loads about six months; later runs restate the last ten days | Power Platform API and OneLake |
-| `Analytics Hub - Product feedback` | Product feedback set to **Upload CSV**, if you say yes | Saves product feedback exports emailed with the subject `Copilot Product Feedback` | Office 365 Outlook and OneLake |
+| `Analytics Hub - Product feedback` | Product feedback set to **Power Automate (emailed export)** | Saves product feedback exports emailed with the subject `Copilot Product Feedback` | Office 365 Outlook and OneLake |
 
 Both need Power Automate Premium. To finish each one:
 
@@ -427,6 +427,14 @@ Both need Power Automate Premium. To finish each one:
 3. Save, then turn it on.
 4. For product feedback, schedule the export in the Microsoft 365 admin center to be emailed to
    that mailbox with the subject `Copilot Product Feedback`.
+
+**Load the Studio credits now.** The Studio flow loads its first six months on its first run,
+which is otherwise the next day, an hour before the pipeline. Once it's on, click **Run** in
+Power Automate to load them now. Or use `run`, or **Repair or change**: when the flow is on and
+hasn't loaded them yet (there's no `Files/analytics_hub_flows/studio_backfill_done` in the
+Lakehouse, or on Azure no successful run), the installer offers to run it as you, and to wait for it
+so the pipeline that follows picks up its files. `--yes` never runs it. If the flow is off, or
+Power Automate turns the run down, the installer shows these steps instead.
 
 The flows write to the drop folder as the person who signed in to the OneLake connection, so
 there's no secret and no Key Vault connection. That works when your Key Vault only takes private
@@ -464,7 +472,7 @@ addresses, the M365 Copilot licence flag and the exact prepaid split.
 |---|---|
 | Choose sources without the questions | `install --data productFeedback=csv,agent365=api --yes` |
 | Upload exports during the install | `install --data productFeedback=csv --csv feedback.csv` |
-| Create the product feedback email flow | `install --data productFeedback=csv --feedback-flow --flow-environment https://contoso.crm.dynamics.com` |
+| Create the product feedback email flow | `install --data productFeedback=flow --flow-environment https://contoso.crm.dynamics.com` |
 | Read Copilot Studio credits with the flow | `install --data studioCredits=api --flow-environment https://contoso.crm.dynamics.com` |
 | Have the flows write as the app, with its secret in Key Vault | `install --flow-identity app` |
 | Read Cowork credits with a Dataflow | `install --data coworkCredits=api --viva-partition <id> --viva-query <id>` |
@@ -473,6 +481,8 @@ addresses, the M365 Copilot licence flag and the exact prepaid split.
 
 Source IDs for `--data`: `workday`, `m365Activity`, `agent365`, `productFeedback`,
 `studioCredits`, `coworkCredits`, `azureAi`, `agentEvaluator`. Modes: `api`, `csv` or `skip`.
+For `productFeedback` and `studioCredits`, `flow` is the same as `api`. `--feedback-flow` still
+works: it's the same as `productFeedback=flow`.
 Without `--flow-environment`, the installer asks which environment to use.
 
 ## Microsoft 365 activity

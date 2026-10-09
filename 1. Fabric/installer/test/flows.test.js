@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { HttpError } from '../src/http.js';
-import { ensureFlows, FLOW_FILES, flowDefinitions, flowsSkipped, flowsSummary, flowsWanted, planFlows } from '../src/steps/flows.js';
+import { ensureFlows, FLOW_FILES, flowDefinitions, flowsSkipped, flowsSummary, flowsWanted, offerStudioRun, planFlows, STUDIO_RUN_POLL_MS } from '../src/steps/flows.js';
+import { run } from '../src/install.js';
 import { ensureWorkspaceRole } from '../src/steps/model.js';
 import {
   BACKFILL_MARKER,
@@ -218,13 +219,14 @@ test('flowClientData and flowFile: a reference per connection, and an update kee
   assert.deepEqual(connectionReferencesOf('not json'), {});
 });
 
-test('flowsWanted: the Studio api mode brings its flow; the feedback flow is asked for', () => {
+test("flowsWanted: each source's Power Automate mode brings its flow; Upload CSV has none", () => {
   const { config } = fakeCtx();
-  config.uploads.feedbackFlow = true;
   assert.deepEqual(flowsWanted(config), []);
   config.dataSources.productFeedback = 'csv';
   config.dataSources.studioCredits = 'csv';
-  assert.deepEqual(flowsWanted(config), ['feedback'], 'Upload CSV only has no flow');
+  assert.deepEqual(flowsWanted(config), [], 'Upload CSV has no flow');
+  config.dataSources.productFeedback = 'api';
+  assert.deepEqual(flowsWanted(config), ['feedback']);
   config.dataSources.studioCredits = 'api';
   assert.deepEqual(flowsWanted(config), ['feedback', 'studio']);
 
@@ -248,8 +250,8 @@ test('flowDefinitions: the user identity by default, the app on request', () => 
   assert.match(JSON.stringify(app), /"clientId":"app-1"/);
 });
 
-test('planFlows: asks about the feedback flow only, then picks the environment from the list', async () => {
-  const { ui, asked } = fakeUi({ answers: [true, 'https://org2.crm.dynamics.com'] });
+test('planFlows: no follow-up about the feedback flow, just the environment from the list', async () => {
+  const { ui, asked } = fakeUi({ answers: ['https://org2.crm.dynamics.com'] });
   const discovery = {
     instances: async () => [
       { Id: '1', Url: 'https://org1.crm.dynamics.com/', FriendlyName: 'Default', EnvironmentId: 'env-1' },
@@ -257,19 +259,17 @@ test('planFlows: asks about the feedback flow only, then picks the environment f
     ],
   };
   const { ctx, config } = fakeCtx({ ui, discovery });
-  config.dataSources.productFeedback = 'csv';
+  config.dataSources.productFeedback = 'api';
   config.dataSources.studioCredits = 'api';
   await planFlows(ctx);
-  assert.equal(asked.length, 2);
-  assert.equal(config.uploads.feedbackFlow, true);
+  assert.equal(asked.length, 1);
   assert.deepEqual(config.uploads.flowEnvironment, { url: 'https://org2.crm.dynamics.com', id: 'env-2', name: 'Ops' });
 
-  // Skipped sources switch their flows off and ask nothing.
+  // No flow mode, no questions.
   const quiet = fakeUi();
   const { ctx: ctx2, config: config2 } = fakeCtx({ ui: quiet.ui });
-  config2.uploads.feedbackFlow = true;
+  config2.dataSources.productFeedback = 'csv';
   await planFlows(ctx2);
-  assert.equal(config2.uploads.feedbackFlow, false);
   assert.equal(quiet.asked.length, 0);
 });
 
@@ -328,9 +328,9 @@ test('ensureFlows: as a user, grants nothing, creates each flow once, and update
   const dv = fakeDataverse();
   const { ui, text } = fakeUi();
   const { ctx, config } = fakeCtx({ ui, fabric: fabric.api, dataverse: () => dv.api });
-  config.dataSources.productFeedback = 'csv';
+  config.dataSources.productFeedback = 'api';
   config.dataSources.studioCredits = 'api';
-  config.uploads = { feedbackFlow: true, flowEnvironment: { url: 'https://org1.crm.dynamics.com', id: 'env-1', name: 'Default' } };
+  config.uploads = { flowEnvironment: { url: 'https://org1.crm.dynamics.com', id: 'env-1', name: 'Default' } };
 
   await ensureFlows(ctx);
   assert.deepEqual(fabric.calls, [], 'the person who signs in brings their own workspace role');
@@ -442,8 +442,8 @@ test('ensureFlows: when the flow can\'t be created, it is written to a file to i
   const { ui, text } = fakeUi();
   const { ctx, config } = fakeCtx({ ui, fabric: fabric.api, dataverse: () => dv.api });
   ctx.configFile = join(tmp, 'valuelens-install.json');
-  config.dataSources.productFeedback = 'csv';
-  config.uploads = { feedbackFlow: true, flowEnvironment: { url: 'https://org1.crm.dynamics.com' } };
+  config.dataSources.productFeedback = 'api';
+  config.uploads = { flowEnvironment: { url: 'https://org1.crm.dynamics.com' } };
 
   await ensureFlows(ctx);
   const file = join(tmp, FLOW_FILES.feedback);
@@ -473,7 +473,7 @@ test('flowsSummary: short numbered steps for each connection; the private vault 
   assert.match(out, /2\. HTTP with Microsoft Entra ID \(preauthorized\), for the Power Platform API: Base Resource URL and Resource URI https:\/\/api\.powerplatform\.com\. Sign in as a Power Platform, Billing or Global administrator\./);
   assert.match(out, /3\. .*for OneLake: Base Resource URL https:\/\/onelake\.dfs\.fabric\.microsoft\.com, Resource URI https:\/\/storage\.azure\.com\. Sign in as someone with Contributor or higher on Analytics\./);
   assert.match(out, /4\. Save, then turn it on\./);
-  assert.match(out, /about six months/);
+  assert.match(out, /5\. To load about six months now rather than at its first daily run, click Run\. Or use ".*run", which offers to run it before the pipeline\./);
   assert.match(out, /co-owner/);
   assert.doesNotMatch(out, /Key Vault|kv-private|trusted service|gateway/i);
 
@@ -498,4 +498,222 @@ test('ensureWorkspaceRole: never lowers a role, adds one when there is none', as
   fabric.roles.length = 0;
   await ensureWorkspaceRole(ctx, 'Viewer');
   assert.deepEqual(fabric.calls, ['addRoleAssignment sp-1 Viewer']);
+});
+
+/**
+ * Power Automate held in memory: one flow, its runs (newest first) and what each trigger does.
+ * `after` scripts the new run's status on each look after a trigger.
+ * @param {{ state?: string, runs?: any[], after?: string[], trigger?: () => Promise<any> }} [o]
+ */
+function fakeFlowApi(o = {}) {
+  /** @type {string[]} */
+  const calls = [];
+  const runs = [...(o.runs ?? [])];
+  const after = [...(o.after ?? ['Running', 'Succeeded'])];
+  let triggered = false;
+  const api = {
+    /** @param {string} env @param {string} id */
+    getFlow: async (env, id) => {
+      calls.push(`getFlow ${env} ${id}`);
+      return { name: id, properties: { state: o.state ?? 'Started' } };
+    },
+    listRuns: async () => {
+      calls.push('listRuns');
+      if (triggered && after.length > 0) runs[0].properties.status = after.length > 1 ? after.shift() : after[0];
+      return runs.map((r) => ({ ...r, properties: { ...r.properties } }));
+    },
+    /** @param {string} env @param {string} id @param {string} trigger */
+    runTrigger: async (env, id, trigger) => {
+      calls.push(`runTrigger ${env} ${id} ${trigger}`);
+      if (o.trigger) return o.trigger();
+      triggered = true;
+      runs.unshift({ name: 'run-new', properties: { status: 'Running' } });
+      return undefined;
+    },
+  };
+  return { api, calls };
+}
+
+/** A Fabric install with the Studio flow created in env-1. @param {Parameters<typeof fakeCtx>[0] & { marker?: boolean }} [o] */
+function studioCtx(o = {}) {
+  const { marker, ...rest } = o;
+  /** @type {string[]} */
+  const looked = [];
+  const made = fakeCtx({
+    oneLake: {
+      /** @param {string} ws @param {string} lh @param {string} path */
+      exists: async (ws, lh, path) => {
+        looked.push(`${ws}/${lh}/${path}`);
+        return !!marker;
+      },
+    },
+    ...rest,
+  });
+  made.config.dataSources.studioCredits = 'api';
+  made.config.uploads = { flowIds: { studio: 'flow-1' }, flowEnvironment: { url: 'https://org1.crm.dynamics.com', id: 'env-1', name: 'Default' } };
+  return { ...made, looked };
+}
+
+test('offerStudioRun: a flow that is off gets the steps to run it, or nothing when the summary covers it', async () => {
+  const ui = fakeUi();
+  const flow = fakeFlowApi({ state: 'Stopped' });
+  const { ctx } = studioCtx({ ui: ui.ui, flow: flow.api });
+  assert.equal(await offerStudioRun(ctx), 'off');
+  assert.match(ui.text(), new RegExp(`${STUDIO_FLOW_NAME} is off\\. To load about six months of Copilot Studio credits now:`));
+  assert.match(ui.text(), /1\. Open https:\/\/make\.powerautomate\.com\/environments\/env-1\/flows/);
+  assert.match(ui.text(), /2\. If it is off, sign in to its connections, save, and turn it on\./);
+  assert.match(ui.text(), /3\. Click Run\./);
+  assert.deepEqual(ui.asked, []);
+  assert.deepEqual(flow.calls, ['getFlow env-1 flow-1']);
+
+  const quiet = fakeUi();
+  const { ctx: ctx2 } = studioCtx({ ui: quiet.ui, flow: fakeFlowApi({ state: 'Suspended' }).api });
+  assert.equal(await offerStudioRun(ctx2, { quietWhenOff: true }), 'off');
+  assert.equal(quiet.text(), '');
+});
+
+test('offerStudioRun: nothing to offer once the backfill marker is in OneLake, or with no Studio flow', async () => {
+  const ui = fakeUi();
+  const flow = fakeFlowApi();
+  const { ctx, looked } = studioCtx({ ui: ui.ui, flow: flow.api, marker: true });
+  assert.equal(await offerStudioRun(ctx, { pipelineNext: true }), 'done');
+  assert.deepEqual(looked, [`ws-1/lh-1/${FLOW_STATE_DIR}/${BACKFILL_MARKER}`]);
+  assert.deepEqual(ui.asked, []);
+  assert.ok(!flow.calls.some((x) => x.startsWith('runTrigger')));
+
+  const none = fakeFlowApi();
+  const { ctx: ctx2, config } = fakeCtx({ flow: none.api });
+  config.dataSources.studioCredits = 'csv';
+  assert.equal(await offerStudioRun(ctx2), 'skipped');
+  const { ctx: ctx3, config: c3 } = studioCtx({ flow: none.api });
+  c3.uploads.flowFiles = { studio: 'x.json' };
+  assert.equal(await offerStudioRun(ctx3), 'skipped');
+  assert.deepEqual(none.calls, []);
+});
+
+test('offerStudioRun: runs the Daily trigger as the signed-in user and waits for it before the pipeline', async () => {
+  const ui = fakeUi();
+  const flow = fakeFlowApi({ runs: [{ name: 'run-old', properties: { status: 'Failed' } }], after: ['Running', 'Running', 'Succeeded'] });
+  const { ctx, sleeps } = studioCtx({ ui: ui.ui, flow: flow.api });
+  assert.equal(await offerStudioRun(ctx, { pipelineNext: true }), 'ran');
+  assert.equal(ui.asked.length, 1);
+  assert.match(ui.asked[0], new RegExp(`${STUDIO_FLOW_NAME} hasn't loaded its first six months of Copilot Studio credits yet\\. Run it now\\?`));
+  assert.ok(flow.calls.includes('runTrigger env-1 flow-1 Daily'));
+  assert.ok(sleeps.length >= 1 && sleeps.every((ms) => ms === STUDIO_RUN_POLL_MS));
+  assert.match(ui.text(), new RegExp(`Started ${STUDIO_FLOW_NAME}`));
+  assert.match(ui.text(), new RegExp(`${STUDIO_FLOW_NAME} loaded its first six months`));
+
+  // Without a pipeline to follow, the default is to start it and carry on.
+  const quick = fakeFlowApi();
+  const { ctx: ctx2, sleeps: s2 } = studioCtx({ flow: quick.api });
+  assert.equal(await offerStudioRun(ctx2), 'started');
+  assert.ok(quick.calls.includes('runTrigger env-1 flow-1 Daily'));
+  assert.deepEqual(s2, []);
+
+  // "Not now" runs nothing.
+  const no = fakeFlowApi();
+  const { ctx: ctx3 } = studioCtx({ ui: fakeUi({ answers: ['no'] }).ui, flow: no.api });
+  assert.equal(await offerStudioRun(ctx3, { pipelineNext: true }), 'skipped');
+  assert.ok(!no.calls.some((x) => x.startsWith('runTrigger')));
+});
+
+test('offerStudioRun: a run that fails is reported, and one already running can be waited for', async () => {
+  const ui = fakeUi();
+  const flow = fakeFlowApi({ after: ['Failed'] });
+  const { ctx } = studioCtx({ ui: ui.ui, flow: flow.api });
+  assert.equal(await offerStudioRun(ctx, { pipelineNext: true }), 'failed');
+  assert.match(ui.text(), new RegExp(`${STUDIO_FLOW_NAME} failed\\. Open its run history in Power Automate`));
+
+  const busy = fakeUi();
+  const running = fakeFlowApi({ runs: [{ name: 'run-1', properties: { status: 'Running' } }] });
+  let looks = 0;
+  const list = running.api.listRuns;
+  running.api.listRuns = async () => {
+    const runs = await list();
+    if (++looks >= 3) runs[0].properties.status = 'Succeeded';
+    return runs;
+  };
+  const { ctx: ctx2 } = studioCtx({ ui: busy.ui, flow: running.api });
+  assert.equal(await offerStudioRun(ctx2, { pipelineNext: true }), 'ran');
+  assert.match(busy.asked[0], /is running now\. Wait for it before starting the pipeline\?/);
+  assert.ok(!running.calls.some((x) => x.startsWith('runTrigger')));
+});
+
+test('offerStudioRun: a trigger Power Automate turns down ends in the steps, never an error', async () => {
+  const ui = fakeUi();
+  const flow = fakeFlowApi({
+    trigger: async () => {
+      throw new HttpError('CannotRunUnpublishedSolutionFlow: The flow is not published.', { method: 'POST', url: 'x', status: 409 });
+    },
+  });
+  const { ctx } = studioCtx({ ui: ui.ui, flow: flow.api });
+  assert.equal(await offerStudioRun(ctx, { pipelineNext: true }), 'failed');
+  assert.match(ui.text(), new RegExp(`${STUDIO_FLOW_NAME} can't run until it is turned on\\.`));
+  assert.match(ui.text(), /To load about six months of Copilot Studio credits now:/);
+  assert.match(ui.text(), /3\. Click Run\./);
+
+  const other = fakeUi();
+  const broken = fakeFlowApi();
+  broken.api.getFlow = async () => {
+    throw new HttpError('Forbidden', { method: 'GET', url: 'x', status: 403 });
+  };
+  const { ctx: ctx2 } = studioCtx({ ui: other.ui, flow: broken.api });
+  assert.equal(await offerStudioRun(ctx2), 'failed');
+  assert.match(other.text(), new RegExp(`Couldn't run ${STUDIO_FLOW_NAME} \\(Forbidden\\)`));
+});
+
+test('offerStudioRun: --yes never runs it; an older record finds its environment ID; Azure goes by run history', async () => {
+  const yes = fakeUi({ yes: true });
+  const flow = fakeFlowApi();
+  const { ctx } = studioCtx({ ui: yes.ui, flow: flow.api });
+  assert.equal(await offerStudioRun(ctx, { pipelineNext: true }), 'skipped');
+  assert.ok(!flow.calls.some((x) => x.startsWith('runTrigger')));
+  assert.match(yes.text(), /hasn't loaded its first six months yet\. Run it in Power Automate, or run this without --yes/);
+
+  const older = fakeFlowApi();
+  const { ctx: ctx2, config: c2, saves } = studioCtx({
+    flow: older.api,
+    marker: true,
+    discovery: { instances: async () => [{ Url: 'https://org1.crm.dynamics.com/', EnvironmentId: 'env-found' }] },
+  });
+  delete c2.uploads.flowEnvironment?.id;
+  assert.equal(await offerStudioRun(ctx2), 'done');
+  assert.equal(c2.uploads.flowEnvironment?.id, 'env-found');
+  assert.equal(older.calls[0], 'getFlow env-found flow-1');
+  assert.ok(saves() >= 1);
+
+  const az = fakeFlowApi({ runs: [{ name: 'run-1', properties: { status: 'Succeeded' } }] });
+  const { ctx: ctx3, config: c3, looked } = studioCtx({ flow: az.api });
+  c3.target = 'azure';
+  assert.equal(await offerStudioRun(ctx3, { pipelineNext: true }), 'done');
+  assert.deepEqual(looked, [], 'no OneLake on Azure');
+
+  const fresh = fakeFlowApi();
+  const { ctx: ctx4, config: c4 } = studioCtx({ flow: fresh.api });
+  c4.target = 'azure';
+  assert.equal(await offerStudioRun(ctx4, { pipelineNext: true }), 'ran');
+  assert.ok(fresh.calls.includes('runTrigger env-1 flow-1 Daily'));
+});
+
+test('run: offers the Studio flow first, so the pipeline it starts picks up its files', async () => {
+  const fabric = fakeFabric();
+  /** @type {string[]} */
+  const order = [];
+  const flow = fakeFlowApi();
+  const trigger = flow.api.runTrigger;
+  flow.api.runTrigger = async (env, id, t) => {
+    order.push('flow');
+    return trigger(env, id, t);
+  };
+  const api = /** @type {any} */ (fabric.api);
+  const runJob = api.runJob;
+  api.runJob = async (/** @type {any[]} */ ...args) => {
+    order.push('pipeline');
+    return runJob.apply(api, args);
+  };
+  const { ctx, config } = studioCtx({ fabric: fabric.api, flow: flow.api });
+  config.fabric.pipelineId = 'pipe-1';
+  config.firstRun = { status: 'Completed' };
+  await run(ctx, { wait: false });
+  assert.deepEqual(order, ['flow', 'pipeline']);
 });

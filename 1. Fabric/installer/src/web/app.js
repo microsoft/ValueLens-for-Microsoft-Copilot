@@ -1075,8 +1075,10 @@ function renderSources(item) {
     const paint = () => {
       const m = modes[c.id];
       where.replaceChildren();
+      const hint = item.lockModes ? null : c.modes.find((x) => x.value === m)?.hint;
       put(where, [
-        c.export && (m === 'csv' || item.lockModes) ? [h('span', { class: 's-d' }, 'Export from '), linkify(`${c.export.where}  ${c.export.url}`)] : null,
+        hint && m !== 'skip' ? [h('span', { class: 's-d' }, hint), ' '] : null,
+        c.export && ((c.exportModes ?? ['csv']).includes(m) || item.lockModes) ? [h('span', { class: 's-d' }, 'Export from '), linkify(`${c.export.where}  ${c.export.url}`)] : null,
         m === 'skip' ? h('span', { class: 's-d' }, c.page ? `The ${c.page} page stays empty.` : 'Not collected.') : null,
       ]);
       where.hidden = !where.childNodes.length;

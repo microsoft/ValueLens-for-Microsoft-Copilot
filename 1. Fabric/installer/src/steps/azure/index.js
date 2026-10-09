@@ -15,7 +15,7 @@ import { addMonths, SECRET_LIFETIME_MONTHS } from '../identity.js';
 import { writeTeamsPackage } from '../../azure/teams.js';
 import { APP_ALIAS, CONSUMPTION_ALIAS } from '../app.js';
 import { AZURE_AI_ROLES, ensureAzureAiAccess, planConsumption } from '../consumption.js';
-import { AZURE_LANDING_DIRS, azureDropLabel, azureDropsToSharePoint, ensureFlows, flowsSummary, flowsWanted, planFlows } from '../flows.js';
+import { AZURE_LANDING_DIRS, azureDropLabel, azureDropsToSharePoint, ensureFlows, flowsSummary, flowsWanted, offerStudioRun, planFlows } from '../flows.js';
 import { askMoreHistory, HISTORY_CHOICES, reloadDetail, reloadLine } from '../plan.js';
 
 /** @typedef {import('../../install.js').Ctx} Ctx */
@@ -275,7 +275,6 @@ export async function planAzureConsumption(ctx, subs) {
     ds.studioCredits = 'skip';
     ds.coworkCredits = 'skip';
     ds.azureAi = 'skip';
-    config.uploads.feedbackFlow = false;
     return;
   }
   ui.heading('Credit consumption');
@@ -696,6 +695,7 @@ export async function installAzure(ctx, opts) {
   step('Teams package');
   await writeAzureTeamsPackage(ctx);
 
+  if (consumption && flowsWanted(config).length) await offerStudioRun(ctx, { pipelineNext: !!(ctx.reloadHistoryDays || ctx.runFirstLoad), quietWhenOff: true });
   if (ctx.reloadHistoryDays) {
     step('Reload audit history');
     const days = ctx.reloadHistoryDays;
@@ -1155,6 +1155,7 @@ async function writeAzureTeamsPackage(ctx) {
  * @param {{ backfillDays?: number }} [opts]
  */
 export async function azureRun(ctx, opts = {}) {
+  if (azureConsumptionOn(ctx.config)) await offerStudioRun(ctx, { pipelineNext: true });
   const result = await startAndWaitJob(ctx, 'run', { wait: false, backfillDays: opts.backfillDays });
   if (opts.backfillDays && opts.backfillDays > ctx.config.history.days) {
     ctx.config.history.days = opts.backfillDays;
