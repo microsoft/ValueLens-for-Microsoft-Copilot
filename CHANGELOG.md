@@ -58,6 +58,30 @@ sample data.
 
 ---
 
+## 2026-10-09 — Analytics Hub installer 0.3.6
+
+**Update an existing install:** download installer 0.3.6, open it and choose **Repair or change**.
+Repair sees the changed Agent Evaluator model, redeploys it and refreshes it.
+
+The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.3.6`, which the
+Azure install pulls.
+
+The README also has a new collapsed note on which agents the Purview audit log covers.
+
+### Fix: Agent Evaluator refresh fails with "Cannot order 'Metric Glossary'[Metric] by [MetricOrder]"
+
+Since 0.3.4 the installer treats refresh warnings as failures. That exposed a warning that was
+already there: in the Agent Evaluator glossary, 11 metrics are listed on more than one page with a
+different `MetricOrder` on each, so `Metric` can't be sorted by `MetricOrder`.
+
+- Each glossary metric now uses its lowest `MetricOrder`, the same rule the ValueLens glossary
+  already follows. The rows, descriptions and page order are unchanged.
+- `scripts/Update-Glossary-Sort-Order.py` applies the rule to every shipped template, and
+  `--check` reports any template that needs it.
+- A new test, `tests/test_dax_sort_by_columns.py`, checks every calculated `DATATABLE` that has a
+  sort-by column in the shipped templates. It fails when a value has more than one sort key.
+  Only the Agent Evaluator template was affected.
+
 ## 2026-10-09 — Analytics Hub installer 0.3.5
 
 **Update an existing install:** download installer 0.3.5, open it and choose **Repair or change**.
