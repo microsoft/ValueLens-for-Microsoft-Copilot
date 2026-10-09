@@ -17,16 +17,19 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
-## Unreleased
+## 2026-10-09 — Analytics Hub installer 0.3.7
 
-**Update an existing install:** open the installer and choose **Repair or change**. If you keep
-the client secret in the notebooks, run `AnalyticsHubInstaller.exe update` instead: Repair
-doesn't rewrite those notebooks.
+**Update an existing install:** download installer 0.3.7, open it and choose **Repair or change**.
+If you keep the client secret in the notebooks, run `AnalyticsHubInstaller.exe update` instead:
+Repair doesn't rewrite those notebooks.
 
 Both update the Power Automate flows in place and keep the connections already signed in to.
 Because the flows now need a OneLake connection, each flow is turned off and the connection to
 sign in to is listed. Sign in, then turn the flow back on. A saved choice of *Upload CSV* for
 Copilot Studio credits with the flow chosen becomes **Connected**, which behaves the same.
+
+The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.3.7`, which the
+Azure install pulls.
 
 ### Fix: Azure capacity, reconciliation and solution spend pages are blank
 
