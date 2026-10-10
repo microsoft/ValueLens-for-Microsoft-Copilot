@@ -65,6 +65,8 @@ param webAppIdUri string = ''
 param reportingCurrency string = 'USD'
 @description('Units of the reporting currency per US dollar, as text; empty when the currency is USD or the rate is left to the app.')
 param exchangeRate string = ''
+@description('Who the web app lets in besides its app roles, and who people ask for access (JSON: {"groupId","groupName","contact","requestUrl"}). Empty for app roles only.')
+param webAccess string = ''
 
 @description('Collection modules the run job executes (catalog ids), e.g. core,org,m365.')
 param modules string = 'core'
@@ -210,6 +212,7 @@ module apps 'modules/containerapps.bicep' = {
     webAppIdUri: webAppIdUri
     reportingCurrency: reportingCurrency
     exchangeRate: exchangeRate
+    webAccess: webAccess
     version: imageTag
     modules: modules
     auditHistoryDays: auditHistoryDays

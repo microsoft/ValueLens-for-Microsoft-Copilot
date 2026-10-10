@@ -13,10 +13,13 @@ import { AuthGate } from "@/components/auth-gate.component";
 import { AuthProvider } from "@/hooks/use-auth";
 import { AnalyticsHubAccessDeniedError, type IAuthService } from "@/services/rayfin-auth.service";
 
-const runtime = vi.hoisted(() => ({ host: "fabric" as "fabric" | "azure" }));
+const runtime = vi.hoisted(() => ({
+    host: "fabric" as "fabric" | "azure",
+    access: undefined as { groupId: string; groupName?: string; contact?: string; requestUrl?: string } | undefined,
+}));
 
 vi.mock("@/lib/runtime-config", () => ({
-    runtimeConfig: () => ({ host: runtime.host, rayfin: {}, semanticModels: {} }),
+    runtimeConfig: () => ({ host: runtime.host, rayfin: {}, semanticModels: {}, access: runtime.access }),
 }));
 
 const authenticatedSession: OpaqueSession = {
@@ -58,6 +61,7 @@ describe("AuthGate", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         runtime.host = "fabric";
+        runtime.access = undefined;
     });
 
     it("sends a visitor on the hosting address to the app's Fabric item instead of signing in", async () => {
@@ -171,6 +175,25 @@ describe("AuthGate", () => {
         renderAuthGate(authService);
 
         expect(await screen.findByRole("alert")).toHaveTextContent("Ask your admin to add you to Analytics Hub users");
+    });
+
+    it("offers request access and an email to the install's contact", async () => {
+        runtime.host = "azure";
+        runtime.access = {
+            groupId: "group-1",
+            groupName: "Analytics Hub Viewers",
+            contact: "admin@example.com",
+            requestUrl: "https://example.com/request",
+        };
+        const authService = createAuthService({
+            initEmbeddedAuth: vi.fn().mockRejectedValue(new AnalyticsHubAccessDeniedError()),
+        });
+        renderAuthGate(authService);
+
+        expect(await screen.findByRole("alert")).toHaveTextContent("Ask to join Analytics Hub Viewers");
+        expect(screen.getByRole("link", { name: "Request access" })).toHaveAttribute("href", "https://example.com/request");
+        const email = screen.getByRole("link", { name: "Email admin@example.com" });
+        expect(email.getAttribute("href")).toMatch(/^mailto:admin%40example\.com\?subject=Access%20to%20Analytics%20Hub/);
     });
 
 });

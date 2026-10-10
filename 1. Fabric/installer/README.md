@@ -235,9 +235,12 @@ app registration. An install from an earlier version keeps the names it already 
 
 - **Admin consent.** If you couldn't grant it, send the link the installer gives you to an admin.
   They select **Grant admin consent**. Then open the exe again and choose **Run now**.
-- **Share the app and reports.** Open **Analytics Hub** or the **ValueLens** report in the
-  workspace, choose **Share**, and add people or a group. They also need **Build** on
-  `Analytics Hub Model` (its **Manage permissions** page), or Viewer on the workspace.
+- **Share the app and reports.** The installer creates **Analytics Hub Viewers** (or uses a group
+  you name) with you as owner, and gives it **Build** on the models. Share the app and the
+  **ValueLens** report with the group once: open each in the workspace, choose **Share** and add
+  it. From then on, sharing is adding people to the group: run `access` (**Manage access** in
+  the browser), use **Share** in the app, or open the group in My Groups. Keep viewers off
+  workspace roles. See [Viewing Analytics Hub](../../docs/PERMISSIONS.md#viewing-analytics-hub-paths-1-and-2).
 - **Own reports.** Connect Power BI Desktop to `Analytics Hub Model`, or use **Save a copy** on a
   published report.
 - **Flows and the Cowork Dataflow.** If you chose them, the end of the install lists what to sign
@@ -491,6 +494,7 @@ addresses, the M365 Copilot licence flag and the exact prepaid split.
 | Read agent configuration and Foundry from Resource Graph | `install --data resourceGraph=api --arg-management-group <id>` |
 | Upload exports later, then load them now | `upload feedback.csv agents.csv --run` |
 | Run only the loads that failed last time | `rerun-failed` |
+| Add viewers or owners to the viewer group, or choose another group | `access` |
 
 Source IDs for `--data`: `workday`, `m365Activity`, `agent365`, `productFeedback`,
 `studioCredits`, `coworkCredits`, `azureAi`, `agentEvaluator`, `defender`, `resourceGraph`. Modes:

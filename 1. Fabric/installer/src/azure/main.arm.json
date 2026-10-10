@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.47.16.16243",
-      "templateHash": "2191988917001526862"
+      "templateHash": "712364317566401486"
     }
   },
   "parameters": {
@@ -174,6 +174,13 @@
       "defaultValue": "",
       "metadata": {
         "description": "Units of the reporting currency per US dollar, as text; empty when the currency is USD or the rate is left to the app."
+      }
+    },
+    "webAccess": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Who the web app lets in besides its app roles, and who people ask for access (JSON: {\"groupId\",\"groupName\",\"contact\",\"requestUrl\"}). Empty for app roles only."
       }
     },
     "modules": {
@@ -1194,6 +1201,9 @@
           "exchangeRate": {
             "value": "[parameters('exchangeRate')]"
           },
+          "webAccess": {
+            "value": "[parameters('webAccess')]"
+          },
           "version": {
             "value": "[parameters('imageTag')]"
           },
@@ -1247,7 +1257,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.47.16.16243",
-              "templateHash": "4619963685139658686"
+              "templateHash": "5661741623112108032"
             }
           },
           "parameters": {
@@ -1323,6 +1333,10 @@
               "defaultValue": "USD"
             },
             "exchangeRate": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "webAccess": {
               "type": "string",
               "defaultValue": ""
             },
@@ -1570,7 +1584,7 @@
                     {
                       "name": "web",
                       "image": "[parameters('webImage')]",
-                      "env": "[concat(variables('commonEnv'), createArray(createObject('name', 'VALUELENS_WEB_CLIENT_ID', 'value', parameters('webClientId')), createObject('name', 'VALUELENS_APP_ID_URI', 'value', parameters('webAppIdUri')), createObject('name', 'VALUELENS_CURRENCY', 'value', parameters('reportingCurrency')), createObject('name', 'VALUELENS_EXCHANGE_RATE', 'value', parameters('exchangeRate'))))]",
+                      "env": "[concat(variables('commonEnv'), createArray(createObject('name', 'VALUELENS_WEB_CLIENT_ID', 'value', parameters('webClientId')), createObject('name', 'VALUELENS_APP_ID_URI', 'value', parameters('webAppIdUri')), createObject('name', 'VALUELENS_CURRENCY', 'value', parameters('reportingCurrency')), createObject('name', 'VALUELENS_EXCHANGE_RATE', 'value', parameters('exchangeRate')), createObject('name', 'VALUELENS_ACCESS', 'value', parameters('webAccess'))))]",
                       "resources": {
                         "cpu": "[json('0.5')]",
                         "memory": "1Gi"

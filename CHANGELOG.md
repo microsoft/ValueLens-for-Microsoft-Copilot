@@ -45,6 +45,37 @@ behaviour, until the installer is run again. The installer defaults to US dollar
 **Power BI templates.** The manual `.pbit` templates still ship with `£` as `Currency Symbol Value`.
 Change that measure in the `Assumptions` table to your currency; #167 tracks the templates.
 
+### New: share Analytics Hub by adding people to one group
+
+**What changed.** Sharing used to take three or four grants across two or three portals for each person.
+Now, on both the Fabric and the Azure path, who can view is one Entra security group,
+**Analytics Hub Viewers**, and sharing is adding people to it (#172).
+
+- **Installer.** A *Who can view* question creates the group with you as owner, or uses a group you
+  name. It also asks who people should ask for access (you by default) and takes an optional https
+  request link, such as a My Access package. A **Viewer access** step gives the group **Build** on
+  each model the app reads. The new `access` command (**Manage access** in the browser) adds
+  viewers or owners and repairs the Build grants.
+- **Share in the app.** A **Share** button copies the app link. On Azure, group owners and
+  `AnalyticsHub.Admin` add and remove people or groups in the app; it calls Graph as them
+  (delegated `GroupMember.ReadWrite.All`), so Graph still enforces ownership. On Fabric it opens
+  the group in My Groups.
+- **Request access.** People without access see which group to join, a **Request access** link
+  and a prefilled email to the contact, instead of "Ask your admin". On Azure the reason is typed:
+  not in the group (`NotAViewer`) or no access to the model (`PowerBIAccessDenied`).
+- **Azure web app.** Lets in members of the group (through the `groups` claim, or
+  `checkMemberGroups` when someone is in too many groups to fit it) as well as the
+  `AnalyticsHub.User` app role. New `/api/access` endpoints back the Share panel.
+- **Teams.** The install summary and `2. Azure/teams/README.md` cover publishing the package to the
+  org app catalog and pinning it for the group with a setup policy.
+- **Fabric.** The app item still has to be shared with the group once, by hand; there is no API
+  for it. After that, membership is enough.
+
+Unaffected: the Power BI template variants (CSV, SharePoint, Power Automate + Dataverse), which share
+through Power BI. Scoped views, named queries and delegated access come in later phases of #172.
+
+---
+
 ## 2026-10-09 — Analytics Hub installer 0.4.0
 
 **Update an existing install:** download installer 0.4.0, open it and choose **Repair or change**.

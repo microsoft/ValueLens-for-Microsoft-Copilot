@@ -16,7 +16,7 @@ import { isVivaId } from './transform/dataflow.js';
 import { c, createUi } from './ui.js';
 import { DATA_SOURCE_IDS, modulesFromSources, parseDataFlags } from './uploads.js';
 
-const COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'upload', 'uninstall', 'prereqs', 'preview'];
+const COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'access', 'upload', 'uninstall', 'prereqs', 'preview'];
 
 /** The `--help` text, naming the command the way it was started. */
 export const help = () => `Sets up Analytics Hub in Microsoft Fabric: the data pipeline, the semantic model and the app.
@@ -34,6 +34,7 @@ Commands:
   deploy-app       Deploy the Analytics Hub app again
   status           Show recent runs and refreshes, the last data check and when secrets expire
   rotate-secret    Create new client secrets for Key Vault and the model's connection
+  access           Who can view: the viewer group, its members and owners, and its Build on the models
   upload [files]   Upload CSV exports to the drop folder (Files/analytics_hub_uploads)
   uninstall        Azure target only: remove the resource group if created, or only tagged resources
   prereqs          Check the roles, licences, capacities and Azure access you have and lack.

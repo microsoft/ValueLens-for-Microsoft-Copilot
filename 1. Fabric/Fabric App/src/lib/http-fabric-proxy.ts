@@ -10,6 +10,7 @@ import {
     FabricNetworkProxyError,
     type IFabricApiProxy,
 } from "@microsoft/fabric-app-data";
+import { errorCode, reportAccessDenied } from "@/lib/access";
 
 export type TokenFactory = (options?: { forceRefresh?: boolean }) => Promise<string>;
 
@@ -35,13 +36,14 @@ export class HttpFabricProxy implements IFabricApiProxy {
                 ?? response.headers.get("x-ms-activity-id")
                 ?? requestId;
             if (!response.ok) {
+                const body = await response.text();
                 if (response.status === 401 || response.status === 403)
-                    window.dispatchEvent(new CustomEvent("analytics-hub-access-denied"));
+                    reportAccessDenied(errorCode(body));
                 throw new FabricApiProxyError({
                     status: response.status,
                     requestId: serviceRequestId,
                     sessionId: this.sessionId,
-                    body: await response.text(),
+                    body,
                 });
             }
 

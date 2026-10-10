@@ -59,9 +59,11 @@ it, open the exe again and choose **Run now**.
 ## Use it
 
 - **Open the app:** in your Fabric workspace, open **Analytics Hub**.
-- **Share it:** in the app, choose **Share** and add people. They also need **Build** permission on
-  `Analytics Hub Model` (under **Manage permissions**). Installs from earlier versions keep the
-  name `ValueLens Model`.
+- **Share it:** add people to **Analytics Hub Viewers**, the group the installer creates with you
+  as owner. Use **Share** in the app (it opens the group in My Groups), or open the exe and choose
+  **Manage access**. The group already has **Build** on the models; share the app item with it
+  once (**Share** on the item). People without access see who to ask. Installs from earlier
+  versions keep the model name `ValueLens Model`.
 - **Fresh data:** the pipeline runs on the schedule you chose.
 - **Status, updates or repairs:** open the exe again.
 

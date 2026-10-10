@@ -7,6 +7,7 @@
 import { FabricApiProxyError, FabricNetworkProxyError } from "@microsoft/fabric-app-data";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HttpFabricProxy } from "@/lib/http-fabric-proxy";
+import { ACCESS_DENIED_EVENT } from "@/lib/access";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -40,6 +41,21 @@ describe("HttpFabricProxy", () => {
             .rejects.toBeInstanceOf(FabricApiProxyError);
         expect(fetchMock).toHaveBeenCalledTimes(2);
         expect(getToken).toHaveBeenLastCalledWith({ forceRefresh: true });
+    });
+
+    it("reports why access was denied so the app can show the request access card", async () => {
+        const body = JSON.stringify({ error: { code: "NotAViewer", message: "no" } });
+        vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response(body, { status: 403 })));
+        const listener = vi.fn();
+        window.addEventListener(ACCESS_DENIED_EVENT, listener);
+        try {
+            await expect(new HttpFabricProxy(async () => "token").semanticModel.executeDaxJson("ws", "model", "EVALUATE ROW()"))
+                .rejects.toBeInstanceOf(FabricApiProxyError);
+        } finally {
+            window.removeEventListener(ACCESS_DENIED_EVENT, listener);
+        }
+        expect(listener).toHaveBeenCalledOnce();
+        expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual({ reason: "NotAViewer" });
     });
 
     it("retries a 403 with a refreshed token, picking up a newly granted role", async () => {

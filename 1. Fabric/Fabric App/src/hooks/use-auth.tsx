@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { OpaqueSession } from "@microsoft/rayfin-auth";
 
 import { AnalyticsHubAccessDeniedError, type AnalyticsHubUser, type IAuthService } from "@/services/rayfin-auth.service";
+import { ACCESS_DENIED_EVENT, type AccessDeniedReason } from "@/lib/access";
 import { AuthContext, type AuthContextValue } from "./auth.context";
 
 interface AuthProviderProps {
@@ -22,6 +23,7 @@ export function AuthProvider({ children, rayfinAuthService }: AuthProviderProps)
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
     const [accessDenied, setAccessDenied] = useState(false);
+    const [accessDeniedReason, setAccessDeniedReason] = useState<AccessDeniedReason>();
     const [isSigningIn, setIsSigningIn] = useState(false);
     const [signInError, setSignInError] = useState<Error | null>(null);
     const signInRequestRef = useRef<Promise<OpaqueSession> | null>(null);
@@ -54,12 +56,14 @@ export function AuthProvider({ children, rayfinAuthService }: AuthProviderProps)
     }, [rayfinAuthService]);
 
     useEffect(() => {
-        const onAccessDenied = () => {
+        const onAccessDenied = (event: Event) => {
+            const reason = (event as CustomEvent<{ reason?: string } | undefined>).detail?.reason;
+            setAccessDeniedReason(reason === "NotAViewer" || reason === "PowerBIAccessDenied" ? reason : undefined);
             setAccessDenied(true);
             setSession(null);
         };
-        window.addEventListener("analytics-hub-access-denied", onAccessDenied);
-        return () => window.removeEventListener("analytics-hub-access-denied", onAccessDenied);
+        window.addEventListener(ACCESS_DENIED_EVENT, onAccessDenied);
+        return () => window.removeEventListener(ACCESS_DENIED_EVENT, onAccessDenied);
     }, []);
 
     const signIn = useCallback(() => {
@@ -108,8 +112,9 @@ export function AuthProvider({ children, rayfinAuthService }: AuthProviderProps)
             isSigningIn,
             signInError,
             accessDenied,
+            accessDeniedReason,
         }),
-        [session, user, isLoading, error, signIn, isSigningIn, signInError, accessDenied],
+        [session, user, isLoading, error, signIn, isSigningIn, signInError, accessDenied, accessDeniedReason],
     );
 
     if (error)

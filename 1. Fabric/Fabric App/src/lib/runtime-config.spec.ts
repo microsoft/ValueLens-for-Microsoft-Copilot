@@ -23,6 +23,7 @@ import {
     RuntimeConfigError,
     loadRuntimeConfig,
     loadSemanticModels,
+    parseAccess,
     parseModules,
     parseReporting,
     parseSemanticModels,
@@ -181,6 +182,23 @@ describe("loadSemanticModels", () => {
 
         stubFiles({ [FABRIC_CONFIG_PATH]: { body: "{ not json" } });
         await expect(loadSemanticModels()).rejects.toThrow(/valid JSON/);
+    });
+});
+
+describe("parseAccess", () => {
+    it("keeps the viewer group, contact and an https request link", () => {
+        expect(parseAccess({
+            access: { groupId: "g-1", groupName: "Analytics Hub Viewers", contact: "admin@example.com", requestUrl: "https://example.com/r" },
+        })).toEqual({ groupId: "g-1", groupName: "Analytics Hub Viewers", contact: "admin@example.com", requestUrl: "https://example.com/r" });
+    });
+
+    it("drops a request link that isn't https", () => {
+        expect(parseAccess({ access: { groupId: "g-1", requestUrl: "javascript:alert(1)" } })).toEqual({ groupId: "g-1" });
+    });
+
+    it("ignores access without a group", () => {
+        expect(parseAccess({})).toBeUndefined();
+        expect(parseAccess({ access: { contact: "admin@example.com" } })).toBeUndefined();
     });
 });
 

@@ -31,8 +31,13 @@ From this folder (`1. Fabric/Fabric App`):
 4. Open the **Fabric portal** link it prints. To call the item **Analytics Hub**, rename it in its
    settings.
 5. Share it. Each person needs:
-   - the app: Viewer on the workspace, or *Run and interact* on the item
+   - the app: *Run and interact* on the item (share it with a group once), not a workspace role
    - the data: **Build** on each model the app reads
+
+   The installer does this with one group, **Analytics Hub Viewers**. By hand, add an `access`
+   object to `fabric.config.json` so the app shows who to ask and links to the group:
+   `{ "groupId": "<object id>", "groupName": "...", "contact": "you@example.com", "requestUrl": "https://..." }`
+   (`requestUrl` is optional and must be https).
 
 To update it, run `npx rayfin up` again.
 

@@ -51,7 +51,8 @@ import { prepareNotebook, serialiseNotebook } from './transform/notebook.js';
 import { buildAgentEvaluatorModel, buildConsumptionModel, buildModel, loadTemplateModel } from './transform/model.js';
 import { buildPipeline } from './transform/pipeline.js';
 import { c } from './ui.js';
-import { askTarget, azureRefresh, azureRotateSecret, azureRun, azureStatus, azureUninstall, azureUpdate, confirmAzurePlan, installAzure, planAzure } from './steps/azure/index.js';
+import { askTarget, azureRefresh, azureRotateSecret, azureRun, azureStatus, azureUninstall, azureUpdate, azureViewerModels, confirmAzurePlan, installAzure, planAzure } from './steps/azure/index.js';
+import { accessCommand, ensureViewerGroup, grantModelAccess, myGroupsUrl } from './steps/access.js';
 
 /**
  * @typedef {object} Apis
@@ -279,6 +280,7 @@ export async function install(ctx, opts) {
   const withUploads = routerWanted(config.dataSources) || !!ctx.pendingUploads?.length || flowsWanted(config).length > 0;
   const withResourceGraph = resourceGraphOn(config);
   const withReports = reportsOn(config);
+  const withAccess = withModel && !!config.access;
   const titles = [
     'Key Vault',
     'App registration',
@@ -291,6 +293,7 @@ export async function install(ctx, opts) {
     ...(withReports ? ['Power BI reports'] : []),
     ...(withUploads ? ['Data uploads'] : []),
     'Notebooks, pipeline and schedule',
+    ...(withAccess ? ['Viewer access'] : []),
     ...(withApp ? ['Analytics Hub app'] : []),
     ...(ctx.runFirstLoad ? ['First load'] : ctx.reloadHistoryDays ? ['Reload audit history'] : withModel ? ['Model refresh'] : []),
   ];
@@ -338,6 +341,10 @@ export async function install(ctx, opts) {
   await ensureSparkSettings(ctx);
   await ensurePipeline(ctx);
   await ensureSchedule(ctx);
+  if (withAccess) {
+    step('Viewer access');
+    if (await ensureViewerGroup(ctx)) await grantModelAccess(ctx, fabricViewerModels(config));
+  }
   if (withApp) {
     step('Analytics Hub app');
     await tryDeployApp(ctx);
@@ -429,6 +436,19 @@ function deployedModels(config) {
 
 /** @param {string[]} names */
 const joinNames = (names) => (names.length < 3 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
+
+/**
+ * The models the viewer group needs Build on: each one deployed, bound to its connection or not yet.
+ * @param {import('./config.js').InstallConfig} config
+ * @returns {import('./steps/access.js').ModelRef[]}
+ */
+export function fabricViewerModels(config) {
+  const ws = config.fabric.workspaceId;
+  if (!ws || !config.semanticModel.enabled) return [];
+  return [config.semanticModel, config.modules.consumption && config.consumption.model, config.modules.agentEvaluator && config.agentEvaluator.model]
+    .filter((m) => m && m.id)
+    .map((m) => ({ workspaceId: ws, datasetId: /** @type {string} */ (/** @type {any} */ (m).id), name: /** @type {any} */ (m).name }));
+}
 
 /**
  * Refreshes the ValueLens model and the other deployed models that share its connection.
@@ -603,6 +623,18 @@ export async function runCommand(ctx, command, opts) {
     case 'prereqs':
       await showPrereqs(ctx);
       return true;
+    case 'access': {
+      const azure = ctx.config.target === 'azure';
+      const before = ctx.config.access?.groupId;
+      await accessCommand(ctx, azure ? azureViewerModels(ctx.config) : fabricViewerModels(ctx.config));
+      const after = ctx.config.access?.groupId;
+      if (after && after !== before) {
+        ctx.ui.note(azure
+          ? `Run "${commandLine('install')}" so the web app lets the group in and shows who to ask for access.`
+          : `Run "${commandLine('deploy-app')}" so the app shows who to ask for access and links to the group.`);
+      }
+      return true;
+    }
     default:
       throw new Error(`Unknown command "${command}".`);
   }
@@ -684,9 +716,16 @@ export async function summary(ctx) {
     reportsSummary(ctx);
 
     const shared = [...(reportsOn(config) ? ['reports'] : []), ...(fa.enabled ? ['app'] : [])].join(' and ') || 'reports you publish';
+    const group = config.access?.groupId ? config.access : undefined;
     ui.heading('Next steps');
-    ui.info(`1. Share the ${shared}: open ${shared === 'app' ? 'it' : 'them'} in the workspace, choose Share, and add people or a group.`);
-    ui.info(`   They also need Build on ${sm.name} (its Manage permissions page), or Viewer on the workspace.`);
+    if (group) {
+      ui.info(`1. Share the ${shared} with "${group.groupName}" once: open ${shared === 'app' ? 'it' : 'them'} in the workspace, choose Share, and add the group.`);
+      ui.info(`   The group already has Build on the models. After that, share by adding people to the group: run "${commandLine('access')}",`);
+      ui.info(`   use Share in the app, or open ${myGroupsUrl(/** @type {string} */ (group.groupId))}. Keep viewers off workspace roles.`);
+    } else {
+      ui.info(`1. Share the ${shared}: open ${shared === 'app' ? 'it' : 'them'} in the workspace, choose Share, and add people or a group.`);
+      ui.info(`   They also need Build on ${sm.name} (its Manage permissions page), or Viewer on the workspace.`);
+    }
     if (secretMode(config) === 'notebook') {
       ui.info('2. Scheduled runs refresh the model as you, the schedule\'s owner. The client secret is plain text in the');
       ui.info(`   notebooks: move it to Key Vault before you share the workspace, or rotate it with "${commandLine('rotate-secret')}".`);

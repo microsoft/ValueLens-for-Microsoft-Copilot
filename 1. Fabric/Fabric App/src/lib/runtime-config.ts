@@ -39,6 +39,17 @@ export interface RuntimeConfig {
     modules?: RuntimeModules;
     /** The reporting currency chosen at install, before anything is saved in the app. Undefined for older installs. */
     reporting?: InstallCurrency;
+    /** The viewer group and who to ask for access. Undefined for installs without one. */
+    access?: AccessInfo;
+}
+
+export interface AccessInfo {
+    groupId: string;
+    groupName?: string;
+    /** Email address that access requests go to. */
+    contact?: string;
+    /** A form or page for requesting access, used instead of email when set. */
+    requestUrl?: string;
 }
 
 export interface RuntimeModules {
@@ -95,6 +106,7 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
             semanticModels: azure.semanticModels,
             modules: azure.modules,
             reporting: azure.reporting,
+            access: azure.access,
         };
         return loaded;
     }
@@ -109,6 +121,7 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
         semanticModels: fabric?.semanticModels ?? defaults.semanticModels,
         modules: fabric?.modules,
         reporting: fabric?.reporting,
+        access: fabric?.access,
     };
     return loaded;
 }
@@ -153,7 +166,7 @@ export async function loadSemanticModels(path = FABRIC_CONFIG_PATH): Promise<Mod
 
 export async function loadFabricConfig(
     path = FABRIC_CONFIG_PATH,
-): Promise<Pick<RuntimeConfig, "semanticModels" | "modules" | "reporting"> | null> {
+): Promise<Pick<RuntimeConfig, "semanticModels" | "modules" | "reporting" | "access"> | null> {
     let response: Response;
     try {
         response = await fetch(path, { cache: "no-store" });
@@ -177,7 +190,7 @@ export async function loadFabricConfig(
     } catch {
         throw new RuntimeConfigError(`${path} isn't valid JSON.`);
     }
-    return { semanticModels: parseSemanticModels(json, path), modules: parseModules(json), reporting: parseReporting(json) };
+    return { semanticModels: parseSemanticModels(json, path), modules: parseModules(json), reporting: parseReporting(json), access: parseAccess(json) };
 }
 
 /** Checks an Azure app.config.json body has the host contract shape. */
@@ -200,6 +213,21 @@ export function parseAzureConfig(json: unknown, path = APP_CONFIG_PATH): Runtime
         semanticModels: parseSemanticModels(json, path),
         modules: parseModules(json),
         reporting: parseReporting(json),
+        access: parseAccess(json),
+    };
+}
+
+/** The `access` block the installer writes: a viewer group, plus who to ask. Ignored without a group id. */
+export function parseAccess(json: unknown): AccessInfo | undefined {
+    const access = isRecord(json) ? json.access : undefined;
+    if (!isRecord(access) || typeof access.groupId !== "string" || !access.groupId) return undefined;
+    const text = (key: string) => (typeof access[key] === "string" && access[key] ? (access[key] as string) : undefined);
+    const requestUrl = text("requestUrl");
+    return {
+        groupId: access.groupId,
+        ...(text("groupName") ? { groupName: text("groupName") } : {}),
+        ...(text("contact") ? { contact: text("contact") } : {}),
+        ...(requestUrl && /^https:\/\//i.test(requestUrl) ? { requestUrl } : {}),
     };
 }
 

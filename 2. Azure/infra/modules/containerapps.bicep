@@ -24,6 +24,7 @@ param webClientId string = ''
 param webAppIdUri string = ''
 param reportingCurrency string = 'USD'
 param exchangeRate string = ''
+param webAccess string = ''
 param version string
 param modules string
 param auditHistoryDays int
@@ -171,6 +172,7 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = if (deployWeb) {
           { name: 'VALUELENS_APP_ID_URI', value: webAppIdUri }
           { name: 'VALUELENS_CURRENCY', value: reportingCurrency }
           { name: 'VALUELENS_EXCHANGE_RATE', value: exchangeRate }
+          { name: 'VALUELENS_ACCESS', value: webAccess }
         ])
         resources: { cpu: json('0.5'), memory: '1Gi' }
         probes: [{ type: 'Liveness', httpGet: { path: '/api/health', port: 8080 } }]

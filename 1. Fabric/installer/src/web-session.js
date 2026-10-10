@@ -13,7 +13,7 @@ import { describeSchedule, modelDeployed } from './steps/fabric.js';
 import { isResumeLater } from './steps/identity.js';
 import { routerWanted } from './uploads.js';
 
-export const WEB_COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'upload', 'uninstall', 'prereqs'];
+export const WEB_COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'access', 'upload', 'uninstall', 'prereqs'];
 /** Commands that work before anything is installed. */
 const NO_RECORD = ['install', 'prereqs'];
 const METHODS = ['browser', 'device-code', 'azure-cli'];
@@ -45,6 +45,7 @@ export function describeRecord(config) {
     secretExpires: (azure ? az?.sqlReader?.secretExpiry : config.app.secretExpires)?.slice(0, 10),
     firstRun: config.firstRun?.status,
     historyDays: config.history?.days,
+    viewers: config.access?.groupId ? config.access.groupName : undefined,
     can: {
       update: installed,
       run: installed && (azure || !!f.pipelineId),
@@ -54,6 +55,7 @@ export function describeRecord(config) {
       'deploy-app': !azure && modelDeployed(config),
       status: true,
       'rotate-secret': azure ? !!az?.sqlReader?.clientId : !!(config.app.appId && (secretMode(config) === 'notebook' ? installed : config.keyVault.uri)),
+      access: azure ? !!az?.powerBi?.datasetId : !!sm.id,
       upload: !azure && installed && !!f.notebooks.uploadRouter && routerWanted(config.dataSources),
       uninstall: azure && installed,
     },

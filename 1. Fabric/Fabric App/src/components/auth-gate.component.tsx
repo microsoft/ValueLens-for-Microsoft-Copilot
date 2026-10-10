@@ -8,8 +8,12 @@ import { type ReactNode } from "react";
 import { isRunningInFabric } from "@microsoft/fabric-app-data-embed-client";
 
 import { useAuth } from "@/hooks/auth.context";
+import { accessRequestMailto } from "@/lib/access";
 import { fabricItemUrl } from "@/lib/fabric-item-url";
 import { runtimeConfig } from "@/lib/runtime-config";
+
+const PRIMARY_ACTION = "inline-block rounded-lg bg-primary px-400 py-200 text-300 font-semibold text-primary-foreground hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+const SECONDARY_ACTION = "inline-block rounded-lg border border-border px-400 py-200 text-300 font-semibold text-card-foreground hover:bg-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 interface AuthGateProps {
     children: ReactNode;
@@ -33,6 +37,7 @@ export function AuthGate({
         isSigningIn,
         signInError,
         accessDenied,
+        accessDeniedReason,
     } = useAuth();
 
     if (host === "fabric" && !embedded && fabricLink) {
@@ -70,15 +75,39 @@ export function AuthGate({
     }
 
     if (accessDenied) {
+        const access = runtimeConfig().access;
+        const mailto = accessRequestMailto(access, host === "azure" ? undefined : fabricLink ?? undefined);
+        const group = access?.groupName ?? "Analytics Hub users";
         return (
             <div className="flex min-h-screen items-center justify-center bg-background p-400">
                 <div role="alert" className="w-full max-w-md rounded-xl border border-border bg-card p-800 text-center shadow-8">
                     <h1 className="mb-200 text-500 font-semibold leading-500 text-card-foreground">
                         You don't have access
                     </h1>
+                    {accessDeniedReason === "PowerBIAccessDenied" && (
+                        <p className="mb-200 text-300 leading-300 text-muted-foreground">
+                            You're signed in, but Power BI won't let you read the Analytics Hub data.
+                        </p>
+                    )}
                     <p className="text-300 leading-300 text-muted-foreground">
-                        Ask your admin to add you to Analytics Hub users.
+                        {access?.requestUrl || mailto
+                            ? <>Ask to join <strong className="font-semibold text-card-foreground">{group}</strong>. Once you're added, reload this page.</>
+                            : `Ask your admin to add you to ${group}.`}
                     </p>
+                    {(access?.requestUrl || mailto) && (
+                        <div className="mt-600 flex flex-wrap justify-center gap-300">
+                            {access?.requestUrl && (
+                                <a href={access.requestUrl} target="_blank" rel="noreferrer" className={PRIMARY_ACTION}>
+                                    Request access
+                                </a>
+                            )}
+                            {mailto && (
+                                <a href={mailto} className={access?.requestUrl ? SECONDARY_ACTION : PRIMARY_ACTION}>
+                                    Email {access?.contact}
+                                </a>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         );

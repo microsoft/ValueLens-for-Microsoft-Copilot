@@ -21,6 +21,7 @@ import { askMoreHistory, askReportingCurrency, HISTORY_CHOICES, reloadDetail, re
 import { ensureResourceGraphAccess, planResourceGraph, resourceGraphGrants, resourceGraphKinds, resourceGraphOn, scopeName } from '../resource-graph.js';
 import { DATA_SOURCES } from '../../uploads.js';
 import { normaliseResourceGraph } from '../../config.js';
+import { accessReview, accessSummaryLines, ensureViewerGroup, grantModelAccess, planAccess, publicAccess } from '../access.js';
 
 /** @typedef {import('../../install.js').Ctx} Ctx */
 
@@ -33,13 +34,15 @@ export const supportsVnetGateway = (/** @type {{ sku?: string }} */ cap) => /^(F
 export const isPrivate = (/** @type {import('../../config.js').AzureConfig | undefined} */ az) => az?.publicNetworkAccess === false;
 export const AZURE_SUPPORTED_MODULES = /** @type {const} */ (['core', 'orgData', 'm365Activity', 'consumption', 'defender']);
 export const WEB_APP_NAME = 'Analytics Hub (Azure)';
+/** Delegated: lets admins and group owners add and remove viewers from the app. Graph still checks they own the group or are a directory admin. */
+export const GROUP_SCOPE = 'GroupMember.ReadWrite.All';
 export const SQL_READER_NAME = 'Analytics Hub SQL Reader';
 export const TEAMS_CLIENTS = ['1fec8e78-bce4-4aaf-ab1b-5451cc387264', '5e3ce6c0-2b1f-4285-8d4b-75ee78787346'];
 const ARM = JSON.parse(readFileSync(new URL('../../azure/main.arm.json', import.meta.url), 'utf8'));
 export const REQUIRED_ARM_PARAMETERS = [
   'location', 'sqlLocation', 'namePrefix', 'installId', 'tags', 'imageRegistry', 'imageTag', 'imageRegistryResourceId', 'runSchedule', 'runSteps', 'sampleData', 'sqlAdminLogin', 'sqlAdminObjectId',
   'sqlAdminPrincipalType', 'sqlMinCapacity', 'sqlMaxCapacity', 'sqlAutoPauseDelayMinutes', 'sqlUseFreeLimit', 'publicNetworkAccess', 'deployWeb',
-  'webMinReplicas', 'webClientId', 'webAppIdUri', 'modules', 'auditHistoryDays', 'powerBiWorkspaceId', 'semanticModels', 'sqlReaderName', 'sqlReaderClientId',
+  'webMinReplicas', 'webClientId', 'webAppIdUri', 'webAccess', 'modules', 'auditHistoryDays', 'powerBiWorkspaceId', 'semanticModels', 'sqlReaderName', 'sqlReaderClientId',
   'azureAiSubscriptionId', 'paygSubscriptionIds', 'dropSiteId', 'dropDriveId', 'dropFolder', 'argManagementGroup', 'argAgents', 'argFoundry', 'reportingCurrency', 'exchangeRate',
 ];
 
@@ -207,6 +210,7 @@ export async function planAzure(ctx, pre) {
   const wsChoice = await ui.select('Power BI workspace', [{ name: 'Create a new workspace', value: 'new' }, ...groups.map((g) => ({ name: `Use "${g.name}"`, value: g.id }))], az.powerBi?.workspaceId ?? 'new');
   if (wsChoice === 'new') az.workspaceName = await ui.input('New Power BI workspace name', { default: az.workspaceName ?? 'Analytics Hub' });
   else az.powerBi.workspaceId = wsChoice;
+  await planAccess(ctx);
 
   if (azureHistoryLoaded(az)) await askMoreHistory(ctx);
   else {
@@ -553,7 +557,7 @@ export async function azureDeployment(ctx, o) {
     sqlAdminLogin: param(''), sqlAdminObjectId: param(''), sqlAdminPrincipalType: param('Application'),
     sqlMinCapacity: param(String(liveSql.minCapacity ?? '0.5')), sqlMaxCapacity: param(liveSql.capacity ?? 2), sqlAutoPauseDelayMinutes: param(liveSql.autoPauseDelay ?? 60), sqlUseFreeLimit: param(liveSql.useFreeLimit ?? true),
     publicNetworkAccess: param(az.publicNetworkAccess === false ? 'Disabled' : 'Enabled'), deployWeb: param(true), webMinReplicas: param(0),
-    webClientId: param(o.pass === 2 ? (az.webApp?.clientId ?? '') : ''), webAppIdUri: param(o.pass === 2 ? (az.webApp?.appIdUri ?? '') : ''),
+    webClientId: param(o.pass === 2 ? (az.webApp?.clientId ?? '') : ''), webAppIdUri: param(o.pass === 2 ? (az.webApp?.appIdUri ?? '') : ''), webAccess: param(webAccess(config)),
     modules: param([...enabledAzureModuleIds(config.modules, az), ...(azureResourceGraphOn(config) ? ['resourceGraph'] : [])].join(',')), auditHistoryDays: param(Math.max(config.history.days, ctx.reloadHistoryDays ?? 0)), powerBiWorkspaceId: param(az.powerBi?.workspaceId ?? ''),
     semanticModels: param(JSON.stringify(azureSemanticModels(az))),
     sqlReaderName: param(SQL_READER_NAME), sqlReaderClientId: param(o.pass === 2 ? (az.sqlReader?.clientId ?? '') : ''),
@@ -574,6 +578,29 @@ export function azureSemanticModels(az) {
     ...(pbi.datasetId ? { [APP_ALIAS]: { workspaceId: pbi.workspaceId, itemId: pbi.datasetId } } : {}),
     ...(pbi.consumptionDatasetId ? { [CONSUMPTION_ALIAS]: { workspaceId: pbi.workspaceId, itemId: pbi.consumptionDatasetId } } : {}),
   };
+}
+
+/**
+ * The models the viewer group needs Build on: the ones the web app queries.
+ * @param {import('../../config.js').InstallConfig} config
+ * @returns {import('../access.js').ModelRef[]}
+ */
+export function azureViewerModels(config) {
+  const pbi = config.azure?.powerBi ?? {};
+  if (!pbi.workspaceId) return [];
+  return [
+    ...(pbi.datasetId ? [{ workspaceId: pbi.workspaceId, datasetId: pbi.datasetId, name: config.semanticModel.name }] : []),
+    ...(pbi.consumptionDatasetId ? [{ workspaceId: pbi.workspaceId, datasetId: pbi.consumptionDatasetId, name: config.consumption.model.name }] : []),
+  ];
+}
+
+/**
+ * Who the web app lets in besides its app roles, and who people ask for access. Empty without a group.
+ * @param {import('../../config.js').InstallConfig} config
+ */
+export function webAccess(config) {
+  const access = publicAccess(config);
+  return access ? JSON.stringify(access) : '';
 }
 
 /**
@@ -642,6 +669,8 @@ export function azurePlanReview(ctx) {
   ]);
   if (!creates.length) creates.push({ kind: 'Azure resources', name: `${az.namePrefix} in ${az.resourceGroup}`, isNew: !az.outputs?.webName, detail: 'ARM what-if returned no changes.' });
   creates.push({ kind: 'Teams package', name: 'AnalyticsHub-Teams.zip', isNew: !az.teamsPackage, detail: 'Written next to the install record.' });
+  const access = accessReview(ctx.config, `Power BI workspace ${az.powerBi?.workspaceId ?? az.workspaceName ?? 'Analytics Hub'}`);
+  creates.push(...access.creates);
   if (isPrivate(az)) {
     creates.push({ kind: 'Power BI VNet data gateway', name: gatewayName(az), isNew: !az.powerBi?.gatewayId, detail: `On capacity ${az.powerBi?.capacityId ?? 'not chosen'}, in the VNet's Power BI subnet.` });
     creates.push({ kind: 'Power BI connection', name: connectionName(az), isNew: !az.powerBi?.connectionId, detail: 'Azure SQL through the VNet data gateway, signed in as the SQL reader app.' });
@@ -663,8 +692,9 @@ export function azurePlanReview(ctx) {
     creates,
     grants: [
       { who: 'Collector managed identity', what: `Microsoft Graph application permissions: ${azureGraphRoles(ctx.config).join(', ')}`, where: 'Microsoft Graph', detail: 'Installer assigns app roles or records admin action if blocked.' },
-      { who: WEB_APP_NAME, what: 'Delegated Power BI Dataset.Read.All and Graph User.Read; app roles AnalyticsHub.User and AnalyticsHub.Admin', where: 'Entra ID' },
+      { who: WEB_APP_NAME, what: `Delegated Power BI Dataset.Read.All and Graph User.Read${ctx.config.access ? ', GroupMember.ReadWrite.All' : ''}; app roles AnalyticsHub.User and AnalyticsHub.Admin`, where: 'Entra ID', ...(ctx.config.access ? { detail: 'GroupMember.ReadWrite.All lets admins and group owners manage viewers from Share in the app, as themselves.' } : {}) },
       { who: 'Managed identity', what: 'Member', where: az.powerBi?.workspaceId ? `Power BI workspace ${az.powerBi.workspaceId}` : `Power BI workspace ${az.workspaceName ?? 'Analytics Hub'}` },
+      ...access.grants,
       ...consumptionGrants,
       ...argGrants,
     ],
@@ -712,9 +742,10 @@ export async function installAzure(ctx, opts) {
   const consumption = azureConsumptionOn(config);
   const resourceGraph = azureResourceGraphOn(config);
   const flows = flowsWanted(config).length > 0;
+  const withAccess = !!config.access;
   const titles = [
     'Resource group', 'Azure resources', 'Entra applications', 'Microsoft Graph permissions', ...(consumption ? ['Credit consumption'] : []), ...(resourceGraph ? ['Resource Graph access'] : []),
-    'Power BI model', 'Azure resources (final)', 'Database migration',
+    'Power BI model', ...(withAccess ? ['Viewer access'] : []), 'Azure resources (final)', 'Database migration',
     ...(flows ? ['Power Automate flow'] : []), 'Teams package', ...(ctx.reloadHistoryDays ? ['Reload audit history'] : ctx.runFirstLoad ? ['First load'] : []),
   ];
   let n = 0;
@@ -758,6 +789,11 @@ export async function installAzure(ctx, opts) {
   await ensureAzurePowerBi(ctx, sqlSecret.value);
   await retireSecret(ctx, sqlSecret.previousKeyId);
   ctx.save();
+
+  if (withAccess) {
+    step('Viewer access');
+    if (await ensureViewerGroup(ctx)) await grantModelAccess(ctx, azureViewerModels(config));
+  }
 
   step('Azure resources (final)');
   recordDeployment(az, await deployOrExplain(ctx, { pass: 2 }));
@@ -830,14 +866,18 @@ async function ensureAzureWebApp(ctx) {
   const graphUserReadScopeId = graphSp.oauth2PermissionScopes?.find((s) => s.value === 'User.Read')?.id;
   const pbiScopeId = pbiSp.oauth2PermissionScopes?.find((s) => s.value === 'Dataset.Read.All')?.id;
   if (!graphUserReadScopeId || !pbiScopeId) throw new Error('Could not find Graph User.Read or Power BI Dataset.Read.All delegated scopes in this tenant.');
+  // With a viewer group, admins and group owners manage it from Share in the app, as themselves.
+  const groups = !!config.access;
+  const graphGroupScopeId = groups ? graphSp.oauth2PermissionScopes?.find((s) => s.value === GROUP_SCOPE)?.id : undefined;
+  const registration = { pbiScopeId, graphUserReadScopeId, graphGroupScopeId, groupClaims: groups, teamsClientIds: TEAMS_CLIENTS };
   az.webApp ??= {};
   let app = az.webApp.clientId ? await api.graph.findApplication(az.webApp.clientId).catch(() => null) : null;
   if (!app) {
-    app = await api.graph.createAzureWebApplication({ displayName: WEB_APP_NAME, fqdn, pbiScopeId, graphUserReadScopeId, teamsClientIds: TEAMS_CLIENTS });
+    app = await api.graph.createAzureWebApplication({ displayName: WEB_APP_NAME, fqdn, ...registration });
     Object.assign(az.webApp, { created: true, clientId: app.appId, objectId: app.id });
     ui.ok(`Created app registration ${WEB_APP_NAME}`);
   }
-  await api.graph.updateAzureWebApplication(app, { fqdn, clientId: /** @type {string} */ (az.webApp.clientId), pbiScopeId, graphUserReadScopeId, teamsClientIds: TEAMS_CLIENTS });
+  await api.graph.updateAzureWebApplication(app, { fqdn, clientId: /** @type {string} */ (az.webApp.clientId), ...registration });
   az.webApp.appIdUri = `api://${fqdn}/${az.webApp.clientId}`;
   let sp = az.webApp.servicePrincipalId ? await api.graph.findServicePrincipal(/** @type {string} */ (az.webApp.clientId)).catch(() => null) : null;
   if (!sp) sp = await api.graph.createServicePrincipal(/** @type {string} */ (az.webApp.clientId));
@@ -850,6 +890,7 @@ async function ensureAzureWebApp(ctx) {
   try {
     await api.graph.grantOauth2Permission({ clientId: sp.id, resourceId: pbiSp.id, scope: 'Dataset.Read.All' });
     await api.graph.grantOauth2Permission({ clientId: sp.id, resourceId: graphSp.id, scope: 'User.Read' });
+    if (graphGroupScopeId) await api.graph.grantOauth2Permission({ clientId: sp.id, resourceId: graphSp.id, scope: GROUP_SCOPE });
     if (az.status?.pendingAdminActions) az.status.pendingAdminActions = az.status.pendingAdminActions.filter((a) => !a.startsWith('Grant delegated consent'));
   } catch (err) {
     ui.warn(`Couldn't grant delegated admin consent (${err instanceof Error ? err.message.split('\n')[0] : err}). Send this to an admin: ${adminConsentUrl(user.tenantId, /** @type {string} */ (az.webApp.clientId))}`);
@@ -1233,7 +1274,7 @@ async function writeAzureTeamsPackage(ctx) {
     ctx.save();
     ctx.ui.ok(`Wrote Teams package ${outFile}`);
   }
-  ctx.ui.info('Teams: upload the ZIP as a custom app, or send it to a Teams admin for approval in the Teams admin center.');
+  ctx.ui.info('Teams: send the ZIP to a Teams admin to publish to your org\'s app catalog, then pin it for the viewer group with an app setup policy. You can also upload it as a custom app to try it.');
 }
 
 /**
@@ -1337,6 +1378,7 @@ export async function azureSummary(ctx) {
   if (az.powerBi?.workspaceId) ui.info(`Power BI:   workspace ${az.powerBi.workspaceId}, model ${az.powerBi.datasetId ?? 'not deployed'}`);
   if (az.powerBi?.consumptionDatasetId) ui.info(`Credits:    model ${az.powerBi.consumptionDatasetId}`);
   if (az.teamsPackage) ui.info(`Teams:      ${az.teamsPackage}`);
+  for (const line of accessSummaryLines(config)) ui.info(line);
   if (flowsWanted(config).length) flowsSummary(ctx);
   ui.info('Record:     Keep valuelens-install.json. It holds no secrets.');
 }

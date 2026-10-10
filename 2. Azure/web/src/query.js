@@ -68,6 +68,9 @@ export class QueryService {
     const text = await upstream.text();
     if (!upstream.ok) console.warn(`executeQueries ${itemId} returned ${upstream.status}: ${text.slice(0, 300)}`);
     else logDaxError(text, query);
+    if (upstream.status === 401 || upstream.status === 403) {
+      return jsonError(403, 'PowerBIAccessDenied', 'Power BI did not let you read this semantic model. Ask an Analytics Hub admin to add you to the viewer group, which has Build on it.');
+    }
     const contentType = upstream.headers?.get?.('content-type') || 'application/json';
     const retryAfter = upstream.headers?.get?.('retry-after');
     if (!contentType.toLowerCase().includes('json')) {

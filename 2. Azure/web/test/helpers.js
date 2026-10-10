@@ -25,5 +25,8 @@ export async function fakeVerifyToken(token) {
   if (token === 'bad') throw new Error('bad token');
   if (token === 'norole') return { scp: 'access_as_user', oid: 'user-1', preferred_username: 'user@example.com', roles: [] };
   if (token === 'admin') return { scp: 'access_as_user', oid: 'admin-1', preferred_username: 'admin@example.com', roles: ['AnalyticsHub.Admin'] };
+  if (token === 'group') return { scp: 'access_as_user', oid: 'viewer-1', preferred_username: 'viewer@example.com', groups: ['group-1'] };
+  if (token === 'owner') return { scp: 'access_as_user', oid: 'owner-1', preferred_username: 'owner@example.com', groups: ['group-1'] };
+  if (token === 'overage') return { scp: 'access_as_user', oid: 'busy-1', preferred_username: 'busy@example.com', _claim_names: { groups: 'src1' } };
   return { scp: 'access_as_user', oid: 'user-1', preferred_username: 'user@example.com', roles: ['AnalyticsHub.User'] };
 }

@@ -23,6 +23,22 @@ The design and the roadmap are in [`docs/plans/AZURE-HOSTED-PLAN.md`](../docs/pl
      replaces the sample.
 3. Review the plan and approve it. The installer prints the web app's URL and writes `AnalyticsHub-Teams.zip`.
 
+## Share it
+
+Who can open the web app and the Teams tab is one Entra group, **Analytics Hub Viewers**, which the
+installer creates with you as owner (or a group you name). It also gives the group **Build** on the
+models. To share, add people to the group:
+
+- **In the app:** choose **Share**. Group owners and `AnalyticsHub.Admin` can add people or groups
+  and remove them; everyone else sees who to ask. **Copy app link** copies the URL.
+- **In the installer:** **Manage access** (`access`).
+- **In [My Groups](https://myaccount.microsoft.com/groups)**, as an owner.
+
+The `AnalyticsHub.User` app role still works too. People without access get a page that names the
+group and links to your contact or request link. For Teams, publish the package to your org's app
+catalog: see [teams](teams/README.md#give-it-to-everyone). Permissions are in
+[Viewing Analytics Hub](../docs/PERMISSIONS.md#viewing-analytics-hub-paths-1-and-2).
+
 What you need, networking, regions and the commands are in the installer's
 [Azure target section](../1.%20Fabric/installer/README.md#azure-target-preview). The images come from
 `ghcr.io/microsoft/valuelens-jobs` and `valuelens-web`, tagged with the installer's version.
@@ -99,5 +115,6 @@ ARM can't do these, so the installer:
   `User.Read.All` and module extras).
 - Run the migrate job, which creates the database users.
 - Create the web app registration with a federated credential, and the Power BI workspace, models and refresh.
+- Create or find the viewer group, give it Build on the models, and pass it to the web app as `VALUELENS_ACCESS`.
 - With credit consumption: the managed identity's Cost Management and Azure AI roles, write access to
   where the credit files land, the Consumption Central model, and the Copilot Studio Power Automate flow.
