@@ -74,6 +74,28 @@ Now, on both the Fabric and the Azure path, who can view is one Entra security g
 Unaffected: the Power BI template variants (CSV, SharePoint, Power Automate + Dataverse), which share
 through Power BI. Scoped views, named queries and delegated access come in later phases of #172.
 
+### Fixed: scheduled refresh blocked by "Data source for Query1" on the SharePoint template
+
+**What changed.** After publishing `ValueLens - SharePoint.pbit`, the Power BI service refused to
+schedule refresh: *"the following data sources currently don't support refresh: Data source for
+Query1"*. The service only schedules a `Web.Contents` source whose URL is a parameter with a value.
+`ProductFeedback` built its URL with `Text.Trim(#"Feedback File")`, and a blank optional file
+parameter is never a valid source URL either.
+
+- **SharePoint.** A new required **SharePoint Site URL** parameter. `Agent 365` and `Feedback File`
+  are read through it with the SharePoint REST API (`ValueLensSharePointFile`), so they can stay
+  blank or be set. They must be in that site. Republish and set credentials for each listed source.
+- **Power Automate + Dataverse.** The same optional **SharePoint Site URL** parameter reads the
+  optional files and the CSV fallback. Dataverse reads use `Dataverse URL` directly as the base URL.
+  For scheduled refresh, set both URLs (the same value if you use only one source).
+- **Local CSV.** `ProductFeedback` takes the parameter directly, the same as the other templates.
+- `scripts/Update-Template-Refresh-Sources.py` applies the change (`--check` reports stale templates),
+  and `tests/test_template_refresh_sources.py` fails on any computed or optional base URL.
+
+Tested in the Power BI service with sample CSVs in a test SharePoint site: no refresh banner, the
+schedule turns on, and on-demand refresh succeeds with the optional files blank and set, and in
+Power Automate CSV fallback.
+
 ---
 
 ## 2026-10-09 — Analytics Hub installer 0.4.0
