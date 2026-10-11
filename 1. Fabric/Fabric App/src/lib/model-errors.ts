@@ -45,3 +45,10 @@ export function parseMissingModelObject(message: string): MissingModelObject | u
 export function isMissingFromModelError(message: string): boolean {
     return MISSING_FROM_MODEL.test(message);
 }
+
+/** What the engine says when the model's tables, columns or relationships have never been refreshed. */
+export const NOT_REFRESHED = /needs to be (?:recalculated|refreshed|processed)|does not hold any data|has not been (?:refreshed|processed)/i;
+
+export function isModelNotRefreshedError(message: string): boolean {
+    return NOT_REFRESHED.test(message);
+}

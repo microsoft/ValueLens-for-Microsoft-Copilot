@@ -47,21 +47,54 @@ export function createCredential(opts) {
   }
 }
 
+/** Errors that mean the network blipped, not that the sign-in or request is wrong. */
+const NETWORK_ERROR = /getaddrinfo|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ECONNABORTED|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH|EPIPE|socket hang up|NameResolutionError|Failed to resolve '|ConnectionError|Connection aborted|Max retries exceeded|Read timed out|network is unreachable|fetch failed/i;
+
 /**
- * Caches a token per resource until five minutes before it expires.
- * @param {import('@azure/identity').TokenCredential} credential
+ * Whether an error is a transient network or DNS failure worth trying again.
+ * @param {unknown} err
  */
-export function createTokenProvider(credential) {
+export function isTransientNetworkError(err) {
+  /** @type {any} */
+  let e = err;
+  for (let depth = 0; e && depth < 4; depth++, e = e.cause) {
+    if (NETWORK_ERROR.test(`${e.code ?? ''} ${e.message ?? (typeof e === 'string' ? e : '')}`)) return true;
+  }
+  return false;
+}
+
+/** How many times a token is tried when the network blips, and the first wait; each wait doubles. */
+export const TOKEN_ATTEMPTS = 6;
+export const TOKEN_RETRY_MS = 2_000;
+
+/**
+ * Caches a token per resource until five minutes before it expires. Tries again, with backoff,
+ * when the network or DNS blips.
+ * @param {import('@azure/identity').TokenCredential} credential
+ * @param {{ sleep?: (ms: number) => Promise<void>, debug?: (msg: string) => void }} [opts]
+ */
+export function createTokenProvider(credential, opts = {}) {
+  const sleep = opts.sleep ?? ((/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)));
   /** @type {Map<Resource, { token: string, expiresOn: number }>} */
   const cache = new Map();
   /** @param {Resource} resource */
   return async function getToken(resource) {
     const hit = cache.get(resource);
     if (hit && hit.expiresOn - Date.now() > 5 * 60_000) return hit.token;
-    const t = await credential.getToken(resource in SCOPES ? SCOPES[/** @type {keyof typeof SCOPES} */ (resource)] : resource);
-    if (!t) throw new Error(`Could not get a token for ${resource}.`);
-    cache.set(resource, { token: t.token, expiresOn: t.expiresOnTimestamp });
-    return t.token;
+    const scope = resource in SCOPES ? SCOPES[/** @type {keyof typeof SCOPES} */ (resource)] : resource;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const t = await credential.getToken(scope);
+        if (!t) throw new Error(`Could not get a token for ${resource}.`);
+        cache.set(resource, { token: t.token, expiresOn: t.expiresOnTimestamp });
+        return t.token;
+      } catch (err) {
+        if (attempt >= TOKEN_ATTEMPTS || !isTransientNetworkError(err)) throw err;
+        const wait = Math.min(TOKEN_RETRY_MS * 2 ** (attempt - 1), 30_000);
+        opts.debug?.(`Network error getting a token for ${resource}; trying again in ${Math.round(wait / 1000)}s`);
+        await sleep(wait);
+      }
+    }
   };
 }
 

@@ -3,6 +3,7 @@
  * Runs the pipeline and the data check, and reports on them. The data check isn't in the pipeline:
  * it runs after the first load, after `run`, and on `check`.
  */
+import { isTransientNetworkError } from '../auth.js';
 import { commandLine } from '../launch.js';
 import { failedCards, fillRerun, loadCards, RERUN } from '../loads.js';
 import { DATA_CHECK_FILE } from '../transform/notebook.js';
@@ -19,6 +20,9 @@ import { modelRefreshes } from './model.js';
 export const TERMINAL = new Set(['Completed', 'Failed', 'Cancelled', 'Deduped', 'Duplicate', 'NotFound', 'OwnerUserMissing', 'DeadLettered']);
 
 export const POLL_MS = 30_000;
+
+/** Polls in a row that may fail on a network blip before watching a job gives up: 20 minutes at POLL_MS. */
+export const NETWORK_LOSSES = 40;
 
 /** Fabric sends job times without a zone; they are UTC. @param {string | null | undefined} t */
 export function utc(t) {
@@ -41,9 +45,22 @@ export async function waitForJob(ctx, url, label, opts = {}) {
   const deadline = Date.now() + (opts.timeoutMs ?? 6 * 3_600_000);
   /** @type {any} */
   let job;
+  let lost = 0;
   try {
     for (;;) {
-      job = await ctx.api.fabric.getJob(url);
+      try {
+        job = await ctx.api.fabric.getJob(url);
+        lost = 0;
+      } catch (err) {
+        // A network blip on this PC doesn't stop the job in Fabric, so keep watching.
+        if (!isTransientNetworkError(err)) throw err;
+        if (++lost > NETWORK_LOSSES) {
+          throw new Error(`Lost the connection while watching the ${label.toLowerCase()}. It carries on in Fabric: check on it with "${commandLine('status')}". (${/** @type {Error} */ (err).message})`, { cause: err });
+        }
+        progress.update('Connection lost, trying again');
+        await ctx.sleep(opts.pollMs ?? POLL_MS);
+        continue;
+      }
       progress.update(job?.status ?? 'Unknown');
       if (TERMINAL.has(job?.status)) break;
       if (Date.now() > deadline) break;
