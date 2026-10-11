@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { cn } from "@/lib/utils";
-import { isMissingFromModelError, parseMissingModelObject } from "@/lib/model-errors";
+import { isMissingFromModelError, isModelNotRefreshedError, parseMissingModelObject } from "@/lib/model-errors";
 
 interface QueryStateProps {
     className?: string;
@@ -116,8 +116,48 @@ export function ModelUpdateRequired({ missing, detail, onRetry, className }: Mod
     );
 }
 
+/** Shown when the semantic model has never been refreshed, so it holds no data yet. */
+export function ModelNotLoaded({ detail, onRetry, className }: { detail?: string; onRetry?: () => void; className?: string }) {
+    return (
+        <div
+            role="alert"
+            className={cn(
+                "flex min-h-[160px] flex-col justify-center gap-300 rounded-xl border border-caution/50 bg-card p-500",
+                className,
+            )}
+        >
+            <span className="text-[length:var(--text-400)] leading-400 font-semibold text-foreground">
+                Data not loaded yet
+            </span>
+            <p className="max-w-[68ch] text-[length:var(--text-300)] leading-300 text-muted-foreground">
+                The semantic model hasn't been refreshed with your data yet. If the first load is still running, wait for it
+                to finish and try again. Otherwise run <code className="font-mono">AnalyticsHubInstaller.exe</code> and choose
+                Repair or change, or refresh the model in Fabric, then reopen the app.
+            </p>
+            {detail && (
+                <details className="text-[length:var(--text-200)] leading-300 text-muted-foreground">
+                    <summary className="cursor-pointer">Details</summary>
+                    <p className="max-w-[68ch] font-monospace">{detail}</p>
+                </details>
+            )}
+            {onRetry && (
+                <button
+                    type="button"
+                    onClick={onRetry}
+                    className="self-start rounded-md border border-border px-300 py-200-nudge text-[length:var(--text-300)] font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                    Try again
+                </button>
+            )}
+        </div>
+    );
+}
+
 /** Shown when the semantic model rejects the query or is unreachable. */
 export function QueryError({ message, onRetry, className }: QueryErrorProps) {
+    if (isModelNotRefreshedError(message)) {
+        return <ModelNotLoaded className={className} detail={message} onRetry={onRetry} />;
+    }
     if (isMissingFromModelError(message)) {
         return <ModelUpdateRequired className={className} missing={missingFromMessage(message)} detail={message} onRetry={onRetry} />;
     }

@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
+import { createTokenProvider, isTransientNetworkError, TOKEN_ATTEMPTS } from '../src/auth.js';
 import { collectedLabels, ESSENTIAL_MODULES, normaliseModules, OPTIONAL_MODULES, permissionsFor } from '../src/catalog.js';
 import { help, parseCli } from '../src/cli.js';
 import { allowsAction, armLocation, parseResourceId, validateVaultName } from '../src/clients/azure.js';
@@ -18,6 +19,41 @@ import { formatDuration } from '../src/ui.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'vl-installer-'));
 after(() => rmSync(dir, { recursive: true, force: true }));
+
+test('tokens are tried again when the network or DNS blips, and not otherwise', async () => {
+  const dns = new Error("HTTPSConnectionPool(host='login.microsoftonline.com', port=443): Max retries exceeded (Caused by NameResolutionError(\"Failed to resolve 'login.microsoftonline.com' ([Errno 11001] getaddrinfo failed)\"))");
+  assert.equal(isTransientNetworkError(dns), true);
+  assert.equal(isTransientNetworkError(new Error('outer', { cause: Object.assign(new Error('x'), { code: 'ENOTFOUND' }) })), true);
+  assert.equal(isTransientNetworkError(new Error('AADSTS50076: multi-factor authentication required')), false);
+
+  /** @type {number[]} */
+  const sleeps = [];
+  const sleep = async (/** @type {number} */ ms) => void sleeps.push(ms);
+  let fails = 2;
+  let calls = 0;
+  const flaky = {
+    getToken: async () => {
+      calls++;
+      if (fails-- > 0) throw dns;
+      return { token: 't', expiresOnTimestamp: Date.now() + 3_600_000 };
+    },
+  };
+  const getToken = createTokenProvider(flaky, { sleep });
+  assert.equal(await getToken('fabric'), 't');
+  assert.equal(await getToken('fabric'), 't', 'cached');
+  assert.equal(calls, 3);
+  assert.deepEqual(sleeps, [2000, 4000]);
+
+  const down = createTokenProvider({ getToken: async () => { throw dns; } }, { sleep });
+  sleeps.length = 0;
+  await assert.rejects(down('graph'), /getaddrinfo failed/);
+  assert.equal(sleeps.length, TOKEN_ATTEMPTS - 1);
+
+  let mfaCalls = 0;
+  const mfa = createTokenProvider({ getToken: async () => { mfaCalls++; throw new Error('AADSTS50076'); } }, { sleep });
+  await assert.rejects(mfa('graph'), /AADSTS50076/);
+  assert.equal(mfaCalls, 1);
+});
 
 test('allowsAction handles wildcards, notActions and data actions', () => {
   const owner = [{ actions: ['*'], notActions: [] }];

@@ -64,6 +64,23 @@ flag still works.
 - The Cowork credits Dataflow's sign-in steps show as numbered steps rather than broken lines, in
   the terminal too.
 
+### Fixed: a network blip no longer fails the install, and an unrefreshed model says so
+
+- A brief network or DNS failure on the PC running the installer (for example *"Failed to resolve
+  'login.microsoftonline.com'"*) made the sign-in token call fail and stopped the install while it
+  watched the first load, even though the load carried on in Fabric. Token calls now retry with
+  backoff, and watching a pipeline run keeps going through up to 20 minutes of lost connection.
+- When the semantic model hasn't been refreshed yet, the app's pages showed raw engine errors such
+  as *"needs to be recalculated or refreshed"*. They now say **Data not loaded yet**, and explain
+  to wait for the first load or choose **Repair or change** in the installer.
+
+### Fixed: Defender agents reported as "Not licensed" when a column was missing
+
+- Defender's **AgentsInfo** table is in preview and its columns vary between tenants. The agents
+  probe failed when a column such as `AgentName` was missing, and reported it as **Not licensed**.
+  It now reads every optional column only when it's there, and reports a missing column as a failed
+  query rather than a missing licence.
+
 ---
 
 ## 2026-10-11 — Analytics Hub installer 0.4.1

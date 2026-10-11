@@ -8,7 +8,7 @@ import { ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, freeN
 import { ensureConsent } from '../src/steps/identity.js';
 import { connectionName } from '../src/steps/model.js';
 import { APP_NAME, lakehouseNameFrom, largeCapacity, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
-import { BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, chooseLoad, firstLoadEstimate, historyLoaded, printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
+import { BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, chooseLoad, firstLoadEstimate, historyLoaded, NETWORK_LOSSES, printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
 import { DATA_CHECK_FILE } from '../src/transform/notebook.js';
 import { PIPELINE_CHANGE, PIPELINE_VERSION, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
 import { fakeCtx, fakeFabric, fakeGraph as fakeGraphApi, fakePowerBi, fakeUi } from './fakes.js';
@@ -401,6 +401,33 @@ test('waitForJob polls until the job ends', async () => {
   const job = await waitForJob(ctx, 'https://x/jobs/instances/j', 'Pipeline', { pollMs: 5 });
   assert.equal(job.status, 'Completed');
   assert.deepEqual(sleeps, [5, 5]);
+});
+
+test('waitForJob keeps watching through a network blip, and gives up on other errors', async () => {
+  const fabric = fakeFabric();
+  fabric.jobs.push({ status: 'InProgress' }, { status: 'Completed' });
+  const getJob = fabric.api.getJob;
+  let blips = 2;
+  fabric.api.getJob = async () => {
+    if (blips-- > 0) throw new Error("HTTPSConnectionPool: Failed to resolve 'login.microsoftonline.com' ([Errno 11001] getaddrinfo failed)");
+    return getJob();
+  };
+  const { ctx, sleeps } = fakeCtx({ fabric: fabric.api });
+  const job = await waitForJob(ctx, 'https://x/jobs/instances/j', 'Pipeline', { pollMs: 5 });
+  assert.equal(job.status, 'Completed');
+  assert.deepEqual(sleeps, [5, 5, 5]);
+
+  fabric.api.getJob = async () => {
+    throw new Error('GET /jobs returned 404');
+  };
+  await assert.rejects(waitForJob(ctx, 'https://x/jobs/instances/j', 'Pipeline', { pollMs: 5 }), /returned 404/);
+
+  fabric.api.getJob = async () => {
+    throw new Error('fetch failed');
+  };
+  sleeps.length = 0;
+  await assert.rejects(waitForJob(ctx, 'https://x/jobs/instances/j', 'Pipeline', { pollMs: 5 }), /Lost the connection while watching the pipeline\. It carries on in Fabric/);
+  assert.equal(sleeps.length, NETWORK_LOSSES);
 });
 
 test('first run starts with a backfill, records the job and reports the result', async () => {

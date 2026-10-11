@@ -18,4 +18,15 @@ describe("QueryError", () => {
         expect(screen.getByText(/Agents 365\[Owner account\]/)).toBeTruthy();
         expect(screen.getByText(message)).toBeTruthy();
     });
+
+    it("says the data isn't loaded yet when the model was never refreshed", () => {
+        const message =
+            "Column 'Chat + Agent Interactions (Audit Logs)'[Is Usage Row] does not hold any data because it needs to be recalculated or refreshed.";
+        render(<QueryError message={message} />);
+
+        expect(screen.getByText("Data not loaded yet")).toBeTruthy();
+        expect(screen.getByText(/choose\s+Repair or change/)).toBeTruthy();
+        expect(screen.queryByText("This didn't load")).toBeNull();
+        expect(screen.queryByText("Update your install")).toBeNull();
+    });
 });

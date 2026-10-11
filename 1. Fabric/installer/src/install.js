@@ -99,7 +99,7 @@ import { accessCommand, ensureViewerGroup, grantModelAccess, myGroupsUrl } from 
  */
 export async function connect(opts) {
   const credential = createCredential({ tenantId: opts.tenantId, method: opts.method, print: (m) => opts.ui.line(m) });
-  const getToken = createTokenProvider(credential);
+  const getToken = createTokenProvider(credential, { debug: opts.debug });
   /**
    * @param {string} baseUrl
    * @param {import('./auth.js').Resource} resource

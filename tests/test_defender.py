@@ -171,6 +171,15 @@ class Answers(unittest.TestCase):
         self.assertEqual(d.classify(403, {"error": {"message": "Tenant is not onboarded"}})[0], "unlicensed")
         self.assertEqual(d.classify(500, "boom"), ("error", "boom"))
         self.assertEqual(d.classify(400, {})[1], "HTTP 400")
+        missing_column = {"error": {"message": "'project' operator: Failed to resolve scalar expression named 'X'."}}
+        self.assertEqual(d.classify(400, missing_column)[0], "error")
+
+    def test_agents_query_tolerates_missing_columns(self):
+        for column in ("AgentName", "Platform", "EntraAgentId", "PublishedStatus", "RawAgentInfo"):
+            self.assertIn(f'column_ifexists("{column}"', d.AGENTS_KQL)
+        rows = d.agent_rows([{"AgentId": "1", "AgentName": "", "RawAgentInfo": '{"displayName": "From raw"}'}],
+                            "AgentsInfo", TODAY, NOW)
+        self.assertEqual(rows[0][2], "From raw")
 
     def test_sign_in(self):
         self.assertEqual(d.sign_in_required("None"), "No")

@@ -305,11 +305,22 @@ def installed_kql(watchlist) -> str | None:
     ])
 
 
+# AgentsInfo is in preview and its columns differ between tenants, so every column but the key is optional.
 AGENTS_KQL = '\n'.join([
     'AgentsInfo',
     '| summarize arg_max(Timestamp, *) by AgentId',
-    '| project AgentId, AgentName, Platform, EntraAgentId, SourceAgentId, PublishedStatus, LifecycleStatus,',
-    '    Availability, ToolsAuthenticationType, DeclaredDataSources, RawAgentInfo',
+    '| project AgentId,',
+    '    AgentName = coalesce(tostring(column_ifexists("AgentName", "")), tostring(column_ifexists("Name", "")),',
+    '        tostring(column_ifexists("DisplayName", ""))),',
+    '    Platform = tostring(column_ifexists("Platform", "")),',
+    '    EntraAgentId = tostring(column_ifexists("EntraAgentId", "")),',
+    '    SourceAgentId = tostring(column_ifexists("SourceAgentId", "")),',
+    '    PublishedStatus = tostring(column_ifexists("PublishedStatus", "")),',
+    '    LifecycleStatus = tostring(column_ifexists("LifecycleStatus", "")),',
+    '    Availability = tostring(column_ifexists("Availability", "")),',
+    '    ToolsAuthenticationType = column_ifexists("ToolsAuthenticationType", dynamic(null)),',
+    '    DeclaredDataSources = column_ifexists("DeclaredDataSources", dynamic(null)),',
+    '    RawAgentInfo = column_ifexists("RawAgentInfo", dynamic(null))',
 ])
 LEGACY_AGENTS_KQL = '\n'.join([
     'AIAgentsInfo',
@@ -347,7 +358,10 @@ def classify(status_code: int, body) -> tuple[str, str]:
             return 'unlicensed', message or f'HTTP {status_code}'
         return 'forbidden', message or f'HTTP {status_code}'
     if status_code in (400, 404):
-        if any(k in low for k in ('failed to resolve', 'could not be resolved', 'unknown table', 'not found',
+        # A missing column means the table is there but its schema changed, which is a query error.
+        if 'failed to resolve scalar expression' in low:
+            return 'error', message
+        if any(k in low for k in ('failed to resolve',  'could not be resolved', 'unknown table', 'not found',
                                   'licens', 'not onboarded', 'not provisioned', 'not enabled')):
             return 'unlicensed', message or f'HTTP {status_code}'
     return 'error', message or f'HTTP {status_code}'
@@ -520,7 +534,8 @@ def agent_rows(results, source_table: str, snapshot: date, loaded_at: datetime) 
             auth = find_key(r.get('RawAgentInfo'), _AUTH_KEYS)
         app_id = r.get('AppId') or find_key(r.get('RawAgentInfo'), ('appid', 'agentappid', 'botappid')) or ''
         knowledge = (r.get('KnowledgeDetails'), r.get('DeclaredDataSources'))
-        out.append((snapshot, agent_id, str(r.get('AgentName') or ''), str(r.get('Platform') or ''), source_table,
+        name = r.get('AgentName') or find_key(r.get('RawAgentInfo'), ('agentname', 'displayname', 'name')) or ''
+        out.append((snapshot, agent_id, str(name), str(r.get('Platform') or ''), source_table,
                     str(r.get('EntraAgentId') or '').lower(), str(r.get('SourceAgentId') or '').lower(),
                     str(app_id).lower(), str(auth or ''), sign_in_required(auth), uses_web_knowledge(*knowledge),
                     str(r.get('PublishedStatus') or ''), str(r.get('LifecycleStatus') or ''),
