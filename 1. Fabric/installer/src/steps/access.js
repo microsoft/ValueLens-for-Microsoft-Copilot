@@ -116,6 +116,28 @@ export async function ensureViewerGroup(ctx) {
   }
 }
 
+/** A new group takes a minute or two to reach Power BI, which until then rejects it as an invalid identifier. */
+export const NEW_GROUP_ATTEMPTS = 8;
+export const NEW_GROUP_RETRY_MS = 15_000;
+
+/**
+ * Adds the group to a model, waiting while Power BI doesn't know the group yet.
+ * @param {Ctx} ctx
+ * @param {ModelRef} m
+ * @param {string} groupId
+ */
+async function addGroupToModel(ctx, m, groupId) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await ctx.api.powerBi.addDatasetUser(m.workspaceId, m.datasetId, { identifier: groupId, principalType: 'Group', datasetUserAccessRight: 'ReadExplore' });
+    } catch (err) {
+      if (!(err instanceof HttpError) || err.status !== 400 || attempt === NEW_GROUP_ATTEMPTS) throw err;
+      if (attempt === 1) ctx.ui.info('Waiting for Power BI to see the group. A new group takes a minute or two.');
+      await ctx.sleep(NEW_GROUP_RETRY_MS);
+    }
+  }
+}
+
 /**
  * Gives the viewer group Build (ReadExplore) on each model, so its members can query them.
  * A grant that fails is reported and doesn't stop the install.
@@ -131,7 +153,7 @@ export async function grantModelAccess(ctx, models) {
     try {
       const users = await api.powerBi.datasetUsers(m.workspaceId, m.datasetId).catch(() => []);
       const has = users.some((u) => String(u.identifier).toLowerCase() === a.groupId?.toLowerCase() && /Explore/i.test(u.datasetUserAccessRight ?? ''));
-      if (!has) await api.powerBi.addDatasetUser(m.workspaceId, m.datasetId, { identifier: a.groupId, principalType: 'Group', datasetUserAccessRight: 'ReadExplore' });
+      if (!has) await addGroupToModel(ctx, m, a.groupId);
       granted.add(m.datasetId);
       ui.ok(`${a.groupName} can build on ${m.name}`);
     } catch (err) {
