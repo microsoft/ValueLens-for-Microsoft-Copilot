@@ -4,7 +4,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { loadConfig } from '../src/config.js';
+import { applyDataFlags, parseCli } from '../src/cli.js';
+import { emptyConfig, loadConfig } from '../src/config.js';
 import { CURRENCIES, currencySymbol, describeReporting, normaliseReporting, parseRate, toCurrencyCode } from '../src/currency.js';
 import { fabricConfigFile } from '../src/steps/app.js';
 import { azureDeployment } from '../src/steps/azure/index.js';
@@ -77,6 +78,38 @@ test('currency: a re-run offers the saved currency and rate', async () => {
   config.reporting = { currency: 'GBP', exchangeRate: 0.79 };
   await askReportingCurrency(ctx);
   assert.deepEqual(config.reporting, { currency: 'GBP', exchangeRate: 0.79 });
+});
+
+test('currency: --currency and --exchange-rate set it without a question', () => {
+  const args = parseCli(['install', '--currency', 'gbp', '--exchange-rate', '0.79']);
+  assert.equal(args.currency, 'GBP');
+  assert.equal(args.exchangeRate, 0.79);
+  const config = emptyConfig();
+  applyDataFlags(config, { ...args, dataSources: {} });
+  assert.deepEqual(config.reporting, { currency: 'GBP', exchangeRate: 0.79 });
+
+  // Same currency again keeps the saved rate; another drops it; USD never has one.
+  applyDataFlags(config, { dataSources: {}, currency: 'GBP' });
+  assert.deepEqual(config.reporting, { currency: 'GBP', exchangeRate: 0.79 });
+  applyDataFlags(config, { dataSources: {}, currency: 'EUR' });
+  assert.deepEqual(config.reporting, { currency: 'EUR' });
+  applyDataFlags(config, { dataSources: {}, currency: 'USD' });
+  assert.deepEqual(config.reporting, { currency: 'USD' });
+
+  // No flag leaves a saved choice alone.
+  config.reporting = { currency: 'GBP', exchangeRate: 0.8 };
+  applyDataFlags(config, { ...parseCli(['install']), dataSources: {} });
+  assert.deepEqual(config.reporting, { currency: 'GBP', exchangeRate: 0.8 });
+  assert.equal(parseCli(['install']).currency, undefined);
+});
+
+test('currency: the flags are checked', () => {
+  assert.throws(() => parseCli(['install', '--currency', 'XYZ']), /--currency should be one of USD/);
+  assert.throws(() => parseCli(['install', '--exchange-rate', '0.79']), /--exchange-rate goes with --currency/);
+  assert.throws(() => parseCli(['install', '--currency', 'USD', '--exchange-rate', '2']), /USD needs no --exchange-rate/);
+  assert.throws(() => parseCli(['install', '--currency', 'GBP', '--exchange-rate', 'abc']), /--exchange-rate: .*above 0/);
+  assert.throws(() => parseCli(['update', '--currency', 'GBP']), /--currency go with install/);
+  assert.throws(() => parseCli(['--ui', '--currency', 'GBP']), /under Advanced settings/);
 });
 
 test('currency: the model shows the reporting currency symbol; the template keeps its own', () => {

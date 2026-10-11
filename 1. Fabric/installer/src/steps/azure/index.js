@@ -22,6 +22,7 @@ import { ensureResourceGraphAccess, planResourceGraph, resourceGraphGrants, reso
 import { DATA_SOURCES } from '../../uploads.js';
 import { normaliseResourceGraph } from '../../config.js';
 import { accessReview, accessSummaryLines, ensureViewerGroup, grantModelAccess, planAccess, publicAccess } from '../access.js';
+import { askAdvanced, asksAdvanced } from '../advanced.js';
 
 /** @typedef {import('../../install.js').Ctx} Ctx */
 
@@ -156,10 +157,17 @@ export async function planAzure(ctx, pre) {
   config.modules = /** @type {import('../../catalog.js').ModuleChoice} */ ({ orgData: true, m365Activity: picked.includes('m365Activity'), agent365: false, productFeedback: false, consumption: picked.includes('consumption'), agentEvaluator: false, defender: picked.includes('defender') });
   config.dataSources.productFeedback = 'skip';
   config.dataSources.defender = config.modules.defender ? 'api' : 'skip';
-  az.sampleData = await ui.select('Which data should the dashboard show?', [
-    { name: "Your tenant's data", value: false, description: 'Collect from the audit log, Microsoft Graph and the modules you ticked.' },
-    { name: 'Demo mode (sample data)', value: true, description: 'Show a synthetic sample, moved forward to end last week, to try Analytics Hub before connecting tenant data. Run the installer again and pick your tenant\'s data to switch.' },
-  ], az.sampleData === true);
+  await askAdvanced(
+    ctx,
+    'demo mode, the Azure SQL region, the name prefix, tags, networking, who can view, audit history, the schedule, where credits come from, agent configuration and Foundry, the first load and the Value page currency',
+  );
+  const advanced = asksAdvanced(ctx);
+  az.sampleData = !advanced
+    ? az.sampleData === true
+    : await ui.select('Which data should the dashboard show?', [
+        { name: "Your tenant's data", value: false, description: 'Collect from the audit log, Microsoft Graph and the modules you ticked.' },
+        { name: 'Demo mode (sample data)', value: true, description: 'Show a synthetic sample, moved forward to end last week, to try Analytics Hub before connecting tenant data. Run the installer again and pick your tenant\'s data to switch.' },
+      ], az.sampleData === true);
 
   ui.heading('Azure');
   const subs = pre.subscriptions.length ? pre.subscriptions : (await api.arm.listSubscriptions()).filter((s) => s.state === 'Enabled');
@@ -187,14 +195,21 @@ export async function planAzure(ctx, pre) {
   const locations = await api.arm.listLocations(subscriptionId).catch(() => []);
   const defaultLocation = rg?.location ?? az.location ?? 'uksouth';
   az.location = await ui.select('Azure region', locations.length ? locations.map((l) => ({ name: l.displayName ?? l.name, value: l.name })) : [{ name: defaultLocation, value: defaultLocation }], defaultLocation);
-  const sqlChoice = await ui.select('Azure SQL region', [{ name: 'Same as above', value: '' }, ...locations.filter((l) => l.name !== az.location).map((l) => ({ name: l.displayName ?? l.name, value: l.name }))], az.sqlLocation ?? '');
-  az.sqlLocation = sqlChoice || undefined;
-  az.namePrefix = await ui.input('Name prefix', { default: az.namePrefix ?? 'vlens', validate: (v) => (/^[a-z][a-z0-9-]{1,9}$/.test(v) ? true : 'Use 2-10 lowercase letters, digits or hyphens, starting with a letter.') });
-  az.tags = parseTags(await ui.input('Extra tags (key=value, comma-separated)', { default: Object.entries(az.tags ?? {}).map(([k, v]) => `${k}=${v}`).join(', ') }));
-  az.publicNetworkAccess = await ui.select('Networking', [
-    { name: 'Public endpoints', value: true, description: 'Azure SQL and Storage accept connections from Azure services only (firewall + Entra auth).' },
-    { name: 'Private networking', value: false, description: 'VNet, private endpoints and a Power BI VNet data gateway. Needed where policy keeps public access off. Needs a Fabric or Premium capacity.' },
-  ], az.publicNetworkAccess !== false);
+  if (advanced) {
+    const sqlChoice = await ui.select('Azure SQL region', [{ name: 'Same as above', value: '' }, ...locations.filter((l) => l.name !== az.location).map((l) => ({ name: l.displayName ?? l.name, value: l.name }))], az.sqlLocation ?? '');
+    az.sqlLocation = sqlChoice || undefined;
+    az.namePrefix = await ui.input('Name prefix', { default: az.namePrefix ?? 'vlens', validate: (v) => (/^[a-z][a-z0-9-]{1,9}$/.test(v) ? true : 'Use 2-10 lowercase letters, digits or hyphens, starting with a letter.') });
+    az.tags = parseTags(await ui.input('Extra tags (key=value, comma-separated)', { default: Object.entries(az.tags ?? {}).map(([k, v]) => `${k}=${v}`).join(', ') }));
+    az.publicNetworkAccess = await ui.select('Networking', [
+      { name: 'Public endpoints', value: true, description: 'Azure SQL and Storage accept connections from Azure services only (firewall + Entra auth).' },
+      { name: 'Private networking', value: false, description: 'VNet, private endpoints and a Power BI VNet data gateway. Needed where policy keeps public access off. Needs a Fabric or Premium capacity.' },
+    ], az.publicNetworkAccess !== false);
+  } else {
+    if (az.sqlLocation === az.location) az.sqlLocation = undefined;
+    az.namePrefix ??= 'vlens';
+    az.tags ??= {};
+    az.publicNetworkAccess = az.publicNetworkAccess !== false;
+  }
 
   ui.heading('Power BI');
   az.powerBi ??= {};
@@ -215,18 +230,20 @@ export async function planAzure(ctx, pre) {
   if (azureHistoryLoaded(az)) await askMoreHistory(ctx);
   else {
     delete ctx.reloadHistoryDays;
-    config.history.days = await ui.select('How much audit history should the first load pull?', HISTORY_CHOICES, config.history.days);
+    if (advanced) config.history.days = await ui.select('How much audit history should the first load pull?', HISTORY_CHOICES, config.history.days);
   }
-  ui.heading('Schedule');
-  config.schedule.frequency = await ui.select('How often should the job run?', [{ name: 'Daily', value: 'daily' }, { name: 'Weekly', value: 'weekly' }], config.schedule.frequency);
-  if (config.schedule.frequency === 'weekly') config.schedule.weekday = await ui.select('Which day?', ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d) => ({ name: d, value: d })), config.schedule.weekday);
   config.schedule.timeZone = 'UTC';
-  config.schedule.time = await ui.input('Time (UTC, 24-hour)', { default: config.schedule.time, validate: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? true : 'Use HH:MM.') });
+  if (advanced) {
+    ui.heading('Schedule');
+    config.schedule.frequency = await ui.select('How often should the job run?', [{ name: 'Daily', value: 'daily' }, { name: 'Weekly', value: 'weekly' }], config.schedule.frequency);
+    if (config.schedule.frequency === 'weekly') config.schedule.weekday = await ui.select('Which day?', ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d) => ({ name: d, value: d })), config.schedule.weekday);
+    config.schedule.time = await ui.input('Time (UTC, 24-hour)', { default: config.schedule.time, validate: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? true : 'Use HH:MM.') });
+  }
   await planAzureConsumption(ctx, subs);
   await planAzureResourceGraph(ctx);
   // A reload runs the job straight after setup anyway.
-  ctx.runFirstLoad = ctx.reloadHistoryDays ? false : await ui.confirm('Run the first load as soon as setup finishes?', true);
-  await askReportingCurrency(ctx);
+  ctx.runFirstLoad = ctx.reloadHistoryDays ? false : !advanced || (await ui.confirm('Run the first load as soon as setup finishes?', true));
+  if (advanced) await askReportingCurrency(ctx);
   await azurePreflight(ctx);
 }
 
@@ -289,15 +306,22 @@ export async function planAzureConsumption(ctx, subs) {
     return;
   }
   ui.heading('Credit consumption');
-  ds.studioCredits = await ui.select('Where should Copilot Studio credits come from?', [
-    { name: 'Power Platform licensing API (recommended)', value: 'api', description: 'A daily Power Automate flow, signed in as you, saves them for the jobs. The first run loads about six months.' },
-    { name: 'CSV exports', value: 'csv', description: `Drop the Power Platform admin center's Copilot Studio exports in the ${AZURE_LANDING_DIRS.studio} folder yourself.` },
-    { name: 'Leave Copilot Studio out', value: 'skip' },
-  ], ds.studioCredits === 'csv' || ds.studioCredits === 'skip' ? ds.studioCredits : 'api');
-  ds.coworkCredits = await ui.select('Cowork credits', [
-    { name: 'CSV export', value: 'csv', description: `Drop the Consumption Dashboard's Viva Insights export in the ${AZURE_LANDING_DIRS.viva} folder.` },
-    { name: 'Leave Cowork out', value: 'skip' },
-  ], ds.coworkCredits === 'skip' ? 'skip' : 'csv');
+  const studio = ds.studioCredits === 'csv' || ds.studioCredits === 'skip' ? ds.studioCredits : 'api';
+  const cowork = ds.coworkCredits === 'skip' ? 'skip' : 'csv';
+  if (!asksAdvanced(ctx)) {
+    ds.studioCredits = studio;
+    ds.coworkCredits = cowork;
+  } else {
+    ds.studioCredits = await ui.select('Where should Copilot Studio credits come from?', [
+      { name: 'Power Platform licensing API (recommended)', value: 'api', description: 'A daily Power Automate flow, signed in as you, saves them for the jobs. The first run loads about six months.' },
+      { name: 'CSV exports', value: 'csv', description: `Drop the Power Platform admin center's Copilot Studio exports in the ${AZURE_LANDING_DIRS.studio} folder yourself.` },
+      { name: 'Leave Copilot Studio out', value: 'skip' },
+    ], studio);
+    ds.coworkCredits = await ui.select('Cowork credits', [
+      { name: 'CSV export', value: 'csv', description: `Drop the Consumption Dashboard's Viva Insights export in the ${AZURE_LANDING_DIRS.viva} folder.` },
+      { name: 'Leave Cowork out', value: 'skip' },
+    ], cowork);
+  }
   ds.azureAi = 'api';
   await planConsumption(ctx, /** @type {import('../plan.js').Preflight} */ (/** @type {unknown} */ ({ subscriptions: subs })));
   if (config.uploads.flowIdentity === 'app' && ds.studioCredits === 'api') ui.warn('On Azure the Studio flow signs in as you; --flow-identity app is Fabric only for now.');
@@ -334,11 +358,13 @@ export async function planAzureResourceGraph(ctx) {
     return;
   }
   const source = DATA_SOURCES.find((s) => s.id === 'resourceGraph');
-  ui.heading('Agent configuration and Foundry');
-  ds.resourceGraph = await ui.select(`${source?.label ?? 'Azure Resource Graph'}?`, [
-    { name: 'Read from Azure Resource Graph', value: 'api', description: source?.hints?.api },
-    { name: 'Leave it out', value: 'skip' },
-  ], ds.resourceGraph === 'api' ? 'api' : 'skip');
+  if (asksAdvanced(ctx)) {
+    ui.heading('Agent configuration and Foundry');
+    ds.resourceGraph = await ui.select(`${source?.label ?? 'Azure Resource Graph'}?`, [
+      { name: 'Read from Azure Resource Graph', value: 'api', description: source?.hints?.api },
+      { name: 'Leave it out', value: 'skip' },
+    ], ds.resourceGraph === 'api' ? 'api' : 'skip');
+  } else ds.resourceGraph = ds.resourceGraph === 'api' ? 'api' : 'skip';
   await planResourceGraph(ctx);
   if (!resourceGraphOn(config) || config.resourceGraph?.agents === false) return;
   if (isPrivate(az) && !azureDropsToSharePoint(az)) {

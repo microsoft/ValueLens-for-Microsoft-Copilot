@@ -23,8 +23,6 @@ import {
   UPLOAD_FOLDERS,
   uploadName,
 } from '../uploads.js';
-import { planFlows } from './flows.js';
-import { planResourceGraph } from './resource-graph.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 /** @typedef {import('../staging.js').PendingUpload} PendingUpload */
@@ -63,8 +61,6 @@ export async function planDataSources(ctx) {
   config.modules = modulesFromSources(picked.modes);
   const fromCli = checkCsvFiles(ctx.csvFiles ?? [], picked.modes);
   ctx.pendingUploads = [...fromCli, ...picked.files];
-  await planResourceGraph(ctx);
-  await planFlows(ctx);
 }
 
 /**

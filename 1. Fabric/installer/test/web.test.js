@@ -615,6 +615,15 @@ test('page: the stages and the finish it waits for are headings the installer pr
   const done = list('DONE_HEADINGS');
   assert.ok(done.length >= 2);
   assert.deepEqual(done.filter((s) => !printed.has(s)), []);
+
+  // Done is last, so nothing ahead of it is skipped; each target-only stage is one of the stages.
+  const stages = list('INSTALL_STAGES');
+  assert.equal(stages.at(-1), 'Done');
+  assert.ok(!stages.includes('Where should Analytics Hub run?'), 'the target question comes first, so it slots in');
+  const only = /const TARGET_STAGES = \{([\s\S]*?)\n\};/.exec(app)?.[1] ?? '';
+  const tagged = [...only.matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  assert.ok(tagged.includes('Fabric') && tagged.includes('Checking Azure'));
+  assert.deepEqual(tagged.filter((s) => !stages.includes(s)), []);
 });
 
 test('page: every command has a row, or for prerequisites its own panel; Check the data needs the data check notebook', async () => {
@@ -631,5 +640,6 @@ test('page: every command has a row, or for prerequisites its own panel; Check t
   assert.equal(describeRecord(config).can.check, true);
   config.history.days = 90;
   assert.equal(describeRecord(config).historyDays, 90, 'the installed view shows how much audit history is loaded');
+  assert.equal(describeRecord({ ...config, target: 'azure' }).target, 'azure', 'the page shows only that target\'s stages');
   assert.match(app, /backfillDays/, 'the Run row can load more history');
 });

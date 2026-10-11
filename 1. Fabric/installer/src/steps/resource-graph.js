@@ -6,6 +6,7 @@
 import { ROLES } from '../clients/azure.js';
 import { normaliseResourceGraph } from '../config.js';
 import { HttpError } from '../http.js';
+import { asksAdvanced } from './advanced.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 /** @typedef {{ id: string, name: string, appId?: string }} Principal */
@@ -55,13 +56,18 @@ export const directoryRoleStep = (who) =>
   `For agents, ${who} also needs one of these Entra roles: ${AGENT_DIRECTORY_ROLES.join(', ').replace(/, ([^,]*)$/, ' or $1')}. A Privileged Role Administrator assigns it in the Entra admin center under Roles and administrators; the installer doesn't. Without one, Resource Graph returns no agents and the load says so.`;
 
 /**
- * Asks which management group to read and what to read there.
+ * Asks which management group to read and what to read there. Behind the advanced settings: without
+ * them it reads what was saved, or the whole tenant, agents and Foundry.
  * @param {Ctx} ctx
  */
 export async function planResourceGraph(ctx) {
   const { ui, config } = ctx;
   if (!resourceGraphOn(config)) return;
   const rg = (config.resourceGraph = normaliseResourceGraph(config.resourceGraph));
+  if (!asksAdvanced(ctx)) {
+    ctx.save();
+    return;
+  }
   ui.note('Resource Graph reads agent configuration and Foundry resources across a management group. Leave it blank for the whole tenant.');
   const raw = await ui.input('Management group ID (blank for the whole tenant):', {
     default: rg.managementGroup ?? '',

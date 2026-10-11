@@ -20,8 +20,8 @@ export function realSources() {
 
 /**
  * A UI that records output. `answers` scripts confirm and select replies in order;
- * when it runs out, the default is taken.
- * @param {{ yes?: boolean, answers?: any[] }} [opts]
+ * when it runs out, the default is taken. `yesTo` names confirms that say yes instead.
+ * @param {{ yes?: boolean, answers?: any[], yesTo?: string[] }} [opts]
  */
 export function fakeUi(opts = {}) {
   /** @type {string[]} */
@@ -35,6 +35,7 @@ export function fakeUi(opts = {}) {
     /** @param {string} message @param {boolean} def */
     async confirm(message, def) {
       asked.push(message);
+      if (opts.yesTo?.includes(message)) return true;
       return answers.length ? answers.shift() : def;
     },
     /** @param {string} message @param {any[]} choices @param {any} def */

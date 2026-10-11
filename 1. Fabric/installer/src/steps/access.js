@@ -5,6 +5,7 @@
  * then adding people to the group, from the installer, the app's Share panel or My Groups.
  */
 import { HttpError } from '../http.js';
+import { asksAdvanced } from './advanced.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 /** @typedef {{ workspaceId: string, datasetId: string, name: string }} ModelRef */
@@ -25,6 +26,13 @@ const isLinkOrEmpty = (/** @type {string} */ v) => (!v.trim() || /^https:\/\/\S+
 export async function planAccess(ctx) {
   const { ui, config, user, api } = ctx;
   const access = { ...(config.access ?? {}) };
+  if (!asksAdvanced(ctx)) {
+    // The saved group, or a new "Analytics Hub Viewers"; Manage access changes it later.
+    if (!access.groupId) access.groupName = access.createdGroup ? access.groupName ?? VIEWER_GROUP_NAME : VIEWER_GROUP_NAME;
+    access.contact ??= user.upn;
+    config.access = access;
+    return;
+  }
   ui.heading('Who can view');
   const mode = await ui.select(
     'Who can view Analytics Hub?',

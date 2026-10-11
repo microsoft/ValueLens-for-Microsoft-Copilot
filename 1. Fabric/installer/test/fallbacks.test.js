@@ -544,6 +544,28 @@ test('planning: Contributor on a resource group is enough for a new vault', asyn
   assert.match(ui.text(), /no resource group called rg-missing that you can see, and you can't create one/);
 });
 
+test('planning: without Advanced settings, a new vault takes its group, region, name and secret name silently', async () => {
+  const arm = vaultArm({ perms: { [SUB]: [{ actions: ['*'] }] } });
+  const ui = fakeUi({ answers: ['sub-1', ''] });
+  const t = fakeCtx({ arm: arm.api, ui: ui.ui });
+  t.ctx.advanced = false;
+  await planKeyVault(t.ctx, PRE, 'uksouth');
+  assert.deepEqual(ui.asked, ['Azure subscription', 'Vault']);
+  assert.equal(t.config.keyVault.resourceGroup, 'rg-valuelens');
+  assert.equal(t.config.keyVault.location, 'uksouth');
+  assert.match(String(t.config.keyVault.name), /^valuelens-[0-9a-f]{6}$/);
+  assert.equal(t.config.keyVault.secretName, 'valuelens-client-secret');
+
+  // Only Contributor on another group: the default can't be made, so it asks.
+  const rg = vaultArm({ groups: ['rg-mine'], perms: { [SUB]: READ_ONLY, [`${SUB}/resourceGroups/rg-mine`]: RG_CONTRIBUTOR } });
+  const u = fakeUi({ answers: ['sub-1', '', 'rg-mine'] });
+  const m = fakeCtx({ arm: rg.api, ui: u.ui });
+  m.ctx.advanced = false;
+  await planKeyVault(m.ctx, PRE, 'uksouth');
+  assert.equal(m.config.keyVault.resourceGroup, 'rg-mine');
+  assert.deepEqual(u.asked, ['Azure subscription', 'Vault', 'Resource group (created if missing)']);
+});
+
 test('new vault: Contributor on just the resource group creates it there', async () => {
   const kv = (/** @type {any} */ arm) => {
     const t = fakeCtx({ arm, ui: fakeUi().ui });
