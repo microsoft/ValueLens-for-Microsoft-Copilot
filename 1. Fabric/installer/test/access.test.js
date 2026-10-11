@@ -1,7 +1,7 @@
 // @ts-check
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { accessCommand, accessReview, ensureViewerGroup, grantModelAccess, myGroupsUrl, planAccess, publicAccess, VIEWER_GROUP_NAME } from '../src/steps/access.js';
+import { accessCommand, accessReview, ensureViewerGroup, grantModelAccess, myGroupsUrl, NEW_GROUP_ATTEMPTS, NEW_GROUP_RETRY_MS, planAccess, publicAccess, VIEWER_GROUP_NAME } from '../src/steps/access.js';
 import { fabricConfigFile } from '../src/steps/app.js';
 import { azureViewerModels, webAccess } from '../src/steps/azure/index.js';
 import { fabricViewerModels } from '../src/install.js';
@@ -59,15 +59,21 @@ function datasets() {
   const calls = [];
   /** @type {Set<string>} */
   const denied = new Set();
+  /** How many more times each model rejects a group Power BI hasn't seen yet. @type {Record<string, number>} */
+  const unseen = {};
   const powerBi = {
     datasetUsers: async (/** @type {string} */ _ws, /** @type {string} */ ds) => users[ds] ?? [],
     addDatasetUser: async (/** @type {string} */ ws, /** @type {string} */ ds, /** @type {any} */ body) => {
       if (denied.has(ds)) throw new HttpError('Forbidden', { status: 403, method: 'POST', url: 'https://x' });
+      if (unseen[ds] > 0) {
+        unseen[ds]--;
+        throw new HttpError('InvalidRequest: Parameter identifier is missing or invalid', { status: 400, method: 'POST', url: 'https://x' });
+      }
       calls.push(`${ws}/${ds} ${body.identifier} ${body.principalType} ${body.datasetUserAccessRight}`);
       (users[ds] ??= []).push(body);
     },
   };
-  return { powerBi, users, calls, denied };
+  return { powerBi, users, calls, denied, unseen };
 }
 
 const MODELS = [{ workspaceId: 'ws-1', datasetId: 'ds-vl', name: 'ValueLens' }, { workspaceId: 'ws-1', datasetId: 'ds-cc', name: 'Credits' }];
@@ -154,6 +160,24 @@ test('access: the group gets Build on each model once, and a failed grant only w
   await grantModelAccess(ctx, [{ workspaceId: 'ws-1', datasetId: 'ds-x', name: 'Other' }]);
   assert.match(text(), /Couldn't give Analytics Hub Viewers Build on Other/);
   assert.ok(!ctx.config.access.grantedModels?.includes('ds-x'));
+});
+
+test('access: a group Power BI does not know yet is retried, then reported if it never appears', async () => {
+  const pbi = datasets();
+  pbi.unseen['ds-vl'] = 2;
+  const { ui, text } = fakeUi();
+  const { ctx: ctx, sleeps } = fakeCtx({ powerBi: pbi.powerBi, ui });
+  ctx.config.access = { groupId: 'g-1', groupName: VIEWER_GROUP_NAME };
+  await grantModelAccess(ctx, MODELS);
+  assert.deepEqual(pbi.calls, ['ws-1/ds-vl g-1 Group ReadExplore', 'ws-1/ds-cc g-1 Group ReadExplore']);
+  assert.deepEqual(sleeps, [NEW_GROUP_RETRY_MS, NEW_GROUP_RETRY_MS]);
+  assert.match(text(), /Waiting for Power BI to see the group/);
+  assert.doesNotMatch(text(), /Couldn't give/);
+
+  pbi.unseen['ds-y'] = NEW_GROUP_ATTEMPTS;
+  await grantModelAccess(ctx, [{ workspaceId: 'ws-1', datasetId: 'ds-y', name: 'Other' }]);
+  assert.match(text(), /Couldn't give Analytics Hub Viewers Build on Other/);
+  assert.equal(sleeps.length, 2 + NEW_GROUP_ATTEMPTS - 1);
 });
 
 test('access: the command adds viewers and owners, and skips names it cannot find', async () => {

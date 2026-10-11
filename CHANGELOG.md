@@ -17,6 +17,19 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased
+
+### Fixed: currency separators shown as "?" and Build not granted to a new viewers group
+
+- The plan's currency line and the Value page's cost summary showed **USD ? US dollar** and
+  **Loading?**. They now show **USD · US dollar** and **Loading…**.
+- On a first install, the installer could create the **Analytics Hub Viewers** group and then fail
+  to give it Build on the models (*"Parameter identifier is missing or invalid"*), because Power BI
+  hadn't seen the new group yet. It now waits and retries for up to two minutes. To fix an install
+  that hit this, run the installer's **access** command.
+
+---
+
 ## 2026-10-11 — Analytics Hub installer 0.4.1
 
 **Update an existing install:** download installer 0.4.1, open it and choose **Repair or change**.
