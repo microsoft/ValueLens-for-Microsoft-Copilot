@@ -204,10 +204,10 @@ function PricesMenu({ data }: { data: CostVsValue }) {
     const needsRate = !dollar && exchangeRate === undefined;
     const summary =
         status === "loading"
-            ? "Loading?"
+            ? "Loading…"
             : needsRate
               ? "Exchange rate needed"
-              : `${listPrice ? "List price" : "Set in this app"} ? ${code}`;
+              : `${listPrice ? "List price" : "Set in this app"} · ${code}`;
 
     return (
         <FilterMenu label="Prices" summary={summary} active={!listPrice || !dollar} panelClassName="w-[320px]">

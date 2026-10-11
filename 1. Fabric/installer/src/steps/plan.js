@@ -484,7 +484,7 @@ export async function askReportingCurrency(ctx) {
   const currency = await ui.select(
     'Which currency should the Value page report in?',
     CURRENCIES.map((cur) => ({
-      name: `${cur.code} ? ${cur.name}`,
+      name: `${cur.code} · ${cur.name}`,
       value: cur.code,
       ...(cur.code === DEFAULT_CURRENCY ? { description: 'Licences and credits are billed in US dollars, so no exchange rate is needed.' } : {}),
     })),
