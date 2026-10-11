@@ -17,7 +17,14 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
-## Unreleased
+## 2026-10-11 — Analytics Hub installer 0.4.1
+
+**Update an existing install:** download installer 0.4.1, open it and choose **Repair or change**.
+It asks for the Value page's reporting currency: pick **GBP** to keep pounds. It also asks who can
+view; let it create the **Analytics Hub Viewers** group, or name your own.
+
+The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.4.1`, which the
+Azure install pulls.
 
 ### Changed: one reporting currency, US dollars by default
 
