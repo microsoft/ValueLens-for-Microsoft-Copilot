@@ -83,6 +83,7 @@ import { accessCommand, ensureViewerGroup, grantModelAccess, myGroupsUrl } from 
  * @property {boolean} [secretInNotebook]  --secret-in-notebook: store the secret in the notebooks instead of Key Vault.
  * @property {Apis} [liveApi]  While the plan's answers can be rewound, the clients without the cache, for checks the user repeats.
  * @property {boolean} [runFirstLoad]
+ * @property {boolean} [advanced]  The plan's "Change the advanced settings?" answer. With false, those settings keep their saved value or default.
  * @property {number} [reloadHistoryDays]  Repair or change: reload this many days of audit history after setup.
  * @property {{ sp: any, roles: { id: string, value: string }[] }} [graphRoles]
  * @property {import('./steps/app.js').Runner} [runner]  Runs the app's build tools; tests replace it.

@@ -210,7 +210,7 @@ export async function reportLoads(ctx, runs, activities) {
   const rerun = `run "${commandLine('rerun-failed')}"`;
   for (const card of cards) {
     if (card.activity === COWORK_DATAFLOW_ACTIVITY && card.state === 'failed' && card.kind !== 'capacity') {
-      card.fix = ['The Cowork credits Dataflow usually fails until it has its sign-ins:', ...coworkSignInSteps(ctx.config).map((l) => `  ${l}`), `Then ${RERUN}.`];
+      card.fix = ['The Cowork credits Dataflow usually fails until it has its sign-ins:', ...coworkSignInSteps(ctx.config).map((step, i) => `  ${i + 1}. ${step}`), `Then ${RERUN}.`];
     }
     card.fix = card.fix.map((t) => fillRerun(t, rerun));
   }

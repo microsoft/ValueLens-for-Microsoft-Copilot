@@ -112,11 +112,19 @@ const COMMANDS = {
 };
 const ROW_ORDER = ['run', 'rerun-failed', 'refresh', 'status', 'upload', 'check', 'update', 'deploy-app', 'access', 'rotate-secret', 'uninstall', 'install'];
 
+// The install's stages in the order the installer prints them. Other headings (the target question,
+// Advanced settings, Who can view, Schedule...) slot in as they come.
 const INSTALL_STAGES = [
-  'Sign in', 'Checking your tenant', 'Data sources', 'Power BI', 'Fabric', 'App registration',
-  'Key Vault for the app secret', 'Schedule', 'Ready to set up', 'Setting up', 'Done',
-  'Where should Analytics Hub run?', 'Azure', 'Checking Azure',
+  'Sign in', 'Checking your tenant', 'Data sources', 'What to collect', 'Azure', 'Power BI', 'Fabric', 'App registration',
+  'Key Vault for the app secret', 'Checking Azure', 'Ready to set up', 'Setting up', 'Done',
 ];
+// Stages only one target has. The rail shows the chosen target's; the record's target, else Fabric, until one is entered.
+const TARGET_STAGES = {
+  fabric: new Set(['Data sources', 'Fabric', 'App registration', 'Key Vault for the app secret']),
+  azure: new Set(['What to collect', 'Azure', 'Checking Azure']),
+};
+const stageTarget = (title) => Object.keys(TARGET_STAGES).find((k) => TARGET_STAGES[k].has(title));
+const applies = (run, s) => !s.only || s.only === run.platform;
 const DONE_HEADINGS = new Set(['Analytics Hub is set up', 'Connect Power BI']);
 
 const METHODS = [
@@ -266,6 +274,17 @@ function dropChars(segs, n) {
 
 const segsText = (segs) => segs.map((s) => s.text).join('').replace(/ {2,}/g, ' · ');
 
+// A line's indented follow-on lines: wrapped text joins it, and each numbered one starts a step of its own.
+function moreParts(more) {
+  const lead = [];
+  const steps = [];
+  for (const m of more ?? []) {
+    if (/^\d+\.\s/.test(segsText(m))) steps.push([m]);
+    else (steps.length ? steps[steps.length - 1] : lead).push(m);
+  }
+  return { lead, steps };
+}
+
 /* ---------- Requests ---------- */
 
 async function post(path, body) {
@@ -407,7 +426,7 @@ function connect() {
 
 function newStage(title, o = {}) {
   return {
-    id: ++stageIds, title, heading: null, level: o.level ?? 0, parent: o.parent ?? null, status: 'upcoming',
+    id: ++stageIds, title, heading: null, level: o.level ?? 0, parent: o.parent ?? null, status: 'upcoming', only: o.only,
     items: [], kids: [], startedAt: 0, endedAt: 0, n: o.n, total: o.total, el: null, body: null, kidsEl: null,
   };
 }
@@ -417,7 +436,8 @@ function createRun(e) {
   const title = cmd === 'install' && app.state?.record?.installed ? COMMANDS.install.row : COMMANDS[cmd].title;
   const run = {
     command: cmd, title, startedAt: e.at, endedAt: 0, state: 'running', error: '', phase: 'signin',
-    stages: cmd === 'install' ? INSTALL_STAGES.map((t) => newStage(t)) : [newStage('Sign in'), newStage(COMMANDS[cmd].section)],
+    stages: cmd === 'install' ? INSTALL_STAGES.map((t) => newStage(t, { only: stageTarget(t) })) : [newStage('Sign in'), newStage(COMMANDS[cmd].section)],
+    platform: app.state?.record?.target === 'azure' ? 'azure' : 'fabric',
     cur: null, child: null, doneTitle: '', signedIn: false, user: null, prompts: new Map(), progress: new Map(), adopted: false,
     events: [e],
   };
@@ -436,6 +456,7 @@ function finish(stage, at, status = 'done') {
 }
 
 function enter(run, stage, at) {
+  if (stage.only) run.platform = stage.only;
   if (stage.level === 0) {
     if (run.child) finish(run.child, at);
     run.child = null;
@@ -834,10 +855,14 @@ function paintStage(s) {
 function renderItem(it) {
   if (it.hidden) return null;
   switch (it.t) {
-    case 'line':
+    case 'line': {
+      const { lead, steps } = moreParts(it.more);
+      const joined = (list) => list.map((m) => [' ', segsEl(m)]);
       return h('div', { class: `ln ${it.kind}` },
         h('span', { class: 'gl' }, GLYPH[it.kind] ? icon(GLYPH[it.kind]) : null),
-        h('span', { class: 'tx' }, segsEl(it.segs), it.more.map((m) => [' ', segsEl(m)])));
+        h('span', { class: 'tx' }, segsEl(it.segs), joined(lead),
+          steps.map(([first, ...rest]) => h('span', { class: 'step' }, segsEl(first), joined(rest)))));
+    }
     case 'kv':
       return h('div', { class: 'kv-row' },
         h('span', { class: 'k' }, it.k),
@@ -1464,7 +1489,7 @@ function renderRail() {
       }, icon(COMMANDS[run.command].icon), h('span', { class: 'dest-text' },
         h('span', { class: 'dest-label' }, run.command === 'install' ? run.title : COMMANDS[run.command].title),
         h('span', { class: 'dest-blurb' }, blurb(run)))),
-      h('ol', { class: 'stages', 'aria-label': 'Stages' }, run.stages.map((s) => h('li', null,
+      h('ol', { class: 'stages', 'aria-label': 'Stages' }, run.stages.filter((s) => applies(run, s)).map((s) => h('li', null,
         stageButton(s),
         s.kids.length ? h('ol', { class: 'steps' }, s.kids.map((k) => h('li', null, stageButton(k)))) : null)))) : null);
 
@@ -1627,7 +1652,9 @@ function itemMarkdown(it, depth) {
   switch (it.t) {
     case 'line': {
       const sym = { ok: '✓ ', warn: '⚠ ', fail: '✗ ' }[it.kind] ?? '';
-      return [`- ${sym}${segsText(it.segs)}${more ? ` ${more}` : ''}`];
+      const { lead, steps } = moreParts(it.more);
+      const joined = (list) => list.map((m) => ` ${segsText(m)}`).join('');
+      return [`- ${sym}${segsText(it.segs)}${joined(lead)}`, ...steps.map(([first, ...rest]) => `  ${segsText(first)}${joined(rest)}`)];
     }
     case 'kv':
       return [`- ${it.k}: ${segsText(it.segs)}${more ? ` (${more})` : ''}`];
@@ -1698,7 +1725,7 @@ function runFacts(run) {
 function saveRecord(run) {
   const L = [`# ${headTitle(run)}`, '', ...runFacts(run)];
   if (run.error) L.push('', `**Error:** ${run.error}`);
-  for (const s of run.stages) L.push(...stageMarkdown(s, 2));
+  for (const s of run.stages) if (applies(run, s)) L.push(...stageMarkdown(s, 2));
   L.push('', '---', '', '_Written by the Analytics Hub installer. Secrets are masked and sign-in codes left out._');
   download(`valuelens-${run.command}-${stamp(run.startedAt)}.md`, L);
 }

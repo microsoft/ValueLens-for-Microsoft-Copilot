@@ -34,6 +34,7 @@ export function describeRecord(config) {
   const installed = azure ? !!(az?.subscriptionId && az.resourceGroup) : !!(f.workspaceId && f.lakehouseId);
   return {
     tenantId: config.tenantId,
+    target: config.target,
     installed,
     workspace: azure ? az?.resourceGroup : f.workspaceName ?? f.workspaceId,
     workspaceUrl: azure ? az?.outputs?.webUrl : f.workspaceId ? `https://app.fabric.microsoft.com/groups/${f.workspaceId}` : undefined,

@@ -16,9 +16,10 @@ import { AGENT_EVALUATOR_MODEL_NAME, CONSUMPTION_MODEL_NAME, flowIdentity, MODEL
 import { MIN_NODE, nodeVersionOk } from './app.js';
 import { agentEvaluatorModelWanted, planAgentEvaluator } from './agent-evaluator.js';
 import { AZURE_AI_ROLES, consumptionModelWanted, COWORK_DATAFLOW_NAME, planConsumption, planCowork } from './consumption.js';
-import { FLOW_NAMES, flowsSkipped, flowsWanted } from './flows.js';
+import { FLOW_NAMES, flowsSkipped, flowsWanted, planFlows } from './flows.js';
 import { adminPack, canWriteSecrets, checkExistingApp, reportAppCheck, ResumeLater, writeAdminPack } from './identity.js';
-import { resourceGraphGrants, resourceGraphKinds, resourceGraphOn, scopeName } from './resource-graph.js';
+import { planResourceGraph, resourceGraphGrants, resourceGraphKinds, resourceGraphOn, scopeName } from './resource-graph.js';
+import { askAdvanced, asksAdvanced } from './advanced.js';
 import { describeSchedule, displayNames, freeName, PIPELINE_NAME } from './fabric.js';
 import { connectionName } from './model.js';
 import { reportsWanted } from './report.js';
@@ -235,7 +236,9 @@ async function planPowerBi(ctx, pre) {
     return;
   }
   const canApp = !!sources.appDir;
-  const choice = await ui.select(
+  const choice = !asksAdvanced(ctx)
+    ? powerBiChoice(config, canApp)
+    : await ui.select(
     'Deploy the semantic model?',
     [
       ...(canApp ? [{ name: 'Semantic model, Power BI reports and the Analytics Hub app (recommended)', value: 'all', description: 'The ValueLens reports and a web app in the workspace, built on the model.' }] : []),
@@ -317,8 +320,15 @@ export async function askMoreHistory(ctx) {
  */
 export async function plan(ctx, pre) {
   const { ui, config, api } = ctx;
+  const advanced = () => asksAdvanced(ctx);
 
   await planDataSources(ctx);
+  await askAdvanced(
+    ctx,
+    'the model and app, who can view, audit history, tenant size, the Lakehouse name, the new Key Vault\'s details, the schedule, the first load, the Value page currency and where Resource Graph reads',
+  );
+  await planResourceGraph(ctx);
+  await planFlows(ctx);
 
   await planPowerBi(ctx, pre);
   if (config.semanticModel.enabled) await planAccess(ctx);
@@ -331,7 +341,7 @@ export async function plan(ctx, pre) {
 
   if (config.firstRun?.status !== 'Completed') {
     delete ctx.reloadHistoryDays;
-    config.history.days = await ui.select('How much audit history should the first load pull?', HISTORY_CHOICES, config.history.days);
+    if (advanced()) config.history.days = await ui.select('How much audit history should the first load pull?', HISTORY_CHOICES, config.history.days);
   } else {
     await askMoreHistory(ctx);
   }
@@ -344,14 +354,17 @@ export async function plan(ctx, pre) {
     pre.capacities.some((cap) => cap.id === config.fabric.capacityId) ? config.fabric.capacityId : pre.capacities[0].id,
   );
   const capacity = pre.capacities.find((cap) => cap.id === config.fabric.capacityId);
-  config.scale = await ui.select(
-    'How many people are in the tenant?',
-    [
-      { name: 'Up to 10,000', value: 'standard' },
-      { name: 'More than 10,000 (smaller audit windows, longer time limits; best on F64 or larger)', value: 'large' },
-    ],
-    config.scale ?? (capacity && largeCapacity(capacity) ? 'large' : 'standard'),
-  );
+  const scale = config.scale ?? (capacity && largeCapacity(capacity) ? 'large' : 'standard');
+  config.scale = !advanced()
+    ? scale
+    : await ui.select(
+        'How many people are in the tenant?',
+        [
+          { name: 'Up to 10,000', value: 'standard' },
+          { name: 'More than 10,000 (smaller audit windows, longer time limits; best on F64 or larger)', value: 'large' },
+        ],
+        scale,
+      );
   if (config.fabric.workspaceId) {
     ui.ok(`Workspace: ${config.fabric.workspaceName ?? config.fabric.workspaceId}`);
   } else {
@@ -375,7 +388,8 @@ export async function plan(ctx, pre) {
   if (!config.fabric.lakehouseId) {
     const ws = config.fabric.workspaceId;
     const taken = ws ? displayNames(await api.fabric.listItems(ws, 'Lakehouse')) : [];
-    const typed = await ui.input('Lakehouse name', { default: freeName(config.fabric.lakehouseName ?? 'ValueLens', taken), validate: validateNewLakehouseName(taken) });
+    const suggested = freeName(config.fabric.lakehouseName ?? 'ValueLens', taken);
+    const typed = advanced() ? await ui.input('Lakehouse name', { default: suggested, validate: validateNewLakehouseName(taken) }) : suggested;
     config.fabric.lakehouseName = lakehouseNameFrom(typed);
     if (config.fabric.lakehouseName !== typed.trim()) ui.note(`Fabric doesn't allow spaces or hyphens in Lakehouse names, so it'll be called ${config.fabric.lakehouseName}.`);
   }
@@ -448,33 +462,36 @@ export async function plan(ctx, pre) {
     );
   }
 
-  ui.heading('Schedule');
-  const freq = await ui.select(
-    'How often should the pipeline run?',
-    [
-      { name: 'Daily (recommended)', value: 'daily' },
-      { name: 'Weekly', value: 'weekly' },
-    ],
-    config.schedule.frequency,
-  );
-  config.schedule.frequency = /** @type {'daily' | 'weekly'} */ (freq);
-  if (freq === 'weekly') {
-    config.schedule.weekday = await ui.select(
-      'Which day?',
-      ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((d) => ({ name: d, value: d })),
-      config.schedule.weekday,
+  if (advanced()) {
+    ui.heading('Schedule');
+    const freq = await ui.select(
+      'How often should the pipeline run?',
+      [
+        { name: 'Daily (recommended)', value: 'daily' },
+        { name: 'Weekly', value: 'weekly' },
+      ],
+      config.schedule.frequency,
     );
+    config.schedule.frequency = /** @type {'daily' | 'weekly'} */ (freq);
+    if (freq === 'weekly') {
+      config.schedule.weekday = await ui.select(
+        'Which day?',
+        ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((d) => ({ name: d, value: d })),
+        config.schedule.weekday,
+      );
+    }
+    config.schedule.time = await ui.input(`Time (${config.schedule.timeZone}, 24-hour)`, { default: config.schedule.time, validate: validateTime });
   }
-  config.schedule.time = await ui.input(`Time (${config.schedule.timeZone}, 24-hour)`, { default: config.schedule.time, validate: validateTime });
 
-  ctx.runFirstLoad = config.firstRun?.status === 'Completed' ? false : await ui.confirm('Run the first load as soon as setup finishes?', true);
+  ctx.runFirstLoad = config.firstRun?.status === 'Completed' ? false : !advanced() || (await ui.confirm('Run the first load as soon as setup finishes?', true));
 
-  await askReportingCurrency(ctx);
+  if (advanced()) await askReportingCurrency(ctx);
 }
 
 /**
  * The currency the Value page reports value and cost in, and optionally its rate to the US
- * dollar. It is the app's default until someone saves another under Prices in the app.
+ * dollar. It is the app's default until someone saves another under Prices in the app. Only asked
+ * under the advanced settings; otherwise the saved choice, --currency, or US dollars.
  * @param {Ctx} ctx
  */
 export async function askReportingCurrency(ctx) {
@@ -575,11 +592,9 @@ export async function planKeyVault(ctx, pre, location) {
     } else {
       kv.existing = false;
       await askResourceGroup(ctx, subscriptionId);
-      kv.location = await ui.input('Azure region', { default: kv.location ?? location });
-      kv.name = await ui.input('Vault name (globally unique)', {
-        default: kv.name ?? `valuelens-${randomBytes(3).toString('hex')}`,
-        validate: validateVaultName,
-      });
+      kv.location = asksAdvanced(ctx) ? await ui.input('Azure region', { default: kv.location ?? location }) : kv.location ?? location;
+      const suggested = kv.name ?? `valuelens-${randomBytes(3).toString('hex')}`;
+      kv.name = asksAdvanced(ctx) ? await ui.input('Vault name (globally unique)', { default: suggested, validate: validateVaultName }) : suggested;
       const available = await api.arm.checkVaultName(subscriptionId, kv.name);
       if (!available.nameAvailable) throw new Error(`Key Vault name "${kv.name}" is taken: ${available.message ?? 'choose another'}.`);
       // Contributor on just the resource group is enough for the vault, so roles are checked where it goes.
@@ -592,7 +607,7 @@ export async function planKeyVault(ctx, pre, location) {
     if (kv.mode !== 'keyvault-admin') delete kv.handoff;
     break;
   }
-  kv.secretName = await ui.input('Secret name', { default: kv.secretName, validate: (v) => (/^[0-9a-zA-Z-]{1,127}$/.test(v) ? true : 'Letters, digits and hyphens only.') });
+  if (asksAdvanced(ctx)) kv.secretName = await ui.input('Secret name', { default: kv.secretName, validate: (v) => (/^[0-9a-zA-Z-]{1,127}$/.test(v) ? true : 'Letters, digits and hyphens only.') });
 }
 
 const NOTEBOOK = 'notebook';
@@ -606,8 +621,9 @@ const NOTEBOOK = 'notebook';
 async function askResourceGroup(ctx, subscriptionId) {
   const { ui, config, api } = ctx;
   const kv = config.keyVault;
-  for (;;) {
-    kv.resourceGroup = (await ui.input('Resource group (created if missing)', { default: kv.resourceGroup ?? 'rg-valuelens' })).trim();
+  for (let ask = asksAdvanced(ctx); ; ask = true) {
+    const name = kv.resourceGroup ?? 'rg-valuelens';
+    kv.resourceGroup = (ask ? await ui.input('Resource group (created if missing)', { default: name }) : name).trim();
     if (await api.arm.getResourceGroup(subscriptionId, kv.resourceGroup).catch(() => null)) return;
     const perms = await api.arm.permissions(`/subscriptions/${subscriptionId}`).catch(() => null);
     if (!perms || allowsAction(perms, 'Microsoft.Resources/subscriptions/resourceGroups/write')) return;

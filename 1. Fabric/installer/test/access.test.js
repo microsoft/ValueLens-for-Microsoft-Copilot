@@ -89,6 +89,24 @@ test('access: the plan asks for a new group by default, with you as the contact'
   assert.equal(review.grants[0].what, 'Build (ReadExplore)');
 });
 
+test('access: without Advanced settings, a new viewer group with you as contact, no questions', async () => {
+  const { ui, asked } = fakeUi();
+  const { ctx } = fakeCtx({ graph: directory().graph, ui });
+  ctx.advanced = false;
+  await planAccess(ctx);
+  assert.deepEqual(ctx.config.access, { groupName: VIEWER_GROUP_NAME, contact: 'admin@contoso.com' });
+  assert.deepEqual(asked, []);
+
+  // A re-run keeps the group, contact and link it had.
+  const saved = { groupId: 'g-9', groupName: 'Copilot Leads', createdGroup: false, contact: 'leads@contoso.com', requestUrl: 'https://myaccess.microsoft.com/x' };
+  const again = fakeCtx({ graph: directory().graph, ui });
+  again.ctx.advanced = false;
+  again.config.access = { ...saved };
+  await planAccess(again.ctx);
+  assert.deepEqual(again.config.access, saved);
+  assert.deepEqual(asked, []);
+});
+
 test('access: an existing group is found by name, asking again until it exists', async () => {
   const dir = directory();
   dir.groups.set('g-9', { id: 'g-9', displayName: 'Copilot Leads', members: [], owners: [] });

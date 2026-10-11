@@ -14,6 +14,7 @@ import { isResumeLater } from './steps/identity.js';
 import { isManagementGroupId, managementGroupId } from './steps/resource-graph.js';
 import { isVivaId } from './transform/dataflow.js';
 import { c, createUi } from './ui.js';
+import { CURRENCIES, DEFAULT_CURRENCY, parseRate, toCurrencyCode } from './currency.js';
 import { DATA_SOURCE_IDS, modulesFromSources, parseDataFlags } from './uploads.js';
 
 const COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'access', 'upload', 'uninstall', 'prereqs', 'preview'];
@@ -77,6 +78,10 @@ Options:
                        and Foundry from (needs resourceGraph=api). Default: the whole tenant
   --no-arg-agents      With install: leave Copilot Studio agents out of Resource Graph
   --no-arg-foundry     With install: leave Foundry resources out of Resource Graph
+  --currency <code>    With install: the currency the Value page reports in, e.g. GBP. Default USD.
+                       ${CURRENCIES.map((cur) => cur.code).join(', ')}
+  --exchange-rate <n>  With --currency: how many of it to 1 US dollar, e.g. 0.79. Without it,
+                       set the rate under Prices in the app
   --run                 With upload: run the pipeline straight after, to load the files now
   --secret-in-notebook With install: store the client secret in plain text in the notebooks instead
                        of Key Vault. Not recommended: for quick tests only. Needed with --yes.
@@ -120,6 +125,8 @@ export function parseCli(argv) {
       'arg-management-group': { type: 'string' },
       'no-arg-agents': { type: 'boolean' },
       'no-arg-foundry': { type: 'boolean' },
+      currency: { type: 'string' },
+      'exchange-rate': { type: 'string' },
       run: { type: 'boolean' },
       'secret-in-notebook': { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
@@ -133,7 +140,7 @@ export function parseCli(argv) {
   if (values.run && command !== 'upload') throw new Error('--run goes with upload.');
   if (values['secret-in-notebook'] && command !== 'install') throw new Error('--secret-in-notebook goes with install.');
   if (values['secret-in-notebook'] && values.target === 'azure') throw new Error('--secret-in-notebook is for the Fabric target only.');
-  const installOnly = ['feedback-flow', 'studio-flow', 'flow-environment', 'flow-identity', 'viva-partition', 'viva-query', 'arg-management-group', 'no-arg-agents', 'no-arg-foundry'].filter((k) => values[/** @type {'feedback-flow'} */ (k)] !== undefined);
+  const installOnly = ['feedback-flow', 'studio-flow', 'flow-environment', 'flow-identity', 'viva-partition', 'viva-query', 'arg-management-group', 'no-arg-agents', 'no-arg-foundry', 'currency', 'exchange-rate'].filter((k) => values[/** @type {'feedback-flow'} */ (k)] !== undefined);
   if ((values.data?.length || values.csv?.length || installOnly.length) && !['install', 'preview'].includes(command)) {
     throw new Error(`--data, --csv${installOnly.map((k) => ` and --${k}`).join('')} go with install. To add exports later, use upload.`);
   }
@@ -147,6 +154,17 @@ export function parseCli(argv) {
   const argManagementGroup = values['arg-management-group'] === undefined ? undefined : managementGroupId(values['arg-management-group']);
   if (argManagementGroup && !isManagementGroupId(argManagementGroup)) throw new Error('--arg-management-group should be a management group ID, as the Azure portal shows it under Management groups.');
   if (values['no-arg-agents'] && values['no-arg-foundry']) throw new Error('--no-arg-agents and --no-arg-foundry together leave Resource Graph nothing to read. Use --data resourceGraph=skip.');
+  const currency = values.currency === undefined ? undefined : toCurrencyCode(values.currency);
+  if (values.currency !== undefined && !currency) throw new Error(`--currency should be one of ${CURRENCIES.map((cur) => cur.code).join(', ')}.`);
+  /** @type {number | undefined} */
+  let exchangeRate;
+  if (values['exchange-rate'] !== undefined) {
+    if (!currency) throw new Error('--exchange-rate goes with --currency, e.g. --currency GBP --exchange-rate 0.79.');
+    if (currency === DEFAULT_CURRENCY) throw new Error('Licences and credits are billed in US dollars, so USD needs no --exchange-rate.');
+    const rate = parseRate(values['exchange-rate']);
+    if (typeof rate !== 'number') throw new Error(`--exchange-rate: ${typeof rate === 'string' ? rate : 'Type a number above 0.'}`);
+    exchangeRate = rate;
+  }
   /** @type {string | undefined} */
   let flowEnvironment;
   if (values['flow-environment'] !== undefined) {
@@ -160,6 +178,7 @@ export function parseCli(argv) {
   if (values.target !== undefined && values.target !== 'fabric' && values.target !== 'azure') throw new Error('--target must be "fabric" or "azure".');
   if (values.ui && (positionals.length || values['dry-run'])) throw new Error('--ui opens a home page where you choose what to do. Leave out the command.');
   if (values.ui && values.yes) throw new Error('Choose one of --ui and --yes.');
+  if (values.ui && (values.currency !== undefined || values['exchange-rate'] !== undefined)) throw new Error('With --ui, choose the currency under Advanced settings.');
   if (values.ui && (values.data?.length || values.csv?.length || installOnly.length)) throw new Error('With --ui, choose data sources and exports on the Data sources page.');
   /** @type {number | undefined} */
   let backfillDays;
@@ -192,6 +211,8 @@ export function parseCli(argv) {
     argManagementGroup,
     argAgents: values['no-arg-agents'] ? false : undefined,
     argFoundry: values['no-arg-foundry'] ? false : undefined,
+    currency,
+    exchangeRate,
     files,
     run: values.run,
     secretInNotebook: !!values['secret-in-notebook'],
@@ -206,10 +227,10 @@ export function version() {
 }
 
 /**
- * Applies --data, the flow flags and the Viva IDs to the install record's answers. The Data
- * sources screen then opens with them, and --yes takes them as they are.
+ * Applies --data, the flow flags, the Viva IDs and the currency to the install record's answers. The
+ * Data sources screen then opens with them, and --yes takes them as they are.
  * @param {import('./config.js').InstallConfig} config
- * @param {{ dataSources: Partial<import('./uploads.js').DataSourceModes>, feedbackFlow?: boolean, studioFlow?: boolean, flowEnvironment?: string, flowIdentity?: import('./config.js').FlowIdentity, vivaPartition?: string, vivaQuery?: string, argManagementGroup?: string, argAgents?: boolean, argFoundry?: boolean }} args
+ * @param {{ dataSources: Partial<import('./uploads.js').DataSourceModes>, feedbackFlow?: boolean, studioFlow?: boolean, flowEnvironment?: string, flowIdentity?: import('./config.js').FlowIdentity, vivaPartition?: string, vivaQuery?: string, argManagementGroup?: string, argAgents?: boolean, argFoundry?: boolean, currency?: string, exchangeRate?: number }} args
  */
 export function applyDataFlags(config, args) {
   // --studio-flow and --feedback-flow are from before each flow was its source's api mode: with csv (as the old docs had it) or alone, they mean api.
@@ -233,6 +254,11 @@ export function applyDataFlags(config, args) {
     }
     if (args.argAgents !== undefined) rg.agents = args.argAgents;
     if (args.argFoundry !== undefined) rg.foundry = args.argFoundry;
+  }
+  if (args.currency) {
+    // A saved rate for the same currency stays unless a new one is given.
+    const rate = args.exchangeRate ?? (config.reporting?.currency === args.currency ? config.reporting.exchangeRate : undefined);
+    config.reporting = args.currency !== DEFAULT_CURRENCY && rate ? { currency: args.currency, exchangeRate: rate } : { currency: args.currency };
   }
 }
 

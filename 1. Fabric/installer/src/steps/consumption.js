@@ -36,14 +36,15 @@ export const COWORK_DATAFLOW_NAME = 'AnalyticsHub_Cowork_Credits';
  * How to give the Cowork Dataflow its sign-ins. The editor's preview uses the user's own sign-in, so
  * rows can show there while every refresh still fails until the connections are saved with the Dataflow.
  * @param {import('../config.js').InstallConfig} config
- * @returns {string[]}
+ * @returns {string[]} One whole step each, to show numbered.
  */
 export function coworkSignInSteps(config) {
   const name = config.consumption?.dataflowName ?? COWORK_DATAFLOW_NAME;
   return [
-    `Open ${name} in ${config.fabric.workspaceName ?? 'the workspace'} and choose Edit dataflow. Under Home > Manage connections,`,
-    `sign in to Viva Insights and to ${config.fabric.lakehouseName ?? 'the Lakehouse'} (Edit on any without a connection). Then choose`,
-    'Save, wait until it says the Dataflow is published, and choose Refresh now. Rows in the preview alone are not enough.',
+    `Open ${name} in ${config.fabric.workspaceName ?? 'the workspace'} and choose Edit dataflow.`,
+    `Under Home > Manage connections, sign in to Viva Insights and to ${config.fabric.lakehouseName ?? 'the Lakehouse'} (Edit on any without a connection).`,
+    'Choose Save and wait until it says the Dataflow is published.',
+    'Choose Refresh now. Rows in the preview alone are not enough.',
   ];
 }
 
@@ -125,7 +126,8 @@ export async function ensureCoworkDataflow(ctx) {
     cc.dataflowSignature = signature;
     ctx.save();
     ui.ok(`Dataflow ${name} reads Viva Insights query ${cc.vivaQuery} into ${COWORK_DATAFLOW_TABLE}`);
-    for (const line of coworkSignInSteps(config)) ui.info(line);
+    ui.info('Give it its sign-ins:');
+    coworkSignInSteps(config).forEach((step, i) => ui.info(`  ${i + 1}. ${step}`));
   } catch (err) {
     // A Dataflow that exists but never got its definition would only fail on every run.
     if (!cc.dataflowSignature) toCsv(`Couldn't set up the Cowork credits Dataflow (${/** @type {Error} */ (err).message}).`);
@@ -458,9 +460,10 @@ export function consumptionSummary(ctx) {
 
   if (coworkDataflowOn(config)) {
     ui.info(c.bold('Cowork credits') + c.dim(`  (Dataflow ${cc.dataflowName ?? COWORK_DATAFLOW_NAME}, refreshed by the pipeline)`));
-    coworkSignInSteps(config).forEach((line, i) => ui.info(`${i ? '     ' : '  1. '}${line}`));
+    const steps = coworkSignInSteps(config);
+    steps.forEach((step, i) => ui.info(`  ${i + 1}. ${step}`));
     ui.info('     Until then, each pipeline run notes that the refresh failed.');
-    ui.info('  2. Keep the Viva Insights query on Auto-refresh. The pipeline refreshes the Dataflow before each Viva load.');
+    ui.info(`  ${steps.length + 1}. Keep the Viva Insights query on Auto-refresh. The pipeline refreshes the Dataflow before each Viva load.`);
     ui.note(`     Guide: ${DATAFLOW_GUIDE}`);
     ui.note(`     Exports of earlier weeks can still go in ${UPLOAD_DIR}: the Dataflow wins for the weeks it covers.`);
   } else if (ds.coworkCredits === 'csv') {

@@ -47,8 +47,10 @@ you're responsible for the data once it's in your workspace.
 3. After about a minute, it opens in your browser. Keep the installer window open until you're
    done.
 4. Choose **Set up Analytics Hub** and sign in with your work account.
-5. Answer the questions. The defaults suit most organisations. Under **What to collect**, tick the
-   data you want. **Back** takes you to the previous question, with your answer filled in.
+5. Answer the questions. Under **Data sources**, choose the data you want. Then **Change the
+   advanced settings?** **No** takes the defaults, which suit most organisations: see
+   [Advanced settings](installer/README.md#advanced-settings). **Back** takes you to the previous
+   question, with your answer filled in.
 6. Check the plan and approve it. Nothing is created until you do.
 7. Wait for it to finish. It sets everything up, loads the first data and gives you a link to the
    app.

@@ -126,15 +126,15 @@ names.
 
 ### Demo mode
 
-After the data tick boxes, the wizard asks which data the dashboard shows. **Demo mode (sample data)**
+Under [Advanced settings](#advanced-settings), the wizard asks which data the dashboard shows. **Demo mode (sample data)**
 deploys everything as usual but sets `VALUELENS_SAMPLE_DATA=true` on the run job, so each run publishes
 the synthetic sample bundled in the jobs image (dates moved forward to end last week) instead of calling
-the tenant's APIs. It's recorded as `azure.sampleData`. To switch to tenant data, run the installer again
-and pick **Your tenant's data**; the next run replaces the sample.
+the tenant's APIs. It's recorded as `azure.sampleData`. To switch to tenant data, run the installer again,
+choose **Yes** for the advanced settings and pick **Your tenant's data**; the next run replaces the sample.
 
 ### Networking
 
-The wizard asks how the app, jobs and Power BI reach Azure SQL and Storage:
+Under [Advanced settings](#advanced-settings), the wizard asks how the app, jobs and Power BI reach Azure SQL and Storage:
 
 - **Public endpoints** (default). SQL allows Azure services and Power BI connects to it directly.
 - **Private networking**. Choose this where Azure Policy keeps public network access off (common on
@@ -190,28 +190,18 @@ Azure commands:
    1. **Data sources.** Each source has a card: **Connected (API)**, **Upload CSV** or **Skip**.
       Copilot usage, licences and org data are always connected. Microsoft 365 activity is
       connected by default; the rest are skipped until you choose otherwise. A CSV card says
-      where to export the file, and you can pick the exports to upload now. See
+      where to export the file, and you can pick the exports to upload now. A source that needs
+      more to work asks for it next, such as the Power Platform environment for a flow. See
       [Data sources and exports](#data-sources-and-exports).
-   2. **Power BI:** the semantic model, the Power BI reports and the app (the default). Or the
-      model and reports, the model and app, the model only, or neither. See
-      [Power BI reports](#power-bi-reports).
-   3. **How much audit history** to load first: 30 (the default), 90 or 180 days. You can load
-      more later. See [Load more audit history](#load-more-audit-history).
-   4. **Capacity, workspace and Lakehouse.** Spaces and hyphens in the Lakehouse name become
-      underscores, because Fabric doesn't allow them. With the capacity comes **how many people
-      are in the tenant**: up to 10,000, or more. See [A large tenant](#a-large-tenant).
-   5. **App registration:** create one, use your own (it's checked first), or let an admin
+   2. **Change the advanced settings?** **No** (the default) takes the defaults that suit most
+      organisations. See [Advanced settings](#advanced-settings).
+   3. **Capacity and workspace.** The Lakehouse is named `ValueLens`, or the next free name.
+   4. **App registration:** create one, use your own (it's checked first), or let an admin
       register it. See [If you can't register apps](#if-you-cant-register-apps).
-   6. **Key Vault:** create one, or pick one you have. If you can't write to it, a vault admin
+   5. **Key Vault:** create one, or pick one you have. If you can't write to it, a vault admin
       can add the secret. See [Where the secret goes](#where-the-secret-goes).
-   7. **Schedule:** daily or weekly, and the time (UTC).
-   8. **Whether to run the first load** now.
-   9. **Currency for the Value page:** US dollars (the default) or another, such as euros or
-      pounds. For another currency you can type how many of it make $1, or leave it blank and set
-      it under **Prices** in the app. Licences and credits are billed in dollars, so this rate
-      converts the costs. It also sets the Power BI model's currency symbol. Nothing is looked up
-      online. The Azure setup asks the same question.
-6. Check the plan and approve it. Nothing is created until you do.
+6. Check the plan and approve it. Nothing is created until you do. The plan shows every setting,
+   including the defaults.
 7. When it finishes, open the link to the app.
 
 **Want to change an answer?** Choose **Back**, on any question or on the plan. It opens the
@@ -230,6 +220,36 @@ didn't create. If one of its names is taken, its own item gets the next free nam
 `AnalyticsHub_Pipeline`, the `Analytics Hub SQL …` connection and the `Analytics Hub Data Collector`
 app registration. An install from an earlier version keeps the names it already has, such as
 `ValueLens Model`.
+
+### Advanced settings
+
+After the data sources, the installer asks **Change the advanced settings?** With **No** (the
+default, and what `--yes` answers) it uses what you chose last time, or else the defaults below.
+With **Yes** it asks about each one as it comes. To change one later, choose **Repair or change**,
+then **Yes**.
+
+| Setting | Default |
+|---|---|
+| [Power BI](#power-bi-reports) | The semantic model, the Power BI reports and the app. Or the model and reports, the model and app, the model only, or neither. |
+| Who can view | A new **Analytics Hub Viewers** group. You're who people ask for access. **Manage access** changes it later. |
+| [Audit history](#load-more-audit-history) for the first load | 30 days. Or 90 or 180. |
+| [How many people are in the tenant](#a-large-tenant) | More than 10,000 on an F64 or larger capacity, otherwise up to 10,000. |
+| Lakehouse name | `ValueLens`, or the next free name. Spaces and hyphens become underscores. |
+| A new Key Vault's resource group, region and name, and the secret's name | `rg-valuelens`, the capacity's region, `valuelens-` and six random characters, and the default secret name. If you can't use `rg-valuelens`, it asks. |
+| Schedule | Daily, at the default time. Or weekly, and the time (UTC). |
+| Run the first load as soon as setup finishes | Yes. |
+| Value page currency | US dollars. See below. |
+| [Agent configuration and Foundry](#agent-configuration-and-foundry) | The whole tenant, agents and Foundry. |
+
+**Currency for the Value page.** Licences and credits are billed in US dollars, so it reports in
+dollars unless you choose another, such as euros or pounds. For another currency you can type how
+many of it make $1, or leave it blank and set it under **Prices** in the app. It also sets the
+Power BI model's currency symbol. Nothing is looked up online. To choose it without the question,
+use `install --currency GBP --exchange-rate 0.79`. The installer keeps your choice for next time.
+
+The [Azure target](#azure-target-preview) asks the same question. Its advanced settings also cover
+[demo mode](#demo-mode), the Azure SQL region, the name prefix, extra tags,
+[networking](#networking), where credits come from, and agent configuration and Foundry.
 
 ## After it finishes
 
@@ -341,7 +361,8 @@ load's time grows with the days of history. With 30 days a tenant of up to 10,00
 loads in under an hour. Later runs load only what's new.
 
 On a tenant with tens of thousands of people, choose **More than 10,000** when asked how many
-people are in the tenant. It's chosen for you on an F64 or larger capacity. Then:
+people are in the tenant, under [Advanced settings](#advanced-settings). It's chosen for you on an
+F64 or larger capacity. Then:
 
 - The audit log is read in 2-hour windows instead of 24-hour ones. A long window can hold too many
   records, and the audit service fails it after an hour or more. A window that fails is split after
@@ -354,8 +375,9 @@ people are in the tenant. It's chosen for you on an F64 or larger capacity. Then
 
 Expect the first load to take several hours. Start with 30 days, use an F64 or larger capacity,
 and [load more history](#load-more-audit-history) later. Don't run audit searches in the
-Purview portal while it loads. To change the tenant size, choose **Repair or change** and answer
-again. An install from an earlier version keeps its audit windows and time limits until you do.
+Purview portal while it loads. To change the tenant size, choose **Repair or change**, then **Yes**
+for the advanced settings. An install from an earlier version keeps its audit windows and time
+limits until you do.
 
 ### Load more audit history
 
@@ -492,6 +514,7 @@ addresses, the M365 Copilot licence flag and the exact prepaid split.
 | Have the flows write as the app, with its secret in Key Vault | `install --flow-identity app` |
 | Read Cowork credits with a Dataflow | `install --data coworkCredits=api --viva-partition <id> --viva-query <id>` |
 | Read agent configuration and Foundry from Resource Graph | `install --data resourceGraph=api --arg-management-group <id>` |
+| Report the Value page in another currency | `install --currency GBP --exchange-rate 0.79` |
 | Upload exports later, then load them now | `upload feedback.csv agents.csv --run` |
 | Run only the loads that failed last time | `rerun-failed` |
 | Add viewers or owners to the viewer group, or choose another group | `access` |
@@ -504,6 +527,9 @@ works: it's the same as `productFeedback=flow`.
 Without `--flow-environment`, the installer asks which environment to use.
 With `resourceGraph=api`, `--arg-management-group <id>` reads one management group rather than the
 whole tenant, and `--no-arg-agents` or `--no-arg-foundry` leaves agents or Foundry out.
+`--currency <code>` sets the Value page currency (US dollars by default), and `--exchange-rate <n>`
+how many of it make $1. Without the rate, set it under **Prices** in the app. In the browser, choose
+the currency under [Advanced settings](#advanced-settings) instead.
 
 ## Microsoft 365 activity
 
@@ -580,7 +606,9 @@ Optional and off by default. On the Data sources screen set **Agent configuratio
 model and channels), Power Platform environments, agent flows, and Foundry resources and projects,
 into `arg_agent_config`, `arg_environments`, `arg_agent_flows`, `arg_foundry_resources` and
 `arg_status`. An agent's authentication setting feeds the Agent 365 registry's *Sign-in Required*
-column, ahead of Defender when both are on. It reads one management group, or the tenant root group if you leave it blank. It
+column, ahead of Defender when both are on. It reads the tenant root group, or under
+[Advanced settings](#advanced-settings) one management group you name. On Azure, turn it on under
+Advanced settings. It
 never fails for want of a role: what it couldn't read is in `arg_status`, in plain words.
 
 Whoever runs the load (the app registration, or on Azure the jobs' managed identity) needs:

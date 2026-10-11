@@ -19,6 +19,34 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ## Unreleased
 
+### Changed: fewer questions, with the rest under Advanced settings
+
+**What changed.** The installer had gained a question for each new option: the reporting currency,
+who can view, the schedule, Resource Graph's scope and more. A first install now asks only what it
+can't guess.
+
+- **The short path.** Fabric: sign in, the data sources, the capacity and workspace, the app
+  registration and the Key Vault. Azure: sign in, what to collect, the subscription, resource group,
+  region and Power BI workspace. A source that can't work without more, such as a flow's Power
+  Platform environment, still asks for it.
+- **Advanced settings.** One new question, **Change the advanced settings?**, comes after the data
+  sources. **No**, the default and what `--yes` answers, keeps what you chose last time or takes the
+  defaults. **Yes** asks as before: the Power BI items, who can view, audit history, tenant size,
+  the Lakehouse name, a new vault's details, the schedule, the first load, the currency and
+  Resource Graph's scope. On Azure it also covers demo mode, the SQL region, the name prefix, tags,
+  networking and where credits come from. The plan still shows every setting before you approve it.
+- **No currency question.** The Value page reports in US dollars unless you choose another under
+  Advanced settings, with `install --currency GBP --exchange-rate 0.79`, or later under **Prices**
+  in the app. A saved choice is kept.
+- **Without Advanced settings,** a new install creates the **Analytics Hub Viewers** group with you
+  as the contact, and a new Key Vault goes in `rg-valuelens` (it asks if you can't use that).
+
+**Why.** Each option made sense alone, but together they made the first install long. Most
+organisations take the defaults.
+
+**What you need to do.** Nothing. Saved answers in `valuelens-install.json` still apply, and every
+flag still works.
+
 ### Fixed: currency separators shown as "?" and Build not granted to a new viewers group
 
 - The plan's currency line and the Value page's cost summary showed **USD ? US dollar** and
@@ -27,6 +55,14 @@ Deployment instructions do **not** live here. They live in the path READMEs:
   to give it Build on the models (*"Parameter identifier is missing or invalid"*), because Power BI
   hadn't seen the new group yet. It now waits and retries for up to two minutes. To fix an install
   that hit this, run the installer's **access** command.
+
+### Fixed: the browser page
+
+- Only one scrollbar on the right: the page no longer scrolls behind the log.
+- The steps on the left show only the chosen target's. A Fabric install no longer shows **Done**
+  struck through, or Azure steps that never come.
+- The Cowork credits Dataflow's sign-in steps show as numbered steps rather than broken lines, in
+  the terminal too.
 
 ---
 

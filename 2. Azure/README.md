@@ -15,13 +15,17 @@ The design and the roadmap are in [`docs/plans/AZURE-HOSTED-PLAN.md`](../docs/pl
 1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe)
    (0.3.0 or later) and open it, or run `npx valuelens-install --ui` from `1. Fabric/installer` after
    `npm install` (see [Without the exe](../1.%20Fabric/installer/README.md#without-the-exe)).
-2. Pick **Your Azure subscription**, tick the data to collect, and choose which data the dashboard shows:
-   - **Your tenant's data** collects from the audit log and Microsoft Graph.
+2. Pick **Your Azure subscription** and tick the data to collect. **Change the advanced settings?**
+   **No** takes the defaults that suit most organisations: see
+   [Advanced settings](../1.%20Fabric/installer/README.md#advanced-settings). With **Yes** you can also
+   choose which data the dashboard shows:
+   - **Your tenant's data** (the default) collects from the audit log and Microsoft Graph.
    - **Demo mode (sample data)** publishes a synthetic sample instead, with its dates moved forward to end
      last week. It's handy for a demo or to try Analytics Hub before the Graph permissions are granted. Run
-     the installer again, choose **Repair or change** and pick your tenant's data to switch; the next run
-     replaces the sample.
-3. Review the plan and approve it. The installer prints the web app's URL and writes `AnalyticsHub-Teams.zip`.
+     the installer again, choose **Repair or change**, then **Yes** for the advanced settings, and pick
+     your tenant's data to switch; the next run replaces the sample.
+3. Choose the subscription, resource group, region and Power BI workspace.
+4. Review the plan and approve it. The installer prints the web app's URL and writes `AnalyticsHub-Teams.zip`.
 
 ## Share it
 
