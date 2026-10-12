@@ -3,6 +3,11 @@ name: installer-exe
 # Builds AnalyticsHubInstaller.exe, the download that runs the Fabric installer without a clone
 # of this repo or a terminal. A tag such as installer-v0.1.0 also drafts a release with it, to
 # publish by hand.
+#
+# Signing: the exe is Authenticode-signed with ESRP outside this workflow (see
+# packaging/sign-installer.azure-pipelines.yml), which replaces the draft's exe, .sha256 and notes.
+# Publishing a release runs the check below. With the repo variable REQUIRE_SIGNED_INSTALLER set to
+# true, it turns an unsigned release back into a draft, so releases/latest keeps the last good one.
 
 on:
   workflow_dispatch:
@@ -12,6 +17,8 @@ on:
     paths:
       - '1. Fabric/installer/packaging/**'
       - '.github/workflows/installer-exe.yml'
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -19,6 +26,7 @@ permissions:
 jobs:
   build:
     name: Build the installer exe
+    if: github.event_name != 'release'
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -71,6 +79,11 @@ jobs:
           if ($LASTEXITCODE) { throw "preview failed with exit code $LASTEXITCODE." }
           if (-not (Test-Path (Join-Path $preview 'model.bim'))) { throw 'preview wrote no model.bim.' }
 
+      # Run on the exe that gets published, after any signing: signing changes the hash.
+      - name: Check the signature, write the hash and the release notes
+        working-directory: '1. Fabric/installer'
+        run: node packaging/finish-exe.js "${{ runner.temp }}\exe\AnalyticsHubInstaller.exe" --notes "${{ runner.temp }}\release-notes.md"
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: AnalyticsHubInstaller
@@ -79,10 +92,16 @@ jobs:
             ${{ runner.temp }}\exe\AnalyticsHubInstaller.exe.sha256
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-notes
+          path: ${{ runner.temp }}\release-notes.md
+          if-no-files-found: error
+
   release:
     name: Draft the release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/installer-v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/installer-v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -90,6 +109,10 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: AnalyticsHubInstaller
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-notes
+          path: notes
       - name: Draft the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -97,5 +120,39 @@ jobs:
         run: |
           gh release create "$TAG" AnalyticsHubInstaller.exe AnalyticsHubInstaller.exe.sha256 \
             --repo "$GITHUB_REPOSITORY" --draft \
-            --notes "Download AnalyticsHubInstaller.exe and open it. Steps: https://github.com/$GITHUB_REPOSITORY/tree/main/1.%20Fabric#install" \
+            --notes-file notes/release-notes.md \
             --title "Analytics Hub installer ${TAG#installer-v}"
+
+  check-published:
+    name: Check the published exe
+    if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'installer-v')
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Download the published exe
+        run: gh release download $env:TAG --repo $env:GITHUB_REPOSITORY --dir "$env:RUNNER_TEMP\published" --pattern AnalyticsHubInstaller.exe --pattern AnalyticsHubInstaller.exe.sha256
+
+      - name: Check its signature and hash
+        working-directory: '1. Fabric/installer'
+        env:
+          REQUIRE_SIGNED: ${{ vars.REQUIRE_SIGNED_INSTALLER }}
+        run: |
+          $require = if ($env:REQUIRE_SIGNED -eq 'true') { '--require-signed' } else { $null }
+          node packaging/finish-exe.js "$env:RUNNER_TEMP\published\AnalyticsHubInstaller.exe" --check-hash $require
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Turn the release back into a draft
+        if: failure()
+        run: |
+          gh release edit $env:TAG --repo $env:GITHUB_REPOSITORY --draft=true
+          Write-Output "::error::$env:TAG is a draft again. Fix the exe or its .sha256, then publish it again."

@@ -60,7 +60,14 @@ when something a published download needs is missing; `--out <dir>` writes the e
 The [`installer-exe`](.github/workflows/installer-exe.yml) workflow builds, tests and smoke-tests
 the exe on pull requests that touch `packaging/`. To publish one, set the version in
 `1. Fabric/installer/package.json` and push a tag `installer-v<version>`. The workflow drafts a
-release with the exe and its SHA-256; review it and publish.
+release with the exe, its SHA-256 and the release notes from `packaging/finish-exe.js`.
+
+Signing happens in CI, never on your computer. Run the ESRP pipeline
+([`packaging/sign-installer.azure-pipelines.yml`](1.%20Fabric/installer/packaging/sign-installer.azure-pipelines.yml))
+with the tag. It signs the draft's exe with the Microsoft Corporation certificate and replaces its
+exe, hash and notes. Then review the draft and publish it. Publishing checks the exe against its
+hash. With the repo variable `REQUIRE_SIGNED_INSTALLER` set to `true`, it also requires the
+signature. A release that fails goes back to being a draft.
 
 ## Repository conventions
 

@@ -17,6 +17,39 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## 2026-10-12 — Analytics Hub installer download: checking it, and getting it signed
+
+**Nothing to update.** This changes how the exe is released, not what it does.
+
+### Changed: the download explains its warnings and how to check it
+
+**Why.** The exe isn't code-signed yet, so Edge says it "isn't commonly downloaded" and Windows
+SmartScreen may block it. That's a reputation warning, not a malware detection. An unsigned file
+builds reputation by its hash, so each new version starts again from nothing.
+
+- **Release notes** now list the exe's SHA-256, show the PowerShell command that checks it, and
+  say what to click past the warnings. For a signed exe they say how to see the signature instead.
+- **READMEs.** A new [Check the download](1.%20Fabric/installer/README.md#check-the-download)
+  section, linked from every download link, has the same steps and points to
+  [running it with Node.js](1.%20Fabric/installer/README.md#without-the-exe) for organisations that
+  block the download.
+
+### Added: the release is ready for ESRP signing
+
+- `packaging/sign-installer.azure-pipelines.yml` is an Azure DevOps pipeline. It signs a drafted
+  release's exe with ESRP using the Microsoft Corporation certificate, checks the signature, then
+  replaces the draft's exe, `.sha256` and notes. Signed exes take the publisher's SmartScreen
+  reputation, so new versions don't trigger the warning. It needs ESRP onboarding before it can run.
+- `packaging/finish-exe.js` checks that a signature is valid, from Microsoft Corporation and
+  timestamped. It writes or checks the `.sha256` and writes the release notes. The `installer-exe`
+  workflow and the signing pipeline both use it.
+- **Publishing check.** When an installer release is published, `installer-exe` downloads the exe and
+  checks it against its `.sha256`. With the repo variable `REQUIRE_SIGNED_INSTALLER` set to `true`, it
+  also requires the signature. A release that fails goes back to being a draft, so the download link
+  keeps serving the last good version.
+
+---
+
 ## 2026-10-12 — Analytics Hub installer 0.4.2
 
 **Update an existing install:** download installer 0.4.2, open it and choose **Repair or change**.

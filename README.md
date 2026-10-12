@@ -15,7 +15,8 @@ https://github.com/user-attachments/assets/2aa65c5d-2a20-4d51-9f1d-072c712fb4f3
 
 **Have Fabric?** [Download the Analytics Hub installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe),
 open it and follow the steps in your browser. Check
-[what you need](docs/PREREQUISITES.md) first.
+[what you need](docs/PREREQUISITES.md) first. If Edge or Windows warns about the download, see
+[Check the download](1.%20Fabric/installer/README.md#check-the-download).
 
 **New here?** Read the [📖 Report Interpretation Guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf) — a page-by-page walkthrough of every report page.
 
