@@ -1,12 +1,11 @@
 # Roles & permissions — one-page reference
 
 Everything you need to grant to stand up ValueLens, least-privilege. The **core source grants
-are the same on every path** — only the last section (Fabric workspace & capacity) is
-Fabric-specific. Three kinds of permission are involved:
+are the same on every path**. Paths 1 and 2 (Fabric and Azure) are Analytics Hub, which has
+[its own reference](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/docs/PERMISSIONS.md) for the rest. Three kinds of permission are involved:
 
 - **App permission / role** — what an automated (unattended) pull needs.
 - **Export role** — the admin-portal role a person needs to download the data by hand.
-- **Fabric workspace role** — needed to run the notebooks/pipeline and write to the Lakehouse.
 
 > Optional sources are opt-in. Skip any you don't use — the dashboard still works (those pages load empty).
 
@@ -61,68 +60,28 @@ projects. Used by `Copilot_Resource_Graph_Ingester` (Fabric, as the app registra
 
 No per-project agent sweep: Foundry is read at account and project level only.
 
-> **Add-ons.** [Agent Evaluator](../1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/README.md) needs the app
+> **Add-ons.** [Agent Evaluator](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/fabric/Add%20Agent%20Evaluator/README.md) needs the app
 > registration as a Dataverse **application user**.
-> [Credit consumption](../1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/README.md) lists its own roles.
+> [Credit consumption](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/fabric/Add%20Credit%20Consumption/README.md) lists its own roles.
 
 ---
 
-## Fabric workspace & capacity (path 1 only)
+## Fabric and Azure (paths 1 and 2)
 
-| What | Role / requirement |
-|---|---|
-| Run the notebooks / pipeline, write Delta to the Lakehouse | **Contributor** or **Member** on the Fabric workspace |
-| Let the pipeline's notebooks share one Spark session (the installer turns this on) | **Admin** on the Fabric workspace, to change the workspace Spark setting *High concurrency for pipeline running multiple notebooks*. Without it the installer warns and carries on, and each notebook starts its own session |
-| Record each run's load status in `dbo.load_log` | Nothing extra. The `AnalyticsHub_Load_Status` notebook reads the run it belongs to through the Fabric API, as the person the pipeline runs as (**Contributor** or **Member**) |
-| Land export-only files via the Power Automate flows | The flow's identity (app reg or workspace identity) as **Member/Contributor** on the workspace; tenant setting **“Service principals can use Fabric APIs”** enabled |
-| Installer-created flows (product feedback, Copilot Studio credits) | The installing person: **Environment Maker** (or System Administrator) in the chosen Power Platform environment. The flow owner: a **Power Automate Premium** licence (HTTP with Microsoft Entra ID is premium). By default the flows write to OneLake as the person signed in to their OneLake connection (resource `https://storage.azure.com`), so that person needs **Contributor** or higher on the workspace, and the Fabric tenant setting **Users can access data stored in OneLake with apps external to Fabric** must be on. No secret or Key Vault. With `--flow-identity app`, the app registration gets **Contributor** from the installer instead, and the flow reads its secret through an **Azure Key Vault** connection: the person who signs in to it needs **Key Vault Secrets User**, and the vault must allow public network access |
-| Installer-created Cowork credits Dataflow | The installing person as **Contributor** or **Member** on the workspace. Whoever signs in to the Dataflow needs Viva Insights **Insights Analyst** |
-| Upload exports with the installer, Fabric or OneLake File Explorer (to `Files/analytics_hub_uploads`) | The signed-in person as **Contributor** or **Member** on the workspace. No extra API permission. |
-| Optional SharePoint/OneDrive folder shortcut into the drop folder | Fabric tenant setting for **OneDrive and SharePoint shortcuts** enabled, and read access to the folder for whoever creates the shortcut. Without it, use the Lakehouse folder. |
-| Capacity | Workspace on a Fabric capacity (**F2+** or trial) |
-| Connect the Power BI template | Read on the Lakehouse **SQL endpoint** (the template signs in to it once) |
-| Installer-published Power BI reports | The installing person as **Contributor** or **Member** on the workspace. No extra API permission. The Tornado chart, Word cloud and Deneb visuals need the tenant setting **Allow visuals created using the Power BI SDK** |
-
----
-
-## Credit consumption on Azure (path 2)
-
-| What | Role / requirement |
-|---|---|
-| Copilot Studio flow (the default source) | As on Fabric: **Environment Maker** in the environment, a **Power Automate Premium** licence for the flow owner, and a Power Platform API connection signed in as a **Power Platform Administrator**, **Billing Administrator** or **Global Administrator**. The flow always signs in as the person installing; `--flow-identity app` is Fabric only |
-| The flow writes to the `landing` container (public endpoints) | Whoever signs the flow's storage connection in (resource `https://storage.azure.com`) needs **Storage Blob Data Contributor** on the storage account. The installer assigns it to the person installing if they can assign roles |
-| The flow writes to a SharePoint folder (private networking) | Whoever signs the flow's SharePoint connection in needs to add files to the folder. The jobs' managed identity needs the Graph app role **Sites.Selected** plus **Read** on that site, granted by a SharePoint or Global administrator (the installer does it, or prints the `Grant-PnPAzureADAppSitePermission` command) |
-| Azure AI and pay-as-you-go spend | The jobs' managed identity gets **Reader**, **Cost Management Reader** and **Monitoring Reader** on the Azure AI subscription, and **Cost Management Reader** on each pay-as-you-go subscription. The installer assigns them when the person installing can assign roles there |
-| Cowork credits | No automated pull on Azure yet. Drop the Consumption Dashboard's Viva Insights export (**Insights Analyst**) in the `viva` folder |
-| Azure Resource Graph (module `resourceGraph`) | The jobs' managed identity gets **Reader** at the management group, or the tenant root group, for Foundry, and needs an Entra role such as **Global Reader** for agents. See [Azure Resource Graph](#azure-resource-graph) |
-
----
-
-## Viewing Analytics Hub (paths 1 and 2)
-
-The installer creates one Entra security group, **Analytics Hub Viewers**, with you as its owner (or uses a group you name). Sharing is adding people to it, from the installer's `access` command, **Share** in the app, or [My Groups](https://myaccount.microsoft.com/groups).
-
-| What | Role / requirement |
-|---|---|
-| Create the viewer group | The installing person can create security groups (users can by default; some tenants turn it off). Otherwise an Entra admin creates one and you pick it with `access` |
-| Query the models | The group gets **Build** (ReadExplore) on each model the app reads: `Analytics Hub Model`, and Consumption Central and Agent Evaluator when they're on. The installer grants it as a workspace Admin or Member |
-| Open the Power BI models below F64 | Viewers need a **Power BI Pro** (or PPU) licence unless the workspace is on an F64 or larger capacity |
-| Open the Fabric app (path 1) | Share the app item with the group once (**Share** on the item). After that, membership is enough |
-| Open the Azure web app (path 2) | Membership of the group (the token's `groups` claim, checked with `checkMemberGroups` when a user is in too many groups), or the **AnalyticsHub.User** app role |
-| Add and remove viewers in the Azure app | Group **owners** and **AnalyticsHub.Admin**. The web app calls Graph as the signed-in person with the delegated **GroupMember.ReadWrite.All** scope (admin-consented by the installer); Graph still only lets owners and admins change the group |
-| Add and remove viewers on Fabric | Group owners, in My Groups |
-
-> **Keep viewers off workspace roles.** Even a workspace Viewer can query the Lakehouse's SQL endpoint, and Admins, Members and Contributors skip any row-level security the models add later. Share the app and models through the group instead. Organizational apps (preview) can be an optional landing page that bundles the app and the reports.
+Paths 1 and 2 are Analytics Hub, which moved to
+[microsoft/AnalyticsHub-Dashboard](https://github.com/microsoft/AnalyticsHub-Dashboard). Its
+[permissions reference](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/docs/PERMISSIONS.md) covers the Fabric workspace and capacity, credit
+consumption on Azure and who can view the app. The core and optional source grants above are the same.
 
 ---
 
 ## Quick "who do I ask?" summary
 
-- **Just the core dashboard:** one Entra app reg (3 Graph perms, admin-consented) + Contributor on the workspace.
-- **+ Feedback:** an admin exports the feedback CSV and lands it, by hand or with the flow. No extra API permission. With the installer, choose **Upload CSV** on its Data sources card, or drop it in `Files/analytics_hub_uploads`.
+- **Just the core dashboard:** one Entra app reg (3 Graph perms, admin-consented), or the export roles to download the core files by hand.
+- **+ Feedback:** an admin exports the feedback CSV and lands it where your path reads it. No extra API permission.
 - **+ Agents 365:** add `CopilotPackages.Read.All` + `Application.Read.All` (+ `User.Read.All`) to the same app reg, and confirm the tenant has an Agent 365 licence.
 
 See the path README you're following for the step-by-step —
-[1](../1.%20Fabric/README.md) · [2](../2.%20Azure/README.md) ·
+[1](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/fabric/README.md) · [2](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/azure/README.md) ·
 [3](../3.%20Power%20Automate%20+%20Dataverse/README.md) · [4](../4.%20SharePoint/README.md) ·
 [5](../5.%20Local%20CSV/README.md).

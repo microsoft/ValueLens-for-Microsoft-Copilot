@@ -141,7 +141,7 @@ class DaxVarNames(unittest.TestCase):
     def test_shipped_templates_use_safe_var_names(self):
         reserved = reserved_names()
         templates = shipped_templates()
-        self.assertGreaterEqual(len(templates), 10)
+        self.assertGreaterEqual(len(templates), 6)
         problems = []
         checked = 0
         for path in templates:

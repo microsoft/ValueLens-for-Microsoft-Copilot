@@ -1,8 +1,10 @@
-"""The agent-type classifier copies outside Fabric must not drift from the Fabric notebook rules.
+"""The agent-type classifier copies in the templates must not drift from the Analytics Hub Fabric notebook rules.
 
 - Local CSV processor: an exact source copy of notebook cell 2's classifier, checked by AST and by output.
 - Power Query templates (Local CSV, SharePoint, Dataverse): ValueLensDescribeAgent is an M port. Its
   shipped text is run with tests/m_eval.py over the samples and a combinatorial grid of inputs.
+
+The notebook and Fabric templates are read from ANALYTICS_HUB_ROOT (see analytics_hub.py).
 """
 import ast
 import csv
@@ -13,17 +15,17 @@ import unittest
 import zipfile
 from pathlib import Path
 
+import analytics_hub
 from m_eval import evaluate
-from test_agent_linking import CSV_PROCESSOR, PROCESSOR, audit_row, cells, load_csv_processor
-from test_agent_type_classification import CLASSIFIER_NAMES, NS, SAMPLES
+from test_agent_linking import CSV_PROCESSOR, PROCESSOR, audit_row, cells, load_csv_processor, load_pure
 
 ROOT = Path(__file__).resolve().parents[1]
 FACT = "Chat + Agent Interactions (Audit Logs)"
 AGENT_TYPE_COLS = ["Agent_Key", "Agent_Type", "Agent_Type_Basis", "Agent_Publisher",
                    "Agent_Is_Published", "Agent_Consolidated_Name"]
 FABRIC_TEMPLATES = (
-    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
-    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
+    analytics_hub.FABRIC / "ValueLens - Fabric.pbit",
+    analytics_hub.FABRIC / "ValueLens - Fabric OneLake.pbit",
 )
 M_TEMPLATES = (
     Path("5. Local CSV") / "ValueLens - Local CSV.pbit",
@@ -31,6 +33,58 @@ M_TEMPLATES = (
     Path("3. Power Automate + Dataverse") / "ValueLens - Power Automate + Dataverse.pbit",
 )
 AGENTS_PAGE = "93c52bc8ecf242b91ee4"
+
+TYPE_NAMES = [
+    "AGENT_TYPE_FP_PUBLISHED", "AGENT_TYPE_FP_NON_PUBLISHED", "AGENT_TYPE_FP_M365",
+    "AGENT_TYPE_DECLARATIVE", "AGENT_TYPE_CUSTOM_ENGINE", "AGENT_TYPE_COPILOT_STUDIO",
+    "AGENT_TYPE_FACILITATOR", "AGENT_TYPE_ORG_PUBLISHED", "AGENT_TYPE_SHARED", "AGENT_TYPE_STORE",
+    "AGENT_TYPE_CONNECTED_APP", "AGENT_TYPE_UNCLASSIFIED",
+]
+CLASSIFIER_NAMES = TYPE_NAMES + [
+    "AGENT_TYPE_INFO", "FIRST_PARTY_AGENT_TYPES", "MICROSOFT_AGENT_NAMES", "MICROSOFT_AGENT_CANONICAL",
+    "_agent_text", "_agent_name_key", "_microsoft_agent_segment", "microsoft_agent_name",
+    "build_agent_type_overrides", "agent_type_override", "classify_agent", "describe_agent",
+]
+
+NS = load_pure(PROCESSOR, 2, CLASSIFIER_NAMES) if analytics_hub.AVAILABLE else {}
+
+# (agent_id, agent_name, app_identity, platform_agent_type, workload, expected Agent_Type key or None)
+SAMPLES = [
+    # Microsoft first-party
+    ("P_researcher01", "Researcher", "MicrosoftAgent.Researcher.P_researcher01", None, "Copilot",
+     "AGENT_TYPE_FP_PUBLISHED"),
+    ("P_9f1c", "Analyst", None, None, "Copilot", "AGENT_TYPE_FP_PUBLISHED"),
+    (None, "Word Drafting Agent", "MicrosoftAgent.WordDraftingAgent", None, "Copilot",
+     "AGENT_TYPE_FP_NON_PUBLISHED"),
+    ("BuiltIn_Interpreter", None, None, None, "Copilot", "AGENT_TYPE_FP_NON_PUBLISHED"),
+    ("WordDraftingAgent", None, None, None, "Copilot", "AGENT_TYPE_FP_NON_PUBLISHED"),
+    ("x1", "Researcher", "Copilot.M365Copilot.Chat", None, "Copilot", "AGENT_TYPE_FP_M365"),
+    # Copilot Studio / Agent Builder
+    ("T_abc.declarative", "HR Helper", "CopilotStudio.Declarative.T_abc", None, "Copilot",
+     "AGENT_TYPE_DECLARATIVE"),
+    ("U_def", "Sales bot", "Copilot.Studio.Declarative.xyz", None, "Copilot", "AGENT_TYPE_DECLARATIVE"),
+    ("T_ce1", "Ops bot", "CopilotStudio.CustomEngine.T_ce1", None, "Copilot", "AGENT_TYPE_CUSTOM_ENGINE"),
+    ("abcd-1234", "IT bot", "Copilot.Studio.0d1e2f", None, "Copilot", "AGENT_TYPE_COPILOT_STUDIO"),
+    ("abcd-1234", "IT bot", None, "Copilot Studio", "Copilot", "AGENT_TYPE_COPILOT_STUDIO"),
+    # Teams Facilitator
+    (None, None, "Copilot.TeamCopilot.Meeting", None, "Copilot", "AGENT_TYPE_FACILITATOR"),
+    # Prefix conventions (inferred)
+    ("T_8a2b.contoso", "Contoso Policies", None, None, "Copilot", "AGENT_TYPE_ORG_PUBLISHED"),
+    ("U_5e5e.alice", "Alice notes", None, None, "Copilot", "AGENT_TYPE_SHARED"),
+    ("P_7c7c.vendor", "Vendor agent", None, None, "Copilot", "AGENT_TYPE_STORE"),
+    # Connected AI apps
+    (None, None, "ConnectedAIApp.Foundry.myapp", None, "ConnectedAIApp", "AGENT_TYPE_CONNECTED_APP"),
+    ("foundry-1", "Foundry agent", None, None, "ConnectedAIApp", "AGENT_TYPE_CONNECTED_APP"),
+    # Agent in the M365 Copilot app that no other rule identified
+    ("zz-9", "Mystery", "Copilot.M365Copilot.Agent", None, "Copilot", "AGENT_TYPE_FP_M365"),
+    # Unclassified agent
+    ("1234-abcd", "Something", None, None, "Copilot", "AGENT_TYPE_UNCLASSIFIED"),
+    # Not agents
+    (None, None, None, None, "Copilot", None),
+    (None, None, "Copilot.M365Copilot.Chat", None, "Copilot", None),
+    ("x", "ChatGPT", "AIApp.ChatGPT", None, "AIApp", None),
+]
+
 
 # Inputs for the grid: edge cases of every rule (prefixes, MicrosoftAgent.* segments, hosts).
 GRID_IDS = [None, "", "  ", "T_1", "u_9.x", "P_r1", "BuiltIn_Researcher", "builtin_", "Analyst",
@@ -82,6 +136,7 @@ def m_row(record):
     return tuple(record[c] for c in AGENT_TYPE_COLS)
 
 
+@analytics_hub.required
 class LocalCsvClassifierParityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -113,6 +168,7 @@ class LocalCsvClassifierParityTests(unittest.TestCase):
         self.assertEqual(describe("", "", "", "", "Copilot"), ("",) * 6)
 
 
+@analytics_hub.required
 class LocalCsvProcessorOutputTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -185,6 +241,12 @@ class LocalCsvProcessorOutputTests(unittest.TestCase):
             self.run_processor("aibv", self.rows(), "agent,type\nx,y\n")
 
 
+class PowerQueryPortIdentityTests(unittest.TestCase):
+    def test_identical_in_every_template(self):
+        self.assertEqual(len(set(m_function_text().values())), 1, list(M_TEMPLATES))
+
+
+@analytics_hub.required
 class PowerQueryPortParityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -196,9 +258,6 @@ class PowerQueryPortParityTests(unittest.TestCase):
         want = NS["describe_agent"](aid, name, app, kind, workload)
         got = m_row(self.describe(aid, name, app, kind, workload))
         self.assertEqual(got, want, (aid, name, app, kind, workload))
-
-    def test_identical_in_every_template(self):
-        self.assertEqual(len(set(self.texts.values())), 1, list(self.texts))
 
     def test_samples(self):
         for aid, name, app, kind, workload, _ in SAMPLES:
@@ -222,6 +281,7 @@ class PowerQueryPortParityTests(unittest.TestCase):
 
 
 class TemplateAgentTypeColumnTests(unittest.TestCase):
+    @analytics_hub.required
     def test_model_columns_match_fabric(self):
         def columns(relative):
             table = fact_table(schema(relative))
@@ -251,7 +311,7 @@ class TemplateAgentTypeColumnTests(unittest.TestCase):
                 self.assertLess(order.index("ValueLensDescribeAgent"), order.index(FACT))
 
     def test_agents_page_has_agent_type_slicer_and_breakdown(self):
-        for relative in FABRIC_TEMPLATES + M_TEMPLATES:
+        for relative in (FABRIC_TEMPLATES if analytics_hub.AVAILABLE else ()) + M_TEMPLATES:
             with zipfile.ZipFile(ROOT / relative) as archive:
                 names = set(archive.namelist())
                 for visual, kind in (("agenttypeslicer", "slicer"), ("agenttypebreakdown", "clusteredBarChart")):

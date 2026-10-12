@@ -13,10 +13,11 @@ https://github.com/user-attachments/assets/2aa65c5d-2a20-4d51-9f1d-072c712fb4f3
 
 > Prefer to download it? [Get the demo video](media/ValueLens-Demo.mp4).
 
-**Have Fabric?** [Download the Analytics Hub installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe),
+**Have Fabric or Azure?** Use [Analytics Hub](https://github.com/microsoft/AnalyticsHub-Dashboard), which now has its own repo.
+[Download the installer](https://github.com/microsoft/AnalyticsHub-Dashboard/releases/latest/download/AnalyticsHubInstaller.exe),
 open it and follow the steps in your browser. Check
-[what you need](docs/PREREQUISITES.md) first. If Edge or Windows warns about the download, see
-[Check the download](1.%20Fabric/installer/README.md#check-the-download).
+[what you need](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/docs/PREREQUISITES.md) first. If Edge or Windows warns about the download, see
+[Check the download](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/installer/README.md#check-the-download).
 
 **New here?** Read the [📖 Report Interpretation Guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf) — a page-by-page walkthrough of every report page.
 
@@ -35,12 +36,13 @@ open it and follow the steps in your browser. Check
 ## Pick a path
 
 Every path gives you the same dashboard. Pick the one that matches what you have, then follow the
-steps in its README.
+steps in its README. Paths 1 and 2 are **Analytics Hub**, which moved to
+[microsoft/AnalyticsHub-Dashboard](https://github.com/microsoft/AnalyticsHub-Dashboard). Paths 3 to 5 are the Power BI templates in this repo.
 
 | Path | You need | Setup |
 |---|---|---|
-| **[1. Fabric](1.%20Fabric/)** (recommended) | Fabric capacity (F2 or larger, or a trial) | Double-click an installer. It sets up everything and deploys the dashboard as an app. **[🎥 Watch the setup](1.%20Fabric/README.md#watch-the-setup)** |
-| **[2. Azure](2.%20Azure/)** (preview) | An Azure subscription (Contributor plus User Access Administrator) and Power BI Pro | Run the installer with the Azure target. It deploys Azure SQL, Container Apps jobs and the web app into your subscription, with no Fabric. See [Azure target](1.%20Fabric/installer/README.md#azure-target-preview). |
+| **[1. Fabric](https://github.com/microsoft/AnalyticsHub-Dashboard/tree/main/fabric)** (recommended) | Fabric capacity (F2 or larger, or a trial) | Double-click an installer. It sets up everything and deploys the dashboard as an app. **[🎥 Watch the setup](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/fabric/README.md#for-manual-setup-not-using-the-installer)** |
+| **[2. Azure](https://github.com/microsoft/AnalyticsHub-Dashboard/tree/main/azure)** (preview) | An Azure subscription (Contributor plus User Access Administrator) and Power BI Pro | Run the installer with the Azure target. It deploys Azure SQL, Container Apps jobs and the web app into your subscription, with no Fabric. See [Azure target](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/installer/README.md#azure-target-preview). |
 | **[3. Power Automate + Dataverse](3.%20Power%20Automate%20+%20Dataverse/)** (preview) | Power Automate premium and Dataverse | Import a collector solution and run a refresh script. |
 | **[4. SharePoint](4.%20SharePoint/)** | Power BI Pro | App registration, a SharePoint library and a scheduled export. |
 | **[5. Local CSV](5.%20Local%20CSV/)** | Power BI Desktop | Open the template. Sample data is included. |
@@ -58,14 +60,15 @@ A page-by-page guide to reading the ValueLens report — 15 report pages, with t
 
 ## Optional add-ons
 
-- **Credit consumption and cost:** in Fabric, choose it in the installer. Other paths have an
-  `Add Credit Consumption` folder.
-- **Copilot Studio agent conversations:** in Fabric, choose *Agent Evaluator* in the installer, or
-  [set it up by hand](1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/).
-- **Shadow AI and agent risk:** in Fabric or Azure, choose *Defender (shadow AI and agent risk)* in
-  the installer. It reads Microsoft Defender, needs Defender for Endpoint P2 or Defender for Cloud
+- **Credit consumption and cost:** in Analytics Hub, choose it in the installer. Paths 3 to 5 have
+  an `Add Credit Consumption` folder.
+- **Copilot Studio agent conversations:** in Analytics Hub on Fabric, choose *Agent Evaluator* in the
+  installer, or
+  [set it up by hand](https://github.com/microsoft/AnalyticsHub-Dashboard/tree/main/fabric/Add%20Agent%20Evaluator).
+- **Shadow AI and agent risk:** in Analytics Hub on Fabric or Azure, choose *Defender (shadow AI and
+  agent risk)* in the installer. It reads Microsoft Defender, needs Defender for Endpoint P2 or Defender for Cloud
   Apps, and fills the Shadow AI section of the app's Governance page
-  ([details](1.%20Fabric/installer/README.md#defender-shadow-ai-and-agent-risk)).
+  ([details](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/installer/README.md#defender-shadow-ai-and-agent-risk)).
 
 ## Reference
 
@@ -91,7 +94,8 @@ Source: [Audit logs for Copilot and AI applications](https://learn.microsoft.com
 
 ## Help
 
-[Open an issue](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues) ·
+[Open an issue](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues)
+(for Analytics Hub, [open it there](https://github.com/microsoft/AnalyticsHub-Dashboard/issues)) ·
 [Support](SUPPORT.md) · [Report a vulnerability](SECURITY.md) · [Contributing](CONTRIBUTING.md) ·
 [MIT licence](LICENSE)
 
