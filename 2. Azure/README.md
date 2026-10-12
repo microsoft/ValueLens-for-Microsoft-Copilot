@@ -1,4 +1,4 @@
-# 2. Azure (preview)
+# 2. Azure
 
 Analytics Hub running in **your own Azure subscription**, without Microsoft Fabric. It has the
 same data, the same ValueLens Model and measures, and the same app pages as `1. Fabric`.
