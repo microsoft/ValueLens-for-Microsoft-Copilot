@@ -1,3 +1,0 @@
-EVALUATE
-// The last day Agent Evaluator has agent interactions for.
-ROW("Last Date", MAX('Agent Performance'[InteractionDate]))

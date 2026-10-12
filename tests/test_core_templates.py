@@ -1,6 +1,8 @@
-"""Portable structural release checks for the five active templates.
+"""Portable structural release checks for the three Power BI templates.
 
-Desktop refresh and rendering still need live QA.
+The Fabric templates and app live in Analytics Hub. With ANALYTICS_HUB_ROOT set (see analytics_hub.py),
+the templates must ship the same report and measures as the Fabric template, and the app's task
+descriptions and glossary. Desktop refresh and rendering still need live QA.
 """
 import json
 import re
@@ -8,13 +10,17 @@ import unittest
 import zipfile
 from pathlib import Path
 
+import analytics_hub
+
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = (
     Path("5. Local CSV") / "ValueLens - Local CSV.pbit",
     Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
-    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
-    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
     Path("3. Power Automate + Dataverse") / "ValueLens - Power Automate + Dataverse.pbit",
+)
+FABRIC_TEMPLATES = (
+    analytics_hub.FABRIC / "ValueLens - Fabric.pbit",
+    analytics_hub.FABRIC / "ValueLens - Fabric OneLake.pbit",
 )
 PAGE_COUNT = 16
 # Separate Consumption Central report shipped as an optional add-on in each path.
@@ -32,17 +38,13 @@ PARAMETER_DEFAULTS = {
     "RangeEnd": "#datetime(2027, 1, 1, 0, 0, 0)",
     "Use SharePoint CSV fallback": "false",
 }
-# Optional Fabric tables default to Include, so a tenant that has not landed them must load empty.
-OPTIONAL_FABRIC_TABLES = {"Agents 365": "agents_365", "ProductFeedback": "user_feedback"}
 # Machine-bound or pending-edit parts that a portable template must not carry.
 FORBIDDEN_PARTS = ("DataModel", "SecurityBindings", "UnappliedChanges")
 LOCAL_PATH = re.compile(r"[a-z]:\\{1,2}users\\{1,2}|onedrive - ", re.IGNORECASE)
 # The Fabric App shows the same task descriptions as the Signal - Impact Table.
-APP_TASK_DESCRIPTIONS = (
-    ROOT / "1. Fabric" / "Fabric App" / "src" / "queries" / "appendix" / "task-descriptions.json"
-)
+APP_TASK_DESCRIPTIONS = analytics_hub.APP / "src" / "queries" / "appendix" / "task-descriptions.json"
 # The Fabric App adds these glossary entries when a model lacks them, so the templates carry them too.
-APP_GLOSSARY = ROOT / "1. Fabric" / "Fabric App" / "src" / "queries" / "appendix" / "app-glossary.json"
+APP_GLOSSARY = analytics_hub.APP / "src" / "queries" / "appendix" / "app-glossary.json"
 M_STRING = re.compile(r'"((?:[^"]|"")*)"')
 GLOSSARY_ORDERS = re.compile(r",(-?\d+),(-?\d+)\},?$")
 
@@ -72,21 +74,32 @@ def field_refs(node, aliases=None):
         yield from field_refs(child, aliases)
 
 
+def load_template(relative):
+    with zipfile.ZipFile(ROOT / relative) as archive:
+        if archive.testzip() is not None:
+            raise AssertionError(f"Corrupt archive: {relative}")
+        members = {n: archive.read(n) for n in archive.namelist()}
+    model = json.loads(members["DataModelSchema"].decode("utf-16-le"))["model"]
+    docs = {n: json.loads(b) for n, b in members.items()
+            if n.startswith("Report/definition/") and n.endswith(".json")}
+    return str(relative), members, model, docs
+
+
+def measures(model):
+    return {(t["name"], m["name"]): (text(m["expression"]), m.get("formatString"))
+            for t in model["tables"] for m in t.get("measures", [])}
+
+
+def report(members):
+    return {n: v for n, v in members.items() if n.startswith("Report/")}
+
+
 class CoreTemplateTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.templates = []
-        for relative in TEMPLATES:
-            with zipfile.ZipFile(ROOT / relative) as archive:
-                if archive.testzip() is not None:
-                    raise AssertionError(f"Corrupt archive: {relative}")
-                members = {n: archive.read(n) for n in archive.namelist()}
-            model = json.loads(members["DataModelSchema"].decode("utf-16-le"))["model"]
-            docs = {n: json.loads(b) for n, b in members.items()
-                    if n.startswith("Report/definition/") and n.endswith(".json")}
-            cls.templates.append((str(relative), members, model, docs))
+        cls.templates = [load_template(relative) for relative in TEMPLATES]
 
-    def test_exactly_five_active_templates(self):
+    def test_exactly_three_active_templates(self):
         active = {p.relative_to(ROOT) for p in ROOT.rglob("*.pbit")
                   if "archive" not in p.parts and not ADDONS & set(p.parts)}
         self.assertEqual(active, set(TEMPLATES))
@@ -96,21 +109,30 @@ class CoreTemplateTests(unittest.TestCase):
             for part in FORBIDDEN_PARTS:
                 self.assertNotIn(part, members, (name, part))
 
-    def test_all_templates_ship_identical_report(self):
-        reports = [{n: v for n, v in members.items() if n.startswith("Report/")}
-                   for _, members, _, _ in self.templates]
-        for (name, _, _, _), report in zip(self.templates[1:], reports[1:]):
-            self.assertEqual(sorted(report), sorted(reports[0]), name)
-            self.assertEqual([n for n in report if report[n] != reports[0][n]], [], name)
+    def assert_same_report(self, others):
+        baseline = report(self.templates[0][1])
+        for name, members, _, _ in others:
+            other = report(members)
+            self.assertEqual(sorted(other), sorted(baseline), name)
+            self.assertEqual([n for n in other if other[n] != baseline[n]], [], name)
 
-    def test_all_templates_share_identical_measures(self):
-        def measures(model):
-            return {(t["name"], m["name"]): (text(m["expression"]), m.get("formatString"))
-                    for t in model["tables"] for m in t.get("measures", [])}
+    def assert_same_measures(self, others):
         baseline = measures(self.templates[0][2])
         self.assertGreater(len(baseline), 0)
-        for name, _, model, _ in self.templates[1:]:
+        for name, _, model, _ in others:
             self.assertEqual(measures(model), baseline, name)
+
+    def test_all_templates_ship_identical_report(self):
+        self.assert_same_report(self.templates[1:])
+
+    def test_all_templates_share_identical_measures(self):
+        self.assert_same_measures(self.templates[1:])
+
+    @analytics_hub.required
+    def test_fabric_templates_ship_the_same_report_and_measures(self):
+        fabric = [load_template(path) for path in FABRIC_TEMPLATES]
+        self.assert_same_report(fabric)
+        self.assert_same_measures(fabric)
 
     def test_report_field_references_resolve_in_every_model(self):
         for name, _, model, docs in self.templates:
@@ -132,16 +154,6 @@ class CoreTemplateTests(unittest.TestCase):
                 value = text(expression["expression"]).split(" meta ")[0].strip()
                 self.assertEqual(value, PARAMETER_DEFAULTS.get(expression["name"], "null"),
                                  (name, expression["name"]))
-
-    def test_optional_fabric_tables_load_empty_when_missing(self):
-        fabric = [(name, model) for name, _, model, _ in self.templates if name.startswith("1. Fabric")]
-        self.assertEqual(len(fabric), 2)
-        for name, model in fabric:
-            queries = {t["name"]: text(t["partitions"][0]["source"]["expression"])
-                       for t in model["tables"] if t.get("partitions")}
-            for table, source in OPTIONAL_FABRIC_TABLES.items():
-                calls = re.findall(r'(try\s+)?FabricTable\("%s"\)' % source, queries[table])
-                self.assertEqual(calls, ["try "], (name, table))
 
     def test_no_local_paths_or_personal_folders(self):
         for name, members, _, _ in self.templates:
@@ -205,6 +217,7 @@ class CoreTemplateTests(unittest.TestCase):
                         self.assertGreaterEqual(parameter["length"], 0, name)
                         self.assertLessEqual(parameter["index"] + parameter["length"], count, name)
 
+    @analytics_hub.required
     def test_task_descriptions_match_the_fabric_app(self):
         expected = list(json.loads(APP_TASK_DESCRIPTIONS.read_text(encoding="utf-8")).items())
         self.assertTrue(expected)
@@ -219,6 +232,7 @@ class CoreTemplateTests(unittest.TestCase):
             self.assertEqual(rows[0], ["Signal", "Behavior", "Use Case", "Value Outcome", "Description"], name)
             self.assertEqual([(row[1], row[4]) for row in rows[1:]], expected, name)
 
+    @analytics_hub.required
     def test_app_host_glossary_matches_the_fabric_app(self):
         glossary = json.loads(APP_GLOSSARY.read_text(encoding="utf-8"))
         expected = [(entry["metric"], entry["description"]) for entry in glossary["entries"]]

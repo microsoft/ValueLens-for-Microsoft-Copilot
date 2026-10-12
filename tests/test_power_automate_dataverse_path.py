@@ -9,10 +9,12 @@ import unittest
 import zipfile
 from pathlib import Path
 
+import analytics_hub
+
 ROOT = Path(__file__).resolve().parents[1]
 PATHWAY = ROOT / "3. Power Automate + Dataverse"
 SOURCE = ROOT / "4. SharePoint" / "ValueLens - SharePoint.pbit"
-ONELAKE = ROOT / "1. Fabric" / "Manual setup" / "ValueLens - Fabric OneLake.pbit"
+ONELAKE = analytics_hub.FABRIC / "ValueLens - Fabric OneLake.pbit"
 TEMPLATE = PATHWAY / "ValueLens - Power Automate + Dataverse.pbit"
 BRIDGE = PATHWAY / "scripts" / "Build-DataverseCoreFeeds.py"
 SOURCE_MAP = PATHWAY / "source-map.json"
@@ -112,8 +114,9 @@ class PowerAutomateDataversePathTests(unittest.TestCase):
                     self.assertNotIn("lineageTag:", text(column["expression"]), (table["name"], column["name"]))
         self.assertIn('{"Status", type text}', self.partition("Agents 365"))
 
+    @analytics_hub.required
     def test_glossary_matches_the_sort_checked_onelake_glossary(self):
-        # test_onelake_source proves each Metric/Page maps to one sort order in this table.
+        # Analytics Hub's test_onelake_source proves each Metric/Page maps to one sort order in this table.
         with zipfile.ZipFile(ONELAKE) as archive:
             onelake = json.loads(archive.read("DataModelSchema").decode("utf-16-le"))["model"]
         mine = self.tables[GLOSSARY]

@@ -4,11 +4,12 @@ How ValueLens turns Microsoft Purview audit records into the figures on each pag
 is counted, how each interaction is classified, how value is estimated, and the research behind
 the assumptions.
 
-It applies to the Power BI template, where all four data paths share one model, and to the
-[Fabric App](../1.%20Fabric/Fabric%20App/). The app reads the same model and adds three pages and a Value
-stage of its own ([§8](#8-fabric-app-only-consumption-agent-evaluation-cost-vs-value-and-work-patterns)). Every rule here is taken from
-`1. Fabric/Manual setup/ValueLens - Fabric.pbit` and the `Copilot_Audit_Log_Processor` notebook. If this page
-and the model ever disagree, the model is right. The template's **📖 Metric Glossary** page
+It applies to the Power BI templates here, where the data paths share one model, and to the
+[Analytics Hub app](https://github.com/microsoft/AnalyticsHub-Dashboard/tree/main/app) (the Fabric App), which now
+has its own repository. The app reads the same model and adds three pages and a Value stage of its own
+([§8](#8-fabric-app-only-consumption-agent-evaluation-cost-vs-value-and-work-patterns)). Every rule here is taken from
+the shared semantic model and the `Copilot_Audit_Log_Processor` notebook in Analytics Hub, which the Local CSV
+processor copies. If this page and the model ever disagree, the model is right. The template's **📖 Metric Glossary** page
 carries the same caveats inside the report.
 
 **Contents**
@@ -289,7 +290,7 @@ band. The model reaches it through the `Behavior Value Map`. Every behaviour the
 processors can produce has a row, so no Copilot or agent row is left without a category.
 The `Behavior Value Map` also gives each behaviour a one-line **Description**, shown beside its use
 case on the **🧬 Appendix: Signal → Impact** page and in the Fabric App. All 48 are listed in
-[`task-descriptions.json`](../1.%20Fabric/Fabric%20App/src/queries/appendix/task-descriptions.json),
+[`task-descriptions.json`](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/app/src/queries/appendix/task-descriptions.json),
 which the Fabric App reads. A test keeps that file and every template the same. [§3.4](#34-signal--impact-reference)
 lists each description with its signal and time band.
 
@@ -407,7 +408,7 @@ agent name, `AppIdentity`, `PlatformAgentType` and the workload. The first match
 What each Task Breakdown means, the audit signal that produces it, and the time a person would
 otherwise spend on it. This matches the **🧬 Appendix: Signal → Impact** page. The Description is
 taken word for word from
-[`task-descriptions.json`](../1.%20Fabric/Fabric%20App/src/queries/appendix/task-descriptions.json).
+[`task-descriptions.json`](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/app/src/queries/appendix/task-descriptions.json).
 The signal summarises the rules in [§3.2](#32-from-signal-to-task-category), where the full order is
 set out. *Typical min* is the default effort scenario. The low and high ends of each band, its grain
 and its research source are in the [appendix](#appendix-time-bands-and-sources).
@@ -920,204 +921,38 @@ saves exports emailed to an admin into that folder. With no export, the page sta
 
 ## 8. Fabric App only: Consumption, Agent Evaluation, Cost vs value and Work patterns
 
-The Consumption and Agent Evaluation pages read optional models, not ValueLens. Each appears only
-when its model is connected in `fabric.yaml`. Cost vs value, at the end of the Value page, sets
-ValueLens's estimated value against costs, most of them from Consumption Central. Work patterns
-reads an optional table the installer adds to the ValueLens model.
+These pages are in the Analytics Hub app, not in the Power BI templates. Analytics Hub moved to
+[microsoft/AnalyticsHub-Dashboard](https://github.com/microsoft/AnalyticsHub-Dashboard), and its
+[methodology](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/docs/METHODOLOGY.md#8-fabric-app-only-consumption-agent-evaluation-cost-vs-value-and-work-patterns)
+describes them.
 
 ### 8.1 Consumption
 
-Reads a published [Consumption Central](../1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/) model and
-rebuilds its consumption and cost pages.
-
-| Section | Source | How cost is worked out |
-|---|---|---|
-| **Cowork / Work IQ** | Weekly credits per person from Viva Insights (`viva_credits_weekly`), read from a Viva Insights query by a Dataflow Gen2 (`viva_credits_dataflow`) or from the Consumption Dashboard's CSV export. Where both cover a week, the Dataflow's figures are used | Credits up to the Capacity Pack balance are priced at the **prepaid rate**; the rest at the **pay-as-you-go rate**. The pack applies to the credits in the selected period. Week by week it is used up in date order, so later weeks spill into pay-as-you-go first. Blended rate = cost ÷ credits |
-| **Copilot Studio** | By default, a daily flow reads the Power Platform licensing API for credits by agent and day (`studio_agent_daily`) and, best effort, by user and day (`studio_user_daily`). It fills the tenant, agent and user views for days and months no export covers. Power Platform admin centre exports (tenant by day, plus agent and user views) are optional and win for the months they cover. The API only sees environments with credits allocated. Without an entitlement snapshot, its credits count as prepaid | The tenant export already splits prepaid from pay-as-you-go credits, and each is priced at its rate. The licensing API gives one tenant-wide prepaid share, applied to every environment. Effective rate = cost ÷ credits. Per-agent and per-user cost uses the pay-as-you-go rate |
-| **Azure** | Azure Cost Management export for the whole solution, or Azure AI Foundry spend by model | Actual billed cost, in the export's own currency. The rates don't apply. If neither export is loaded, the section says which to load and the other sections still work |
-
-**Rates & packs.** By default the rates come from the model, through the `commercial_terms` table
-or the model's parameters. In the app, **Rates & packs** overrides them for everyone. The values
-are stored in the app's SQL database. Each query redefines the model's rate measures with them,
-so the published model and the Power BI report keep their own rates. Rates must be between $0.001
-and $0.05 per credit. A pack balance of 0 means no pack.
-
-**Cowork limits.** A person's monthly credit limit and a spending policy's plan limit only count
-when they are above 0. A blank or 0 limit means **no limit set**: allowance, headroom and allowance
-used are blank, and that person or policy is never over or near the limit.
-
-**Budget runway.** **Monthly budgets**, next to Rates & packs, takes an optional monthly budget for
-Cowork / Work IQ and Copilot Studio in dollars, and for Azure (the solution and Foundry together)
-in Azure's billing currency. The budgets are stored with the rates: in the app's SQL database on
-Fabric, and in Table Storage through `/api/settings` on Azure. For each source, the runway takes
-the latest month in the data, adds up the spend so far, and projects it in a straight line: spend
-so far ÷ days elapsed × days in the month. The days elapsed run to the newest date with data, so a
-late export doesn't read as a slowdown. Cowork arrives weekly, so each week's cost is spread
-evenly over its seven days and the month gets the days that fall in it. Azure uses the first cost
-basis the export offers, and only one currency. The card then says one of: no spend yet; too early
-to project (under three days in); on track; at risk, with the date spend would pass the budget; or
-over, with the date it passed. With no budget, it shows the projected month-end only. This is a
-straight line, not a forecast: it ignores seasonality, packs running out and price changes.
+See [8.1 Consumption](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/docs/METHODOLOGY.md#81-consumption) in the Analytics Hub methodology.
 
 ### 8.2 Agent Evaluation
 
-Reads a published [Agent Evaluator](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio)
-model. That model is built from Copilot Studio conversation transcripts in Dataverse. The app shows
-aggregates and feedback comments only. It never shows the conversations.
-
-| Measure | Definition |
-|---|---|
-| Resolution rate | Conversations the agent resolved itself ÷ all conversations. The model's verdict uses 70% as its working benchmark |
-| Implied success | Conversations the orchestrator flagged as implied success. A proxy for satisfaction when thumbs are sparse |
-| Unintended escalation | Error-driven handoffs ÷ all conversations. Designed or requested handoffs are excluded |
-| True failure rate | Failing conversations (an error forced a handoff, or an engaged user gave up) ÷ conversations that actually started |
-| Error rate | Sessions with at least one error trace |
-| Response time | Median seconds, plus the share of replies over 10 seconds, the point where people start to disengage |
-| CSAT | Thumbs up ÷ (up + down), counted per turn |
-| Grounded rate | Sessions answered from an internal knowledge source |
-| Knowledge gap rate | Of the times the agent searched, how often it found nothing usable |
-| Friction | A 0–100 score where higher is worse: 60% give-up rate, 40% turns taken |
-| Answer archetype | The most advanced thing the agent did: answered from your content, answered from the model alone, passed to a specialist, or hit an error |
+See [8.2 Agent Evaluation](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/docs/METHODOLOGY.md#82-agent-evaluation) in the Analytics Hub methodology.
 
 ### 8.3 Cost vs value
 
-The last stage of the app's Value page sets what Copilot cost against the estimated value of the
-work it did. Value is the Estimated Value figure ([§5](#5-estimated-value)), at the hourly rate
-set on the stage before. The effort scenario is shared by both stages and can be switched on
-either; it starts at Typical. Credit costs come from Consumption Central
-([§8.1](#81-consumption)).
-
-**Dates.** The days ValueLens holds activity for, inside the date filter. With Consumption Central
-connected, only the days both models hold, so cost and value cover the same days. Costs are
-tenant-wide, so the other filters don't apply to this stage.
-
-**Costs.** Licences and credits are billed in US dollars.
-
-| Cost | How it's worked out |
-|---|---|
-| Microsoft 365 Copilot licences | Licensed users × price per month × days ÷ 30.44, the average month (365.25 ÷ 12). Licensed users is the model's **Total Licensed Users**. It's a snapshot, so one count covers every day ([§9](#9-known-limits)). The price is the $30 US list price unless one is set under **Prices** |
-| Copilot Studio credits | Copilot Studio's cost over the dates, at the Consumption page's **Rates & packs** |
-| Cowork / Work IQ credits | Cowork / Work IQ's credits over the dates, priced as the Consumption page's Cowork section prices them: up to the **Capacity Pack balance** at the prepaid rate, the rest at pay-as-you-go. Pack credits left unused aren't counted |
-
-**Currency.** The whole Value page uses one reporting currency, US dollars unless another is picked
-in the installer or under **Prices**. With US dollars nothing is converted. With another currency,
-each cost is converted at the **exchange rate** set under **Prices**, in that currency per $1, and
-until one is set the stage asks for it instead of comparing. The hourly value is entered in the
-reporting currency. Consumption figures stay in the currency they're billed in.
-
-**Pairing.** Each cost is set against the work it pays for, using the model's Activity column:
-
-| Cost | Set against |
-|---|---|
-| Licences | Copilot, by licensed users |
-| Copilot Studio credits | Agents, by anyone |
-| Cowork / Work IQ credits | Cowork |
-
-Copilot Chat by people without a licence is left out of the value. It's free with Microsoft 365,
-so no cost here pays for it. Agent use by unlicensed people stays in, because its credits are
-billed. The Agents value also covers built-in and Agent Builder agents that a licence pays for, so
-the Agents pair reads high.
-
-**Figures.**
-
-| Figure | Definition |
-|---|---|
-| Return on cost | Value ÷ (licences + credits), under the chosen scenario. The range below it uses the conservative and optimistic scenarios at the same hourly rate |
-| Break-even hourly rate | Hourly rate ÷ return: the rate at which the value would just cover the cost |
-| Each pair's return | Its value ÷ its cost. Below 1×, the cost is more than the value set against it |
-
-**Agents.** Consumption Central's credits by agent aren't dated. Each Copilot Studio agent's cost is
-Copilot Studio's cost over the dates, split by that agent's share of all the credits held by
-agent. It's set against the value ValueLens records for the agent with the same name, matched
-ignoring case and extra spaces. An agent with no activity under that name is listed as not found,
-and its share isn't set against any value.
-
-**Left out.** Azure AI Foundry, because ValueLens doesn't record the work it does. GitHub Copilot,
-which neither model holds. Without Consumption Central, or when the two models share no days, the
-cost is licences alone, so the return reads high.
+See [8.3 Cost vs value](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/docs/METHODOLOGY.md#83-cost-vs-value) in the Analytics Hub methodology.
 
 ### 8.4 Work patterns
 
-Reads the `M365 Activity` table, which the [installer](../1.%20Fabric/installer/README.md#microsoft-365-activity)
-adds to the ValueLens model. `Copilot_M365_Activity_Ingester` fills it from the Microsoft 365 usage
-reports in Graph: one row per person per day they were active in Teams, Outlook, SharePoint,
-OneDrive, Viva Engage or the Microsoft 365 apps. Microsoft keeps 28 days of these reports and
-publishes each day two to three days late, so history builds up from the first load. The date and
-organisation filters apply; the other filters don't.
-
-Throughout, a **week** is seven loaded days, so a figure per person per week is the total ÷ (people
-active × days loaded ÷ 7).
-
-| Figure | Definition |
-|---|---|
-| People active | People with at least one active workload on a day in the period |
-| Active days per week | Days people were active ÷ person-weeks |
-| Workloads per active day | Average number of the six workloads used on a day someone was active |
-| Meetings, call hours, emails sent, chat messages per week | Teams meetings, Teams audio time, emails sent, and chat plus private chat messages, each ÷ person-weeks |
-| Workload reach | People who used the workload ÷ people active. The trend shows it for each full week |
-| App reach | People who used the app on any platform ÷ people active |
-| Apps used | How many of the six apps (Outlook, Teams, Word, Excel, PowerPoint, OneNote) each person used on any platform in the period, as a share of people active. *No app use reported* means active in Teams, email, SharePoint, OneDrive or Viva Engage with no apps-report entry; it isn't a depth of zero |
-| Platform reach | People who used any of the apps on Windows, Mac, the web or mobile ÷ people active. One person can count on several platforms |
-| Copilot reach | People active in Microsoft 365 who also appear in the Copilot audit log in the period ÷ people active |
-| Licensed, not using | People active in Microsoft 365 with a Copilot licence and no Copilot activity in the period ÷ those licensed |
-| Copilot users vs others | Each measure per person per week for people active in Microsoft 365 who used Copilot, ÷ the same for those who didn't. 1.2× means 20% more. It compares the two groups, and doesn't show that Copilot caused the difference |
-
-**Coverage.** The page says which dates the figures cover and how many days in that span have
-nothing loaded. Days with no rows are left out of every per-week figure rather than counted as zero.
-
-**Smaller groups.** In the comparison by organisation, organisations with fewer than five people
-active share one *Smaller groups* row, so no small team can be picked out. Its figures are worked
-out over everyone in those organisations together.
-
-People are matched on their lowercase UPN. If the Microsoft 365 admin center conceals user names in
-reports, the activity arrives under random IDs: the page's totals still hold, but the organisation
-filter, the Copilot comparison and the licence score's breadth can't use it. The page says so, and
-how to turn the setting off. Once it's off, the next run reloads the concealed days.
-
-**Licence score.** With the activity loaded and names not concealed, Readiness's *Who to license
-next* adds breadth to the priority score ([License Readiness](#license-readiness-who-should-get-a-licence-next)).
-Breadth is a sign of how much of someone's work Copilot could reach, so a person who uses four or
-more workloads a day scores full marks for it.
+See [8.4 Work patterns](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/docs/METHODOLOGY.md#84-work-patterns) in the Analytics Hub methodology.
 
 ### 8.5 Chart headlines
 
-Most charts in the app have one sentence above them, worked out from the rows the chart draws: the
-largest category and its share, the peak period, or how a total splits. A headline says what the
-data shows and never why. It's left out rather than guessed when there are no rows, only one
-category or period, a tie for the lead, a zero or negative total, or fewer than five people behind
-a share or a ranking. A peak is never compared with the period before, because the latest period
-may be incomplete.
+See [8.5 Chart headlines](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/docs/METHODOLOGY.md#85-chart-headlines) in the Analytics Hub methodology.
 
 ### 8.6 Concentration, value by habit and agent spotlights
 
-- **Concentration** (Leaderboards, Consumption's Copilot Studio section, Value) ranks people by one
-  measure and shows the share of the total taken by the top 1%, 5% and 25%, with a Pareto curve
-  of cumulative share against cumulative people. On Leaderboards the measure is sessions under the
-  page filters. On Consumption it is Copilot Studio credits this month. On Value it is
-  expert-equivalent hours in the last full month. A slice is the top *pct × people*, rounded up,
-  and its share is shown only when it covers at least five people.
-- **Value by habit** (Value) puts each person active in the last full month into a habit group by
-  their active days (Power 16+, Habitual 11–15, Developing 6–10, Beginner 1–5), then shows each
-  group's expert-equivalent hours per person that month under the selected effort scenario. A
-  group under five people isn't shown.   It's a comparison, not a cause: more active days means more
-    activity to count.
-- **Agent spotlights** (Leaderboards) name the agent with the most sessions, the one used by
-  the most job functions (distinct non-blank `Function` values in the org directory, among the
-  people behind its sessions), and the one reached across the most organisations. Ties name up to
-  two agents and count the rest. The job-functions and organisations cards are hidden below two,
-  and the job-functions card is hidden when the directory has no functions.
+See [8.6 Concentration, value by habit and agent spotlights](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/docs/METHODOLOGY.md#86-concentration-value-by-habit-and-agent-spotlights) in the Analytics Hub methodology.
 
 ### 8.7 Data freshness and chart actions
 
-Each page shows, under its description, the latest date each of its sources holds, such as
-*Audit log to 7 Oct*. The date is the latest row in the source's own table, not the date table,
-which runs on past the data, and it ignores the page filters. Cowork credits arrive weekly, so
-theirs reads *to week of*. The Agent 365 registry uses the model's own freshness measure. A source
-that isn't connected, or whose date can't be read, is left out.
-
-Each chart's actions menu offers **Copy as image** and **Download CSV**. The CSV holds the rows
-the chart was drawn from, with the chart's column names. Where the browser blocks the clipboard,
-as it can inside Fabric, the image downloads as a PNG instead.
+See [8.7 Data freshness and chart actions](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/docs/METHODOLOGY.md#87-data-freshness-and-chart-actions) in the Analytics Hub methodology.
 
 ---
 

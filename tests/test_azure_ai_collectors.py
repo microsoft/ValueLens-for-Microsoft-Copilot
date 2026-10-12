@@ -1,4 +1,8 @@
-"""Azure capacity, solution spend and billing reconciliation collectors (Fabric notebook + CSV script)."""
+"""Azure capacity, solution spend and billing reconciliation collectors (CSV script).
+
+The shared block and the "notebook" cases check the script against the Analytics Hub Fabric notebook
+and Azure jobs collector, read from ANALYTICS_HUB_ROOT (see analytics_hub.py).
+"""
 from __future__ import annotations
 
 import ast
@@ -6,15 +10,17 @@ import csv
 import importlib.util
 import json
 from datetime import date
+from pathlib import Path
 
 import pytest
 
+import analytics_hub
 import notebook_source
 
-ROOT = notebook_source.ROOT
+ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK = "credit-consumption/Ingest_Azure_AI.ipynb"
 CSV_SCRIPT = ROOT / "5. Local CSV" / "Add Credit Consumption" / "pull_azure_ai.py"
-JOBS_COLLECTOR = ROOT / "2. Azure" / "jobs" / "valuelens_jobs" / "collect" / "azure_ai.py"
+JOBS_COLLECTOR = analytics_hub.AZURE / "jobs" / "valuelens_jobs" / "collect" / "azure_ai.py"
 SAMPLES = ROOT / "5. Local CSV" / "Add Credit Consumption" / "sample-data"
 DATAVERSE = ROOT / "3. Power Automate + Dataverse" / "Add Credit Consumption" / "dataverse-schema.json"
 SHARED_START = "# --- Shared with the Fabric notebook Ingest_Azure_AI.ipynb (section 4); keep identical. ---\n"
@@ -37,10 +43,10 @@ def _load_csv_module():
 
 
 CSV_MODULE = _load_csv_module()
-NOTEBOOK_NS = notebook_source.namespace(NOTEBOOK, CONSTANTS)
+NOTEBOOK_NS = notebook_source.namespace(NOTEBOOK, CONSTANTS) if analytics_hub.AVAILABLE else {}
 
 
-@pytest.fixture(params=["notebook", "csv"])
+@pytest.fixture(params=[pytest.param("notebook", marks=analytics_hub.required), "csv"])
 def impl(request):
     return NOTEBOOK_NS if request.param == "notebook" else vars(CSV_MODULE)
 
@@ -52,6 +58,7 @@ def _helper_cell():
     return "".join(found[0]["source"])
 
 
+@analytics_hub.required
 def test_shared_block_is_identical_in_notebook_and_csv_script():
     script = CSV_SCRIPT.read_text(encoding="utf-8").replace("\r\n", "\n")
     shared = script.split(SHARED_START, 1)[1].split(SHARED_END, 1)[0].strip()
@@ -72,19 +79,8 @@ def test_headers_match_the_report_contract(table):
     headers = getattr(CSV_MODULE, TABLES[table])
     assert headers == sample
     assert headers == [c["canonical"] for c in dataverse["columns"]]
-    assert NOTEBOOK_NS[TABLES[table]] == headers
-
-
-def test_notebook_writes_every_new_table_with_matching_schema():
-    cells = json.loads((notebook_source.NOTEBOOKS / NOTEBOOK).read_text(encoding="utf-8"))["cells"]
-    source = "\n".join("".join(c["source"]) for c in cells if c["cell_type"] == "code")
-    for table, constant in (("azure_deployment_health", "HEALTH"), ("azure_solution_spend", "SOLUTION"),
-                            ("azure_billing_reconciliation", "RECON")):
-        assert f'LAKEHOUSE_{constant} = "{table}"' in " ".join(source.split())
-        assert f"saveAsTable(LAKEHOUSE_{constant})" in source
-        schema = source.split(f'{constant}_SCHEMA = (', 1)[1].split(")\n", 1)[0]
-        columns = [part.split()[0] for part in "".join(ast.literal_eval(f"({schema})")).split(", ")]
-        assert columns == NOTEBOOK_NS[f"{constant}_HEADERS"]
+    if analytics_hub.AVAILABLE:
+        assert NOTEBOOK_NS[TABLES[table]] == headers
 
 
 def _series(deployment, status, points):

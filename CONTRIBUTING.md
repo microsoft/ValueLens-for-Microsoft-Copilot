@@ -30,9 +30,7 @@ python -B -m pytest tests -q
 The offline suite uses the Python standard library plus pytest as the runner;
 PowerShell subprocess checks also exercise dry-run helpers. No tenant credentials
 are required. Do not provide production credentials or customer data to tests.
-The optional Spark check in `test_snapshot_safety.py` skips when local PySpark /
-Spark is unavailable; the default CI job does not install Spark. Local tests do
-not certify Fabric execution, tenant permissions or Desktop / Service refresh.
+Local tests do not certify tenant permissions or Desktop / Service refresh.
 
 CI runs the full suite with no exclusions. The Dataverse directory-refresh
 checks launch PowerShell 7 (`pwsh`); on a machine with only
@@ -40,38 +38,28 @@ Windows PowerShell 5.1 or a restrictive execution policy they fail at setup
 rather than on template content. Don't bypass the execution policy to run them;
 rely on CI or install PowerShell 7.
 
-## Work on the installer
+### Parity with Analytics Hub
 
-From `1. Fabric/installer`:
+Analytics Hub (paths 1 and 2: the Fabric notebooks, the installer, the Azure jobs and the app)
+lives in [microsoft/AnalyticsHub-Dashboard](https://github.com/microsoft/AnalyticsHub-Dashboard).
+Its notebooks own the rules that the Local CSV processor copies, and its Fabric templates share
+the report and measures with the templates here. Tests that compare against it read a checkout from
+`ANALYTICS_HUB_ROOT` and skip when it isn't set:
 
 ```text
-npm test                       # unit tests with fakes, no sign-in
-npm run typecheck              # TypeScript checks over the JSDoc types
-npx valuelens-install preview  # writes ./valuelens-preview (ignored by git)
-npm run build:exe              # builds dist-exe/AnalyticsHubInstaller.exe (Windows, about 10 minutes)
+git clone https://github.com/microsoft/AnalyticsHub-Dashboard ../AnalyticsHub-Dashboard
+$env:ANALYTICS_HUB_ROOT = "../AnalyticsHub-Dashboard"
+python -B -m pytest tests -q
 ```
 
-`npm run build:exe` builds the [Analytics Hub app](1.%20Fabric/Fabric%20App/) once, stages it
-with the installer and the notebooks, pipeline and templates it deploys, and zips them with a
-portable Node.js into a small C# launcher, compiled with the `csc` that comes with the .NET
-Framework. Run `npm ci` in the installer and in the app first. `--release` fails rather than warns
-when something a published download needs is missing; `--out <dir>` writes the exe somewhere else.
-
-The [`installer-exe`](.github/workflows/installer-exe.yml) workflow builds, tests and smoke-tests
-the exe on pull requests that touch `packaging/`. To publish one, set the version in
-`1. Fabric/installer/package.json` and push a tag `installer-v<version>`. The workflow drafts a
-release with the exe, its SHA-256 and the release notes from `packaging/finish-exe.js`.
-
-Signing happens in CI, never on your computer. Run the ESRP pipeline
-([`packaging/sign-installer.azure-pipelines.yml`](1.%20Fabric/installer/packaging/sign-installer.azure-pipelines.yml))
-with the tag. It signs the draft's exe with the Microsoft Corporation certificate and replaces its
-exe, hash and notes. Then review the draft and publish it. Publishing checks the exe against its
-hash. With the repo variable `REQUIRE_SIGNED_INSTALLER` set to `true`, it also requires the
-signature. A release that fails goes back to being a draft.
+CI checks out the Analytics Hub release pinned in [`tests.yml`](.github/workflows/tests.yml) and
+runs them every time. When a rule or a shared measure changes, change it in Analytics Hub first,
+then bring the copy here in line and move the pin to the release that has it, in the same PR.
 
 ## Repository conventions
 
-- Keep the four numbered deployment paths stable. Put setup details in the relevant
+- Keep the numbered deployment paths stable. `1. Fabric` and `2. Azure` only point to Analytics
+  Hub now; keep them so old links still land somewhere. Put setup details in the relevant
   path README and shared column contracts in the
   [data dictionary](docs/DATA-DICTIONARY.md).
 - Preserve existing names, formatting and README tone. Separate measured signals
@@ -79,7 +67,7 @@ signature. A release that fails goes back to being a draft.
 - Use fabricated fixtures only. Never commit tenant exports, user identities,
   prompts, credentials, private solution packages or populated report files.
   Review notebook outputs and screenshots before attaching them.
-- Edit Fabric notebooks in `1. Fabric/Manual setup/notebooks/`. There are no mirrored copies to keep in sync.
+- Fabric notebooks, the installer and the Azure code are edited in Analytics Hub, not here.
 - Old templates live, flat, in [`archive/`](archive/). They aren't maintained.
 - **`.pbit` templates are binary packages.** Source/helper changes do not update
   shipped templates automatically: rebuild with the relevant repository generator

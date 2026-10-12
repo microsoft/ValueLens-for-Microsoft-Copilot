@@ -1,5 +1,0 @@
-EVALUATE
-ROW(
-    "First Date", MIN('Reporting Date'[Date]),
-    "Last Date", MAX('Reporting Date'[Date])
-)

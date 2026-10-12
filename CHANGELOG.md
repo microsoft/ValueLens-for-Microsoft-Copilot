@@ -8,12 +8,39 @@ changes down in one place, and back-filling that accurately from commit messages
 worse record than pointing you at the commits themselves.
 
 Deployment instructions do **not** live here. They live in the path READMEs:
-[1. Fabric](1.%20Fabric/README.md) ·
-[1. Fabric/Fabric App](1.%20Fabric/Fabric%20App/README.md) ·
-[2. Azure](2.%20Azure/README.md) ·
 [3. Power Automate + Dataverse](3.%20Power%20Automate%20+%20Dataverse/README.md) ·
 [4. SharePoint](4.%20SharePoint/README.md) ·
-[5. Local CSV](5.%20Local%20CSV/README.md).
+[5. Local CSV](5.%20Local%20CSV/README.md). Fabric and Azure (Analytics Hub) are in
+[microsoft/AnalyticsHub-Dashboard](https://github.com/microsoft/AnalyticsHub-Dashboard).
+
+Older entries below link to `1. Fabric` and `2. Azure` paths as they were at the time. Those files
+are now in Analytics Hub.
+
+---
+
+## Unreleased — Analytics Hub moved to its own repository
+
+Paths 1 (Fabric) and 2 (Azure) are Analytics Hub, which now has its own repository,
+[microsoft/AnalyticsHub-Dashboard](https://github.com/microsoft/AnalyticsHub-Dashboard), with its
+history. Its installer, Fabric notebooks and templates, Azure jobs and web app, and the app are built,
+tested and released there from 0.5.0 on.
+
+**Existing installs keep updating.** Installs from 0.4.2 and earlier check this repository's
+releases, so the release `analytics-hub-azure-v0.5.0` here carries the 0.5.0 installer, and the old
+download link still gets it. The `valuelens-jobs` and `valuelens-web` images keep their names.
+
+### Removed
+
+- `1. Fabric/` and `2. Azure/`, apart from a README in each that points to Analytics Hub.
+- The installer, Azure image and ARM drift workflows, and the tests that covered only Fabric or Azure.
+
+### Changed
+
+- Tests that keep the Local CSV processor and the templates in line with the Fabric notebooks and
+  templates now read a pinned Analytics Hub release, set in `tests.yml` (see CONTRIBUTING).
+- README, SUPPORT, CONTRIBUTING, the issue and pull request templates and the docs point Fabric and
+  Azure questions to Analytics Hub. PREREQUISITES points to Analytics Hub's copy, and the METHODOLOGY
+  section on app-only pages and the Fabric and Azure part of PERMISSIONS now point there too.
 
 ---
 
