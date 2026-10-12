@@ -45,7 +45,8 @@ catalog: see [teams](teams/README.md#give-it-to-everyone). Permissions are in
 
 What you need, networking, regions and the commands are in the installer's
 [Azure target section](../1.%20Fabric/installer/README.md#azure-target-preview). The images come from
-`ghcr.io/microsoft/valuelens-jobs` and `valuelens-web`, tagged with the installer's version.
+`ghcr.io/microsoft/valuelens-jobs` and `valuelens-web`, tagged with the installer's version. For every
+prerequisite on one page, with links to Microsoft Learn, see [Prerequisites](../docs/PREREQUISITES.md).
 
 Read the [disclaimer](../README.md#disclaimer) too: these aren't the official Copilot reports, and
 you're responsible for the data once it's in your Azure SQL database.

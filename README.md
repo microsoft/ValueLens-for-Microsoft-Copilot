@@ -15,7 +15,7 @@ https://github.com/user-attachments/assets/2aa65c5d-2a20-4d51-9f1d-072c712fb4f3
 
 **Have Fabric?** [Download the Analytics Hub installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe),
 open it and follow the steps in your browser. Check
-[what you need](1.%20Fabric/README.md#before-you-start) first.
+[what you need](docs/PREREQUISITES.md) first.
 
 **New here?** Read the [📖 Report Interpretation Guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf) — a page-by-page walkthrough of every report page.
 
@@ -69,6 +69,7 @@ A page-by-page guide to reading the ValueLens report — 15 report pages, with t
 ## Reference
 
 - [How the value is calculated](docs/METHODOLOGY.md)
+- [Prerequisites](docs/PREREQUISITES.md)
 - [Permissions](docs/PERMISSIONS.md)
 - [Data dictionary](docs/DATA-DICTIONARY.md)
 - [Report interpretation guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf)

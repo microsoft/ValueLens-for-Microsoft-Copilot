@@ -19,7 +19,8 @@ and the Analytics Hub app. Then it loads the first data and checks it.
 | For credit consumption: **Owner** or **User Access Administrator** on the subscription | Only if you add [credit consumption](#credit-consumption). |
 | For the Agent Evaluator: **System Administrator** in each Power Platform environment | Only if you add the [Agent Evaluator](#agent-evaluator). |
 
-The Graph permissions are listed in [`/docs/PERMISSIONS.md`](../../docs/PERMISSIONS.md).
+The Graph permissions are listed in [`/docs/PERMISSIONS.md`](../../docs/PERMISSIONS.md). For every
+prerequisite on one page, optional data sources included, see [`/docs/PREREQUISITES.md`](../../docs/PREREQUISITES.md).
 
 **Check what you have.** Once you sign in, the home page's **Prerequisites** panel checks the
 list above for you, and says what each one is for and how to get it. It only reads; nothing is
