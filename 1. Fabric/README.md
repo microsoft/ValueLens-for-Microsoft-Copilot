@@ -44,7 +44,9 @@ you're responsible for the data once it's in your workspace.
    If Edge says it isn't commonly downloaded, choose **…** next to the file, then **Keep**,
    **Show more** and **Keep anyway**.
 2. Open it. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
-   These warnings appear because the installer is new and isn't code-signed yet.
+   These warnings appear because the installer is new and isn't code-signed yet. To check the
+   file first, or if your organisation blocks it, see
+   [Check the download](installer/README.md#check-the-download).
 3. After about a minute, it opens in your browser. Keep the installer window open until you're
    done.
 4. Choose **Set up Analytics Hub** and sign in with your work account.

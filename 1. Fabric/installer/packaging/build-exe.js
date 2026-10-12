@@ -29,6 +29,7 @@ import {
   EMPTY_GENERATED, EXE_NAME, SOURCE_ROOT, appFile, appPackageJson, fileVersion, installerFile, leakedIds, localIds, payloadId, prebuiltRayfinYml,
   prunable, sourceFiles, tooLong,
 } from './payload.js';
+import { sha256File, sha256Line } from './signing.js';
 
 const INSTALLER = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FABRIC = resolve(INSTALLER, '..');
@@ -254,8 +255,8 @@ try {
     '/resource:payload.zip,payload.zip', '/resource:payload-id.txt,payload-id.txt',
     'Launcher.cs', 'AssemblyInfo.cs',
   ], { cwd: work });
-  const hash = createHash('sha256').update(readFileSync(exe)).digest('hex');
-  writeFileSync(`${exe}.sha256`, `${hash}  ${EXE_NAME}\n`, 'utf8');
+  const hash = sha256File(exe);
+  writeFileSync(`${exe}.sha256`, sha256Line(hash), 'utf8');
   const mb = (n) => `${(n / 1024 / 1024).toFixed(0)} MB`;
   process.stdout.write(`\n✓ ${exe}\n  ${mb(readFileSync(exe).length)}, payload ${id}\n  sha256 ${hash}\n`);
 } finally {

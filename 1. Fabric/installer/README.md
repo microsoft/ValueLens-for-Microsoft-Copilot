@@ -182,7 +182,8 @@ Azure commands:
 
 1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe).
    This link always gets the newest version. If Edge says it isn't commonly downloaded, choose
-   **…** next to the file, then **Keep**, **Show more** and **Keep anyway**.
+   **…** next to the file, then **Keep**, **Show more** and **Keep anyway**. To check the file,
+   see [Check the download](#check-the-download).
 2. Open it. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
 3. The first time, it takes about a minute to unpack. Then it opens in your browser. Keep its
    window open while you use the page.
@@ -693,6 +694,27 @@ the endpoint, someone who manages the vault approves it under **Networking** >
 | Work patterns says the reports hide user names | See [Microsoft 365 activity](#microsoft-365-activity). |
 | An export isn't recognised, or is `set to Skip` | Check it's the export the card names, unedited. Or set its source to **Upload CSV** with **Repair or change**. Files the pipeline couldn't place are in `analytics_hub_uploads/_unrecognised`. |
 | A page is blank | Its source is skipped, or no export has arrived yet. See [Data sources and exports](#data-sources-and-exports). |
+
+## Check the download
+
+Each [release](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases) lists the
+exe's SHA-256, which is also in `AnalyticsHubInstaller.exe.sha256`. To check your copy, run this in
+PowerShell, in the folder you downloaded it to:
+
+```powershell
+(Get-FileHash .\AnalyticsHubInstaller.exe -Algorithm SHA256).Hash
+```
+
+It should match, ignoring capitals. If it doesn't, delete the file and download it again.
+
+Edge and Windows SmartScreen warn about the exe because it's new and isn't code-signed yet:
+
+- If Edge says it **isn't commonly downloaded**, choose **…** next to the file, then **Keep**,
+  **Show more** and **Keep anyway**.
+- If Windows says it **protected your PC**, choose **More info**, then **Run anyway**.
+
+If your organisation blocks the download or won't let you past the warnings,
+[run the installer with Node.js](#without-the-exe) instead.
 
 ## Without the exe
 
