@@ -32,7 +32,8 @@ Someone in your organisation also needs to:
   *Service principals can call Fabric public APIs*, *Semantic Model Execute Queries REST API* and
   *Fabric App items*.
 
-The full list of roles is in the [installer README](installer/README.md#before-you-start).
+The full list of roles is in the [installer README](installer/README.md#before-you-start). For
+everything on one page, with links to Microsoft Learn, see [Prerequisites](../docs/PREREQUISITES.md).
 
 Read the [disclaimer](../README.md#disclaimer) too: these aren't the official Copilot reports, and
 you're responsible for the data once it's in your workspace.
