@@ -17,7 +17,14 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
-## Unreleased
+## 2026-10-12 — Analytics Hub installer 0.4.2
+
+**Update an existing install:** download installer 0.4.2, open it and choose **Repair or change**.
+Your saved answers are kept, so it asks fewer questions. If **Give the group Build on the models**
+failed last time, run the installer's **access** command.
+
+The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.4.2`, which the
+Azure install pulls.
 
 ### Changed: fewer questions, with the rest under Advanced settings
 
