@@ -13,12 +13,12 @@ https://github.com/user-attachments/assets/2aa65c5d-2a20-4d51-9f1d-072c712fb4f3
 
 > Prefer to download it? [Get the demo video](media/ValueLens-Demo.mp4).
 
-**Have Fabric?** [Download the Analytics Hub installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe),
-open it and follow the steps in your browser. If Edge or Windows warns about the download, see
-[Check the download](1.%20Fabric/installer/README.md#check-the-download).
+**Have Fabric?** Follow the [manual setup](1.%20Fabric/README.md#set-it-up): import the notebooks,
+schedule the pipeline and publish the report. **[🎥 Watch the setup](1.%20Fabric/README.md#set-it-up)**.
+The [Analytics Hub installer](1.%20Fabric/README.md#analytics-hub-installer-work-in-progress)
+automates it, but it's a work in progress: try it in a test tenant first.
 
-**Before you start**, go through the **[checklist](docs/PREREQUISITES.md)**. It says what you need
-and what to ask other admins for, with the costs. No Fabric capacity?
+**Before you start**, see [what you need](1.%20Fabric/README.md#before-you-start). No Fabric capacity?
 [Start a free trial](https://learn.microsoft.com/fabric/fundamentals/fabric-trial#method-1-start-a-new-trial-capacity-from-the-account-manager).
 
 **New here?** Read the [📖 Report Interpretation Guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf) — a page-by-page walkthrough of every report page.
@@ -42,8 +42,8 @@ steps in its README.
 
 | Path | You need | Setup |
 |---|---|---|
-| **[1. Fabric](1.%20Fabric/)** (recommended) | Fabric capacity (F2 or larger, or a [free trial](https://learn.microsoft.com/fabric/fundamentals/fabric-trial#method-1-start-a-new-trial-capacity-from-the-account-manager)) | Open the installer. It sets up everything and deploys the dashboard as an app in Fabric. To set it up by hand instead, **[🎥 watch the manual setup](1.%20Fabric/README.md#set-it-up-by-hand)**. |
-| **[2. Azure](2.%20Azure/)** | An Azure subscription (Contributor plus User Access Administrator) and Power BI Pro | Open the installer and pick **Your Azure subscription**. It runs the data collection in your Azure subscription (scheduled jobs in Azure Container Apps, with Azure SQL and the web app) and publishes to a Power BI workspace, with no Fabric. See [Azure target](1.%20Fabric/installer/README.md#azure-target). |
+| **[1. Fabric](1.%20Fabric/)** (recommended) | Fabric capacity (F2 or larger, or a [free trial](https://learn.microsoft.com/fabric/fundamentals/fabric-trial#method-1-start-a-new-trial-capacity-from-the-account-manager)) | Import the notebooks, schedule the pipeline and publish the report. **[🎥 Watch the setup](1.%20Fabric/README.md#set-it-up)**. The [installer](1.%20Fabric/README.md#analytics-hub-installer-work-in-progress) that automates it is a work in progress. |
+| **[2. Azure](2.%20Azure/)** (work in progress) | An Azure subscription (Contributor plus User Access Administrator) and Power BI Pro | Open the installer and pick **Your Azure subscription**. It runs the data collection in your Azure subscription (scheduled jobs in Azure Container Apps, with Azure SQL and the web app) and publishes to a Power BI workspace, with no Fabric. See [Azure target](1.%20Fabric/installer/README.md#azure-target). |
 | **[3. Power Automate + Dataverse](3.%20Power%20Automate%20+%20Dataverse/)** (preview) | Power Automate premium and Dataverse | Import a collector solution and run a refresh script. |
 | **[4. SharePoint](4.%20SharePoint/)** | Power BI Pro | App registration, a SharePoint library and a scheduled export. |
 | **[5. Local CSV](5.%20Local%20CSV/)** | Power BI Desktop | Open the template. Sample data is included. |
@@ -61,13 +61,12 @@ A page-by-page guide to reading the ValueLens report — 15 report pages, with t
 
 ## Optional add-ons
 
-- **Credit consumption and cost:** in Fabric or Azure, choose any of the **Copilot Studio credits**,
-  **Copilot Cowork credits** and **Azure AI costs** cards on the installer's **Data sources**
-  screen. Other paths have an `Add Credit Consumption` folder.
-- **Copilot Studio agent conversations:** in Fabric, choose *Agent Evaluator* in the installer, or
-  [set it up by hand](1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/).
-- **Shadow AI and agent risk:** in Fabric or Azure, choose *Defender (shadow AI and agent risk)* in
-  the installer. It reads Microsoft Defender, needs Defender for Endpoint P2 or Defender for Cloud
+- **Credit consumption and cost:** each path has an `Add Credit Consumption` folder. In Fabric,
+  [set it up by hand](1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/).
+- **Copilot Studio agent conversations:** in Fabric,
+  [set up Agent Evaluator by hand](1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/).
+- **Shadow AI and agent risk:** in Fabric, run the
+  [Defender notebook](1.%20Fabric/Manual%20setup/notebooks/README.md#optional-notebooks). It reads Microsoft Defender, needs Defender for Endpoint P2 or Defender for Cloud
   Apps, and fills the Shadow AI section of the app's Governance page
   ([details](1.%20Fabric/installer/README.md#defender-shadow-ai-and-agent-risk)).
 
@@ -79,7 +78,7 @@ A page-by-page guide to reading the ValueLens report — 15 report pages, with t
 - [Permissions](docs/PERMISSIONS.md)
 - [Data dictionary](docs/DATA-DICTIONARY.md)
 - [Report interpretation guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf)
-- [Installer reference](1.%20Fabric/installer/README.md)
+- [Installer reference](1.%20Fabric/installer/README.md) (work in progress)
 - [What changed](CHANGELOG.md)
 
 <details>

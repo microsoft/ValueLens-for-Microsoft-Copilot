@@ -4,7 +4,8 @@ Analytics Hub running in **your own Azure subscription**, without Microsoft Fabr
 same data, the same ValueLens Model and measures, and the same app pages as `1. Fabric`.
 The design and the roadmap are in [`docs/plans/AZURE-HOSTED-PLAN.md`](../docs/plans/AZURE-HOSTED-PLAN.md).
 
-> **Status.** The installer deploys it end to end: Azure SQL, the Container Apps jobs, the Power BI
+> **Status: work in progress.** It's set up by the [installer](../1.%20Fabric/installer/), which is
+> also a work in progress. The installer deploys it end to end: Azure SQL, the Container Apps jobs, the Power BI
 > models, the web app and a Teams package. It collects Copilot interactions, licences and org data, Microsoft
 > 365 activity, credit consumption (Copilot Studio, Cowork, Azure AI and pay-as-you-go), and optionally
 > Defender shadow AI and agent risk. The other modules

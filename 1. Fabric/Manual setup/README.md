@@ -1,7 +1,7 @@
 # Manual setup
 
-The [installer](../installer/) does all of this for you, using these same files. Use them only if
-you can't run the installer.
+The main way to set up the Fabric path. The [installer](../installer/) (work in progress) automates
+the same steps with these same files.
 
 ## Steps
 

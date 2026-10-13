@@ -17,6 +17,18 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased — Manual setup is the main Fabric path
+
+**Why.** The installer is still changing, so production setups should use the manual steps.
+
+- [1. Fabric](1.%20Fabric/README.md) leads with the manual setup: the notebooks, the pipeline and the
+  Power BI report. The installer has its own section, marked as a work in progress.
+- The root README, the manual setup and notebooks READMEs, the installer README, the
+  [checklist](docs/PREREQUISITES.md) and [2. Azure](2.%20Azure/README.md) say the same. Azure is set
+  up only by the installer, so it's a work in progress too.
+
+---
+
 ## Unreleased — Fabric and Azure paths are back
 
 **Why.** Analytics Hub (paths 1 and 2) moved to its own repo, `microsoft/AnalyticsHub-Dashboard`,

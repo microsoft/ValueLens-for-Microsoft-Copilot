@@ -1,33 +1,69 @@
 # 1. Fabric
 
-The recommended path. One installer sets everything up in your tenant and gives you the dashboard
-as an app in Fabric, called **Analytics Hub**. You don't need a terminal or Power BI Desktop.
-
-[![Download the Analytics Hub installer](https://img.shields.io/badge/Download-Analytics%20Hub%20installer-0078D4?style=for-the-badge)](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe)
-
-For Windows 10 or 11. Check [what you need](#before-you-start) first.
+The recommended path. Notebooks in a Fabric Lakehouse collect the data, a pipeline runs them on a
+schedule, and the ValueLens Power BI report reads it. You set it up by hand, step by step.
 
 ## Before you start
 
-Go through the **[Before you start checklist](../docs/PREREQUISITES.md)**. It lists what you need
-and what to ask other admins for, by person, with the optional extras and the costs. In short:
-
 - A **Fabric capacity**, F2 or larger. No capacity?
   [Start a free trial](https://learn.microsoft.com/fabric/fundamentals/fabric-trial#method-1-start-a-new-trial-capacity-from-the-account-manager).
-- An **Azure subscription** or resource group where you can create a Key Vault.
-- A **Fabric admin** to turn on three tenant settings, and a **Global Administrator** or
-  **Privileged Role Administrator** to grant admin consent. The installer gives you a link to send.
-- For Copilot Cowork credits, a **Viva Insights query** built first.
-  [Send this to your Viva Insights analyst](../docs/PREREQUISITES.md#send-this-to-your-viva-insights-analyst-first).
+- An **app registration** with the Microsoft Graph permissions in
+  [PERMISSIONS](../docs/PERMISSIONS.md), and a **Global Administrator** or **Privileged Role
+  Administrator** to grant admin consent.
+- An **Azure Key Vault** for the app's secret.
+- **Power BI Desktop** to open the template, and Power BI Pro to publish it.
 
-It takes about 5 minutes of questions and about 15 minutes of setup. The first data reaches the
-app about 25 minutes after you choose **Go ahead** with 30 days of history, or about 2 hours with
-180 days. Keep the PC awake and plugged in until it finishes.
+The [Before you start checklist](../docs/PREREQUISITES.md) goes through who to ask for what, the
+optional extras and the costs.
 
 Read the [disclaimer](../README.md#disclaimer) too: these aren't the official Copilot reports, and
 you're responsible for the data once it's in your workspace.
 
-## Install
+## Set it up
+
+Follow [Manual setup](Manual%20setup/README.md):
+
+1. **[Notebooks](Manual%20setup/notebooks/README.md).** Register an app, create a Lakehouse, load
+   the data and publish the report.
+2. **[Pipeline](Manual%20setup/pipelines/README.md).** Run the notebooks on a schedule and refresh
+   the report.
+
+This video walks through it, from a fresh app registration to a saved, self-refreshing Power BI
+report.
+
+https://github.com/user-attachments/assets/c834bed3-49fa-4f6a-bc7a-01bded2fd53e
+
+> Prefer to download it? [Get the walkthrough video](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/installer-v0.2.2/ValueLens_Fabric_Setup.mp4).
+
+## Optional extras
+
+Copilot usage, licences and org data are always collected. Each of these adds a notebook or a
+report of its own:
+
+| Extra | What it shows | Set it up |
+|---|---|---|
+| Microsoft 365 activity | How people work across Teams, Outlook, SharePoint, OneDrive and the Office apps | [Optional notebooks](Manual%20setup/notebooks/README.md#optional-notebooks) |
+| Agent 365 registry | The agents in your tenant and who made them | [Optional notebooks](Manual%20setup/notebooks/README.md#optional-notebooks) |
+| Product feedback | What people say about Copilot | [Optional notebooks](Manual%20setup/notebooks/README.md#optional-notebooks) and the [flow](Manual%20setup/flows/) |
+| Credit consumption | Credits used and what they cost across Copilot Studio, Copilot Cowork and Azure AI | [Add Credit Consumption](Manual%20setup/Add%20Credit%20Consumption/) |
+| Agent Evaluator | How well your Copilot Studio agents work | [Add Agent Evaluator](Manual%20setup/Add%20Agent%20Evaluator/) |
+| Defender (shadow AI and agent risk) | AI tools other than Copilot in use on your devices and network, and agents that answer without sign-in | [Optional notebooks](Manual%20setup/notebooks/README.md#optional-notebooks) |
+| Agent configuration and Foundry (Azure Resource Graph) | How each Copilot Studio agent is set up, and your Foundry resources | [Optional notebooks](Manual%20setup/notebooks/README.md#optional-notebooks) |
+
+## Analytics Hub installer (work in progress)
+
+> **Work in progress.** The installer automates the manual setup above and adds **Analytics Hub**,
+> the dashboard as an app in Fabric. It's still changing, so try it in a test or demo tenant first,
+> and use the manual setup for production. [Tell us](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues)
+> what works and what doesn't.
+
+[Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe) (Windows 10 or 11). The
+[Before you start checklist](../docs/PREREQUISITES.md) lists what it needs. Allow about 5 minutes of questions and 15
+minutes of setup. The first data reaches the app about 25 minutes after you choose **Go ahead**, or
+about 2 hours with 180 days of history. The full reference is in the
+[installer README](installer/README.md).
+
+### Install
 
 1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe).
    If Edge says it isn't commonly downloaded, choose **…** next to the file, then **Keep**,
@@ -50,7 +86,7 @@ you're responsible for the data once it's in your workspace.
 If admin consent isn't granted yet, the installer skips the first load. Once an admin has granted
 it, open the exe again and choose **Run now**.
 
-## Use it
+### Use it
 
 - **Open the app:** in your Fabric workspace, open **Analytics Hub**.
 - **Share it.** The installer creates the **Analytics Hub Viewers** group, with you as owner, and
@@ -71,7 +107,7 @@ it, open the exe again and choose **Run now**.
   ([Microsoft's note](https://learn.microsoft.com/fabric/data-factory/dataflows-gen2-overview#staging-items-in-your-workspace)).
 - Installs from earlier versions keep the model name `ValueLens Model`.
 
-## Optional extras
+### Data source cards
 
 Copilot usage, licences and org data are always collected. Choose any of these on the
 installer's **Data sources** screen, where each one is a card. Each has a few steps of its own:
@@ -87,7 +123,7 @@ see [Optional extras](../docs/PREREQUISITES.md#optional-extras) for what each on
 | [Defender (shadow AI and agent risk)](installer/README.md#defender-shadow-ai-and-agent-risk) | AI tools other than Copilot in use on your devices and network, and agents that answer without sign-in | Microsoft Defender advanced hunting and Cloud Discovery |
 | [Agent configuration and Foundry (Azure Resource Graph)](installer/README.md#agent-configuration-and-foundry) | How each Copilot Studio agent is set up, and your Foundry resources | Azure Resource Graph |
 
-## Prefer Power BI Desktop?
+### Prefer Power BI Desktop?
 
 To build your own reports, connect Power BI Desktop to `Analytics Hub Model` (or `ValueLens Model`)
 in your workspace.
@@ -99,18 +135,7 @@ When it finishes, it shows the values to enter in
 Publish the report, then
 [add a refresh step to the pipeline](Manual%20setup/pipelines/README.md#refresh-power-bi-from-the-pipeline).
 
-## Set it up by hand
-
-If you can't use the installer, follow [Manual setup](Manual%20setup/README.md). It uses the same
-files the installer does.
-
-This video walks through the manual setup, from a fresh app registration to a saved,
-self-refreshing Power BI report. You don't need it if you use the installer.
-
-https://github.com/user-attachments/assets/c834bed3-49fa-4f6a-bc7a-01bded2fd53e
-
-> Prefer to download it? [Get the walkthrough video](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/installer-v0.2.2/ValueLens_Fabric_Setup.mp4).
-
 ## Problems
 
-See [Troubleshooting](installer/README.md#troubleshooting).
+See [Troubleshooting](installer/README.md#troubleshooting) for the installer, and
+[An audit window keeps failing](Manual%20setup/notebooks/README.md#an-audit-window-keeps-failing) for the notebooks.
