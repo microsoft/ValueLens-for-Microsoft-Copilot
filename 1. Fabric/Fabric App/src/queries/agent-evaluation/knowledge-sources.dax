@@ -1,0 +1,14 @@
+// The ten knowledge sources agents cited most.
+EVALUATE
+VAR _sources =
+    SUMMARIZECOLUMNS(
+        'Knowledge Citations'[source_label],
+        "@Citations", [Knowledge Citation Count]
+    )
+RETURN
+SELECTCOLUMNS(
+    TOPN(10, FILTER(_sources, [@Citations] > 0 && 'Knowledge Citations'[source_label] <> ""), [@Citations], DESC, 'Knowledge Citations'[source_label], ASC),
+    "Source", 'Knowledge Citations'[source_label],
+    "Citations", [@Citations]
+)
+ORDER BY [Citations] DESC, [Source] ASC

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar" },
+  "transform": [
+    { "calculate": "toDate(datum['Week Start'])", "as": "Week Date" },
+    { "calculate": "time(datum['Week Date'])", "as": "Week Order" },
+    { "calculate": "timeFormat(datum['Week Date'], '%-d %b')", "as": "Week" },
+    { "joinaggregate": [{ "op": "sum", "field": "Conversations", "as": "Week Total" }], "groupby": ["Week Start"] },
+    { "calculate": "datum['Conversations'] / datum['Week Total']", "as": "Share" }
+  ],
+  "encoding": {
+    "x": {
+      "field": "Week",
+      "type": "ordinal",
+      "title": null,
+      "sort": { "field": "Week Order", "op": "min", "order": "ascending" },
+      "axis": { "labelAngle": 0, "labelOverlap": "greedy" }
+    },
+    "y": { "field": "Conversations", "type": "quantitative", "title": "Conversations", "stack": "zero" },
+    "color": {
+      "field": "Outcome",
+      "type": "nominal",
+      "title": null,
+      "sort": ["Resolved", "Escalated by design", "Escalated after an error", "Abandoned"],
+      "legend": { "orient": "top", "direction": "horizontal", "labelLimit": 240 }
+    },
+    "order": { "field": "Outcome Order", "type": "quantitative", "sort": "ascending" },
+    "tooltip": [
+      { "field": "Week Date", "type": "temporal", "title": "Week starting", "format": "%d %b %Y" },
+      { "field": "Outcome", "type": "nominal", "title": "Ended" },
+      { "field": "Conversations", "type": "quantitative", "title": "Conversations", "format": ",.0f" },
+      { "field": "Share", "type": "quantitative", "title": "Share of the week", "format": ".0%" }
+    ]
+  }
+}

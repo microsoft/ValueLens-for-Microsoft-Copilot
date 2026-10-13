@@ -1,0 +1,15 @@
+# Set these to your own published models before deploying (see README, step 2).
+# IDs are in each model's URL: app.powerbi.com/groups/<workspaceId>/datasets/<itemId>/
+activeProfile: default
+profiles:
+  default:
+    semanticModels:
+      vl:
+        workspaceId: "<ValueLens workspace ID>"
+        itemId: "<ValueLens semantic model ID>"
+      cc:
+        workspaceId: "<Consumption Central workspace ID>"
+        itemId: "<Consumption Central semantic model ID>"
+      ae:
+        workspaceId: "<Agent Evaluator workspace ID>"
+        itemId: "<Agent Evaluator semantic model ID>"

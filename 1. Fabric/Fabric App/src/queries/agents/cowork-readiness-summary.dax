@@ -1,0 +1,7 @@
+EVALUATE
+ROW(
+    "Eligible Users", [Cowork Fit: Eligible Users],
+    "Surfaces Per Day", [Cowork Fit: Surfaces Per Active Day],
+    "Prompts Per Session", [Cowork Fit: Session Depth],
+    "Agent User Share", [Cowork Fit: Agent User Share]
+)

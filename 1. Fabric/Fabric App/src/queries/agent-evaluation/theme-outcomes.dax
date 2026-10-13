@@ -1,0 +1,32 @@
+// How conversations in each topic theme ended, in the same outcome words as
+// the weekly chart.
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Agent Performance'[Topic Theme],
+            'Agent Performance'[Outcome (Detailed)],
+            "@Conversations", [Total Conversations]
+        ),
+        [@Conversations] > 0
+    ),
+    "Theme", 'Agent Performance'[Topic Theme],
+    "Outcome",
+        SWITCH(
+            'Agent Performance'[Outcome (Detailed)],
+            "Escalated - Intended", "Escalated by design",
+            "Escalated - Unintended", "Escalated after an error",
+            'Agent Performance'[Outcome (Detailed)]
+        ),
+    "Outcome Order",
+        SWITCH(
+            'Agent Performance'[Outcome (Detailed)],
+            "Resolved", 1,
+            "Escalated - Intended", 2,
+            "Escalated - Unintended", 3,
+            "Abandoned", 4,
+            5
+        ),
+    "Conversations", [@Conversations]
+)
+ORDER BY [Theme] ASC, [Outcome Order] ASC

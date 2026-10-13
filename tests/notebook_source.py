@@ -1,11 +1,12 @@
-"""Execute the pure-Python parts of an Analytics Hub Fabric notebook (imports, defs, chosen constants) for parity tests."""
+"""Execute the pure-Python parts of a Fabric notebook (imports, defs, chosen constants) for parity tests."""
 from __future__ import annotations
 
 import ast
 import json
+from pathlib import Path
 
-from analytics_hub import NOTEBOOKS
-
+ROOT = Path(__file__).resolve().parents[1]
+NOTEBOOKS = ROOT / "1. Fabric" / "Manual setup" / "notebooks"
 _SKIP_IMPORTS = {"pyspark", "notebookutils", "requests"}
 
 

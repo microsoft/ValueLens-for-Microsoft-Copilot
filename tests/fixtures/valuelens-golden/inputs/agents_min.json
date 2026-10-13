@@ -1,0 +1,33 @@
+{
+ "columns": [
+  [
+   "Title ID",
+   "string"
+  ],
+  [
+   "Entra Agent ID",
+   "string"
+  ],
+  [
+   "Agent name",
+   "string"
+  ]
+ ],
+ "rows": [
+  [
+   "title-1",
+   "entra-1",
+   "Agent One"
+  ],
+  [
+   "title-1",
+   "entra-1",
+   "Agent One"
+  ],
+  [
+   "title-2",
+   "entra-2",
+   "Agent Two"
+  ]
+ ]
+}

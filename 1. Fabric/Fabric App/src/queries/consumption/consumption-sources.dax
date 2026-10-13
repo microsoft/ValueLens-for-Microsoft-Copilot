@@ -1,0 +1,6 @@
+EVALUATE
+ROW(
+    "Cowork Rows", COUNTROWS(CreditsWeekly),
+    "Studio Rows", COUNTROWS('Credit Consumption (Tenant)'),
+    "Azure Rows", COUNTROWS('AzureSolutionSpend') + COUNTROWS('AzureAiSpend')
+)

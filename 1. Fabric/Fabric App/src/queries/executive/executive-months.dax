@@ -1,0 +1,80 @@
+DEFINE
+    // The same kinds of work as the summary's: General Chat and General
+    // Assistance never count, and Security Copilot's automated sessions are
+    // left out (EXCLUDED_KINDS in executive/skills.ts lists the same names).
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Skills In Use] =
+        CALCULATE(
+            DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category]),
+            KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Is Prompt Row] = TRUE()),
+            KEEPFILTERS(
+                FILTER(
+                    ALL('Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category]),
+                    LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category])) > 0
+                        && NOT 'Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category]
+                            IN { "General Chat", "General Assistance", "General assistance / Other" }
+                )
+            ),
+            KEEPFILTERS(
+                FILTER(
+                    ALL('Chat + Agent Interactions (Audit Logs)'[AppHost]),
+                    NOT CONTAINSSTRING('Chat + Agent Interactions (Audit Logs)'[AppHost], "SecurityCopilot")
+                )
+            )
+        )
+    // Everyone with a task counts, so someone who only chatted scores 0.
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Skills Per Person] =
+        AVERAGEX(
+            FILTER(
+                VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Audit_UserId])) > 0 && CALCULATE([AI Tasks]) > 0
+            ),
+            [ValueLens Skills In Use] + 0
+        )
+
+EVALUATE
+// One row per month of the dates in the filter. The caller sets the dates to
+// six whole months, so the trend always spans the same time, and compares the
+// last two full months for the arrows on the cards.
+VAR _months =
+    DISTINCT(
+        SELECTCOLUMNS(
+            VALUES('Calendar'[Date]),
+            "Month Start", DATE(YEAR('Calendar'[Date]), MONTH('Calendar'[Date]), 1)
+        )
+    )
+RETURN
+    GENERATE(
+        _months,
+        VAR _start = [Month Start]
+        RETURN
+            CALCULATETABLE(
+                ROW(
+                    "Copilot Hours",
+                        CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Typical",
+                            KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)] = "Copilot")),
+                    "Agent Hours",
+                        CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Typical",
+                            KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)] = "Agents")),
+                    "Cowork Hours",
+                        CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Typical",
+                            KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)] = "Cowork")),
+                    "Hours", CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Typical"),
+                    "Tasks", [AI Tasks],
+                    "Skills Per Person", [ValueLens Skills Per Person],
+                    "Seats In Use Pct", [% Active Licensed Users],
+                    // The Adoption page's monthly habit mix: Habitual and Power
+                    // over everyone counted that month, inactive included.
+                    "Habit Pct",
+                        DIVIDE(
+                            [Habitual Users (Monthly)] + [Power Users (Monthly)],
+                            COALESCE([Inactive Users (Monthly)], 0) + [All Active Users]
+                        ),
+                    "Satisfaction", 'ProductFeedback'[Satisfaction Rate],
+                    "Feedback", 'ProductFeedback'[Total Feedback]
+                ),
+                KEEPFILTERS(
+                    FILTER(ALL('Calendar'[Date]), 'Calendar'[Date] >= _start && 'Calendar'[Date] <= EOMONTH(_start, 0))
+                )
+            )
+    )
+ORDER BY [Month Start]

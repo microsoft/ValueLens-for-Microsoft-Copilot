@@ -1,0 +1,38 @@
+[
+  {
+    "[Organization]": "IT",
+    "[Active Unlicensed Users]": 5,
+    "[Active Days Per Week]": 1.4638095238095237,
+    "[Sessions Per User Per Week]": 1.4270833333333335
+  },
+  {
+    "[Organization]": "Sales",
+    "[Active Unlicensed Users]": 5,
+    "[Active Days Per Week]": 1.3199999999999998,
+    "[Sessions Per User Per Week]": 1.3703703703703702
+  },
+  {
+    "[Organization]": "HR",
+    "[Active Unlicensed Users]": 5,
+    "[Active Days Per Week]": 1.2833333333333332,
+    "[Sessions Per User Per Week]": 1.3214285714285714
+  },
+  {
+    "[Organization]": "Marketing",
+    "[Active Unlicensed Users]": 5,
+    "[Active Days Per Week]": 1.2833333333333334,
+    "[Sessions Per User Per Week]": 1.2962962962962963
+  },
+  {
+    "[Organization]": "Legal",
+    "[Active Unlicensed Users]": 5,
+    "[Active Days Per Week]": 1.25,
+    "[Sessions Per User Per Week]": 1.2777777777777777
+  },
+  {
+    "[Organization]": "Finance",
+    "[Active Unlicensed Users]": 5,
+    "[Active Days Per Week]": 1.2,
+    "[Sessions Per User Per Week]": 1.1428571428571428
+  }
+]

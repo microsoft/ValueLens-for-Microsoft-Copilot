@@ -1,0 +1,24 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Interactions (Audit Logs)'[Audit_UserId],
+            "@Rank", [Cowork Readiness Rank (Dynamic)],
+            "@Surfaces", [Cowork Readiness: Surfaces Per Day],
+            "@Depth", [Cowork Readiness: Prompts Per Session],
+            "@UsesAgents", [Cowork Fit: Agent User Share]
+        ),
+        NOT ISBLANK([@Rank])
+    ),
+    "Rank", [@Rank],
+    "User", 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId],
+    "Organization",
+        LOOKUPVALUE(
+            'Chat + Agent Org Data'[Organization],
+            'Chat + Agent Org Data'[PersonId], 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId]
+        ),
+    "Surfaces Per Day", [@Surfaces],
+    "Prompts Per Session", [@Depth],
+    "Uses Agents", IF(COALESCE([@UsesAgents], 0) > 0, "Yes", "No")
+)
+ORDER BY [Rank], [Surfaces Per Day] DESC, [User]

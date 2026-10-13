@@ -1,0 +1,49 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": {
+    "type": "bar"
+  },
+  "encoding": {
+    "y": {
+      "field": "Owner Status",
+      "type": "nominal",
+      "title": null,
+      "sort": {
+        "field": "Status Order",
+        "op": "min",
+        "order": "ascending"
+      },
+      "axis": {
+        "labelLimit": 200
+      }
+    },
+    "x": {
+      "field": "Agents",
+      "type": "quantitative",
+      "title": "Agents",
+      "axis": {
+        "labelExpr": "format(datum.value, ',.0f')"
+      }
+    },
+    "color": {
+      "field": "Owner Status",
+      "type": "nominal",
+      "legend": null
+    },
+    "tooltip": [
+      {
+        "field": "Owner Status",
+        "type": "nominal",
+        "title": "Owner"
+      },
+      {
+        "field": "Agents",
+        "type": "quantitative",
+        "title": "Agents",
+        "format": ",.0f"
+      }
+    ]
+  }
+}

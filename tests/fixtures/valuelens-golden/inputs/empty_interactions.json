@@ -1,0 +1,17 @@
+{
+ "columns": [
+  [
+   "Id",
+   "string"
+  ],
+  [
+   "CreationDate",
+   "string"
+  ],
+  [
+   "Audit_UserId",
+   "string"
+  ]
+ ],
+ "rows": []
+}

@@ -1,0 +1,65 @@
+[
+  {
+    "[Agent]": "Finance Analyst Bot",
+    "[Sessions]": 529,
+    "[Users]": 62,
+    "[Return Rate]": 0.8870967741935484,
+    "[Organizations]": 6
+  },
+  {
+    "[Agent]": "Legal Document Agent",
+    "[Sessions]": 513,
+    "[Users]": 61,
+    "[Return Rate]": 0.8852459016393442,
+    "[Organizations]": 6
+  },
+  {
+    "[Agent]": "Copilot for Excel",
+    "[Sessions]": 502,
+    "[Users]": 62,
+    "[Return Rate]": 0.8548387096774194,
+    "[Organizations]": 6
+  },
+  {
+    "[Agent]": "HR Copilot Studio",
+    "[Sessions]": 501,
+    "[Users]": 61,
+    "[Return Rate]": 0.8852459016393442,
+    "[Organizations]": 6
+  },
+  {
+    "[Agent]": "Copilot for Teams",
+    "[Sessions]": 498,
+    "[Users]": 62,
+    "[Return Rate]": 0.8870967741935484,
+    "[Organizations]": 6
+  },
+  {
+    "[Agent]": "IT Helpdesk Agent",
+    "[Sessions]": 493,
+    "[Users]": 61,
+    "[Return Rate]": 0.8688524590163934,
+    "[Organizations]": 6
+  },
+  {
+    "[Agent]": "Copilot for Outlook",
+    "[Sessions]": 492,
+    "[Users]": 61,
+    "[Return Rate]": 0.9016393442622951,
+    "[Organizations]": 6
+  },
+  {
+    "[Agent]": "Copilot for Word",
+    "[Sessions]": 488,
+    "[Users]": 59,
+    "[Return Rate]": 0.8983050847457628,
+    "[Organizations]": 6
+  },
+  {
+    "[Agent]": "Sales Agent 365",
+    "[Sessions]": 484,
+    "[Users]": 60,
+    "[Return Rate]": 0.8666666666666667,
+    "[Organizations]": 6
+  }
+]

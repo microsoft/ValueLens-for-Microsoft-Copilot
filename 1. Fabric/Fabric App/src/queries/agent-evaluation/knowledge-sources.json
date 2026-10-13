@@ -1,0 +1,20 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Source",
+      "type": "nominal",
+      "title": null,
+      "sort": { "field": "Citations", "op": "sum", "order": "descending" },
+      "axis": { "labelLimit": 220 }
+    },
+    "x": { "field": "Citations", "type": "quantitative", "title": "Citations" },
+    "tooltip": [
+      { "field": "Source", "type": "nominal", "title": "Source" },
+      { "field": "Citations", "type": "quantitative", "title": "Citations", "format": ",.0f" }
+    ]
+  }
+}

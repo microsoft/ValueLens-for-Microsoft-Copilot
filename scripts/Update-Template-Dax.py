@@ -1,9 +1,8 @@
 """Apply the shared DAX fixes to every shipped ValueLens and Consumption Central PBIT.
 
-The three ValueLens templates and the three Consumption Central add-ons carry the same
-model, so a DAX fix has to land in all of them byte-for-byte. (Analytics Hub keeps its own
-copy of this script for the Fabric templates; the objects must match, see
-tests/test_template_dax_fixes.py.) This script owns those objects: it sets each one's expression (adding the object when a template lacks it),
+The five ValueLens templates and the four Consumption Central add-ons carry the same
+model, so a DAX fix has to land in all of them byte-for-byte. This script owns those
+objects: it sets each one's expression (adding the object when a template lacks it),
 leaves every other model field and ZIP member untouched, and is idempotent.
 
     python scripts/Update-Template-Dax.py           # patch the templates in place
@@ -22,11 +21,14 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 VALUELENS = (
+    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
+    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
     Path("5. Local CSV") / "ValueLens - Local CSV.pbit",
     Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
     Path("3. Power Automate + Dataverse") / "ValueLens - Power Automate + Dataverse.pbit",
 )
 CONSUMPTION = (
+    Path("1. Fabric") / "Manual setup" / "Add Credit Consumption" / "Consumption Central - Fabric.pbit",
     Path("3. Power Automate + Dataverse") / "Add Credit Consumption"
     / "Consumption Central - Power Automate + Dataverse.pbit",
     Path("4. SharePoint") / "Add Credit Consumption" / "Consumption Central - Viva Direct.pbit",

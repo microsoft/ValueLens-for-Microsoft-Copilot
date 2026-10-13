@@ -1,0 +1,55 @@
+//-----------------------------------------------------------------------
+// <copyright company="Microsoft Corporation">
+//        Copyright (c) Microsoft Corporation.  All rights reserved.
+//        Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// </copyright>
+//-----------------------------------------------------------------------
+
+import { cn } from "@/lib/utils";
+
+interface SegmentedControlProps<T extends string> {
+    /** Names the group for assistive technology, e.g. "Cohort". */
+    label: string;
+    options: readonly { id: T; label: string; disabled?: boolean; hint?: string }[];
+    value: T;
+    onChange: (value: T) => void;
+    className?: string;
+}
+
+/**
+ * The segmented toggle that replaces Power BI's bookmark buttons. Every
+ * destination uses it to swap between cohorts and lenses without refetching,
+ * so it behaves identically wherever it appears.
+ */
+export function SegmentedControl<T extends string>({
+    label,
+    options,
+    value,
+    onChange,
+    className,
+}: SegmentedControlProps<T>) {
+    return (
+        <div role="group" aria-label={label} className={cn("flex rounded-md border border-border bg-card p-100-nudge", className)}>
+            {options.map((option) => (
+                <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => onChange(option.id)}
+                    aria-pressed={option.id === value}
+                    disabled={option.disabled}
+                    title={option.hint}
+                    className={cn(
+                        "rounded-sm px-300 py-100 text-[length:var(--text-200)] transition-colors",
+                        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                        "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted-foreground",
+                        option.id === value
+                            ? "bg-accent font-semibold text-accent-foreground"
+                            : "text-muted-foreground hover:text-foreground",
+                    )}
+                >
+                    {option.label}
+                </button>
+            ))}
+        </div>
+    );
+}

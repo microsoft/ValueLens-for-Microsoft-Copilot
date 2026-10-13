@@ -1,0 +1,19 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Agent Bridge'[Agent Name],
+            "@Credits", [Studio Total Credits Used],
+            "@Share", [Group Credit Share %],
+            "@Billable", [Total Billable Credits Used],
+            "@Cost", [Billable Credit Cost (User)]
+        ),
+        NOT ISBLANK([@Credits])
+    ),
+    "Agent", 'Agent Bridge'[Agent Name],
+    "Credits Used", [@Credits],
+    "Credit Share", [@Share],
+    "Billable Credits", [@Billable],
+    "Estimated Cost", [@Cost]
+)
+ORDER BY [Credits Used] DESC

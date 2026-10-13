@@ -1,0 +1,5 @@
+duckdb>=1.5.6,<2
+requests>=2.34.2,<3
+azure-identity>=1.26.0,<2
+azure-storage-blob>=12.31.0,<13
+pyodbc>=5.3.0,<6

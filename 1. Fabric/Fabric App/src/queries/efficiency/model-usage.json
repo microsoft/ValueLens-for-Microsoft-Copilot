@@ -1,0 +1,34 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Model",
+      "type": "nominal",
+      "title": null,
+      "sort": "-x",
+      "axis": { "labelLimit": 240 }
+    },
+    "x": {
+      "field": "Sessions",
+      "type": "quantitative",
+      "title": "Sessions",
+      "axis": { "labelExpr": "format(datum.value, ',.0f')" }
+    },
+    "color": {
+      "field": "Cost Tier",
+      "type": "nominal",
+      "title": "Cost tier",
+      "sort": { "field": "Tier Sort", "order": "ascending" },
+      "legend": { "labelLimit": 240 }
+    },
+    "tooltip": [
+      { "field": "Model", "type": "nominal", "title": "Model" },
+      { "field": "Cost Tier", "type": "nominal", "title": "Cost tier" },
+      { "field": "Sessions", "type": "quantitative", "title": "Sessions", "format": ",.0f" },
+      { "field": "Usage Share", "type": "quantitative", "title": "Share", "format": ".1%" }
+    ]
+  }
+}

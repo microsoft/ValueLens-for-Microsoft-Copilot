@@ -1,0 +1,31 @@
+// Every headline rate for each group of the chosen Group by column, largest
+// first. The app fills in the column from a fixed list.
+EVALUATE
+VAR _groups =
+    SUMMARIZECOLUMNS(
+        __GROUP__,
+        "@Conversations", [Total Conversations],
+        "@People", [Unique Users],
+        "@Resolution", [Resolution Rate],
+        "@Failure", [True Failure Rate],
+        "@Unintended", [Unintended Escalation Rate],
+        "@Abandoned", [Abandonment Rate],
+        "@CSAT", [Turn CSAT %],
+        "@Errors", [Session Error Rate],
+        "@Response", [Median Response Time (sec)]
+    )
+RETURN
+SELECTCOLUMNS(
+    FILTER(_groups, [@Conversations] > 0),
+    "Group", __GROUP__,
+    "Conversations", [@Conversations],
+    "People", [@People],
+    "Resolution Rate", [@Resolution],
+    "True Failure Rate", [@Failure],
+    "Unintended Escalation Rate", [@Unintended],
+    "Abandonment Rate", [@Abandoned],
+    "CSAT", [@CSAT],
+    "Error Rate", [@Errors],
+    "Median Response", [@Response]
+)
+ORDER BY [Conversations] DESC, [Group] ASC

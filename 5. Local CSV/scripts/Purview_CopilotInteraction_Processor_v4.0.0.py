@@ -1374,9 +1374,9 @@ def compute_agent_publish_status(agent_id: str, agent_name: str) -> str:
 
 # ---------------------------------------------------------------------------
 # Agent type classification: what kind of agent a row used and who published it.
-# EXACT COPY of the classifier in the Analytics Hub processor notebook
-# (microsoft/AnalyticsHub-Dashboard, fabric/notebooks/Copilot_Audit_Log_Processor.ipynb, cell 2).
-# tests/test_agent_type_parity.py fails if the two copies drift: change Analytics Hub first.
+# EXACT COPY of the classifier in the Fabric processor notebook
+# (1. Fabric/Manual setup/notebooks/Copilot_Audit_Log_Processor.ipynb, cell 2).
+# tests/test_agent_type_parity.py fails if the two copies drift, so edit both.
 # Agent_Type_Basis says how firm each category is:
 #   documented = a value pattern Microsoft documents for audit records
 #   observed   = seen in real audit data but not formally documented

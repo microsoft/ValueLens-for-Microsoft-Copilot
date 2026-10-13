@@ -39,7 +39,7 @@ Open **`Consumption Central - Local CSV.pbit`**, set **`DataFolder`** to the ful
 3. **Open the template**, paste the folder path into `DataFolder`, click **Load**.
 
 Copilot Studio figures here come from admin centre exports. To read them daily from the Power
-Platform licensing API instead, use the [Fabric](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/installer/README.md#power-automate-flows)
+Platform licensing API instead, use the [Fabric](../../1.%20Fabric/installer/README.md#power-automate-flows)
 or [Power Automate + Dataverse](../../3.%20Power%20Automate%20+%20Dataverse/Add%20Credit%20Consumption/)
 path.
 

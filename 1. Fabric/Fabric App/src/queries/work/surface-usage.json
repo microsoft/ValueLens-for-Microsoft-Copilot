@@ -1,0 +1,26 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [{ "filter": "datum.Lens === '__LENS__'" }],
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Category",
+      "type": "nominal",
+      "title": null,
+      "sort": "-x",
+      "axis": { "labelLimit": 160 }
+    },
+    "x": {
+      "field": "__VALUE__",
+      "type": "quantitative",
+      "title": "Tasks",
+      "axis": { "labelExpr": "format(datum.value, ',.0f')" }
+    },
+    "tooltip": [
+      { "field": "Category", "type": "nominal", "title": "__TITLE__" },
+      { "field": "__VALUE__", "type": "quantitative", "title": "Tasks", "format": ",.0f" }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "Chat + Agent Interactions (Audit Logs)[AgentName]": "Agent A",
+    "[Active Agent Users]": 61,
+    "[Observed Agent Sessions]": 492,
+    "[Expert Equivalent Hours]": 144.9,
+    "[AI Assisted Value]": 7245
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[AgentName]": "Agent B",
+    "[Active Agent Users]": 62,
+    "[Observed Agent Sessions]": 502,
+    "[Expert Equivalent Hours]": 134.26666666666665,
+    "[AI Assisted Value]": 6713.333333333332
+  },
+  {
+    "Chat + Agent Interactions (Audit Logs)[AgentName]": "Agent C",
+    "[Active Agent Users]": 62,
+    "[Observed Agent Sessions]": 529,
+    "[Expert Equivalent Hours]": 125.33333333333334,
+    "[AI Assisted Value]": 6266.666666666667
+  }
+]

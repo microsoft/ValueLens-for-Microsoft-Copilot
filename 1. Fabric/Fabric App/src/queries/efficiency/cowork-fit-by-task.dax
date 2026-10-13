@@ -1,0 +1,29 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Interactions (Audit Logs)'[Cowork Task Category],
+            'Chat + Agent Interactions (Audit Logs)'[Work Weight Grade],
+            'Chat + Agent Interactions (Audit Logs)'[Work Weight Grade Sort],
+            "@Share", [Usage Efficiency: Task Grade Share],
+            "@Sessions", [Usage Efficiency: Graded Tasks],
+            "@TaskSessions",
+                CALCULATE(
+                    [Usage Efficiency: Graded Tasks],
+                    REMOVEFILTERS(
+                        'Chat + Agent Interactions (Audit Logs)'[Work Weight Grade],
+                        'Chat + Agent Interactions (Audit Logs)'[Work Weight Grade Sort]
+                    )
+                )
+        ),
+        NOT ISBLANK([@Share])
+            && NOT ISBLANK('Chat + Agent Interactions (Audit Logs)'[Cowork Task Category])
+    ),
+    "Task", 'Chat + Agent Interactions (Audit Logs)'[Cowork Task Category],
+    "Grade", 'Chat + Agent Interactions (Audit Logs)'[Work Weight Grade],
+    "Grade Order", 'Chat + Agent Interactions (Audit Logs)'[Work Weight Grade Sort],
+    "Share", [@Share],
+    "Sessions", [@Sessions],
+    "Task Sessions", [@TaskSessions]
+)
+ORDER BY [Task Sessions] DESC, [Task] ASC, [Grade Order] ASC

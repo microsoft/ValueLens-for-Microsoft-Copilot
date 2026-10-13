@@ -1,0 +1,27 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [{ "filter": "isValid(datum['Credits'])" }],
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Item",
+      "type": "nominal",
+      "title": null,
+      "sort": "-x",
+      "axis": { "labelLimit": 180 }
+    },
+    "x": {
+      "field": "Credits",
+      "type": "quantitative",
+      "title": "Credits",
+      "axis": { "labelExpr": "format(datum.value, '~s')" }
+    },
+    "tooltip": [
+      { "field": "Item", "type": "nominal", "title": "Item" },
+      { "field": "Credits", "type": "quantitative", "title": "Credits", "format": ",.0f" },
+      { "field": "Cost", "type": "quantitative", "title": "Estimated cost", "format": "$,.2f" }
+    ]
+  }
+}

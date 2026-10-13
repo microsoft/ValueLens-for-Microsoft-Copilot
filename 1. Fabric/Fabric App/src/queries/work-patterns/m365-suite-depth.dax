@@ -1,0 +1,45 @@
+EVALUATE
+VAR _people =
+    ADDCOLUMNS(
+        CALCULATETABLE(VALUES('M365 Activity'[UPN_Normalized]), 'M365 Activity'[WorkloadsActive] > 0),
+        "@Apps",
+            CALCULATE(
+                MAX('M365 Activity'[AppOutlook])
+                    + MAX('M365 Activity'[AppTeams])
+                    + MAX('M365 Activity'[AppWord])
+                    + MAX('M365 Activity'[AppExcel])
+                    + MAX('M365 Activity'[AppPowerPoint])
+                    + MAX('M365 Activity'[AppOneNote])
+            )
+    )
+VAR _total = COUNTROWS(_people)
+VAR _buckets =
+    DATATABLE(
+        "Apps", INTEGER,
+        "Apps Used", STRING,
+        {
+            { 0, "No app use reported" },
+            { 1, "1 app" },
+            { 2, "2 apps" },
+            { 3, "3 apps" },
+            { 4, "4 apps" },
+            { 5, "5 apps" },
+            { 6, "All 6 apps" }
+        }
+    )
+VAR _measured =
+    ADDCOLUMNS(
+        FILTER(_buckets, _total > 0),
+        "@People",
+            VAR _apps = [Apps]
+            RETURN COALESCE(COUNTROWS(FILTER(_people, [@Apps] = _apps)), 0)
+    )
+RETURN
+SELECTCOLUMNS(
+    _measured,
+    "Apps Used", [Apps Used],
+    "Apps", [Apps],
+    "People", [@People],
+    "Share", DIVIDE([@People], _total)
+)
+ORDER BY [Apps]

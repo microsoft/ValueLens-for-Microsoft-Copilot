@@ -1,0 +1,23 @@
+{
+  "page": "Appendix: Signal - Impact Table",
+  "pageOrder": 14,
+  "pageDescription": "Trace how observed signals become inferred tasks and modeled value.",
+  "entries": [
+    {
+      "metric": "App host",
+      "description": "The Copilot host application an interaction happened in, as the audit log records it: for example Teams, Word, Outlook, Excel, PowerPoint, Copilot Studio or Cowork. It says where Copilot was used, not what the person did."
+    },
+    {
+      "metric": "App host and Cowork",
+      "description": "An interaction whose app host contains \"cowork\" is counted as Cowork. Cowork prompts are categorised separately from Copilot and agent tasks; that method is being revised."
+    },
+    {
+      "metric": "App host and the task category",
+      "description": "Each row is classified first by the resource it touched, such as an email, a meeting, a file or a link. When no resource matches and the enterprise search plugin wasn't used, the open file and then the app host decide the Task Breakdown and its Task Category. For example, Outlook gives Email Drafting or Email Summarising (Email), Excel gives Excel Assistance (Data & Analysis), and Copilot Studio gives Domain-Specific Agent (Specialist Support). If nothing matches, the row is General Chat (General Chat & Q&A)."
+    },
+    {
+      "metric": "App host caveat",
+      "description": "Because the app host fills in whenever the resource doesn't say, Task Breakdown is inferred largely from the host application rather than the action performed. Creation-heavy work is under-represented relative to summarising and review, so treat the task mix as indicative, not as a measured task census."
+    }
+  ]
+}

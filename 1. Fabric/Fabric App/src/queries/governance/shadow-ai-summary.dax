@@ -1,0 +1,11 @@
+EVALUATE
+ROW(
+    "Tools Watched", [AI Tools Watched],
+    "Unsanctioned Tools", [Unsanctioned AI Tools],
+    "Tools Found", [Shadow AI Tools Found],
+    "Tools This Week", [Shadow AI Tools This Week],
+    "Devices", [Shadow AI Devices],
+    "Users", [Shadow AI Users],
+    "Cloud Users", [Shadow AI Users (Cloud Discovery)],
+    "Status", [Shadow AI Status]
+)
