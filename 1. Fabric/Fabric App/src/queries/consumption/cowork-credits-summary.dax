@@ -1,0 +1,28 @@
+DEFINE
+    // The released Consumption Central templates have no policy count yet, so
+    // the query brings its own. The all-zero GUID is usage recorded outside any
+    // policy window, not a policy.
+    MEASURE 'CoworkBilling'[ValueLens Cowork Policies] =
+        CALCULATE(
+            DISTINCTCOUNT('CoworkBilling'[SpendingPolicyId]),
+            KEEPFILTERS('CoworkBilling'[SpendingPolicyId] <> "00000000-0000-0000-0000-000000000000"),
+            KEEPFILTERS('CoworkBilling'[SpendingPolicyId] <> "")
+        )
+EVALUATE
+ROW(
+    "Credits Used", [Cowork Total Credits Used],
+    "Consuming Users", [Consuming Users],
+    "Weekly Active Users", [Weekly Active Users],
+    "Avg Credits Per User", DIVIDE([Cowork Total Credits Used], [Consuming Users]),
+    "Allowance Used", [Person Allowance Used %],
+    "Users Over Limit", [% Users Over Limit],
+    "Policies", [ValueLens Cowork Policies],
+    "Total Cost", [Cowork Total Cost],
+    "Prepaid Cost", [Cowork Prepaid Cost],
+    "PAYG Cost", [Cowork PAYG Cost],
+    "Blended Rate", [Blended Rate $],
+    "Avg Cost Per User", DIVIDE([Cowork Total Cost], [Consuming Users]),
+    "Policy Headroom", [Policy Headroom],
+    "Billing Basis", [Billing Basis],
+    "Period Label", [Cowork Period Label]
+)

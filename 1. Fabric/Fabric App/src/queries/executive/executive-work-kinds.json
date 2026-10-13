@@ -1,0 +1,31 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Chat + Agent Interactions (Audit Logs)Task Breakdown Category",
+      "type": "nominal",
+      "title": null,
+      "sort": "-x",
+      "axis": { "labelLimit": 220 }
+    },
+    "x": {
+      "field": "Hours",
+      "type": "quantitative",
+      "title": "Expert-equivalent hours",
+      "axis": { "labelExpr": "format(datum.value, ',.0f')", "tickCount": 4 }
+    },
+    "tooltip": [
+      {
+        "field": "Chat + Agent Interactions (Audit Logs)Task Breakdown Category",
+        "type": "nominal",
+        "title": "Kind of work"
+      },
+      { "field": "Hours", "type": "quantitative", "title": "Expert-equivalent hours", "format": ",.0f" },
+      { "field": "Tasks", "type": "quantitative", "title": "Tasks", "format": ",.0f" },
+      { "field": "People", "type": "quantitative", "title": "People", "format": ",.0f" }
+    ]
+  }
+}

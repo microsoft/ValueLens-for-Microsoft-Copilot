@@ -1,0 +1,59 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": {
+    "type": "bar"
+  },
+  "encoding": {
+    "y": {
+      "field": "Tool",
+      "type": "nominal",
+      "title": null,
+      "sort": "-x",
+      "axis": {
+        "labelLimit": 200
+      }
+    },
+    "x": {
+      "field": "Devices",
+      "type": "quantitative",
+      "title": "Devices",
+      "axis": {
+        "labelExpr": "format(datum.value, ',.0f')"
+      }
+    },
+    "color": {
+      "field": "Posture",
+      "type": "nominal",
+      "legend": {
+        "orient": "bottom",
+        "title": null
+      }
+    },
+    "tooltip": [
+      {
+        "field": "Tool",
+        "type": "nominal",
+        "title": "Tool"
+      },
+      {
+        "field": "Posture",
+        "type": "nominal",
+        "title": "Posture"
+      },
+      {
+        "field": "Devices",
+        "type": "quantitative",
+        "title": "Devices",
+        "format": ",.0f"
+      },
+      {
+        "field": "Users",
+        "type": "quantitative",
+        "title": "People",
+        "format": ",.0f"
+      }
+    ]
+  }
+}

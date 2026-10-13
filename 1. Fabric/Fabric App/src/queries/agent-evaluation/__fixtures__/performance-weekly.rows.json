@@ -1,0 +1,302 @@
+[
+  {
+    "[Week Start]": "2026-05-18T00:00:00",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 112
+  },
+  {
+    "[Week Start]": "2026-05-18T00:00:00",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 21
+  },
+  {
+    "[Week Start]": "2026-05-18T00:00:00",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 3
+  },
+  {
+    "[Week Start]": "2026-05-18T00:00:00",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 35
+  },
+  {
+    "[Week Start]": "2026-05-25T00:00:00",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 116
+  },
+  {
+    "[Week Start]": "2026-05-25T00:00:00",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 24
+  },
+  {
+    "[Week Start]": "2026-05-25T00:00:00",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 3
+  },
+  {
+    "[Week Start]": "2026-05-25T00:00:00",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 43
+  },
+  {
+    "[Week Start]": "2026-06-01T00:00:00",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 136
+  },
+  {
+    "[Week Start]": "2026-06-01T00:00:00",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 34
+  },
+  {
+    "[Week Start]": "2026-06-01T00:00:00",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 3
+  },
+  {
+    "[Week Start]": "2026-06-01T00:00:00",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 35
+  },
+  {
+    "[Week Start]": "2026-06-08T00:00:00",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 123
+  },
+  {
+    "[Week Start]": "2026-06-08T00:00:00",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 25
+  },
+  {
+    "[Week Start]": "2026-06-08T00:00:00",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 1
+  },
+  {
+    "[Week Start]": "2026-06-08T00:00:00",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 37
+  },
+  {
+    "[Week Start]": "2026-06-15T00:00:00",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 114
+  },
+  {
+    "[Week Start]": "2026-06-15T00:00:00",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 21
+  },
+  {
+    "[Week Start]": "2026-06-15T00:00:00",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 31
+  },
+  {
+    "[Week Start]": "2026-06-22T00:00:00",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 129
+  },
+  {
+    "[Week Start]": "2026-06-22T00:00:00",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 32
+  },
+  {
+    "[Week Start]": "2026-06-22T00:00:00",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 31
+  },
+  {
+    "[Week Start]": "2026-06-29T00:00:00",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 115
+  },
+  {
+    "[Week Start]": "2026-06-29T00:00:00",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 22
+  },
+  {
+    "[Week Start]": "2026-06-29T00:00:00",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 2
+  },
+  {
+    "[Week Start]": "2026-06-29T00:00:00",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 38
+  },
+  {
+    "[Week Start]": "2026-07-06T00:00:00",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 124
+  },
+  {
+    "[Week Start]": "2026-07-06T00:00:00",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 24
+  },
+  {
+    "[Week Start]": "2026-07-06T00:00:00",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 1
+  },
+  {
+    "[Week Start]": "2026-07-06T00:00:00",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 35
+  },
+  {
+    "[Week Start]": "2026-07-13T00:00:00",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 116
+  },
+  {
+    "[Week Start]": "2026-07-13T00:00:00",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 29
+  },
+  {
+    "[Week Start]": "2026-07-13T00:00:00",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 1
+  },
+  {
+    "[Week Start]": "2026-07-13T00:00:00",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 36
+  },
+  {
+    "[Week Start]": "2026-07-20T00:00:00",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 110
+  },
+  {
+    "[Week Start]": "2026-07-20T00:00:00",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 29
+  },
+  {
+    "[Week Start]": "2026-07-20T00:00:00",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 4
+  },
+  {
+    "[Week Start]": "2026-07-20T00:00:00",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 33
+  },
+  {
+    "[Week Start]": "2026-07-27T00:00:00",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 124
+  },
+  {
+    "[Week Start]": "2026-07-27T00:00:00",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 24
+  },
+  {
+    "[Week Start]": "2026-07-27T00:00:00",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 3
+  },
+  {
+    "[Week Start]": "2026-07-27T00:00:00",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 44
+  },
+  {
+    "[Week Start]": "2026-08-03T00:00:00",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 126
+  },
+  {
+    "[Week Start]": "2026-08-03T00:00:00",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 25
+  },
+  {
+    "[Week Start]": "2026-08-03T00:00:00",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 2
+  },
+  {
+    "[Week Start]": "2026-08-03T00:00:00",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 32
+  },
+  {
+    "[Week Start]": "2026-08-10T00:00:00",
+    "[Outcome]": "Resolved",
+    "[Outcome Order]": 1,
+    "[Conversations]": 135
+  },
+  {
+    "[Week Start]": "2026-08-10T00:00:00",
+    "[Outcome]": "Escalated by design",
+    "[Outcome Order]": 2,
+    "[Conversations]": 25
+  },
+  {
+    "[Week Start]": "2026-08-10T00:00:00",
+    "[Outcome]": "Escalated after an error",
+    "[Outcome Order]": 3,
+    "[Conversations]": 1
+  },
+  {
+    "[Week Start]": "2026-08-10T00:00:00",
+    "[Outcome]": "Abandoned",
+    "[Outcome Order]": 4,
+    "[Conversations]": 31
+  }
+]

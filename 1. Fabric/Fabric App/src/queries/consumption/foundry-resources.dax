@@ -1,0 +1,21 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'AzureAiSpend'[ResourceName],
+            'AzureAiSpend'[ResourceGroup],
+            'AzureAiSpend'[Model],
+            'AzureAiSpend'[DepartmentTag],
+            "@Cost", [Foundry Cost],
+            "@Tokens", [Foundry Tokens (M)]
+        ),
+        NOT ISBLANK([@Cost])
+    ),
+    "Resource", 'AzureAiSpend'[ResourceName],
+    "Resource Group", 'AzureAiSpend'[ResourceGroup],
+    "Model", 'AzureAiSpend'[Model],
+    "Department Tag", 'AzureAiSpend'[DepartmentTag],
+    "Cost", [@Cost],
+    "Tokens M", [@Tokens]
+)
+ORDER BY [Cost] DESC

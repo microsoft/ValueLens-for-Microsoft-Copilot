@@ -1,0 +1,18 @@
+[
+  {
+    "[Archetype]": "Answered from your content",
+    "[Conversations]": 1295
+  },
+  {
+    "[Archetype]": "Answered from the model alone",
+    "[Conversations]": 546
+  },
+  {
+    "[Archetype]": "Passed to a specialist",
+    "[Conversations]": 332
+  },
+  {
+    "[Archetype]": "Hit an error",
+    "[Conversations]": 227
+  }
+]

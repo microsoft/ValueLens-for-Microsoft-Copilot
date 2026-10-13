@@ -1,0 +1,21 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Interactions (Audit Logs)'[AI_Model],
+            'Chat + Agent Interactions (Audit Logs)'[Model Cost Tier],
+            'Chat + Agent Interactions (Audit Logs)'[Model Cost Tier Sort],
+            "@Sessions", [Model: Sessions],
+            "@UsageShare", [Model: Usage Share]
+        ),
+        NOT ISBLANK([@Sessions])
+    ),
+    "Model",
+        VAR _model = 'Chat + Agent Interactions (Audit Logs)'[AI_Model]
+        RETURN IF(ISBLANK(_model) || TRIM(_model) = "", "Model not logged", _model),
+    "Cost Tier", COALESCE('Chat + Agent Interactions (Audit Logs)'[Model Cost Tier], "Not attributed"),
+    "Tier Sort", 'Chat + Agent Interactions (Audit Logs)'[Model Cost Tier Sort],
+    "Sessions", [@Sessions],
+    "Usage Share", [@UsageShare]
+)
+ORDER BY [Sessions] DESC, [Model] ASC

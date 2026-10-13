@@ -12,9 +12,9 @@ Use fabricated examples and redact screenshots. -->
 
 ### Deployment path
 
-Fabric, Azure or the Analytics Hub app? Report it in
-[microsoft/AnalyticsHub-Dashboard](https://github.com/microsoft/AnalyticsHub-Dashboard/issues) instead.
-
+- [ ] 1. Fabric (SQL endpoint or OneLake? Specify below.)
+- [ ] 1. Fabric/Fabric App (preview)
+- [ ] 2. Azure (preview)
 - [ ] 3. Power Automate + Dataverse (preview)
 - [ ] 4. SharePoint
 - [ ] 5. Local CSV
@@ -44,4 +44,4 @@ Describe the defect and include the exact error message, with sensitive values r
 ### Sanitized evidence
 
 Include a minimal fabricated input, relevant log excerpt or redacted screenshot.
-For refresh issues, identify the failing query or script.
+For refresh issues, identify the failing query, notebook or script.

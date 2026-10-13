@@ -116,6 +116,6 @@ Use [`scripts/README.md`](scripts/README.md) for the full parameter reference. R
 | "You can't schedule refresh for this semantic model because the following data sources currently don't support refresh: Data source for Query1" | The model was published from a template older than this fix, which built the feedback file URL in M. Republish from the current `ValueLens - SharePoint.pbit` and set **SharePoint Site URL**, then set credentials for each listed source. |
 | Refresh error `FileOutsideSharePointSite` or `MissingSharePointSiteUrl` | Set **SharePoint Site URL** to the https site that holds the `Agent 365` and `Feedback File` files, with no spaces around it. |
 | Agent 365 export returns `403` | Add the Agent 365 licence and permissions, or use `-Agents365Csv <admin-centre-agents-export.csv>`. |
-| Refresh hits the 1 GB or 2-hour Power BI Pro limit | Move to [Analytics Hub on Fabric](https://github.com/microsoft/AnalyticsHub-Dashboard/blob/main/fabric/README.md). |
+| Refresh hits the 1 GB or 2-hour Power BI Pro limit | Move to [`../1. Fabric/README.md`](../1.%20Fabric/README.md). |
 
 Optional: add Copilot credit consumption with [`Add Credit Consumption/README.md`](Add%20Credit%20Consumption/README.md).

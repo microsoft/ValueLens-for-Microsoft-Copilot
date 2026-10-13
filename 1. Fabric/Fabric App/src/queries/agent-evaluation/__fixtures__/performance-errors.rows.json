@@ -1,0 +1,42 @@
+[
+  {
+    "[Error Code]": "Backend unavailable",
+    "[Source]": "System fault",
+    "[Errors]": 34
+  },
+  {
+    "[Error Code]": "Knowledge search failed",
+    "[Source]": "System fault",
+    "[Errors]": 31
+  },
+  {
+    "[Error Code]": "Authentication failed",
+    "[Source]": "User fault",
+    "[Errors]": 28
+  },
+  {
+    "[Error Code]": "Invalid user input",
+    "[Source]": "User fault",
+    "[Errors]": 28
+  },
+  {
+    "[Error Code]": "Plugin invocation timeout",
+    "[Source]": "System fault",
+    "[Errors]": 28
+  },
+  {
+    "[Error Code]": "Rate limit exceeded",
+    "[Source]": "System fault",
+    "[Errors]": 28
+  },
+  {
+    "[Error Code]": "Connector request failed",
+    "[Source]": "System fault",
+    "[Errors]": 26
+  },
+  {
+    "[Error Code]": "Content filter blocked",
+    "[Source]": "System fault",
+    "[Errors]": 24
+  }
+]

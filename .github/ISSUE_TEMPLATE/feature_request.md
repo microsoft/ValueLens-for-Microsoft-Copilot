@@ -12,9 +12,9 @@ What decision or deployment task is difficult today? Do not include tenant data.
 
 ### Affected deployment paths
 
-Fabric, Azure or the Analytics Hub app? Propose it in
-[microsoft/AnalyticsHub-Dashboard](https://github.com/microsoft/AnalyticsHub-Dashboard/issues) instead.
-
+- [ ] 1. Fabric
+- [ ] 1. Fabric/Fabric App (preview)
+- [ ] 2. Azure (preview)
 - [ ] 3. Power Automate + Dataverse (preview)
 - [ ] 4. SharePoint
 - [ ] 5. Local CSV

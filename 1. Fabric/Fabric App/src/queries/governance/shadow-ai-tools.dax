@@ -1,0 +1,67 @@
+EVALUATE
+VAR __LastDay =
+    MAXX(FILTER('Shadow AI Daily', 'Shadow AI Daily'[Window] = "30d"), 'Shadow AI Daily'[Day])
+VAR __Activity =
+    SELECTCOLUMNS(
+        FILTER(
+            'Shadow AI Daily',
+            'Shadow AI Daily'[Window] = "30d"
+                && 'Shadow AI Daily'[Day] = __LastDay
+                && 'Shadow AI Daily'[Devices] > 0
+        ),
+        "Tool", 'Shadow AI Daily'[Tool],
+        "Layer", 'Shadow AI Daily'[Layer],
+        "Posture",
+            COALESCE(
+                LOOKUPVALUE('Defender AI Watchlist'[Posture], 'Defender AI Watchlist'[Tool], 'Shadow AI Daily'[Tool]),
+                "Not reviewed"
+            ),
+        "Devices", 'Shadow AI Daily'[Devices] + 0,
+        "Users", 'Shadow AI Daily'[Users] + 0
+    )
+VAR __LastInstall = MAX('Defender AI Installed'[SnapshotDate])
+VAR __Installed =
+    SELECTCOLUMNS(
+        FILTER(
+            'Defender AI Installed',
+            'Defender AI Installed'[SnapshotDate] = __LastInstall
+                && 'Defender AI Installed'[Devices] > 0
+        ),
+        "Tool", 'Defender AI Installed'[Tool],
+        "Layer", "Installed",
+        "Posture",
+            COALESCE(
+                LOOKUPVALUE('Defender AI Watchlist'[Posture], 'Defender AI Watchlist'[Tool], 'Defender AI Installed'[Tool]),
+                "Not reviewed"
+            ),
+        "Devices", 'Defender AI Installed'[Devices] + 0,
+        "Users", BLANK()
+    )
+VAR __LastCloud = MAX('Defender Cloud Discovery'[SnapshotDate])
+VAR __Cloud =
+    SELECTCOLUMNS(
+        FILTER('Defender Cloud Discovery', 'Defender Cloud Discovery'[SnapshotDate] = __LastCloud),
+        "Tool",
+            IF(
+                COALESCE('Defender Cloud Discovery'[WatchlistTool], "") <> "",
+                'Defender Cloud Discovery'[WatchlistTool],
+                'Defender Cloud Discovery'[AppName]
+            ),
+        "Layer", "Cloud Discovery",
+        "Posture", COALESCE('Defender Cloud Discovery'[Posture], "Not reviewed"),
+        "Devices", 'Defender Cloud Discovery'[Devices] + 0,
+        "Users", 'Defender Cloud Discovery'[Users] + 0
+    )
+RETURN
+    FILTER(
+        GROUPBY(
+            UNION(__Activity, __Installed, __Cloud),
+            [Tool],
+            [Layer],
+            [Posture],
+            "Devices", MAXX(CURRENTGROUP(), [Devices]),
+            "Users", MAXX(CURRENTGROUP(), [Users])
+        ),
+        [Posture] <> "Sanctioned"
+    )
+ORDER BY [Layer] ASC, [Devices] DESC, [Users] DESC, [Tool] ASC

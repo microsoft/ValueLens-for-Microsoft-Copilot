@@ -1,0 +1,17 @@
+// What people wrote when they left feedback, most repeated first. Comments
+// only: never the conversation itself.
+EVALUATE
+VAR _comments =
+    SUMMARIZECOLUMNS(
+        'Agent Turns'[feedback_comment],
+        'Agent Turns'[feedback_verdict],
+        "@Comments", COUNTROWS('Agent Turns')
+    )
+RETURN
+SELECTCOLUMNS(
+    TOPN(25, FILTER(_comments, 'Agent Turns'[feedback_comment] <> ""), [@Comments], DESC, 'Agent Turns'[feedback_comment], ASC),
+    "Comment", 'Agent Turns'[feedback_comment],
+    "Verdict", 'Agent Turns'[feedback_verdict],
+    "Times", [@Comments]
+)
+ORDER BY [Times] DESC, [Comment] ASC

@@ -1,0 +1,21 @@
+// Each theme, then its topics, with the most failing conversations first:
+// row one is the biggest fix.
+EVALUATE
+SUMMARIZECOLUMNS(
+    ROLLUPADDISSUBTOTAL(
+        'Agent Performance'[Topic Theme], "Is Grand Total",
+        'Agent Performance'[Topic (resolved)], "Is Group Total"
+    ),
+    "Conversations", [Total Conversations],
+    "Resolved", [Theme Health %],
+    "Failing", [Failing Conversations],
+    "Friction", [Friction Score],
+    "Knowledge Gaps", [Knowledge Gap Conversations],
+    "Turns To Resolve", [Avg Turns to Resolve],
+    "CSAT", [Turn CSAT %]
+)
+ORDER BY
+    [Is Grand Total] DESC,
+    [Is Group Total] DESC,
+    [Failing] DESC,
+    [Conversations] DESC

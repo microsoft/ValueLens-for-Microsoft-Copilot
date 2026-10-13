@@ -1,0 +1,53 @@
+EVALUATE
+VAR __Month = [Last Full Month Start]
+-- One row per person active in the month: their distinct active days, and
+-- whether any of their activity was licensed or unlicensed. The day count
+-- matches the Power, Habitual, Developing and Beginner measures.
+VAR __People =
+    FILTER(
+        CALCULATETABLE(
+            ADDCOLUMNS(
+                VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                "@Days", CALCULATE(DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[InteractionDate])),
+                "@Licensed",
+                    CALCULATE(
+                        COUNTROWS('Chat + Agent Interactions (Audit Logs)'),
+                        KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[License Status] = "M365 Copilot Licensed")
+                    ) > 0,
+                "@Unlicensed",
+                    CALCULATE(
+                        COUNTROWS('Chat + Agent Interactions (Audit Logs)'),
+                        KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[License Status] = "Unlicensed")
+                    ) > 0
+            ),
+            REMOVEFILTERS('Calendar'),
+            'Chat + Agent Interactions (Audit Logs)'[MonthStart] = __Month
+        ),
+        LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Audit_UserId])) > 0
+            && [@Days] > 0
+    )
+VAR __Cohorts =
+    DATATABLE(
+        "Cohort", STRING, "Cohort Order", INTEGER, "Low", INTEGER, "High", INTEGER,
+        {
+            { "Power", 1, 16, 31 },
+            { "Habitual", 2, 11, 15 },
+            { "Developing", 3, 6, 10 },
+            { "Beginner", 4, 1, 5 }
+        }
+    )
+RETURN
+    SELECTCOLUMNS(
+        __Cohorts,
+        "Month", __Month,
+        "Cohort", [Cohort],
+        "Cohort Order", [Cohort Order],
+        "Licensed",
+            COUNTROWS(FILTER(__People, [@Licensed] && [@Days] >= [Low] && [@Days] <= [High])) + 0,
+        -- Someone with any licensed activity counts as licensed, never both.
+        "Unlicensed",
+            COUNTROWS(
+                FILTER(__People, NOT [@Licensed] && [@Unlicensed] && [@Days] >= [Low] && [@Days] <= [High])
+            ) + 0
+    )
+ORDER BY [Cohort Order]

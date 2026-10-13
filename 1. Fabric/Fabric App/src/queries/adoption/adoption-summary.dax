@@ -1,0 +1,46 @@
+DEFINE
+    // The model's [Agent Return Rate] resolves an agent via
+    // SELECTEDVALUE('Agents 365'[Agent name]), so it only means what its name
+    // says inside a per-agent visual. With no agent in context it silently
+    // measures rows whose AgentName is blank — chat, not agents. This screen
+    // has no agent selected, so it defines the population-wide equivalent
+    // itself, scoped by the model's own [Is_Agent_Activity] flag.
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[Agent Return Rate (All Agents)] =
+        VAR UserSessions =
+            ADDCOLUMNS(
+                CALCULATETABLE(
+                    VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                    'Chat + Agent Interactions (Audit Logs)'[Message_isPrompt] = "TRUE",
+                    'Chat + Agent Interactions (Audit Logs)'[Is_Agent_Activity] = TRUE()
+                ),
+                "@Sessions",
+                    CALCULATE(
+                        DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[ThreadId]),
+                        'Chat + Agent Interactions (Audit Logs)'[Message_isPrompt] = "TRUE",
+                        'Chat + Agent Interactions (Audit Logs)'[Is_Agent_Activity] = TRUE()
+                    )
+            )
+        VAR TotalUsers = COUNTROWS(UserSessions)
+        VAR ReturnUsers = COUNTROWS(FILTER(UserSessions, [@Sessions] >= 2)) + 0
+        RETURN
+            IF(TotalUsers = 0, BLANK(), DIVIDE(ReturnUsers, TotalUsers))
+
+EVALUATE
+ROW(
+    "Overall Users", [All Active Users],
+    "Overall Sessions", [Observed Sessions],
+    "Overall SPUW", [Observed Sessions per User per Week],
+    "Overall Hours Wk", [Expert Equivalent Hours Per Week],
+    "Overall Top Outcome", [Top Value Outcome],
+    "Licensed Users", [Active Licensed Users],
+    "Licensed SPUW", [Observed Licensed Sessions per User per Week],
+    "Unlicensed Users", [Active Unlicensed Users],
+    "Unlicensed SPUW", [Observed Unlicensed Sessions per User per Week],
+    "Agent Users", [Active Agent Users],
+    "Agent SPUW", [Observed Agent Sessions per User per Week],
+    "Agent Return Rate", [Agent Return Rate (All Agents)],
+    "Cowork Users", [Cowork Users],
+    "Cowork SPUW", [Observed Cowork Sessions per User per Week],
+    "Cowork Hours Wk", [Cowork Expert Equivalent Hours Per Week],
+    "Cowork Top Outcome", [Cowork Top Value Outcome]
+)

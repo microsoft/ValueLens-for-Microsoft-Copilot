@@ -1,0 +1,76 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [
+    { "calculate": "timeFormat(toDate(datum['Month Start']), '%b %Y')", "as": "Month" },
+    { "calculate": "1", "as": "Emphasis" },
+    { "fold": ["Studio Credits", "Cowork Credits"], "as": ["Series", "Value"] },
+    { "filter": "isValid(datum.Value) && datum.Value > 0" },
+    {
+      "calculate": "datum.Series === 'Studio Credits' ? 'Copilot Studio agents' : 'Cowork'",
+      "as": "Source"
+    },
+    { "calculate": "indexof(['Studio Credits', 'Cowork Credits'], datum.Series)", "as": "Rank" }
+  ],
+  "encoding": {
+    "x": {
+      "field": "Month",
+      "type": "ordinal",
+      "title": null,
+      "sort": null,
+      "scale": { "paddingInner": 0.45, "paddingOuter": 0.25 },
+      "axis": { "labelAngle": 0, "ticks": false }
+    }
+  },
+  "layer": [
+    {
+      "mark": { "type": "bar" },
+      "encoding": {
+        "y": {
+          "aggregate": "sum",
+          "field": "Value",
+          "type": "quantitative",
+          "title": null,
+          "stack": "zero",
+          "axis": { "labelExpr": "format(datum.value, '~s')", "minExtent": 48, "tickCount": 4 }
+        },
+        "color": {
+          "field": "Source",
+          "type": "nominal",
+          "title": null,
+          "sort": null,
+          "scale": {
+            "domain": ["Copilot Studio agents", "Cowork"],
+            "range": ["#f1963a", "#8783ff"]
+          },
+          "legend": { "orient": "top", "direction": "horizontal", "symbolType": "square", "symbolLimit": 10, "labelLimit": 240 }
+        },
+        "order": { "field": "Rank", "type": "quantitative", "sort": "ascending" },
+        "opacity": { "field": "Emphasis", "type": "quantitative", "scale": null, "legend": null },
+        "tooltip": [
+          { "field": "Month", "type": "ordinal", "title": "Month" },
+          { "field": "Source", "type": "nominal", "title": "Source" },
+          { "field": "Value", "type": "quantitative", "aggregate": "sum", "title": "Credits", "format": ",.0f" }
+        ]
+      }
+    },
+    {
+      "transform": [
+        {
+          "aggregate": [
+            { "op": "sum", "field": "Value", "as": "Total" },
+            { "op": "max", "field": "Emphasis", "as": "Emphasis" }
+          ],
+          "groupby": ["Month"]
+        }
+      ],
+      "mark": { "type": "text", "baseline": "bottom", "dy": -4, "fontWeight": 600 },
+      "encoding": {
+        "y": { "field": "Total", "type": "quantitative", "title": null },
+        "text": { "field": "Total", "type": "quantitative", "format": ".3~s" },
+        "opacity": { "field": "Emphasis", "type": "quantitative", "scale": null, "legend": null }
+      }
+    }
+  ]
+}

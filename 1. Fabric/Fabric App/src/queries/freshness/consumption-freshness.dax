@@ -1,0 +1,9 @@
+EVALUATE
+// The last date each Consumption Central source has rows for. 'Reporting Date'
+// runs on past the data, so each fact table's own date is read. Cowork credits
+// arrive weekly, so theirs is the start of the last week loaded.
+ROW(
+    "Cowork Last Date", MAX(CreditsWeekly[MetricDate]),
+    "Studio Last Date", MAX('Credit Consumption (Tenant)'[Usage_Date]),
+    "Azure Last Date", MAX(MAX('AzureSolutionSpend'[UsageDate]), MAX('AzureAiSpend'[UsageDate]))
+)

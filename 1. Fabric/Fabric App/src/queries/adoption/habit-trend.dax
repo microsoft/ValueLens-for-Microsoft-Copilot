@@ -1,0 +1,13 @@
+EVALUATE
+VAR __LastFullMonth = [Last Full Month Start]
+RETURN
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Interactions (Audit Logs)'[MonthStart],
+            'Stage Legend'[Stage],
+            "Users", [Stage Users (Monthly)]
+        ),
+        -- A month still in progress reads as a collapse in Power users.
+        'Chat + Agent Interactions (Audit Logs)'[MonthStart] <= __LastFullMonth
+    )
+ORDER BY 'Chat + Agent Interactions (Audit Logs)'[MonthStart], 'Stage Legend'[Stage]

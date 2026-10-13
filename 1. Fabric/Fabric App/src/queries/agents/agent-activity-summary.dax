@@ -1,0 +1,8 @@
+EVALUATE
+ROW(
+    "Agent Users", [Active Agent Users],
+    "Agent User Share", [% Active Users Using Agents],
+    "Agent Sessions", [Observed Agent Sessions],
+    "Sessions Per User", [Observed Agent Sessions per User],
+    "Return Rate", [Agent Return Rate]
+)

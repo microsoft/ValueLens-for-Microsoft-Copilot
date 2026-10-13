@@ -1,0 +1,33 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar" },
+  "transform": [
+    { "joinaggregate": [{ "op": "sum", "field": "Conversations", "as": "Theme Total" }], "groupby": ["Theme"] },
+    { "calculate": "datum['Conversations'] / datum['Theme Total']", "as": "Share" }
+  ],
+  "encoding": {
+    "y": {
+      "field": "Theme",
+      "type": "nominal",
+      "title": null,
+      "sort": { "field": "Conversations", "op": "sum", "order": "descending" }
+    },
+    "x": { "field": "Conversations", "type": "quantitative", "title": "Conversations", "stack": "zero" },
+    "color": {
+      "field": "Outcome",
+      "type": "nominal",
+      "title": null,
+      "sort": ["Resolved", "Escalated by design", "Escalated after an error", "Abandoned"],
+      "legend": { "orient": "top", "direction": "horizontal", "labelLimit": 240 }
+    },
+    "order": { "field": "Outcome Order", "type": "quantitative", "sort": "ascending" },
+    "tooltip": [
+      { "field": "Theme", "type": "nominal", "title": "Theme" },
+      { "field": "Outcome", "type": "nominal", "title": "Ended" },
+      { "field": "Conversations", "type": "quantitative", "title": "Conversations", "format": ",.0f" },
+      { "field": "Share", "type": "quantitative", "title": "Share of the theme", "format": ".0%" }
+    ]
+  }
+}

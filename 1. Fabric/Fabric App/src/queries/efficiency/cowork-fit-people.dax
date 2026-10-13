@@ -1,0 +1,35 @@
+DEFINE
+    // The report's Who Flag, as a count: people with half or more of their
+    // graded Cowork sessions at Worth a look. Defined here so models built
+    // before that measure was added still answer.
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Cowork Flagged People] =
+        VAR _people =
+            CALCULATETABLE(
+                VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                REMOVEFILTERS(
+                    'Chat + Agent Interactions (Audit Logs)'[Work Weight Grade],
+                    'Chat + Agent Interactions (Audit Logs)'[Work Weight Grade Sort]
+                ),
+                KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)] = "Cowork")
+            )
+        RETURN
+            COUNTROWS(FILTER(_people, [Usage Efficiency: Who Low Share] >= 0.5))
+
+EVALUATE
+SUMMARIZECOLUMNS(
+    ROLLUPADDISSUBTOTAL(
+        'Chat + Agent Org Data'[Organization], "Is Grand Total",
+        'Chat + Agent Interactions (Audit Logs)'[Audit_UserId], "Is Group Total"
+    ),
+    "People", [Usage Efficiency: Who People],
+    "Sessions", [Usage Efficiency: Who Graded Sessions],
+    "Strong", [Usage Efficiency: Who High Share],
+    "Fair", [Usage Efficiency: Who Medium Share],
+    "Worth A Look", [Usage Efficiency: Who Low Share],
+    "Flagged People", [ValueLens Cowork Flagged People]
+)
+ORDER BY
+    [Is Grand Total] DESC,
+    'Chat + Agent Org Data'[Organization] ASC,
+    [Is Group Total] DESC,
+    [Sessions] DESC

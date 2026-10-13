@@ -8,19 +8,10 @@ import unittest
 import zipfile
 from pathlib import Path
 
-import analytics_hub
-
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def load_patcher(root, name):
-    spec = importlib.util.spec_from_file_location(name, root / "scripts" / "Update-Template-Dax.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-PATCHER = load_patcher(ROOT, "template_dax")
+SPEC = importlib.util.spec_from_file_location("template_dax", ROOT / "scripts" / "Update-Template-Dax.py")
+PATCHER = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(PATCHER)
 AUDIT = PATCHER.AUDIT
 
 
@@ -42,19 +33,13 @@ def objects(model, table_name):
 
 class TemplatesAreCurrent(unittest.TestCase):
     def test_every_template_is_current_and_the_patcher_is_idempotent(self):
-        self.assertEqual(len(PATCHER.VALUELENS), 3)
-        self.assertEqual(len(PATCHER.CONSUMPTION), 3)
+        self.assertEqual(len(PATCHER.VALUELENS), 5)
+        self.assertEqual(len(PATCHER.CONSUMPTION), 4)
         for relative, specs in PATCHER.TARGETS:
             original = (ROOT / relative).read_bytes()
             rebuilt, changed = PATCHER.build(original, specs)
             self.assertEqual(changed, [], f"{relative} is stale: run scripts/Update-Template-Dax.py")
             self.assertEqual(rebuilt, original, relative)
-
-    @analytics_hub.required
-    def test_analytics_hub_patcher_owns_the_same_objects(self):
-        other = load_patcher(analytics_hub.ROOT, "analytics_hub_template_dax")
-        for name in ("VALUELENS_OBJECTS", "CONSUMPTION_OBJECTS", "CALENDAR"):
-            self.assertEqual(getattr(other, name), getattr(PATCHER, name), name)
 
     def test_patcher_refuses_to_replace_an_imported_column(self):
         model = {"tables": [{"name": AUDIT, "columns": [{"name": "Is Usage Row", "sourceColumn": "x"}]}]}
@@ -128,10 +113,9 @@ class CalendarRange(unittest.TestCase):
             for name in ("Date", "Year", "Year-Month", "Week Start", "Is Weekend"):
                 self.assertIn(f"[{name}]", sources, (relative, name))
 
-    @analytics_hub.required
     def test_the_installer_range_lines_match_the_template(self):
-        # The Analytics Hub installer (installer/src/transform/m365.js) widens these two lines with the M365 dates.
-        source = (analytics_hub.INSTALLER / "src" / "transform" / "m365.js").read_text(encoding="utf-8")
+        # 1. Fabric/installer/src/transform/m365.js widens these two lines with the M365 dates.
+        source = (ROOT / "1. Fabric" / "installer" / "src" / "transform" / "m365.js").read_text(encoding="utf-8")
         for line in ("VAR MinDate = MINX({ AuditMin, FeedbackMin }, [Value])",
                      "VAR MaxDate = MAXX({ AuditMax, FeedbackMax }, [Value])"):
             self.assertIn(line, PATCHER.CALENDAR)

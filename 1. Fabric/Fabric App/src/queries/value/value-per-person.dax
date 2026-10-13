@@ -1,0 +1,39 @@
+EVALUATE
+VAR __Month = [Last Full Month Start]
+-- One row per person active in the last full month the selected dates reach:
+-- their distinct active days, which set their habit as on the Adoption page,
+-- and the expert-equivalent hours their activity that month adds up to.
+-- Hours and habit cover the same month, so the two can be compared.
+VAR __People =
+    FILTER(
+        CALCULATETABLE(
+            ADDCOLUMNS(
+                VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                "@Days", CALCULATE(DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[InteractionDate])),
+                "@Hours", [Expert Equivalent Hours]
+            ),
+            REMOVEFILTERS('Calendar'),
+            'Chat + Agent Interactions (Audit Logs)'[MonthStart] = __Month
+        ),
+        LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Audit_UserId])) > 0
+            && [@Days] > 0
+    )
+RETURN
+    SELECTCOLUMNS(
+        __People,
+        "Month", __Month,
+        "User", 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId],
+        "Active Days", [@Days],
+        -- The same bands as the Power, Habitual, Developing and Beginner measures.
+        "Cohort",
+            SWITCH(
+                TRUE(),
+                [@Days] >= 16, "Power",
+                [@Days] >= 11, "Habitual",
+                [@Days] >= 6, "Developing",
+                "Beginner"
+            ),
+        -- Named apart from the measure, which the task-time overrides may redefine.
+        "Hours", [@Hours] + 0
+    )
+ORDER BY [Hours] DESC, [User]

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Agent",
+      "type": "nominal",
+      "title": null,
+      "sort": "-x",
+      "axis": { "labelLimit": 200 }
+    },
+    "x": {
+      "field": "Sessions",
+      "type": "quantitative",
+      "title": "Sessions",
+      "axis": { "labelExpr": "format(datum.value, ',.0f')" }
+    },
+    "tooltip": [
+      { "field": "Agent", "type": "nominal", "title": "Agent" },
+      { "field": "Sessions", "type": "quantitative", "title": "Sessions", "format": ",.0f" },
+      { "field": "Users", "type": "quantitative", "title": "Users", "format": ",.0f" },
+      { "field": "Return Rate", "type": "quantitative", "title": "Came back", "format": ".0%" },
+      { "field": "Organizations", "type": "quantitative", "title": "Organizations", "format": ",.0f" }
+    ]
+  }
+}

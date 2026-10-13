@@ -1,0 +1,41 @@
+[
+  {
+    "[Month Start]": "2026-05-01T00:00:00",
+    "[Copilot Hours]": 181.53333333333336,
+    "[Agent Hours]": 415.1333333333333,
+    "[Cowork Hours]": null,
+    "[Hours]": 596.6666666666666,
+    "[Tasks]": 2502,
+    "[Skills Per Person]": 4.203488372093023,
+    "[Seats In Use Pct]": 0.6577777777777778,
+    "[Habit Pct]": 0.15261044176706828,
+    "[Satisfaction]": 0.6133333333333333,
+    "[Feedback]": 150
+  },
+  {
+    "[Month Start]": "2026-06-01T00:00:00",
+    "[Copilot Hours]": 218,
+    "[Agent Hours]": 564.8333333333334,
+    "[Cowork Hours]": null,
+    "[Hours]": 782.8333333333331,
+    "[Tasks]": 3105,
+    "[Skills Per Person]": 3.4293785310734464,
+    "[Seats In Use Pct]": 0.6577777777777778,
+    "[Habit Pct]": 0.21653543307086615,
+    "[Satisfaction]": 0.6464088397790055,
+    "[Feedback]": 181
+  },
+  {
+    "[Month Start]": "2026-07-01T00:00:00",
+    "[Copilot Hours]": 51.2,
+    "[Agent Hours]": 110.83333333333331,
+    "[Cowork Hours]": null,
+    "[Hours]": 162.03333333333333,
+    "[Tasks]": 693,
+    "[Skills Per Person]": 1.937984496124031,
+    "[Seats In Use Pct]": 0.5422222222222223,
+    "[Habit Pct]": null,
+    "[Satisfaction]": 0.5172413793103449,
+    "[Feedback]": 29
+  }
+]

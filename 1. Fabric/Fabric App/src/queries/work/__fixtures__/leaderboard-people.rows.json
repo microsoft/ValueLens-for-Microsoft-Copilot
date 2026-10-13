@@ -1,0 +1,101 @@
+[
+    {
+        "Chat + Agent Org Data[Organization]": null,
+        "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": null,
+        "[Is Grand Total]": true,
+        "[Is Group Total]": true,
+        "[Active Users]": 180,
+        "[Sessions]": 6300,
+        "[Sessions Per User Per Week]": 5.006057463651787
+    },
+    {
+        "Chat + Agent Org Data[Organization]": "Sales",
+        "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": null,
+        "[Is Grand Total]": false,
+        "[Is Group Total]": true,
+        "[Active Users]": 30,
+        "[Sessions]": 1655,
+        "[Sessions Per User Per Week]": 8.083517316017318
+    },
+    {
+        "Chat + Agent Org Data[Organization]": "IT",
+        "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": null,
+        "[Is Grand Total]": false,
+        "[Is Group Total]": true,
+        "[Active Users]": 30,
+        "[Sessions]": 1139,
+        "[Sessions Per User Per Week]": 5.244838509316771
+    },
+    {
+        "Chat + Agent Org Data[Organization]": "Sales",
+        "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user1@contoso-demo.com",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 1,
+        "[Sessions]": 931,
+        "[Sessions Per User Per Week]": 93.1
+    },
+    {
+        "Chat + Agent Org Data[Organization]": "IT",
+        "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user2@contoso-demo.com",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 1,
+        "[Sessions]": 457,
+        "[Sessions Per User Per Week]": 45.7
+    },
+    {
+        "Chat + Agent Org Data[Organization]": "Sales",
+        "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user67@contoso-demo.com",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 1,
+        "[Sessions]": 152,
+        "[Sessions Per User Per Week]": 15.2
+    },
+    {
+        "Chat + Agent Org Data[Organization]": "IT",
+        "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user8@contoso-demo.com",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 1,
+        "[Sessions]": 121,
+        "[Sessions Per User Per Week]": 12.1
+    },
+    {
+        "Chat + Agent Org Data[Organization]": "Sales",
+        "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user7@contoso-demo.com",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 1,
+        "[Sessions]": 121,
+        "[Sessions Per User Per Week]": 12.1
+    },
+    {
+        "Chat + Agent Org Data[Organization]": "IT",
+        "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user68@contoso-demo.com",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 1,
+        "[Sessions]": 105,
+        "[Sessions Per User Per Week]": 10.5
+    },
+    {
+        "Chat + Agent Org Data[Organization]": "IT",
+        "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user14@contoso-demo.com",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 1,
+        "[Sessions]": 78,
+        "[Sessions Per User Per Week]": 8.666666666666666
+    },
+    {
+        "Chat + Agent Org Data[Organization]": "Sales",
+        "Chat + Agent Interactions (Audit Logs)[Audit_UserId]": "user13@contoso-demo.com",
+        "[Is Grand Total]": false,
+        "[Is Group Total]": false,
+        "[Active Users]": 1,
+        "[Sessions]": 68,
+        "[Sessions Per User Per Week]": 6.8
+    }
+]

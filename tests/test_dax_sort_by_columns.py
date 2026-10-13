@@ -172,7 +172,7 @@ class DatatableSortByColumns(unittest.TestCase):
                     continue
                 checked += any(column.get("sortByColumn") for column in item.get("columns", []))
                 problems += [f"{path.relative_to(ROOT)}: {item['name']}: {problem}" for problem in found]
-        self.assertGreaterEqual(checked, 18, "expected the glossaries, legends and period tables")
+        self.assertGreaterEqual(checked, 30, "expected the glossaries, legends and period tables")
         self.assertEqual(problems, [], "A value sorts by several keys:\n" + "\n".join(problems))
 
     def test_glossary_script_is_current(self):

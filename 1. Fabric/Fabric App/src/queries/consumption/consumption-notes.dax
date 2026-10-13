@@ -1,0 +1,7 @@
+EVALUATE
+ROW(
+    "Reporting Window", [Reporting Window],
+    "Reporting Caveat", [Reporting Caveat],
+    "Rates In Use", [Rates In Use],
+    "Azure Currency", CONCATENATEX(VALUES('AzureAiSpend'[Currency]), 'AzureAiSpend'[Currency], ", ")
+)

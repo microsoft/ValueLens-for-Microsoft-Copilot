@@ -1,0 +1,27 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [{ "filter": "datum.Dimension === '__DIMENSION__'" }],
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Category",
+      "type": "nominal",
+      "title": null,
+      "sort": "-x",
+      "axis": { "labelLimit": 220 }
+    },
+    "x": {
+      "field": "Tasks",
+      "type": "quantitative",
+      "title": "Tasks",
+      "axis": { "labelExpr": "format(datum.value, ',.0f')" }
+    },
+    "tooltip": [
+      { "field": "Category", "type": "nominal", "title": "__TITLE__" },
+      { "field": "Tasks", "type": "quantitative", "title": "Tasks", "format": ",.0f" },
+      { "field": "Share", "type": "quantitative", "title": "Share of all tasks", "format": ".1%" }
+    ]
+  }
+}

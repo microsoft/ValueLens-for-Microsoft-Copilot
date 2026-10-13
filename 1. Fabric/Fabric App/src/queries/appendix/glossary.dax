@@ -1,0 +1,11 @@
+EVALUATE
+SELECTCOLUMNS(
+    '📖 Metric Glossary',
+    "Page", '📖 Metric Glossary'[Page],
+    "Metric", '📖 Metric Glossary'[Metric],
+    "Description", '📖 Metric Glossary'[Description],
+    "Page Order", '📖 Metric Glossary'[PageOrder],
+    "Metric Order", '📖 Metric Glossary'[MetricOrder],
+    "Page Description", '📖 Metric Glossary'[PageDescription]
+)
+ORDER BY [Page Order], [Metric Order]

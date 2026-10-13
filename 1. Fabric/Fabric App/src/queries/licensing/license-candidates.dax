@@ -1,0 +1,25 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Interactions (Audit Logs)'[Audit_UserId],
+            "@Score", [License Priority Score (User)],
+            "@Rank", [License Priority Rank (Dynamic)],
+            "@Sessions", [Observed Unlicensed Sessions per User per Week],
+            "@ActiveDays", [Median Chat + Agent Active Days Per User Per Week (Unlicensed)]
+        ),
+        NOT ISBLANK([@Rank])
+            && CALCULATE([Observed Unlicensed Sessions]) > 0
+    ),
+    "Rank", [@Rank],
+    "User", 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId],
+    "Organization",
+        LOOKUPVALUE(
+            'Chat + Agent Org Data'[Organization],
+            'Chat + Agent Org Data'[PersonId], 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId]
+        ),
+    "Priority Score", [@Score],
+    "Sessions Per Week", [@Sessions],
+    "Active Days Per Week", [@ActiveDays]
+)
+ORDER BY [Rank], [Priority Score] DESC, [Sessions Per Week] DESC, [User]

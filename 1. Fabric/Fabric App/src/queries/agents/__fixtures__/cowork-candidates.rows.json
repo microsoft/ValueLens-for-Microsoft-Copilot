@@ -1,0 +1,242 @@
+[
+  {
+    "[Rank]": 1,
+    "[User]": "user1@contoso-demo.com",
+    "[Organization]": "Sales",
+    "[Surfaces Per Day]": 4.6,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 2,
+    "[User]": "user2@contoso-demo.com",
+    "[Organization]": "IT",
+    "[Surfaces Per Day]": 3.6166666666666667,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 3,
+    "[User]": "user3@contoso-demo.com",
+    "[Organization]": "Marketing",
+    "[Surfaces Per Day]": 3.1,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 4,
+    "[User]": "user4@contoso-demo.com",
+    "[Organization]": "Finance",
+    "[Surfaces Per Day]": 2.5,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 5,
+    "[User]": "user5@contoso-demo.com",
+    "[Organization]": "HR",
+    "[Surfaces Per Day]": 2.152542372881356,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 6,
+    "[User]": "user6@contoso-demo.com",
+    "[Organization]": "Legal",
+    "[Surfaces Per Day]": 1.896551724137931,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 7,
+    "[User]": "user7@contoso-demo.com",
+    "[Organization]": "Sales",
+    "[Surfaces Per Day]": 1.7962962962962963,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 7,
+    "[User]": "user9@contoso-demo.com",
+    "[Organization]": "Marketing",
+    "[Surfaces Per Day]": 1.8518518518518519,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 8,
+    "[User]": "user10@contoso-demo.com",
+    "[Organization]": "Finance",
+    "[Surfaces Per Day]": 1.673913043478261,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 8,
+    "[User]": "user8@contoso-demo.com",
+    "[Organization]": "IT",
+    "[Surfaces Per Day]": 1.6226415094339623,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 9,
+    "[User]": "user11@contoso-demo.com",
+    "[Organization]": "HR",
+    "[Surfaces Per Day]": 1.5555555555555556,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 9,
+    "[User]": "user13@contoso-demo.com",
+    "[Organization]": "Sales",
+    "[Surfaces Per Day]": 1.5128205128205128,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 9,
+    "[User]": "user14@contoso-demo.com",
+    "[Organization]": "IT",
+    "[Surfaces Per Day]": 1.5238095238095237,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 10,
+    "[User]": "user12@contoso-demo.com",
+    "[Organization]": "Legal",
+    "[Surfaces Per Day]": 1.434782608695652,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 10,
+    "[User]": "user17@contoso-demo.com",
+    "[Organization]": "HR",
+    "[Surfaces Per Day]": 1.4411764705882353,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 10,
+    "[User]": "user18@contoso-demo.com",
+    "[Organization]": "Legal",
+    "[Surfaces Per Day]": 1.4,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 11,
+    "[User]": "user15@contoso-demo.com",
+    "[Organization]": "Marketing",
+    "[Surfaces Per Day]": 1.3142857142857143,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 11,
+    "[User]": "user19@contoso-demo.com",
+    "[Organization]": "Sales",
+    "[Surfaces Per Day]": 1.28125,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 11,
+    "[User]": "user20@contoso-demo.com",
+    "[Organization]": "IT",
+    "[Surfaces Per Day]": 1.28125,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 11,
+    "[User]": "user22@contoso-demo.com",
+    "[Organization]": "Finance",
+    "[Surfaces Per Day]": 1.28,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 11,
+    "[User]": "user23@contoso-demo.com",
+    "[Organization]": "HR",
+    "[Surfaces Per Day]": 1.2857142857142858,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 11,
+    "[User]": "user28@contoso-demo.com",
+    "[Organization]": "Finance",
+    "[Surfaces Per Day]": 1.28,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 11,
+    "[User]": "user34@contoso-demo.com",
+    "[Organization]": "Finance",
+    "[Surfaces Per Day]": 1.2857142857142858,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 11,
+    "[User]": "user47@contoso-demo.com",
+    "[Organization]": "HR",
+    "[Surfaces Per Day]": 1.3043478260869565,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 12,
+    "[User]": "user16@contoso-demo.com",
+    "[Organization]": "Finance",
+    "[Surfaces Per Day]": 1.2162162162162162,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 12,
+    "[User]": "user24@contoso-demo.com",
+    "[Organization]": "Legal",
+    "[Surfaces Per Day]": 1.2285714285714286,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 12,
+    "[User]": "user25@contoso-demo.com",
+    "[Organization]": "Sales",
+    "[Surfaces Per Day]": 1.25,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 12,
+    "[User]": "user27@contoso-demo.com",
+    "[Organization]": "Marketing",
+    "[Surfaces Per Day]": 1.2592592592592593,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 12,
+    "[User]": "user29@contoso-demo.com",
+    "[Organization]": "HR",
+    "[Surfaces Per Day]": 1.2380952380952381,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  },
+  {
+    "[Rank]": 12,
+    "[User]": "user31@contoso-demo.com",
+    "[Organization]": "Sales",
+    "[Surfaces Per Day]": 1.2,
+    "[Prompts Per Session]": 1,
+    "[Uses Agents]": "Yes"
+  }
+]

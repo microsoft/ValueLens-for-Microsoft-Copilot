@@ -1,0 +1,18 @@
+{
+ "columns": [
+  [
+   "CreationDate",
+   "string"
+  ],
+  [
+   "Audit_UserId",
+   "string"
+  ]
+ ],
+ "rows": [
+  [
+   "2026-09-02T12:00:00Z",
+   "unlicensed@example.invalid"
+  ]
+ ]
+}

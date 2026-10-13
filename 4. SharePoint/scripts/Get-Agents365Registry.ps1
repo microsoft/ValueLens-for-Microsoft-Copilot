@@ -4,9 +4,9 @@
   ValueLens "Agent 365" CSV.
 
 .DESCRIPTION
-  Produces the same columns, names, mappings and row rules as the Analytics Hub Fabric notebook
-  fabric/notebooks/Copilot_Agent365_Registry_Ingester.ipynb (microsoft/AnalyticsHub-Dashboard),
-  so the Local CSV, SharePoint and Power Automate + Dataverse templates read exactly the registry
+  Produces the same columns, names, mappings and row rules as the Fabric notebook
+  1. Fabric/Manual setup/notebooks/Copilot_Agent365_Registry_Ingester.ipynb, so the Local CSV,
+  SharePoint and Power Automate + Dataverse templates read exactly the registry
   the Fabric template reads from dbo.agents_365:
 
     1. List    GET /v1.0/copilot/admin/catalog/packages (falls back to /beta on 404)

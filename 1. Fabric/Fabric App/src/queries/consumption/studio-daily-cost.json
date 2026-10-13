@@ -1,0 +1,42 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [
+    { "fold": ["Prepaid Cost", "PAYG Cost"], "as": ["Series", "Value"] },
+    { "filter": "isValid(datum['Value'])" },
+    { "calculate": "datum['Series'] === 'Prepaid Cost' ? 'Prepaid' : 'Pay-as-you-go'", "as": "Billing" },
+    { "calculate": "datum['Series'] === 'Prepaid Cost' ? 1 : 2", "as": "Billing Order" },
+    { "calculate": "toDate(datum['Usage Date'])", "as": "Day" }
+  ],
+  "mark": { "type": "bar", "width": { "expr": "max(1, 0.7 * (scale('x', 86400000) - scale('x', 0)))" } },
+  "encoding": {
+    "x": {
+      "field": "Day",
+      "type": "temporal",
+      "title": null,
+      "axis": { "labelExpr": "timeFormat(datum.value, '%-d %b')", "labelAngle": 0, "labelOverlap": true, "tickCount": "week", "grid": false }
+    },
+    "y": {
+      "field": "Value",
+      "type": "quantitative",
+      "stack": "zero",
+      "title": "Cost ($)",
+      "axis": { "format": ",~f", "formatType": "number" }
+    },
+    "color": {
+      "field": "Billing",
+      "type": "nominal",
+      "title": null,
+      "sort": ["Prepaid", "Pay-as-you-go"],
+      "legend": { "orient": "top", "direction": "horizontal" }
+    },
+    "order": { "field": "Billing Order", "type": "quantitative" },
+    "tooltip": [
+      { "field": "Day", "type": "temporal", "title": "Day", "format": "%a %d %b %Y" },
+      { "field": "Billing", "type": "nominal", "title": "Billing" },
+      { "field": "Value", "type": "quantitative", "title": "Cost ($)", "format": "$,.2f" },
+      { "field": "Credits", "type": "quantitative", "title": "All credits", "format": ",.0f" }
+    ]
+  }
+}
