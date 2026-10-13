@@ -248,6 +248,25 @@ export function fakeFabric() {
       find(id).content = def;
       return null;
     },
+    /** @param {string} _ws @param {string} name @param {any} def */
+    createDataAgent: async (_ws, name, def) => {
+      calls.push(`createDataAgent ${name}`);
+      fail('createDataAgent');
+      return { id: add('DataAgent', name, def).id };
+    },
+    /** @param {string} _ws @param {string} id @param {any} def */
+    updateDataAgent: async (_ws, id, def) => {
+      calls.push(`updateDataAgent ${find(id).displayName}`);
+      fail('updateDataAgent');
+      find(id).content = def;
+      return null;
+    },
+    /** @param {string} _ws @param {string} id */
+    publishDataAgent: async (_ws, id) => {
+      calls.push(`publishDataAgent ${find(id).displayName}`);
+      fail('publishDataAgent');
+      return null;
+    },
     listRoleAssignments: async () => structuredClone(roles),
     /** @param {string} _ws @param {string} id @param {string} type @param {string} role */
     addRoleAssignment: async (_ws, id, type, role) => {
@@ -370,6 +389,15 @@ export function fakeArm() {
   const jobTemplates = [];
   /** @type {Record<string, Error[]>} */
   const failures = {};
+  const offered = (/** @type {string} */ name = 'gpt-5-mini', /** @type {string} */ version = '2025-08-07') => ({ kind: 'AIServices', model: { name, version, skus: [{ name: 'GlobalStandard' }, { name: 'DataZoneStandard' }] } });
+  /** Azure AI: models and quota by region ('*' = any), accounts, and deployments by account ID. */
+  const ai = {
+    /** @type {Record<string, any[]>} */ models: { '*': [offered()] },
+    /** @type {Record<string, any[]>} */ usages: { '*': [{ name: { value: 'OpenAI.GlobalStandard.gpt-5-mini' }, currentValue: 0, limit: 1000 }] },
+    /** @type {any[]} */ accounts: [],
+    /** @type {Record<string, any[]>} */ deployments: {},
+    offered,
+  };
   const fail = (/** @type {string} */ method) => {
     const err = failures[method]?.shift();
     if (err) throw err;
@@ -432,6 +460,17 @@ export function fakeArm() {
       calls.push(`assignRole ${scope} ${role} ${principal} ${type}`);
       fail('assignRole');
     },
+    listAiAccounts: async () => {
+      fail('listAiAccounts');
+      return ai.accounts;
+    },
+    listAiModels: async (/** @type {string} */ _sub, /** @type {string} */ location) => {
+      calls.push(`listAiModels ${location}`);
+      fail('listAiModels');
+      return ai.models[location] ?? ai.models['*'] ?? [];
+    },
+    listAiUsages: async (/** @type {string} */ _sub, /** @type {string} */ location) => ai.usages[location] ?? ai.usages['*'] ?? [],
+    listAiDeployments: async (/** @type {string} */ accountId) => ai.deployments[accountId] ?? [],
     getSqlDatabase: async () => null,
     startContainerAppJob: async (/** @type {string} */ _sub, /** @type {string} */ _rg, /** @type {string} */ name, /** @type {any} */ template) => {
       calls.push(`startJob ${name}`);
@@ -452,7 +491,7 @@ export function fakeArm() {
       calls.push(`deleteResource ${id}`);
     },
   };
-  return { api, calls, resources, groups, executions, jobTemplates, failures, restrictedSqlRegions };
+  return { api, calls, resources, groups, executions, jobTemplates, failures, restrictedSqlRegions, ai };
 }
 
 /** Rich Graph fake for Azure app registration work. */
@@ -606,7 +645,7 @@ export function fakePowerBi() {
 }
 
 /**
- * @param {{ ui?: import('../src/ui.js').Ui, fabric?: any, graph?: any, oneLake?: any, arm?: any, keyVault?: any, powerBi?: any, discovery?: any, powerPlatform?: any, flow?: any, dataverse?: (url: string) => any, runner?: import('../src/steps/app.js').Runner, sources?: import('../src/sources.js').Sources, config?: import('../src/config.js').InstallConfig, now?: Date }} [o]
+ * @param {{ ui?: import('../src/ui.js').Ui, fabric?: any, graph?: any, oneLake?: any, arm?: any, keyVault?: any, powerBi?: any, discovery?: any, powerPlatform?: any, flow?: any, dataverse?: (url: string) => any, dataLake?: (account: string) => any, runner?: import('../src/steps/app.js').Runner, sources?: import('../src/sources.js').Sources, config?: import('../src/config.js').InstallConfig, now?: Date }} [o]
  */
 export function fakeCtx(o = {}) {
   const config = o.config ?? emptyConfig();
@@ -639,6 +678,7 @@ export function fakeCtx(o = {}) {
         // No billing policies unless a test adds some.
         powerPlatform: o.powerPlatform ?? { billingPolicies: async () => [] },
         dataverse: o.dataverse,
+        dataLake: o.dataLake,
         flow: o.flow,
       },
       user: { id: 'user-1', upn: 'admin@contoso.com', tenantId: 'tenant-1' },

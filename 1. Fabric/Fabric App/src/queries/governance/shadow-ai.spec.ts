@@ -127,6 +127,35 @@ describe("toolsForLayer", () => {
     it("waits until the tools query answers", () => {
         expect(toolsForLayer(undefined, "Ran")).toBeUndefined();
     });
+
+    it("draws untagged and monitored apps as Not reviewed", () => {
+        const tagged: DataTable = {
+            columns: ["Tool", "Layer", "Posture", "Devices", "Users"].map((name) => ({ name })),
+            rows: [
+                ["Tool A", "Cloud Discovery", "", 0, 20],
+                ["Tool B", "Cloud Discovery", "Monitored", 0, 6],
+                ["Tool C", "Cloud Discovery", null, 0, 4],
+                ["Tool D", "Cloud Discovery", "Unsanctioned", 0, 3],
+            ],
+        };
+        expect(toolsForLayer(tagged, "Cloud Discovery")?.rows.map((row) => row[2])).toEqual([
+            "Not reviewed",
+            "Not reviewed",
+            "Not reviewed",
+            "Unsanctioned",
+        ]);
+        expect(tagged.rows[0][2]).toBe("");
+    });
+});
+
+describe("shadowAiTools query", () => {
+    it("reads any Cloud Discovery posture other than Sanctioned or Unsanctioned as Not reviewed", () => {
+        const query = shadowAiTools().query;
+        expect(query).not.toContain("COALESCE('Defender Cloud Discovery'[Posture]");
+        expect(query).toMatch(
+            /SWITCH\(\s*'Defender Cloud Discovery'\[Posture\],\s*"Sanctioned", "Sanctioned",\s*"Unsanctioned", "Unsanctioned",\s*"Not reviewed"\s*\)/,
+        );
+    });
 });
 
 describe("layerToolsSpec", () => {

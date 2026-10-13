@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { useStageFilter } from "@/hooks/stage-filter.context";
 import { useMemo, useState } from "react";
 import { stageAnchor } from "@/components/destinations";
 import { SourceEmpty, SourceError } from "@/components/source-states";
@@ -37,6 +38,7 @@ export function AgentEvaluationScreen() {
         () => (optionsResult.table ? readEvaluationOptions(optionsResult.table) : undefined),
         [optionsResult.table],
     );
+    const { show, inPack } = useStageFilter();
     const [selection, setSelection] = useState<EvaluationSelection>(NO_SELECTION);
     const extra = useMemo(() => evaluationFilters(selection, options), [selection, options]);
 
@@ -63,9 +65,9 @@ export function AgentEvaluationScreen() {
 
     return (
         <div className="flex flex-col gap-800">
-            <EvaluationBar options={options} selection={selection} onChange={setSelection} />
-            <PerformanceStage options={options} extra={extra} />
-            <ConversationsStage extra={extra} />
+            {!inPack && <EvaluationBar options={options} selection={selection} onChange={setSelection} />}
+            {show("agent-performance") && <PerformanceStage options={options} extra={extra} />}
+            {show("agent-conversations") && <ConversationsStage extra={extra} />}
         </div>
     );
 }

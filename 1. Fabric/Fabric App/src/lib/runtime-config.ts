@@ -41,7 +41,12 @@ export interface RuntimeConfig {
     reporting?: InstallCurrency;
     /** The viewer group and who to ask for access. Undefined for installs without one. */
     access?: AccessInfo;
+    /** Where questions about the data go. Undefined when the install set up neither a data agent nor a model. */
+    ask?: AskConfig;
 }
+
+/** A Fabric data agent the viewer opens in Fabric, or the Azure host's own `/api/ask` chat. */
+export type AskConfig = { mode: "fabric"; workspaceId: string; itemId: string } | { mode: "chat" };
 
 export interface AccessInfo {
     groupId: string;
@@ -50,6 +55,8 @@ export interface AccessInfo {
     contact?: string;
     /** A form or page for requesting access, used instead of email when set. */
     requestUrl?: string;
+    /** The org attribute that org-scoped access (row-level security) filters on. Only there when it's on. */
+    rlsOrgAttribute?: string;
 }
 
 export interface RuntimeModules {
@@ -107,6 +114,7 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
             modules: azure.modules,
             reporting: azure.reporting,
             access: azure.access,
+            ask: azure.ask,
         };
         return loaded;
     }
@@ -122,6 +130,7 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
         modules: fabric?.modules,
         reporting: fabric?.reporting,
         access: fabric?.access,
+        ask: fabric?.ask,
     };
     return loaded;
 }
@@ -166,7 +175,7 @@ export async function loadSemanticModels(path = FABRIC_CONFIG_PATH): Promise<Mod
 
 export async function loadFabricConfig(
     path = FABRIC_CONFIG_PATH,
-): Promise<Pick<RuntimeConfig, "semanticModels" | "modules" | "reporting" | "access"> | null> {
+): Promise<Pick<RuntimeConfig, "semanticModels" | "modules" | "reporting" | "access" | "ask"> | null> {
     let response: Response;
     try {
         response = await fetch(path, { cache: "no-store" });
@@ -190,7 +199,13 @@ export async function loadFabricConfig(
     } catch {
         throw new RuntimeConfigError(`${path} isn't valid JSON.`);
     }
-    return { semanticModels: parseSemanticModels(json, path), modules: parseModules(json), reporting: parseReporting(json), access: parseAccess(json) };
+    return {
+        semanticModels: parseSemanticModels(json, path),
+        modules: parseModules(json),
+        reporting: parseReporting(json),
+        access: parseAccess(json),
+        ask: parseAsk(json, "fabric"),
+    };
 }
 
 /** Checks an Azure app.config.json body has the host contract shape. */
@@ -214,8 +229,26 @@ export function parseAzureConfig(json: unknown, path = APP_CONFIG_PATH): Runtime
         modules: parseModules(json),
         reporting: parseReporting(json),
         access: parseAccess(json),
+        ask: parseAsk(json, "azure"),
     };
 }
+
+/**
+ * The `ask` block: a Fabric install names its data agent
+ * (`{ workspaceId, itemId }`), and an Azure host says `{ mode: "chat" }` when
+ * its `/api/ask` has a model. Anything else leaves Ask unconfigured.
+ */
+export function parseAsk(json: unknown, host: RuntimeHost): AskConfig | undefined {
+    const ask = isRecord(json) ? json.ask : undefined;
+    if (!isRecord(ask)) return undefined;
+    if (host === "azure") return ask.mode === "chat" ? { mode: "chat" } : undefined;
+    const { workspaceId, itemId } = ask;
+    if (typeof workspaceId !== "string" || !GUID.test(workspaceId)) return undefined;
+    if (typeof itemId !== "string" || !GUID.test(itemId)) return undefined;
+    return { mode: "fabric", workspaceId, itemId };
+}
+
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The `access` block the installer writes: a viewer group, plus who to ask. Ignored without a group id. */
 export function parseAccess(json: unknown): AccessInfo | undefined {
@@ -228,6 +261,7 @@ export function parseAccess(json: unknown): AccessInfo | undefined {
         ...(text("groupName") ? { groupName: text("groupName") } : {}),
         ...(text("contact") ? { contact: text("contact") } : {}),
         ...(requestUrl && /^https:\/\//i.test(requestUrl) ? { requestUrl } : {}),
+        ...(text("rlsOrgAttribute") ? { rlsOrgAttribute: text("rlsOrgAttribute") } : {}),
     };
 }
 

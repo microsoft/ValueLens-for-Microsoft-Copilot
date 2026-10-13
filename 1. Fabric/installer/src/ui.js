@@ -42,6 +42,8 @@ export function createUi(opts = {}) {
 
   return {
     yes,
+    /** The browser wizard, rather than the terminal. */
+    web: false,
     line,
     /** @param {string} title */
     heading: (title) => line(`\n${c.bold(c.cyan(title))}`),
@@ -58,10 +60,12 @@ export function createUi(opts = {}) {
     /** @param {string} s */
     note: (s) => line(`    ${c.dim(s)}`),
     /**
-     * The plan as structured data. The terminal already printed it line by line.
-     * @param {import('./steps/plan.js').PlanReview} _plan
+     * The plan as structured data. The terminal already printed it line by line, all but the costs.
+     * @param {import('./steps/plan.js').PlanReview} plan
      */
-    review: (_plan) => {},
+    review: (plan) => {
+      (plan.costs ?? []).forEach((cost, i) => line(`    ${i ? ' '.repeat(13) : 'Costs:       '}${cost.what} ${c.dim(cost.url)}`));
+    },
     /**
      * How each source's load went: a tick, a cross or a warning per source, then why and what to do.
      * @param {import('./loads.js').LoadCard[]} cards
@@ -162,7 +166,11 @@ export function createUi(opts = {}) {
     async sources(message, cards, o = {}) {
       const modes = /** @type {import('./uploads.js').DataSourceModes} */ (Object.fromEntries(cards.map((card) => [card.id, card.mode])));
       line(`    ${message}`);
+      /** @type {string | undefined} */
+      let group;
       for (const card of cards) {
+        if (card.group && card.group !== group) line(`    ${c.bold(card.group)}`);
+        group = card.group;
         const fixed = card.locked || o.lockModes || card.modes.length === 1 || yes;
         if (!fixed) {
           modes[card.id] = await select({

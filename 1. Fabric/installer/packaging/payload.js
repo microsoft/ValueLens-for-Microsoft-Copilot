@@ -10,8 +10,9 @@
  */
 import { posix } from 'node:path';
 import { NOTEBOOKS, NOTEBOOKS_DIR } from '../src/catalog.js';
-import { APP_DIR, PIPELINE_TEMPLATE } from '../src/sources.js';
+import { APP_DIR, DEFAULT_SOURCE_DIR, PIPELINE_TEMPLATE } from '../src/sources.js';
 import { PREBUILT_STATIC } from '../src/steps/app.js';
+import { askFiles, loadAsk } from '../src/transform/data-agent.js';
 import { AGENT_EVALUATOR_TEMPLATE, CONSUMPTION_TEMPLATE, MODEL_TEMPLATE } from '../src/transform/model.js';
 
 export const EXE_NAME = 'AnalyticsHubInstaller.exe';
@@ -48,6 +49,7 @@ export function sourceFiles() {
     MODEL_TEMPLATE,
     CONSUMPTION_TEMPLATE,
     AGENT_EVALUATOR_TEMPLATE,
+    ...askFiles(/** @type {import('../src/transform/data-agent.js').Ask} */ (loadAsk(DEFAULT_SOURCE_DIR)).catalogue),
   ].map(slash);
 }
 

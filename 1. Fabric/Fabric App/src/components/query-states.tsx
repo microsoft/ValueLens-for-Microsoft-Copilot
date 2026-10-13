@@ -18,6 +18,7 @@ export function QueryLoading({ className }: QueryStateProps) {
         <div
             role="status"
             aria-live="polite"
+            data-query-loading=""
             className={cn("flex min-h-[160px] flex-col justify-end gap-300 rounded-xl border border-border bg-card p-500", className)}
         >
             <span className="sr-only">Loading</span>

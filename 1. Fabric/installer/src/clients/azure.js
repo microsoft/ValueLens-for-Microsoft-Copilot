@@ -21,6 +21,7 @@ export const ROLES = {
   owner: '8e3af657-a8ff-443c-a75c-2fe8c4bcb635',
   contributor: 'b24988ac-6180-42a0-ab88-20f7382dd24c',
   userAccessAdministrator: '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9',
+  cognitiveServicesOpenAiUser: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd',
 };
 
 /**
@@ -303,6 +304,18 @@ export function armApi(http, opts = {}) {
     /** Azure OpenAI, AI Foundry and other AI services accounts. @param {string} subscriptionId */
     listAiAccounts: (subscriptionId) =>
       http.list(`/subscriptions/${subscriptionId}/providers/Microsoft.CognitiveServices/accounts`, { query: { 'api-version': '2023-05-01' }, maxRetries: 1 }),
+
+    /** Models an AI Services account in `location` can deploy, with their SKUs. @param {string} subscriptionId @param {string} location */
+    listAiModels: (subscriptionId, location) =>
+      http.list(`/subscriptions/${subscriptionId}/providers/Microsoft.CognitiveServices/locations/${location}/models`, { query: { 'api-version': '2024-10-01' }, maxRetries: 1 }),
+
+    /** Model quota used and allowed in `location`, e.g. OpenAI.GlobalStandard.gpt-5-mini. @param {string} subscriptionId @param {string} location */
+    listAiUsages: (subscriptionId, location) =>
+      http.list(`/subscriptions/${subscriptionId}/providers/Microsoft.CognitiveServices/locations/${location}/usages`, { query: { 'api-version': '2024-10-01' }, maxRetries: 1 }),
+
+    /** Model deployments on an AI Services or Azure OpenAI account. @param {string} accountId  The account's ARM resource ID. */
+    listAiDeployments: (accountId) =>
+      http.list(`${accountId}/deployments`, { query: { 'api-version': '2024-10-01' }, maxRetries: 1 }),
 
     /** @param {string} subscriptionId @param {string} name @returns {Promise<{ nameAvailable: boolean, message?: string }>} */
     checkVaultName: (subscriptionId, name) =>

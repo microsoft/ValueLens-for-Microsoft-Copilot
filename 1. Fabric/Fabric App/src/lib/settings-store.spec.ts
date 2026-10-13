@@ -101,6 +101,36 @@ describe("HttpSettingsStore", () => {
         expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/settings/TaskTime/"), expect.objectContaining({ method: "DELETE" }));
     });
 
+    it("saves, lists and deletes report packs through the settings API", async () => {
+        const id = "00000000-0000-0000-0000-0000000000aa";
+        const fetchMock = vi.fn()
+            .mockImplementationOnce((_url: string, init: RequestInit) => Promise.resolve(new Response(init.body as string)))
+            .mockResolvedValueOnce(new Response(JSON.stringify([
+                { id, name: "Weekly", stages: '["budget-runway","gone"]' },
+                { id: "x", name: "Broken", stages: "[]" },
+            ])))
+            .mockResolvedValueOnce(new Response(null, { status: 204 }));
+        vi.stubGlobal("fetch", fetchMock);
+        const { getSettingsStore } = await import("@/lib/settings-store");
+
+        const saved = await getSettingsStore().saveReportPack({ id, name: " Weekly ", stages: ["budget-runway", "budget-runway"] }, "a@example.com");
+        expect(saved).toMatchObject({ id, name: "Weekly", stages: ["budget-runway"] });
+        expect(fetchMock.mock.calls[0][0]).toBe(`/api/settings/ReportPack/${id}`);
+        expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toMatchObject({ stages: '["budget-runway"]', updatedBy: "a@example.com" });
+
+        await expect(getSettingsStore().loadReportPacks()).resolves.toEqual([
+            expect.objectContaining({ id, name: "Weekly", stages: ["budget-runway"] }),
+        ]);
+        await getSettingsStore().deleteReportPack(id);
+        expect(fetchMock).toHaveBeenLastCalledWith(`/api/settings/ReportPack/${id}`, expect.objectContaining({ method: "DELETE" }));
+    });
+
+    it("refuses to save a pack with no stages", async () => {
+        vi.stubGlobal("fetch", vi.fn());
+        const { getSettingsStore } = await import("@/lib/settings-store");
+        await expect(getSettingsStore().saveReportPack({ id: "p", name: "Empty", stages: [] }, undefined)).rejects.toThrow("at least one stage");
+    });
+
     it("surfaces admin-only writes as a friendly message", async () => {
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("forbidden", { status: 403 })));
         const { getSettingsStore } = await import("@/lib/settings-store");

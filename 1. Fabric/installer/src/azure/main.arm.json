@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.47.16.16243",
-      "templateHash": "712364317566401486"
+      "templateHash": "2642653273680490021"
     }
   },
   "parameters": {
@@ -276,6 +276,64 @@
       "metadata": {
         "description": "Azure Resource Graph: read Foundry accounts and projects from resources."
       }
+    },
+    "askMode": {
+      "type": "string",
+      "defaultValue": "off",
+      "allowedValues": [
+        "off",
+        "create",
+        "existing"
+      ],
+      "metadata": {
+        "description": "Ask (/api/ask): off, create an Azure AI Services account and model deployment here, or use an existing Azure OpenAI endpoint."
+      }
+    },
+    "askEndpoint": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Ask, existing: the Azure OpenAI endpoint, e.g. https://name.openai.azure.com/. The web app's identity needs Cognitive Services OpenAI User on it."
+      }
+    },
+    "askDeployment": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Ask: the model deployment name. Create mode defaults to the model name."
+      }
+    },
+    "askModelName": {
+      "type": "string",
+      "defaultValue": "gpt-5-mini",
+      "metadata": {
+        "description": "Ask, create: the model and version to deploy."
+      }
+    },
+    "askModelVersion": {
+      "type": "string",
+      "defaultValue": "2025-08-07"
+    },
+    "askSku": {
+      "type": "string",
+      "defaultValue": "GlobalStandard",
+      "metadata": {
+        "description": "Ask, create: the deployment SKU."
+      }
+    },
+    "askCapacity": {
+      "type": "int",
+      "defaultValue": 50,
+      "metadata": {
+        "description": "Ask, create: throughput, in thousands of tokens per minute."
+      }
+    },
+    "askLocation": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Ask, create: region for the AI Services account. Empty = location."
+      }
     }
   },
   "variables": {
@@ -292,12 +350,171 @@
       "vnet": "[format('vnet-{0}-{1}', parameters('namePrefix'), variables('suffix'))]",
       "runJob": "[format('job-{0}-run', parameters('namePrefix'))]",
       "migrateJob": "[format('job-{0}-migrate', parameters('namePrefix'))]",
-      "web": "[format('ca-{0}-web', parameters('namePrefix'))]"
+      "web": "[format('ca-{0}-web', parameters('namePrefix'))]",
+      "ask": "[format('ai-{0}-{1}', parameters('namePrefix'), variables('suffix'))]"
     },
     "privateRegistry": "[not(empty(parameters('imageRegistryResourceId')))]",
     "registryIdParts": "[split(if(variables('privateRegistry'), parameters('imageRegistryResourceId'), format('{0}/providers/Microsoft.ContainerRegistry/registries/none', resourceGroup().id)), '/')]"
   },
   "resources": [
+    {
+      "condition": "[equals(parameters('askMode'), 'create')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "vl-ask",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": "[if(empty(parameters('askLocation')), createObject('value', parameters('location')), createObject('value', parameters('askLocation')))]",
+          "tags": {
+            "value": "[variables('allTags')]"
+          },
+          "accountName": {
+            "value": "[variables('names').ask]"
+          },
+          "principalId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'vl-identity'), '2025-04-01').outputs.principalId.value]"
+          },
+          "modelName": {
+            "value": "[parameters('askModelName')]"
+          },
+          "modelVersion": {
+            "value": "[parameters('askModelVersion')]"
+          },
+          "deploymentName": "[if(empty(parameters('askDeployment')), createObject('value', parameters('askModelName')), createObject('value', parameters('askDeployment')))]",
+          "sku": {
+            "value": "[parameters('askSku')]"
+          },
+          "capacity": {
+            "value": "[parameters('askCapacity')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.47.16.16243",
+              "templateHash": "17399195808032408165"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object"
+            },
+            "accountName": {
+              "type": "string"
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Principal ID of the managed identity the web app runs as."
+              }
+            },
+            "modelName": {
+              "type": "string"
+            },
+            "modelVersion": {
+              "type": "string"
+            },
+            "deploymentName": {
+              "type": "string"
+            },
+            "sku": {
+              "type": "string",
+              "metadata": {
+                "description": "Deployment SKU, e.g. GlobalStandard or DataZoneStandard."
+              }
+            },
+            "capacity": {
+              "type": "int",
+              "metadata": {
+                "description": "Throughput, in thousands of tokens per minute."
+              }
+            }
+          },
+          "variables": {
+            "openAiUserRole": "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.CognitiveServices/accounts",
+              "apiVersion": "2024-10-01",
+              "name": "[parameters('accountName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "AIServices",
+              "sku": {
+                "name": "S0"
+              },
+              "properties": {
+                "customSubDomainName": "[parameters('accountName')]",
+                "disableLocalAuth": true,
+                "publicNetworkAccess": "Enabled"
+              }
+            },
+            {
+              "type": "Microsoft.CognitiveServices/accounts/deployments",
+              "apiVersion": "2024-10-01",
+              "name": "[format('{0}/{1}', parameters('accountName'), parameters('deploymentName'))]",
+              "sku": {
+                "name": "[parameters('sku')]",
+                "capacity": "[parameters('capacity')]"
+              },
+              "properties": {
+                "model": {
+                  "format": "OpenAI",
+                  "name": "[parameters('modelName')]",
+                  "version": "[parameters('modelVersion')]"
+                },
+                "versionUpgradeOption": "OnceNewDefaultVersionAvailable"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]",
+              "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName')), parameters('principalId'), variables('openAiUserRole'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('openAiUserRole'))]",
+                "principalId": "[parameters('principalId')]",
+                "principalType": "ServicePrincipal"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "endpoint": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName')), '2024-10-01').endpoint]"
+            },
+            "deploymentName": {
+              "type": "string",
+              "value": "[parameters('deploymentName')]"
+            },
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'vl-identity')]"
+      ]
+    },
     {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
@@ -1248,7 +1465,9 @@
           },
           "argFoundry": {
             "value": "[parameters('argFoundry')]"
-          }
+          },
+          "askEndpoint": "[if(equals(parameters('askMode'), 'create'), createObject('value', reference(resourceId('Microsoft.Resources/deployments', 'vl-ask'), '2025-04-01').outputs.endpoint.value), if(equals(parameters('askMode'), 'existing'), createObject('value', parameters('askEndpoint')), createObject('value', '')))]",
+          "askDeployment": "[if(equals(parameters('askMode'), 'create'), createObject('value', reference(resourceId('Microsoft.Resources/deployments', 'vl-ask'), '2025-04-01').outputs.deploymentName.value), if(equals(parameters('askMode'), 'existing'), createObject('value', parameters('askDeployment')), createObject('value', '')))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -1257,7 +1476,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.47.16.16243",
-              "templateHash": "5661741623112108032"
+              "templateHash": "12369894832626957425"
             }
           },
           "parameters": {
@@ -1404,6 +1623,17 @@
               "metadata": {
                 "description": "Subnet delegated to Microsoft.App/environments (private networking). Empty = no VNet."
               }
+            },
+            "askEndpoint": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Ask: the Azure OpenAI endpoint and deployment the web app answers questions with. Empty = Ask runs in the data agent or not at all."
+              }
+            },
+            "askDeployment": {
+              "type": "string",
+              "defaultValue": ""
             }
           },
           "variables": {
@@ -1584,7 +1814,7 @@
                     {
                       "name": "web",
                       "image": "[parameters('webImage')]",
-                      "env": "[concat(variables('commonEnv'), createArray(createObject('name', 'VALUELENS_WEB_CLIENT_ID', 'value', parameters('webClientId')), createObject('name', 'VALUELENS_APP_ID_URI', 'value', parameters('webAppIdUri')), createObject('name', 'VALUELENS_CURRENCY', 'value', parameters('reportingCurrency')), createObject('name', 'VALUELENS_EXCHANGE_RATE', 'value', parameters('exchangeRate')), createObject('name', 'VALUELENS_ACCESS', 'value', parameters('webAccess'))))]",
+                      "env": "[concat(variables('commonEnv'), createArray(createObject('name', 'VALUELENS_WEB_CLIENT_ID', 'value', parameters('webClientId')), createObject('name', 'VALUELENS_APP_ID_URI', 'value', parameters('webAppIdUri')), createObject('name', 'VALUELENS_CURRENCY', 'value', parameters('reportingCurrency')), createObject('name', 'VALUELENS_EXCHANGE_RATE', 'value', parameters('exchangeRate')), createObject('name', 'VALUELENS_ACCESS', 'value', parameters('webAccess')), createObject('name', 'VALUELENS_ASK_ENDPOINT', 'value', parameters('askEndpoint')), createObject('name', 'VALUELENS_ASK_DEPLOYMENT', 'value', parameters('askDeployment'))))]",
                       "resources": {
                         "cpu": "[json('0.5')]",
                         "memory": "1Gi"
@@ -1629,6 +1859,7 @@
       },
       "dependsOn": [
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('registryIdParts')[2], variables('registryIdParts')[4]), 'Microsoft.Resources/deployments', format('vl-acrpull-{0}', variables('suffix')))]",
+        "[resourceId('Microsoft.Resources/deployments', 'vl-ask')]",
         "[resourceId('Microsoft.Resources/deployments', 'vl-identity')]",
         "[resourceId('Microsoft.Resources/deployments', 'vl-monitoring')]",
         "[resourceId('Microsoft.Resources/deployments', 'vl-network')]",
@@ -1689,6 +1920,18 @@
     "vnetName": {
       "type": "string",
       "value": "[if(variables('privateNetworking'), variables('names').vnet, '')]"
+    },
+    "askEndpoint": {
+      "type": "string",
+      "value": "[if(equals(parameters('askMode'), 'create'), reference(resourceId('Microsoft.Resources/deployments', 'vl-ask'), '2025-04-01').outputs.endpoint.value, if(equals(parameters('askMode'), 'existing'), parameters('askEndpoint'), ''))]"
+    },
+    "askDeployment": {
+      "type": "string",
+      "value": "[if(equals(parameters('askMode'), 'create'), reference(resourceId('Microsoft.Resources/deployments', 'vl-ask'), '2025-04-01').outputs.deploymentName.value, if(equals(parameters('askMode'), 'existing'), parameters('askDeployment'), ''))]"
+    },
+    "askAccountName": {
+      "type": "string",
+      "value": "[if(equals(parameters('askMode'), 'create'), variables('names').ask, '')]"
     },
     "gatewaySubnetName": {
       "type": "string",

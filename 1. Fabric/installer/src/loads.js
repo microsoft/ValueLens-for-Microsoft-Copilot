@@ -5,6 +5,7 @@
  * (`statusConfigJson`), so dbo.load_log and the installer say the same thing.
  */
 import {
+  ACCESS_ACTIVITY,
   AGENT365_FALLBACK,
   AGENT365_LANDER,
   AGENT365_REGISTRY,
@@ -31,6 +32,7 @@ export const LOAD_LABELS = /** @type {Record<string, string>} */ ({
   [AGENT365_LANDER]: 'Agent 365 (export)',
   Run_Org_Data_Ingester: 'Org data (Entra ID)',
   [WORKDAY_ACTIVITY]: 'Org data (Workday export)',
+  [ACCESS_ACTIVITY]: 'Who sees which orgs (org-scoped access)',
   Run_M365_Activity_Ingester: 'Microsoft 365 activity',
   Run_ProductFeedback_Ingester: 'Product feedback',
   Run_Consumption_Azure_AI: 'Azure AI spend',

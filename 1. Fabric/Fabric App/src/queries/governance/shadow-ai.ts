@@ -183,12 +183,27 @@ export function layerUnavailable(statuses: readonly ProbeStatus[] | undefined, l
     return found !== undefined && !WORKING.has(found.status);
 }
 
-/** The tools seen in one layer, the busiest first. */
+/**
+ * The tools seen in one layer, the busiest first. Any posture the chart has no colour for
+ * (an untagged app, or Defender's "Monitored") reads as Not reviewed, so its bar still draws.
+ */
 export function toolsForLayer(table: DataTable | undefined, layer: ShadowAiLayer): DataTable | undefined {
     if (!table) return undefined;
     const at = table.columns.findIndex((def) => def.name === "Layer");
     if (at < 0) return table;
-    return { ...table, rows: table.rows.filter((row) => row[at] === layer) };
+    const posture = table.columns.findIndex((def) => def.name === "Posture");
+    const known = new Set<unknown>(SHADOW_AI_POSTURES);
+    const rows = table.rows.filter((row) => row[at] === layer);
+    if (posture < 0) return { ...table, rows };
+    return {
+        ...table,
+        rows: rows.map((row) => {
+            if (known.has(row[posture])) return row;
+            const next = [...row];
+            next[posture] = "Not reviewed";
+            return next;
+        }),
+    };
 }
 
 /** Sizes the bars by the layer's own count: devices for what ran on a device, people for Cloud Discovery. */

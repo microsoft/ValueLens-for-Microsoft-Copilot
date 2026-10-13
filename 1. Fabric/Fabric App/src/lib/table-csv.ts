@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import type { DataTable } from "@microsoft/fabric-visuals-core";
-import { downloadBlob, fileNameFor } from "./download";
+import { dataToSuffix, downloadBlob, fileNameFor } from "./download";
 
 /** Lets Excel open the file as UTF-8 rather than guessing a code page. */
 const BOM = "\uFEFF";
@@ -32,7 +32,15 @@ export function tableToCsv(table: DataTable): string {
     return BOM + [header, ...rows].map((line) => line.join(",")).join("\r\n") + "\r\n";
 }
 
-/** Downloads a chart's rows as `<title>.csv`. */
-export function downloadTableCsv(table: DataTable, title: string): void {
-    downloadBlob(new Blob([tableToCsv(table)], { type: "text/csv;charset=utf-8" }), fileNameFor(title, "csv"));
+/**
+ * A chart's CSV file name: `<title>.csv`, or `<title>-data-to-<date>.csv` when
+ * the date the data runs to is known, so a saved file says how fresh it is.
+ */
+export function csvFileName(title: string, dataTo?: string): string {
+    return fileNameFor(title, "csv").replace(/\.csv$/, `${dataToSuffix(dataTo)}.csv`);
+}
+
+/** Downloads a chart's rows; see `csvFileName`. */
+export function downloadTableCsv(table: DataTable, title: string, dataTo?: string): void {
+    downloadBlob(new Blob([tableToCsv(table)], { type: "text/csv;charset=utf-8" }), csvFileName(title, dataTo));
 }

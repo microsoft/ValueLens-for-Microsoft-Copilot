@@ -13,6 +13,7 @@ import { checkStaged, clearStaged, inspectFile, sizeOk, stageUpload } from '../s
 import { checkCsvFiles, ensureUploads, planDataSources, uploadCommand, uploadFiles } from '../src/steps/data-sources.js';
 import { buildPipeline, UPLOAD_ROUTER_ACTIVITY } from '../src/transform/pipeline.js';
 import {
+  CREDIT_GROUP,
   DATA_SOURCES,
   decodeStart,
   defaultDataSources,
@@ -159,6 +160,19 @@ test('product feedback: the Power Automate route is its own mode; a record with 
   assert.deepEqual(card?.modes.map((m) => m.label), ['Power Automate (emailed export)', 'Upload CSV', 'Skip']);
   assert.deepEqual(card?.exportModes, ['api', 'csv'], 'the flow saves the same export, so its location still shows');
   assert.match(card?.modes[0].hint ?? '', /Power Automate Premium/);
+});
+
+test('credit sources: grouped under Credit consumption, next to each other, with what each needs', () => {
+  const cards = sourceCards(defaultDataSources());
+  const grouped = cards.filter((c) => c.group === CREDIT_GROUP).map((c) => c.id);
+  assert.equal(CREDIT_GROUP, 'Credit consumption');
+  assert.deepEqual(grouped, ['studioCredits', 'coworkCredits', 'azureAi']);
+  const at = cards.findIndex((c) => c.id === 'studioCredits');
+  assert.deepEqual(cards.slice(at, at + 3).map((c) => c.id), grouped, 'one run of cards, so one heading');
+  assert.equal(cards.find((c) => c.id === 'core')?.group, undefined);
+  const hint = (/** @type {string} */ id) => cards.find((c) => c.id === id)?.modes.find((m) => m.value === 'api')?.hint ?? '';
+  assert.match(hint('studioCredits'), /Power Automate Premium/);
+  assert.match(hint('coworkCredits'), /Viva Insights analyst/);
 });
 
 test('modulesFromSources, routedSources and routerWanted', () => {

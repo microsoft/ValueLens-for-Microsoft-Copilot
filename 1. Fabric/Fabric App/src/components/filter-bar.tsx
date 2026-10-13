@@ -333,6 +333,7 @@ export function FilterBar({ destinationLabel }: { destinationLabel: string }) {
         <div
             role="group"
             aria-label="Filters"
+            data-print="hide"
             className="sticky top-0 z-10 -mx-700 flex flex-wrap items-center gap-x-400 gap-y-200 border-b border-border bg-background px-700 py-300"
         >
             {has("dateRange") && <DateFilter />}

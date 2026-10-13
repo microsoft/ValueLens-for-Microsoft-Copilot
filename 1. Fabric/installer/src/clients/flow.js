@@ -39,6 +39,12 @@ export function flowApi(http) {
      * @param {string} trigger  The trigger's name in the definition.
      */
     runTrigger: (env, id, trigger) => http.post(`${path(env, id)}/triggers/${encodeURIComponent(trigger)}/run?${VERSION}`, {}),
+    /**
+     * The environments the signed-in user can make flows in. `name` is the environment ID, and
+     * properties.isDefault marks the tenant's default environment.
+     * @returns {Promise<{ name: string, properties?: { displayName?: string, isDefault?: boolean } }[]>}
+     */
+    listEnvironments: async () => (await http.get(`/providers/Microsoft.ProcessSimple/environments?${VERSION}`))?.value ?? [],
   };
 }
 

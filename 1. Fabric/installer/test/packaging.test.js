@@ -30,6 +30,8 @@ test('packaging: ships every template the installer reads, and they exist', () =
   assert.ok(files.includes('Manual setup/notebooks/Copilot_Audit_Log_Processor.ipynb'));
   assert.ok(files.some((f) => f.startsWith('Manual setup/notebooks/credit-consumption/')));
   assert.ok(files.some((f) => f.startsWith('Manual setup/notebooks/agent-evaluator/')));
+  assert.ok(files.includes('Fabric App/src/ask/catalogue.json'), 'the Ask catalogue, for the data agent');
+  assert.ok(files.some((f) => f.startsWith('Fabric App/src/queries/') && f.endsWith('.dax')), 'the queries the catalogue names');
   assert.ok(files.every((f) => !f.includes('\\')));
   for (const f of files) assert.ok(existsSync(join(DEFAULT_SOURCE_DIR, f)), `${f} is missing`);
 });
@@ -40,7 +42,7 @@ test('packaging: ships the installer code, not its tests or tooling', () => {
 });
 
 test('packaging: ships only what deploys the built app', () => {
-  for (const f of ['tsconfig.json', 'LICENSE', 'rayfin/tsconfig.json', 'rayfin/data/schema.ts', 'rayfin/data/TaskTime.ts']) assert.ok(appFile(f), f);
+  for (const f of ['tsconfig.json', 'LICENSE', 'rayfin/tsconfig.json', 'rayfin/data/schema.ts', 'rayfin/data/TaskTime.ts', 'rayfin/data/ReportPack.ts']) assert.ok(appFile(f), f);
   for (const f of ['src/main.tsx', 'package.json', 'rayfin/rayfin.yml', 'rayfin/.deployments.json', 'rayfin/.env', 'fabric.yaml', '.env.local', 'rayfin/data/sub/x.ts']) {
     assert.ok(!appFile(f), f);
   }

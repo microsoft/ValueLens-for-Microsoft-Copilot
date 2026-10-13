@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { SETUP_DIR } from '../catalog.js';
 import { currencySymbol } from '../currency.js';
+import { addAccessScope } from './access.js';
 import { addDefender } from './defender.js';
 import { addM365Activity } from './m365.js';
 import { addCopilotPaygSpend } from './payg.js';
@@ -101,7 +102,10 @@ export function mParameter(model, name) {
  * @property {import('../catalog.js').ModuleChoice} modules
  * @property {boolean} [resourceGraph]  Agent configuration and Foundry come from Azure Resource Graph.
  * @property {string} [currency]  The reporting currency's ISO code. The template's symbol stays when absent.
+ * @property {AccessSettings} [access]  Org-scoped access. The model has no roles when absent.
  */
+
+/** @typedef {{ orgAttribute?: string }} AccessSettings */
 
 /** The measure the report and the app read the reporting currency's symbol from. */
 export const CURRENCY_SYMBOL_MEASURE = 'Currency Symbol Value';
@@ -141,6 +145,7 @@ export function buildModel(template, settings) {
   addDefender(model, !!settings.modules.defender);
   addResourceGraph(model, !!settings.resourceGraph);
   if (settings.currency) setCurrencySymbol(model, settings.currency);
+  if (settings.access) addAccessScope(model, 'valuelens', settings.access);
   return { compatibilityLevel: template.compatibilityLevel, model };
 }
 
@@ -148,7 +153,7 @@ export function buildModel(template, settings) {
  * The credit consumption model. Every table in it is optional, so it deploys and
  * refreshes before any consumption data has landed.
  * @param {ModelBim} template
- * @param {{ server: string, database: string, resourceGraph?: boolean }} settings
+ * @param {{ server: string, database: string, resourceGraph?: boolean, access?: AccessSettings }} settings
  * @returns {ModelBim}
  */
 export function buildConsumptionModel(template, settings) {
@@ -157,6 +162,7 @@ export function buildConsumptionModel(template, settings) {
   setMParameter(model, 'LakehouseName', settings.database);
   addCopilotPaygSpend(model);
   addFoundryResources(model, !!settings.resourceGraph);
+  if (settings.access) addAccessScope(model, 'consumption', settings.access);
   return { compatibilityLevel: template.compatibilityLevel, model };
 }
 
@@ -170,7 +176,7 @@ export const AGENT_EVALUATOR_DIAGNOSTIC_TABLE = 'Dataverse Diagnostic';
  * reads Dataverse or CSV files directly; those paths are switched off and stubbed so the service
  * only ever sees the Lakehouse as a data source.
  * @param {ModelBim} template
- * @param {{ server: string, database: string }} settings
+ * @param {{ server: string, database: string, access?: AccessSettings }} settings
  * @returns {ModelBim}
  */
 export function buildAgentEvaluatorModel(template, settings) {
@@ -202,6 +208,7 @@ export function buildAgentEvaluatorModel(template, settings) {
     if (!empty) throw new Error(`The "${AGENT_EVALUATOR_DIAGNOSTIC_TABLE}" table has changed shape.`);
     p.source.expression = empty[1];
   }
+  if (settings.access) addAccessScope(model, 'agentEvaluator', settings.access);
   return { compatibilityLevel: template.compatibilityLevel, model };
 }
 

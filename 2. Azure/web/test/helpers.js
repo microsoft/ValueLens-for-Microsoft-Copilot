@@ -14,7 +14,9 @@ export async function startTestServer(options = {}) {
     config: testConfig(options.config), settingsStore: options.settingsStore || new MemorySettingsStore(),
     verifyToken: options.verifyToken || fakeVerifyToken, tokenAcquirer: options.tokenAcquirer || (async () => 'powerbi-token'),
     fetchImpl: options.fetchImpl || (async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })),
-    publicDir: options.publicDir || testConfig().publicDir, now: options.now
+    publicDir: options.publicDir || testConfig().publicDir, now: options.now,
+    scopeStore: options.scopeStore, appToken: options.appToken || (async () => 'app-token'), setTimer: options.setTimer,
+    aiToken: options.aiToken || (async () => 'ai-token'), loadAskCatalogue: options.loadAskCatalogue
   });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   const address = server.address(); return { server, baseUrl: `http://127.0.0.1:${address.port}` };

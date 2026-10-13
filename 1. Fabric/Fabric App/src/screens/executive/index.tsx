@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { useStageFilter } from "@/hooks/stage-filter.context";
 import { CommercialTermsProvider } from "@/components/commercial-terms-provider";
 import { QueryEmpty, QueryError } from "@/components/query-states";
 import { useFilterContext } from "@/hooks/filter.context";
@@ -18,6 +19,7 @@ import { useExecutiveData } from "./use-executive-data";
 function ExecutiveStages() {
     const data = useExecutiveData();
     const { optionsError } = useFilterContext();
+    const { show } = useStageFilter();
 
     if (optionsError) {
         return <QueryError message={`The dates with Copilot activity couldn't be read: ${optionsError.message}`} />;
@@ -32,10 +34,10 @@ function ExecutiveStages() {
     }
     return (
         <div className="flex flex-col gap-800">
-            <BottomLineStage data={data} />
-            <GrowingStage data={data} />
-            <LandingStage data={data} />
-            <AttentionStage data={data} />
+            {show("the-bottom-line") && <BottomLineStage data={data} />}
+            {show("is-it-growing") && <GrowingStage data={data} />}
+            {show("where-it-is-landing") && <LandingStage data={data} />}
+            {show("what-needs-attention") && <AttentionStage data={data} />}
         </div>
     );
 }

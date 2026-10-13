@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { useStageFilter } from "@/hooks/stage-filter.context";
 import { stageAnchor } from "@/components/destinations";
 import { ModelUpdateRequired, QueryEmpty, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
@@ -20,6 +21,7 @@ import { ReviewQueueStage } from "./review-queue-stage";
 import { ShadowAiStage } from "./shadow-ai-stage";
 
 const SUMMARY = governanceSummary();
+const REGISTRY_STAGES = ["estate-health", "exposure", "accountability", "review-queue"] as const;
 
 /**
  * The Agent 365 registry read as an estate to look after: how big it is and
@@ -37,10 +39,17 @@ const SUMMARY = governanceSummary();
 export function GovernanceScreen() {
     const sources = useSourceAvailability();
     const registry = !isAbsent(sources, "agentRegistry");
+    const { show } = useStageFilter();
+    const registryStages = REGISTRY_STAGES.some(show);
     return (
         <div className="flex flex-col gap-800">
-            {registry ? <GovernanceRequirements /> : <ConnectRegistry configured={sources.agentRegistry !== "notConfigured"} />}
-            <ShadowAiStage source={sources.defender} />
+            {registryStages &&
+                (registry ? (
+                    <GovernanceRequirements />
+                ) : (
+                    <ConnectRegistry configured={sources.agentRegistry !== "notConfigured"} />
+                ))}
+            {show("shadow-ai") && <ShadowAiStage source={sources.defender} />}
         </div>
     );
 }
@@ -64,13 +73,14 @@ function GovernanceRequirements() {
 
 function GovernanceStages() {
     const summary = useSummaryQuery(SUMMARY);
+    const { show } = useStageFilter();
 
     return (
         <div className="flex flex-col gap-800">
-            <EstateHealthStage summary={summary} />
-            <ExposureStage />
-            <AccountabilityStage summary={summary} />
-            <ReviewQueueStage />
+            {show("estate-health") && <EstateHealthStage summary={summary} />}
+            {show("exposure") && <ExposureStage />}
+            {show("accountability") && <AccountabilityStage summary={summary} />}
+            {show("review-queue") && <ReviewQueueStage />}
         </div>
     );
 }

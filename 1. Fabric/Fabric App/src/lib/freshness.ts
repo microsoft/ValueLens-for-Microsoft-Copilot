@@ -45,6 +45,7 @@ export const PAGE_SOURCES: Readonly<Record<DestinationId, readonly FreshnessSour
     value: ["auditLog"],
     efficiency: ["auditLog"],
     feedback: ["productFeedback"],
+    ask: [],
     assumptions: [],
     appendix: [],
 };

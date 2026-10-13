@@ -8,6 +8,7 @@ import { enabledModules, MODEL_MODULES } from '../catalog.js';
 import { servicePrincipalCredentials, semanticModelDefinition, sqlConnectionBody } from '../clients/fabric.js';
 import { HttpError } from '../http.js';
 import { commandLine } from '../launch.js';
+import { EVERYONE_ROLE, rlsSettings, SCOPED_ROLE } from '../transform/access.js';
 import { buildModel, datasourcePath, loadTemplateModel, PBISM } from '../transform/model.js';
 import { formatDuration } from '../ui.js';
 import { createdId, displayNames, freeName, noteRenamed } from './fabric.js';
@@ -65,6 +66,32 @@ export async function waitForSqlEndpoint(ctx) {
 export const modelSignature = (server, database, modules) =>
   `${server.toLowerCase()};${database};${enabledModules(modules).filter((m) => /** @type {readonly string[]} */ (MODEL_MODULES).includes(m)).join(',')}`;
 
+/** Roles each model was deployed with in this run, by model ID. */
+const DEPLOYED_ROLES = new WeakMap();
+
+/**
+ * The org-scoped access roles (without members) of the models deployed in this run, by model ID.
+ * @param {Ctx} ctx
+ * @returns {Map<string, any[]>}
+ */
+export function deployedRoles(ctx) {
+  let roles = DEPLOYED_ROLES.get(ctx);
+  if (!roles) DEPLOYED_ROLES.set(ctx, (roles = new Map()));
+  return roles;
+}
+
+/**
+ * The org-scoped access roles in a semantic model definition; none when access is off.
+ * @param {{ parts?: { path: string, payload: string }[] }} definition
+ * @returns {any[]}
+ */
+export function definitionRoles(definition) {
+  const part = definition?.parts?.find((p) => p.path === 'model.bim');
+  if (!part) return [];
+  const bim = JSON.parse(Buffer.from(part.payload, 'base64').toString('utf8'));
+  return (bim.model?.roles ?? []).filter((/** @type {any} */ r) => r.name === EVERYONE_ROLE || r.name === SCOPED_ROLE);
+}
+
 /** @param {unknown} definition */
 export const definitionHash = (definition) => createHash('sha256').update(JSON.stringify(definition)).digest('hex').slice(0, 16);
 
@@ -72,7 +99,7 @@ export const definitionHash = (definition) => createHash('sha256').update(JSON.s
  * Creates a semantic model item, or updates it when its inputs or its definition changed, or
  * `force` is set. The definition's hash is part of the signature, so running the installer again
  * from a newer checkout redeploys a model whose template changed. An update clears the model's
- * data and its connection binding.
+ * data, its connection binding and any role members.
  * @param {Ctx} ctx
  * @param {import('../config.js').ModelConfig} m
  * @param {{ signature: string, definition: () => any, force?: boolean }} o
@@ -88,6 +115,7 @@ export async function deployModel(ctx, m, o) {
     ui.warn(`${m.name} was deleted. Deploying it again.`);
     delete m.id;
   }
+  const deployed = !m.id || !!o.force || m.signature !== signature;
   if (!m.id) {
     const name = freeName(m.name, displayNames(items));
     noteRenamed(ctx, m.name, name);
@@ -103,6 +131,12 @@ export async function deployModel(ctx, m, o) {
   } else {
     ui.ok(`Semantic model ${m.name} is in place`);
   }
+  if (deployed) {
+    const rls = ctx.config.access?.rls;
+    if (rls?.applied) rls.applied = rls.applied.filter((id) => id !== m.id);
+  }
+  const roles = definitionRoles(definition);
+  if (roles.length) deployedRoles(ctx).set(/** @type {string} */ (m.id), roles);
   m.signature = signature;
   ctx.save();
 }
@@ -122,7 +156,7 @@ export async function ensureSemanticModel(ctx, opts = {}) {
     signature: modelSignature(server, database, config.modules),
     definition: () =>
       semanticModelDefinition(
-        buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { server, database, modules: config.modules, resourceGraph: config.dataSources?.resourceGraph === 'api', currency: config.reporting?.currency }),
+        buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { server, database, modules: config.modules, resourceGraph: config.dataSources?.resourceGraph === 'api', currency: config.reporting?.currency, access: rlsSettings(config) }),
         PBISM,
       ),
     force: opts.force,

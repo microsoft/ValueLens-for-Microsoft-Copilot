@@ -44,6 +44,10 @@ param registryServer string = ''
 @description('Subnet delegated to Microsoft.App/environments (private networking). Empty = no VNet.')
 param infrastructureSubnetId string = ''
 
+@description('Ask: the Azure OpenAI endpoint and deployment the web app answers questions with. Empty = Ask runs in the data agent or not at all.')
+param askEndpoint string = ''
+param askDeployment string = ''
+
 resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: logAnalyticsName
 }
@@ -173,6 +177,8 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = if (deployWeb) {
           { name: 'VALUELENS_CURRENCY', value: reportingCurrency }
           { name: 'VALUELENS_EXCHANGE_RATE', value: exchangeRate }
           { name: 'VALUELENS_ACCESS', value: webAccess }
+          { name: 'VALUELENS_ASK_ENDPOINT', value: askEndpoint }
+          { name: 'VALUELENS_ASK_DEPLOYMENT', value: askDeployment }
         ])
         resources: { cpu: json('0.5'), memory: '1Gi' }
         probes: [{ type: 'Liveness', httpGet: { path: '/api/health', port: 8080 } }]

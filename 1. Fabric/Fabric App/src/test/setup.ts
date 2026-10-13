@@ -5,7 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 
 // jsdom does not implement matchMedia, which the reduced-motion check in
 // `lib/scroll-to-anchor` calls. Stub it so components that read it can

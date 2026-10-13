@@ -132,8 +132,29 @@ export async function planFlows(ctx) {
   if (flowsWanted(ctx.config).length) await pickFlowEnvironment(ctx);
 }
 
+/** What the user should know before picking the flows' environment. */
+export const FLOW_ENVIRONMENT_HINT =
+  'The flows run in this environment, and people with access to it can see them. Its data policy (DLP) must allow the "HTTP with Microsoft Entra ID (preauthorized)" connector, and whoever signs in to the flows needs a Power Automate Premium licence.';
+
 /**
- * Picks the Power Platform environment the flows go in.
+ * The tenant's default Power Platform environment ID, from Power Automate. If that can't be read,
+ * it is "Default-<tenant ID>", which is what Power Platform calls it.
+ * @param {Ctx} ctx
+ */
+async function defaultEnvironmentId(ctx) {
+  try {
+    const envs = (await ctx.api.flow?.listEnvironments()) ?? [];
+    const found = envs.find((e) => e.properties?.isDefault === true)?.name;
+    if (found) return found;
+  } catch {
+    // Falls back to the name below.
+  }
+  return ctx.user?.tenantId ? `Default-${ctx.user.tenantId}` : undefined;
+}
+
+/**
+ * Picks the Power Platform environment the flows go in. The saved one first, then the tenant's
+ * default environment.
  * @param {Ctx} ctx
  */
 async function pickFlowEnvironment(ctx) {
@@ -146,12 +167,16 @@ async function pickFlowEnvironment(ctx) {
   } catch (err) {
     ui.warn(`Couldn't list your Power Platform environments (${/** @type {Error} */ (err).message}).`);
   }
+  ui.note(FLOW_ENVIRONMENT_HINT);
   if (found?.length) {
+    const defaultId = (await defaultEnvironmentId(ctx))?.toLowerCase();
+    const isDefault = (/** @type {import('../clients/dataverse.js').DataverseInstance} */ i) => !!defaultId && i.EnvironmentId?.toLowerCase() === defaultId;
     const listed = found.map((i) => ({ i, url: orgUrl(i.Url) })).sort((a, b) => (a.i.FriendlyName ?? a.url).localeCompare(b.i.FriendlyName ?? b.url));
+    const fallback = listed.find((l) => isDefault(l.i)) ?? listed[0];
     const url = await ui.select(
       'Which Power Platform environment should the flows go in?',
-      listed.map(({ i, url }) => ({ name: `${i.FriendlyName ?? i.UniqueName ?? new URL(url).host} (${new URL(url).host})`, value: url })),
-      listed.some((l) => l.url === saved?.url) ? saved?.url : listed[0].url,
+      listed.map(({ i, url }) => ({ name: `${i.FriendlyName ?? i.UniqueName ?? new URL(url).host} (${new URL(url).host})${isDefault(i) ? ', the default environment' : ''}`, value: url })),
+      listed.some((l) => l.url === saved?.url) ? saved?.url : fallback.url,
     );
     const i = listed.find((l) => l.url === url)?.i;
     config.uploads.flowEnvironment = { url, ...(i?.EnvironmentId ? { id: i.EnvironmentId } : {}), ...(i?.FriendlyName ? { name: i.FriendlyName } : {}) };

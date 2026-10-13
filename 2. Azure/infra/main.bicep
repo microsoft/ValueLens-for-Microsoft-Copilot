@@ -99,6 +99,23 @@ param argAgents bool = true
 @description('Azure Resource Graph: read Foundry accounts and projects from resources.')
 param argFoundry bool = true
 
+@description('Ask (/api/ask): off, create an Azure AI Services account and model deployment here, or use an existing Azure OpenAI endpoint.')
+@allowed(['off', 'create', 'existing'])
+param askMode string = 'off'
+@description('Ask, existing: the Azure OpenAI endpoint, e.g. https://name.openai.azure.com/. The web app\'s identity needs Cognitive Services OpenAI User on it.')
+param askEndpoint string = ''
+@description('Ask: the model deployment name. Create mode defaults to the model name.')
+param askDeployment string = ''
+@description('Ask, create: the model and version to deploy.')
+param askModelName string = 'gpt-5-mini'
+param askModelVersion string = '2025-08-07'
+@description('Ask, create: the deployment SKU.')
+param askSku string = 'GlobalStandard'
+@description('Ask, create: throughput, in thousands of tokens per minute.')
+param askCapacity int = 50
+@description('Ask, create: region for the AI Services account. Empty = location.')
+param askLocation string = ''
+
 var allTags = union(tags, { 'valuelens-install-id': installId, 'valuelens-component': 'analytics-hub' })
 var privateNetworking = publicNetworkAccess == 'Disabled'
 var suffix = substring(uniqueString(resourceGroup().id, installId), 0, 6)
@@ -115,7 +132,26 @@ var names = {
   runJob: 'job-${namePrefix}-run'
   migrateJob: 'job-${namePrefix}-migrate'
   web: 'ca-${namePrefix}-web'
+  ask: 'ai-${namePrefix}-${suffix}'
 }
+
+module ask 'modules/ask.bicep' = if (askMode == 'create') {
+  name: 'vl-ask'
+  params: {
+    location: empty(askLocation) ? location : askLocation
+    tags: allTags
+    accountName: names.ask
+    principalId: identity.outputs.principalId
+    modelName: askModelName
+    modelVersion: askModelVersion
+    deploymentName: empty(askDeployment) ? askModelName : askDeployment
+    sku: askSku
+    capacity: askCapacity
+  }
+}
+
+var askEndpointValue = askMode == 'create' ? ask!.outputs.endpoint : askMode == 'existing' ? askEndpoint : ''
+var askDeploymentValue = askMode == 'create' ? ask!.outputs.deploymentName : askMode == 'existing' ? askDeployment : ''
 
 module identity 'modules/identity.bicep' = {
   name: 'vl-identity'
@@ -228,6 +264,8 @@ module apps 'modules/containerapps.bicep' = {
     argManagementGroup: argManagementGroup
     argAgents: argAgents
     argFoundry: argFoundry
+    askEndpoint: askEndpointValue
+    askDeployment: askDeploymentValue
   }
 }
 
@@ -244,4 +282,7 @@ output webFqdn string = apps.outputs.webFqdn
 output environmentName string = names.environment
 output webName string = deployWeb ? names.web : ''
 output vnetName string = privateNetworking ? names.vnet : ''
+output askEndpoint string = askEndpointValue
+output askDeployment string = askDeploymentValue
+output askAccountName string = askMode == 'create' ? names.ask : ''
 output gatewaySubnetName string = privateNetworking ? network!.outputs.gatewaySubnetName : ''

@@ -6,29 +6,25 @@ and the Analytics Hub app. Then it loads the first data and checks it.
 
 ## Before you start
 
-| You need | Why |
-|---|---|
-| **Windows 10 or 11** (64-bit) | To run `AnalyticsHubInstaller.exe`. Or use [Node.js](#without-the-exe). |
-| An **active Fabric capacity** (F2 or larger, or a trial) | The workspace runs on it. Or pick an existing workspace where you're an Admin or Member. |
-| For a new Key Vault: **Contributor** on a subscription, or on just one resource group | The client secret lives in Key Vault. With Contributor on one resource group only, pick that group: the installer doesn't need to create one. |
-| Or an existing Key Vault you can **write secrets to** (Key Vault Secrets Officer, or secret Set on an access policy) | The installer stores the secret for you. |
-| Or an existing Key Vault you can only **read secrets from** (Key Vault Secrets User, or secret Get on an access policy) | A vault admin adds the secret for you. See [Where the secret goes](#where-the-secret-goes). |
-| Permission to **register apps** in Entra | The default user setting is enough. Or use an app you already have, which the installer checks first. Or let an admin register it with the [admin pack](#if-you-cant-register-apps). |
-| A **Global Administrator** or **Privileged Role Administrator** | To grant admin consent for the Graph permissions. If that isn't you, the installer gives you a link to send them. |
-| These **Fabric tenant settings** turned on | *Service principals can call Fabric public APIs*, *Semantic Model Execute Queries REST API* and *Fabric App items*. If you're a Fabric administrator, the installer checks them. |
-| For credit consumption: **Owner** or **User Access Administrator** on the subscription | Only if you add [credit consumption](#credit-consumption). |
-| For the Agent Evaluator: **System Administrator** in each Power Platform environment | Only if you add the [Agent Evaluator](#agent-evaluator). |
+Go through the **[Before you start checklist](../../docs/PREREQUISITES.md)** first. It lists what you
+need and what to ask other admins for, by person, with each optional extra and the costs. In short,
+you need Windows 10 or 11 (or [Node.js](#without-the-exe)), a Fabric capacity, an Azure
+subscription or resource group for the Key Vault (or [another place for the secret](#where-the-secret-goes)),
+and permission to register apps (or [an admin who can](#if-you-cant-register-apps)). A Fabric admin
+turns on three tenant settings, and a Global Administrator or Privileged Role Administrator grants
+admin consent. If you want Copilot Cowork credits, ask your Viva Insights analyst for the query
+[before you start](../../docs/PREREQUISITES.md#send-this-to-your-viva-insights-analyst-first).
 
-The Graph permissions are listed in [`/docs/PERMISSIONS.md`](../../docs/PERMISSIONS.md). For every
-prerequisite on one page, optional data sources included, see [`/docs/PREREQUISITES.md`](../../docs/PREREQUISITES.md).
-
-**Check what you have.** Once you sign in, the home page's **Prerequisites** panel checks the
-list above for you, and says what each one is for and how to get it. It only reads; nothing is
+**Check what you have.** Once you sign in, the home page's **Prerequisites** panel checks most of
+the checklist for you, and says what each item is for and how to get it. It only reads; nothing is
 changed. Each one shows as met, missing, or couldn't check (for example, the Fabric tenant
-settings, which only a Fabric administrator can read). Only roles that are active count. A role
-you're eligible for in Privileged Identity Management shows as **eligible, activate first**:
-activate it, then choose **Check again**. Azure access is checked for each subscription, and
-Power Platform access for each environment. In the terminal, run `prereqs`.
+settings, which only a Fabric administrator can read). Only roles that are switched on count. Some
+organisations make admins switch a role on before they use it, in Privileged Identity Management.
+A role like that shows as **can be activated**: switch it on, then choose **Check again**.
+Azure access is checked for each subscription, and Power Platform access for each environment.
+Optional rows say whether the tenant has Microsoft 365 Copilot licences, whether you have Power
+Automate Premium (for the flows) and that the Viva Insights Insights Analyst role, which the
+installer can't check, is needed for the Cowork credits query. In the terminal, run `prereqs`.
 
 ### Where the secret goes
 
@@ -88,9 +84,9 @@ it with admin consent. It lists anything missing with the link to the app's API 
 Once an admin has fixed it, choose **Check again**. Or choose **Carry on anyway**: data the missing
 permissions cover won't load until they're fixed.
 
-## Azure target (preview)
+## Azure target
 
-The installer can also set up the Phase 1 preview in **your Azure subscription**. Start it with
+The installer can also set up Analytics Hub in **your Azure subscription**. Start it with
 `--target azure`, or pick **Your Azure subscription** as the first wizard answer.
 
 You need:
@@ -105,13 +101,13 @@ You need:
   the managed identity, so the jobs can refresh the model) and *Semantic Model Execute Queries REST
   API* (for the app's queries).
 
-The preview creates or reuses a resource group and deploys a managed identity, Storage, Log Analytics,
+It creates or reuses a resource group and deploys a managed identity, Storage, Log Analytics,
 Azure SQL Database serverless, Container Apps jobs, and the web app from the ARM template in
 `src/azure/main.arm.json`. It also creates the Azure web app registration, an SQL reader app
 registration, a Power BI workspace and model, and an `AnalyticsHub-Teams.zip` package (the app as a
 Teams tab, built by `src/azure/teams/build-package.mjs`) next to the install record.
 
-`core`, `orgData`, `m365Activity` and `consumption` are supported on Azure in this preview. Other modules
+`core`, `orgData`, `m365Activity` and `consumption` are supported on Azure. Other modules
 are shown as coming soon and cannot be selected. Credit consumption deploys the Consumption Central model,
 gives the jobs' managed identity Cost Management and Azure AI roles, and creates the Copilot Studio flow,
 signed in as you (`--flow-identity app` is Fabric only). With public endpoints the flow writes to the
@@ -120,6 +116,8 @@ networking it writes to a SharePoint folder you name, and the managed identity g
 on that site (a SharePoint or Global administrator grants it). See
 [2. Azure](../../2.%20Azure/README.md#credit-consumption). Agent configuration and Foundry from Azure
 Resource Graph also works on Azure: see [Agent configuration and Foundry](#agent-configuration-and-foundry).
+The app's Ask page answers with an Azure OpenAI model, an AI Services account the installer creates
+by default or a deployment you already have: see [Ask](#ask).
 Re-runs are incremental and use the same
 `valuelens-install.json`, with `target: "azure"` and an `azure` block. The installer tags every Azure
 resource with `valuelens-install-id` and stops rather than modifying untagged resources with colliding
@@ -186,33 +184,60 @@ Azure commands:
    see [Check the download](#check-the-download).
 2. Open it. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
 3. The first time, it takes about a minute to unpack. Then it opens in your browser. Keep its
-   window open while you use the page.
+   window open while you use the page, and keep the PC awake and plugged in until it finishes. If
+   you close the page, go back to that window and press **Enter** to open it again.
 4. Choose **Set up Analytics Hub** and sign in.
-5. Answer the questions:
+5. Answer the questions. This takes about 5 minutes:
    1. **Data sources.** Each source has a card: **Connected (API)**, **Upload CSV** or **Skip**.
       Copilot usage, licences and org data are always connected. Microsoft 365 activity is
-      connected by default; the rest are skipped until you choose otherwise. A CSV card says
+      connected by default; the rest are skipped until you choose otherwise. The **Copilot Studio
+      credits**, **Copilot Cowork credits** and **Azure AI costs** cards make up
+      [Credit consumption](#credit-consumption). A CSV card says
       where to export the file, and you can pick the exports to upload now. A source that needs
       more to work asks for it next, such as the Power Platform environment for a flow. See
       [Data sources and exports](#data-sources-and-exports).
    2. **Change the advanced settings?** **No** (the default) takes the defaults that suit most
       organisations. See [Advanced settings](#advanced-settings).
-   3. **Capacity and workspace.** The Lakehouse is named `ValueLens`, or the next free name.
+   3. **Capacity and workspace.** A new workspace is named `Analytics Hub` and its Lakehouse
+      `Analytics_Hub`, or the next free name. F64 or larger is recommended for more than 10,000
+      people. An existing install keeps its names.
    4. **App registration:** create one, use your own (it's checked first), or let an admin
       register it. See [If you can't register apps](#if-you-cant-register-apps).
    5. **Key Vault:** create one, or pick one you have. If you can't write to it, a vault admin
       can add the secret. See [Where the secret goes](#where-the-secret-goes).
 6. Check the plan and approve it. Nothing is created until you do. The plan shows every setting,
-   including the defaults.
-7. When it finishes, open the link to the app.
+   including the defaults, and a **Costs** list of what's billed (the Fabric capacity, Power
+   Automate Premium for the flows, the Azure resources), with links to the pricing pages. The exe
+   stops Windows going to sleep while it runs.
+7. Wait for it to finish. Setting up takes about 15 minutes. The first data reaches the app about
+   25 minutes after you choose **Go ahead** with 30 days of history, or about 2 hours with 180 days
+   ([a large tenant](#a-large-tenant) takes longer). Copilot Studio credits arrive after the Studio
+   flow's first run: see [Load the Studio credits now](#power-automate-flows).
+8. When it finishes, open the link to the app.
 
 **Want to change an answer?** Choose **Back**, on any question or on the plan. It opens the
 previous question with your answer filled in, and the questions after it are asked again. If you
 go back to the client secret, leave the box empty to keep the one you pasted. If you go back
 further, you'll be asked for it again.
 
-It keeps your answers in `Documents\Analytics Hub`. Keep that folder. To run the pipeline, check
-status, update, or repair the set-up later, open the exe again.
+It keeps your answers in `Documents\Analytics Hub`, in an install record named
+`valuelens-install.json`. Keep that folder. To run the pipeline, check status, update, or repair
+the set-up later, open the exe again. **Manage Analytics Hub** shows the record's full path. If
+OneDrive syncs your Documents folder, the record follows you to your other PCs.
+
+**The workspace has gone?** After you sign in, the installer checks that the record's workspace
+still exists. If Fabric says it doesn't, or the record is for another tenant, the home page says
+so. Choose **Start fresh** to set up again. The old record is kept beside the new one, renamed
+with the date and time, such as `valuelens-install.20260507-090302.json`. Or choose **Keep this
+record** to carry on with it. In the terminal, `install` asks whether to start fresh. If Fabric
+can't be reached, or you can't read the workspace, nothing changes.
+
+**Updates.** When it opens, the installer checks
+[the latest release](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest). If
+there's a newer one, its window and the page say so. Download it, open it, and choose **Repair or
+change** to update your install. The check sends nothing about you or your tenant, and it's
+skipped if GitHub can't be reached. To turn it off, set the environment variable
+`ANALYTICS_HUB_NO_UPDATE_CHECK=1`.
 
 **Using a workspace that already has things in it?** The installer never changes anything it
 didn't create. If one of its names is taken, its own item gets the next free name, such as
@@ -236,12 +261,13 @@ then **Yes**.
 | Who can view | A new **Analytics Hub Viewers** group. You're who people ask for access. **Manage access** changes it later. |
 | [Audit history](#load-more-audit-history) for the first load | 30 days. Or 90 or 180. |
 | [How many people are in the tenant](#a-large-tenant) | More than 10,000 on an F64 or larger capacity, otherwise up to 10,000. |
-| Lakehouse name | `ValueLens`, or the next free name. Spaces and hyphens become underscores. |
+| Lakehouse name | `Analytics_Hub`, or the next free name (`ValueLens` on earlier installs, which keep it). Spaces and hyphens become underscores. |
 | A new Key Vault's resource group, region and name, and the secret's name | `rg-valuelens`, the capacity's region, `valuelens-` and six random characters, and the default secret name. If you can't use `rg-valuelens`, it asks. |
 | Schedule | Daily, at the default time. Or weekly, and the time (UTC). |
 | Run the first load as soon as setup finishes | Yes. |
 | Value page currency | US dollars. See below. |
 | [Agent configuration and Foundry](#agent-configuration-and-foundry) | The whole tenant, agents and Foundry. |
+| [Ask data agent](#ask) | Yes, on a paid F2 or larger, or Premium, capacity. |
 
 **Currency for the Value page.** Licences and credits are billed in US dollars, so it reports in
 dollars unless you choose another, such as euros or pounds. For another currency you can type how
@@ -249,20 +275,24 @@ many of it make $1, or leave it blank and set it under **Prices** in the app. It
 Power BI model's currency symbol. Nothing is looked up online. To choose it without the question,
 use `install --currency GBP --exchange-rate 0.79`. The installer keeps your choice for next time.
 
-The [Azure target](#azure-target-preview) asks the same question. Its advanced settings also cover
+The [Azure target](#azure-target) asks the same question. Its advanced settings also cover
 [demo mode](#demo-mode), the Azure SQL region, the name prefix, extra tags,
-[networking](#networking), where credits come from, and agent configuration and Foundry.
+[networking](#networking), where credits come from, agent configuration and Foundry, and
+[which model Ask uses](#ask).
 
 ## After it finishes
 
 - **Admin consent.** If you couldn't grant it, send the link the installer gives you to an admin.
   They select **Grant admin consent**. Then open the exe again and choose **Run now**.
 - **Share the app and reports.** The installer creates **Analytics Hub Viewers** (or uses a group
-  you name) with you as owner, and gives it **Build** on the models. Share the app and the
-  **ValueLens** report with the group once: open each in the workspace, choose **Share** and add
-  it. From then on, sharing is adding people to the group: run `access` (**Manage access** in
-  the browser), use **Share** in the app, or open the group in My Groups. Keep viewers off
-  workspace roles. See [Viewing Analytics Hub](../../docs/PERMISSIONS.md#viewing-analytics-hub-paths-1-and-2).
+  you name) with you as owner, and gives it **Build** on the models. Then:
+  1. **Once:** share the app with the group. In the workspace, choose **…** next to the
+     **Analytics Hub** app, then **Share**, add the group and choose **Grant**. Do the same for the
+     **ValueLens** report.
+  2. **To give someone access:** add them to the group in
+     [My Groups](https://myaccount.microsoft.com/groups).
+
+  Keep viewers off workspace roles. See [Viewing Analytics Hub](../../docs/PERMISSIONS.md#viewing-analytics-hub-paths-1-and-2).
 - **Own reports.** Connect Power BI Desktop to `Analytics Hub Model`, or use **Save a copy** on a
   published report.
 - **Flows and the Cowork Dataflow.** If you chose them, the end of the install lists what to sign
@@ -397,7 +427,7 @@ The record keeps the most history loaded, once the reload has started. On Fabric
 read are reused, so a reload only queries what's missing. On a large tenant, 90 or 180 days can
 take many hours.
 
-On the [Azure target](#azure-target-preview), the reload starts the run job once with
+On the [Azure target](#azure-target), the reload starts the run job once with
 `VALUELENS_AUDIT_BACKFILL_DAYS` set, and leaves its usual settings alone. Job images older than
 this installer ignore it and run as usual: run `update` first if yours is.
 
@@ -443,7 +473,9 @@ use the Lakehouse folder.
 
 ### Power Automate flows
 
-The installer creates these flows in the Power Platform environment you pick, **turned off**:
+The installer creates these flows in the Power Platform environment you pick, **turned off**. It
+preselects the tenant's default environment. The environment's DLP policy must allow *HTTP with
+Microsoft Entra ID (preauthorized)*, and people with access to the environment can see the flows.
 
 | Flow | When | What it does | Sign in to |
 |---|---|---|---|
@@ -451,7 +483,9 @@ The installer creates these flows in the Power Platform environment you pick, **
 | `Analytics Hub - Product feedback` | Product feedback set to **Power Automate (emailed export)** | Saves product feedback exports emailed with the subject `Copilot Product Feedback` | Office 365 Outlook and OneLake |
 | `Analytics Hub - Agent inventory` | Agent configuration and Foundry set to **Connected**, with agents | Each day, an hour before the pipeline, saves the Power Platform inventory of Copilot Studio agents, environments and agent flows to `Files/arg_inventory`, for when Resource Graph won't give the app the agents | Power Platform API and OneLake |
 
-They need Power Automate Premium. To finish each one:
+They need Power Automate Premium for whoever signs in to them, and a data policy that allows
+**HTTP with Microsoft Entra ID (preauthorized)**: see the
+[Power Platform admin checklist](../../docs/PREREQUISITES.md#power-platform-admin-for-the-copilot-studio-credits-flow). To finish each one:
 
 1. Open it in Power Automate.
 2. Sign in to its connections:
@@ -520,6 +554,7 @@ addresses, the M365 Copilot licence flag and the exact prepaid split.
 | Upload exports later, then load them now | `upload feedback.csv agents.csv --run` |
 | Run only the loads that failed last time | `rerun-failed` |
 | Add viewers or owners to the viewer group, or choose another group | `access` |
+| Show each viewer only the orgs they're given (opt-in) | `access`, then **Turn on org-scoped access**. See [Org-scoped access](../../docs/PERMISSIONS.md#org-scoped-access-row-level-security) |
 
 Source IDs for `--data`: `workday`, `m365Activity`, `agent365`, `productFeedback`,
 `studioCredits`, `coworkCredits`, `azureAi`, `agentEvaluator`, `defender`, `resourceGraph`. Modes:
@@ -543,25 +578,30 @@ Microsoft 365 admin center, go to **Settings** > **Org settings** > **Services**
 
 ## Credit consumption
 
-Optional. It fills the app's Consumption pages. See [Consumption Central](../Manual%20setup/Add%20Credit%20Consumption/).
+Optional. It fills the app's Consumption pages. See [Consumption Central](../Manual%20setup/Add%20Credit%20Consumption).
+On the **Data sources** screen it's three cards, grouped as **Credit consumption**: **Copilot
+Studio credits**, **Copilot Cowork credits** and **Azure AI costs**. Choose any of them.
 
-The installer reads Azure AI and Copilot pay-as-you-go costs for you. `Ingest_Azure_AI` also fills
-the Azure capacity and health, billing reconciliation and Foundry solution spend pages from ARM,
-Azure Monitor, Cost Management and the public Retail Prices API. It needs no extra roles. Installs
-from 0.3.5 or earlier get it with **Repair or change** when the client secret is in Key Vault. If
-you keep the secret in the notebooks, run `AnalyticsHubInstaller.exe update` instead: Repair
-doesn't rewrite those notebooks. For the other two:
-
+- **Azure AI costs.** The installer reads Azure AI and Copilot pay-as-you-go costs for you.
+  `Ingest_Azure_AI` also fills the Azure capacity and health, billing reconciliation and Foundry
+  solution spend pages from ARM, Azure Monitor, Cost Management and the public Retail Prices API.
+  It needs no extra roles. Installs from 0.3.5 or earlier get it with **Repair or change** when the
+  client secret is in Key Vault. If you keep the secret in the notebooks, run
+  `AnalyticsHubInstaller.exe update` instead: Repair doesn't rewrite those notebooks.
 - **Copilot Studio credits.** Leave it on **Connected** and finish the
   [Copilot Studio credits flow](#power-automate-flows). To add exports as well, or instead, in the
   Power Platform admin center go to **Licensing** > **Products** > **Copilot Studio**. Download the
   `EntitlementConsumption…_MCSMessages…csv` files from the Summary, Environments, Agents and Users
   tabs, and add them as [exports](#data-sources-and-exports). A new file replaces the last one of
   the same kind, and an export's figures win for the month it covers.
-- **Cowork credits.** Choose **Connected (Dataflow)** where you can. In Viva Insights > **Analysis**,
-  build a query with the Copilot credit metrics and turn on **Auto-refresh**. In **Analysis
-  results**, choose the link icon to copy its partition and query IDs, and give them to the
-  installer. It creates the Dataflow Gen2 `AnalyticsHub_Cowork_Credits`, which loads the query
+- **Copilot Cowork credits.** Choose **Connected (Dataflow)** where you can. Your Viva Insights
+  analyst creates the query first: send them the
+  [note in the checklist](../../docs/PREREQUISITES.md#send-this-to-your-viva-insights-analyst-first).
+  In Viva Insights > **Analysis**, they build a query with the Copilot credit metrics and turn on
+  **Auto-refresh**. In **Analysis results**, the link icon copies its partition and query IDs. The
+  installer fills in the partition ID with your tenant ID, which is usually right. If you don't
+  have the query ID yet, choose **Not yet** to add the query later: Cowork credits use the CSV export
+  until then, and you add the IDs with **Repair or change**. With the IDs, the installer creates the Dataflow Gen2 `AnalyticsHub_Cowork_Credits`, which loads the query
   into `viva_credits_dataflow`, and the pipeline refreshes it before each Viva load. Once, open the
   Dataflow, choose **Edit dataflow**, and under **Home** > **Manage connections** sign in to Viva
   Insights and the Lakehouse. Then choose **Save**, wait until it's published, and choose **Refresh
@@ -571,7 +611,9 @@ doesn't rewrite those notebooks. For the other two:
   You need the Viva Insights **Insights Analyst** role. Without the IDs, or if the Dataflow can't be
   created, Cowork credits fall back to the Consumption Dashboard's CSV
   [export](#data-sources-and-exports). Exports can still fill weeks before the query; the
-  Dataflow wins for weeks both cover.
+  Dataflow wins for weeks both cover. Fabric also adds **DataflowsStagingLakehouse** and
+  **DataflowsStagingWarehouse** items to the workspace for the Dataflow. They're expected: leave
+  them. See [staging items](https://learn.microsoft.com/fabric/data-factory/dataflows-gen2-overview#staging-items-in-your-workspace).
 
 If you can't assign Azure roles, ask an Owner or User Access Administrator to give the app
 registration Reader, Cost Management Reader and Monitoring Reader on the subscription. Then
@@ -649,6 +691,53 @@ If you aren't a System Administrator in an environment you pick, ask one to:
 
 Then choose **Repair or change**.
 
+## Ask
+
+The app's **Ask** page answers questions about the dashboard in plain language. It lists suggested
+questions for each page the install shows, from `Fabric App/src/ask/catalogue.json`. How it answers depends
+on the target.
+
+**Fabric.** The installer creates a data agent, **Analytics Hub Ask**, in the workspace and publishes
+it. It reads `Analytics Hub Model`, and Consumption Central and Agent Evaluator when they're on. Its
+instructions come from the same catalogue: what the measures mean, how to filter by date and
+organization, to compare rather than explain why, never to estimate, and to leave out groups under
+5 people. A data agent built on semantic models can't take example queries, so these all go into its
+instructions. On a re-run the installer updates and republishes it only when the models or the
+catalogue changed, and a failure here never stops the install. The app's Ask page links to the agent
+in Fabric (**Open the data agent in Fabric**) and copies questions to ask it. To use it in Teams or
+Microsoft 365 Copilot, publish it there from Fabric by hand: there's no API for that yet.
+
+It needs:
+
+- A paid Fabric capacity, **F2 or larger**, or Premium (P1 or larger). On a trial capacity the
+  installer skips the agent and the Ask page lists the questions only.
+- The tenant settings **Users can create and share data agent items**, **Users can use Copilot and
+  other features powered by Azure OpenAI** and, if your capacity isn't in the US or EU, **Data sent
+  to Azure OpenAI can be processed outside your capacity's geographic region**. The installer
+  checks them when it can read tenant settings and warns about any that look off.
+- For the people who ask it: access to the agent (share it, or a workspace role) and **Build** or
+  **Read** on the models it reads. The viewer group already has Build.
+
+To leave it out, choose **Yes** for the advanced settings and **No** when asked to create the data
+agent. It's recorded as `dataAgent` in `valuelens-install.json`.
+
+**Azure.** The web app answers on the page itself through `POST /api/ask`, with an Azure OpenAI model.
+The model can only run the named queries the pages run, as the person asking, so it sees only what
+they can see. Under [Advanced settings](#advanced-settings) the wizard asks which model to use:
+
+- **Create one for Ask** (the default): an Azure AI Services account in the resource group with a
+  `gpt-5-mini` deployment, billed per token. Choose whether prompts may be processed in any region
+  (Global Standard) or only in your data zone (Data Zone Standard). The installer checks the region
+  offers the model and has quota, and moves a global deployment to another region if it doesn't.
+  The web app's managed identity gets **Cognitive Services OpenAI User** on it.
+- **Use an Azure OpenAI deployment you already have**: pick the account and a chat deployment that
+  supports tool calling. The installer gives the managed identity Cognitive Services OpenAI User on
+  that account if you can assign roles there, or prints the `az role assignment create` command.
+- **Leave Ask off**: the page lists suggested questions without answers. An account the installer
+  created earlier stays until you delete it.
+
+It's recorded as `azure.ask`. See [Ask](../../2.%20Azure/README.md#ask) for the limits and what's logged.
+
 ## Private Key Vaults
 
 If your vault blocks public access, the installer connects the workspace to it with a managed
@@ -663,6 +752,8 @@ the endpoint, someone who manages the vault approves it under **Networking** >
 | Edge says the file isn't commonly downloaded | Choose **…** next to the file, then **Keep**, **Show more** and **Keep anyway**. The exe isn't code-signed yet. |
 | Windows says it protected your PC | Choose **More info**, then **Run anyway**. The exe isn't code-signed yet. |
 | `The installer couldn't start` | Download the exe again. If that doesn't help, delete `%LOCALAPPDATA%\AnalyticsHub` and open it again. |
+| The page says it needs the installer's link, or the link has expired | Go back to the installer's window and press **Enter**. It opens the page again. |
+| `This workspace no longer exists` | The workspace in the install record was deleted, or the record is for another tenant. Choose **Start fresh**. The old record is kept, renamed with the date and time. See [Run it](#run-it). |
 | `No active Fabric capacity you can use` | Start a Fabric trial, or ask a capacity admin to make you a Contributor on a capacity. |
 | `No Azure subscription you can use` | Ask for Contributor on a subscription, on a resource group, or for read access to an existing vault a vault admin can add the secret to. Or, for a quick test only, [store the secret in the notebook](#where-the-secret-goes). |
 | `You can't write secrets to …` or `You can't change access policies on …` | Run the installer again without `--yes`, pick the vault, and choose **A vault admin will add the secret for me**. See [Where the secret goes](#where-the-secret-goes). |

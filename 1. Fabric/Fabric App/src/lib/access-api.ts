@@ -34,6 +34,63 @@ export function removeViewer(id: string): Promise<void> {
     return call<void>(`/api/access/members/${encodeURIComponent(id)}`, "DELETE");
 }
 
+/** A scope given from the Share panel: whose data someone sees. */
+export interface Delegation {
+    /** Opaque: pass it back to remove or approve. */
+    id: string;
+    upn: string;
+    scope: { type: "hierarchy" | "org"; value: string };
+    canDelegate: boolean;
+    grantedBy: string;
+    /** `pending_group` until an admin adds them to the viewer group. */
+    status: "active" | "pending_group";
+    note: string;
+    createdAt: string;
+}
+
+export interface RefreshNotice {
+    status: "started" | "queued" | "unavailable";
+    message: string;
+}
+
+/** What `/api/delegations` tells the signed-in user. `enabled` is false when org-scoped access is off. */
+export type DelegationState =
+    | { enabled: false }
+    | {
+          enabled: true;
+          orgAttribute: string;
+          me: { upn: string; isAdmin: boolean; canDelegate: boolean; scopes: { type: "all" | "hierarchy" | "org"; value: string; canDelegate: boolean }[] };
+          /** Admins: every active scope given here. Leaders: the ones they gave, waiting or not. */
+          delegations: Delegation[];
+          /** Admins only: scopes waiting for someone to be added to the viewer group. */
+          pending: Delegation[];
+          refresh?: RefreshNotice & { at: string };
+      };
+
+export interface NewDelegation {
+    upn: string;
+    /** Leaders leave `value` out: it's always themselves. */
+    scope: { type: "hierarchy" | "org"; value?: string };
+    note?: string;
+    canDelegate?: boolean;
+}
+
+export function loadDelegations(): Promise<DelegationState> {
+    return call<DelegationState>("/api/delegations");
+}
+
+export function addDelegation(input: NewDelegation): Promise<{ delegation: Delegation; refresh?: RefreshNotice }> {
+    return call("/api/delegations", "POST", input);
+}
+
+export function removeDelegation(id: string): Promise<{ refresh?: RefreshNotice }> {
+    return call(`/api/delegations/${encodeURIComponent(id)}`, "DELETE");
+}
+
+export function approveDelegation(id: string): Promise<{ delegation: Delegation; refresh?: RefreshNotice }> {
+    return call(`/api/delegations/${encodeURIComponent(id)}/approve`, "POST");
+}
+
 async function call<T>(path: string, method = "GET", body?: unknown): Promise<T> {
     const send = async (forceRefresh: boolean) => {
         const token = await getAccessToken(forceRefresh ? { forceRefresh } : undefined);

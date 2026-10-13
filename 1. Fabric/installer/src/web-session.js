@@ -3,13 +3,14 @@
  * Runs installer commands for the browser wizard, one at a time. Signs in once and keeps the
  * sign-in for the next command, the way one terminal run does for its steps.
  */
+import { existsSync } from 'node:fs';
 import { collectedLabels } from './catalog.js';
-import { loadConfig, secretMode } from './config.js';
+import { archiveConfig, loadConfig, secretMode } from './config.js';
 import { connect as realConnect, createCtx, runCommand, showPrereqs } from './install.js';
 import { fromExe } from './launch.js';
 import { checkPrereqs } from './prereqs.js';
 import { loadSources } from './sources.js';
-import { describeSchedule, modelDeployed } from './steps/fabric.js';
+import { describeSchedule, modelDeployed, recordWorkspaceGone, staleRecordMessage } from './steps/fabric.js';
 import { isResumeLater } from './steps/identity.js';
 import { routerWanted } from './uploads.js';
 
@@ -63,6 +64,19 @@ export function describeRecord(config) {
   };
 }
 
+/**
+ * What the home page keeps of a prerequisites check. canAssignDirectoryRoles: Global Administrator or
+ * Privileged Role Administrator is active, so the user can assign directory roles themselves.
+ * @param {string} upn
+ * @param {import('./prereqs.js').Prereq[]} items
+ */
+export const prereqsSnapshot = (upn, items) => ({
+  at: new Date().toISOString(),
+  upn,
+  items,
+  canAssignDirectoryRoles: items.some((i) => i.id === 'consent-role' && i.status === 'met'),
+});
+
 /** @param {any} err */
 export function describeError(err) {
   if (/device_code_expired|expired_token|code_expired/i.test(String(err?.message ?? err?.errorCode ?? ''))) {
@@ -91,10 +105,29 @@ export function createSession(o) {
   let running = null;
   /** @type {Promise<void>} */
   let current = Promise.resolve();
-  /** The last prerequisites check for this sign-in. @type {{ at: string, upn: string, items: import('./prereqs.js').Prereq[] } | null} */
+  /** The last prerequisites check for this sign-in. @type {ReturnType<typeof prereqsSnapshot> | null} */
   let prereqs = null;
   /** @type {Promise<void>} */
   let checking = Promise.resolve();
+  /** A newer installer, once the update check finds one. @type {import('./update-check.js').Update | null} */
+  let update = null;
+  /** What the record's workspace check found for this sign-in. @type {{ key: string, gone: Awaited<ReturnType<typeof recordWorkspaceGone>>, kept: boolean } | null} */
+  let stale = null;
+
+  /**
+   * Checks once per sign-in and workspace that the record's workspace is still there.
+   * @param {import('./config.js').InstallConfig} config
+   */
+  async function checkRecord(config) {
+    if (!signedIn) return null;
+    const key = `${signedIn.user.tenantId}|${config.tenantId}|${config.fabric.workspaceId}`;
+    if (stale?.key !== key) {
+      const gone = await recordWorkspaceGone({ config, fabric: signedIn.api.fabric, tenantId: signedIn.user.tenantId });
+      stale = { key, gone, kept: false };
+      o.ui.emit({ type: 'record-checked' });
+    }
+    return stale.kept ? null : stale.gone;
+  }
 
   /**
    * Checks the prerequisites in the background after a sign-in, without holding up the command.
@@ -106,7 +139,7 @@ export function createSession(o) {
     checking = checkPrereqs({ api, user, config })
       .then((items) => {
         if (signedIn?.user !== user) return;
-        prereqs = { at: new Date().toISOString(), upn: user.upn, items };
+        prereqs = prereqsSnapshot(user.upn, items);
         o.ui.emit({ type: 'prereqs-ready' });
       })
       .catch((err) => o.debug?.(`Prerequisites check failed: ${describeError(err)}`));
@@ -129,9 +162,11 @@ export function createSession(o) {
       configFile: o.configFile,
       record,
       recordError,
+      stale: record && stale && !stale.kept ? stale.gone : null,
       running,
       user: signedIn ? { upn: signedIn.user.upn, displayName: signedIn.user.displayName, tenantId: signedIn.user.tenantId, method: signedIn.method } : null,
       prereqs,
+      update,
       defaults: { tenant: o.tenantId ?? record?.tenantId ?? '', method: o.method ?? 'browser' },
     };
   }
@@ -159,11 +194,16 @@ export function createSession(o) {
         if (command !== 'prereqs') checkInBackground(config);
       }
       ui.emit({ type: 'signin', state: reuse ? 'reused' : 'done', user: { upn: signedIn.user.upn, displayName: signedIn.user.displayName, tenantId: signedIn.user.tenantId } });
+      const gone = existed ? await checkRecord(config) : null;
+      if (gone && command !== 'prereqs') {
+        ui.emit({ type: 'command', command, state: 'failed', stale: true, error: `${staleRecordMessage(gone)} Go back to the home page to start fresh, or keep the record.` });
+        return;
+      }
       const ctx = createCtx({ ui, config, file: o.configFile, api: signedIn.api, user: signedIn.user, sources });
       let ok = true;
       if (command === 'prereqs') {
         const items = await showPrereqs(ctx);
-        prereqs = { at: new Date().toISOString(), upn: signedIn.user.upn, items };
+        prereqs = prereqsSnapshot(signedIn.user.upn, items);
       } else ok = await runCommand(ctx, command, { wait: req.wait !== false, backfillDays: req.backfillDays });
       ui.emit({ type: 'command', command, state: ok ? 'done' : 'failed', ...(ok ? {} : { error: 'It didn\'t finish successfully. The details are above.' }) });
     } catch (err) {
@@ -182,10 +222,37 @@ export function createSession(o) {
     get running() {
       return running;
     },
+    /**
+     * Records a newer installer and tells the page to show it.
+     * @param {import('./update-check.js').Update} u
+     */
+    setUpdate(u) {
+      update = u;
+      o.ui.emit({ type: 'update-available' });
+    },
     /** Resolves when the command that is running now, and any background prerequisites check, have finished. */
     settled: async () => {
       await current;
       await checking;
+    },
+    /**
+     * Sets the install record aside, as `valuelens-install.<date>.json`, so the next install starts fresh.
+     * @returns {{ ok: true, archived: string | null } | { ok: false, status: number, error: string }}
+     */
+    startFresh() {
+      if (running) return { ok: false, status: 409, error: `"${running}" is still running.` };
+      try {
+        const archived = existsSync(o.configFile) ? archiveConfig(o.configFile) : null;
+        stale = null;
+        return { ok: true, archived };
+      } catch (err) {
+        return { ok: false, status: 500, error: `Couldn't set the install record aside: ${describeError(err)}` };
+      }
+    },
+    /** Keeps using the install record even though its workspace looks gone. */
+    keepRecord() {
+      if (stale) stale.kept = true;
+      return { ok: true };
     },
     /**
      * Starts a command and returns straight away; its progress arrives as events.

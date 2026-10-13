@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NOTEBOOKS, NOTEBOOKS_DIR, SETUP_DIR } from './catalog.js';
+import { loadAsk } from './transform/data-agent.js';
 import { AGENT_EVALUATOR_TEMPLATE, CONSUMPTION_TEMPLATE, MODEL_TEMPLATE } from './transform/model.js';
 
 /** `1. Fabric`, when the installer runs from inside the repo. */
@@ -21,6 +22,7 @@ export const APP_DIR = 'Fabric App';
  * @property {string} [consumptionModelFile]  `Consumption Central - Fabric.pbit`, for the credit consumption model.
  * @property {string} [agentEvaluatorModelFile]  `Agent Evaluator.pbit`, for the Agent Evaluator model.
  * @property {string} [appDir]  The web app's source, when this checkout has it.
+ * @property {import('./transform/data-agent.js').Ask} [ask]  The app's Ask catalogue and its queries, for the Fabric data agent.
  */
 
 /**
@@ -52,6 +54,7 @@ export function loadSources(dir = DEFAULT_SOURCE_DIR) {
     consumptionModelFile: existsSync(consumptionModelFile) ? consumptionModelFile : undefined,
     agentEvaluatorModelFile: existsSync(agentEvaluatorModelFile) ? agentEvaluatorModelFile : undefined,
     appDir: existsSync(join(appDir, 'rayfin', 'rayfin.yml')) ? appDir : undefined,
+    ask: loadAsk(root),
   };
 }
 

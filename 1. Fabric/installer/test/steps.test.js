@@ -7,7 +7,7 @@ import { runCommand } from '../src/install.js';
 import { ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, freeName, pipelineSignature, usesSecret } from '../src/steps/fabric.js';
 import { ensureConsent } from '../src/steps/identity.js';
 import { connectionName } from '../src/steps/model.js';
-import { APP_NAME, lakehouseNameFrom, largeCapacity, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
+import { APP_NAME, lakehouseNameFrom, largeCapacity, planCosts, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
 import { BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, chooseLoad, firstLoadEstimate, historyLoaded, NETWORK_LOSSES, printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
 import { DATA_CHECK_FILE } from '../src/transform/notebook.js';
 import { PIPELINE_CHANGE, PIPELINE_VERSION, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
@@ -167,6 +167,25 @@ test('plan: new items get names nothing in the workspace has; a name someone cho
 
   await ensureNotebooks(ctx);
   assert.ok(fabric.calls.includes('createNotebook Copilot_Audit_Log_Processor'));
+});
+
+test('planReview: lists what adds to the bill with pricing links and no prices', () => {
+  const { ctx, config } = fakeCtx();
+  const what = () => (planReview(ctx).costs ?? []).map((x) => x.what);
+  assert.deepEqual(what(), ['Fabric capacity', 'Azure Key Vault']);
+  config.dataSources.productFeedback = 'api';
+  assert.deepEqual(what(), ['Fabric capacity', 'Power Automate Premium', 'Azure Key Vault'], 'flows need Premium');
+  for (const x of planReview(ctx).costs ?? []) {
+    assert.match(x.url, /^https:\/\//);
+    assert.doesNotMatch(`${x.what} ${x.detail}`, /[$£€]\s?\d/, 'no hard-coded prices');
+  }
+  const t = fakeUi();
+  t.ui.review(planReview(ctx));
+  assert.match(t.text(), /Costs: +Fabric capacity https:\/\/azure\.microsoft\.com\/pricing\/details\/microsoft-fabric\/\n +Power Automate Premium https:\/\/www\.microsoft\.com\/power-platform\/products\/power-automate\/pricing/);
+
+  config.target = 'azure';
+  const azure = planCosts(config).map((x) => x.what);
+  assert.ok(azure.includes('Azure resources') && !azure.includes('Fabric capacity') && !azure.includes('Azure Key Vault'));
 });
 
 test('lakehouse: never writes to one it did not create', async () => {

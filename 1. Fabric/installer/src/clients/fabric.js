@@ -328,6 +328,24 @@ export function fabricApi(http) {
       return JSON.parse(Buffer.from(part.payload, 'base64').toString('utf8'));
     },
 
+    /** @param {string} workspaceId @param {string} displayName @param {any} definition */
+    createDataAgent: (workspaceId, displayName, definition) =>
+      http.requestLro('POST', `/workspaces/${workspaceId}/dataAgents`, {
+        body: { displayName, description: 'Answers questions about Copilot and agents from the Analytics Hub models. Deployed by the Analytics Hub installer.', definition },
+        lroResult: true,
+      }),
+    /** @param {string} workspaceId @param {string} id @param {any} definition */
+    updateDataAgent: (workspaceId, id, definition) =>
+      http.requestLro('POST', `/workspaces/${workspaceId}/dataAgents/${id}/updateDefinition`, { body: { definition } }),
+    /**
+     * Publishes the draft, so people other than its editors can chat with it.
+     * @param {string} workspaceId @param {string} id @param {string} [publishedDescription]
+     */
+    publishDataAgent: (workspaceId, id, publishedDescription) =>
+      http.requestLro('POST', `/workspaces/${workspaceId}/dataAgents/${id}/staging/publish`, {
+        body: publishedDescription ? { publishedDescription } : {},
+      }),
+
     /** Spark settings of a workspace. Needs workspace Admin. @param {string} workspaceId */
     getSparkSettings: (workspaceId) => http.get(`/workspaces/${workspaceId}/spark/settings`),
     /** @param {string} workspaceId @param {any} body  Only the settings to change. */

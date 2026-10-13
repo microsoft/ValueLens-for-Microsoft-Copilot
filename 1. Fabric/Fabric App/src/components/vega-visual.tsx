@@ -4,8 +4,10 @@
 //        Licensed under the MIT license. See LICENSE file in the project root for full license information.
 // </copyright>
 //-----------------------------------------------------------------------
+import type { ComponentProps } from "react";
 import { VegaVisual as EvalVegaVisual } from "@microsoft/fabric-visuals";
 import { EmbeddableVegaVisual } from "@microsoft/fabric-visuals/embeddable";
+import { rowCountKey } from "@/lib/chart-height";
 
 export type { VegaVisualHandle, VisualizationSpec } from "@microsoft/fabric-visuals";
 
@@ -24,4 +26,16 @@ export function isEvalBlocked(): boolean {
  * VegaVisual; under a strict CSP the embeddable build interprets Vega
  * expressions instead. Both take the same props.
  */
-export const VegaVisual = isEvalBlocked() ? EmbeddableVegaVisual : EvalVegaVisual;
+const HostVegaVisual = isEvalBlocked() ? EmbeddableVegaVisual : EvalVegaVisual;
+
+export type VegaVisualProps = ComponentProps<typeof HostVegaVisual>;
+
+/**
+ * Row-per-category charts size their frame from the row count, and the stock
+ * visual doesn't re-lay its plot when new data shrinks that frame: the rows
+ * collapse onto one line and the bars vanish until the window is resized.
+ * Remounting on a new row count draws the chart fresh at its new size.
+ */
+export function VegaVisual(props: VegaVisualProps) {
+    return <HostVegaVisual key={rowCountKey(props.data)} {...props} />;
+}

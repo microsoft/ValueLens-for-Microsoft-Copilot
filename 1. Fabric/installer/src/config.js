@@ -34,6 +34,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {ConsumptionConfig} consumption
  * @property {AgentEvaluatorConfig} agentEvaluator
  * @property {ResourceGraphConfig} resourceGraph
+ * @property {DataAgentConfig} dataAgent
  */
 
 /**
@@ -55,6 +56,15 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {string} [contact]  Who people ask for access. Defaults to the installer.
  * @property {string} [requestUrl]  Optional link for access requests, e.g. a My Access package or a form.
  * @property {string[]} [grantedModels]  Semantic model IDs the group has Build (ReadExplore) on.
+ * @property {RlsConfig} [rls]  Org-scoped access (row-level security). Off when absent.
+ */
+
+/**
+ * Org-scoped access. Opt-in: with it off the models have no roles, as before.
+ * @typedef {object} RlsConfig
+ * @property {boolean} enabled
+ * @property {'department' | 'country'} [orgAttribute]  What an org scope matches. Defaults to department.
+ * @property {string[]} [applied]  Models whose role members were applied since they were last deployed. A deploy drops members.
  */
 
 /**
@@ -191,6 +201,17 @@ export const flowIdentity = (config) => (config.target !== 'azure' && config.upl
  */
 
 /**
+ * The Fabric data agent behind the app's Ask page.
+ * @typedef {object} DataAgentConfig
+ * @property {boolean} [enabled]  Create it. Unset means yes, on a capacity that runs data agents.
+ * @property {string} [id]
+ * @property {string} name
+ * @property {boolean} [capacityOk]  The workspace's capacity runs data agents (paid F or P), as of the last plan.
+ * @property {string} [signature]  What the deployed definition was built from.
+ * @property {string} [publishedSignature]  The definition last published.
+ */
+
+/**
  * The ValueLens web app (Fabric App item) from `1. Fabric/Fabric App`.
  * @typedef {object} FabricAppConfig
  * @property {boolean} [enabled]
@@ -229,7 +250,7 @@ export const flowIdentity = (config) => (config.target !== 'azure' && config.upl
  * @property {Record<string, any>} [outputs]
  * @property {{ clientId?: string, objectId?: string, servicePrincipalId?: string, created?: boolean, appIdUri?: string }} [webApp]
  * @property {{ clientId?: string, objectId?: string, servicePrincipalId?: string, secretKeyId?: string, secretExpiry?: string, created?: boolean }} [sqlReader]
- * @property {{ workspaceId?: string, createdWorkspace?: boolean, datasetId?: string, consumptionDatasetId?: string, capacityId?: string, gatewayId?: string, createdGateway?: boolean, connectionId?: string }} [powerBi]
+ * @property {{ workspaceId?: string, createdWorkspace?: boolean, datasetId?: string, consumptionDatasetId?: string, capacityId?: string, gatewayId?: string, createdGateway?: boolean, connectionId?: string, accessNotebookId?: string }} [powerBi]
  *   `capacityId` hosts the workspace (semantic model definition APIs need a Fabric/Premium capacity) and, in private
  *   networking mode, the VNet data gateway `gatewayId` whose SQL connection `connectionId` the model is bound to.
  *   `consumptionDatasetId` is the Consumption model, deployed with credit consumption.
@@ -237,7 +258,21 @@ export const flowIdentity = (config) => (config.target !== 'azure' && config.upl
  * @property {boolean} [storageRole] The installer gave the signed-in user Storage Blob Data Contributor on the landing container, for the Studio flow.
  * @property {{ assigned: string[], pending: string[] }} [graphRoles]
  * @property {string} [teamsPackage]
- * @property {{ whatIf?: any[], pendingAdminActions?: string[], lastRun?: any, lastMigrate?: any }} [status]
+ * @property {AzureAskConfig} [ask] The model the web app's Ask answers with. Absent on installs from before Ask, which leaves it off.
+ * @property {{ whatIf?: any[], pendingAdminActions?: string[], lastRun?: any, lastMigrate?: any, lastAccess?: any }} [status]
+ */
+
+/**
+ * Ask on Azure: an Azure OpenAI model the installer creates, one that already exists, or none.
+ * @typedef {object} AzureAskConfig
+ * @property {'create' | 'existing' | 'off'} mode
+ * @property {string} [location] create: region of the AI Services account.
+ * @property {string} [sku] create: GlobalStandard or DataZoneStandard.
+ * @property {number} [capacity] create: thousands of tokens a minute.
+ * @property {string} [deployment] The model deployment's name.
+ * @property {string} [endpoint] existing: the account's endpoint.
+ * @property {string} [accountId] existing: the account's ARM resource ID, when it was picked from a list.
+ * @property {boolean} [granted] existing: the web app's managed identity has Cognitive Services OpenAI User on it.
  */
 
 /**
@@ -259,6 +294,7 @@ export const AGENT_EVALUATOR_MODEL_NAME = 'Analytics Hub Agent Evaluator Model';
 export const REPORT_NAME = 'ValueLens';
 export const CONSUMPTION_REPORT_NAME = 'Consumption Central';
 export const AGENT_EVALUATOR_REPORT_NAME = 'Agent Evaluator';
+export const DATA_AGENT_NAME = 'Analytics Hub Ask';
 
 /** @returns {InstallConfig} */
 export function emptyConfig() {
@@ -279,6 +315,7 @@ export function emptyConfig() {
     consumption: { model: { name: CONSUMPTION_MODEL_NAME } },
     agentEvaluator: { environments: [], model: { name: AGENT_EVALUATOR_MODEL_NAME } },
     resourceGraph: { managementGroup: '', agents: true, foundry: true },
+    dataAgent: { name: DATA_AGENT_NAME },
   };
 }
 
@@ -314,7 +351,15 @@ export function loadConfig(file) {
     fabric: { ...base.fabric, ...(raw.fabric ?? {}), notebooks: { ...(raw.fabric?.notebooks ?? {}) } },
     semanticModel: { ...base.semanticModel, ...(raw.semanticModel ?? {}) },
     fabricApp: { ...(raw.fabricApp ?? {}) },
-    ...(raw.access ? { access: { ...raw.access, grantedModels: [...(raw.access.grantedModels ?? [])] } } : {}),
+    ...(raw.access
+      ? {
+          access: {
+            ...raw.access,
+            grantedModels: [...(raw.access.grantedModels ?? [])],
+            ...(raw.access.rls ? { rls: { ...raw.access.rls, applied: Array.isArray(raw.access.rls.applied) ? [...raw.access.rls.applied] : [] } } : {}),
+          },
+        }
+      : {}),
     azure: {
       ...base.azure,
       ...(raw.azure ?? {}),
@@ -335,6 +380,7 @@ export function loadConfig(file) {
       model: { ...base.agentEvaluator.model, ...(raw.agentEvaluator?.model ?? {}) },
     },
     resourceGraph: normaliseResourceGraph(raw.resourceGraph),
+    dataAgent: { ...base.dataAgent, ...(raw.dataAgent ?? {}) },
   };
   if (!config.reporting) delete config.reporting;
   assertNoSecrets(config);
@@ -366,6 +412,23 @@ export function saveConfig(file, config) {
   const tmp = `${file}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
   renameSync(tmp, file);
+}
+
+/**
+ * Sets an install record aside so the next install starts fresh. It's renamed beside itself, as
+ * `valuelens-install.<yyyyMMdd-HHmmss>.json`, so nothing in it is lost.
+ * @param {string} file
+ * @param {Date} [now]
+ * @returns {string} where the record went
+ */
+export function archiveConfig(file, now = new Date()) {
+  const p = (/** @type {number} */ n) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`;
+  const base = file.replace(/\.json$/i, '');
+  let to = `${base}.${stamp}.json`;
+  for (let i = 2; existsSync(to); i++) to = `${base}.${stamp}-${i}.json`;
+  renameSync(file, to);
+  return to;
 }
 
 /** @param {unknown} config */

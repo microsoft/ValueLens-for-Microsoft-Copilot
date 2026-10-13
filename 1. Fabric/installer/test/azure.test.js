@@ -8,7 +8,7 @@ import { MODULES, azureGraphRolesFor } from '../src/catalog.js';
 import { HttpError } from '../src/http.js';
 import { waitForDeployment } from '../src/clients/azure.js';
 import { runCommand } from '../src/install.js';
-import { REQUIRED_ARM_PARAMETERS, armParameterNames, azureConsumptionOn, azureCron, azureDeployment, azureGraphRoles, azureModuleChoices, azurePlanReview, azurePreflight, azureRotateSecret, azureSemanticModels, consumptionParameters, installAzure, parseDropFolder, policyMessage, publicAccessMessage, regionCapacityMessage, supportsVnetGateway, whileSqlResumes, isSqlResuming, whatIfSummary } from '../src/steps/azure/index.js';
+import { AZURE_TARGET_DESCRIPTION, REQUIRED_ARM_PARAMETERS, armParameterNames, askTarget, azureConsumptionOn, azureCron, azureDeployment, azureGraphRoles, azureModuleChoices, azurePlanReview, azurePreflight, azureRotateSecret, azureSemanticModels, consumptionParameters, installAzure, parseDropFolder, policyMessage, publicAccessMessage, regionCapacityMessage, supportsVnetGateway, whileSqlResumes, isSqlResuming, whatIfSummary } from '../src/steps/azure/index.js';
 import { AZURE_AI_ROLES } from '../src/steps/consumption.js';
 import { azureFlowTarget, connectionSteps, flowDefinitions, flowsWanted } from '../src/steps/flows.js';
 import { CONNECTORS, connectorsUsed } from '../src/transform/flows.js';
@@ -531,4 +531,19 @@ test('delegated consent reuses an existing grant on re-runs', async () => {
   await g.grantOauth2Permission({ clientId: 'c', resourceId: 'r', scope: 'Dataset.Read.All' });
   await g.grantOauth2Permission({ clientId: 'c', resourceId: 'r', scope: 'User.Read' });
   assert.deepEqual(calls, ['post Dataset.Read.All', 'patch /oauth2PermissionGrants/g1 Dataset.Read.All User.Read']);
+});
+
+test('askTarget: the Azure choice says what it runs, in plain words', async () => {
+  const t = fakeUi();
+  /** @type {any[]} */
+  let seen = [];
+  const ui = /** @type {any} */ ({ ...t.ui, select: async (/** @type {string} */ _m, /** @type {any[]} */ choices, /** @type {any} */ def) => ((seen = choices), def) });
+  const { ctx, config } = fakeCtx({ ui });
+  delete config.fabric.workspaceId;
+  delete config.target;
+  await askTarget(ctx);
+  const azure = seen.find((c) => c.value === 'azure');
+  assert.equal(azure.description, AZURE_TARGET_DESCRIPTION);
+  assert.match(azure.description, /scheduled jobs in Azure Container Apps/);
+  assert.doesNotMatch(azure.description, /PaaS/);
 });

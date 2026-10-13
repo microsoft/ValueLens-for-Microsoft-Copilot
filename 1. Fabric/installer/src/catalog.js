@@ -115,7 +115,7 @@ export const ESSENTIAL_MODULES = /** @type {const} */ (['core', 'orgData']);
 /** Modules the Data sources screen can switch on, in order. */
 export const OPTIONAL_MODULES = /** @type {const} */ (['m365Activity', 'agent365', 'productFeedback', 'consumption', 'agentEvaluator', 'defender']);
 
-/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'm365Activity' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts' | 'uploadRouter' | 'workdayLander' | 'loadStatus' | 'defender' | 'resourceGraph'} NotebookKey */
+/** @typedef {'auditIngester' | 'licensedUsers' | 'processor' | 'dataCheck' | 'orgData' | 'm365Activity' | 'agent365Registry' | 'agent365Lander' | 'productFeedback' | 'refreshModel' | 'azureAi' | 'studioConsumption' | 'vivaConsumption' | 'agentTranscripts' | 'uploadRouter' | 'workdayLander' | 'loadStatus' | 'defender' | 'resourceGraph' | 'accessScope'} NotebookKey */
 
 /**
  * A text change the installer makes to its copy of a notebook. `find` must occur exactly once.
@@ -139,6 +139,7 @@ export const OPTIONAL_MODULES = /** @type {const} */ (['m365Activity', 'agent365
  * @property {boolean} [workday]  Only deployed when Workday org data is uploaded.
  * @property {boolean} [registry]  Left out when Agent 365 comes from its CSV export instead of the API.
  * @property {boolean} [resourceGraph]  Only deployed when agent configuration and Foundry come from Azure Resource Graph.
+ * @property {boolean} [access]  Only deployed with org-scoped access (row-level security) on.
  * @property {Record<string, string>} [values]  String settings the installer's copy always has.
  * @property {Record<string, string>} [expressions]  Python expressions the installer's copy always has, e.g. `True`.
  * @property {NotebookPatch[]} [patches]
@@ -321,6 +322,16 @@ export const NOTEBOOKS = [
     semanticModel: true,
   },
   {
+    key: 'accessScope',
+    file: 'AnalyticsHub_Access_Scope.ipynb',
+    displayName: 'AnalyticsHub_Access_Scope',
+    module: 'core',
+    credentials: false,
+    parameters: ['MODE', 'ROLES_B64', 'ROLES_FILE', 'WORKSPACE_ID'],
+    placeholder: null,
+    access: true,
+  },
+  {
     key: 'azureAi',
     file: 'Ingest_Azure_AI.ipynb',
     dir: CONSUMPTION_NOTEBOOKS_DIR,
@@ -417,7 +428,7 @@ export function enabledModules(modules) {
 /**
  * Notebooks to deploy for the chosen modules, in deployment order.
  * @param {ModuleChoice} modules
- * @param {{ semanticModel?: boolean, azureAi?: boolean, dataverse?: boolean, dataSources?: import('./uploads.js').DataSourceModes }} [opts]
+ * @param {{ semanticModel?: boolean, azureAi?: boolean, dataverse?: boolean, access?: boolean, dataSources?: import('./uploads.js').DataSourceModes }} [opts]
  * @returns {NotebookInfo[]}
  */
 export function notebooksFor(modules, opts = {}) {
@@ -432,7 +443,8 @@ export function notebooksFor(modules, opts = {}) {
       (!nb.uploads || (!!ds && routerWanted(ds))) &&
       (!nb.workday || ds?.workday === 'csv') &&
       (!nb.registry || ds?.agent365 !== 'csv') &&
-      (!nb.resourceGraph || ds?.resourceGraph === 'api'),
+      (!nb.resourceGraph || ds?.resourceGraph === 'api') &&
+      (!nb.access || !!opts.access),
   );
 }
 

@@ -17,6 +17,272 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased — Fabric and Azure paths are back
+
+**Why.** Analytics Hub (paths 1 and 2) moved to its own repo, `microsoft/AnalyticsHub-Dashboard`,
+for installer 0.5.0. It's back here, in its original folders, with everything made there since.
+
+- [1. Fabric](1.%20Fabric/) and [2. Azure](2.%20Azure/) are back, with the installer, the Fabric App,
+  the Azure jobs and web app, and `shared/python`, as they were before the move.
+- They're up to date with installer 0.5.1 and the changes below.
+- The installer's update check and the Azure web app's update banner read this repo's releases.
+
+---
+
+## Unreleased — Prerequisites and questions
+
+Findings F8, F12, F13 and F14 from the newcomer self-serve test of installer 0.4.2.
+
+### Changed: the prerequisite check covers more, in plainer words
+
+**Why.** A newcomer couldn't tell from the list whether they had what the flows and the Cowork
+credits need, and "PIM-eligible" meant nothing to them.
+
+- New optional rows: **Microsoft 365 Copilot licences in the tenant**, **Power Automate Premium**
+  (for whoever signs in to the flows) and the **Viva Insights analyst** role, which can't be
+  checked, so it says how to get it.
+- The Fabric administrator row says it's only needed if the tenant settings are off. A role you
+  can activate says so, with a link to Privileged Identity Management.
+- The check now records whether you can assign directory roles (Global Administrator or
+  Privileged Role Administrator), as `canAssignDirectoryRoles`.
+
+### Changed: the questions explain themselves
+
+**Why.** Defaults were picked by name, not by what the tenant uses, and some choices didn't say
+what they cost or need.
+
+- The Power Platform environment defaults to the tenant's default environment, with a note on
+  DLP, Power Automate Premium and who can see the flows.
+- The capacity question recommends F64 or larger for more than 10,000 people, and shows each
+  capacity's SKU and region.
+- A new install names the workspace `Analytics Hub` and the Lakehouse `Analytics_Hub`. Existing
+  installs keep `ValueLens`.
+- The Azure target is described in plain words.
+- Cowork credits ask first whether you have the Viva Insights query IDs. **Not yet** uses the CSV
+  export until you add them. The partition ID is prefilled with the tenant ID.
+- The Copilot Studio, Cowork and Azure AI cards sit under **Credit consumption**, and their hints
+  say what each needs.
+- **Ready to set up** lists the costs that apply, with links to the pricing pages.
+
+### Fixed: an access contact from another tenant
+
+**Why.** A record carried over from another tenant kept an outside address as the person to ask
+for access.
+
+- If the saved contact isn't on one of the tenant's verified domains, it's reset to you, with a
+  note.
+- The request-access link question says what it's for.
+
+---
+
+## Unreleased — Install record and launch
+
+**Why.** In a newcomer self-serve test of installer 0.4.2, an install record for a deleted
+workspace kept showing **Manage Analytics Hub**. Nothing said where the record was or how to start
+again. A closed page couldn't be reopened without the printed link, the PC could sleep mid-setup,
+and some text named internal tools.
+
+- **A record whose workspace has gone.** After sign-in, the installer checks that the record's
+  workspace still exists. If Fabric says it doesn't, or the record is for another tenant, the home
+  page says so and offers **Start fresh** or **Keep this record**. Start fresh renames the record to
+  `valuelens-install.<yyyyMMdd-HHmmss>.json` beside it. A network error or a 403 changes nothing.
+  In the terminal, `install` asks whether to start fresh; other commands stop and say how.
+- **Where the record is.** **Manage Analytics Hub** shows the record's full path, and notes that
+  OneDrive may sync it.
+- **Reopen the page.** The installer's window says to press **Enter** to open the page again. A
+  page opened without the link says to do that.
+- **Keep awake.** The exe stops Windows going to sleep while it runs. The plan says to keep the
+  PC plugged in and awake until setup finishes.
+- **Wording.** The web page says you can close the window while a run carries on, not Ctrl+C. The
+  app deploy says a browser window may open for sign-in, without naming its deploy tool.
+
+---
+
+## Unreleased — Before you start checklist (docs)
+
+Docs only. Nothing in the installer, app or notebooks changes.
+
+### Changed: one checklist for everything you need before you install
+
+**Why.** A newcomer had to piece together what to ask for from three overlapping lists, found out
+about the Viva Insights query, Power Automate Premium and the data policy only part-way through,
+and had no idea how long it would take or what it would cost.
+
+- **[Before you start](docs/PREREQUISITES.md)** is now the one checklist, organised by person: you,
+  the Fabric admin, the Power Platform admin, the Viva Insights analyst, the Entra admin and the
+  Microsoft 365 admin, then each optional extra with what it needs. The root, Fabric and installer
+  READMEs link to it rather than repeat it.
+- **Send this to your Viva Insights analyst first.** A short note to forward, so the Cowork credits
+  query exists before you start. The partition ID defaults to the tenant ID, and you can add the
+  query later.
+- **How long it takes**: about 5 minutes of questions, 15 minutes of setup, and the first data
+  about 25 minutes after **Go ahead** (about 2 hours for 180 days). Keep the PC awake and plugged
+  in.
+- **What it costs**: links to the official pricing pages for Fabric capacity (with a size hint),
+  the Fabric free trial, Power Automate Premium and the optional Azure resources. No prices are
+  written down.
+- **Fabric README.** The installer comes before the manual setup video. Sharing is two steps:
+  share the app with Analytics Hub Viewers once, then add people to the group. The data source
+  cards are named as the installer shows them, and the Dataflow staging items are explained.
+- **Credit consumption** docs use the card names (Copilot Studio credits, Copilot Cowork credits,
+  Azure AI costs). A broken link from the Fabric README to the installer's download check is
+  fixed.
+
+---
+
+## Unreleased — Org-scoped access (row-level security)
+
+**Nothing changes unless you turn it on.** Upgrading or choosing **Repair or change** deploys the
+models exactly as before. To use it, run the installer's `access` command and choose **Turn on
+org-scoped access**. See [Org-scoped access](docs/PERMISSIONS.md#org-scoped-access-row-level-security).
+
+### Added: each viewer can see only the orgs they're given
+
+**Why.** Everyone in Analytics Hub Viewers saw every org. A leader sharing the dashboard with their
+own org had no way to keep the rest of the tenant out of it.
+
+- **Scopes.** A viewer can see everyone, everyone below a person (from the org data's manager
+  chain), or one department or country. The installer's `access` command adds and removes them,
+  switches between department and country, applies the changes and turns the feature off again.
+- **Models.** When it's on, the ValueLens, Consumption Central and Agent Evaluator models get two
+  roles and two hidden access tables. Tenant-wide data (spend, agent inventory, Defender, Resource
+  Graph, product feedback) shows only to people who see everyone.
+- **Turning it on keeps everyone's view.** Current members of the viewer group, and you, get an
+  "everyone" scope. People added to the group later see nothing until they're given a scope.
+- **Role members are applied after every deploy.** A model deploy drops them, so the installer
+  runs the new `AnalyticsHub_Access_Scope` notebook through the XMLA endpoint after each deploy,
+  then checks the result by querying as a seeded viewer. It needs **Allow XMLA endpoints** and a
+  capacity with the XMLA endpoint set to Read Write. On Azure the Power BI workspace has to be on a
+  capacity, and installs with private networking aren't supported yet.
+- **App.** Pages say whose data they show ("Showing: people below …"). A viewer with no scope sees
+  who to ask instead of empty pages.
+- **Data.** The org data gains an `OrgPath` column (the manager chain by UPN) on both targets. Azure
+  gets an `access_scope` table (migration V005) and an `access_people` view, and the jobs' publish
+  step loads the scope list into it.
+
+### Added: leaders give their own org from the Share panel (Azure)
+
+**Why.** Every scope change went through an admin running the installer, even when a leader only
+wanted to share their own org with someone who works for them.
+
+- **Admins** (AnalyticsHub.Admin) give anyone the people below a person, or an org, from **Share**
+  in the app, and can let them share their org in turn.
+- **Leaders** with a "can share" scope give someone their own org: the people below them. They
+  can't pass on "can share" and take back only what they gave. Nobody gives "everyone" from the
+  app: that stays in the installer.
+- **Waiting for an admin.** The delegate is added to the viewer group as the signed-in person. When
+  Microsoft Entra doesn't allow that (only group owners and directory admins can), the scope waits
+  until an admin approves it in the Share panel. No new Graph permissions.
+- **Applies in minutes.** The web app saves the scope to Azure SQL as its managed identity and
+  refreshes the models' access table. Changes close together share a refresh; if Power BI won't
+  take one, the change applies at the next scheduled refresh. The jobs' load leaves these scopes
+  alone.
+- **Fabric** stays admin-only, through the installer. The Share panel says who to ask.
+
+---
+
+## Unreleased — Fabric App: chart redraw and Shadow AI fixes
+
+### Fixed: charts that collapsed after a filter, and missing Shadow AI bars
+
+- **Row charts redraw when their row count changes.** Charts with one row per category (by org,
+  city, country or surface) set their height from the row count. When a filter or a different
+  grouping returned fewer rows, the plot kept its old layout: the rows collapsed onto one line and
+  the bars vanished until the window was resized. Every chart now redraws from scratch when its
+  row count changes.
+- **Cloud Discovery shows its unreviewed apps.** Defender for Cloud Apps leaves most apps
+  untagged (an empty posture) or marks them Monitored. The Shadow AI tools query only caught a
+  blank posture, so these apps had no colour and drew no bar. Anything that isn't Sanctioned or
+  Unsanctioned now reads as Not reviewed, as the Cloud Discovery KPI already counts it.
+
+Redeploy the app (**Repair or change**) to pick these up. The models don't change.
+
+---
+
+## Unreleased — Agent Evaluator and Consumption Central model fixes
+
+### Fixed: refresh failures and an empty Credit Consumption page
+
+**Why.** On a large tenant the Consumption Central and Agent Evaluator models failed to refresh,
+and in Fabric mode the Agent Evaluator's Credit Consumption page was always empty.
+
+- **Consumption Central: connection pool exhausted.** The credit and Azure tables that are read
+  column by column (`studio_tenant_daily`, `studio_agent`, `studio_user` and the four
+  `azure_*` spend and health tables) now buffer the Lakehouse table first. Unbuffered, the SQL
+  endpoint was queried once per column.
+- **Agent Evaluator: `'Agent Turns'[Response Seconds]` ran out of memory.** It now scans just the
+  conversation, role and timestamp columns with `FILTER(ALL(...))` instead of
+  `CALCULATE(..., ALLEXCEPT(...))`. The values are the same.
+- **Agent Evaluator: Credit Consumption page empty in Fabric mode.** Nothing in Fabric writes the
+  `credit_consumption_*` tables the page read. A new `FabricCreditTable` function reads them when
+  they have rows, else the Consumption Central add-on's `studio_agent`, `studio_user` and
+  `studio_tenant_daily` tables (latest snapshot), renamed to the export's columns.
+- **Agent Evaluator: Agent Name Map.** In Fabric mode it now reads the credit-side agent names
+  too, instead of an empty table. Both of its key columns are relationship keys, so a new
+  `AgentNameMapRows` function keeps them unique the way the engine compares text (ignoring case
+  and trailing spaces): one row per credit name, and a blank or already claimed `agent_schema`
+  becomes `(unmatched) <name>`. Unmatched names used to share a blank key and fail the refresh.
+
+The changes are applied by `scripts/Update-Model-Refresh-Fixes.py` (`--check` reports templates
+that need it). **Repair or change** deploys the updated models; refresh them afterwards.
+
+---
+
+## Unreleased — Fabric App: report packs, PDF and PowerPoint
+
+### New: report packs, exported as PDF and PowerPoint
+
+**What changed.** The Fabric App, which serves both the Fabric and Azure paths, can now build and
+export reports (#24).
+
+- **Report packs.** A pack is a named, ordered list of sections taken from any page, listed under
+  **Reports** in the sidebar. *Exec pre-read*, *Finance weekly* and *Adoption review* come built
+  in; **Save a copy** starts a new pack from one. **New pack** opens an editor to name a pack, tick
+  sections and order them. Packs are stored with the other settings: in the app's SQL database on
+  Fabric, where anyone who can open the app can change them, and in Table Storage through
+  `/api/settings/ReportPack` on Azure, where saving needs `AnalyticsHub.Admin`. A pack skips, and
+  names, sections whose page this install hides.
+- **Download PDF.** Every page and pack can be printed as a report laid out for paper, through the
+  browser's **Save as PDF**. Where the host blocks the print dialog, it downloads as an HTML page
+  to print instead.
+- **Download PowerPoint.** A deck with a cover (filters, data dates, sections left out) and one
+  slide per chart or table, built in the browser with `pptxgenjs`.
+- **Data dates in file names.** Exports and each chart's **Download CSV** are named with the
+  date the data runs to, such as `exec-pre-read-data-to-2026-10-11.pptx`.
+
+Scheduled digests by email are not part of this change. The Power BI templates are unchanged.
+
+---
+
+## 2026-10-12 — Analytics Hub installer 0.5.1
+
+**Updating is optional.** What the installer deploys is the same as 0.4.2 and 0.5.0. To update,
+download installer 0.5.1 [from this repo](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe), open it and choose **Repair or change**.
+
+The tag also publishes the `valuelens-jobs` and `valuelens-web` images as `0.5.1`, which the Azure
+install pulls.
+
+### Added: update notices
+
+- The installer checks this repo's latest release when it starts and says when a newer one is
+  out. It stays quiet when it can't reach GitHub, for example offline or behind a proxy. Set
+  `ANALYTICS_HUB_NO_UPDATE_CHECK=1` to turn it off.
+- The Azure web app's update banner recognises `installer-v` tags.
+
+### Changed: Azure is no longer in preview
+
+- The READMEs, prerequisites and the installer no longer call the Azure target a preview. The
+  installer README section is now [Azure target](1.%20Fabric/installer/README.md#azure-target), so
+  links to `#azure-target-preview` open the top of that README instead.
+
+### Changed
+
+- The `valuelens-jobs` and `valuelens-web` images carry this repo as their source.
+- The exe's release notes and the ESRP signing pipeline are in the
+  [entry below](#2026-10-12--analytics-hub-installer-download-checking-it-and-getting-it-signed).
+
+---
+
 ## 2026-10-12 — Analytics Hub installer download: checking it, and getting it signed
 
 **Nothing to update.** This changes how the exe is released, not what it does.

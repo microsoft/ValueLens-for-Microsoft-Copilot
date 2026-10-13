@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { useStageFilter } from "@/hooks/stage-filter.context";
 import { CoworkReadinessStage } from "./cowork-readiness-stage";
 import { HabitLicenceStage } from "./habit-licence-stage";
 import { LicenseReadinessStage } from "./license-readiness-stage";
@@ -14,11 +15,12 @@ import { LicenseReadinessStage } from "./license-readiness-stage";
  * Allocation folded in) and its Cowork Readiness page, in report order.
  */
 export function ReadinessScreen() {
+    const { show } = useStageFilter();
     return (
         <div className="flex flex-col gap-800">
-            <LicenseReadinessStage />
-            <HabitLicenceStage />
-            <CoworkReadinessStage />
+            {show("license-readiness") && <LicenseReadinessStage />}
+            {show("habit-licence") && <HabitLicenceStage />}
+            {show("cowork-readiness") && <CoworkReadinessStage />}
         </div>
     );
 }

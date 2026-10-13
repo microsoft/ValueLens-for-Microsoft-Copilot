@@ -48,7 +48,13 @@ VAR __Cloud =
                 'Defender Cloud Discovery'[AppName]
             ),
         "Layer", "Cloud Discovery",
-        "Posture", COALESCE('Defender Cloud Discovery'[Posture], "Not reviewed"),
+        "Posture",
+            SWITCH(
+                'Defender Cloud Discovery'[Posture],
+                "Sanctioned", "Sanctioned",
+                "Unsanctioned", "Unsanctioned",
+                "Not reviewed"
+            ),
         "Devices", 'Defender Cloud Discovery'[Devices] + 0,
         "Users", 'Defender Cloud Discovery'[Users] + 0
     )

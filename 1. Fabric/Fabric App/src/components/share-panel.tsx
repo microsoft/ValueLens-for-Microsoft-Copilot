@@ -6,9 +6,10 @@
 //-----------------------------------------------------------------------
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { Check, Copy, Share2, X } from "lucide-react";
-import { appLink, myGroupsUrl } from "@/lib/access";
+import { adminOnlyCopy, appLink, myGroupsUrl } from "@/lib/access";
 import { addViewer, loadAccess, removeViewer, type AccessPrincipal, type AccessState } from "@/lib/access-api";
 import { runtimeConfig, type AccessInfo } from "@/lib/runtime-config";
+import { ScopedDelegation } from "@/components/share-delegations";
 import { cn } from "@/lib/utils";
 
 const TEXT = "text-[length:var(--text-200)] leading-200";
@@ -19,6 +20,9 @@ const BUTTON = "flex items-center justify-center gap-200 rounded-md border borde
  * Sharing from inside the app: copy its link, see who it is shared with, and on Azure let admins
  * and owners of the viewer group add and remove people. Fabric has no API the app can call for
  * this, so there it points to the group in My Groups.
+ *
+ * With org-scoped access on, Azure also lets admins and leaders choose what people see. On Fabric
+ * that stays with admins, through the installer.
  */
 export function SharePanel() {
     const [open, setOpen] = useState(false);
@@ -41,6 +45,7 @@ export function SharePanel() {
                 <section id={panelId} aria-label="Share Analytics Hub" className="flex flex-col gap-300 rounded-md border border-border p-300">
                     <CopyLink />
                     {config.host === "azure" ? <AzureAccess access={config.access} /> : <FabricAccess access={config.access} />}
+                    {config.host === "azure" && config.access?.rlsOrgAttribute && <ScopedDelegation contact={config.access.contact} />}
                 </section>
             )}
         </div>
@@ -90,6 +95,7 @@ function FabricAccess({ access }: { access?: AccessInfo }) {
             <a href={myGroupsUrl(access.groupId)} target="_blank" rel="noreferrer" className={LINK}>
                 Add or remove people in My Groups
             </a>
+            {access.rlsOrgAttribute && <p className={cn(TEXT, "text-muted-foreground")}>{adminOnlyCopy(access.contact)}</p>}
         </div>
     );
 }

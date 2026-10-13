@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { useStageFilter } from "@/hooks/stage-filter.context";
 import { CoworkFitStage } from "./cowork-fit-stage";
 import { GradingMethodStage } from "./grading-method-stage";
 import { ModelFitStage } from "./model-fit-stage";
@@ -15,11 +16,12 @@ import { ModelFitStage } from "./model-fit-stage";
  * rules and research both stages grade by.
  */
 export function EfficiencyScreen() {
+    const { show } = useStageFilter();
     return (
         <div className="flex flex-col gap-800">
-            <CoworkFitStage />
-            <ModelFitStage />
-            <GradingMethodStage />
+            {show("cowork-fit") && <CoworkFitStage />}
+            {show("model-fit") && <ModelFitStage />}
+            {show("grading-method") && <GradingMethodStage />}
         </div>
     );
 }

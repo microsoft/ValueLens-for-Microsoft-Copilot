@@ -150,6 +150,19 @@ def test_org_two_person_cycle_kept_and_flagged():
     assert c["HierarchyPath"] == "B > A > C" and c["OrgLevel"] == "2"
 
 
+def test_org_path_is_lowercase_upn_chain():
+    hier = org.build_hierarchy(CYCLE_ROWS)
+    assert hier["ic@contoso.com"]["OrgPath"] == "ceo@contoso.com|vp@contoso.com|ic@contoso.com"
+    assert hier["ceo@contoso.com"]["OrgPath"] == "ceo@contoso.com"
+    # A cycle truncates the chain the same way HierarchyPath does.
+    assert hier["c@contoso.com"]["OrgPath"] == "b@contoso.com|a@contoso.com|c@contoso.com"
+    cols, rows = org.build_snapshot(USERS)
+    by = {r[0]: dict(zip(cols, r)) for r in rows}
+    assert "OrgPath" in cols
+    assert by["ic@contoso.com"]["OrgPath"].split("|")[-1] == "ic@contoso.com"
+    assert by["orphan@contoso.com"]["OrgPath"] == "orphan@contoso.com"
+
+
 def test_org_direct_reports_exclude_self():
     hier = org.build_hierarchy(CYCLE_ROWS)
     assert hier["ceo@contoso.com"]["DirectReports"] == "1"

@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { fabricItemUrl } from "@/lib/fabric-item-url";
+import { dataAgentUrl, fabricItemUrl } from "@/lib/fabric-item-url";
 
 const ids = {
     workspaceId: "ws-1",
@@ -45,5 +45,18 @@ describe("fabricItemUrl", () => {
         expect(fabricItemUrl({ ...ids, portalUrl: "https://app.fabric.microsoft.com", workspaceId: "" })).toBeNull();
         expect(fabricItemUrl({ ...ids, portalUrl: "https://app.fabric.microsoft.com", itemId: undefined })).toBeNull();
         expect(fabricItemUrl({ ...ids, portalUrl: "not a url" })).toBeNull();
+    });
+});
+
+describe("dataAgentUrl", () => {
+    it("links to the data agent on the app's portal and tenant", () => {
+        expect(dataAgentUrl(
+            { workspaceId: "ws-2", itemId: "agent-1" },
+            { ...ids, portalUrl: "https://app.fabric.microsoft.com", hostname: "loyal-arch-1-westus3.webapp.fabricapps.net" },
+        )).toBe("https://app.fabric.microsoft.com/groups/ws-2/aiskills/agent-1?ctid=tenant-1");
+    });
+
+    it("has no link on Azure", () => {
+        expect(dataAgentUrl({ workspaceId: "ws-2", itemId: "agent-1" }, { ...ids, host: "azure" })).toBeNull();
     });
 });

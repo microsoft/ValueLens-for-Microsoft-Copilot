@@ -12,8 +12,8 @@ import { EXE_NAME } from '../src/launch.js';
 export const PUBLISHER = 'Microsoft Corporation';
 
 /** Where the install steps live, relative to the repo's main branch. */
-export const INSTALL_DOCS = 'tree/main/1.%20Fabric#install';
-export const WITHOUT_EXE_DOCS = 'blob/main/1.%20Fabric/installer/README.md#without-the-exe';
+export const INSTALL_DOCS = 'tree/main/fabric#install';
+export const WITHOUT_EXE_DOCS = 'blob/main/installer/README.md#without-the-exe';
 
 /** @param {string} file */
 export const sha256File = (file) => createHash('sha256').update(readFileSync(file)).digest('hex');

@@ -9,9 +9,10 @@ import { ROLES } from '../clients/azure.js';
 import { semanticModelDefinition } from '../clients/fabric.js';
 import { HttpError } from '../http.js';
 import { COWORK_DATAFLOW_TABLE, coworkDataflowDefinition, isVivaId } from '../transform/dataflow.js';
+import { rlsSettings } from '../transform/access.js';
 import { buildConsumptionModel, loadTemplateModel, PBISM } from '../transform/model.js';
 import { c } from '../ui.js';
-import { UPLOAD_DIR } from '../uploads.js';
+import { UPLOAD_DIR, modeLabel } from '../uploads.js';
 import { azureAiOn, coworkDataflowOn, createdId, displayNames, freeName, noteRenamed } from './fabric.js';
 import { bindModel, deployModel, modelUrl, waitForSqlEndpoint } from './model.js';
 
@@ -57,18 +58,28 @@ export async function planCowork(ctx) {
   const { ui, config } = ctx;
   const cc = config.consumption;
   if (config.dataSources.coworkCredits !== 'api') return;
-  ui.note('A Dataflow reads Cowork credits from a Viva Insights query. In Viva Insights > Analysis, build a query with the Copilot credit metrics and turn on Auto-refresh; then, in Analysis results, choose the link icon to copy its partition and query IDs.');
+  ui.note('A Dataflow reads Cowork credits from a Viva Insights query. A Viva Insights analyst (someone with the Insights Analyst role) builds it in Viva Insights > Analysis with the Copilot credit metrics and Auto-refresh on; then, in Analysis results, the link icon copies its partition and query IDs.');
   ui.note(`Guide: ${DATAFLOW_GUIDE}`);
+  const toCsv = () => {
+    config.dataSources.coworkCredits = 'csv';
+    ui.note(`Cowork credits come from the Consumption Dashboard's CSV export. Drop it in ${UPLOAD_DIR}. To add the query later, run the installer again and set Copilot Cowork credits to ${modeLabel('coworkCredits', 'api')}.`);
+  };
+  const when = await ui.select(
+    'Do you have the Viva Insights query IDs?',
+    [
+      { name: 'I have the query IDs now', value: 'now' },
+      { name: 'Not yet — set up the rest and add the query later (use the CSV export meanwhile)', value: 'later' },
+    ],
+    'now',
+  );
+  if (when === 'later') return toCsv();
   const guid = 'It looks like 00000000-0000-0000-0000-000000000000.';
-  const partition = (await ui.input('Viva Insights partition ID. Leave blank to upload the CSV export instead.', {
-    default: cc.vivaPartition ?? '',
+  const tenant = config.tenantId ?? ctx.user?.tenantId;
+  const partition = (await ui.input('Viva Insights partition ID (usually your tenant ID). Leave blank to upload the CSV export instead.', {
+    default: cc.vivaPartition ?? (isVivaId(tenant) ? tenant : ''),
     validate: (v) => !v.trim() || isVivaId(v) || guid,
   })).trim();
-  if (!partition) {
-    config.dataSources.coworkCredits = 'csv';
-    ui.note(`Cowork credits come from the Consumption Dashboard's CSV export. Drop it in ${UPLOAD_DIR}.`);
-    return;
-  }
+  if (!partition) return toCsv();
   const query = (await ui.input('Viva Insights query ID', { default: cc.vivaQuery ?? '', validate: (v) => isVivaId(v) || guid })).trim();
   cc.vivaPartition = partition;
   cc.vivaQuery = query;
@@ -415,7 +426,7 @@ export async function ensureConsumptionModel(ctx, opts = {}) {
   await deployModel(ctx, m, {
     signature: `${server.toLowerCase()};${database}`,
     definition: () =>
-      semanticModelDefinition(buildConsumptionModel(loadTemplateModel(file), { server, database, resourceGraph: config.dataSources?.resourceGraph === 'api' }), PBISM),
+      semanticModelDefinition(buildConsumptionModel(loadTemplateModel(file), { server, database, resourceGraph: config.dataSources?.resourceGraph === 'api', access: rlsSettings(config) }), PBISM),
     force: opts.force,
   });
   if (!m.bound && config.semanticModel.connectionId) await bindModel(ctx, m);

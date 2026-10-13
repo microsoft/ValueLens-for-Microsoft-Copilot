@@ -273,6 +273,39 @@ test('planFlows: no follow-up about the feedback flow, just the environment from
   assert.equal(quiet.asked.length, 0);
 });
 
+test('planFlows: the tenant\'s default environment is preselected, not the first by name, with a hint about DLP and Premium', async () => {
+  const instances = async () => [
+    { Id: '1', Url: 'https://alpha.crm.dynamics.com/', FriendlyName: 'Alpha sandbox', EnvironmentId: 'env-alpha' },
+    { Id: '2', Url: 'https://org9.crm.dynamics.com/', FriendlyName: 'Contoso (default)', EnvironmentId: 'Default-tenant-1' },
+    { Id: '3', Url: 'https://zulu.crm.dynamics.com/', FriendlyName: 'Zulu', EnvironmentId: 'env-zulu' },
+  ];
+  const pick = async (/** @type {any} */ flow, /** @type {any} */ saved = undefined) => {
+    const made = fakeUi();
+    /** @type {any[]} */
+    const selects = [];
+    const ui = { ...made.ui, select: async (/** @type {string} */ m, /** @type {any[]} */ choices, /** @type {any} */ def) => (selects.push({ choices, def }), def) };
+    const { ctx, config } = fakeCtx({ ui: /** @type {any} */ (ui), discovery: { instances }, flow });
+    config.dataSources.studioCredits = 'api';
+    if (saved) config.uploads.flowEnvironment = saved;
+    await planFlows(ctx);
+    return { config, select: selects[0], text: made.text() };
+  };
+
+  const fromApi = await pick({ listEnvironments: async () => [{ name: 'env-zulu', properties: { isDefault: true } }, { name: 'env-alpha', properties: { isDefault: false } }] });
+  assert.equal(fromApi.select.def, 'https://zulu.crm.dynamics.com');
+  assert.match(fromApi.select.choices.find((/** @type {any} */ c) => c.value === fromApi.select.def).name, /the default environment/);
+  assert.equal(fromApi.config.uploads.flowEnvironment?.id, 'env-zulu');
+  assert.match(fromApi.text, /HTTP with Microsoft Entra ID \(preauthorized\)/);
+  assert.match(fromApi.text, /Power Automate Premium/);
+  assert.match(fromApi.text, /people with access to it can see them/);
+
+  const noApi = await pick({ listEnvironments: async () => { throw new Error('403'); } });
+  assert.equal(noApi.select.def, 'https://org9.crm.dynamics.com', 'Default-<tenant> when Power Automate can\'t be read');
+
+  const kept = await pick({ listEnvironments: async () => [{ name: 'env-zulu', properties: { isDefault: true } }] }, { url: 'https://alpha.crm.dynamics.com', id: 'env-alpha' });
+  assert.equal(kept.select.def, 'https://alpha.crm.dynamics.com', 'the saved choice wins');
+});
+
 /** A Dataverse environment with flows held in memory. */
 function fakeDataverse(fail = false) {
   /** @type {Map<string, any>} */

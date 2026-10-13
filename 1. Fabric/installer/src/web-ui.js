@@ -163,6 +163,7 @@ export function createWebUi(opts = {}) {
 
   return {
     yes: false,
+    web: true,
     /** @param {string} [s] */
     line(s = '') {
       const text = plainText(s);

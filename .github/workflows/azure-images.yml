@@ -50,10 +50,12 @@ jobs:
           fi
           echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${{ matrix.image }}:$version" >> "$GITHUB_OUTPUT"
 
+      # The source label links the package on GHCR to this repo.
       - name: Build
         run: |
           dockerfile="2. Azure/${{ matrix.image == 'valuelens-jobs' && 'jobs' || 'web' }}/Dockerfile"
-          docker build -f "$dockerfile" -t "${{ steps.tag.outputs.image }}" .
+          docker build -f "$dockerfile" -t "${{ steps.tag.outputs.image }}" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" .
 
       - name: Smoke-test the jobs image
         if: matrix.image == 'valuelens-jobs'

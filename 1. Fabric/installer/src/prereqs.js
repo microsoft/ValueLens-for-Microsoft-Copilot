@@ -33,6 +33,33 @@ const PRO_PLANS = { BI_AZURE_P2: 'Power BI Pro', BI_AZURE_P3: 'Power BI Premium 
 /** Service plans that give Defender advanced hunting over devices, or Cloud Discovery. */
 export const DEFENDER_PLANS = { WINDEFATP: 'Defender for Endpoint P2', MTP: 'Microsoft Defender XDR', ADALLOM_S_STANDALONE: 'Defender for Cloud Apps' };
 
+/**
+ * Service plans that let a user run flows with premium connectors, such as "HTTP with Microsoft Entra ID".
+ * Names from Microsoft Learn's "Product names and service plan identifiers for licensing".
+ */
+export const PREMIUM_FLOW_PLANS = {
+  POWER_AUTOMATE_ATTENDED_RPA: 'Power Automate Premium',
+  POWER_AUTOMATE_ATTENDED_RPA_GCC: 'Power Automate Premium',
+  FLOW_PER_USER: 'Power Automate per user',
+  FLOW_PER_USER_GCC: 'Power Automate per user',
+  FLOW_P2: 'Power Automate Plan 2',
+  FLOW_P1_GOV: 'Power Automate Plan 1',
+};
+
+/** The service plan in every Microsoft 365 Copilot SKU (Microsoft_365_Copilot, M365_Copilot, the EDU and E7 SKUs, ...). */
+export const COPILOT_PLAN = 'M365_COPILOT_APPS';
+
+const PIM_URL = 'https://entra.microsoft.com/#view/Microsoft_Azure_PIMCommon/ActivationMenuBlade/~/aadmigratedroles';
+
+/**
+ * Whether the signed-in user has Global Administrator or Privileged Role Administrator active, so they
+ * can assign directory roles (and grant admin consent) themselves.
+ * @param {import('./install.js').Apis} api
+ */
+export async function canAssignDirectoryRoles(api) {
+  return (await api.graph.myDirectoryRoles()).some((r) => Object.hasOwn(CONSENT_ROLES, r.roleTemplateId));
+}
+
 const AZURE_ROLE_NAMES = {
   [ROLES.owner]: 'Owner',
   [ROLES.contributor]: 'Contributor',
@@ -74,6 +101,14 @@ export async function checkPrereqs(ctx) {
   const subs = api.arm.listSubscriptions().then((s) => s.filter((x) => x.state === 'Enabled'));
   // Unhandled until awaited by a check; these keep a rejected lookup from crashing the process.
   for (const p of [roles, eligible, subs]) p.catch(() => {});
+  /** @type {ReturnType<typeof api.graph.myLicenseDetails> | undefined} */
+  let licenceList;
+  const licences = () => (licenceList ??= api.graph.myLicenseDetails());
+  /** @type {ReturnType<typeof api.graph.subscribedSkus> | undefined} */
+  let skuList;
+  const skus = () => (skuList ??= api.graph.subscribedSkus());
+  /** Service plans assigned to the signed-in user and provisioned, by name. */
+  const myPlans = async () => (await licences()).flatMap((l) => l.servicePlans ?? []).filter((p) => p.provisioningStatus === 'Success').map((p) => p.servicePlanName);
 
   /**
    * @param {Omit<Prereq, 'status' | 'detail'>} base
@@ -89,7 +124,7 @@ export async function checkPrereqs(ctx) {
   };
 
   /**
-   * An Entra role: active, eligible through PIM ("activate first"), or missing.
+   * An Entra role: active, one the user can activate through PIM, or missing.
    * @param {Omit<Prereq, 'status' | 'detail'>} base
    * @param {Record<string, string>} wanted  Template ID to name.
    */
@@ -105,9 +140,9 @@ export async function checkPrereqs(ctx) {
         // Reading PIM eligibility needs its own permission; without it, only active roles are known.
       }
       if (elig?.length) {
-        return { status: 'eligible', detail: `Eligible, activate first: ${[...new Set(elig.map((r) => wanted[r.roleDefinitionId]))].join(', ')}. Activate it in Entra Privileged Identity Management, then check again.` };
+        return { status: 'eligible', detail: `Not active yet: ${[...new Set(elig.map((r) => wanted[r.roleDefinitionId]))].join(', ')}. You can activate this role in Entra (Privileged Identity Management): ${PIM_URL} Then check again.` };
       }
-      return { status: 'missing', detail: `You don't have ${Object.values(wanted).join(' or ')} active.${elig ? '' : ' Couldn\'t check PIM-eligible roles.'}` };
+      return { status: 'missing', detail: `You don't have ${Object.values(wanted).join(' or ')} active.${elig ? '' : ' Couldn\'t check for roles you could activate yourself.'}` };
     });
 
   /** Owner, or Contributor plus User Access Administrator, per subscription. */
@@ -144,7 +179,7 @@ export async function checkPrereqs(ctx) {
           if (access.create && access.assign) return { name, status: /** @type {PrereqStatus} */ ('met'), detail: `Can create resources and assign roles${has}` };
           const elig = await api.arm.myEligibleRoles(scope, ids).catch(() => []);
           const eligNames = [...new Set(elig.map((a) => AZURE_ROLE_NAMES[roleGuid(a.properties.roleDefinitionId)]).filter(Boolean))];
-          if (eligNames.length) return { name, status: /** @type {PrereqStatus} */ ('eligible'), detail: `Eligible, activate first: ${eligNames.join(', ')}` };
+          if (eligNames.length) return { name, status: /** @type {PrereqStatus} */ ('eligible'), detail: `Not active yet: ${eligNames.join(', ')}. You can activate it in Privileged Identity Management.` };
           const lacks = access.create ? 'Can create resources but not assign roles (no User Access Administrator)' : access.assign ? 'Can assign roles but not create resources (no Contributor)' : 'Can\'t create resources or assign roles';
           return { name, status: /** @type {PrereqStatus} */ ('missing'), detail: `${lacks}${has}` };
         } catch (err) {
@@ -173,9 +208,9 @@ export async function checkPrereqs(ctx) {
     entraRole(
       {
         id: 'fabric-admin',
-        label: 'Fabric Administrator',
-        neededFor: 'Reading and switching on the Fabric tenant settings the model, reports and app need.',
-        howTo: 'Ask a Global Administrator for the Fabric Administrator role, or ask a Fabric administrator to check the tenant settings for you.',
+        label: 'Fabric administrator — only needed if the tenant settings below are off',
+        neededFor: 'Reading and switching on the Fabric tenant settings the model, reports and app need. If they are already on, you don\'t need this role.',
+        howTo: 'Ask a Fabric administrator to check the tenant settings below and turn on any that are off, or ask a Global Administrator for the Fabric Administrator role.',
         optional: true,
       },
       { [FABRIC_ADMIN_ROLE]: 'Fabric Administrator' },
@@ -217,13 +252,47 @@ export async function checkPrereqs(ctx) {
         howTo: 'Ask your licence admin to assign you Power BI Pro (included in Microsoft 365 E5) or Premium Per User.',
       },
       async () => {
-        const found = (await api.graph.myLicenseDetails())
-          .flatMap((l) => l.servicePlans ?? [])
-          .filter((p) => p.provisioningStatus === 'Success' && PRO_PLANS[/** @type {keyof typeof PRO_PLANS} */ (p.servicePlanName)])
-          .map((p) => PRO_PLANS[/** @type {keyof typeof PRO_PLANS} */ (p.servicePlanName)]);
+        const found = (await myPlans())
+          .map((name) => PRO_PLANS[/** @type {keyof typeof PRO_PLANS} */ (name)])
+          .filter(Boolean);
         return found.length
           ? { status: 'met', detail: [...new Set(found)].join(', ') }
           : { status: 'missing', detail: 'No Power BI Pro or Premium Per User licence is assigned to you.' };
+      },
+    ),
+    guard(
+      {
+        id: 'copilot-licences',
+        label: 'Microsoft 365 Copilot licences in the tenant',
+        neededFor: 'The Copilot usage and licence pages. Without Microsoft 365 Copilot licences assigned, only Copilot Chat usage shows.',
+        howTo: 'Nothing to do for the install: once Microsoft 365 Copilot licences are assigned, their usage shows after the next load.',
+        optional: true,
+      },
+      async () => {
+        const copilot = (await skus()).filter((s) => (s.servicePlans ?? []).some((p) => p.servicePlanName === COPILOT_PLAN));
+        const names = [...new Set(copilot.map((s) => s.skuPartNumber).filter(Boolean))].join(', ');
+        const assigned = copilot.reduce((n, s) => n + (s.consumedUnits ?? 0), 0);
+        if (assigned) return { status: 'met', detail: `${assigned} assigned (${names}).` };
+        return copilot.length
+          ? { status: 'missing', detail: `The tenant has ${names}, but none are assigned yet.` }
+          : { status: 'missing', detail: 'No Microsoft 365 Copilot licences found in this tenant.' };
+      },
+    ),
+    guard(
+      {
+        id: 'power-automate-premium',
+        label: 'Power Automate Premium licence',
+        neededFor: 'Only the Power Automate flows: Copilot Studio credits and the product feedback export. Whoever signs in to the flow\'s connections needs it, because the flows use premium connectors.',
+        howTo: 'Ask your licence admin for Power Automate Premium for whoever will sign in to the flows. Without it, upload the CSV exports instead.',
+        optional: true,
+      },
+      async () => {
+        const found = (await myPlans())
+          .map((name) => PREMIUM_FLOW_PLANS[/** @type {keyof typeof PREMIUM_FLOW_PLANS} */ (name)])
+          .filter(Boolean);
+        return found.length
+          ? { status: 'met', detail: [...new Set(found)].join(', ') }
+          : { status: 'missing', detail: 'No Power Automate Premium (or per user) licence is assigned to you. Someone else who has one can sign in to the flows.' };
       },
     ),
     ...(azure
@@ -293,6 +362,16 @@ export async function checkPrereqs(ctx) {
         return { status, detail: `System Administrator in ${admin} of ${rows.length} ${rows.length === 1 ? 'environment' : 'environments'}.${more}`, rows };
       },
     ),
+    // Viva Insights roles aren't readable through Graph, so this one is always "couldn't check".
+    Promise.resolve({
+      id: 'viva-analyst',
+      label: 'Viva Insights analyst',
+      status: /** @type {PrereqStatus} */ ('unknown'),
+      detail: 'Couldn\'t check: Viva Insights roles can\'t be read through Microsoft Graph.',
+      neededFor: 'Only Copilot Cowork credits read straight from Viva Insights: someone with the Insights Analyst role creates the query the installer reads. You can add it later, and use the CSV export meanwhile.',
+      howTo: 'Ask a Viva Insights administrator for the Insights Analyst role, or ask an analyst to create the Cowork credits query and send you its partition and query IDs.',
+      optional: true,
+    }),
     ...(config.modules.defender
       ? [
           guard(
@@ -304,7 +383,7 @@ export async function checkPrereqs(ctx) {
               optional: true,
             },
             async () => {
-              const found = (await api.graph.subscribedSkus())
+              const found = (await skus())
                 .filter((s) => (s.capabilityStatus ?? 'Enabled') === 'Enabled')
                 .flatMap((s) => s.servicePlans ?? [])
                 .map((p) => DEFENDER_PLANS[/** @type {keyof typeof DEFENDER_PLANS} */ (p.servicePlanName)])

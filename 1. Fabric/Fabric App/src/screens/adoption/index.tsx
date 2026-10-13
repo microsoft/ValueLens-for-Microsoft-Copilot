@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { useStageFilter } from "@/hooks/stage-filter.context";
 import { ActivationStage } from "./activation-stage";
 import { AdoptionStage } from "./adoption-stage";
 import { HabitStage } from "./habit-stage";
@@ -16,12 +17,13 @@ import { TrendHeatmapStage } from "./trend-heatmap-stage";
  * Four report pages, more than one hundred visuals and eight queries.
  */
 export function AdoptionScreen() {
+    const { show } = useStageFilter();
     return (
         <div className="flex flex-col gap-800">
-            <ActivationStage />
-            <AdoptionStage />
-            <HabitStage />
-            <TrendHeatmapStage />
+            {show("activation") && <ActivationStage />}
+            {show("adoption") && <AdoptionStage />}
+            {show("habit-formation") && <HabitStage />}
+            {show("trend-heatmap") && <TrendHeatmapStage />}
         </div>
     );
 }

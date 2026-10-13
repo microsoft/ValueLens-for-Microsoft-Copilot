@@ -5,7 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startTestServer, request, authHeader } from './helpers.js';
 import { MemorySettingsStore } from '../src/server.js';
-import { VersionService } from '../src/version.js';
+import { VersionService, parseReleaseVersion } from '../src/version.js';
+import { loadConfig } from '../src/config.js';
 
 const testDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.test-scratch');
 
@@ -106,6 +107,19 @@ test('settings API round-trips the reporting currency beside the exchange rate',
   } finally { server.close(); }
 });
 
+test('settings API stores report packs with their stage list as sent', async () => {
+  const { server, baseUrl } = await startTestServer({ settingsStore: new MemorySettingsStore() });
+  const id = '00000000-0000-0000-0000-0000000000aa';
+  try {
+    const pack = { id, name: 'Finance weekly', stages: '["budget-runway","cost-vs-value"]' };
+    assert.equal((await request(baseUrl, `/api/settings/ReportPack/${id}`, { method: 'PUT', headers: { ...authHeader(), 'Content-Type': 'application/json' }, body: JSON.stringify(pack) })).status, 403);
+    const put = await request(baseUrl, `/api/settings/ReportPack/${id}`, { method: 'PUT', headers: { ...authHeader('admin'), 'Content-Type': 'application/json' }, body: JSON.stringify(pack) });
+    assert.equal(put.status, 200);
+    const [row] = await (await request(baseUrl, '/api/settings/ReportPack', { headers: authHeader() })).json();
+    assert.deepEqual({ name: row.name, stages: row.stages }, { name: pack.name, stages: pack.stages });
+  } finally { server.close(); }
+});
+
 test('settings entity whitelist returns 404', async () => {
   const { server, baseUrl } = await startTestServer();
   try { assert.equal((await request(baseUrl, '/api/settings/Other', { headers: authHeader() })).status, 404); } finally { server.close(); }
@@ -114,6 +128,15 @@ test('settings entity whitelist returns 404', async () => {
 test('version selects highest stable Azure or generic semver tag', async () => {
   const service = new VersionService({ installed: '0.1.0', releasesUrl: 'https://example.test/releases', fetchImpl: async () => new Response(JSON.stringify([{ tag_name: 'analytics-hub-azure-v0.2.0', draft: false, prerelease: false, html_url: 'https://example.test/0.2.0' }, { tag_name: 'v0.3.0', draft: false, prerelease: true }, { tag_name: 'other-v9.0.0', draft: false, prerelease: false }]), { status: 200, headers: { 'Content-Type': 'application/json' } }) });
   assert.deepEqual(await service.getVersion(), { installed: '0.1.0', latest: '0.2.0', updateAvailable: true, releaseUrl: 'https://example.test/0.2.0' });
+});
+
+test('version reads installer-v releases from ValueLens', async () => {
+  assert.match(loadConfig({}).releasesUrl, /^https:\/\/api\.github\.com\/repos\/microsoft\/ValueLens-for-Microsoft-Copilot\/releases\b/);
+  assert.equal(parseReleaseVersion('installer-v0.5.0'), '0.5.0');
+  assert.equal(parseReleaseVersion('analytics-hub-azure-v0.5.0'), '0.5.0');
+  assert.equal(parseReleaseVersion('other-v0.5.0'), null);
+  const service = new VersionService({ installed: '0.5.0', releasesUrl: 'https://example.test/releases', fetchImpl: async () => new Response(JSON.stringify([{ tag_name: 'installer-v0.5.1', draft: false, prerelease: false, html_url: 'https://example.test/0.5.1' }, { tag_name: 'installer-v0.4.2', draft: false, prerelease: false }]), { status: 200, headers: { 'Content-Type': 'application/json' } }) });
+  assert.deepEqual(await service.getVersion(), { installed: '0.5.0', latest: '0.5.1', updateAvailable: true, releaseUrl: 'https://example.test/0.5.1' });
 });
 
 test('SPA fallback and security headers include Teams frame ancestors', async () => {

@@ -4,7 +4,7 @@ Analytics Hub running in **your own Azure subscription**, without Microsoft Fabr
 same data, the same ValueLens Model and measures, and the same app pages as `1. Fabric`.
 The design and the roadmap are in [`docs/plans/AZURE-HOSTED-PLAN.md`](../docs/plans/AZURE-HOSTED-PLAN.md).
 
-> **Status: preview.** The installer deploys it end to end: Azure SQL, the Container Apps jobs, the Power BI
+> **Status.** The installer deploys it end to end: Azure SQL, the Container Apps jobs, the Power BI
 > models, the web app and a Teams package. It collects Copilot interactions, licences and org data, Microsoft
 > 365 activity, credit consumption (Copilot Studio, Cowork, Azure AI and pay-as-you-go), and optionally
 > Defender shadow AI and agent risk. The other modules
@@ -14,8 +14,8 @@ The design and the roadmap are in [`docs/plans/AZURE-HOSTED-PLAN.md`](../docs/pl
 
 1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe)
    (0.3.0 or later) and open it, or run `npx valuelens-install --ui` from `1. Fabric/installer` after
-   `npm install` (see [Without the exe](../1.%20Fabric/installer/README.md#without-the-exe)). If Edge
-   or Windows warns about the download, see
+   `npm install` (see [Without the exe](../1.%20Fabric/installer/README.md#without-the-exe)). If Edge or
+   Windows warns about the download, see
    [Check the download](../1.%20Fabric/installer/README.md#check-the-download).
 2. Pick **Your Azure subscription** and tick the data to collect. **Change the advanced settings?**
    **No** takes the defaults that suit most organisations: see
@@ -46,7 +46,7 @@ catalog: see [teams](teams/README.md#give-it-to-everyone). Permissions are in
 [Viewing Analytics Hub](../docs/PERMISSIONS.md#viewing-analytics-hub-paths-1-and-2).
 
 What you need, networking, regions and the commands are in the installer's
-[Azure target section](../1.%20Fabric/installer/README.md#azure-target-preview). The images come from
+[Azure target section](../1.%20Fabric/installer/README.md#azure-target). The images come from
 `ghcr.io/microsoft/valuelens-jobs` and `valuelens-web`, tagged with the installer's version. For every
 prerequisite on one page, with links to Microsoft Learn, see [Prerequisites](../docs/PREREQUISITES.md).
 
@@ -78,14 +78,34 @@ The jobs read the files where they land and don't move them, the same as the Fab
 Not on Azure yet: GitHub Copilot consumption, the dated Agent Daily table, Viva without a CSV, and
 `--flow-identity app` (the flow always signs in as you; the option warns and is ignored).
 
+## Ask
+
+The app's **Ask** page answers questions about the dashboard in plain language, inline. The web app's
+`POST /api/ask` sends the question to an Azure OpenAI model, which can only call the named queries in
+`1. Fabric/Fabric App/src/ask/catalogue.json`, the same DAX the pages run, with a date range and organizations. It
+never writes its own DAX. Each query runs through `/api/query` as the signed-in person, so Ask sees
+only what they can. The answer shows which queries it ran and links to the page each came from.
+
+- **The model.** By default the installer creates an Azure AI Services account (`ai-<prefix>-<suffix>`)
+  with a `gpt-5-mini` deployment and gives the web app's managed identity **Cognitive Services OpenAI
+  User** on it. Or it uses a deployment you already have, or leaves Ask off. See
+  [Ask](../1.%20Fabric/installer/README.md#ask) in the installer's README. The web app reads
+  `VALUELENS_ASK_ENDPOINT` and `VALUELENS_ASK_DEPLOYMENT`; without both, `/app.config.json` has no
+  `ask` block and the page lists suggested questions only.
+- **Limits.** Groups under 5 people are left out before the model sees a row, and at most 50 rows of
+  each query reach it. A question runs at most 8 queries and keeps the last 8 turns of the
+  conversation. Each person gets 20 questions every 10 minutes and 2 at once.
+- **Logs.** The question and the names of the queries it ran, never the answer or the data.
+- **Cost.** Billed per token on the AI Services account. Light use costs a few dollars a month.
+
 ## What's here
 
 | Folder | Contents |
 |---|---|
-| `infra/` | Bicep: a user-assigned managed identity, ADLS Gen2 (shared keys off), Log Analytics, Azure SQL serverless (Entra-only), a Container Apps environment, a scheduled run job, a manual migrate job, the web app and optional private networking. Every resource is tagged `valuelens-install-id`. The installer ships it compiled as `src/azure/main.arm.json` |
+| `infra/` | Bicep: a user-assigned managed identity, ADLS Gen2 (shared keys off), Log Analytics, Azure SQL serverless (Entra-only), a Container Apps environment, a scheduled run job, a manual migrate job, the web app, optional private networking and an optional Azure AI Services account for Ask. Every resource is tagged `valuelens-install-id`. The installer ships it compiled as `src/azure/main.arm.json` |
 | `jobs/` | The `valuelens-jobs` image: `python -m valuelens_jobs run --steps collect,process,publish,refresh` |
 | `sql/migrations/` | Versioned `V###__*.sql` scripts and a `schema_version` table, applied by the migrate job |
-| `web/` | The `valuelens-web` image: the Node service that serves the app's `dist` plus `/api/query`, `/api/settings`, `/api/version` and `/api/health` |
+| `web/` | The `valuelens-web` image: the Node service that serves the app's `dist` plus `/api/query`, `/api/ask`, `/api/settings`, `/api/version` and `/api/health` |
 | `teams/` | The Teams tab manifest template (SSO) |
 
 The processing logic lives in [`shared/python/valuelens_core`](../shared/python/valuelens_core). It's a DuckDB

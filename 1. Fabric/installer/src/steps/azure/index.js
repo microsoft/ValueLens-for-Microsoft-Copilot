@@ -9,6 +9,7 @@ import { POWER_BI_APP_ID, adminConsentUrl, apiPermissionsUrl, resolveAppRoles } 
 import { ROLES } from '../../clients/azure.js';
 import { HttpError } from '../../http.js';
 import { commandLine } from '../../launch.js';
+import { rlsOn, rlsSettings } from '../../transform/access.js';
 import { buildConsumptionModel, buildModel, loadTemplateModel, PBISM } from '../../transform/model.js';
 import { deployModel, modelSignature, REFRESH_POLL_MS } from '../model.js';
 import { addMonths, OPTIONAL_PERMISSION_EFFECTS, OPTIONAL_PERMISSIONS, SECRET_LIFETIME_MONTHS } from '../identity.js';
@@ -17,18 +18,22 @@ import { APP_ALIAS, CONSUMPTION_ALIAS } from '../app.js';
 import { AZURE_AI_ROLES, ensureAzureAiAccess, planConsumption } from '../consumption.js';
 import { AZURE_LANDING_DIRS, azureDropLabel, azureDropsToSharePoint, ensureFlows, flowsSummary, flowsWanted, offerStudioRun, planFlows } from '../flows.js';
 import { DEFAULT_CURRENCY } from '../../currency.js';
-import { askMoreHistory, askReportingCurrency, HISTORY_CHOICES, reloadDetail, reloadLine } from '../plan.js';
+import { askMoreHistory, askReportingCurrency, HISTORY_CHOICES, KEEP_AWAKE, planCosts, reloadDetail, reloadLine } from '../plan.js';
 import { ensureResourceGraphAccess, planResourceGraph, resourceGraphGrants, resourceGraphKinds, resourceGraphOn, scopeName } from '../resource-graph.js';
 import { DATA_SOURCES } from '../../uploads.js';
 import { normaliseResourceGraph } from '../../config.js';
 import { accessReview, accessSummaryLines, ensureViewerGroup, grantModelAccess, planAccess, publicAccess } from '../access.js';
+import { ensureOrgAccess, verifyOrgAccess } from '../org-access.js';
 import { askAdvanced, asksAdvanced } from '../advanced.js';
+import { askGrants, askLine, askMode, askParameters, ensureAzureAskAccess, planAzureAsk } from './ask.js';
 
 /** @typedef {import('../../install.js').Ctx} Ctx */
 
 export const AZURE_PROVIDERS = ['Microsoft.App', 'Microsoft.Sql', 'Microsoft.Storage', 'Microsoft.OperationalInsights', 'Microsoft.ManagedIdentity'];
 /** Extra resource providers for private networking: the VNet and private endpoints, and the Power BI VNet data gateway's subnet delegation. */
 export const PRIVATE_PROVIDERS = ['Microsoft.Network', 'Microsoft.PowerPlatform'];
+/** For the Ask model, when the installer creates one. */
+export const ASK_PROVIDERS = ['Microsoft.CognitiveServices'];
 export const PRIVATE_FEATURE = /** @type {[string, string]} */ (['Microsoft.Network', 'AllowBringYourOwnPublicIpAddress']);
 /** Capacities that can host a Power BI VNet data gateway: F (including trial), P and A4+; not PPU, EM or A1-A3. */
 export const supportsVnetGateway = (/** @type {{ sku?: string }} */ cap) => /^(F|FT|P\d|A[4-9])/i.test(String(cap.sku ?? '')) && !/^PP/i.test(String(cap.sku ?? ''));
@@ -45,6 +50,7 @@ export const REQUIRED_ARM_PARAMETERS = [
   'sqlAdminPrincipalType', 'sqlMinCapacity', 'sqlMaxCapacity', 'sqlAutoPauseDelayMinutes', 'sqlUseFreeLimit', 'publicNetworkAccess', 'deployWeb',
   'webMinReplicas', 'webClientId', 'webAppIdUri', 'webAccess', 'modules', 'auditHistoryDays', 'powerBiWorkspaceId', 'semanticModels', 'sqlReaderName', 'sqlReaderClientId',
   'azureAiSubscriptionId', 'paygSubscriptionIds', 'dropSiteId', 'dropDriveId', 'dropFolder', 'argManagementGroup', 'argAgents', 'argFoundry', 'reportingCurrency', 'exchangeRate',
+  'askMode', 'askEndpoint', 'askDeployment', 'askModelName', 'askModelVersion', 'askSku', 'askCapacity', 'askLocation',
 ];
 
 const last = (/** @type {string} */ path) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -107,7 +113,15 @@ export function publicAccessMessage(err) {
 }
 
 /** @param {any} err */
-const explain = (err) => policyMessage(err) || publicAccessMessage(err) || regionCapacityMessage(err);
+const explain = (err) => policyMessage(err) || publicAccessMessage(err) || regionCapacityMessage(err) || askModelMessage(err);
+
+/** @param {any} err */
+export function askModelMessage(err) {
+  const body = err instanceof HttpError ? err.body : err;
+  const text = typeof body === 'string' ? body : JSON.stringify(body ?? {});
+  if (!/InsufficientQuota|DeploymentModelNotSupported|ModelNotSupported|ServiceModelDeprecated|SkuNotSupported/i.test(text) || !/CognitiveServices|deployment|model/i.test(text)) return '';
+  return 'Azure couldn\'t deploy the Ask model (quota, region or model version). Run the installer again, choose advanced options, and point Ask at an existing deployment or leave it off; everything else is unaffected.';
+}
 
 /** @param {any} err */
 export function regionCapacityMessage(err) {
@@ -135,6 +149,10 @@ export function whatIfSummary(changes) {
   return grouped;
 }
 
+/** What the Azure target is, in plain words. */
+export const AZURE_TARGET_DESCRIPTION =
+  'Runs the data collection in your Azure subscription (scheduled jobs in Azure Container Apps) and publishes to a Power BI workspace.';
+
 /** @param {Ctx} ctx */
 export async function askTarget(ctx) {
   ctx.config.target ??= 'fabric';
@@ -142,7 +160,7 @@ export async function askTarget(ctx) {
   ctx.ui.heading('Where should Analytics Hub run?');
   ctx.config.target = await ctx.ui.select('Where should Analytics Hub run?', [
     { name: 'Microsoft Fabric', value: 'fabric', description: 'Use Fabric workspaces, Lakehouse, notebooks and pipeline.' },
-    { name: 'Your Azure subscription', value: 'azure', description: 'Preview: use Azure PaaS, Container Apps jobs and a Power BI workspace.' },
+    { name: 'Your Azure subscription', value: 'azure', description: AZURE_TARGET_DESCRIPTION },
   ], ctx.config.target);
 }
 
@@ -241,6 +259,7 @@ export async function planAzure(ctx, pre) {
   }
   await planAzureConsumption(ctx, subs);
   await planAzureResourceGraph(ctx);
+  await planAzureAsk(ctx);
   // A reload runs the job straight after setup anyway.
   ctx.runFirstLoad = ctx.reloadHistoryDays ? false : !advanced || (await ui.confirm('Run the first load as soon as setup finishes?', true));
   if (advanced) await askReportingCurrency(ctx);
@@ -261,9 +280,10 @@ export const BACKFILL_ENV = 'VALUELENS_AUDIT_BACKFILL_DAYS';
  * template instead of the job's, so each container keeps its image, command, resources and settings.
  * @param {any} job  The job resource.
  * @param {{ name: string, value: string }[]} env
+ * @param {{ args?: string[] }} [opts]  Arguments that replace the containers' own, e.g. other steps.
  * @returns {{ containers: any[], initContainers?: any[] } | undefined}  undefined when the job has no containers to copy.
  */
-export function jobTemplateWith(job, env) {
+export function jobTemplateWith(job, env, opts = {}) {
   const template = job?.properties?.template;
   const containers = template?.containers ?? [];
   if (!containers.length) return undefined;
@@ -273,7 +293,7 @@ export function jobTemplateWith(job, env) {
       name: ct.name,
       image: ct.image,
       ...(ct.command ? { command: ct.command } : {}),
-      ...(ct.args ? { args: ct.args } : {}),
+      ...(opts.args ? { args: opts.args } : ct.args ? { args: ct.args } : {}),
       ...(ct.resources ? { resources: ct.resources } : {}),
       env: [...(ct.env ?? []).filter((/** @type {any} */ e) => !names.has(e.name)), ...env],
     })),
@@ -473,22 +493,28 @@ async function grantDropSite(ctx) {
  * Gives the person installing Storage Blob Data Contributor on the storage account, so the Studio
  * flow's storage connection, signed in as them, can write to the landing container.
  * @param {Ctx} ctx
+ * @param {string} [why]  What the role is for, e.g. "for the Studio flow".
+ * @returns {Promise<boolean>} false when you can't assign it.
  */
-async function grantLandingWrite(ctx) {
+export async function grantLandingWrite(ctx, why = 'for the Studio flow') {
   const { ui, api, user } = ctx;
   const az = /** @type {import('../../config.js').AzureConfig} */ (ctx.config.azure);
   const account = az.outputs?.storageAccountName;
-  if (!account || az.storageRole) return;
+  if (!account) return false;
+  if (az.storageRole) return true;
   const scope = `/subscriptions/${az.subscriptionId}/resourceGroups/${az.resourceGroup}/providers/Microsoft.Storage/storageAccounts/${account}`;
   try {
     await api.arm.assignRole(scope, ROLES.storageBlobDataContributor, user.id, 'User');
     az.storageRole = true;
-    ui.ok(`Gave you Storage Blob Data Contributor on ${account}, for the Studio flow`);
+    ui.ok(`Gave you Storage Blob Data Contributor on ${account}, ${why}`);
   } catch (err) {
     if (!(err instanceof HttpError) || err.status !== 403) throw err;
-    ui.warn(`You can't assign roles on ${account}. Whoever signs the Studio flow in needs Storage Blob Data Contributor on it.`);
+    ui.warn(`You can't assign roles on ${account}. Someone needs Storage Blob Data Contributor on it ${why}.`);
+    return false;
+  } finally {
+    ctx.save();
   }
-  ctx.save();
+  return true;
 }
 
 /** @param {Ctx} ctx */
@@ -497,7 +523,7 @@ export async function azurePreflight(ctx) {
   const az = /** @type {import('../../config.js').AzureConfig} */ (config.azure);
   ui.heading('Checking Azure');
   az.installId ??= randomUUID();
-  for (const ns of [...AZURE_PROVIDERS, ...(isPrivate(az) ? PRIVATE_PROVIDERS : [])]) await api.arm.ensureProvider(/** @type {string} */ (az.subscriptionId), ns).catch((err) => ui.warn(`Couldn't register ${ns}: ${err.message}`));
+  for (const ns of [...AZURE_PROVIDERS, ...(isPrivate(az) ? PRIVATE_PROVIDERS : []), ...(askMode(az) === 'create' ? ASK_PROVIDERS : [])]) await api.arm.ensureProvider(/** @type {string} */ (az.subscriptionId), ns).catch((err) => ui.warn(`Couldn't register ${ns}: ${err.message}`));
   // A VNet-integrated Container Apps environment fails with SubscriptionNotRegisteredForFeature unless this flag is on.
   if (isPrivate(az)) await api.arm.ensureFeature(/** @type {string} */ (az.subscriptionId), ...PRIVATE_FEATURE).catch((err) => ui.warn(`Couldn't register the ${PRIVATE_FEATURE.join('/')} feature: ${err.message}`));
   if (isPrivate(az) && !az.powerBi?.capacityId) throw new Error('Private networking needs a Fabric or Premium capacity for the Power BI VNet data gateway. Run the installer without --yes to choose one.');
@@ -557,6 +583,7 @@ export function newResourceGroupResources(az) {
       ['Microsoft.Network/privateEndpoints', 'private endpoints for SQL, blob, dfs and table'],
       ['Microsoft.Network/privateDnsZones', 'private DNS zones linked to the VNet'],
     ] : []),
+    ...(askMode(az) === 'create' ? [['Microsoft.CognitiveServices/accounts', `Azure AI Services account and ${az.ask?.deployment ?? 'model'} deployment for Ask`]] : []),
   ].map(([resourceType, name]) => ({ resourceType, name, changeType: 'Create' }));
 }
 
@@ -590,6 +617,7 @@ export async function azureDeployment(ctx, o) {
     reportingCurrency: param(config.reporting?.currency ?? DEFAULT_CURRENCY), exchangeRate: param(config.reporting?.exchangeRate ? String(config.reporting.exchangeRate) : ''),
     ...consumptionParameters(config),
     ...argParameters(config),
+    ...askParameters(config),
   };
   return { properties: { mode: 'Incremental', template: ARM, parameters: params } };
 }
@@ -723,6 +751,7 @@ export function azurePlanReview(ctx) {
       ...access.grants,
       ...consumptionGrants,
       ...argGrants,
+      ...askGrants(az),
     ],
     runsOn: [
       { what: 'Azure resources', where: `${az.subscriptionName ?? az.subscriptionId} / ${az.resourceGroup} / ${az.location}`, detail: `Incremental ARM deployment. Deletes are not applied by the template.${az.sqlLocation ? ` Azure SQL goes in ${az.sqlLocation}.` : ''}` },
@@ -730,6 +759,7 @@ export function azurePlanReview(ctx) {
       { what: 'Cost', where: `Indicative Azure cost: about $5-40/month small tenants or $60-160/month large tenants, plus Power BI Pro/PPU licences.${isPrivate(az) ? ' Private networking adds about $30-40/month (4 private endpoints and DNS zones); the VNet data gateway uses capacity units on your Fabric/Premium capacity while refreshing.' : ''}` },
       ...(ctx.reloadHistoryDays ? [{ what: 'History reload', where: reloadLine(ctx.reloadHistoryDays), detail: `The run job, once, with ${BACKFILL_ENV}=${ctx.reloadHistoryDays}. ${reloadDetail(ctx.reloadHistoryDays)}` }] : []),
     ],
+    costs: planCosts(ctx.config),
   };
 }
 
@@ -754,8 +784,10 @@ export async function confirmAzurePlan(ctx) {
     ui.info(`Azure AI:    ${ds.azureAi === 'api' && config.consumption.azureSubscriptionId ? config.consumption.azureSubscriptionName ?? config.consumption.azureSubscriptionId : 'Left out'}`);
   }
   if (azureResourceGraphOn(config)) ui.info(`Governance:  ${resourceGraphKinds(config)} from Azure Resource Graph, in ${scopeName(config)}`);
+  ui.info(`Ask:         ${askLine(az)}`);
   if (ctx.reloadHistoryDays) ui.info(`History:     ${reloadLine(ctx.reloadHistoryDays)}`);
   ui.review(azurePlanReview(ctx));
+  ui.note(KEEP_AWAKE);
   return ui.confirm('Go ahead?', true);
 }
 
@@ -769,9 +801,11 @@ export async function installAzure(ctx, opts) {
   const resourceGraph = azureResourceGraphOn(config);
   const flows = flowsWanted(config).length > 0;
   const withAccess = !!config.access;
+  const askAccess = askMode(az) === 'existing';
   const titles = [
     'Resource group', 'Azure resources', 'Entra applications', 'Microsoft Graph permissions', ...(consumption ? ['Credit consumption'] : []), ...(resourceGraph ? ['Resource Graph access'] : []),
-    'Power BI model', ...(withAccess ? ['Viewer access'] : []), 'Azure resources (final)', 'Database migration',
+    ...(askAccess ? ['Ask model access'] : []),
+    'Power BI model', ...(withAccess ? ['Viewer access'] : []), 'Azure resources (final)', 'Database migration', ...(rlsOn(config) ? ['Org-scoped access'] : []),
     ...(flows ? ['Power Automate flow'] : []), 'Teams package', ...(ctx.reloadHistoryDays ? ['Reload audit history'] : ctx.runFirstLoad ? ['First load'] : []),
   ];
   let n = 0;
@@ -811,6 +845,11 @@ export async function installAzure(ctx, opts) {
     ctx.save();
   }
 
+  if (askAccess) {
+    step('Ask model access');
+    await ensureAzureAskAccess(ctx);
+  }
+
   step('Power BI model');
   await ensureAzurePowerBi(ctx, sqlSecret.value);
   await retireSecret(ctx, sqlSecret.previousKeyId);
@@ -831,6 +870,13 @@ export async function installAzure(ctx, opts) {
     throw new Error(`The database migration job did not succeed (${migration.status}), so setup stopped before the first load. ` +
       `See its logs with: az containerapp job logs show -g ${az.resourceGroup} -n ${az.outputs?.migrateJobName} --execution ${az.status?.lastMigrate?.name} --container migrate. ` +
       'Re-run install once it is fixed; finished steps are skipped.');
+  }
+
+  if (rlsOn(config)) {
+    step('Org-scoped access');
+    // A first load refreshes the models itself, after loading the scopes into SQL.
+    const refresh = !ctx.runFirstLoad && !ctx.reloadHistoryDays;
+    if ((await ensureOrgAccess(ctx, { refresh })) && refresh) await verifyOrgAccess(ctx);
   }
 
   if (flows) {
@@ -1034,9 +1080,9 @@ async function ensureAzurePowerBi(ctx, sqlReaderSecret) {
   const database = String(az.outputs?.sqlDatabaseName ?? 'valuelens');
   await deployModel(ctx, sm, {
     signature: `azure;${modelSignature(server, database, config.modules)}`,
-    definition: () => semanticModelDefinition(buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { server, database, modules: config.modules, resourceGraph: azureResourceGraphOn(config), currency: config.reporting?.currency }), PBISM),
+    definition: () => semanticModelDefinition(buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { server, database, modules: config.modules, resourceGraph: azureResourceGraphOn(config), currency: config.reporting?.currency, access: rlsSettings(config) }), PBISM),
   }).catch((err) => {
-    if (err instanceof HttpError && err.status >= 400 && /FeatureNotAvailable|capacity|Premium|Fabric/i.test(JSON.stringify(err.body ?? err.message))) throw new Error('Power BI semantic model definition APIs are not available in this Pro workspace. The .pbix Imports fallback is planned but not implemented in this preview.');
+    if (err instanceof HttpError && err.status >= 400 && /FeatureNotAvailable|capacity|Premium|Fabric/i.test(JSON.stringify(err.body ?? err.message))) throw new Error('Power BI semantic model definition APIs are not available in this Pro workspace. The .pbix Imports fallback is planned but not implemented yet.');
     throw err;
   });
   az.powerBi.datasetId = sm.id;
@@ -1065,7 +1111,7 @@ async function ensureAzureConsumptionModel(ctx, server, database) {
   const m = config.consumption.model;
   await deployModel(ctx, m, {
     signature: `azure;${server};${database}`,
-    definition: () => semanticModelDefinition(buildConsumptionModel(loadTemplateModel(file), { server, database, resourceGraph: azureResourceGraphOn(config) }), PBISM),
+    definition: () => semanticModelDefinition(buildConsumptionModel(loadTemplateModel(file), { server, database, resourceGraph: azureResourceGraphOn(config), access: rlsSettings(config) }), PBISM),
   });
   pbi.consumptionDatasetId = m.id;
   ctx.save();
@@ -1239,8 +1285,13 @@ function refreshScheduleBody(ctx) {
   return { value: { enabled: true, localTimeZoneId: 'UTC', times: [`${String((hour + 1) % 24).padStart(2, '0')}:${String(minute).padStart(2, '0')}`], days: ctx.config.schedule.frequency === 'weekly' ? [ctx.config.schedule.weekday] : undefined } };
 }
 
-/** @param {Ctx} ctx @param {'run' | 'migrate'} kind @param {{ wait: boolean, timeoutMs?: number, backfillDays?: number }} opts */
-async function startAndWaitJob(ctx, kind, opts) {
+/**
+ * Starts the run or migrate job, and waits for it when asked. `steps` runs only those steps of the run
+ * job; such a run isn't recorded as the last run, which tells whether the history was loaded.
+ * @param {Ctx} ctx @param {'run' | 'migrate'} kind
+ * @param {{ wait: boolean, timeoutMs?: number, backfillDays?: number, steps?: string }} opts
+ */
+export async function startAndWaitJob(ctx, kind, opts) {
   const az = /** @type {import('../../config.js').AzureConfig} */ (ctx.config.azure);
   const name = kind === 'run' ? az.outputs?.runJobName : az.outputs?.migrateJobName;
   if (!name) throw new Error(`The ARM deployment did not return ${kind} job name.`);
@@ -1250,15 +1301,20 @@ async function startAndWaitJob(ctx, kind, opts) {
   if (opts.backfillDays) {
     template = jobTemplateWith(await ctx.api.arm.getContainerAppJob(sub, rg, name), [{ name: BACKFILL_ENV, value: String(opts.backfillDays) }]);
     if (!template) throw new Error(`Couldn't read the ${name} job's containers, so it can't be started with ${opts.backfillDays} days of history.`);
+  } else if (opts.steps) {
+    template = jobTemplateWith(await ctx.api.arm.getContainerAppJob(sub, rg, name), [], { args: ['run', '--steps', opts.steps] });
+    if (!template) throw new Error(`Couldn't read the ${name} job's containers, so it can't be started with only ${opts.steps}.`);
   }
+  const label = opts.steps ? `${kind} job (${opts.steps})` : `${kind} job`;
+  const key = opts.steps ? 'lastAccess' : kind === 'run' ? 'lastRun' : 'lastMigrate';
   const started = await ctx.api.arm.startContainerAppJob(sub, rg, name, template);
   const executionName = started?.name ?? started?.properties?.name ?? started?.id?.split('/').pop();
-  ctx.ui.ok(`Started ${kind} job${executionName ? ` (${executionName})` : ''}${opts.backfillDays ? ` with ${opts.backfillDays} days of audit history` : ''}`);
+  ctx.ui.ok(`Started ${label}${executionName ? ` (${executionName})` : ''}${opts.backfillDays ? ` with ${opts.backfillDays} days of audit history` : ''}`);
   if (opts.backfillDays) {
     ctx.ui.note(`${reloadDetail(opts.backfillDays)} Job images older than this installer ignore ${BACKFILL_ENV} and run as usual: run "${commandLine('update')}" first if yours is.`);
   }
   az.status ??= {};
-  az.status[kind === 'run' ? 'lastRun' : 'lastMigrate'] = { name: executionName, status: 'Running', startedAt: ctx.now().toISOString() };
+  az.status[key] = { name: executionName, status: 'Running', startedAt: ctx.now().toISOString() };
   ctx.save();
   if (!opts.wait || !executionName) return { ok: true, status: 'Running' };
   const progress = ctx.ui.progress(kind === 'run' ? 'Run job' : 'Migrate job');
@@ -1277,7 +1333,7 @@ async function startAndWaitJob(ctx, kind, opts) {
     progress.done();
   }
   const state = job?.properties?.status ?? job?.status ?? 'Unknown';
-  az.status[kind === 'run' ? 'lastRun' : 'lastMigrate'] = { name: executionName, status: state, finishedAt: /Succeeded|Completed|Failed|Canceled|Cancelled/i.test(state) ? ctx.now().toISOString() : undefined };
+  az.status[key] = { name: executionName, status: state, finishedAt: /Succeeded|Completed|Failed|Canceled|Cancelled/i.test(state) ? ctx.now().toISOString() : undefined };
   ctx.save();
   if (/Succeeded|Completed/i.test(state)) {
     ctx.ui.ok(`${kind === 'run' ? 'Run' : 'Migration'} job finished`);
@@ -1404,6 +1460,7 @@ export async function azureSummary(ctx) {
   if (az.powerBi?.workspaceId) ui.info(`Power BI:   workspace ${az.powerBi.workspaceId}, model ${az.powerBi.datasetId ?? 'not deployed'}`);
   if (az.powerBi?.consumptionDatasetId) ui.info(`Credits:    model ${az.powerBi.consumptionDatasetId}`);
   if (az.teamsPackage) ui.info(`Teams:      ${az.teamsPackage}`);
+  ui.info(`Ask:        ${askLine(az)}`);
   for (const line of accessSummaryLines(config)) ui.info(line);
   if (flowsWanted(config).length) flowsSummary(ctx);
   ui.info('Record:     Keep valuelens-install.json. It holds no secrets.');

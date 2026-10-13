@@ -6,13 +6,15 @@
 //-----------------------------------------------------------------------
 
 import { CommercialTerms } from "./CommercialTerms.js";
+import { ReportPack } from "./ReportPack.js";
 import { TaskTime } from "./TaskTime.js";
 
 // The app imports only this type. Importing the classes would ship their
 // decorators to the browser.
 export type ValueLensSchema = {
     CommercialTerms: CommercialTerms;
+    ReportPack: ReportPack;
     TaskTime: TaskTime;
 };
 
-export const schema = [CommercialTerms, TaskTime];
+export const schema = [CommercialTerms, ReportPack, TaskTime];

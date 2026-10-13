@@ -35,7 +35,11 @@ export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
  * @property {string} [page]  The dashboard page that stays dormant when it is skipped.
  * @property {Partial<Record<SourceMode, string>>} [modeLabels]  Overrides MODE_LABELS, e.g. "Connected (Dataflow)".
  * @property {Partial<Record<SourceMode, string>>} [hints]  What the mode does, shown under the card.
+ * @property {string} [group]  A heading the card sits under with the others that share it, e.g. "Credit consumption".
  */
+
+/** The heading over the cards for Copilot Studio, Cowork and Azure AI credits. */
+export const CREDIT_GROUP = 'Credit consumption';
 
 /** @type {DataSourceInfo[]} */
 export const DATA_SOURCES = [
@@ -114,9 +118,10 @@ export const DATA_SOURCES = [
     modes: ['api', 'csv', 'skip'],
     defaultMode: 'skip',
     page: 'Consumption Central',
+    group: CREDIT_GROUP,
     modeLabels: { api: 'Connected (Power Automate flow)', csv: 'Upload CSV only' },
     hints: {
-      api: 'A daily Power Automate flow reads the licensing API. You sign in to its connections once. Exports are optional and win for the months they cover.',
+      api: 'A daily Power Automate flow reads the licensing API. Needs Power Automate Premium for whoever signs in to the flow; you sign in to its connections once. Exports are optional and win for the months they cover.',
       csv: 'Upload the exports each month. No flow.',
     },
     export: {
@@ -132,9 +137,10 @@ export const DATA_SOURCES = [
     modes: ['api', 'csv', 'skip'],
     defaultMode: 'skip',
     page: 'Consumption Central',
+    group: CREDIT_GROUP,
     modeLabels: { api: 'Connected (Dataflow)' },
     hints: {
-      api: 'The installer creates a Dataflow Gen2 that reads your Viva Insights Copilot consumption query on every run. You give the partition and query IDs, then sign in to the Dataflow once.',
+      api: 'A Viva Insights analyst (Insights Analyst role) creates the Copilot consumption query and gives you its partition and query IDs. The installer creates a Dataflow Gen2 that reads it on every run; you sign in to the Dataflow once. No query yet? Upload the CSV export until there is one.',
     },
     export: {
       where: 'Viva Insights > Copilot Consumption Dashboard > Export (PersonServiceCreditsMetrics and SpendingPolicyMetadata CSVs).',
@@ -149,6 +155,7 @@ export const DATA_SOURCES = [
     modes: ['api', 'skip'],
     defaultMode: 'skip',
     page: 'Consumption Central',
+    group: CREDIT_GROUP,
   },
   {
     id: 'agentEvaluator',
@@ -495,6 +502,7 @@ export function routerSignaturesJson(ds) {
  * @property {string} [page]
  * @property {{ where: string, url: string, files: string }} [export]
  * @property {SourceMode[]} [exportModes]  The modes that still need the export.
+ * @property {string} [group]
  */
 
 /**
@@ -512,6 +520,7 @@ export function sourceCards(ds) {
     locked: !!s.locked,
     uploadable: UPLOADABLE_SOURCES.includes(s.id),
     ...(s.page ? { page: s.page } : {}),
+    ...(s.group ? { group: s.group } : {}),
     ...(s.export ? { export: s.export, exportModes: exportModesOf(s) } : {}),
   }));
 }

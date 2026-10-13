@@ -5,7 +5,9 @@
  * then adding people to the group, from the installer, the app's Share panel or My Groups.
  */
 import { HttpError } from '../http.js';
+import { rlsOn, rlsSettings } from '../transform/access.js';
 import { asksAdvanced } from './advanced.js';
+import { orgAccessCommand } from './org-access.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 /** @typedef {{ workspaceId: string, datasetId: string, name: string }} ModelRef */
@@ -20,12 +22,30 @@ const isEmail = (/** @type {string} */ v) => (/^[^\s@]+@[^\s@]+$/.test(v.trim())
 const isLinkOrEmpty = (/** @type {string} */ v) => (!v.trim() || /^https:\/\/\S+$/i.test(v.trim()) ? true : 'Enter an https:// link, or leave it empty');
 
 /**
+ * The saved access contact, or undefined when its domain isn't one of the tenant's verified domains,
+ * e.g. a record carried over from another tenant. Kept when the domains can't be read.
+ * @param {Ctx} ctx
+ * @param {string | undefined} contact
+ */
+export async function contactInTenant(ctx, contact) {
+  if (!contact || contact.toLowerCase() === ctx.user.upn.toLowerCase()) return contact;
+  const domain = contact.split('@').pop()?.trim().toLowerCase() ?? '';
+  const domains = await Promise.resolve()
+    .then(() => ctx.api.graph.verifiedDomains())
+    .catch(() => /** @type {string[]} */ ([]));
+  if (!domains.length || domains.some((d) => domain === d || domain.endsWith(`.${d}`))) return contact;
+  ctx.ui.note(`The saved access contact, ${contact}, isn't on one of this tenant's domains, so it's now ${ctx.user.upn}.`);
+  return undefined;
+}
+
+/**
  * The plan's questions: which group, who to ask for access, and an optional request link.
  * @param {Ctx} ctx
  */
 export async function planAccess(ctx) {
   const { ui, config, user, api } = ctx;
   const access = { ...(config.access ?? {}) };
+  access.contact = await contactInTenant(ctx, access.contact);
   if (!asksAdvanced(ctx)) {
     // The saved group, or a new "Analytics Hub Viewers"; Manage access changes it later.
     if (!access.groupId) access.groupName = access.createdGroup ? access.groupName ?? VIEWER_GROUP_NAME : VIEWER_GROUP_NAME;
@@ -58,7 +78,8 @@ export async function planAccess(ctx) {
     }
   }
   access.contact = (await ui.input('Who should people ask for access? (email)', { default: access.contact ?? user.upn, validate: isEmail })).trim();
-  access.requestUrl = (await ui.input('A link for requesting access, e.g. a My Access package (optional; empty emails the contact)', { default: access.requestUrl ?? '', validate: isLinkOrEmpty })).trim() || undefined;
+  ui.note(`People without access are asked to email ${access.contact}. Add a link, e.g. a request form, to offer that too.`);
+  access.requestUrl = (await ui.input('Link where people can request access (optional)', { default: access.requestUrl ?? '', validate: isLinkOrEmpty })).trim() || undefined;
   config.access = access;
 }
 
@@ -175,6 +196,7 @@ export async function grantModelAccess(ctx, models) {
 
 /**
  * What the app is told about access: the group and who to ask. Undefined without a group.
+ * With org-scoped access on, also the org attribute, which turns on scoped delegation in the Share panel.
  * @param {import('../config.js').InstallConfig} config
  * @returns {Record<string, string> | undefined}
  */
@@ -184,6 +206,8 @@ export function publicAccess(config) {
   /** @type {Record<string, string>} */
   const out = { groupId: a.groupId };
   for (const k of /** @type {const} */ (['groupName', 'contact', 'requestUrl'])) if (a[k]) out[k] = /** @type {string} */ (a[k]);
+  const rls = rlsSettings(config);
+  if (rls?.orgAttribute) out.rlsOrgAttribute = rls.orgAttribute;
   return out;
 }
 
@@ -204,8 +228,9 @@ export function accessSummaryLines(config) {
  * The `access` command: shows the viewer group and adds viewers or owners to it.
  * @param {Ctx} ctx
  * @param {ModelRef[]} models  The models the group should have Build on.
+ * @param {(ctx: Ctx) => Promise<unknown>} [redeploy]  The `update` command, for turning org-scoped access on or off.
  */
-export async function accessCommand(ctx, models) {
+export async function accessCommand(ctx, models, redeploy) {
   const { ui, config, api } = ctx;
   if (!config.access?.groupId) await planAccess(ctx);
   ctx.save();
@@ -222,11 +247,18 @@ export async function accessCommand(ctx, models) {
         { name: 'Add viewers', value: 'members', description: 'People or groups, by email or group name.' },
         { name: 'Add an owner', value: 'owner', description: 'Owners can add and remove viewers themselves.' },
         { name: 'Give the group Build on the models again', value: 'grants', description: 'Repairs access to the models the app queries.' },
+        ...(redeploy
+          ? [{ name: rlsOn(config) ? 'Org-scoped access: who sees which orgs' : 'Turn on org-scoped access', value: 'orgs', description: 'Row-level security: each viewer sees only the orgs you give them.' }]
+          : []),
         { name: 'Done', value: 'done' },
       ],
       'done',
     );
     if (action === 'done') return;
+    if (action === 'orgs' && redeploy) {
+      await orgAccessCommand(ctx, redeploy);
+      continue;
+    }
     if (action === 'grants') {
       await grantModelAccess(ctx, models);
       continue;

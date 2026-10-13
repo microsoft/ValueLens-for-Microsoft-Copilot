@@ -257,7 +257,7 @@
     /* Steel belongs to Governance: a sober, desaturated blue for a page about
        oversight, kept clear of the coral and amber its flags would compete with. */
     --vl-steel: #4a6b82;       --vl-steel-text: #36546a;     --vl-steel-tint: #eaf0f4;
-    --vl-periwinkle: #95a9ce;
+    --vl-periwinkle: #95a9ce;  --vl-periwinkle-text: #4d5f8f; --vl-periwinkle-tint: #eef1f8;
     --vl-slate: #8793a3;
     --vl-ink: #1c2632;
     /* The habit ladder, Power (4) down to Inactive (0): one blue ramp, with
@@ -283,7 +283,7 @@
     --vl-cyan: #56bfe0;        --vl-cyan-text: #8fd5ec;      --vl-cyan-tint: #14303a;
     --vl-indigo: #7f85f5;      --vl-indigo-text: #aab1fa;    --vl-indigo-tint: #262848;
     --vl-steel: #86a7bf;       --vl-steel-text: #adc6d8;     --vl-steel-tint: #1a2731;
-    --vl-periwinkle: #b3c2de;
+    --vl-periwinkle: #b3c2de;  --vl-periwinkle-text: #c9d4ea; --vl-periwinkle-tint: #232a3a;
     --vl-slate: #a3aebd;
     --vl-ink: #dbdfe4;
     /* On a dark ground engagement reads as brightness. */
@@ -516,6 +516,26 @@
     --color-data-9: var(--vl-slate);
     --color-data-10: var(--vl-ink);
   }
+  /* Ask speaks for every destination but tells no story of its own, so it
+     takes periwinkle, the one hue no destination leads with. */
+  .palette-ask {
+    --color-brand: var(--vl-periwinkle);
+    --color-brand-foreground: var(--vl-periwinkle-text);
+    --color-primary: var(--vl-periwinkle-text);
+    --color-ring: var(--vl-periwinkle-text);
+    --color-accent: var(--vl-periwinkle-tint);
+    --color-accent-foreground: var(--vl-periwinkle-text);
+    --color-data-1: var(--vl-periwinkle);
+    --color-data-2: var(--vl-blue);
+    --color-data-3: var(--vl-teal);
+    --color-data-4: var(--vl-amber);
+    --color-data-5: var(--vl-plum);
+    --color-data-6: var(--vl-lavender);
+    --color-data-7: var(--vl-coral);
+    --color-data-8: var(--vl-navy);
+    --color-data-9: var(--vl-slate);
+    --color-data-10: var(--vl-ink);
+  }
   /* The assumptions and the appendix are reference, not places with their own
      story, so they take the report's navy: the quietest hue in the family. */
   .palette-assumptions,
@@ -572,5 +592,39 @@ body,
   .vl-heat {
     background-color: transparent;
     box-shadow: none;
+  }
+}
+
+/* Exports (lib/report-export.ts). "Download PDF" prints a report built from
+   the captured charts in place of the app, so the paper copy matches the
+   slides and no chart has to re-flow to the page width. A plain Ctrl+P still
+   prints the page itself, without the sidebar, filters and buttons. */
+#vl-print-report {
+  display: none;
+}
+
+@media print {
+  html.vl-printing body > :not(#vl-print-report) {
+    display: none !important;
+  }
+
+  html.vl-printing #vl-print-report {
+    display: block;
+  }
+
+  html:not(.vl-printing),
+  html:not(.vl-printing) body,
+  html:not(.vl-printing) #root,
+  html:not(.vl-printing) [data-print="flow"] {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  html:not(.vl-printing) [data-print="hide"] {
+    display: none !important;
+  }
+
+  html:not(.vl-printing) [data-export] {
+    break-inside: avoid;
   }
 }

@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { TreeFrame } from "@/components/tree-frame";
 import { Headlined, HEADLINE_SPACE } from "@/components/headlined";
+import { useDataTo } from "@/hooks/data-to.context";
 import { useThemeContext } from "@/hooks/theme.context";
 import { useRowToggles } from "@/hooks/use-row-toggles";
 import { gridHeight } from "@/lib/chart-height";
@@ -55,7 +56,11 @@ export function KpiRowState({
         );
     }
     if (!summary.row) return <QueryEmpty title={emptyTitle} description={emptyDescription} />;
-    return <div className={className}>{children}</div>;
+    return (
+        <div className={className} data-export="">
+            {children}
+        </div>
+    );
 }
 
 interface PanelProps {
@@ -131,6 +136,7 @@ function ChartFrame({
     const container = useRef<VisualContainerHandle>(null);
     const visual = useRef<VegaVisualHandle>(null);
     const [status, setStatus] = useState<string>();
+    const dataTo = useDataTo();
 
     useEffect(() => {
         if (!status) return;
@@ -167,16 +173,16 @@ function ChartFrame({
                 label: "Download CSV",
                 icon: <Download aria-hidden="true" />,
                 onClick: () => {
-                    downloadTableCsv(table, title);
+                    downloadTableCsv(table, title, dataTo);
                     setStatus("Downloaded");
                 },
             },
         ],
-        [table, title],
+        [table, title, dataTo],
     );
 
     return (
-        <div className="relative h-full min-h-0">
+        <div className="relative h-full min-h-0" data-export="" data-export-title={title}>
             <VisualContainer
                 ref={container}
                 header={{ title, subtitle }}
@@ -211,7 +217,7 @@ export function NoteCard({ title, notes, children }: { title: string; notes: rea
     const shown = notes.filter((note): note is { term: string; text: string } => Boolean(note.text));
     if (shown.length === 0 && !children) return null;
     return (
-        <article aria-labelledby={headingId} className="flex flex-col rounded-xl border border-border bg-card">
+        <article aria-labelledby={headingId} className="flex flex-col rounded-xl border border-border bg-card" data-export="">
             <h3
                 id={headingId}
                 className="border-b border-border px-500 py-300 text-[length:var(--text-300)] leading-300 font-semibold text-foreground"

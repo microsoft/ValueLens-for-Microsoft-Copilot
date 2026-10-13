@@ -106,8 +106,13 @@ export function graphApi(http) {
       (await http.list('/me/transitiveMemberOf/microsoft.graph.group', { query: { $select: 'id' } })).map((g) => String(g.id)),
     /** @returns {Promise<{ skuPartNumber?: string, servicePlans?: { servicePlanName: string, provisioningStatus: string }[] }[]>} */
     myLicenseDetails: () => http.list('/me/licenseDetails'),
-    /** @returns {Promise<{ skuPartNumber?: string, capabilityStatus?: string, servicePlans?: { servicePlanName: string, provisioningStatus?: string }[] }[]>} */
+    /** @returns {Promise<{ skuPartNumber?: string, capabilityStatus?: string, consumedUnits?: number, prepaidUnits?: { enabled?: number }, servicePlans?: { servicePlanName: string, provisioningStatus?: string }[] }[]>} */
     subscribedSkus: () => http.list('/subscribedSkus'),
+    /** The tenant's verified domain names, lower case. */
+    verifiedDomains: async () =>
+      /** @type {{ name?: string }[]} */ ((await http.get('/organization', { query: { $select: 'verifiedDomains' } })).value?.[0]?.verifiedDomains ?? [])
+        .map((d) => String(d.name ?? '').toLowerCase())
+        .filter(Boolean),
     /**
      * Directory roles the user could activate through PIM. Only rows for this principal are kept,
      * whatever the filter returned.
@@ -287,6 +292,14 @@ export function graphApi(http) {
       }),
     /** Direct members of a group. @param {string} groupId @returns {Promise<{ id: string, displayName?: string, userPrincipalName?: string }[]>} */
     groupMembers: (groupId) => http.list(`/groups/${groupId}/members`, { query: { $select: 'id,displayName,userPrincipalName' } }),
+    /**
+     * The users in a group, including through nested groups.
+     * @param {string} groupId
+     * @returns {Promise<{ id: string, displayName?: string, userPrincipalName?: string }[]>}
+     */
+    groupUsers: async (groupId) =>
+      (await http.list(`/groups/${groupId}/transitiveMembers`, { query: { $select: 'id,displayName,userPrincipalName' } }))
+        .filter((/** @type {any} */ m) => !m['@odata.type'] || m['@odata.type'] === '#microsoft.graph.user'),
     /** @param {string} groupId @returns {Promise<{ id: string, displayName?: string, userPrincipalName?: string }[]>} */
     groupOwners: (groupId) => http.list(`/groups/${groupId}/owners`, { query: { $select: 'id,displayName,userPrincipalName' } }),
     /** Adds a user or group to a group. Already being a member is fine. @param {string} groupId @param {string} memberId */

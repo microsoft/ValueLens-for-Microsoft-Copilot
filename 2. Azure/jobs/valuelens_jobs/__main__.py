@@ -2,6 +2,7 @@
 
     python -m valuelens_jobs run --steps collect,process,publish,refresh
     python -m valuelens_jobs run --data-dir <dir> --steps process      # local / mounted data
+    python -m valuelens_jobs run --steps access,refresh                # org-scoped access only (the installer)
     python -m valuelens_jobs process --data-dir <dir>
     python -m valuelens_jobs migrate
 
@@ -37,7 +38,9 @@ from .storage import LocalStore, open_store
 from .tables import parquet_glob, q
 
 log = logging.getLogger("valuelens_jobs")
-STEPS = ("collect", "process", "publish", "refresh")
+STEPS = ("collect", "process", "publish", "access", "refresh")
+# What a run does when --steps isn't given. The access sync is part of publish; "access" runs it alone.
+DEFAULT_STEPS = ("collect", "process", "publish", "refresh")
 CURATED = "curated/copilot_interactions_curated/part-0.parquet"
 PROCESS_INPUTS = ("raw/copilot_interactions_parsed", "raw/copilot_licensed_users", "raw/agents_365")
 
@@ -150,11 +153,30 @@ def _sql(settings):
 
 
 def publish_step(store, settings, conn=None):
+    from .access import sync_access
     from .publish import publish
 
     conn = conn or _sql(settings)
     try:
-        return publish(conn, store, publish_targets(settings))
+        results = publish(conn, store, publish_targets(settings))
+        try:
+            access = sync_access(conn, store)
+        except Exception as exc:
+            # The scopes already in SQL stay as they were; the models still refresh.
+            log.exception("access: sync failed: %s", exc)
+            conn.rollback()
+            access = {"error": f"{type(exc).__name__}: {exc}"}
+        return results + [{"table": "access", **access}]
+    finally:
+        conn.close()
+
+
+def access_step(store, settings, conn=None):
+    from .access import sync_access
+
+    conn = conn or _sql(settings)
+    try:
+        return sync_access(conn, store)
     finally:
         conn.close()
 
@@ -189,7 +211,7 @@ def main(argv=None, env=None) -> int:
     ap =  argparse.ArgumentParser(prog="valuelens_jobs")
     sub = ap.add_subparsers(dest="cmd", required=True)
     run = sub.add_parser("run")
-    run.add_argument("--steps", default=",".join(STEPS))
+    run.add_argument("--steps", default=",".join(DEFAULT_STEPS))
     run.add_argument("--data-dir", default=os.environ.get("VALUELENS_DATA_DIR"))
     proc = sub.add_parser("process")
     proc.add_argument("--data-dir", required=True)
@@ -211,7 +233,7 @@ def main(argv=None, env=None) -> int:
     unknown = [s for s in steps if s not in STEPS]
     if unknown:
         ap.error(f"unknown steps {unknown}; expected a subset of {list(STEPS)}")
-    store = open_store(args.data_dir, settings) if {"collect", "process", "publish"} & set(steps) else None
+    store = open_store(args.data_dir, settings) if {"collect", "process", "publish", "access"} & set(steps) else None
     if store is not None and settings.sample_data:
         import tempfile
 
@@ -235,6 +257,9 @@ def main(argv=None, env=None) -> int:
             process(store)
         elif step == "publish":
             published = publish_step(store, settings)
+        elif step == "access":
+            if "publish" not in steps:
+                access_step(store, settings)
         else:
             refresh_step(settings, publish_results=published)
         log.info("step %s: done", step)

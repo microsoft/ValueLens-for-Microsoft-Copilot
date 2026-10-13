@@ -3,8 +3,8 @@
 It exists so tests can run M text shipped in the .pbit files (for example ValueLensDescribeAgent)
 against the Python rules they port, without Power BI Desktop. Supported: let/in, if/then/else,
 and/or/not, = <> < <= > >= & + -, function literals (type annotations are ignored), each/_,
-lists (with "a".."z" ranges), records, {n} item access, calls, and the Text.*/List.* library
-functions in BUILTINS. Evaluation is strict about logical conditions and lazy for let bindings,
+lists (with "a".."z" ranges), records, {n} item and r[field] access, calls, and the Text.*/List.*
+library functions in BUILTINS. Evaluation is strict about logical conditions and lazy for let bindings,
 as in M. Anything else raises MError, so unsupported M fails loudly instead of being guessed.
 """
 import re
@@ -196,6 +196,11 @@ class _Parser:
                 index = self.expr()
                 self.take("op", "}")
                 node = ("item", node, index)
+            elif self.at("op", "["):
+                self.take()
+                name = self.take("ident")[1]
+                self.take("op", "]")
+                node = ("field", node, name)
             else:
                 return node
 
@@ -292,6 +297,7 @@ def _call(fn, *args):
 BUILTINS = {
     "Text.From": _text_from,
     "Text.Trim": _nullable_text(lambda t: t.strip()),
+    "Text.TrimEnd": _nullable_text(lambda t: t.rstrip()),
     "Text.Lower": _nullable_text(str.lower),
     "Text.Upper": _nullable_text(str.upper),
     "Text.Length": _nullable_text(len),
@@ -306,6 +312,9 @@ BUILTINS = {
     "List.Transform": lambda items, fn: [_call(fn, x) for x in items],
     "List.RemoveNulls": lambda items: [x for x in items if x is not None],
     "List.Contains": lambda items, value: value in items,
+    "List.Buffer": list,
+    "List.Positions": lambda items: list(range(len(items))),
+    "List.PositionOf": lambda items, value: next((i for i, x in enumerate(items) if _equal(x, value)), -1),
 }
 
 
@@ -352,6 +361,11 @@ def _eval(node, env):
         if not isinstance(items, list) or not isinstance(index, int) or not 0 <= index < len(items):
             raise MError(f"bad item access {index!r}")
         return items[index]
+    if kind == "field":
+        record = _eval(node[1], env)
+        if not isinstance(record, dict) or node[2] not in record:
+            raise MError(f"bad field access [{node[2]}]")
+        return record[node[2]]
     if kind == "list":
         out = []
         for item in node[1]:

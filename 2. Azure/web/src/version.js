@@ -1,5 +1,7 @@
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
-const TAG_PREFIX = 'analytics-hub-azure-v';
+// installer-v: the installer releases, which carry the Azure images' version. analytics-hub-azure-v and v:
+// older Azure releases.
+const TAG_PREFIXES = ['installer-v', 'analytics-hub-azure-v', 'v'];
 
 export class VersionService {
   constructor({ installed, releasesUrl, fetchImpl = fetch, now = () => Date.now() }) {
@@ -30,7 +32,8 @@ export function findLatestRelease(releases) {
   return best;
 }
 export function parseReleaseVersion(tag) {
-  const raw = tag.startsWith(TAG_PREFIX) ? tag.slice(TAG_PREFIX.length) : tag.startsWith('v') ? tag.slice(1) : '';
+  const prefix = TAG_PREFIXES.find((p) => tag.startsWith(p));
+  const raw = prefix ? tag.slice(prefix.length) : '';
   return /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(raw) ? raw : null;
 }
 export function compareSemver(a, b) {

@@ -409,7 +409,7 @@ test('app: deployed to the customer workspace under the app name, and a develope
 test('app: a failed deploy still restores the checkout; missing tools are installed first', async () => {
   const t = appSetup({ tools: false, upFails: true });
   try {
-    await assert.rejects(deployApp(t.ctx), /rayfin up" failed/);
+    await assert.rejects(deployApp(t.ctx), /deploy tool failed/);
     assert.ok(t.runs[0].startsWith('npm ci'));
     assert.ok(existsSync(join(t.dir, RAYFIN_CLI)));
     assert.equal(readFileSync(join(t.dir, 'rayfin', '.env'), 'utf8'), 'TEAM=1\n');
@@ -635,7 +635,7 @@ test('app: a first deploy that fails part way keeps the app item it made, so the
   const o = { upFails: true };
   const t = prebuiltSetup(o);
   try {
-    await assert.rejects(deployApp(t.ctx), /rayfin up" failed/);
+    await assert.rejects(deployApp(t.ctx), /deploy tool failed/);
     const made = t.fabric.items.filter((i) => i.type === 'AppBackend');
     assert.deepEqual(made.map((i) => i.displayName), ['Analytics Hub']);
     assert.equal(findDeployment(t.config.fabricApp.rayfin?.deployments, 'ws-1')?.fabricItemId, made[0].id);
@@ -657,7 +657,7 @@ test('app: a prebuilt deploy that fails keeps what Rayfin recorded, and needs it
   try {
     const half = t.fabric.add('AppBackend', 'valuelens', null);
     t.config.fabricApp.rayfin = { deployments: { active: 'x', deployments: { x: { fabricWorkspaceId: 'ws-1', fabricItemId: half.id } } } };
-    await assert.rejects(deployApp(t.ctx), /rayfin up" failed/);
+    await assert.rejects(deployApp(t.ctx), /deploy tool failed/);
     assert.equal(t.config.fabricApp.rayfin?.deployments.deployments.x.fabricItemId, half.id);
     assert.ok(!t.fabric.calls.some((c) => c.startsWith('createItem')), 'the half-made app is ours, so it is reused');
     assert.equal(t.config.fabricApp.rayfin?.env, 'CUSTOMER=1\n');

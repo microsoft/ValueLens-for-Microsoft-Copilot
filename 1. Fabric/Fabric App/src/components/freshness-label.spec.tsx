@@ -41,4 +41,18 @@ describe("FreshnessLabel", () => {
         const { container } = render(<FreshnessLabel destination="assumptions" />);
         expect(container).toBeEmptyDOMElement();
     });
+
+    it("reads any set of sources, as behind a report pack", () => {
+        useSourceFreshness.mockReturnValue({ auditLog: "2026-10-07T00:00:00", cowork: "2026-09-28T00:00:00" });
+        render(<FreshnessLabel sources={["auditLog", "cowork"]} />);
+        expect(useSourceFreshness).toHaveBeenCalledWith(["auditLog", "cowork"]);
+        expect(screen.getByText("Data: Audit log to 7 Oct · Cowork to week of 28 Sept")).toBeInTheDocument();
+    });
+
+    it("uses dates already read rather than reading them again", () => {
+        useSourceFreshness.mockReturnValue({});
+        render(<FreshnessLabel sources={["auditLog"]} dates={{ auditLog: "2026-10-07T00:00:00" }} />);
+        expect(useSourceFreshness).toHaveBeenCalledWith([]);
+        expect(screen.getByText("Data: Audit log to 7 Oct")).toBeInTheDocument();
+    });
 });

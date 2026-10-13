@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { useStageFilter } from "@/hooks/stage-filter.context";
 import { GlossaryStage } from "./glossary-stage";
 import { SignalImpactStage } from "./signal-impact-stage";
 
@@ -14,10 +15,11 @@ import { SignalImpactStage } from "./signal-impact-stage";
  * activity, so no filter applies.
  */
 export function AppendixScreen() {
+    const { show } = useStageFilter();
     return (
         <div className="flex flex-col gap-800">
-            <GlossaryStage />
-            <SignalImpactStage />
+            {show("glossary") && <GlossaryStage />}
+            {show("signal-impact") && <SignalImpactStage />}
         </div>
     );
 }

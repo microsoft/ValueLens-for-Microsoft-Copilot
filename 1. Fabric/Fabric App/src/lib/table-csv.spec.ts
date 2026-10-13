@@ -8,7 +8,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DataTable } from "@microsoft/fabric-visuals-core";
 import { fileNameFor } from "./download";
-import { downloadTableCsv, tableToCsv } from "./table-csv";
+import { csvFileName, downloadTableCsv, tableToCsv } from "./table-csv";
 
 const table: DataTable = {
     columns: [
@@ -63,6 +63,13 @@ describe("fileNameFor", () => {
 
     it("falls back to a generic name when the title has no letters", () => {
         expect(fileNameFor("—", "csv")).toBe("chart.csv");
+    });
+});
+
+describe("csvFileName", () => {
+    it("adds the date the data runs to when it is known", () => {
+        expect(csvFileName("Monthly trend")).toBe("monthly-trend.csv");
+        expect(csvFileName("Monthly trend", "2026-10-05T00:00:00Z")).toBe("monthly-trend-data-to-2026-10-05.csv");
     });
 });
 

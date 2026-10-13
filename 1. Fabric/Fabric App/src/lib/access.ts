@@ -46,3 +46,16 @@ export function accessRequestMailto(access: AccessInfo | undefined, link = appLi
     const body = `Hi,\n\nPlease add me to the Analytics Hub viewers${group} so I can open ${link}\n\nThanks`;
     return `mailto:${encodeURIComponent(access.contact)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
+
+/** A prefilled email asking the install's contact to choose which orgs the person sees. */
+export function scopeRequestMailto(access: AccessInfo | undefined, link = appLink()): string | null {
+    if (!access?.contact) return null;
+    const subject = "Which orgs I can see in Analytics Hub";
+    const body = `Hi,\n\nI can open ${link} but haven't been given any orgs to see yet. Please give me a scope.\n\nThanks`;
+    return `mailto:${encodeURIComponent(access.contact)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+/** Who can choose what people see, for those who can't. */
+export function adminOnlyCopy(contact?: string): string {
+    return `Only an Analytics Hub admin can choose what people see.${contact ? ` Ask ${contact}.` : ""}`;
+}

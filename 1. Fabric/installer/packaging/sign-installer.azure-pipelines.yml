@@ -97,7 +97,7 @@ jobs:
           node packaging/finish-exe.js "$env:TOSIGN\AnalyticsHubInstaller.exe" --require-signed --repo $env:BUILD_REPOSITORY_NAME --notes "$env:TOSIGN\release-notes.md"
           if ($LASTEXITCODE) { throw 'The signed exe failed its checks.' }
         displayName: Check the signature, write the hash and the release notes
-        workingDirectory: 1. Fabric/installer
+        workingDirectory: installer
         env:
           TOSIGN: $(ToSign)
 

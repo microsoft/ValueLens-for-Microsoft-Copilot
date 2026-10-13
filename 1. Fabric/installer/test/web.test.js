@@ -2,13 +2,14 @@
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { request } from 'node:http';
+import { PassThrough } from 'node:stream';
 import { test } from 'node:test';
 import { emptyConfig } from '../src/config.js';
 import { memoApi, rewindable } from '../src/install.js';
-import { mirror, startServer } from '../src/server.js';
+import { mirror, reopenOnEnter, startServer } from '../src/server.js';
 import { collectChoices } from '../src/steps/plan.js';
 import { createWebUi, plainText, SECRET_MASK, toSegments } from '../src/web-ui.js';
-import { describeRecord, WEB_COMMANDS } from '../src/web-session.js';
+import { describeRecord, prereqsSnapshot, WEB_COMMANDS } from '../src/web-session.js';
 import { fakeCtx } from './fakes.js';
 
 const SRC = new URL('../src/', import.meta.url);
@@ -403,6 +404,59 @@ test('server: start passes through; quit waits for a running command', async () 
   }
 });
 
+test('server: start fresh and keep the record pass through, behind the same checks', async () => {
+  let fresh = /** @type {any} */ ({ ok: true, archived: 'C:\\Docs\\valuelens-install.20260507-090302.json' });
+  let kept = 0;
+  const { server, post } = await serve({ startFresh: () => fresh, keepRecord: () => (kept++, { ok: true }) });
+  try {
+    const ok = await post('/api/fresh', {});
+    assert.equal(ok.status, 200);
+    assert.deepEqual(JSON.parse(ok.body), fresh);
+    fresh = { ok: false, status: 409, error: 'Wait for the current command to finish.' };
+    const busy = await post('/api/fresh', {});
+    assert.equal(busy.status, 409);
+    assert.equal(JSON.parse(busy.body).error, 'Wait for the current command to finish.');
+    assert.equal((await post('/api/keep', {})).status, 200);
+    assert.equal(kept, 1);
+
+    assert.equal((await call(server.port, { method: 'POST', path: '/api/fresh', body: '{}', headers: { 'Content-Type': 'application/json', Origin: `http://127.0.0.1:${server.port}` } })).status, 401);
+    assert.equal((await post('/api/fresh', {}, { Origin: 'http://evil.example' })).status, 403);
+    assert.equal((await post('/api/keep', {}, { 'Content-Type': 'text/plain' })).status, 415);
+    assert.equal(kept, 1);
+  } finally {
+    server.close();
+    await server.done;
+  }
+});
+
+test('server: a page without the link says to press Enter in the installer window, and Enter opens it again', async () => {
+  const { server } = await serve();
+  try {
+    const bare = await call(server.port, { path: '/' });
+    assert.equal(bare.status, 401);
+    assert.match(bare.body, /needs the installer's link\. Go back to .* and press Enter there to open the installer again\./);
+    assert.match((await call(server.port, { path: '/?t=wrong' })).body, /expired\. Go back to .* press Enter/);
+    assert.match(JSON.parse((await call(server.port, { path: '/api/state' })).body).error, /press Enter/);
+  } finally {
+    server.close();
+    await server.done;
+  }
+
+  const input = new PassThrough();
+  let opened = 0;
+  const stop = reopenOnEnter(input, () => opened++);
+  input.write('x');
+  await tick();
+  assert.equal(opened, 0);
+  input.write('\r\n');
+  await tick();
+  assert.equal(opened, 1, 'one Enter, one page');
+  stop();
+  input.write('\n');
+  await tick();
+  assert.equal(opened, 1);
+});
+
 test('server: Back works once there is an earlier question', async () => {
   const { ui, server, post } = await serve();
   try {
@@ -642,4 +696,14 @@ test('page: every command has a row, or for prerequisites its own panel; Check t
   assert.equal(describeRecord(config).historyDays, 90, 'the installed view shows how much audit history is loaded');
   assert.equal(describeRecord({ ...config, target: 'azure' }).target, 'azure', 'the page shows only that target\'s stages');
   assert.match(app, /backfillDays/, 'the Run row can load more history');
+});
+
+test('prereqsSnapshot: says whether the signer can assign directory roles, from an active Global or Privileged Role Administrator', () => {
+  const row = (/** @type {string} */ status) => /** @type {any} */ ({ id: 'consent-role', label: 'x', neededFor: 'x', status });
+  const yes = prereqsSnapshot('admin@contoso.com', [row('met')]);
+  assert.equal(yes.canAssignDirectoryRoles, true);
+  assert.equal(yes.upn, 'admin@contoso.com');
+  assert.equal(prereqsSnapshot('admin@contoso.com', [row('eligible')]).canAssignDirectoryRoles, false, 'eligible is not active');
+  assert.equal(prereqsSnapshot('admin@contoso.com', [row('missing')]).canAssignDirectoryRoles, false);
+  assert.equal(prereqsSnapshot('admin@contoso.com', []).canAssignDirectoryRoles, false);
 });

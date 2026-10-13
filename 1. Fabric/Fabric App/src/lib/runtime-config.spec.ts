@@ -24,6 +24,7 @@ import {
     loadRuntimeConfig,
     loadSemanticModels,
     parseAccess,
+    parseAsk,
     parseModules,
     parseReporting,
     parseSemanticModels,
@@ -192,6 +193,11 @@ describe("parseAccess", () => {
         })).toEqual({ groupId: "g-1", groupName: "Analytics Hub Viewers", contact: "admin@example.com", requestUrl: "https://example.com/r" });
     });
 
+    it("keeps the org attribute when org-scoped access is on", () => {
+        expect(parseAccess({ access: { groupId: "g-1", rlsOrgAttribute: "department" } })).toEqual({ groupId: "g-1", rlsOrgAttribute: "department" });
+        expect(parseAccess({ access: { groupId: "g-1", rlsOrgAttribute: 7 } })).toEqual({ groupId: "g-1" });
+    });
+
     it("drops a request link that isn't https", () => {
         expect(parseAccess({ access: { groupId: "g-1", requestUrl: "javascript:alert(1)" } })).toEqual({ groupId: "g-1" });
     });
@@ -199,6 +205,41 @@ describe("parseAccess", () => {
     it("ignores access without a group", () => {
         expect(parseAccess({})).toBeUndefined();
         expect(parseAccess({ access: { contact: "admin@example.com" } })).toBeUndefined();
+    });
+});
+
+describe("parseAsk", () => {
+    const agent = { workspaceId: "11111111-2222-3333-4444-555555555555", itemId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" };
+
+    it("reads a Fabric install's data agent", () => {
+        expect(parseAsk({ ask: agent }, "fabric")).toEqual({ mode: "fabric", ...agent });
+    });
+
+    it("reads an Azure host's chat", () => {
+        expect(parseAsk({ ask: { mode: "chat" } }, "azure")).toEqual({ mode: "chat" });
+    });
+
+    it("leaves Ask unconfigured for anything else", () => {
+        expect(parseAsk({}, "fabric")).toBeUndefined();
+        expect(parseAsk({ ask: { workspaceId: agent.workspaceId, itemId: "../x" } }, "fabric")).toBeUndefined();
+        expect(parseAsk({ ask: { mode: "chat" } }, "fabric")).toBeUndefined();
+        expect(parseAsk({ ask: agent }, "azure")).toBeUndefined();
+    });
+
+    it("carries through loadRuntimeConfig on both hosts", async () => {
+        stubFiles({
+            "/rayfin.config.json": { body: JSON.stringify(deployedRayfin) },
+            [FABRIC_CONFIG_PATH]: { body: JSON.stringify({ ...deployedModels, ask: agent }) },
+        });
+        await loadRuntimeConfig();
+        expect(runtimeConfig().ask).toEqual({ mode: "fabric", ...agent });
+
+        resetRuntimeConfig();
+        stubFiles({
+            [APP_CONFIG_PATH]: { body: JSON.stringify({ host: "azure", tenantId: "t", clientId: "c", apiScope: "s", semanticModels: deployedModels.semanticModels, ask: { mode: "chat" } }) },
+        });
+        await loadRuntimeConfig();
+        expect(runtimeConfig().ask).toEqual({ mode: "chat" });
     });
 });
 

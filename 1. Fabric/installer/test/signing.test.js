@@ -48,12 +48,12 @@ test('signing: a broken, foreign or untimestamped signature fails', () => {
 
 test('signing: unsigned release notes say how to get past the warnings and check the hash', () => {
   const notes = releaseNotes({ repo: 'octo/hub', sha256: HASH.toUpperCase(), signed: false });
-  assert.match(notes, /https:\/\/github\.com\/octo\/hub\/tree\/main\/1\.%20Fabric#install/);
+  assert.match(notes, /https:\/\/github\.com\/octo\/hub\/tree\/main\/fabric#install/);
   assert.ok(notes.includes(`\`${HASH}\``));
   assert.ok(notes.includes(`Get-FileHash .\\${EXE_NAME} -Algorithm SHA256`));
   assert.match(notes, /\*\*Keep\*\*, \*\*Show more\*\* and \*\*Keep anyway\*\*/);
   assert.match(notes, /\*\*More info\*\*, then \*\*Run anyway\*\*/);
-  assert.match(notes, /octo\/hub\/blob\/main\/1\.%20Fabric\/installer\/README\.md#without-the-exe/);
+  assert.match(notes, /octo\/hub\/blob\/main\/installer\/README\.md#without-the-exe/);
   assert.doesNotMatch(notes, /Digital Signatures/);
 });
 

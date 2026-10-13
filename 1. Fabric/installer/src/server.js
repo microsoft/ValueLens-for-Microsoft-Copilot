@@ -11,6 +11,7 @@ import { installerWindow } from './launch.js';
 import { createSession } from './web-session.js';
 import { clearStaged, sizeOk, stageUpload } from './staging.js';
 import { c } from './ui.js';
+import { checkForUpdate } from './update-check.js';
 import { MAX_UPLOAD_BYTES } from './uploads.js';
 import { createWebUi } from './web-ui.js';
 
@@ -187,13 +188,13 @@ export async function startServer(o) {
     const method = req.method ?? 'GET';
 
     if (method === 'GET' && url.pathname === '/' && url.searchParams.has('t')) {
-      if (!tokenOk(url.searchParams.get('t') ?? '')) return page(res, 403, `That link has expired. Use the one the installer printed in ${installerWindow()}.`);
+      if (!tokenOk(url.searchParams.get('t') ?? '')) return page(res, 403, `That link has expired. ${reopenHint()}`);
       res.writeHead(303, { ...HEADERS, Location: '/', 'Set-Cookie': `${cookieName()}=${token}; HttpOnly; SameSite=Strict; Path=/` });
       return res.end();
     }
     if (!tokenOk(cookie(req.headers.cookie, cookieName()))) {
-      if (url.pathname === '/') return page(res, 401, `Open the link the installer printed in ${installerWindow()}.`);
-      return json(res, 401, { error: `Open the link the installer printed in ${installerWindow()}.` });
+      if (url.pathname === '/') return page(res, 401, `This page needs the installer's link. ${reopenHint()}`);
+      return json(res, 401, { error: reopenHint() });
     }
 
     if (method === 'GET') {
@@ -235,6 +236,12 @@ export async function startServer(o) {
         const ok = ui.back();
         return ok ? json(res, 200, { ok: true }) : json(res, 409, { error: 'There\'s no earlier question to go back to.' });
       }
+      case '/api/fresh': {
+        const r = session.startFresh();
+        return r.ok ? json(res, 200, r) : json(res, r.status, { error: r.error });
+      }
+      case '/api/keep':
+        return json(res, 200, session.keepRecord());
       case '/api/quit':
         if (session.running) return json(res, 409, { error: `"${session.running}" is still running.` });
         json(res, 200, { ok: true });
@@ -269,6 +276,27 @@ export async function startServer(o) {
   port = /** @type {import('node:net').AddressInfo} */ (server.address()).port;
   const url = `http://${host}:${port}/`;
   return { url, launchUrl: `${url}?t=${token}`, port, token, done, close };
+}
+
+/** What a page opened without the installer's link says to do. */
+export const reopenHint = () => `Go back to ${installerWindow()} and press Enter there to open the installer again. Or open the link it printed.`;
+
+/**
+ * Reopens the page each time Enter is pressed in the terminal.
+ * @param {NodeJS.ReadableStream} input
+ * @param {() => void} open
+ * @returns {() => void} stops listening
+ */
+export function reopenOnEnter(input, open) {
+  /** @param {Buffer | string} chunk */
+  const onData = (chunk) => {
+    for (const ch of String(chunk)) if (ch === '\n' || ch === '\r') return open();
+  };
+  input.on('data', onData);
+  return () => {
+    input.off('data', onData);
+    input.pause?.();
+  };
 }
 
 /**
@@ -352,7 +380,7 @@ export function mirror(write) {
 
 /**
  * `valuelens-install --ui`: serves the wizard until the page closes it or Ctrl+C.
- * @param {{ configFile: string, sourceDir?: string, tenantId?: string, method?: import('./web-session.js').Method, open: boolean, version: string, debug?: (m: string) => void, write?: (s: string) => void }} o
+ * @param {{ configFile: string, sourceDir?: string, tenantId?: string, method?: import('./web-session.js').Method, open: boolean, version: string, debug?: (m: string) => void, write?: (s: string) => void, checkUpdate?: () => Promise<import('./update-check.js').Update | null>, stdin?: NodeJS.ReadableStream & { isTTY?: boolean } }} o
  */
 export async function runWizard(o) {
   const write = o.write ?? ((/** @type {string} */ s) => process.stdout.write(s));
@@ -363,7 +391,18 @@ export async function runWizard(o) {
   write(`${c.bold(`Analytics Hub installer ${o.version}`)}\n`);
   write(`${o.open ? 'The installer is opening in your browser. If it doesn\'t, go to:' : 'Open the installer in your browser:'}\n\n  ${server.launchUrl}\n\n`);
   write(`${c.dim('Only this computer can reach it. Keep this window open; press Ctrl+C to stop.')}\n`);
+  const input = o.stdin ?? process.stdin;
+  const stopReopen = input.isTTY ? reopenOnEnter(input, () => openBrowser(server.launchUrl)) : () => {};
+  if (input.isTTY) write(`${c.dim('Press Enter here to reopen the page.')}\n`);
   if (o.open) openBrowser(server.launchUrl);
+  (o.checkUpdate ?? (() => checkForUpdate({ version: o.version })))()
+    .then((u) => {
+      if (!u) return;
+      session.setUpdate(u);
+      write(`\n${c.yellow('!')} Installer ${u.version} is available. Download it from ${u.url}, then choose Repair or change.\n`);
+    })
+    .catch(() => {});
   await server.done;
+  stopReopen();
   write('Closed the installer.\n');
 }

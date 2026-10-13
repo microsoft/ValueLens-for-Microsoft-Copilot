@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { useStageFilter } from "@/hooks/stage-filter.context";
 import { AgentRegistryStage } from "./agent-registry-stage";
 import { LeaderboardStage } from "./leaderboard-stage";
 
@@ -14,10 +15,11 @@ import { LeaderboardStage } from "./leaderboard-stage";
  * page; the registry itself is Governance's.
  */
 export function LeaderboardsScreen() {
+    const { show } = useStageFilter();
     return (
         <div className="flex flex-col gap-800">
-            <LeaderboardStage />
-            <AgentRegistryStage />
+            {show("leaderboard") && <LeaderboardStage />}
+            {show("agents") && <AgentRegistryStage />}
         </div>
     );
 }

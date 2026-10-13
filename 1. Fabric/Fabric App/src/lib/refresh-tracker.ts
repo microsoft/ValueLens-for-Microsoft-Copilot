@@ -37,6 +37,11 @@ export function beginRefresh(): () => void {
     };
 }
 
+/** Whether any refetch is in flight right now, for code outside React. */
+export function isRefreshPending(): boolean {
+    return pending > 0;
+}
+
 /** True while any query is refetching behind stale data. */
 export function useIsRefreshing(): boolean {
     return useSyncExternalStore(

@@ -4,12 +4,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { orgUrl } from './clients/dataverse.js';
-import { DEFAULT_CONFIG_FILE, loadConfig, normaliseResourceGraph } from './config.js';
+import { archiveConfig, DEFAULT_CONFIG_FILE, loadConfig, normaliseResourceGraph } from './config.js';
 import { HttpError } from './http.js';
 import { connect, createCtx, preview, runCommand } from './install.js';
 import { commandLine } from './launch.js';
 import { runWizard } from './server.js';
 import { loadSources } from './sources.js';
+import { recordWorkspaceGone, staleRecordMessage } from './steps/fabric.js';
 import { isResumeLater } from './steps/identity.js';
 import { isManagementGroupId, managementGroupId } from './steps/resource-graph.js';
 import { isVivaId } from './transform/dataflow.js';
@@ -263,6 +264,24 @@ export function applyDataFlags(config, args) {
 }
 
 /**
+ * When the install record's workspace is gone, offers to set the record aside and start fresh.
+ * Only install can start fresh; other commands stop and say so.
+ * @param {{ ui: import('./ui.js').Ui, config: import('./config.js').InstallConfig, file: string, fabric: { getWorkspace: (id: string) => Promise<any> }, tenantId?: string, command: string }} o
+ * @returns {Promise<boolean>} whether the record was set aside
+ */
+export async function startFresh(o) {
+  const gone = await recordWorkspaceGone({ config: o.config, fabric: o.fabric, tenantId: o.tenantId });
+  if (!gone) return false;
+  const why = staleRecordMessage(gone);
+  if (o.command !== 'install') throw new Error(`${why} To start fresh, run install.`);
+  if (o.ui.yes) throw new Error(`${why} To start fresh, run install without --yes.`);
+  o.ui.warn(why);
+  if (!(await o.ui.confirm('Start fresh? The old install record is kept beside the new one, renamed with the date and time.', true))) return false;
+  o.ui.ok(`The old install record is now ${archiveConfig(o.file)}`);
+  return true;
+}
+
+/**
  * @param {string[]} argv
  * @returns {Promise<number>} Exit code.
  */
@@ -285,7 +304,9 @@ export async function main(argv) {
       return 0;
     }
     const ui = createUi({ yes: args.yes });
-    const { config, existed } = loadConfig(args.configFile);
+    const loaded = loadConfig(args.configFile);
+    let config = loaded.config;
+    const existed = loaded.existed;
     if (args.target) config.target = args.target;
     const sources = loadSources(args.sourceDir);
     applyDataFlags(config, args);
@@ -305,6 +326,11 @@ export async function main(argv) {
       ui,
       debug,
     });
+    if (existed && args.command !== 'prereqs' && (await startFresh({ ui, config, file: args.configFile, fabric: api.fabric, tenantId: user.tenantId, command: args.command }))) {
+      config = loadConfig(args.configFile).config;
+      if (args.target) config.target = args.target;
+      applyDataFlags(config, args);
+    }
     const ctx = createCtx({ ui, config, file: args.configFile, api, user, sources });
     ctx.csvFiles = args.csvFiles;
     if (args.secretInNotebook) ctx.secretInNotebook = true;

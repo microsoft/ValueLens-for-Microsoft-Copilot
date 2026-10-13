@@ -31,6 +31,20 @@ internal static class Launcher
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern uint GetConsoleProcessList(uint[] processList, uint processCount);
 
+    [DllImport("kernel32.dll")]
+    private static extern uint SetThreadExecutionState(uint flags);
+
+    private const uint EsContinuous = 0x80000000;
+    private const uint EsSystemRequired = 0x00000001;
+    // Keeps the PC from sleeping until it's reset. The display can still turn off.
+    internal const uint AwakeFlags = EsContinuous | EsSystemRequired;
+
+    // Asks Windows not to sleep while the installer runs, or lets it sleep again. False if Windows refused.
+    internal static bool KeepAwake(bool on)
+    {
+        return SetThreadExecutionState(on ? AwakeFlags : EsContinuous) != 0;
+    }
+
     private static int Main(string[] args)
     {
         // Double-clicked: this window closes with the installer, so pause on a failure to show it.
@@ -79,10 +93,19 @@ internal static class Launcher
 
         // Ctrl+C reaches the installer too; wait for it to finish cleaning up.
         Console.CancelKeyPress += delegate(object sender, ConsoleCancelEventArgs e) { e.Cancel = true; };
-        using (Process p = Process.Start(psi))
+        // A PC that sleeps part way through setup stops it, so stay awake until the installer exits.
+        KeepAwake(true);
+        try
         {
-            p.WaitForExit();
-            return p.ExitCode;
+            using (Process p = Process.Start(psi))
+            {
+                p.WaitForExit();
+                return p.ExitCode;
+            }
+        }
+        finally
+        {
+            KeepAwake(false);
         }
     }
 

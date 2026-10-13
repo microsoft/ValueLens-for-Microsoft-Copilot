@@ -60,7 +60,9 @@ when something a published download needs is missing; `--out <dir>` writes the e
 The [`installer-exe`](.github/workflows/installer-exe.yml) workflow builds, tests and smoke-tests
 the exe on pull requests that touch `packaging/`. To publish one, set the version in
 `1. Fabric/installer/package.json` and push a tag `installer-v<version>`. The workflow drafts a
-release with the exe, its SHA-256 and the release notes from `packaging/finish-exe.js`.
+release with the exe, its SHA-256 and the release notes from `packaging/finish-exe.js`. The same
+tag makes [`azure-images`](.github/workflows/azure-images.yml) push
+`ghcr.io/microsoft/valuelens-jobs` and `valuelens-web` with that version, which Azure installs pull.
 
 Signing happens in CI, never on your computer. Run the ESRP pipeline
 ([`packaging/sign-installer.azure-pipelines.yml`](1.%20Fabric/installer/packaging/sign-installer.azure-pipelines.yml))

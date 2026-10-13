@@ -98,9 +98,12 @@ export const scaleProfile = (scale) => (scale === 'large' || scale === 'standard
  * @property {boolean} [agent365Csv]  Agent 365 comes from its admin center export: the lander replaces the registry load.
  * @property {string} [coworkDataflowId]  Refreshes this Dataflow, which pulls Cowork credits from Viva Insights, before the Viva load.
  * @property {boolean} [resourceGraph]  Reads agent configuration and Foundry from Azure Resource Graph, after Agent 365.
+ * @property {boolean} [access]  Org-scoped access is on: loads the access tables after org data, before the models refresh.
  */
 
 export const REFRESH_ACTIVITY = 'Refresh_Semantic_Model';
+/** Loads access_scope and rebuilds access_people. Only with org-scoped access on. */
+export const ACCESS_ACTIVITY = 'Run_Access_Scope';
 export const CONSUMPTION_REFRESH_ACTIVITY = 'Refresh_Consumption_Model';
 export const AGENT_EVALUATOR_ACTIVITY = 'Run_Agent_Evaluator_Transcripts';
 export const AGENT_EVALUATOR_REFRESH_ACTIVITY = 'Refresh_Agent_Evaluator_Model';
@@ -167,6 +170,7 @@ export const LANE_ORDER = [
   RESOURCE_GRAPH_ACTIVITY,
   'Conditionally_Run_Org_Data',
   WORKDAY_ACTIVITY,
+  ACCESS_ACTIVITY,
   'Conditionally_Run_M365_Activity',
   'Conditionally_Run_Product_Feedback',
   'Conditionally_Run_Defender',
@@ -308,7 +312,7 @@ function refreshStep(settings, o) {
 function refreshActivity(activities, settings) {
   const has = (/** @type {string} */ name) => activities.some((a) => a.name === name);
   const dependsOn = [{ activity: 'Run_Audit_Log_Processor', dependencyConditions: ['Succeeded'] }];
-  for (const name of [RESOURCE_GRAPH_ACTIVITY, 'Conditionally_Run_Org_Data', WORKDAY_ACTIVITY, 'Conditionally_Run_M365_Activity', 'Conditionally_Run_Product_Feedback', 'Conditionally_Run_Defender']) {
+  for (const name of [RESOURCE_GRAPH_ACTIVITY, 'Conditionally_Run_Org_Data', WORKDAY_ACTIVITY, ACCESS_ACTIVITY, 'Conditionally_Run_M365_Activity', 'Conditionally_Run_Product_Feedback', 'Conditionally_Run_Defender']) {
     if (has(name)) dependsOn.push({ activity: name, dependencyConditions: ['Completed'] });
   }
   return refreshStep(settings, {
@@ -558,6 +562,16 @@ export function buildPipeline(template, settings) {
         name: WORKDAY_ACTIVITY,
         description: 'Adds or overrides org fields in copilot_org_data from the Workday export in Files/org_workday. Does nothing without an export.',
         timeout: '0.00:30:00',
+      }),
+    );
+  }
+  if (settings.access) {
+    filled.properties.activities.push(
+      notebookStep(settings, {
+        key: 'accessScope',
+        name: ACCESS_ACTIVITY,
+        description: 'Org-scoped access: loads who sees what from Files/analytics_hub_access/access_scope.csv into access_scope, and rebuilds access_people from org data, so the models refresh with current scopes.',
+        timeout: '0.00:20:00',
       }),
     );
   }

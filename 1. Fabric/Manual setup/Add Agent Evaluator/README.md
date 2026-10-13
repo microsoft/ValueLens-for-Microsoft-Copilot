@@ -80,5 +80,13 @@ Publish to your workspace. Schedule the notebook, then the report's refresh **af
 
 Copied from [microsoft/AgentEvaluator-for-Copilot-Studio ↗](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio)
 (MIT) at commit `e37b1ac`, where the full documentation lives. The notebook adds a UPN lookup
-(cell *8c*) so department views work; set `RESOLVE_UPNS = False` to turn it off. The report's
-**Credit Consumption** page stays empty here: use [Add Credit Consumption](../Add%20Credit%20Consumption/).
+(cell *8c*) so department views work; set `RESOLVE_UPNS = False` to turn it off. In Fabric mode
+the report's **Credit Consumption** page reads `credit_consumption_agent`, `_user` and `_tenant`
+when they have rows, else the tables [Add Credit Consumption](../Add%20Credit%20Consumption/)
+loads (`studio_agent`, `studio_user`, `studio_tenant_daily`, latest snapshot). Without either,
+the page stays empty.
+
+The template also differs from upstream in its model, to refresh on large tenants:
+`'Agent Turns'[Response Seconds]` scans only the columns it needs, and **Agent Name Map** keeps
+both key columns unique (`AgentNameMapRows`), giving a blank or already claimed schema an
+`(unmatched) <name>` placeholder. `scripts/Update-Model-Refresh-Fixes.py` applies these changes.

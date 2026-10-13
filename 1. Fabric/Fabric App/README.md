@@ -14,7 +14,7 @@ You need:
 - A published ValueLens semantic model from any path, 1 to 4.
 - A workspace on Fabric capacity (F2 or larger, or a trial). *My workspace* won't work.
 - The tenant settings **Fabric Apps (preview)** and **Semantic Model Execute Queries REST API** turned on.
-- [Node.js 22.13 or later](https://nodejs.org/).
+- [Node.js](https://nodejs.org/) 24.15 or later, or 22.22 or later.
 
 From this folder (`1. Fabric/Fabric App`):
 
@@ -38,6 +38,10 @@ From this folder (`1. Fabric/Fabric App`):
    object to `fabric.config.json` so the app shows who to ask and links to the group:
    `{ "groupId": "<object id>", "groupName": "...", "contact": "you@example.com", "requestUrl": "https://..." }`
    (`requestUrl` is optional and must be https).
+6. Optional: to link the **Ask** page to a Fabric data agent, add
+   `"ask": { "workspaceId": "<workspace id>", "itemId": "<data agent id>" }` to `fabric.config.json`.
+   The installer creates the agent and adds this for you; see [Ask](../installer/README.md#ask).
+   Without it the page lists suggested questions and how to turn Ask on.
 
 To update it, run `npx rayfin up` again.
 
@@ -67,6 +71,28 @@ only with people who should.
   **Use research** puts them back.
 
 The app saves these in a small SQL database under its item. The Power BI report doesn't see them.
+
+## Reports
+
+A report pack is a named, ordered list of sections taken from any page. Packs are listed under
+**Reports** in the sidebar.
+
+- **Built-in packs.** *Exec pre-read*, *Finance weekly* and *Adoption review* come with the app.
+  You can't edit or delete them, but **Save a copy** starts a new pack from one.
+- **Your packs.** **New pack** opens an editor where you name the pack, tick sections from each
+  page, and put them in order. On Fabric anyone who can open the app can save, edit or delete a
+  pack, and it changes for everyone. On Azure that needs the `AnalyticsHub.Admin` role. Packs are
+  stored with the other settings: in the app's SQL database on Fabric, and in Table Storage on
+  Azure.
+- **Missing sections.** A pack skips a section whose page is hidden because its optional data
+  hasn't arrived, and says which ones it left out.
+- **Download PDF** and **Download PowerPoint** are on every page and every pack. Both show the
+  filters in use and the date the data runs to, and the file is named after it, such as
+  `exec-pre-read-data-to-2026-10-11.pdf`. The PDF uses the browser's print dialog: choose
+  **Save as PDF**. Where the browser can't open a print dialog, the report downloads as an HTML
+  file you can print later.   The PowerPoint deck opens with a cover listing the filters, the
+    data dates and any sections left out, then has one slide per chart or table.
+- **Download CSV** on each chart and table also adds the data date to the file name.
 
 ## Change the app
 

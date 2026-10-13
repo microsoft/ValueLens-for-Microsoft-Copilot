@@ -10,6 +10,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { useCssTheme } from "@microsoft/fabric-visuals";
 import { FilterContext } from "@/hooks/filter.context";
+import { onlyStages, StageFilterContext, type StageFilter } from "@/hooks/stage-filter.context";
 import { ThemeContext } from "@/hooks/theme.context";
 import { useAppTheme } from "@/hooks/use-theme";
 import { defaultFilters } from "@/lib/filters";
@@ -92,7 +93,10 @@ function Themed({ children }: { children: ReactNode }) {
     return <ThemeContext.Provider value={{ isDark, toggleTheme, theme }}>{children}</ThemeContext.Provider>;
 }
 
-function renderScreen(dates: Partial<FilterOptions> = { firstDate: "2026-05-08", lastDate: "2026-07-06" }) {
+function renderScreen(
+    dates: Partial<FilterOptions> = { firstDate: "2026-05-08", lastDate: "2026-07-06" },
+    stages?: StageFilter,
+) {
     const options = { agentTypes: [], agentNames: [], activities: [], firstDate: undefined, lastDate: undefined, ...dates };
     render(
         <FilterContext.Provider
@@ -108,7 +112,13 @@ function renderScreen(dates: Partial<FilterOptions> = { firstDate: "2026-05-08",
             }}
         >
             <Themed>
-                <ExecutiveScreen />
+                {stages ? (
+                    <StageFilterContext.Provider value={stages}>
+                        <ExecutiveScreen />
+                    </StageFilterContext.Provider>
+                ) : (
+                    <ExecutiveScreen />
+                )}
             </Themed>
         </FilterContext.Provider>,
     );
@@ -127,6 +137,15 @@ describe("Executive summary", () => {
             "The bottom line",
             "Is it growing?",
             "Where it is landing",
+            "What needs attention",
+        ]);
+    });
+
+    it("shows only the stages a report pack holds", async () => {
+        renderScreen(undefined, onlyStages(["what-needs-attention", "the-bottom-line"]));
+        await waitFor(() => expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(2));
+        expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([
+            "The bottom line",
             "What needs attention",
         ]);
     });

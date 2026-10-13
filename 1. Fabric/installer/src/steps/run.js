@@ -186,7 +186,7 @@ export async function runPipeline(ctx, opts) {
     ui.note(`It runs in Fabric. Check on it with "${commandLine('status')}".`);
     return { jobId, status: 'NotStarted', started: true };
   }
-  ui.note(`${days ? firstLoadEstimate(days, config.scale) : ''}You can press Ctrl+C; the run carries on in Fabric.`);
+  ui.note(`${days ? firstLoadEstimate(days, config.scale) : ''}${ui.web ? 'You can close this window' : 'You can press Ctrl+C'}; the run carries on in Fabric.`);
   const job = await waitForJob(ctx, url, 'Pipeline');
   const ok = reportJob(ctx, job, 'Pipeline');
   const runs = TERMINAL.has(job?.status) ? await activityRuns(ctx, jobId, { startTimeUtc: job.startTimeUtc ?? startedAt, endTimeUtc: job.endTimeUtc }) : null;

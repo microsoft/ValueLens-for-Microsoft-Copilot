@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { useStageFilter } from "@/hooks/stage-filter.context";
 import { useMemo } from "react";
 import { CommercialTermsProvider } from "@/components/commercial-terms-provider";
 import { stageAnchor } from "@/components/destinations";
@@ -55,6 +56,7 @@ function ConsumptionPage() {
     const sources = useConsumptionSummary(consumptionSources());
     const azureSourceRow = useConsumptionSummary(azureSource()).row;
     const azure = useMemo(() => azureMode(azureSourceRow), [azureSourceRow]);
+    const { show, inPack } = useStageFilter();
     const azureCurrency =
         azure.kind === "solution" ? azure.currencies[0] : azure.kind === "foundry" ? azure.currency : undefined;
 
@@ -81,12 +83,12 @@ function ConsumptionPage() {
 
     return (
         <div className="flex flex-col gap-800">
-            <RatesBar azureCurrency={azureCurrency} />
-            <OverviewStage />
-            <BudgetRunwayStage options={options} azure={azure} sources={sources.row} />
-            <CoworkStage options={options} rates={rates} />
-            <StudioStage options={options} rates={rates} />
-            <AzureStage options={options} />
+            {!inPack && <RatesBar azureCurrency={azureCurrency} />}
+            {show("consumption-overview") && <OverviewStage />}
+            {show("budget-runway") && <BudgetRunwayStage options={options} azure={azure} sources={sources.row} />}
+            {show("cowork-credits") && <CoworkStage options={options} rates={rates} />}
+            {show("studio-credits") && <StudioStage options={options} rates={rates} />}
+            {show("azure-spend") && <AzureStage options={options} />}
         </div>
     );
 }

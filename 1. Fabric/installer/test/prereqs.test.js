@@ -5,7 +5,7 @@ import { armApi, ROLES } from '../src/clients/azure.js';
 import { FABRIC_ADMIN_ROLE, graphApi } from '../src/clients/graph.js';
 import { emptyConfig } from '../src/config.js';
 import { HttpError } from '../src/http.js';
-import { checkPrereqs } from '../src/prereqs.js';
+import { canAssignDirectoryRoles, checkPrereqs } from '../src/prereqs.js';
 
 const GA = '62e90394-69f5-4237-9190-012177145e10';
 const USER = /** @type {any} */ ({ id: 'user-1', upn: 'admin@contoso.com', tenantId: 't-1' });
@@ -55,7 +55,7 @@ const run = async (/** @type {any} */ over, config = emptyConfig()) => {
 
 test('checkPrereqs: a well-equipped admin meets everything; each item says what it is for and how to get it', async () => {
   const items = await checkPrereqs({ api: fakeApis(), user: USER, config: emptyConfig() });
-  assert.deepEqual(items.map((i) => i.id), ['consent-role', 'fabric-admin', 'power-platform-admin', 'register-apps', 'power-bi-pro', 'fabric-capacity', 'azure-rbac', 'key-vault', 'environments', 'tenant-settings']);
+  assert.deepEqual(items.map((i) => i.id), ['consent-role', 'fabric-admin', 'power-platform-admin', 'register-apps', 'power-bi-pro', 'copilot-licences', 'power-automate-premium', 'fabric-capacity', 'azure-rbac', 'key-vault', 'environments', 'viva-analyst', 'tenant-settings']);
   for (const i of items) {
     assert.ok(i.neededFor && i.howTo && i.label, i.id);
   }
@@ -75,14 +75,15 @@ test('checkPrereqs: a well-equipped admin meets everything; each item says what 
   assert.match(byId['tenant-settings'].detail, /only a Fabric Administrator can read/);
 });
 
-test('checkPrereqs: only active roles count; a PIM-eligible one is "eligible, activate first"', async () => {
+test('checkPrereqs: only active roles count; one you can activate in PIM says so, with a link', async () => {
   const eligible = await run({ roles: [], eligible: async () => [{ roleDefinitionId: GA, principalId: USER.id }] });
   assert.equal(eligible['consent-role'].status, 'eligible');
-  assert.match(eligible['consent-role'].detail, /Eligible, activate first: Global Administrator/);
+  assert.match(eligible['consent-role'].detail, /Not active yet: Global Administrator\. You can activate this role in Entra \(Privileged Identity Management\): https:\/\/entra\.microsoft\.com\//);
+  assert.doesNotMatch(eligible['consent-role'].detail, /PIM-eligible|Eligible/);
 
   const none = await run({ roles: [], eligible: async () => { throw new HttpError('403', { method: 'GET', url: 'x', status: 403 }); } });
   assert.equal(none['consent-role'].status, 'missing');
-  assert.match(none['consent-role'].detail, /Couldn't check PIM-eligible roles/);
+  assert.match(none['consent-role'].detail, /Couldn't check for roles you could activate yourself/);
   assert.match(none['consent-role'].howTo, /link for a Global Administrator/);
   assert.equal(none['register-apps'].status, 'met', 'users can register apps');
 
@@ -122,7 +123,7 @@ test('checkPrereqs: Azure access per subscription: Contributor alone is missing,
   assert.equal(rows.B.status, 'met');
   assert.match(rows.B.detail ?? '', /Contributor, User Access Administrator/, 'a role held through a group counts');
   assert.equal(rows.C.status, 'eligible');
-  assert.match(rows.C.detail ?? '', /Eligible, activate first: Owner/);
+  assert.match(rows.C.detail ?? '', /Not active yet: Owner\. You can activate it/);
   assert.equal(r['azure-rbac'].status, 'met');
   assert.match(r['azure-rbac'].detail, /1 of 3 subscriptions/);
 });
@@ -233,4 +234,59 @@ test('checkPrereqs: the Defender licence check only shows when Defender is picke
   assert.equal(lapsed['defender-licence'].status, 'missing');
   const unreadable = await run({ skusFn: async () => { throw new HttpError('403', { method: 'GET', url: 'x', status: 403 }); } }, config);
   assert.equal(unreadable['defender-licence'].status, 'unknown');
+});
+
+test('checkPrereqs: Fabric administrator says plainly it is only needed when the tenant settings are off', async () => {
+  const r = await run({ roles: [], eligible: async () => [{ roleDefinitionId: FABRIC_ADMIN_ROLE, principalId: USER.id }] });
+  assert.match(r['fabric-admin'].label, /only needed if the tenant settings below are off/);
+  assert.equal(r['fabric-admin'].status, 'eligible');
+  assert.match(r['fabric-admin'].detail, /You can activate this role in Entra \(Privileged Identity Management\)/);
+  for (const i of Object.values(r)) assert.doesNotMatch(`${i.label} ${i.detail} ${i.howTo}`, /PIM-eligible/, i.id);
+});
+
+test('checkPrereqs: Power Automate Premium is optional, needed only for the flows, and read from your own licences', async () => {
+  const none = await run({});
+  assert.equal(none['power-automate-premium'].status, 'missing');
+  assert.equal(none['power-automate-premium'].optional, true);
+  assert.match(none['power-automate-premium'].neededFor, /Copilot Studio credits/);
+  assert.match(none['power-automate-premium'].neededFor, /signs in to the flow/);
+  const premium = await run({ licences: [{ servicePlans: [{ servicePlanName: 'BI_AZURE_P2', provisioningStatus: 'Success' }, { servicePlanName: 'POWER_AUTOMATE_ATTENDED_RPA', provisioningStatus: 'Success' }] }] });
+  assert.equal(premium['power-automate-premium'].status, 'met');
+  assert.equal(premium['power-bi-pro'].status, 'met', 'one licence read serves both rows');
+  assert.match(premium['power-automate-premium'].detail, /Power Automate Premium/);
+  const perUser = await run({ licences: [{ servicePlans: [{ servicePlanName: 'FLOW_PER_USER', provisioningStatus: 'Success' }] }] });
+  assert.equal(perUser['power-automate-premium'].status, 'met');
+  const seeded = await run({ licences: [{ servicePlans: [{ servicePlanName: 'FLOW_O365_P3', provisioningStatus: 'Success' }, { servicePlanName: 'FLOW_PER_USER', provisioningStatus: 'PendingActivation' }] }] });
+  assert.equal(seeded['power-automate-premium'].status, 'missing', 'the Microsoft 365 flow plan has no premium connectors');
+});
+
+test('checkPrereqs: Viva Insights analyst can\'t be read, so it is optional and "couldn\'t check", and says it can wait', async () => {
+  const r = await run({});
+  assert.equal(r['viva-analyst'].status, 'unknown');
+  assert.equal(r['viva-analyst'].optional, true);
+  assert.match(r['viva-analyst'].detail, /^Couldn't check/);
+  assert.match(r['viva-analyst'].neededFor, /Insights Analyst role creates the query/);
+  assert.match(r['viva-analyst'].neededFor, /add it later/);
+});
+
+test('checkPrereqs: Microsoft 365 Copilot licences in the tenant are met once any are assigned', async () => {
+  const copilot = (/** @type {number} */ consumedUnits, sku = 'Microsoft_365_Copilot') => ({ skuPartNumber: sku, capabilityStatus: 'Enabled', consumedUnits, prepaidUnits: { enabled: 100 }, servicePlans: [{ servicePlanName: 'M365_COPILOT_APPS' }] });
+  const none = await run({ skus: [{ skuPartNumber: 'SPE_E5', consumedUnits: 50, servicePlans: [{ servicePlanName: 'EXCHANGE_S_ENTERPRISE' }] }] });
+  assert.equal(none['copilot-licences'].status, 'missing');
+  assert.match(none['copilot-licences'].detail, /No Microsoft 365 Copilot licences/);
+  const bought = await run({ skus: [copilot(0)] });
+  assert.equal(bought['copilot-licences'].status, 'missing');
+  assert.match(bought['copilot-licences'].detail, /Microsoft_365_Copilot, but none are assigned/);
+  const used = await run({ skus: [copilot(30), copilot(5, 'Microsoft_365_Copilot_EDU')] });
+  assert.equal(used['copilot-licences'].status, 'met');
+  assert.match(used['copilot-licences'].detail, /35 assigned \(Microsoft_365_Copilot, Microsoft_365_Copilot_EDU\)/);
+  const unreadable = await run({ skusFn: async () => { throw new HttpError('403', { method: 'GET', url: 'x', status: 403 }); } });
+  assert.equal(unreadable['copilot-licences'].status, 'unknown');
+});
+
+test('canAssignDirectoryRoles: true only with Global Administrator or Privileged Role Administrator active', async () => {
+  assert.equal(await canAssignDirectoryRoles(fakeApis()), true);
+  assert.equal(await canAssignDirectoryRoles(fakeApis({ roles: [{ roleTemplateId: 'e8611ab8-c189-46e8-94e1-60213ab1f814', displayName: 'Privileged Role Administrator' }] })), true);
+  assert.equal(await canAssignDirectoryRoles(fakeApis({ roles: [{ roleTemplateId: FABRIC_ADMIN_ROLE, displayName: 'Fabric Administrator' }] })), false);
+  assert.equal(await canAssignDirectoryRoles(fakeApis({ roles: [] })), false);
 });

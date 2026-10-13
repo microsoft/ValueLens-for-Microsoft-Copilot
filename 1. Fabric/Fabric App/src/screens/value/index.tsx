@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { useStageFilter } from "@/hooks/stage-filter.context";
 import { CommercialTermsProvider } from "@/components/commercial-terms-provider";
 import { ValueAssumptionsProvider } from "@/components/value-assumptions-provider";
 import { CONSUMPTION_CONFIGURED } from "./cost-vs-value-data";
@@ -21,15 +22,16 @@ import { ValueByHabitStage } from "./value-by-habit-stage";
  * cost. The last two stages share one rate and scenario.
  */
 export function ValueScreen() {
+    const { show } = useStageFilter();
     return (
         <CommercialTermsProvider readModel={CONSUMPTION_CONFIGURED}>
             <ValueAssumptionsProvider>
                 <div className="flex flex-col gap-800">
-                    <TasksStage />
-                    <SurfacesStage />
-                    <EstimatedValueStage />
-                    <ValueByHabitStage />
-                    <CostVsValueStage />
+                    {show("task-breakdown") && <TasksStage />}
+                    {show("task-breakdown") && <SurfacesStage />}
+                    {show("estimated-value") && <EstimatedValueStage />}
+                    {show("value-by-habit") && <ValueByHabitStage />}
+                    {show("cost-vs-value") && <CostVsValueStage />}
                 </div>
             </ValueAssumptionsProvider>
         </CommercialTermsProvider>

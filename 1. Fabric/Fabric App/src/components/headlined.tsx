@@ -6,6 +6,7 @@
 //-----------------------------------------------------------------------
 
 import type { ReactNode } from "react";
+import { CAPTURE_EXCLUDE_ATTR } from "@microsoft/fabric-visuals-extensibility";
 
 /** Room a one-line headline takes above a chart, so the plot keeps its height. */
 export const HEADLINE_SPACE = 40;
@@ -13,12 +14,17 @@ export const HEADLINE_SPACE = 40;
 /**
  * A chart with its one-sentence headline above it. Without a headline the
  * chart is returned as it is, so a thin result never shows an empty line.
+ *
+ * In an export the pair is one slide: the headline becomes the slide title,
+ * so it is left out of the captured picture.
  */
 export function Headlined({ text, children }: { text: string | undefined; children: ReactNode }) {
     if (!text) return <>{children}</>;
     return (
-        <div className="flex h-full flex-col gap-200">
-            <p className="text-[length:var(--text-300)] leading-300 text-foreground">{text}</p>
+        <div className="flex h-full flex-col gap-200" data-export="">
+            <p className="text-[length:var(--text-300)] leading-300 text-foreground" data-headline="" {...{ [CAPTURE_EXCLUDE_ATTR]: "" }}>
+                {text}
+            </p>
             <div className="min-h-0 flex-1">{children}</div>
         </div>
     );

@@ -29,3 +29,12 @@ export function rowChartHeight(rows: number, { perRow = 44, chrome = 160, min = 
 export function gridHeight(rows: number, { perRow = 32, chrome = 132, min = 240, max = 560 }: RowChartSizing & { max?: number } = {}): number {
     return Math.min(max, rowChartHeight(rows, { perRow, chrome, min }));
 }
+
+/**
+ * The key a chart remounts on: its row count, or undefined when its data
+ * isn't a table. A remount redraws a row chart at its new height.
+ */
+export function rowCountKey(data: unknown): number | undefined {
+    const rows = (data as { rows?: unknown } | null | undefined)?.rows;
+    return Array.isArray(rows) ? rows.length : undefined;
+}

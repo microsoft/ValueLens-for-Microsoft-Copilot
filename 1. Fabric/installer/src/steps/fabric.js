@@ -11,6 +11,7 @@ import { parseResourceId } from '../clients/azure.js';
 import { scheduleBody } from '../clients/fabric.js';
 import { normaliseResourceGraph, secretMode } from '../config.js';
 import { HttpError } from '../http.js';
+import { rlsOn } from '../transform/access.js';
 import { INLINE_SECRET_NOTE, MARKER, prepareNotebook, pyString, serialiseNotebook } from '../transform/notebook.js';
 import { buildPipeline, PIPELINE_CHANGE, PIPELINE_VERSION } from '../transform/pipeline.js';
 import { addMonths, SECRET_LIFETIME_MONTHS } from './identity.js';
@@ -72,6 +73,35 @@ export async function createdId(ctx, created, type, name) {
   if (!found) throw new Error(`Fabric reported that ${name} was created, but it isn't in the workspace.`);
   return found.id;
 }
+
+/**
+ * Whether the workspace an install record points at is gone, so the record is stale. Only a
+ * definite answer counts: Fabric says it isn't there, or the record is for another tenant. A 403,
+ * a network error or anything else returns null, and the record is used as it is.
+ * @param {{ config: import('../config.js').InstallConfig, fabric: { getWorkspace: (id: string) => Promise<any> }, tenantId?: string }} o
+ * @returns {Promise<{ workspace: string, reason: 'not-found' | 'other-tenant' } | null>}
+ */
+export async function recordWorkspaceGone({ config, fabric, tenantId }) {
+  const f = config.fabric;
+  if (config.target === 'azure' || !f?.workspaceId) return null;
+  const workspace = f.workspaceName ?? f.workspaceId;
+  if (config.tenantId && tenantId && config.tenantId.toLowerCase() !== tenantId.toLowerCase()) return { workspace, reason: 'other-tenant' };
+  try {
+    await fabric.getWorkspace(f.workspaceId);
+    return null;
+  } catch (err) {
+    return isNotFound(err) && /** @type {HttpError} */ (err).status !== 403 ? { workspace, reason: 'not-found' } : null;
+  }
+}
+
+/**
+ * Says why the install record is stale.
+ * @param {{ workspace: string, reason: 'not-found' | 'other-tenant' }} gone
+ */
+export const staleRecordMessage = (gone) =>
+  gone.reason === 'other-tenant'
+    ? `The install record is for workspace "${gone.workspace}" in another tenant, not the one you signed in to.`
+    : `This workspace no longer exists: "${gone.workspace}".`;
 
 /** @param {Ctx} ctx */
 export async function ensureWorkspace(ctx) {
@@ -322,6 +352,8 @@ export function notebookSettings(ctx, nb) {
   if (nb.key === 'agentTranscripts') values = { SOURCE_MODE: 'dataverse', WRITE_MODE: 'merge', RAW_TABLE: '' };
   if (nb.key === 'uploadRouter') values = routerValues(config);
   if (nb.key === 'loadStatus') values = { STATUS_JSON: statusConfigJson() };
+  // The pipeline loads the tables only; the installer passes roles when it applies membership.
+  if (nb.key === 'accessScope') values = { WORKSPACE_ID: /** @type {string} */ (f.workspaceId), MODE: 'all', ROLES_B64: '', ROLES_FILE: '' };
   /** @type {Record<string, string> | undefined} */
   let expressions = nb.expressions;
   if (nb.key === 'resourceGraph') {
@@ -382,6 +414,7 @@ export const notebookOptions = (config) => ({
   semanticModel: modelDeployed(config),
   azureAi: azureAiOn(config),
   dataverse: agentEvaluatorOn(config),
+  access: rlsOn(config),
   dataSources: config.dataSources,
 });
 
@@ -649,6 +682,7 @@ export function pipelineSignature(config) {
   if (agent365Csv(config)) parts.push('agent365=csv');
   if (coworkDataflowOn(config)) parts.push(`cowork=${config.consumption.dataflowId}`);
   if (resourceGraphNotebookOn(config)) parts.push('resourceGraph');
+  if (rlsOn(config)) parts.push('access');
   if (config.scale) parts.push(`scale=${config.scale}`);
   return parts.join(';');
 }
@@ -732,6 +766,7 @@ export function pipelineSettings(config) {
     agent365Csv: agent365Csv(config),
     coworkDataflowId: coworkDataflowOn(config) ? config.consumption.dataflowId : undefined,
     resourceGraph: resourceGraphNotebookOn(config),
+    access: rlsOn(config),
   };
 }
 

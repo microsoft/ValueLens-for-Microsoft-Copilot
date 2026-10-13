@@ -11,6 +11,7 @@ import { getAccessToken } from "@/services/rayfin-auth.service";
 import { taskTimeKey, type TaskTime, type TaskTimeOverride } from "@/queries/assumptions";
 import { COMMERCIAL_TERM_KEYS, type CommercialTermsValues } from "@/queries/consumption/commercial-terms";
 import { toCurrencyCode } from "@/lib/currency";
+import { parsePack, type ReportPack } from "@/lib/report-pack";
 
 /** The app keeps one set of terms for everyone, in this row. */
 export const COMMERCIAL_TERMS_ID = "00000000-0000-0000-0000-000000000001";
@@ -39,6 +40,9 @@ export interface SettingsStore {
     saveCommercialTerms(patch: CommercialTermsValues, updatedBy: string | undefined): Promise<SavedCommercialTerms>;
     loadTaskTimes(): Promise<SavedTaskTime[]>;
     saveTaskTimes(changes: readonly TaskTimeChange[], updatedBy: string | undefined): Promise<SavedTaskTime[]>;
+    loadReportPacks(): Promise<ReportPack[]>;
+    saveReportPack(pack: ReportPack, updatedBy: string | undefined): Promise<ReportPack>;
+    deleteReportPack(id: string): Promise<void>;
 }
 
 let store: SettingsStore | undefined;
@@ -112,6 +116,32 @@ class RayfinSettingsStore implements SettingsStore {
             values as unknown as Parameters<typeof rows.upsert>[2],
         );
     }
+
+    async loadReportPacks(): Promise<ReportPack[]> {
+        const rows = await withTimeout(getRayfinClient().data.ReportPack.first(MAX_ROWS).execute(), LOAD_TIMEOUT_MS);
+        return reportPacksFromRows(rows as unknown as Record<string, unknown>[]);
+    }
+
+    async saveReportPack(pack: ReportPack, updatedBy: string | undefined): Promise<ReportPack> {
+        const rows = getRayfinClient().data.ReportPack;
+        const values = { ...reportPackRow(pack), updatedBy: updatedBy ?? null, updatedAt: new Date() };
+        const { id, ...update } = values;
+        const row = await rows.upsert(
+            { id },
+            values as unknown as Parameters<typeof rows.upsert>[1],
+            update as unknown as Parameters<typeof rows.upsert>[2],
+        );
+        return savedPack(row as unknown as Record<string, unknown>);
+    }
+
+    async deleteReportPack(id: string): Promise<void> {
+        const rows = getRayfinClient().data.ReportPack;
+        try {
+            await rows.delete({ id });
+        } catch (error) {
+            if (await rows.findById(id)) throw error;
+        }
+    }
 }
 
 class HttpSettingsStore implements SettingsStore {
@@ -154,7 +184,20 @@ class HttpSettingsStore implements SettingsStore {
         return this.loadTaskTimes();
     }
 
-    private async request<T>(entity: "CommercialTerms" | "TaskTime", id?: string, method = "GET", body?: unknown): Promise<T> {
+    async loadReportPacks(): Promise<ReportPack[]> {
+        return reportPacksFromRows(await this.request<Record<string, unknown>[]>("ReportPack"));
+    }
+
+    async saveReportPack(pack: ReportPack, updatedBy: string | undefined): Promise<ReportPack> {
+        const row = { ...reportPackRow(pack), updatedBy: updatedBy ?? null, updatedAt: new Date().toISOString() };
+        return savedPack(await this.request<Record<string, unknown>>("ReportPack", row.id, "PUT", row));
+    }
+
+    async deleteReportPack(id: string): Promise<void> {
+        await this.request<void>("ReportPack", id, "DELETE");
+    }
+
+    private async request<T>(entity: "CommercialTerms" | "ReportPack" | "TaskTime", id?: string, method = "GET", body?: unknown): Promise<T> {
         const send = async (forceRefresh: boolean) => {
             const token = await getAccessToken(forceRefresh ? { forceRefresh } : undefined);
             return fetch(`/api/settings/${entity}${id ? `/${encodeURIComponent(id)}` : ""}`, {
@@ -239,6 +282,26 @@ function dedupeTaskTimes(rows: readonly Record<string, unknown>[]): SavedTaskTim
         if (!existing || (saved.updatedAt?.getTime() ?? 0) > (existing.updatedAt?.getTime() ?? 0)) byTask.set(key, saved);
     }
     return [...byTask.values()];
+}
+
+/** A pack as a database row: stages as JSON text, as the `ReportPack` entity holds them. */
+function reportPackRow(pack: ReportPack): { id: string; name: string; description: string | null; stages: string } {
+    const clean = parsePack(pack);
+    if (!clean) throw new Error("A report pack needs a name and at least one stage.");
+    return { id: clean.id, name: clean.name, description: clean.description ?? null, stages: JSON.stringify(clean.stages) };
+}
+
+function savedPack(row: Record<string, unknown>): ReportPack {
+    const pack = parsePack(row);
+    if (!pack) throw new Error("The saved report pack couldn't be read back.");
+    return pack;
+}
+
+/** Saved packs by name; rows that no longer name a known stage are skipped. */
+function reportPacksFromRows(rows: readonly Record<string, unknown>[]): ReportPack[] {
+    return rows
+        .flatMap((row) => parsePack(row) ?? [])
+        .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function toOptionalNumber(value: unknown): number | undefined {

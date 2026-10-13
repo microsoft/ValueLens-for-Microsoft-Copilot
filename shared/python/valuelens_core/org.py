@@ -14,7 +14,8 @@ USERS_URL = ('https://graph.microsoft.com/v1.0/users?$select=userPrincipalName,d
 MAX_ORG_LEVELS = 14
 BASE_COLUMNS = ['PersonId', 'displayName', 'Organization', 'JobTitle', 'companyName', 'officeLocation',
                 'city', 'country', 'accountEnabled', 'managerUPN']
-HIER_FIXED = ['OrgLevel', 'HierarchyPath', 'TopOfChain_Name', 'IsManager', 'DirectReports', 'HierarchyError']
+HIER_FIXED = ['OrgLevel', 'HierarchyPath', 'TopOfChain_Name', 'IsManager', 'DirectReports', 'HierarchyError',
+              'OrgPath']
 HIER_LEVELS = [f'Level{i}_Name' for i in range(MAX_ORG_LEVELS + 1)]
 HIER_COLUMNS = HIER_FIXED + HIER_LEVELS
 COLUMNS = BASE_COLUMNS + HIER_COLUMNS + ['PersonId_Normalized', 'TotalEmployees']
@@ -92,6 +93,7 @@ def build_hierarchy(rows, max_levels=MAX_ORG_LEVELS):
 
     Cycle-tolerant: a cycle truncates the chain and is recorded in HierarchyError.
     Someone who is their own manager is the top of their chain, not an error.
+    OrgPath is the chain as lower-case UPNs joined by '|' (top first), the form DAX PATHCONTAINS reads.
     """
     def _n(v):
         return (v or '').strip().lower()
@@ -130,8 +132,33 @@ def build_hierarchy(rows, max_levels=MAX_ORG_LEVELS):
         rec['IsManager'] = 'TRUE' if direct.get(user, 0) > 0 else 'FALSE'
         rec['DirectReports'] = str(direct.get(user, 0))
         rec['HierarchyError'] = error
+        rec['OrgPath'] = '|'.join(chain)
         out[user] = rec
     return out
+
+
+def access_people(rows):
+    """`access_people` for org-scoped access: [(PersonId, OrgPath)], one per person, lower-case.
+
+    Keeps a row's OrgPath when it has one (Graph org data); otherwise, e.g. a Workday-only org table,
+    builds it from the managerUPN chain. A blank or missing PersonId is skipped.
+    """
+    def _n(v):
+        return (v or '').strip().lower()
+
+    computed = None
+    out = {}
+    for row in rows:
+        person = _n(row.get('PersonId'))
+        if not person or person in out:
+            continue
+        path = _n(row.get('OrgPath'))
+        if not path:
+            if computed is None:
+                computed = build_hierarchy(rows)
+            path = computed.get(person, {}).get('OrgPath') or person
+        out[person] = path
+    return sorted(out.items())
 
 
 def build_snapshot(users, *, table_exists=False, allow_empty=False):

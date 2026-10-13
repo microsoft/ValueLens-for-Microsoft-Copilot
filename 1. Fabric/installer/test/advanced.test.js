@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { askAdvanced, asksAdvanced } from '../src/steps/advanced.js';
 import { planAzure } from '../src/steps/azure/index.js';
-import { plan } from '../src/steps/plan.js';
+import { capacityLabel, plan } from '../src/steps/plan.js';
 import { planResourceGraph } from '../src/steps/resource-graph.js';
 import { fakeArm, fakeCtx, fakeFabric, fakePowerBi, fakeUi } from './fakes.js';
 
@@ -59,10 +59,39 @@ test('advanced: a Fabric plan with No asks only the essentials and keeps the def
   assert.equal(config.reporting, undefined, 'the Value page stays in US dollars');
   assert.equal(config.history.days, 30);
   assert.equal(config.scale, 'large', 'from the F64');
-  assert.equal(config.fabric.lakehouseName, 'ValueLens');
+  assert.equal(config.fabric.lakehouseName, 'Analytics_Hub', 'a new install suggests the new name');
   assert.equal(config.schedule.frequency, 'daily');
   assert.equal(ctx.runFirstLoad, true);
   assert.equal(config.access?.groupName, 'Analytics Hub Viewers');
+});
+
+test('plan: a new install suggests Analytics Hub names and says what capacity size suits', async () => {
+  const t = fakeUi();
+  const fabric = fakeFabric().api;
+  const { ctx, config } = fakeCtx({ ui: t.ui, fabric: { ...fabric, listWorkspaces: async () => [{ id: 'ws-x', type: 'Workspace', displayName: 'Other' }] } });
+    delete config.fabric.workspaceId;
+    delete config.fabric.workspaceName;
+  delete config.fabric.lakehouseId;
+  delete config.fabric.lakehouseName;
+  await plan(ctx, PRE);
+  assert.equal(config.fabric.workspaceName, 'Analytics Hub');
+  assert.equal(config.fabric.lakehouseName, 'Analytics_Hub');
+  assert.match(t.text(), /F64 or larger is recommended for more than 10,000 people; small or trial capacities work but loads are slower\./);
+});
+
+test('plan: an existing record keeps its names', async () => {
+  const { ui } = fakeUi();
+  const { ctx, config } = fakeCtx({ ui, fabric: fakeFabric().api });
+  delete config.fabric.lakehouseId;
+  config.fabric.lakehouseName = 'ValueLens';
+  await plan(ctx, PRE);
+  assert.equal(config.fabric.lakehouseName, 'ValueLens');
+});
+
+test('capacityLabel: the SKU and region when Fabric gives them', () => {
+  assert.equal(capacityLabel({ id: 'c', displayName: 'Prod', sku: 'F64', region: 'UK South' }), 'Prod (F64, UK South)');
+  assert.equal(capacityLabel({ id: 'c', displayName: 'Trial', sku: 'FT1' }), 'Trial (FT1)');
+  assert.equal(capacityLabel({ id: 'c', displayName: 'Bare' }), 'Bare');
 });
 
 test('advanced: a Fabric plan with Yes asks the settings behind it, currency last', async () => {

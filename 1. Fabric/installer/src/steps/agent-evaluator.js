@@ -7,6 +7,7 @@
 import { orgUrl, TRANSCRIPT_ROLE } from '../clients/dataverse.js';
 import { semanticModelDefinition } from '../clients/fabric.js';
 import { HttpError } from '../http.js';
+import { rlsSettings } from '../transform/access.js';
 import { buildAgentEvaluatorModel, loadTemplateModel, PBISM } from '../transform/model.js';
 import { c } from '../ui.js';
 import { agentEvaluatorOn } from './fabric.js';
@@ -216,7 +217,7 @@ export async function ensureAgentEvaluatorModel(ctx, opts = {}) {
   const { server, database } = await waitForSqlEndpoint(ctx);
   await deployModel(ctx, m, {
     signature: `${server.toLowerCase()};${database}`,
-    definition: () => semanticModelDefinition(buildAgentEvaluatorModel(loadTemplateModel(file), { server, database }), PBISM),
+    definition: () => semanticModelDefinition(buildAgentEvaluatorModel(loadTemplateModel(file), { server, database, access: rlsSettings(ctx.config) }), PBISM),
     force: opts.force,
   });
   if (!m.bound && config.semanticModel.connectionId) await bindModel(ctx, m);

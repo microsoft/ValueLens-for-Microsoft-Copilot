@@ -380,7 +380,7 @@ async function buildAndDeploy(ctx, dir, ws, models) {
 
   try {
     await data('use', profile, '-o', GENERATED);
-    ui.info('Building and deploying the app. Rayfin may open a browser for you to sign in.');
+    ui.info('Building and deploying the app. A browser window may open for sign-in.');
     return { record: await rayfinUp(ctx, dir, ws), profile };
   } finally {
     if (restore) {
@@ -414,7 +414,7 @@ async function deployPrebuilt(ctx, dir, ws, models) {
   writeOrRemove(deploymentsFile, fa.rayfin?.deployments ? `${JSON.stringify(fa.rayfin.deployments, null, 2)}\n` : null);
   writeOrRemove(envFile, fa.rayfin?.env ?? null);
 
-  ui.info('Deploying the app. Rayfin may open a browser for you to sign in.');
+  ui.info('Deploying the app. A browser window may open for sign-in.');
   try {
     return { record: await rayfinUp(ctx, dir, ws), profile: undefined };
   } finally {
@@ -441,7 +441,7 @@ export function fabricConfigFile(config, ws, models) {
     [CONSUMPTION_ALIAS]: config.consumption.model.id,
     [EVALUATOR_ALIAS]: config.agentEvaluator.model.id,
   };
-  /** @type {{ semanticModels: Record<string, { workspaceId: string, itemId: string | undefined }>, modules?: Record<string, boolean>, reporting?: import('../currency.js').ReportingConfig, access?: Record<string, string> }} */
+  /** @type {{ semanticModels: Record<string, { workspaceId: string, itemId: string | undefined }>, modules?: Record<string, boolean>, reporting?: import('../currency.js').ReportingConfig, access?: Record<string, string>, ask?: { workspaceId: string, itemId: string } }} */
   const body = { semanticModels: Object.fromEntries(models.map((alias) => [alias, { workspaceId: ws, itemId: ids[alias] }])) };
   if (config.modules) {
     body.modules = {
@@ -454,6 +454,8 @@ export function fabricConfigFile(config, ws, models) {
   if (config.reporting) body.reporting = { ...config.reporting };
   const access = publicAccess(config);
   if (access) body.access = access;
+  const da = config.dataAgent;
+  if (da?.id && da.enabled !== false && da.capacityOk !== false) body.ask = { workspaceId: ws, itemId: da.id };
   return body;
 }
 
@@ -467,9 +469,9 @@ async function rayfinUp(ctx, dir, ws) {
   const run = ctx.runner ?? defaultRunner;
   await claimAppItem(ctx, dir, ws);
   const res = await run(process.execPath, [join(dir, RAYFIN_CLI), 'up', '--tenant', ctx.user.tenantId, '--workspace-id', ws, '--yes'], { cwd: dir, inherit: true });
-  if (res.code) throw new Error('"rayfin up" failed. Its output is above.');
+  if (res.code) throw new Error('The app\'s deploy tool failed. Its output is above.');
   const record = findDeployment(readJson(join(dir, 'rayfin', '.deployments.json')), ws);
-  if (!record?.fabricItemId) throw new Error('The app deployed, but Rayfin didn\'t record the item it created.');
+  if (!record?.fabricItemId) throw new Error('The app deployed, but its deploy tool didn\'t record the item it created.');
   return record;
 }
 

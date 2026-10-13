@@ -16,6 +16,9 @@ on:
   pull_request:
     paths:
       - '1. Fabric/installer/packaging/**'
+      # The exe bundles the app with the rayfin version from its lock file.
+      - '1. Fabric/Fabric App/package.json'
+      - '1. Fabric/Fabric App/package-lock.json'
       - '.github/workflows/installer-exe.yml'
   release:
     types: [published]

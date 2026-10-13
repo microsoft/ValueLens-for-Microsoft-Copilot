@@ -7,7 +7,11 @@ import { QueryService } from './query.js';
 import { AccessService, httpError } from './access.js';
 import { MemorySettingsStore, TableSettingsStore, validateEntity, validateSettingsRow } from './settings.js';
 import { VersionService } from './version.js';
+import { DelegationService } from './delegations.js';
+import { AccessRefresher, managedIdentityTokens } from './refresh.js';
+import { createScopeStore } from './scope-store.js';
 import { createStaticHandler } from './static.js';
+import { AskService } from './ask.js';
 
 export function createServer(deps = {}) {
   const config = deps.config || loadConfig();
@@ -16,7 +20,11 @@ export function createServer(deps = {}) {
   const settingsStore = deps.settingsStore || new TableSettingsStore(config);
   const queryService = new QueryService({ config, tokenAcquirer, fetchImpl: deps.fetchImpl || fetch, now: deps.now });
   const accessService = new AccessService({ config, tokenAcquirer, fetchImpl: deps.fetchImpl || fetch, now: deps.now });
+  const askService = new AskService({ config, queryService, fetchImpl: deps.fetchImpl || fetch, now: deps.now, aiToken: deps.aiToken, loadCatalogue: deps.loadAskCatalogue });
   const auth = (req, write = false) => requireAuth(req, verifyToken, write, config, accessService);
+  const scopeStore = deps.scopeStore !== undefined ? deps.scopeStore : createScopeStore(config);
+  const refresher = deps.refresher || new AccessRefresher({ models: config.semanticModels, getToken: deps.appToken || managedIdentityTokens(config), fetchImpl: deps.fetchImpl || fetch, now: deps.now, ...(deps.setTimer ? { setTimer: deps.setTimer } : {}) });
+  const delegations = new DelegationService({ config, store: scopeStore, accessService, refresher, now: deps.now });
   const versionService = new VersionService({ installed: config.version, releasesUrl: config.releasesUrl, fetchImpl: deps.fetchImpl || fetch, now: deps.now });
   const staticHandler = createStaticHandler(deps.publicDir || config.publicDir);
 
@@ -26,7 +34,7 @@ export function createServer(deps = {}) {
       const url = new URL(req.url || '/', 'http://localhost');
       if (req.method === 'GET' && url.pathname === '/app.config.json') {
         res.setHeader('Cache-Control', 'no-store');
-        return sendJson(res, 200, { host: 'azure', tenantId: config.tenantId, clientId: config.webClientId, apiScope: `${config.appIdUri}/access_as_user`, semanticModels: config.semanticModels, reporting: config.reporting, version: config.version, ...(config.access ? { access: publicAccess(config.access) } : {}) });
+        return sendJson(res, 200, { host: 'azure', tenantId: config.tenantId, clientId: config.webClientId, apiScope: `${config.appIdUri}/access_as_user`, semanticModels: config.semanticModels, reporting: config.reporting,         version: config.version, ...(config.access ? { access: publicAccess(config.access) } : {}), ...(askService.enabled ? { ask: { mode: 'chat' } } : {}) });
       }
       if (req.method === 'GET' && url.pathname === '/api/health') return sendJson(res, 200, { status: 'ok', version: config.version });
       if (url.pathname === '/api/query' && req.method === 'POST') {
@@ -34,6 +42,10 @@ export function createServer(deps = {}) {
         for (const [key, value] of Object.entries(result.headers || {})) res.setHeader(key, value);
         res.statusCode = result.status;
         return res.end(result.body);
+      }
+      if (url.pathname === '/api/ask' && req.method === 'POST') {
+        const caller = await auth(req);
+        return sendJson(res, 200, await askService.ask(await readJsonBody(req, 64 * 1024), caller));
       }
       const settingsMatch = /^\/api\/settings\/([^/]+)(?:\/([^/]+))?$/.exec(url.pathname);
       if (settingsMatch) {
@@ -60,6 +72,14 @@ export function createServer(deps = {}) {
       }
       const memberMatch = /^\/api\/access\/members\/([^/]+)$/.exec(url.pathname);
       if (memberMatch && req.method === 'DELETE') { await accessService.remove(await auth(req), decodeURIComponent(memberMatch[1])); res.statusCode = 204; return res.end(); }
+      if (url.pathname === '/api/delegations' && req.method === 'GET') return sendJson(res, 200, await delegations.describe(await auth(req)));
+      if (url.pathname === '/api/delegations' && req.method === 'POST') {
+        const caller = await auth(req);
+        return sendJson(res, 201, await delegations.add(caller, await readJsonBody(req, 4 * 1024)));
+      }
+      const delegationMatch = /^\/api\/delegations\/([^/]+)(\/approve)?$/.exec(url.pathname);
+      if (delegationMatch && req.method === 'DELETE' && !delegationMatch[2]) return sendJson(res, 200, await delegations.remove(await auth(req), decodeURIComponent(delegationMatch[1])));
+      if (delegationMatch && req.method === 'POST' && delegationMatch[2]) return sendJson(res, 200, await delegations.approve(await auth(req), decodeURIComponent(delegationMatch[1])));
       if (url.pathname.startsWith('/api/')) return sendJson(res, 404, { error: { code: 'NotFound', message: 'API route not found.' } });
       if (await staticHandler(req, res, url.pathname)) return;
       return sendJson(res, 404, { error: { code: 'NotFound', message: 'Not found.' } });
@@ -67,6 +87,7 @@ export function createServer(deps = {}) {
       const status = error.statusCode || 500;
       if (status >= 500) console.error(`${req.method} ${req.url} failed:`, error);
       else if (status === 401 || status === 403) console.warn(`${req.method} ${req.url} ${status}: ${error.message}`);
+      if (error.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
       return sendJson(res, status, { error: { code: error.code || (status === 401 ? 'Unauthorized' : status === 403 ? 'Forbidden' : 'ServerError'), message: status === 500 ? 'Internal server error.' : error.message } });
     }
   });

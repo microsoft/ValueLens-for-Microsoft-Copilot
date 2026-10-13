@@ -5,8 +5,8 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { lazy, Suspense, useMemo, useRef, useState } from "react";
-import { AppShell } from "./components/app-shell";
+import { Suspense, useMemo, useRef, useState } from "react";
+import { AppShell, type AppView } from "./components/app-shell";
 import {
     availableDestinations,
     destinations,
@@ -16,101 +16,95 @@ import {
 } from "./components/destinations";
 import { FilterProvider } from "./components/filter-provider";
 import { QueryLoading } from "./components/query-states";
+import { ReportPackView } from "./components/report-pack-view";
+import { ReportPacksProvider } from "./components/report-packs-provider";
 import { TaskTimesProvider } from "./components/task-times-provider";
 import { NavigationContext } from "./hooks/navigation.context";
-import { SourceAvailabilityContext } from "./hooks/source-availability.context";
+import { useReportPacks } from "./hooks/report-packs.context";
+import { SourceAvailabilityContext, useSourceAvailability } from "./hooks/source-availability.context";
 import { useSourceProbes } from "./hooks/use-source-probes";
+import { packFilters, packRuns } from "./lib/report-pack";
 import { runtimeConfig } from "./lib/runtime-config";
 import { scrollToAnchorWhenReady } from "./lib/scroll-to-anchor";
+import { SCREENS } from "./screens/registry";
 
-// Screens load on demand so only the visible destination queries the model.
-const ExecutiveScreen = lazy(() =>
-    import("./screens/executive").then((module) => ({ default: module.ExecutiveScreen })),
-);
-const AdoptionScreen = lazy(() =>
-    import("./screens/adoption").then((module) => ({ default: module.AdoptionScreen })),
-);
-const LeaderboardsScreen = lazy(() =>
-    import("./screens/leaderboards").then((module) => ({ default: module.LeaderboardsScreen })),
-);
-const WorkPatternsScreen = lazy(() =>
-    import("./screens/work-patterns").then((module) => ({ default: module.WorkPatternsScreen })),
-);
-const ReadinessScreen = lazy(() =>
-    import("./screens/readiness").then((module) => ({ default: module.ReadinessScreen })),
-);
-const ConsumptionScreen = lazy(() =>
-    import("./screens/consumption").then((module) => ({ default: module.ConsumptionScreen })),
-);
-const ValueScreen = lazy(() => import("./screens/value").then((module) => ({ default: module.ValueScreen })));
-const EfficiencyScreen = lazy(() =>
-    import("./screens/efficiency").then((module) => ({ default: module.EfficiencyScreen })),
-);
-const FeedbackScreen = lazy(() =>
-    import("./screens/feedback").then((module) => ({ default: module.FeedbackScreen })),
-);
-const AgentEvaluationScreen = lazy(() =>
-    import("./screens/agent-evaluation").then((module) => ({ default: module.AgentEvaluationScreen })),
-);
-const GovernanceScreen = lazy(() =>
-    import("./screens/governance").then((module) => ({ default: module.GovernanceScreen })),
-);
-const AppendixScreen = lazy(() =>
-    import("./screens/appendix").then((module) => ({ default: module.AppendixScreen })),
-);
-const AssumptionsScreen = lazy(() =>
-    import("./screens/assumptions").then((module) => ({ default: module.AssumptionsScreen })),
-);
+type Selection = { kind: "destination"; id: DestinationId } | { kind: "pack"; id: string };
 
-function App() {
-    const [selected, setDestination] = useState<DestinationId>("executive");
-    const sources = useSourceProbes();
-    // A page whose source turns out to have no data gives way to the Executive summary.
-    const destination = useMemo(
+/**
+ * The open destination or report pack, its slicers and the shell around it.
+ * A page whose source turns out to have no data, or a pack that has been
+ * deleted, gives way to the Executive summary.
+ */
+function Workspace() {
+    const [selected, setSelected] = useState<Selection>({ kind: "destination", id: "executive" });
+    const sources = useSourceAvailability();
+    const { packs } = useReportPacks();
+    const available = useMemo(() => availableDestinations(runtimeConfig().semanticModels, sources), [sources]);
+
+    const view = useMemo<AppView>(() => {
+        if (selected.kind === "pack") {
+            const pack = packs.find(({ id }) => id === selected.id);
+            if (pack) return { kind: "pack", pack, ...packRuns(pack.stages, available) };
+        }
+        const id = selected.kind === "destination" && available.some((candidate) => candidate.id === selected.id) ? selected.id : "executive";
+        return { kind: "destination", id };
+    }, [selected, packs, available]);
+
+    const applicable = useMemo(
         () =>
-            availableDestinations(runtimeConfig().semanticModels, sources).some(({ id }) => id === selected)
-                ? selected
-                : "executive",
-        [selected, sources],
+            view.kind === "pack"
+                ? packFilters(view.runs)
+                : (destinations.find((candidate) => candidate.id === view.id)?.filters ?? []),
+        [view],
     );
-    const applicable = destinations.find((candidate) => candidate.id === destination)?.filters ?? [];
     const stopWaiting = useRef<() => void>(undefined);
 
     const navigation = useMemo(
         () => ({
             navigate: (id: DestinationId, stage?: StageId) => {
                 stopWaiting.current?.();
-                setDestination(id);
+                setSelected({ kind: "destination", id });
                 stopWaiting.current = stage ? scrollToAnchorWhenReady(stageAnchor(stage)) : undefined;
             },
         }),
         [],
     );
+    const openPack = (id: string) => {
+        stopWaiting.current?.();
+        stopWaiting.current = undefined;
+        setSelected({ kind: "pack", id });
+    };
 
+    const Screen = view.kind === "destination" ? SCREENS[view.id] : undefined;
+
+    return (
+        <FilterProvider applicable={applicable}>
+            <NavigationContext.Provider value={navigation}>
+                <AppShell view={view} onNavigate={navigation.navigate} onOpenPack={openPack}>
+                    {view.kind === "pack" ? (
+                        <ReportPackView key={view.pack.id} runs={view.runs} missing={view.missing} />
+                    ) : (
+                        Screen && (
+                            // Screens load on demand so only the visible destination queries the model.
+                            <Suspense fallback={<QueryLoading />}>
+                                <Screen key={view.id} />
+                            </Suspense>
+                        )
+                    )}
+                </AppShell>
+            </NavigationContext.Provider>
+        </FilterProvider>
+    );
+}
+
+function App() {
+    const sources = useSourceProbes();
     return (
         <SourceAvailabilityContext.Provider value={sources}>
             <TaskTimesProvider>
-                <FilterProvider applicable={applicable}>
-                    <NavigationContext.Provider value={navigation}>
-                        <AppShell active={destination} onNavigate={navigation.navigate}>
-                            <Suspense fallback={<QueryLoading />}>
-                                {destination === "executive" && <ExecutiveScreen />}
-                                {destination === "adoption" && <AdoptionScreen />}
-                                {destination === "leaderboards" && <LeaderboardsScreen />}
-                                {destination === "work-patterns" && <WorkPatternsScreen />}
-                                {destination === "readiness" && <ReadinessScreen />}
-                                {destination === "consumption" && <ConsumptionScreen />}
-                                {destination === "value" && <ValueScreen />}
-                                {destination === "efficiency" && <EfficiencyScreen />}
-                                {destination === "feedback" && <FeedbackScreen />}
-                                {destination === "agent-evaluation" && <AgentEvaluationScreen />}
-                                {destination === "governance" && <GovernanceScreen />}
-                                {destination === "assumptions" && <AssumptionsScreen />}
-                                {destination === "appendix" && <AppendixScreen />}
-                            </Suspense>
-                        </AppShell>
-                    </NavigationContext.Provider>
-                </FilterProvider>
+                <ReportPacksProvider>
+                    <Workspace />
+                </ReportPacksProvider>
             </TaskTimesProvider>
         </SourceAvailabilityContext.Provider>
     );

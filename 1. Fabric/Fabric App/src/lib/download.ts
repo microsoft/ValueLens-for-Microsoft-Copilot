@@ -18,6 +18,12 @@ export function fileNameFor(title: string, extension: string): string {
     return `${slug || "chart"}.${extension}`;
 }
 
+/** `-data-to-2026-07-06`, or nothing when the date is unknown or unreadable. */
+export function dataToSuffix(dataTo: string | undefined): string {
+    const day = dataTo?.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+    return day ? `-data-to-${day}` : "";
+}
+
 /** Saves a blob through the browser's download prompt. */
 export function downloadBlob(blob: Blob, fileName: string): void {
     const url = URL.createObjectURL(blob);

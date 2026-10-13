@@ -11,7 +11,7 @@ import { dataverseApi, dataverseScope, DISCOVERY_URL, discoveryApi, orgUrl } fro
 import { FLOW_URL, flowApi } from './clients/flow.js';
 import { fabricApi, scheduleBody } from './clients/fabric.js';
 import { CONSENT_ROLES, graphApi } from './clients/graph.js';
-import { ONELAKE_URL, oneLakeApi } from './clients/onelake.js';
+import { dataLakeApi, dataLakeUrl, ONELAKE_URL, oneLakeApi } from './clients/onelake.js';
 import { powerBiApi } from './clients/powerbi.js';
 import { POWER_PLATFORM_URL, powerPlatformApi } from './clients/powerplatform.js';
 import { saveConfig, secretMode } from './config.js';
@@ -41,6 +41,7 @@ import { ensureModelConnection, ensureSemanticModel, modelUrl, refreshModel, rot
 import { confirmPlan, plan, preflight } from './steps/plan.js';
 import { checkPrereqs } from './prereqs.js';
 import { ensureReports, reportsOn, reportsSummary } from './steps/report.js';
+import { dataAgentSummary, dataAgentWanted, ensureDataAgent } from './steps/data-agent.js';
 import { dataSourcesSummary, ensureUploads, uploadCommand } from './steps/data-sources.js';
 import { ensureFlows, FLOW_FILES, flowDefinitions, flowsSummary, flowsWanted, offerStudioRun } from './steps/flows.js';
 import { ensureAppResourceGraphAccess, resourceGraphOn } from './steps/resource-graph.js';
@@ -48,11 +49,13 @@ import { routerWanted } from './uploads.js';
 import { checkData, chooseLoad, runDataCheck, runPipeline, status } from './steps/run.js';
 import { rerunFailed } from './steps/rerun.js';
 import { prepareNotebook, serialiseNotebook } from './transform/notebook.js';
+import { rlsOn, rlsSettings } from './transform/access.js';
 import { buildAgentEvaluatorModel, buildConsumptionModel, buildModel, loadTemplateModel } from './transform/model.js';
 import { buildPipeline } from './transform/pipeline.js';
 import { c } from './ui.js';
 import { askTarget, azureRefresh, azureRotateSecret, azureRun, azureStatus, azureUninstall, azureUpdate, azureViewerModels, confirmAzurePlan, installAzure, planAzure } from './steps/azure/index.js';
 import { accessCommand, ensureViewerGroup, grantModelAccess, myGroupsUrl } from './steps/access.js';
+import { ensureOrgAccess, verifyOrgAccess } from './steps/org-access.js';
 
 /**
  * @typedef {object} Apis
@@ -66,6 +69,7 @@ import { accessCommand, ensureViewerGroup, grantModelAccess, myGroupsUrl } from 
  * @property {import('./clients/powerplatform.js').PowerPlatformApi} powerPlatform
  * @property {import('./clients/flow.js').FlowApi} flow
  * @property {(url: string) => import('./clients/dataverse.js').DataverseApi} dataverse  A Dataverse environment, by org URL.
+ * @property {(account: string) => import('./clients/onelake.js').DataLakeApi} dataLake  An Azure storage account's files, by account name.
  *
  * @typedef {{ id: string, upn: string, tenantId: string, displayName?: string }} User
  *
@@ -117,6 +121,7 @@ export async function connect(opts) {
     powerPlatform: powerPlatformApi(client(POWER_PLATFORM_URL, 'powerPlatform')),
     flow: flowApi(client(FLOW_URL, 'flow')),
     dataverse: (url) => dataverseApi(client(`${orgUrl(url)}/api/data/v9.2`, dataverseScope(url)), url),
+    dataLake: (account) => dataLakeApi(client(dataLakeUrl(account), 'storage')),
   };
   const claims = decodeJwt(await getToken('graph'));
   const me = await api.graph.me();
@@ -281,6 +286,7 @@ export async function install(ctx, opts) {
   const withUploads = routerWanted(config.dataSources) || !!ctx.pendingUploads?.length || flowsWanted(config).length > 0;
   const withResourceGraph = resourceGraphOn(config);
   const withReports = reportsOn(config);
+  const withDataAgent = dataAgentWanted(ctx);
   const withAccess = withModel && !!config.access;
   const titles = [
     'Key Vault',
@@ -292,6 +298,7 @@ export async function install(ctx, opts) {
     ...(withAgentEvaluator ? ['Copilot Studio transcripts'] : []),
     ...(withResourceGraph ? ['Resource Graph access'] : []),
     ...(withReports ? ['Power BI reports'] : []),
+    ...(withDataAgent ? ['Ask data agent'] : []),
     ...(withUploads ? ['Data uploads'] : []),
     'Notebooks, pipeline and schedule',
     ...(withAccess ? ['Viewer access'] : []),
@@ -332,6 +339,10 @@ export async function install(ctx, opts) {
     step('Power BI reports');
     await ensureReports(ctx);
   }
+  if (withDataAgent) {
+    step('Ask data agent');
+    await ensureDataAgent(ctx);
+  }
   if (withUploads) {
     step('Data uploads');
     await ensureUploads(ctx);
@@ -342,6 +353,8 @@ export async function install(ctx, opts) {
   await ensureSparkSettings(ctx);
   await ensurePipeline(ctx);
   await ensureSchedule(ctx);
+  // Before the first load or refresh, so the models open to viewers as soon as they have data.
+  await ensureOrgAccess(ctx, { refresh: false });
   if (withAccess) {
     step('Viewer access');
     if (await ensureViewerGroup(ctx)) await grantModelAccess(ctx, fabricViewerModels(config));
@@ -512,12 +525,14 @@ export async function update(ctx, opts = {}) {
   if (config.modules.agentEvaluator) await agentEvaluatorSteps(ctx, { force: true });
   if (resourceGraphOn(config)) await ensureAppResourceGraphAccess(ctx);
   if (reportsOn(config)) await ensureReports(ctx);
+  await ensureDataAgent(ctx);
   if (routerWanted(config.dataSources)) await ensureUploads(ctx);
   await ensureFlows(ctx);
   await ensureNotebooks(ctx, { force: true });
   await ensureSparkSettings(ctx);
   await ensurePipeline(ctx, { force: true });
   await ensureSchedule(ctx);
+  await ensureOrgAccess(ctx, { refresh: false });
   if (sm.enabled && config.fabricApp.enabled) {
     if (await ui.confirm('Rebuild and redeploy the Analytics Hub app too?', true)) await tryDeployApp(ctx, { force: true });
     else await ensureAppName(ctx);
@@ -526,6 +541,7 @@ export async function update(ctx, opts = {}) {
     ui.note('Updating a model clears its data, so it refreshes now.');
     const refreshed = await refreshModels(ctx, { wait: opts.wait ?? true });
     if (refreshed.ok && (opts.wait ?? true) && !(await verifyModel(ctx)).ok) return false;
+    if (refreshed.ok && (opts.wait ?? true)) await verifyOrgAccess(ctx);
   }
   ui.ok('Up to date. The next scheduled run uses the new versions.');
   return true;
@@ -617,7 +633,7 @@ export async function runCommand(ctx, command, opts) {
       return true;
     case 'uninstall':
       if (ctx.config.target === 'azure') await azureUninstall(ctx);
-      else throw new Error('Uninstall is only implemented for the Azure target in this preview.');
+      else throw new Error('Uninstall is only implemented for the Azure target.');
       return true;
     case 'upload':
       return uploadCommand(ctx, { files: opts.files ?? [], run: opts.run, wait: opts.wait }, (c2, o) => run(c2, o));
@@ -627,7 +643,7 @@ export async function runCommand(ctx, command, opts) {
     case 'access': {
       const azure = ctx.config.target === 'azure';
       const before = ctx.config.access?.groupId;
-      await accessCommand(ctx, azure ? azureViewerModels(ctx.config) : fabricViewerModels(ctx.config));
+      await accessCommand(ctx, azure ? azureViewerModels(ctx.config) : fabricViewerModels(ctx.config), (c2) => update(c2));
       const after = ctx.config.access?.groupId;
       if (after && after !== before) {
         ctx.ui.note(azure
@@ -715,6 +731,7 @@ export async function summary(ctx) {
     if (sm.connectionName) ui.info(`            ${c.dim(`Reads the Lakehouse through "${sm.connectionName}"${sm.secretExpires ? `, whose secret expires ${sm.secretExpires.slice(0, 10)}` : ''}.`)}`);
     if (fa.enabled && fa.itemId) ui.info(`App:        ${fa.name}  ${c.dim(fa.url ?? '')}`);
     reportsSummary(ctx);
+    dataAgentSummary(ctx);
 
     const shared = [...(reportsOn(config) ? ['reports'] : []), ...(fa.enabled ? ['app'] : [])].join(' and ') || 'reports you publish';
     const group = config.access?.groupId ? config.access : undefined;
@@ -809,7 +826,7 @@ export function preview(o) {
 
   mkdirSync(join(out, 'notebooks'), { recursive: true });
   let n = 10;
-  for (const nb of notebooksFor(config.modules, { semanticModel: withModel, azureAi: withAzureAi, dataverse: withTranscripts, dataSources: config.dataSources })) {
+  for (const nb of notebooksFor(config.modules, { semanticModel: withModel, azureAi: withAzureAi, dataverse: withTranscripts, access: rlsOn(ctx.config), dataSources: config.dataSources })) {
     const prepared = prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb));
     writeFileSync(join(out, 'notebooks', `${nb.displayName}.ipynb`), serialiseNotebook(prepared), 'utf8');
     ctx.config.fabric.notebooks[nb.key] = ctx.config.fabric.notebooks[nb.key] ?? fake(n++);
@@ -826,6 +843,7 @@ export function preview(o) {
     agentEvaluatorModelId: withAgentEvaluatorModel ? ctx.config.agentEvaluator.model.id : undefined,
     coworkDataflowId: withDataflow ? cc.dataflowId ?? fake(7) : undefined,
     resourceGraph: config.dataSources.resourceGraph === 'api',
+    access: rlsOn(ctx.config),
   });
   writeFileSync(join(out, 'pipeline-content.json'), `${JSON.stringify(pipeline, null, 2)}\n`, 'utf8');
   if (withDataflow) {
@@ -856,6 +874,7 @@ export function preview(o) {
       database: /** @type {string} */ (ctx.config.fabric.lakehouseName),
       modules: config.modules,
       resourceGraph: config.dataSources.resourceGraph === 'api',
+      access: rlsSettings(ctx.config),
     });
     writeFileSync(join(out, 'model.bim'), `${JSON.stringify(bim, null, 2)}\n`, 'utf8');
   }
@@ -864,6 +883,7 @@ export function preview(o) {
       server: sm.server ?? 'your-endpoint.datawarehouse.fabric.microsoft.com',
       database: /** @type {string} */ (ctx.config.fabric.lakehouseName),
       resourceGraph: config.dataSources.resourceGraph === 'api',
+      access: rlsSettings(ctx.config),
     });
     writeFileSync(join(out, 'consumption-model.bim'), `${JSON.stringify(bim, null, 2)}\n`, 'utf8');
   }
@@ -871,6 +891,7 @@ export function preview(o) {
     const bim = buildAgentEvaluatorModel(loadTemplateModel(/** @type {string} */ (sources.agentEvaluatorModelFile)), {
       server: sm.server ?? 'your-endpoint.datawarehouse.fabric.microsoft.com',
       database: /** @type {string} */ (ctx.config.fabric.lakehouseName),
+      access: rlsSettings(ctx.config),
     });
     writeFileSync(join(out, 'agent-evaluator-model.bim'), `${JSON.stringify(bim, null, 2)}\n`, 'utf8');
   }

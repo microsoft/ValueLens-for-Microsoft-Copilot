@@ -72,6 +72,10 @@ internal static class LauncherCheck
         Directory.Delete(Launcher.Long(dest), true);
         Check(!Directory.Exists(dest), "unpacked folder removed");
 
+        Check(Launcher.AwakeFlags == 0x80000001, "keep-awake asks for ES_CONTINUOUS | ES_SYSTEM_REQUIRED");
+        Check(Launcher.KeepAwake(true), "keep-awake turned on");
+        Check(Launcher.KeepAwake(false), "keep-awake reset");
+
         Console.WriteLine(failures == 0 ? "ok" : failures + " failed");
         return failures == 0 ? 0 : 1;
     }

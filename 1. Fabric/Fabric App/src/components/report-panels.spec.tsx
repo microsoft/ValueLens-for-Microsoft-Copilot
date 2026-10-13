@@ -9,6 +9,7 @@ import { forwardRef } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { DataTable, VisualTheme } from "@microsoft/fabric-visuals-core";
+import { DataToContext } from "@/hooks/data-to.context";
 import { ThemeContext } from "@/hooks/theme.context";
 import { ChartPanel } from "./report-panels";
 
@@ -52,19 +53,21 @@ afterEach(() => {
     vi.clearAllMocks();
 });
 
-function renderChart() {
+function renderChart(dataTo?: string) {
     return render(
         <ThemeContext.Provider value={{ isDark: false, toggleTheme: () => undefined, theme: {} as VisualTheme }}>
-            <ChartPanel
-                result={{ table, error: undefined, isLoading: false, refetch: () => {} }}
-                table={shown}
-                height={300}
-                spec={{ mark: "bar" }}
-                title="Monthly trend"
-                subtitle="Active users by month"
-                emptyTitle="No data"
-                emptyDescription="Nothing yet"
-            />
+            <DataToContext.Provider value={dataTo}>
+                <ChartPanel
+                    result={{ table, error: undefined, isLoading: false, refetch: () => {} }}
+                    table={shown}
+                    height={300}
+                    spec={{ mark: "bar" }}
+                    title="Monthly trend"
+                    subtitle="Active users by month"
+                    emptyTitle="No data"
+                    emptyDescription="Nothing yet"
+                />
+            </DataToContext.Provider>
         </ThemeContext.Provider>,
     );
 }
@@ -90,8 +93,14 @@ describe("ChartPanel actions", () => {
     it("downloads the rows the chart shows as CSV", async () => {
         renderChart();
         await choose("Download CSV");
-        expect(downloadTableCsv).toHaveBeenCalledWith(shown, "Monthly trend");
+        expect(downloadTableCsv).toHaveBeenCalledWith(shown, "Monthly trend", undefined);
         expect(screen.getByRole("status")).toHaveTextContent("Downloaded");
+    });
+
+    it("names the CSV for the date the page's data runs to", async () => {
+        renderChart("2026-10-05");
+        await choose("Download CSV");
+        expect(downloadTableCsv).toHaveBeenCalledWith(shown, "Monthly trend", "2026-10-05");
     });
 
     it("copies the chart as a picture, saying so", async () => {

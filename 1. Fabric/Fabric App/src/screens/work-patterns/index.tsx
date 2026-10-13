@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+import { useStageFilter } from "@/hooks/stage-filter.context";
 import { stageAnchor } from "@/components/destinations";
 import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
 import { Section } from "@/components/section";
@@ -28,13 +29,14 @@ export function WorkPatternsScreen() {
 
 function WorkPatternsContent() {
     const m365 = useM365Activity();
+    const { show } = useStageFilter();
 
     if (m365.state === "ready") {
         return (
             <div className="flex flex-col gap-800">
-                <M365ActivityStage concealed={m365.concealed} />
-                <M365SuiteStage />
-                <M365CopilotStage concealed={m365.concealed} />
+                {show("m365-activity") && <M365ActivityStage concealed={m365.concealed} />}
+                {show("m365-suite") && <M365SuiteStage />}
+                {show("m365-copilot") && <M365CopilotStage concealed={m365.concealed} />}
             </div>
         );
     }

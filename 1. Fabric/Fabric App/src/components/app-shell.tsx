@@ -5,13 +5,19 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Moon, Sun } from "lucide-react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { FileStack, Moon, Sun } from "lucide-react";
+import { DataToContext } from "@/hooks/data-to.context";
+import { useReportPacks } from "@/hooks/report-packs.context";
+import { useSourceFreshness } from "@/hooks/use-source-freshness";
 import { paletteClass, usePaletteTheme } from "@/hooks/use-palette-theme";
 import { ThemeContext, useThemeContext } from "@/hooks/theme.context";
 import { AuthContext } from "@/hooks/auth.context";
 import { useSourceAvailability } from "@/hooks/source-availability.context";
+import { useAccessScope } from "@/hooks/use-access-scope";
 import { useIsRefreshing } from "@/lib/refresh-tracker";
+import { PAGE_SOURCES } from "@/lib/freshness";
+import { earliestDate, newPackId, packFilters, packSources, stageLabel, type PackRun, type ReportPack } from "@/lib/report-pack";
 import { runtimeConfig } from "@/lib/runtime-config";
 import { scrollToAnchor } from "@/lib/scroll-to-anchor";
 import { cn } from "@/lib/utils";
@@ -20,14 +26,19 @@ import {
     availableDestinations,
     destinations,
     isDestinationReady,
+    isPackable,
     isReference,
     stageAnchor,
     type Destination,
     type DestinationId,
     type StageId,
 } from "./destinations";
+import { AccessScopeChip, NoScopeNotice } from "./access-scope";
 import { FilterBar } from "./filter-bar";
-import { FreshnessLabel } from "./freshness-label";
+import { ReportHeader } from "./report-header";
+import { PackActions } from "./report-pack-actions";
+import { ReportPackEditor } from "./report-pack-editor";
+import { ReportsNav } from "./reports-nav";
 import { SharePanel } from "./share-panel";
 
 interface VersionResponse {
@@ -66,9 +77,15 @@ function UpdateNotice() {
     );
 }
 
+/** What the canvas shows: one destination, or a report pack's stages from any of them. */
+export type AppView =
+    | { kind: "destination"; id: DestinationId }
+    | { kind: "pack"; pack: ReportPack; runs: readonly PackRun[]; missing: readonly StageId[] };
+
 interface AppShellProps {
-    active: DestinationId;
+    view: AppView;
     onNavigate: (id: DestinationId) => void;
+    onOpenPack: (id: string) => void;
     children: ReactNode;
 }
 
@@ -85,15 +102,42 @@ const READING_LINE = 0.3;
  * once so they read as distinct places, and the canvas — chrome and charts
  * alike — takes on the hue of the one that is open.
  */
-export function AppShell({ active, onNavigate, children }: AppShellProps) {
+export function AppShell({ view, onNavigate, onOpenPack, children }: AppShellProps) {
     const themeContext = useThemeContext();
     const { isDark, toggleTheme } = themeContext;
-    const paletteTheme = usePaletteTheme(active);
+    const active = view.kind === "destination" ? view.id : undefined;
+    // A pack takes on the hue of the destination it opens with.
+    const palette: DestinationId = active ?? (view.kind === "pack" ? view.runs[0]?.destination.id : undefined) ?? "executive";
+    const paletteTheme = usePaletteTheme(palette);
     const refreshing = useIsRefreshing();
     const current = destinations.find((destination) => destination.id === active);
+    const viewKey = view.kind === "destination" ? view.id : `pack:${view.pack.id}`;
     const mainRef = useRef<HTMLElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const { save } = useReportPacks();
+    const [editing, setEditing] = useState<{ pack: ReportPack; heading: string }>();
+    const closeEditor = useCallback(() => setEditing(undefined), []);
+    const savePack = async (pack: ReportPack) => {
+        const saved = await save(pack);
+        setEditing(undefined);
+        onOpenPack(saved.id);
+    };
+
+    const headerSources = useMemo(
+        () => (view.kind === "pack" ? packSources(view.runs) : PAGE_SOURCES[view.id]),
+        [view],
+    );
+    const dates = useSourceFreshness(headerSources);
+    const dataTo = earliestDate(headerSources.map((source) => dates[source]));
+    const filterKeys = useMemo(
+        () => (view.kind === "pack" ? packFilters(view.runs) : (current?.filters ?? [])),
+        [view, current],
+    );
+    const title = view.kind === "pack" ? view.pack.name : current?.label;
     const [readingStage, setReadingStage] = useState<StageId>();
     const sources = useSourceAvailability();
+    const accessScope = useAccessScope();
+    const noScope = accessScope.kind === "none";
     // Pages whose model the install didn't set up, or whose source has no data, are left out of the sidebar.
     const available = useMemo(() => availableDestinations(runtimeConfig().semanticModels, sources), [sources]);
 
@@ -132,7 +176,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
             main.removeEventListener("scroll", onScroll);
             cancelAnimationFrame(frame);
         };
-    }, [active]);
+    }, [active, viewKey]);
 
     const goToStage = (id: StageId) => scrollToAnchor(stageAnchor(id));
 
@@ -214,11 +258,13 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
         <div
             className={cn(
                 "relative flex h-screen w-full overflow-hidden bg-background text-foreground",
-                paletteClass(active),
+                paletteClass(palette),
             )}
+            data-print="flow"
         >
             <nav
                 aria-label="Sections"
+                data-print="hide"
                 className="relative flex w-[248px] shrink-0 flex-col gap-500 overflow-y-auto border-r border-border bg-card px-400 py-500"
             >
                 <div className="flex flex-col gap-100 px-200">
@@ -246,6 +292,12 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                     </div>
                 )}
 
+                <ReportsNav
+                    activePack={view.kind === "pack" ? view.pack.id : undefined}
+                    onOpen={onOpenPack}
+                    onCreate={() => setEditing({ pack: { id: newPackId(), name: "", stages: [] }, heading: "New report pack" })}
+                />
+
                 <SharePanel />
 
                 <UpdateNotice />
@@ -265,36 +317,77 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
                 </button>
             </nav>
 
-            <main ref={mainRef} className="relative min-w-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
-                <div className="mx-auto flex max-w-[1400px] flex-col gap-600 px-700 pt-600 pb-800">
-                    {current && (
-                        <header className="flex items-center gap-400">
-                            <span className="flex size-[48px] shrink-0 items-center justify-center rounded-lg bg-accent text-primary">
-                                <current.icon className="icon-size-400" aria-hidden="true" />
-                            </span>
-                            <span className="flex flex-col gap-100">
-                                <h1 className="text-[length:var(--text-hero-700)] leading-hero-700 font-semibold">
-                                    {current.label}
-                                </h1>
-                                <span className="text-[length:var(--text-300)] leading-300 text-muted-foreground">
-                                    {current.blurb}
-                                </span>
-                                <FreshnessLabel key={current.id} destination={current.id} />
-                            </span>
-                        </header>
+            <main ref={mainRef} data-print="flow" className="relative min-w-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+                <div className="mx-auto flex max-w-[1400px] flex-col gap-600 px-700 pt-600 pb-800" data-print="flow">
+                    {view.kind === "pack" ? (
+                        <ReportHeader
+                            key={viewKey}
+                            icon={FileStack}
+                            title={view.pack.name}
+                            blurb={view.pack.description}
+                            sources={headerSources}
+                            dates={dates}
+                            filterKeys={filterKeys}
+                            missing={view.missing.map(stageLabel)}
+                            contentRef={contentRef}
+                            meta={<AccessScopeChip state={accessScope} />}
+                            downloadable={!noScope}
+                            actions={
+                                <PackActions
+                                    pack={view.pack}
+                                    onEdit={(pack, heading) => setEditing({ pack, heading })}
+                                    onDeleted={() => onNavigate("executive")}
+                                />
+                            }
+                        />
+                    ) : (
+                        current && (
+                            <ReportHeader
+                                key={viewKey}
+                                icon={current.icon}
+                                title={current.label}
+                                blurb={current.blurb}
+                                sources={headerSources}
+                                dates={dates}
+                                filterKeys={filterKeys}
+                                contentRef={contentRef}
+                                meta={<AccessScopeChip state={accessScope} />}
+                                downloadable={isPackable(current) && !noScope}
+                            />
+                        )
                     )}
-                    {current && current.filters.length > 0 && <FilterBar destinationLabel={current.label} />}
-                    <ThemeContext.Provider value={{ ...themeContext, theme: paletteTheme }}>
-                        <div
-                            aria-busy={refreshing || undefined}
-                            data-refreshing={refreshing || undefined}
-                            className="flex flex-col gap-700 transition-opacity duration-200 data-[refreshing]:opacity-55 data-[refreshing]:delay-150"
-                        >
-                            {children}
-                        </div>
-                    </ThemeContext.Provider>
+                    {noScope ? (
+                        <NoScopeNotice />
+                    ) : (
+                        <>
+                            {title && filterKeys.length > 0 && <FilterBar destinationLabel={title} />}
+                            <ThemeContext.Provider value={{ ...themeContext, theme: paletteTheme }}>
+                                <DataToContext.Provider value={dataTo}>
+                                    <div
+                                        ref={contentRef}
+                                        aria-busy={refreshing || undefined}
+                                        data-refreshing={refreshing || undefined}
+                                        className="flex flex-col gap-700 transition-opacity duration-200 data-[refreshing]:opacity-55 data-[refreshing]:delay-150"
+                                    >
+                                        {children}
+                                    </div>
+                                </DataToContext.Provider>
+                            </ThemeContext.Provider>
+                        </>
+                    )}
                 </div>
             </main>
+
+            {editing && (
+                <ReportPackEditor
+                    key={editing.pack.id}
+                    pack={editing.pack}
+                    heading={editing.heading}
+                    available={available}
+                    onSave={savePack}
+                    onClose={closeEditor}
+                />
+            )}
         </div>
     );
 }

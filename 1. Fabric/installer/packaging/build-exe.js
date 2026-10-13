@@ -185,7 +185,7 @@ try {
   const { loadSources } = await import(pathToFileURL(join(stagedInstaller, 'src', 'sources.js')).href);
   const sources = loadSources();
   if (resolve(sources.dir) !== resolve(stage, SOURCE_ROOT)) throw new Error(`The staged installer reads its templates from ${sources.dir}.`);
-  for (const key of ['modelFile', 'consumptionModelFile', 'agentEvaluatorModelFile', 'appDir']) {
+  for (const key of ['modelFile', 'consumptionModelFile', 'agentEvaluatorModelFile', 'appDir', 'ask']) {
     if (!sources[key]) throw new Error(`The staged installer can't find its ${key}.`);
   }
   if (!existsSync(join(sources.appDir, PREBUILT_MARKER))) throw new Error('The staged app isn\'t marked prebuilt.');

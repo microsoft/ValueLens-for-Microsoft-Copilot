@@ -55,13 +55,13 @@ test('dataflow: reads the Viva query into a text staging table in the Lakehouse'
 });
 
 test('planCowork: asks for the partition and query; a blank partition falls back to the CSV export', async () => {
-  const t = setup({ answers: [PARTITION, QUERY] });
+  const t = setup({ answers: ['now', PARTITION, QUERY] });
   await planCowork(t.ctx);
   assert.equal(t.config.consumption.vivaPartition, PARTITION);
   assert.equal(t.config.consumption.vivaQuery, QUERY);
   assert.equal(t.config.dataSources.coworkCredits, 'api');
 
-  const blank = setup({ answers: [''] });
+  const blank = setup({ answers: ['now', ''] });
   await planCowork(blank.ctx);
   assert.equal(blank.config.dataSources.coworkCredits, 'csv');
   assert.match(blank.ui.text(), new RegExp(UPLOAD_DIR));
@@ -71,8 +71,39 @@ test('planCowork: asks for the partition and query; a blank partition falls back
   await planCowork(csv.ctx);
   assert.deepEqual(csv.ui.asked, [], 'nothing to ask when the export is uploaded');
 
-  const typo = setup({ answers: ['not-a-guid'] });
+  const typo = setup({ answers: ['now', 'not-a-guid'] });
   await assert.rejects(planCowork(typo.ctx), /looks like 00000000/);
+});
+
+test('planCowork: "not yet" sets up the rest with the CSV export, and the query can be added on a later run', async () => {
+  const later = setup({ answers: ['later'] });
+  await planCowork(later.ctx);
+  assert.equal(later.config.dataSources.coworkCredits, 'csv');
+  assert.deepEqual(later.ui.asked, ['Do you have the Viva Insights query IDs?'], 'no IDs asked for');
+  assert.equal(later.config.consumption.vivaPartition, undefined);
+  assert.match(later.ui.text(), new RegExp(UPLOAD_DIR));
+  assert.match(later.ui.text(), /run the installer again and set Copilot Cowork credits to Connected \(Dataflow\)/);
+  assert.match(later.ui.text(), /Viva Insights analyst/);
+
+  later.config.dataSources.coworkCredits = 'api';
+  const again = fakeUi({ answers: ['now', PARTITION, QUERY] });
+  await planCowork({ ...later.ctx, ui: again.ui });
+  assert.equal(later.config.dataSources.coworkCredits, 'api');
+  assert.equal(later.config.consumption.vivaQuery, QUERY);
+});
+
+test('planCowork: the partition ID starts as the tenant ID', async () => {
+  const t = setup();
+  t.config.tenantId = PARTITION;
+  t.config.consumption.vivaQuery = QUERY;
+  await planCowork(t.ctx);
+  assert.equal(t.config.consumption.vivaPartition, PARTITION);
+  assert.equal(t.config.dataSources.coworkCredits, 'api');
+
+  const notGuid = setup({ answers: ['now', ''] });
+  notGuid.config.tenantId = 'contoso.onmicrosoft.com';
+  await planCowork(notGuid.ctx);
+  assert.equal(notGuid.config.dataSources.coworkCredits, 'csv', 'no GUID to start from, so blank takes the export');
 });
 
 test('ensureCoworkDataflow: created once, left alone on re-run, redefined when the query changes, recreated when deleted', async () => {

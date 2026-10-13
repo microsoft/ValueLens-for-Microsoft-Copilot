@@ -1,7 +1,7 @@
 import { TableClient, odata } from '@azure/data-tables';
 import { ManagedIdentityCredential } from '@azure/identity';
 
-export const ALLOWED_ENTITIES = new Set(['CommercialTerms', 'TaskTime']);
+export const ALLOWED_ENTITIES = new Set(['CommercialTerms', 'ReportPack', 'TaskTime']);
 const MAX_ROW_BYTES = 16 * 1024;
 
 export function validateEntity(entity) { return ALLOWED_ENTITIES.has(entity); }
