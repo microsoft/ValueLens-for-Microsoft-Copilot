@@ -1,6 +1,7 @@
 # Fabric notebooks (set up by hand)
 
-The [installer](../../installer/) does all of this for you. Use these steps only if you can't use it.
+The main way to set up the Fabric path. The [installer](../../installer/) (work in progress)
+automates the same steps.
 
 ## Before you start
 

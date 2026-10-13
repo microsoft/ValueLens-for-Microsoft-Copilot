@@ -1,5 +1,8 @@
 # Analytics Hub installer
 
+> **Work in progress.** The installer is still changing. Try it in a test or demo tenant first, and
+> use the [manual setup](../Manual%20setup/README.md) for production.
+
 Sets up the [Fabric path](../README.md) in your tenant: the app registration and its secret in Key
 Vault, a workspace and Lakehouse, the notebooks, the pipeline and its schedule, the semantic model
 and the Analytics Hub app. Then it loads the first data and checks it.

@@ -4,6 +4,11 @@ Everything you need before you install Analytics Hub, on one page, by who does i
 takes another admin a few minutes. Send them their part before you start, so you don't have to
 stop halfway.
 
+> The installer is a work in progress. For the [manual setup](../1.%20Fabric/Manual%20setup/README.md),
+> you need the Fabric capacity, the app registration and admin consent, the Key Vault and the
+> optional extras' permissions below, plus the Power BI visuals setting. The *Three tenant settings*
+> are only for the installer and the Analytics Hub app.
+
 Once you sign in, the installer's **Prerequisites** panel (or `prereqs` in the terminal) checks
 most of this for you. For the detail behind each permission, see [PERMISSIONS.md](PERMISSIONS.md).
 
