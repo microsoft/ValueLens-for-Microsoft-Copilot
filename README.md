@@ -9,9 +9,9 @@ the hours and value they deliver.
 
 **Demo: what the dashboard measures, page by page** *(2m 4s)*
 
-https://github.com/user-attachments/assets/2aa65c5d-2a20-4d51-9f1d-072c712fb4f3
+[![Watch the demo on YouTube](https://img.youtube.com/vi/Ou601NG_pdg/maxresdefault.jpg)](https://youtu.be/Ou601NG_pdg)
 
-> Prefer to download it? [Get the demo video](media/ValueLens-Demo.mp4).
+**▶ [Watch on YouTube](https://youtu.be/Ou601NG_pdg)**
 
 **Have Fabric?** Follow the [manual setup](1.%20Fabric/README.md#set-it-up): import the notebooks,
 schedule the pipeline and publish the report. **[🎥 Watch the setup](1.%20Fabric/README.md#set-it-up)**.
