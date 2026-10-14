@@ -9,9 +9,9 @@ the hours and value they deliver.
 
 **Demo: what the dashboard measures, page by page** *(2m 4s)*
 
-[![Watch the demo on YouTube](https://img.youtube.com/vi/Ou601NG_pdg/maxresdefault.jpg)](https://youtu.be/Ou601NG_pdg)
+[![Watch the demo on YouTube](https://img.youtube.com/vi/P0uHJb13ZR0/maxresdefault.jpg)](https://youtu.be/P0uHJb13ZR0)
 
-**▶ [Watch on YouTube](https://youtu.be/Ou601NG_pdg)**
+**▶ [Watch on YouTube](https://youtu.be/P0uHJb13ZR0)**
 
 **Have Fabric?** Follow the [manual setup](1.%20Fabric/README.md#set-it-up): import the notebooks,
 schedule the pipeline and publish the report. **[🎥 Watch the setup](1.%20Fabric/README.md#set-it-up)**.
