@@ -760,7 +760,15 @@ function Select-UniqueRows {
 
 function Write-RegistryCsv {
   param($Rows, [string]$Path)
-  $quote = { param($v) '"' + ("$v" -replace '"', '""') + '"' }
+  # Makers choose agent names and descriptions. Text Excel would run as a formula gets a
+  # leading apostrophe, unless it's just a signed number (CWE-1236). Same rule as the
+  # Fabric App's CSV download.
+  $quote = {
+    param($v)
+    $text = "$v"
+    if ($text -match '^[=+\-@\t\r]' -and $text -notmatch '^[+-]?[0-9][0-9,]*(\.[0-9]+)?%?\z') { $text = "'$text" }
+    '"' + ($text -replace '"', '""') + '"'
+  }
   $lines = [System.Collections.Generic.List[string]]::new()
   $lines.Add((@($script:RegistryColumns | ForEach-Object { & $quote $_ }) -join ','))
   foreach ($row in $Rows) {
