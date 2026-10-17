@@ -302,6 +302,20 @@ def normalize_user_id(value: Any) -> str:
     return to_text(value).strip().lower()
 
 
+# Agent names, profile fields and other audit text reach the output CSVs as they are, and
+# admins open those files in Excel. Text Excel would run as a formula gets a leading
+# apostrophe, unless it's just a signed number (CWE-1236). Same rule as the Fabric App's
+# CSV download. Every output applies it, so keys that join the outputs still match.
+_FORMULA_START = frozenset("=+-@\t\r")
+_SIGNED_NUMBER_RE = re.compile(r"[+-]?[0-9][0-9,]*(\.[0-9]+)?%?")
+
+
+def csv_text(value: Any) -> Any:
+    if isinstance(value, str) and value[:1] in _FORMULA_START and not _SIGNED_NUMBER_RE.fullmatch(value):
+        return "'" + value
+    return value
+
+
 # Non-human/system identities found in Purview audit logs (Teams Sync, SharePoint app,
 # SupervisoryReview bots, ServicePrincipals, NT-style accounts, SIDs, bare GUIDs, etc.).
 # These have no matching userPrincipalName in EntraUsers and would render as blank
@@ -1854,7 +1868,7 @@ def load_entra_and_write_users(
             # TotalEmployees (matches M-code: row count repeated per row)
             out_row["TotalEmployees"] = str(total_rows)
 
-            writer.writerow(out_row)
+            writer.writerow({h: csv_text(v) for h, v in out_row.items()})
 
             # Build fact-lookup dict (dedupe on normalized key, last-wins matches
             # M-code Table.Distinct behavior on the licensed-users path).
@@ -2386,7 +2400,7 @@ def compute_and_write_aggregates(
             w = csv.writer(f, lineterminator="\n")
             w.writerow(header)
             for r in rows:
-                w.writerow([_fmt_float(v) if i in float_cols else v for i, v in enumerate(r)])
+                w.writerow([_fmt_float(v) if i in float_cols else csv_text(v) for i, v in enumerate(r)])
         return len(rows)
 
     counts = {}
@@ -2560,12 +2574,14 @@ def run_processor(
         # DictWriter (skips dict-to-list translation + per-row genexpr).
         nongrain_attrs = nongrain_attrs_sel  # local rebind
         grain_len = len(grain_keys)
+        formula_start = _FORMULA_START  # local rebind
         for (grain_key, mid_int), attrs in rollup.items():
             # fact_header = grain_keys + ("Message_Id",) + nongrain_attrs
             row_out = list(grain_key)
             row_out.append(mid_int)
             row_out.extend(attrs[k] for k in nongrain_attrs)
-            writer.writerow(row_out)
+            # Only text that starts like a formula pays for the csv_text call.
+            writer.writerow([csv_text(v) if v.__class__ is str and v[:1] in formula_start else v for v in row_out])
 
     stats["output_rows_rollup"] = len(rollup)
     stats["distinct_message_ids"] = len(mid_to_int)

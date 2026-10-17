@@ -15,6 +15,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
@@ -34,6 +36,8 @@ jobs:
         working-directory: '1. Fabric/installer'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
@@ -49,6 +53,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
@@ -66,18 +72,29 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Build the Bicep template
         run: |
           az bicep install
-          az bicep build --file "2. Azure/infra/main.bicep" --outfile "${{ runner.temp }}/main.arm.json"
+          az bicep build --file "2. Azure/infra/main.bicep" --outfile "$RUNNER_TEMP/main.arm.json"
       - name: Compare with the installer's copy
         shell: python
         run: |
           import json, os, sys
+          # Ignore which Bicep version compiled the template and each nested module.
+          def strip(node):
+              if isinstance(node, dict):
+                  if isinstance(node.get("metadata"), dict):
+                      node["metadata"].pop("_generator", None)
+                  for value in node.values():
+                      strip(value)
+              elif isinstance(node, list):
+                  for value in node:
+                      strip(value)
+              return node
           def load(p):
-              d = json.load(open(p, encoding="utf-8"))
-              d.get("metadata", {}).pop("_generator", None)
-              return d
+              return strip(json.load(open(p, encoding="utf-8")))
           built = load(os.path.join(os.environ["RUNNER_TEMP"], "main.arm.json"))
           shipped = load("1. Fabric/installer/src/azure/main.arm.json")
           if built != shipped:

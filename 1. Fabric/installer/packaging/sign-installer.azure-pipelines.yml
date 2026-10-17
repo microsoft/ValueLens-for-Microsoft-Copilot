@@ -11,6 +11,8 @@
 #     token that can write releases in this repo only.
 #   - Your organisation's required pipeline template (1ES or OneBranch) wrapped around the job,
 #     if it requires one.
+#   - A Branch control check limiting the variable group and the ESRP service connection to main,
+#     so a run of another branch, whose copy of this file could differ, can't use them.
 #
 # Run it with the tag once installer-exe has drafted the release. It signs the draft's exe, checks
 # the signature, then replaces the exe, its .sha256 and the notes. Review and publish by hand as
@@ -43,13 +45,16 @@ jobs:
         inputs:
           version: '24.x'
 
+      # The tag reaches scripts only through the TAG variable: written into a script, a crafted tag
+      # would run as code beside GitHubReleaseToken, ahead of signing.
       - pwsh: |
-          if ('${{ parameters.tag }}' -notmatch '^installer-v\d+\.\d+\.\d+') { throw "'${{ parameters.tag }}' isn't an installer tag." }
-          gh release download '${{ parameters.tag }}' --repo $env:BUILD_REPOSITORY_NAME --dir $env:TOSIGN --pattern AnalyticsHubInstaller.exe
+          if ($env:TAG -cnotmatch '^installer-v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?\z') { throw 'The tag must look like installer-v0.4.3.' }
+          gh release download $env:TAG --repo $env:BUILD_REPOSITORY_NAME --dir $env:TOSIGN --pattern AnalyticsHubInstaller.exe
           if ($LASTEXITCODE) { throw 'Download failed.' }
         displayName: Download the drafted exe
         env:
           GH_TOKEN: $(GitHubReleaseToken)
+          TAG: ${{ parameters.tag }}
           TOSIGN: $(ToSign)
 
       - task: EsrpCodeSigning@6
@@ -97,17 +102,18 @@ jobs:
           node packaging/finish-exe.js "$env:TOSIGN\AnalyticsHubInstaller.exe" --require-signed --repo $env:BUILD_REPOSITORY_NAME --notes "$env:TOSIGN\release-notes.md"
           if ($LASTEXITCODE) { throw 'The signed exe failed its checks.' }
         displayName: Check the signature, write the hash and the release notes
-        workingDirectory: installer
+        workingDirectory: '1. Fabric/installer'
         env:
           TOSIGN: $(ToSign)
 
       - pwsh: |
           $exe = Join-Path $env:TOSIGN 'AnalyticsHubInstaller.exe'
-          gh release upload '${{ parameters.tag }}' $exe "$exe.sha256" --repo $env:BUILD_REPOSITORY_NAME --clobber
+          gh release upload $env:TAG $exe "$exe.sha256" --repo $env:BUILD_REPOSITORY_NAME --clobber
           if ($LASTEXITCODE) { throw 'Upload failed.' }
-          gh release edit '${{ parameters.tag }}' --repo $env:BUILD_REPOSITORY_NAME --notes-file (Join-Path $env:TOSIGN 'release-notes.md')
+          gh release edit $env:TAG --repo $env:BUILD_REPOSITORY_NAME --notes-file (Join-Path $env:TOSIGN 'release-notes.md')
           if ($LASTEXITCODE) { throw 'Updating the notes failed.' }
         displayName: Replace the draft's exe, hash and notes
         env:
           GH_TOKEN: $(GitHubReleaseToken)
+          TAG: ${{ parameters.tag }}
           TOSIGN: $(ToSign)

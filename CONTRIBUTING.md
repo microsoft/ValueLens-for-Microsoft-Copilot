@@ -63,6 +63,7 @@ the exe on pull requests that touch `packaging/`. To publish one, set the versio
 release with the exe, its SHA-256 and the release notes from `packaging/finish-exe.js`. The same
 tag makes [`azure-images`](.github/workflows/azure-images.yml) push
 `ghcr.io/microsoft/valuelens-jobs` and `valuelens-web` with that version, which Azure installs pull.
+Run by hand, it pushes only when run on an `installer-v*` tag; on a branch it just builds.
 
 Signing happens in CI, never on your computer. Run the ESRP pipeline
 ([`packaging/sign-installer.azure-pipelines.yml`](1.%20Fabric/installer/packaging/sign-installer.azure-pipelines.yml))
