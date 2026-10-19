@@ -2,11 +2,12 @@
 
 > [!IMPORTANT]
 > **The schema blocker that held this up is now resolved.** As of
-> **PAX v1.11.5** (and **v1.11.6**, the current release) PAX embeds the
-> **v4.0.0** CopilotInteraction processor and a new **`-Dashboard AIBV`** switch
-> that produces the ValueLens rollup **natively** — the same 50-column
-> profile the AIBV PBIT consumes. A custom container layer is **no longer
-> needed**: you can run PAX's own container image directly.
+> **PAX v1.11.5**, PAX embeds the **v4.0.0** CopilotInteraction processor and a
+> **`-Dashboard`** value that produces the ValueLens rollup **natively** — the same
+> 50-column profile the AIBV PBIT consumes. It's **`-Dashboard ValueLens`** from
+> PAX v1.11.15 and `-Dashboard AIBV` in v1.11.5–v1.11.14; each release rejects the
+> other name. A custom container layer is **no longer needed**: you can run PAX's
+> own container image directly.
 >
 > What remains is to **commit and test** the deployment, so until the files in
 > the table below land here, the supported way to schedule the SharePoint
@@ -21,13 +22,13 @@
 | | Before (PAX ≤ v1.11.4) | Now (PAX ≥ v1.11.5) |
 |---|---|---|
 | Embedded rollup processor | v3.1.0 (33-column schema) | **v4.0.0** (50-column AIBV schema) |
-| AIBV rollup | Not available in PAX — needed this repo's separate [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../../5.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py) | Built in — select with **`-Dashboard AIBV`** (auto-enables `-Rollup`) |
+| AIBV rollup | Not available in PAX — needed this repo's separate [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../../5.%20Local%20CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py) | Built in — select with **`-Dashboard ValueLens`** (`-Dashboard AIBV` before v1.11.15; auto-enables `-Rollup`) |
 | Container story | Custom image layering the v4.0.0 processor over PAX | **Vanilla PAX image** ([`PAX.Dockerfile`](https://github.com/microsoft/PAX/blob/release/fabric_resources/Dockerfile/PAX.Dockerfile)) — no layer needed |
 
 > [!NOTE]
-> PAX's `-Dashboard AIBV` runs the **same** v4.0.0 processor this folder shipped;
-> it was upstreamed into PAX. A one-time column/row diff of a PAX
-> `-Dashboard AIBV` rollup against this repo's standalone processor output is
+> PAX's `-Dashboard ValueLens` runs the **same** v4.0.0 processor this folder shipped
+> (`--profile aibv`); it was upstreamed into PAX. A one-time column/row diff of a PAX
+> `-Dashboard ValueLens` rollup against this repo's standalone processor output is
 > still worth doing as a validation step before cutting over (see the checklist).
 
 ## Target design (no custom layer)
@@ -38,14 +39,14 @@ to be baked into an image:
 1. **Image** — build/push `microsoft/PAX`'s
    [`Dockerfile/PAX.Dockerfile`](https://github.com/microsoft/PAX/blob/release/fabric_resources/Dockerfile/PAX.Dockerfile)
    to your ACR (or pull a published tag).
-2. **Job command** — invoke PAX with the AIBV dashboard, managed-identity auth,
+2. **Job command** — invoke PAX with the ValueLens dashboard, managed-identity auth,
    and a SharePoint document-library `-OutputPath`. These go in the deploy
    script's `-ScriptArgs`:
 
    ```text
    -Auth        ManagedIdentity
    -TenantId    <tenant-guid>
-   -Dashboard   AIBV                 # embedded v4.0.0 rollup; auto-enables -Rollup
+   -Dashboard   ValueLens            # embedded v4.0.0 rollup; auto-enables -Rollup
    -IncludeUserInfo                  # Entra users + MAC licensing (AIBV needs both)
    -StartDate   <yyyy-MM-dd>         # PAX has no -Days; omit both for a 30-day window
    -EndDate     <yyyy-MM-dd>
@@ -62,11 +63,11 @@ to be baked into an image:
    ```powershell
    ./Deploy-PAXAcaJob.ps1 `
        -SubscriptionId 'xxx' -ResourceGroup 'rg-pax' -EnvironmentName 'cae-pax' `
-       -JobName 'aibv-sharepoint-daily' -AcrName 'paxacr' -ImageTag '1.11.14' `
+       -JobName 'aibv-sharepoint-daily' -AcrName 'paxacr' -ImageTag '1.11.15' `
        -ManagedIdentityResourceId '/subscriptions/.../userAssignedIdentities/uai-aibv' `
        -ManagedIdentityClientId '<uami-client-id>' `
        -BootstrapLogStorageAccount 'aibvbootstraplogs' `
-       -ScriptArgs @('-Dashboard','AIBV','-IncludeUserInfo','-Auth','ManagedIdentity',
+       -ScriptArgs @('-Dashboard','ValueLens','-IncludeUserInfo','-Auth','ManagedIdentity',
                      '-OutputPath','https://<tenant>.sharepoint.com/sites/<site>/<library>/AIBV') `
        -CronExpression '0 2 * * *'   # 02:00 UTC daily
    ```
@@ -83,12 +84,14 @@ Because PAX emits AIBV directly, the in-container flow is a **single step**
 (PAX → SharePoint) rather than the old two-step (PAX → v4.0.0 processor →
 SharePoint).
 
-> **Pin `-ImageTag '1.11.14'` or newer.** Earlier `purview-v1.11.x` container
+> **Pin `-ImageTag '1.11.14'` or newer, and match `-Dashboard` to it:**
+> `'ValueLens'` from 1.11.15, `'AIBV'` in 1.11.14. Earlier `purview-v1.11.x` container
 > builds had a bug where the Agent 365 catalog CSV was generated but not
 > uploaded to a SharePoint (or Fabric/OneLake) `-OutputPath`. Fixed in
 > [`purview-v1.11.14`](https://github.com/microsoft/PAX/releases/tag/purview-v1.11.14).
 > Local-output runs via this repo's [`../scripts/Run-PAX-AIBV.ps1`](../scripts/Run-PAX-AIBV.ps1)
-> wrapper were never affected — the bug is remote-output-only.
+> wrapper were never affected — the bug is remote-output-only — and the wrapper
+> passes whichever `-Dashboard` name the release it downloads accepts.
 
 > [!WARNING]
 > **Permissions differ from the app-registration path — decide this before
@@ -107,9 +110,9 @@ SharePoint).
 
 ## Remaining work to ship this
 
-- [ ] **Validate** a PAX `-Dashboard AIBV` rollup matches this repo's standalone
+- [ ] **Validate** a PAX `-Dashboard ValueLens` rollup matches this repo's standalone
       v4.0.0 output (column set + a row-level spot check).
-- [ ] **Confirm filenames (don't rename).** PAX's `-Dashboard AIBV` rollup is
+- [ ] **Confirm filenames (don't rename).** PAX's `-Dashboard ValueLens` rollup is
       built to emit the exact filenames the AIBV PBIT reads — PAX's docs say the
       rollup output names *"are the exact files expected by the Copilot Analytics
       Lab Power BI templates — do not rename them."* Just confirm the PBIT's
@@ -135,11 +138,11 @@ deploy script:
 
 | File | Purpose |
 |---|---|
-| `Deploy-AcaJob.ps1` _(optional)_ | Thin convenience wrapper that calls PAX's [`Deploy-PAXAcaJob.ps1`](https://github.com/microsoft/PAX/blob/release/fabric_resources/Deploy/Deploy-PAXAcaJob.ps1) pre-set with the AIBV `-ScriptArgs` (`-Dashboard AIBV -IncludeUserInfo`) and a SharePoint `-OutputPath`. |
+| `Deploy-AcaJob.ps1` _(optional)_ | Thin convenience wrapper that calls PAX's [`Deploy-PAXAcaJob.ps1`](https://github.com/microsoft/PAX/blob/release/fabric_resources/Deploy/Deploy-PAXAcaJob.ps1) pre-set with the ValueLens `-ScriptArgs` (`-Dashboard ValueLens -IncludeUserInfo`) and a SharePoint `-OutputPath`. |
 | `Grant-Permissions.ps1` _(optional)_ | Thin wrapper over PAX's [`Grant-PAXPermissions.ps1`](https://github.com/microsoft/PAX/blob/release/fabric_resources/Prereqs/Grant-PAXPermissions.ps1), defaulting to the SharePoint scopes. |
 | `job.env.example` | Example job parameters (subscription, RG, ACA env, ACR, UAMI, site/library path, schedule). |
 
-> No `Dockerfile` or `entrypoint.ps1` is needed — with `-Dashboard AIBV` the
+> No `Dockerfile` or `entrypoint.ps1` is needed — with `-Dashboard ValueLens` the
 > stock PAX image is used as-is.
 
 ## Until this lands

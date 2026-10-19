@@ -71,6 +71,9 @@ Outputs to `<WorkRoot>\processed\`:
 - `rollup-manifest.json` (paths + timings for the upload step; `agents365_csv` points at the registry,
   or at your `-Agents365Csv` file when the fallback was used)
 The script downloads the selected extract-tool release into `<WorkRoot>\pax\releases\`.
+It reads that release's `-Dashboard` values without running it and passes `ValueLens` (PAX v1.11.15
+and later) or `AIBV` (v1.11.5 to v1.11.14), which build the same rollup. A release before v1.11.5
+stops with an error. The manifest records the value as `pax_dashboard`.
 Defaults are `-Auth AppRegistration`, `-Rollup`, and `-IncludeUserInfo`.
 
 **Seed once, then append (interactions)** — `-AppendFile`: the Purview interactions data is a growing

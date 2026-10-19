@@ -25,7 +25,10 @@
   Working directory. Holds the downloaded PAX release cache and processed CSVs.
 
 .PARAMETER PaxReleaseTag
-  GitHub release tag to use. Default: latest.
+  GitHub release tag to use. Default: latest. The script reads the release's
+  -Dashboard values without running it and passes ValueLens (PAX purview-v1.11.15
+  and later) or AIBV (v1.11.5 to v1.11.14); both build the same rollup. Releases
+  before v1.11.5 have no ValueLens rollup and stop with an error.
 
 .PARAMETER IncludeAgent365Info
   Also export the Agent 365 registry (Copilot agent catalogue) for the template's
@@ -261,6 +264,47 @@ function Get-PaxReleaseScript {
   }
 }
 
+function Get-PaxDashboardValue {
+  # Reads -Dashboard from the PAX script's param block without running it. PAX
+  # purview-v1.11.15 renamed the ValueLens rollup's value from AIBV to ValueLens and
+  # rejects AIBV; v1.11.5 to v1.11.14 accept only AIBV. Both build the same rollup.
+  param([Parameter(Mandatory = $true)] [string]$ScriptPath)
+
+  $parseErrors = $null
+  $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$parseErrors)
+  if ($parseErrors) {
+    throw "Can't read the PAX script at '$ScriptPath': $($parseErrors[0].Message) Re-download it with -ForcePaxDownload."
+  }
+
+  $dashboard = $null
+  if ($ast.ParamBlock) {
+    $dashboard = $ast.ParamBlock.Parameters |
+      Where-Object { $_.Name.VariablePath.UserPath -eq 'Dashboard' } |
+      Select-Object -First 1
+  }
+  if (-not $dashboard) {
+    throw "This PAX release has no -Dashboard parameter, so it can't build the ValueLens rollup. Use PAX purview-v1.11.5 or later (-PaxReleaseTag)."
+  }
+
+  $validateSet = $dashboard.Attributes |
+    Where-Object {
+      $_ -is [System.Management.Automation.Language.AttributeAst] -and
+      $_.TypeName.Name -match '^(System\.Management\.Automation\.)?ValidateSet(Attribute)?$'
+    } |
+    Select-Object -First 1
+  # Newer prereleases check the value in code instead of a ValidateSet, and take ValueLens.
+  if (-not $validateSet) { return 'ValueLens' }
+
+  $accepted = @($validateSet.PositionalArguments |
+    Where-Object { $_ -is [System.Management.Automation.Language.StringConstantExpressionAst] } |
+    ForEach-Object { $_.Value })
+  foreach ($candidate in 'ValueLens', 'AIBV') {
+    $match = $accepted | Where-Object { $_ -eq $candidate } | Select-Object -First 1
+    if ($match) { return $match }
+  }
+  throw ("This PAX release's -Dashboard accepts only {0}, so it can't build the ValueLens rollup. Use PAX purview-v1.11.5 or later (-PaxReleaseTag)." -f ($accepted -join ', '))
+}
+
 if (-not (Test-Path -LiteralPath $WorkRoot)) {
   New-Item -ItemType Directory -Force -Path $WorkRoot | Out-Null
 }
@@ -279,6 +323,7 @@ $StartDate = (Get-Date).AddDays(-$Days).ToString('yyyy-MM-dd')
 $EndDate = (Get-Date).ToString('yyyy-MM-dd')
 
 $pax = Get-PaxReleaseScript -ReleaseTag $PaxReleaseTag -CacheRoot $PaxCacheRoot -ForceDownload:$ForcePaxDownload
+$paxDashboard = Get-PaxDashboardValue -ScriptPath $pax.Path
 
 Write-Host ""
 Write-Host "==== PAX run ====" -ForegroundColor Cyan
@@ -286,6 +331,7 @@ Write-Host ("Tenant   : {0}" -f $TenantId)
 Write-Host ("App      : {0}" -f $ClientId)
 Write-Host ("Window   : {0} -> {1} ({2} days)" -f $StartDate, $EndDate, $Days)
 Write-Host ("Release  : {0} ({1})" -f $pax.Tag, $pax.Asset)
+Write-Host ("Dashboard: {0}" -f $paxDashboard)
 Write-Host ("Out dir  : {0}" -f $OutDir)
 Write-Host ""
 
@@ -294,7 +340,7 @@ $paxParams = @{
   TenantId = $TenantId
   ClientId = $ClientId
   Auth = $Auth
-  Dashboard = 'AIBV'
+  Dashboard = $paxDashboard
   StartDate = $StartDate
   EndDate = $EndDate
   OutputPath = $OutDir
@@ -441,6 +487,7 @@ $manifest = [pscustomobject]@{
   window_end         = $EndDate
   pax_release_tag    = $pax.Tag
   pax_release_asset  = $pax.Asset
+  pax_dashboard      = $paxDashboard
   pax_elapsed_min    = [math]::Round($paxElapsed.TotalMinutes, 2)
   pax_auth_mode      = $Auth
   rollup_mode        = if ($RollupPlusRaw) { 'RollupPlusRaw' } else { 'Rollup' }

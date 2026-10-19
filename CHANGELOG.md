@@ -17,6 +17,28 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased — SharePoint refresh works with PAX v1.11.15
+
+**Why.** PAX purview-v1.11.15, the current release, renamed the ValueLens rollup's `-Dashboard` value
+from `AIBV` to `ValueLens` and rejects `AIBV`. `Run-PAX-AIBV.ps1` downloads the latest release by
+default and passed `-Dashboard AIBV`, so the SharePoint refresh stopped before PAX started.
+
+- [`Run-PAX-AIBV.ps1`](4.%20SharePoint/scripts/Run-PAX-AIBV.ps1) now reads the `-Dashboard` values
+  from the downloaded PAX script without running it. It passes `ValueLens` to v1.11.15 and later and
+  `AIBV` to v1.11.5 to v1.11.14, so a pinned `-PaxReleaseTag` still works. A release before v1.11.5
+  stops with a clear error. The run prints the value, and `rollup-manifest.json` records it as
+  `pax_dashboard`.
+- Both names build the same rollup (`--profile aibv`), so the output files, the uploaded file names and
+  the templates don't change. The script, the `AIBV-Rollup-Refresh` task and the output files keep
+  their names.
+- The [Azure Container Apps notes](4.%20SharePoint/azure-container/README.md) and the
+  [Azure-hosted plan](docs/plans/AZURE-HOSTED-PLAN.md) now say `-Dashboard ValueLens`, and the worked
+  example uses a 1.11.15 image.
+- `tests/test_sharepoint_pax_dashboard.py` checks the choice against param blocks shaped like each
+  PAX release.
+
+---
+
 ## Unreleased — Faster active-user counts
 
 **Why.** `[All Active Users]` and `[Active Licensed Users]` checked each user ID one at a time, which is
