@@ -219,7 +219,7 @@ Variants: App Service B1 Linux for the web app (+$13), or B1 Windows as in PnP (
 | `flows/Copilot_ProductFeedback_Email_to_OneLake` | A Power Automate flow that writes to OneLake | A variant that writes to the **Blob** connector instead |
 
 The logic is **already forked**. `5. Local CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py`
-(which PAX now embeds as `-Dashboard AIBV`) and the Dataverse bridge
+(which PAX now embeds as `-Dashboard ValueLens`, `AIBV` before PAX v1.11.15) and the Dataverse bridge
 (`3. Power Automate + Dataverse/scripts/Build-DataverseCoreFeeds.py`) both re-implement parts of the
 Spark processor. The Azure version must not add a fourth copy.
 
