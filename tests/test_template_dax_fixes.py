@@ -99,39 +99,76 @@ class CoworkScheduledRuns(unittest.TestCase):
 
 
 class ActiveUserFastPath(unittest.TestCase):
-    """All Active Users and Active Licensed Users use distinct counts unless Audit_UserId is filtered
-    directly. There they keep the per-user form: the fast path is only proven equal to this one,
-    so a change to it needs the fast path re-proven."""
+    """The per-user counts use distinct counts unless Audit_UserId is filtered directly. There they
+    keep the per-user form: the fast path is only proven equal to this one, so a change to it
+    needs the fast path re-proven."""
 
     USER_ID = f"'{AUDIT}'[Audit_UserId]"
     PER_USER = (f"COUNTROWS(FILTER(VALUES({USER_ID}), LEN(TRIM({USER_ID})) > 0"
                 " && CALCULATE([Usage Rows]) > 0))")
-    LICENSED = f"KEEPFILTERS('{AUDIT}'[License Status] = \"M365 Copilot Licensed\")"
-    NAMES = ("All Active Users", "Active Licensed Users")
+    PROMPT_USERS = PER_USER.replace("[Usage Rows]", "[AI Tasks]")
+    FILTERS = {
+        "Active Licensed Users": f"KEEPFILTERS('{AUDIT}'[License Status] = \"M365 Copilot Licensed\")",
+        "Active Unlicensed Users": f"KEEPFILTERS('{AUDIT}'[License Status] = \"Unlicensed\")",
+        "Cowork Users": f"KEEPFILTERS('{AUDIT}'[Is_Cowork] = TRUE())",
+    }
+    AGENTS = f"KEEPFILTERS('{AUDIT}'[Agent Filter (Normalized)] = \"Agents\")"
+    NAMES = ("All Active Users", "Active Licensed Users", "Active Unlicensed Users", "Cowork Users",
+             "Active Agent Users", "Cowork Fit: Eligible Users")
 
-    def test_both_counts_guard_the_per_user_form(self):
-        per_user = {
-            "All Active Users": self.PER_USER,
-            "Active Licensed Users": f"CALCULATE( {self.PER_USER}, {self.LICENSED} )",
-        }
+    def assert_guarded(self, expression, per_user, rows, ids, where):
+        self.assertIn(f"IF( ISFILTERED({self.USER_ID}), {per_user}, VAR BlankIds =", flat(expression), where)
+        self.assertIn(f"FILTER( ALL({self.USER_ID}), LEN(TRIM({self.USER_ID})) = 0 )", flat(expression), where)
+        self.assertEqual(expression.count(f"DISTINCTCOUNT({self.USER_ID})"), 2, where)
+        self.assertEqual(expression.count(rows), 2, where)
+        self.assertEqual(expression.count("KEEPFILTERS(BlankIds)"), 1, where)
+        self.assertIn(f"VAR ActiveIds = {ids} - Blank{ids}", expression, where)
+        self.assertTrue(flat(expression).endswith("RETURN IF(ActiveIds > 0, ActiveIds) )"), where)
+
+    def test_usage_counts_guard_the_per_user_form(self):
         for relative in PATCHER.VALUELENS:
             _, measures, _ = objects(load(relative), AUDIT)
             # The fast path filters usage rows exactly as [Usage Rows] does.
             self.assertIn(PATCHER.USAGE_ROW_FILTER, text(measures["Usage Rows"]["expression"]), relative)
-            for name in self.NAMES:
+            self.assert_guarded(text(measures["All Active Users"]["expression"]), self.PER_USER,
+                                PATCHER.USAGE_ROW_FILTER, "UsageIds", (relative, "All Active Users"))
+            for name, keep in self.FILTERS.items():
                 expression = text(measures[name]["expression"])
-                where = (relative, name)
-                self.assertIn(f"IF( ISFILTERED({self.USER_ID}), {per_user[name]}, VAR BlankIds =",
-                              flat(expression), where)
-                self.assertIn(f"FILTER( ALL({self.USER_ID}), LEN(TRIM({self.USER_ID})) = 0 )", flat(expression), where)
-                self.assertEqual(expression.count(f"DISTINCTCOUNT({self.USER_ID})"), 2, where)
-                self.assertEqual(expression.count(PATCHER.USAGE_ROW_FILTER), 2, where)
-                self.assertEqual(expression.count("KEEPFILTERS(BlankIds)"), 1, where)
-                self.assertTrue(flat(expression).endswith("RETURN IF(ActiveIds > 0, ActiveIds) )"), where)
-            # The licence filter is in the per-user form and in both distinct counts.
-            self.assertEqual(text(measures["Active Licensed Users"]["expression"]).count(self.LICENSED), 3, relative)
-            for name in ("Active Unlicensed Users", "Cowork Users"):
-                self.assertNotIn("ISFILTERED", text(measures[name]["expression"]), (relative, name))
+                self.assert_guarded(expression, f"CALCULATE( {self.PER_USER}, {keep} )",
+                                    PATCHER.USAGE_ROW_FILTER, "UsageIds", (relative, name))
+                # The filter is in the per-user form and in both distinct counts.
+                self.assertEqual(expression.count(keep), 3, (relative, name))
+
+    def test_agent_users_guard_the_prompt_based_per_user_form(self):
+        for relative in PATCHER.VALUELENS:
+            _, measures, _ = objects(load(relative), AUDIT)
+            # The distinct counts filter prompt rows exactly as [AI Tasks] counts them.
+            self.assertEqual(flat(text(measures["AI Tasks"]["expression"])),
+                             f"CALCULATE(COUNTROWS('{AUDIT}'), {PATCHER.PROMPT_ROW_FILTER})", relative)
+            expression = text(measures["Active Agent Users"]["expression"])
+            where = (relative, "Active Agent Users")
+            self.assert_guarded(expression, f"CALCULATE( {self.PROMPT_USERS}, {self.AGENTS} )",
+                                PATCHER.PROMPT_ROW_FILTER, "PromptIds", where)
+            self.assertEqual(expression.count(self.AGENTS), 3, where)
+            self.assertNotIn("[Usage Rows]", expression, where)
+
+    def test_cowork_fit_guards_the_per_user_form(self):
+        for relative in PATCHER.VALUELENS:
+            _, measures, _ = objects(load(relative), AUDIT)
+            expression = flat(text(measures["Cowork Fit: Eligible Users"]["expression"]))
+            where = (relative, "Cowork Fit: Eligible Users")
+            # Cowork users are anyone with a Cowork row under any filter; the per-user form is unchanged.
+            self.assertIn(
+                f"VAR _CoworkUsers = CALCULATETABLE( VALUES({self.USER_ID}), REMOVEFILTERS('{AUDIT}'), "
+                f"'{AUDIT}'[Is_Cowork] = TRUE() ) RETURN IF( ISFILTERED({self.USER_ID}), "
+                f"VAR _ActiveUsers = FILTER(VALUES({self.USER_ID}), LEN(TRIM({self.USER_ID})) > 0 "
+                "&& CALCULATE([AI Tasks]) > 0) VAR _Eligible = EXCEPT(_ActiveUsers, _CoworkUsers) "
+                "RETURN COUNTROWS(_Eligible), VAR Excluded = UNION( _CoworkUsers, "
+                f"FILTER( ALL({self.USER_ID}), LEN(TRIM({self.USER_ID})) = 0 ) )", expression, where)
+            self.assertEqual(expression.count(f"DISTINCTCOUNT({self.USER_ID})"), 1, where)
+            self.assertEqual(expression.count(PATCHER.PROMPT_ROW_FILTER), 1, where)
+            self.assertTrue(expression.endswith(
+                f"{PATCHER.PROMPT_ROW_FILTER}, KEEPFILTERS(EXCEPT(ALL({self.USER_ID}), Excluded)) ) )"), where)
 
     def test_templates_share_the_active_user_counts(self):
         baseline = None

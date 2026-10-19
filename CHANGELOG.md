@@ -17,6 +17,28 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased — Faster agent, unlicensed and Cowork user counts
+
+**Why.** `[Active Agent Users]`, `[Active Unlicensed Users]`, `[Cowork Users]` and `[Cowork Fit: Eligible Users]`
+checked each user ID one at a time, like the two counts in "Faster active-user counts" below. They feed the
+agent, unlicensed-use and Cowork pages, and 17 other measures use them.
+
+- All five ValueLens templates now count these users in one pass, as `[All Active Users]` does: the user IDs
+  with prompt rows (agent users) or usage rows (unlicensed and Cowork users), less any blank or
+  whitespace-only IDs. Where user IDs are filtered directly, the four measures still check each user.
+- `[Cowork Fit: Eligible Users]` leaves out everyone who has used Cowork, whatever the filters. It now counts
+  the IDs with prompt rows in one pass over a list of user IDs without the Cowork users and the blank or
+  whitespace-only IDs.
+- The numbers don't change. On synthetic data, old and new matched in 152 filter contexts, and so did the
+  17 measures built on them, in 17 contexts including a row per user. Names, format strings, display folders
+  and descriptions are unchanged.
+- In Power BI Desktop with 20,000 synthetic users and an empty cache, the Cowork Fit chart by department took
+  0.4 s instead of 2.4 s, the unlicensed chart by department 0.5 s instead of 1.0 s, and the 17 dependent
+  measures 1.8 s instead of 4.5 s. Tables with a row per user still check each user, so they gain less.
+- `scripts/Update-Template-Dax.py` writes the new definitions, and `tests/test_template_dax_fixes.py` checks them.
+
+---
+
 ## Unreleased — SharePoint refresh works with PAX v1.11.15
 
 **Why.** PAX purview-v1.11.15, the current release, renamed the ValueLens rollup's `-Dashboard` value
