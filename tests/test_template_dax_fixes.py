@@ -19,6 +19,10 @@ def text(value):
     return "\n".join(value) if isinstance(value, list) else (value or "")
 
 
+def flat(dax):
+    return " ".join(dax.split())
+
+
 def load(relative):
     with zipfile.ZipFile(ROOT / relative) as archive:
         return json.loads(archive.read("DataModelSchema").decode("utf-16-le"))["model"]
@@ -92,6 +96,50 @@ class CoworkScheduledRuns(unittest.TestCase):
             self.assertIn("[Is_Cowork] = TRUE()", runs)
             self.assertIn("[Is Prompt Row] = FALSE()", runs)
             self.assertEqual(measures["Cowork Scheduled Runs"]["displayFolder"], "AI Fluency\\Cowork - Value")
+
+
+class ActiveUserFastPath(unittest.TestCase):
+    """All Active Users and Active Licensed Users use distinct counts unless Audit_UserId is filtered
+    directly. There they keep the per-user form: the fast path is only proven equal to this one,
+    so a change to it needs the fast path re-proven."""
+
+    USER_ID = f"'{AUDIT}'[Audit_UserId]"
+    PER_USER = (f"COUNTROWS(FILTER(VALUES({USER_ID}), LEN(TRIM({USER_ID})) > 0"
+                " && CALCULATE([Usage Rows]) > 0))")
+    LICENSED = f"KEEPFILTERS('{AUDIT}'[License Status] = \"M365 Copilot Licensed\")"
+    NAMES = ("All Active Users", "Active Licensed Users")
+
+    def test_both_counts_guard_the_per_user_form(self):
+        per_user = {
+            "All Active Users": self.PER_USER,
+            "Active Licensed Users": f"CALCULATE( {self.PER_USER}, {self.LICENSED} )",
+        }
+        for relative in PATCHER.VALUELENS:
+            _, measures, _ = objects(load(relative), AUDIT)
+            # The fast path filters usage rows exactly as [Usage Rows] does.
+            self.assertIn(PATCHER.USAGE_ROW_FILTER, text(measures["Usage Rows"]["expression"]), relative)
+            for name in self.NAMES:
+                expression = text(measures[name]["expression"])
+                where = (relative, name)
+                self.assertIn(f"IF( ISFILTERED({self.USER_ID}), {per_user[name]}, VAR BlankIds =",
+                              flat(expression), where)
+                self.assertIn(f"FILTER( ALL({self.USER_ID}), LEN(TRIM({self.USER_ID})) = 0 )", flat(expression), where)
+                self.assertEqual(expression.count(f"DISTINCTCOUNT({self.USER_ID})"), 2, where)
+                self.assertEqual(expression.count(PATCHER.USAGE_ROW_FILTER), 2, where)
+                self.assertEqual(expression.count("KEEPFILTERS(BlankIds)"), 1, where)
+                self.assertTrue(flat(expression).endswith("RETURN IF(ActiveIds > 0, ActiveIds) )"), where)
+            # The licence filter is in the per-user form and in both distinct counts.
+            self.assertEqual(text(measures["Active Licensed Users"]["expression"]).count(self.LICENSED), 3, relative)
+            for name in ("Active Unlicensed Users", "Cowork Users"):
+                self.assertNotIn("ISFILTERED", text(measures[name]["expression"]), (relative, name))
+
+    def test_templates_share_the_active_user_counts(self):
+        baseline = None
+        for relative in PATCHER.VALUELENS:
+            _, measures, _ = objects(load(relative), AUDIT)
+            current = {name: measures[name]["expression"] for name in self.NAMES}
+            baseline = baseline or current
+            self.assertEqual(current, baseline, relative)
 
 
 class CalendarRange(unittest.TestCase):

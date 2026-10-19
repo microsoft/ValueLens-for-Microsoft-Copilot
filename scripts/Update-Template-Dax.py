@@ -43,17 +43,64 @@ AUDIT = "Chat + Agent Interactions (Audit Logs)"
 A = f"'{AUDIT}'"
 
 # ---------------------------------------------------------------------------
-# ValueLens: Cowork scheduled runs (P3) and the Calendar range (P7)
+# ValueLens: Cowork scheduled runs (P3), the Calendar range (P7) and the
+# active-user fast path
 # ---------------------------------------------------------------------------
 
+USER_ID = f"{A}[Audit_UserId]"
+USAGE_ROW_FILTER = f"KEEPFILTERS({A}[Is Usage Row] = TRUE())"
+LICENSED = f"{A}[License Status] = \"M365 Copilot Licensed\""
 ACTIVE_USERS_FILTER = (
-    f"COUNTROWS(FILTER(VALUES({A}[Audit_UserId]),\n"
-    f"        LEN(TRIM({A}[Audit_UserId])) > 0 && CALCULATE([Usage Rows]) > 0))"
+    f"COUNTROWS(FILTER(VALUES({USER_ID}),\n"
+    f"        LEN(TRIM({USER_ID})) > 0 && CALCULATE([Usage Rows]) > 0))"
 )
 
 
 def _active_users_in(filter_expression):
     return f"CALCULATE(\n    {ACTIVE_USERS_FILTER},\n    KEEPFILTERS({filter_expression})\n)"
+
+
+def _indent(expression, prefix="    "):
+    return "\n".join(prefix + line if line else line for line in expression.split("\n"))
+
+
+def _guarded_active_users(per_user, *filters):
+    """The per-user count as distinct counts, keeping the per-user form where it can differ.
+
+    Counting the IDs that have usage rows, less the blank or whitespace-only ones, gives the
+    per-user result whenever Audit_UserId has no direct filter: each ID's CALCULATE then sees
+    the same rows as the distinct count. A direct filter on it (user rows, a user slicer, or a
+    selection pairing users with other fields) is overridden per ID by the per-user form but
+    intersected by the distinct count, so those contexts still run the per-user form.
+    """
+    keep = (USAGE_ROW_FILTER,) + tuple(f"KEEPFILTERS({f})" for f in filters)
+
+    def distinct_ids(*extra):
+        arguments = ",\n".join(f"            {k}" for k in keep + extra)
+        return f"        CALCULATE(\n            DISTINCTCOUNT({USER_ID}),\n{arguments}\n        )"
+
+    return "\n".join((
+        "// Fast path: distinct counts of the IDs with usage rows, less any blank or",
+        "// whitespace-only IDs, instead of one CALCULATE per user. When Audit_UserId",
+        "// is filtered directly (user rows, a user slicer, or a selection that pairs",
+        "// users with other fields) the per-user form runs, so results always match it.",
+        "IF(",
+        f"    ISFILTERED({USER_ID}),",
+        _indent(per_user) + ",",
+        "    VAR BlankIds =",
+        "        FILTER(",
+        f"            ALL({USER_ID}),",
+        f"            LEN(TRIM({USER_ID})) = 0",
+        "        )",
+        "    VAR UsageIds =",
+        distinct_ids(),
+        "    VAR BlankUsageIds =",
+        distinct_ids("KEEPFILTERS(BlankIds)"),
+        "    VAR ActiveIds = UsageIds - BlankUsageIds",
+        "    RETURN",
+        "        IF(ActiveIds > 0, ActiveIds)",
+        ")",
+    ))
 
 
 CALENDAR = "\n".join((
@@ -110,7 +157,7 @@ VALUELENS_OBJECTS = (
     },
     {
         "kind": "measure", "table": AUDIT, "name": "Usage Rows",
-        "expression": f"CALCULATE(COUNTROWS({A}), KEEPFILTERS({A}[Is Usage Row] = TRUE()))",
+        "expression": f"CALCULATE(COUNTROWS({A}), {USAGE_ROW_FILTER})",
         "new": {
             "formatString": "#,##0", "isHidden": True, "displayFolder": "AI Fluency\\Overall - Value",
             "description": [
@@ -122,11 +169,11 @@ VALUELENS_OBJECTS = (
     },
     {
         "kind": "measure", "table": AUDIT, "name": "All Active Users",
-        "expression": ACTIVE_USERS_FILTER,
+        "expression": _guarded_active_users(ACTIVE_USERS_FILTER),
     },
     {
         "kind": "measure", "table": AUDIT, "name": "Active Licensed Users",
-        "expression": _active_users_in(f"{A}[License Status] = \"M365 Copilot Licensed\""),
+        "expression": _guarded_active_users(_active_users_in(LICENSED), LICENSED),
     },
     {
         "kind": "measure", "table": AUDIT, "name": "Active Unlicensed Users",
