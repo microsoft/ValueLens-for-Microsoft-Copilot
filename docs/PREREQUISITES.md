@@ -6,8 +6,8 @@ stop halfway.
 
 > The installer is a work in progress. For the [manual setup](../1.%20Fabric/Manual%20setup/README.md),
 > you need the Fabric capacity, the app registration and admin consent, the Key Vault and the
-> optional extras' permissions below, plus the Power BI visuals setting. The *Three tenant settings*
-> are only for the installer and the Analytics Hub app.
+> optional extras' permissions below, plus *Users can create Fabric items* and the Power BI visuals
+> setting. The *Three tenant settings* are only for the installer and the Analytics Hub app.
 
 Once you sign in, the installer's **Prerequisites** panel (or `prereqs` in the terminal) checks
 most of this for you. For the detail behind each permission, see [PERMISSIONS.md](PERMISSIONS.md).
@@ -84,7 +84,13 @@ items below give it access.
 
 - [ ] **A capacity.** An F2 or larger [Fabric capacity](https://learn.microsoft.com/fabric/enterprise/licenses#capacity),
       or a [free trial](#what-it-costs). Use **F64 or larger** for a tenant with more than 10,000
-      people. Make the person who runs the installer a **Contributor** on it.
+      people. Make the person who runs the installer a **Contributor** on it. A Premium P capacity
+      works too, but **Premium Per User (PPU)** workspaces can't hold notebooks or Lakehouses.
+- [ ] [*Users can create Fabric items*](https://learn.microsoft.com/fabric/admin/fabric-switch) turned on
+      for the person who sets it up: for the whole organisation, a security group they're in, or
+      [delegated](https://learn.microsoft.com/fabric/admin/capacity-settings#delegated-tenant-settings)
+      to the capacity. Without it, Fabric says *Unable to create Import notebook* (or Lakehouse).
+      It can take about 15 minutes to apply.
 - [ ] **Three tenant settings** turned on, in the Fabric admin portal under **Tenant settings**. They
       can be on for the whole organisation, or for a security group that the Analytics Hub Data
       Collector app is in:
