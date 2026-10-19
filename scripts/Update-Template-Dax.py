@@ -44,7 +44,7 @@ A = f"'{AUDIT}'"
 
 # ---------------------------------------------------------------------------
 # ValueLens: Cowork scheduled runs (P3), the Calendar range (P7) and the
-# active-user fast path
+# active-user and habit-stage fast paths
 # ---------------------------------------------------------------------------
 
 USER_ID = f"{A}[Audit_UserId]"
@@ -168,6 +168,84 @@ def _cowork_fit_eligible_users():
     ))
 
 
+ACTIVE_DATE = f"{A}[InteractionDate]"
+# Active days a user needs in the month (Last Month) or the period (Monthly) for each stage.
+HABIT_STAGES = (("Beginner", 1, 5), ("Developing", 6, 10), ("Habitual", 11, 15), ("Power", 16, None))
+
+
+def _habit_stage_users(low, high, last_month):
+    """Users whose active days fall in a stage's band, counted in one pass unless Audit_UserId is filtered.
+
+    The per-user form lists the users, then counts each one's active days in its own CALCULATE.
+    SUMMARIZECOLUMNS counts every user's days in one pass. It returns the same users and counts
+    whenever Audit_UserId has no direct filter, because each user's CALCULATE then only adds that
+    user's ID to the filters. A direct filter on it (user rows, a user slicer, or a selection
+    pairing users with other fields) is overridden per ID by the per-user form but intersected by
+    SUMMARIZECOLUMNS, so those contexts still run the per-user form. Blank and whitespace-only IDs
+    count in both forms, as before. SUMMARIZECOLUMNS in a measure needs a June 2024 or later engine.
+    """
+    band = f"[Days] >= {low}" if high is None else f"[Days] >= {low} && [Days] <= {high}"
+    count = ("RETURN", f"    COUNTROWS(FILTER(UserDays, {band}))")
+    days = f"\"Days\", DISTINCTCOUNT({ACTIVE_DATE})"
+    if last_month:
+        month = ("REMOVEFILTERS('Calendar'),", f"{A}[MonthStart] = MStart")
+        per_user = (
+            "VAR UserDays =",
+            "    ADDCOLUMNS(",
+            "        CALCULATETABLE(",
+            f"            VALUES({USER_ID}),",
+            *(f"            {line}" for line in month),
+            "        ),",
+            "        \"Days\",",
+            "            CALCULATE(",
+            f"                DISTINCTCOUNT({ACTIVE_DATE}),",
+            *(f"                {line}" for line in month),
+            "            )",
+            "    )",
+        ) + count
+        fast = (
+            "VAR UserDays =",
+            "    CALCULATETABLE(",
+            "        SUMMARIZECOLUMNS(",
+            f"            {USER_ID},",
+            f"            {days}",
+            "        ),",
+            *(f"        {line}" for line in month),
+            "    )",
+        ) + count
+    else:
+        per_user = (
+            "VAR UserDays =",
+            "    ADDCOLUMNS(",
+            f"        VALUES({USER_ID}),",
+            f"        \"Days\", CALCULATE(DISTINCTCOUNT({ACTIVE_DATE}))",
+            "    )",
+        ) + count
+        fast = (
+            "VAR UserDays =",
+            "    SUMMARIZECOLUMNS(",
+            f"        {USER_ID},",
+            f"        {days}",
+            "    )",
+        ) + count
+    guarded = (
+        "IF(",
+        f"    ISFILTERED({USER_ID}),",
+        _indent("\n".join(per_user)) + ",",
+        _indent("\n".join(fast)),
+        ")",
+    )
+    comment = (
+        "// Fast path: one SUMMARIZECOLUMNS counts every user's active days, instead of",
+        "// one CALCULATE per user. When Audit_UserId is filtered directly (user rows, a",
+        "// user slicer, or a selection that pairs users with other fields) the per-user",
+        "// form runs, so results always match it. Needs the June 2024 or later engine.",
+    )
+    if not last_month:
+        return "\n".join(comment + guarded)
+    return "\n".join(comment + ("VAR MStart = [Last Full Month Start]", "RETURN", _indent("\n".join(guarded))))
+
+
 CALENDAR = "\n".join((
     "",
     "// Spans every date the model can be sliced by - audit activity and product",
@@ -278,6 +356,13 @@ VALUELENS_OBJECTS = (
         },
     },
     {"kind": "calculatedTable", "table": "Calendar", "expression": CALENDAR},
+) + tuple(
+    {
+        "kind": "measure", "table": AUDIT, "name": f"{stage} Users{suffix}",
+        "expression": _habit_stage_users(low, high, last_month),
+    }
+    for last_month, suffix in ((True, ", Last Month"), (False, " (Monthly)"))
+    for stage, low, high in HABIT_STAGES
 )
 
 # ---------------------------------------------------------------------------

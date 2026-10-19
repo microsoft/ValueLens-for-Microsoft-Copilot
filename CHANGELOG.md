@@ -17,6 +17,30 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased — Faster habit-stage counts
+
+**Why.** The eight habit-stage counts, `[Beginner Users, Last Month]` and `[Beginner Users (Monthly)]` and the
+same pairs for Developing, Habitual and Power users, counted each user's active days one user at a time. They
+feed the Habit Formation page and the Fabric App's habit figures, and 6 other measures use them.
+
+- All five ValueLens templates now count every user's active days in one `SUMMARIZECOLUMNS`, then count the
+  users in each band. The bands don't change (Beginner 1–5 active days, Developing 6–10, Habitual 11–15,
+  Power 16 or more), and blank user IDs count as they did before. Where user IDs are filtered directly, the
+  eight measures still check each user.
+- The numbers don't change. On synthetic data, old and new matched in 209 filter contexts, and so did the
+  6 measures built on them, in 23 contexts including a row per user. Names, format strings, display folders
+  and descriptions are unchanged.
+- In Power BI Desktop with 20,000 synthetic users and an empty cache, the monthly stage chart took 0.40 s
+  instead of 0.52 s, the stage table by department and month 0.32 s instead of 0.40 s, and the Fabric App's
+  habit-by-month query 0.68 s instead of 0.93 s. Tables with a row per user still check each user, so they
+  take about as long as before.
+- **Needs the June 2024 or later Power BI engine**, because the new definitions use `SUMMARIZECOLUMNS` inside
+  a measure. The Power BI service and Fabric are up to date. Power BI Desktop releases before June 2024 show
+  errors in most habit-stage visuals, so update Desktop before opening a template.
+- `scripts/Update-Template-Dax.py` writes the new definitions, and `tests/test_template_dax_fixes.py` checks them.
+
+---
+
 ## Unreleased — Faster agent, unlicensed and Cowork user counts
 
 **Why.** `[Active Agent Users]`, `[Active Unlicensed Users]`, `[Cowork Users]` and `[Cowork Fit: Eligible Users]`
