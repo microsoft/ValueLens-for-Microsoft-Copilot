@@ -49,38 +49,52 @@ A = f"'{AUDIT}'"
 
 USER_ID = f"{A}[Audit_UserId]"
 USAGE_ROW_FILTER = f"KEEPFILTERS({A}[Is Usage Row] = TRUE())"
+# [AI Tasks] counts these rows; the prompt-based counts below rely on that.
+PROMPT_ROW_FILTER = f"KEEPFILTERS({A}[Is Prompt Row] = TRUE())"
 LICENSED = f"{A}[License Status] = \"M365 Copilot Licensed\""
-ACTIVE_USERS_FILTER = (
-    f"COUNTROWS(FILTER(VALUES({USER_ID}),\n"
-    f"        LEN(TRIM({USER_ID})) > 0 && CALCULATE([Usage Rows]) > 0))"
-)
+UNLICENSED = f"{A}[License Status] = \"Unlicensed\""
+COWORK = f"{A}[Is_Cowork] = TRUE()"
+AGENTS = f"{A}[Agent Filter (Normalized)] = \"Agents\""
 
 
-def _active_users_in(filter_expression):
-    return f"CALCULATE(\n    {ACTIVE_USERS_FILTER},\n    KEEPFILTERS({filter_expression})\n)"
+def _users_with(rows_measure):
+    return (
+        f"COUNTROWS(FILTER(VALUES({USER_ID}),\n"
+        f"        LEN(TRIM({USER_ID})) > 0 && CALCULATE({rows_measure}) > 0))"
+    )
+
+
+ACTIVE_USERS_FILTER = _users_with("[Usage Rows]")
+PROMPT_USERS_FILTER = _users_with("[AI Tasks]")
+
+
+def _active_users_in(filter_expression, users=ACTIVE_USERS_FILTER):
+    return f"CALCULATE(\n    {users},\n    KEEPFILTERS({filter_expression})\n)"
 
 
 def _indent(expression, prefix="    "):
     return "\n".join(prefix + line if line else line for line in expression.split("\n"))
 
 
-def _guarded_active_users(per_user, *filters):
+def _guarded_active_users(per_user, *filters, rows=USAGE_ROW_FILTER, kind="usage"):
     """The per-user count as distinct counts, keeping the per-user form where it can differ.
 
-    Counting the IDs that have usage rows, less the blank or whitespace-only ones, gives the
-    per-user result whenever Audit_UserId has no direct filter: each ID's CALCULATE then sees
-    the same rows as the distinct count. A direct filter on it (user rows, a user slicer, or a
-    selection pairing users with other fields) is overridden per ID by the per-user form but
-    intersected by the distinct count, so those contexts still run the per-user form.
+    Counting the IDs that have `kind` rows (usage rows, or prompt rows for counts built on
+    [AI Tasks]), less the blank or whitespace-only ones, gives the per-user result whenever
+    Audit_UserId has no direct filter: each ID's CALCULATE then sees the same rows as the
+    distinct count. A direct filter on it (user rows, a user slicer, or a selection pairing
+    users with other fields) is overridden per ID by the per-user form but intersected by the
+    distinct count, so those contexts still run the per-user form.
     """
-    keep = (USAGE_ROW_FILTER,) + tuple(f"KEEPFILTERS({f})" for f in filters)
+    keep = (rows,) + tuple(f"KEEPFILTERS({f})" for f in filters)
+    ids = f"{kind.capitalize()}Ids"
 
     def distinct_ids(*extra):
         arguments = ",\n".join(f"            {k}" for k in keep + extra)
         return f"        CALCULATE(\n            DISTINCTCOUNT({USER_ID}),\n{arguments}\n        )"
 
     return "\n".join((
-        "// Fast path: distinct counts of the IDs with usage rows, less any blank or",
+        f"// Fast path: distinct counts of the IDs with {kind} rows, less any blank or",
         "// whitespace-only IDs, instead of one CALCULATE per user. When Audit_UserId",
         "// is filtered directly (user rows, a user slicer, or a selection that pairs",
         "// users with other fields) the per-user form runs, so results always match it.",
@@ -92,14 +106,65 @@ def _guarded_active_users(per_user, *filters):
         f"            ALL({USER_ID}),",
         f"            LEN(TRIM({USER_ID})) = 0",
         "        )",
-        "    VAR UsageIds =",
+        f"    VAR {ids} =",
         distinct_ids(),
-        "    VAR BlankUsageIds =",
+        f"    VAR Blank{ids} =",
         distinct_ids("KEEPFILTERS(BlankIds)"),
-        "    VAR ActiveIds = UsageIds - BlankUsageIds",
+        f"    VAR ActiveIds = {ids} - Blank{ids}",
         "    RETURN",
         "        IF(ActiveIds > 0, ActiveIds)",
         ")",
+    ))
+
+
+def _cowork_fit_eligible_users():
+    """Prompt users who have never used Cowork, as one distinct count unless Audit_UserId is filtered.
+
+    _CoworkUsers ignores every filter, so leaving it and the blank or whitespace-only IDs out of
+    ALL(Audit_UserId) gives a list that does not depend on the context. A distinct count of the
+    prompt-row IDs in that list is then the per-user result, under the same Audit_UserId guard
+    as _guarded_active_users. It returns BLANK, as the per-user form does, when no one is eligible.
+    """
+    per_user = "\n".join((
+        "VAR _ActiveUsers =",
+        f"    FILTER(VALUES({USER_ID}),",
+        f"        LEN(TRIM({USER_ID})) > 0 && CALCULATE([AI Tasks]) > 0)",
+        "VAR _Eligible = EXCEPT(_ActiveUsers, _CoworkUsers)",
+        "RETURN COUNTROWS(_Eligible)",
+    ))
+    fast = "\n".join((
+        "VAR Excluded =",
+        "    UNION(",
+        "        _CoworkUsers,",
+        "        FILTER(",
+        f"            ALL({USER_ID}),",
+        f"            LEN(TRIM({USER_ID})) = 0",
+        "        )",
+        "    )",
+        "RETURN",
+        "    CALCULATE(",
+        f"        DISTINCTCOUNT({USER_ID}),",
+        f"        {PROMPT_ROW_FILTER},",
+        f"        KEEPFILTERS(EXCEPT(ALL({USER_ID}), Excluded))",
+        "    )",
+    ))
+    return "\n".join((
+        "// Fast path: one distinct count of the IDs with prompt rows, leaving out the Cowork",
+        "// users and any blank or whitespace-only IDs, instead of one CALCULATE per user.",
+        "// When Audit_UserId is filtered directly (user rows, a user slicer, or a selection",
+        "// that pairs users with other fields) the per-user form runs, so results always match it.",
+        "VAR _CoworkUsers =",
+        "    CALCULATETABLE(",
+        f"        VALUES({USER_ID}),",
+        f"        REMOVEFILTERS({A}),",
+        f"        {COWORK}",
+        "    )",
+        "RETURN",
+        "    IF(",
+        f"        ISFILTERED({USER_ID}),",
+        _indent(per_user, "        ") + ",",
+        _indent(fast, "        "),
+        "    )",
     ))
 
 
@@ -177,14 +242,23 @@ VALUELENS_OBJECTS = (
     },
     {
         "kind": "measure", "table": AUDIT, "name": "Active Unlicensed Users",
-        "expression": _active_users_in(f"{A}[License Status] = \"Unlicensed\""),
+        "expression": _guarded_active_users(_active_users_in(UNLICENSED), UNLICENSED),
+    },
+    {
+        "kind": "measure", "table": AUDIT, "name": "Active Agent Users",
+        "expression": _guarded_active_users(
+            _active_users_in(AGENTS, PROMPT_USERS_FILTER), AGENTS, rows=PROMPT_ROW_FILTER, kind="prompt"),
     },
     {
         "kind": "measure", "table": AUDIT, "name": "Cowork Users",
-        "expression": _active_users_in(f"{A}[Is_Cowork] = TRUE()"),
+        "expression": _guarded_active_users(_active_users_in(COWORK), COWORK),
         "set": {
             "description": "Users with Cowork activity: a prompt in Cowork, or a scheduled / autonomous Cowork run.",
         },
+    },
+    {
+        "kind": "measure", "table": AUDIT, "name": "Cowork Fit: Eligible Users",
+        "expression": _cowork_fit_eligible_users(),
     },
     {
         "kind": "measure", "table": AUDIT, "name": "Cowork Scheduled Runs",
