@@ -17,6 +17,25 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased — Faster active-user counts
+
+**Why.** `[All Active Users]` and `[Active Licensed Users]` checked each user ID one at a time, which is
+slow on a large tenant. 21 measures use them directly and 41 in all, so most pages waited on them.
+
+- All five ValueLens templates now count the user IDs with usage rows in one pass, less any blank or
+  whitespace-only IDs. It's the approach Analytics Hub took in `microsoft/AnalyticsHub-Dashboard` #118.
+- Where user IDs are filtered directly (a row per user, a user slicer, or a selection that pairs users
+  with another field), the two measures still check each user, because only there could the counts differ.
+- The numbers don't change. On synthetic data, old and new matched in 98 filter contexts, and so did the
+  41 measures built on them. Names, format strings, display folders and descriptions are unchanged.
+- In Power BI Desktop with 20,000 synthetic users and an empty cache, a monthly trend took 0.2 s instead
+  of 2.3 s, the 41 dependent measures 1.8 s instead of 12.8 s, and the report's department-by-user tables,
+  fully expanded, about 4.4 s instead of 8–9 s.
+- `scripts/Update-Template-Dax.py` writes the new definitions, and `tests/test_template_dax_fixes.py`
+  checks them.
+
+---
+
 ## Unreleased — Manual setup is the main Fabric path
 
 **Why.** The installer is still changing, so production setups should use the manual steps.
