@@ -3,6 +3,10 @@
 A Power BI dashboard that shows how your organisation uses Microsoft 365 Copilot and agents, and
 the hours and value they deliver.
 
+**Also see [Analytics Hub for Microsoft Copilot](https://github.com/microsoft/AnalyticsHub-Dashboard):**
+one installer sets up an app on Microsoft Fabric or Azure that shows Copilot and agent adoption,
+value, consumption and governance in one place. It includes the ValueLens report.
+
 ![ValueLens preview](Images/ValueLens-Preview.gif)
 
 ## Watch first
@@ -15,7 +19,7 @@ the hours and value they deliver.
 
 **Have Fabric?** Follow the [manual setup](1.%20Fabric/README.md#set-it-up): import the notebooks,
 schedule the pipeline and publish the report. **[🎥 Watch the setup](1.%20Fabric/README.md#set-it-up)**.
-The [Analytics Hub installer](1.%20Fabric/README.md#analytics-hub-installer-work-in-progress)
+The [Analytics Hub installer](https://github.com/microsoft/AnalyticsHub-Dashboard)
 automates it, but it's a work in progress: try it in a test tenant first.
 
 **Before you start**, see [what you need](1.%20Fabric/README.md#before-you-start). No Fabric capacity?
