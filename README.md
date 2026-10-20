@@ -50,10 +50,16 @@ steps in its README.
 | **[2. Azure](2.%20Azure/)** (work in progress) | An Azure subscription (Contributor plus User Access Administrator) and Power BI Pro | Open the installer and pick **Your Azure subscription**. It runs the data collection in your Azure subscription (scheduled jobs in Azure Container Apps, with Azure SQL and the web app) and publishes to a Power BI workspace, with no Fabric. See [Azure target](1.%20Fabric/installer/README.md#azure-target). |
 | **[3. Power Automate + Dataverse](3.%20Power%20Automate%20+%20Dataverse/)** (preview) | Power Automate premium and Dataverse | Import a collector solution and run a refresh script. |
 | **[4. SharePoint](4.%20SharePoint/)** | Power BI Pro | App registration, a SharePoint library and a scheduled export. |
-| **[5. Local CSV](5.%20Local%20CSV/)** | Power BI Desktop | Open the template. Sample data is included. |
+| **[5. Local CSV](5.%20Local%20CSV/)** | Power BI Desktop, June 2024 or later | Open the template. Sample data is included. |
 
 **Just want a look?** Use [5. Local CSV](5.%20Local%20CSV/) with its sample data. It takes two
 minutes and needs no access to your tenant.
+
+**Opening a template?** Use Power BI Desktop from June 2024 or later. In older releases, the
+habit-stage charts and cards on the Habit Formation page can show errors, because their measures
+use [`SUMMARIZECOLUMNS`](https://learn.microsoft.com/dax/summarizecolumns-function-dax#contextual-summarizecolumns)
+in ways those releases don't fully support. Reports in the Power BI service and Fabric aren't
+affected.
 
 ## Report interpretation guide
 

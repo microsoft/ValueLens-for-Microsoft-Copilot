@@ -5,6 +5,7 @@ Use this path when you want ValueLens in Power BI Pro with scheduled refresh fro
 ## You need
 
 - Power BI Pro, PPU, or Premium, plus a workspace where you can publish and schedule refresh.
+- Power BI Desktop, June 2024 or later, to open the template. In older releases, the habit-stage charts and cards on the Habit Formation page can show errors, because their measures use `SUMMARIZECOLUMNS` in ways those releases don't fully support. Reports in the Power BI service aren't affected.
 - PowerShell 7+ (`pwsh`), Python 3.10+, and internet access to GitHub Releases on the machine that runs the extract.
 - An Entra app registration with tenant ID, client ID, and client secret.
 - The licences, roles, Graph permissions, admin consent, and SharePoint access listed in [`../docs/PERMISSIONS.md`](../docs/PERMISSIONS.md).
