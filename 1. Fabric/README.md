@@ -11,7 +11,10 @@ schedule, and the ValueLens Power BI report reads it. You set it up by hand, ste
   [PERMISSIONS](../docs/PERMISSIONS.md), and a **Global Administrator** or **Privileged Role
   Administrator** to grant admin consent.
 - An **Azure Key Vault** for the app's secret.
-- **Power BI Desktop** to open the template, and Power BI Pro to publish it.
+- **Power BI Desktop**, June 2024 or later, to open the template, and Power BI Pro to publish it.
+  In older Desktop releases, the habit-stage charts and cards on the Habit Formation page can show
+  errors, because their measures use `SUMMARIZECOLUMNS` in ways those releases don't fully
+  support. Reports in the Power BI service and Fabric aren't affected.
 
 The [Before you start checklist](../docs/PREREQUISITES.md) goes through who to ask for what, the
 optional extras and the costs.

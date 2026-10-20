@@ -7,7 +7,8 @@ This preview path is for customers who use a compatible Power Automate `CopilotI
 - An isolated Power Platform environment with Dataverse, Power Automate premium/Dataverse licensing, enough Dataverse database capacity, and access to a Power BI workspace.
 - An authorized local unmanaged `CopilotInteractionLogging.zip` collector package supplied outside this repository.
 - A deployment user, Entra app, and Dataverse application user with the full least-privilege access in [`../docs/PERMISSIONS.md`](../docs/PERMISSIONS.md).
-- PowerShell 7+, Python 3.10+, Power BI Desktop, and a commercial-cloud Dataverse URL such as `https://contoso.crm.dynamics.com`.
+- PowerShell 7+, Python 3.10+, and a commercial-cloud Dataverse URL such as `https://contoso.crm.dynamics.com`.
+- Power BI Desktop, June 2024 or later. In older releases, the habit-stage charts and cards on the Habit Formation page can show errors, because their measures use `SUMMARIZECOLUMNS` in ways those releases don't fully support. Reports in the Power BI service aren't affected.
 
 Read the [disclaimer](../README.md#disclaimer) too: these aren't the official Copilot reports, and
 you're responsible for the data once it's in Dataverse.

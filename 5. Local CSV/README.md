@@ -2,6 +2,8 @@
 
 Power BI Desktop only: no tenant setup is needed to try it, and it ships with a fabricated sample dataset.
 
+Use Power BI Desktop from June 2024 or later. In older releases, the habit-stage charts and cards on the Habit Formation page can show errors, because their measures use `SUMMARIZECOLUMNS` in ways those releases don't fully support. Reports published to the Power BI service aren't affected.
+
 ## 1. Try it with sample data
 
 1. Open [`ValueLens - Local CSV.pbit`](ValueLens%20-%20Local%20CSV.pbit) in Power BI Desktop.
@@ -22,7 +24,7 @@ See [`sample-data/README.md`](sample-data/README.md) for what the sample contain
 
 ### You need
 
-- Power BI Desktop.
+- Power BI Desktop, June 2024 or later.
 - Python 3.9+.
 - Access to the Purview audit export, the Microsoft Entra users export, and the Microsoft 365 Admin Center Copilot user export.
 - Roles and permissions listed in [`../docs/PERMISSIONS.md`](../docs/PERMISSIONS.md).
