@@ -179,6 +179,54 @@ class ActiveUserFastPath(unittest.TestCase):
             self.assertEqual(current, baseline, relative)
 
 
+class HabitStageFastPath(unittest.TestCase):
+    """The 8 habit-stage counts count every user's active days in one SUMMARIZECOLUMNS unless
+    Audit_UserId is filtered directly. There they keep the per-user form: the fast path is only
+    proven equal to this one, so a change to it needs the fast path re-proven."""
+
+    USER_ID = f"'{AUDIT}'[Audit_UserId]"
+    DAY = f"'{AUDIT}'[InteractionDate]"
+    LAST_MONTH = f"REMOVEFILTERS('Calendar'), '{AUDIT}'[MonthStart] = MStart"
+    BANDS = {"Beginner": "[Days] >= 1 && [Days] <= 5", "Developing": "[Days] >= 6 && [Days] <= 10",
+             "Habitual": "[Days] >= 11 && [Days] <= 15", "Power": "[Days] >= 16"}
+    SUFFIXES = {", Last Month": True, " (Monthly)": False}
+
+    def names(self):
+        return [f"{stage} Users{suffix}" for suffix in self.SUFFIXES for stage in self.BANDS]
+
+    def expected(self, band, last_month):
+        days = f'SUMMARIZECOLUMNS( {self.USER_ID}, "Days", DISTINCTCOUNT({self.DAY}) )'
+        count = f"RETURN COUNTROWS(FILTER(UserDays, {band}))"
+        if last_month:
+            per_user = (f"VAR UserDays = ADDCOLUMNS( CALCULATETABLE( VALUES({self.USER_ID}), {self.LAST_MONTH} ), "
+                        f"\"Days\", CALCULATE( DISTINCTCOUNT({self.DAY}), {self.LAST_MONTH} ) ) {count}")
+            fast = f"VAR UserDays = CALCULATETABLE( {days}, {self.LAST_MONTH} ) {count}"
+            return f"VAR MStart = [Last Full Month Start] RETURN IF( ISFILTERED({self.USER_ID}), {per_user}, {fast} )"
+        per_user = (f"VAR UserDays = ADDCOLUMNS( VALUES({self.USER_ID}), "
+                    f"\"Days\", CALCULATE(DISTINCTCOUNT({self.DAY})) ) {count}")
+        return f"IF( ISFILTERED({self.USER_ID}), {per_user}, VAR UserDays = {days} {count} )"
+
+    def test_stage_counts_guard_the_per_user_form(self):
+        for relative in PATCHER.VALUELENS:
+            _, measures, _ = objects(load(relative), AUDIT)
+            for suffix, last_month in self.SUFFIXES.items():
+                for stage, band in self.BANDS.items():
+                    name = f"{stage} Users{suffix}"
+                    expression = text(measures[name]["expression"])
+                    code = "\n".join(line for line in expression.split("\n") if not line.lstrip().startswith("//"))
+                    self.assertEqual(flat(code), self.expected(band, last_month), (relative, name))
+                    # SUMMARIZECOLUMNS in a measure needs the June 2024 or later engine; the note says so.
+                    self.assertIn("June 2024", expression, (relative, name))
+
+    def test_templates_share_the_stage_counts(self):
+        baseline = None
+        for relative in PATCHER.VALUELENS:
+            _, measures, _ = objects(load(relative), AUDIT)
+            current = {name: measures[name]["expression"] for name in self.names()}
+            baseline = baseline or current
+            self.assertEqual(current, baseline, relative)
+
+
 class CalendarRange(unittest.TestCase):
     """P7: the Calendar no longer collapses to one day when the audit is empty."""
 
