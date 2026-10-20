@@ -17,6 +17,26 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased — UserMonthMetrics no longer fails on blank and whitespace-only user IDs
+
+**Why.** In the Power Automate + Dataverse, SharePoint and Local CSV templates, `UserMonthMetrics` has a row per
+user ID and month, keyed `<user ID>|yyyy-MM`. Power BI stores a whitespace-only user ID as an empty string, so in
+a month with both a blank and a whitespace-only ID, two rows got the key `|yyyy-MM`. The refresh then reported
+"contains a duplicate value '|yyyy-MM'" and left the table empty. Any query that used the audit table's
+`User_Stage_Maturity` column then failed, such as the stage filters on the Task Breakdown charts.
+
+- `UserMonthMetrics` now leaves out blank and whitespace-only user IDs, as the active-user counts do. No audit
+  row related to those rows anyway: the audit table's own key is blank for a blank ID and keeps the whitespace
+  of a whitespace-only one. So no user's stage changes.
+- On synthetic data the table lost only its 3 blank and whitespace-only rows. The other 43,311 rows were
+  unchanged, and so was the stage on all 1,372,709 audit rows. With a blank and a whitespace-only ID in the same
+  month, the old table failed to refresh and the new one refreshed cleanly.
+- The table refreshes as fast as before: 2.15 s against 2.16 s with 20,000 synthetic users.
+- The Fabric templates don't have this table and are unchanged. `scripts/Update-Template-Dax.py` writes the new
+  definition, and `tests/test_template_dax_fixes.py` checks it.
+
+---
+
 ## Unreleased — Faster habit-stage counts
 
 **Why.** The eight habit-stage counts, `[Beginner Users, Last Month]` and `[Beginner Users (Monthly)]` and the

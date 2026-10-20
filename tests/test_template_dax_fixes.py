@@ -255,6 +255,55 @@ class CalendarRange(unittest.TestCase):
             self.assertIn(f"'{line}'", source)
 
 
+class UserMonthMetricsKeys(unittest.TestCase):
+    """UserMonthMetrics leaves out blank and whitespace-only IDs. The engine stores a whitespace-only
+    ID as "", so with a blank ID in the same month both rows got the key "|yyyy-MM" and the refresh
+    failed on the one side of the UserMonthKey relationship."""
+
+    USER_ID = f"'{AUDIT}'[Audit_UserId]"
+
+    def expression(self, model):
+        return text(PATCHER.find_table(model, "UserMonthMetrics")["partitions"][0]["source"]["expression"])
+
+    def test_only_the_power_query_templates_have_the_table(self):
+        self.assertEqual(len(PATCHER.USER_MONTH_TEMPLATES), 3)
+        for relative in PATCHER.VALUELENS:
+            names = {t["name"] for t in load(relative)["tables"]}
+            self.assertEqual("UserMonthMetrics" in names, relative in PATCHER.USER_MONTH_TEMPLATES, relative)
+
+    def test_blank_and_whitespace_only_ids_are_left_out(self):
+        for relative in PATCHER.USER_MONTH_TEMPLATES:
+            expression = flat(self.expression(load(relative)))
+            # The metrics still run straight over SUMMARIZE (one pass); the filter comes after them.
+            self.assertIn("VAR WithMetrics = ADDCOLUMNS( Base,", expression, relative)
+            self.assertIn(f"VAR UserMonths = FILTER( WithMetrics, LEN(TRIM({self.USER_ID})) > 0 )",
+                          expression, relative)
+            self.assertIn("RETURN ADDCOLUMNS( UserMonths, \"UserStage\",", expression, relative)
+            # The key itself is unchanged, so every audit row still finds its user-month.
+            self.assertIn(f"\"UserMonthKey\", {self.USER_ID} & \"|\" & FORMAT('{AUDIT}'[MonthStart], \"yyyy-MM\")",
+                          expression, relative)
+
+    def test_no_audit_row_relates_to_a_blank_or_whitespace_only_id(self):
+        for relative in PATCHER.USER_MONTH_TEMPLATES:
+            model = load(relative)
+            relationships = [r for r in model["relationships"] if r["toTable"] == "UserMonthMetrics"]
+            self.assertEqual([(r["fromTable"], r["fromColumn"], r["toColumn"]) for r in relationships],
+                             [(AUDIT, "UserMonthKey", "UserMonthKey")], relative)
+            _, _, columns = objects(model, AUDIT)
+            self.assertEqual(text(columns["User_Stage_Maturity"]["expression"]),
+                             "RELATED('UserMonthMetrics'[UserStage])", relative)
+            # The audit key is built in Power Query: null for a blank ID ("" is already null there),
+            # and a whitespace-only ID keeps its whitespace, so it never matches "|yyyy-MM".
+            query = text(PATCHER.find_table(model, AUDIT)["partitions"][0]["source"]["expression"])
+            self.assertIn('Table.ReplaceValue(__model, "", null, Replacer.ReplaceValue, {"CreationDate", "Audit_UserId",',
+                          query, relative)
+            self.assertIn("each if [Audit_UserId] = null or [MonthStart] = null then null", query, relative)
+            self.assertIn('else Text.From([Audit_UserId]) & "|" & DateTime.ToText([MonthStart]', query, relative)
+
+    def test_templates_share_the_table(self):
+        self.assertEqual(len({self.expression(load(r)) for r in PATCHER.USER_MONTH_TEMPLATES}), 1)
+
+
 class CoworkNoLimit(unittest.TestCase):
     """P9: a blank or zero Cowork limit means no limit is set, never 'over the limit'."""
 

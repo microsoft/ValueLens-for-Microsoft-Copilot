@@ -1,8 +1,9 @@
 """Apply the shared DAX fixes to every shipped ValueLens and Consumption Central PBIT.
 
 The five ValueLens templates and the four Consumption Central add-ons carry the same
-model, so a DAX fix has to land in all of them byte-for-byte. This script owns those
-objects: it sets each one's expression (adding the object when a template lacks it),
+model, so a DAX fix has to land in all of them byte-for-byte; UserMonthMetrics is only
+in the three ValueLens templates that build the audit table in Power Query. This script
+owns those objects: it sets each one's expression (adding the object when a template lacks it),
 leaves every other model field and ZIP member untouched, and is idempotent.
 
     python scripts/Update-Template-Dax.py           # patch the templates in place
@@ -366,6 +367,79 @@ VALUELENS_OBJECTS = (
 )
 
 # ---------------------------------------------------------------------------
+# ValueLens: UserMonthMetrics keys. Only the templates that build the audit
+# table in Power Query have UserMonthMetrics; the Fabric ones read the stage
+# from the Lakehouse.
+# ---------------------------------------------------------------------------
+
+USER_MONTH_TEMPLATES = tuple(path for path in VALUELENS if path.parts[0] != "1. Fabric")
+USER_MONTH_METRICS = "\n".join((
+    "VAR Base =",
+    "    SUMMARIZE(",
+    f"\t{A},",
+    f"\t{USER_ID},",
+    f"\t{A}[MonthStart]",
+    "    )",
+    "VAR WithMetrics =",
+    "    ADDCOLUMNS(",
+    "\tBase,",
+    "\t\"BehaviorCount\", CALCULATE(",
+    f"\t    DISTINCTCOUNTNOBLANK({A}[Behavior_Enriched_Full])",
+    "\t),",
+    "\t\"HasAgent\", CALCULATE(",
+    "\t    COUNTROWS(",
+    "\t\tFILTER(",
+    f"\t\t    {A},",
+    f"\t\t    NOT(ISBLANK({A}[AgentName]))",
+    f"\t\t\t&& {A}[AgentName] <> \"\"",
+    "\t\t)",
+    "\t    )",
+    "\t) > 0,",
+    "\t\"ActiveDays\", CALCULATE(",
+    f"\t    DISTINCTCOUNTNOBLANK({A}[InteractionDate])",
+    "\t),",
+    "\t\"ValueFocusShare\",",
+    "\t    DIVIDE(",
+    "\t\tCALCULATE(",
+    f"\t\t    COUNTROWS({A}),",
+    f"\t\t    {A}[Usage_Mode] IN {{\"4 - Producing\",\"5 - Delegating\"}}",
+    "\t\t),",
+    f"\t\tCALCULATE(COUNTROWS({A})),",
+    "\t\t0",
+    "\t    ),",
+    "\t\"UserMonthKey\",",
+    f"\t    {USER_ID} & \"|\" &",
+    f"\t    FORMAT({A}[MonthStart], \"yyyy-MM\")",
+    "    )",
+    "// Leaves out blank and whitespace-only user IDs, as the active-user counts do. The",
+    "// engine stores a whitespace-only ID as \"\", so with a blank ID in the same month",
+    "// both rows would get the key \"|yyyy-MM\" and the refresh would fail on the one",
+    "// side of the UserMonthKey relationship. No audit row relates to either: the audit",
+    "// table's own key is null for a blank ID and keeps the whitespace of the other.",
+    "// Filtering Base instead, before the metrics, doubled this table's refresh time.",
+    "VAR UserMonths =",
+    "    FILTER(",
+    "\tWithMetrics,",
+    f"\tLEN(TRIM({USER_ID})) > 0",
+    "    )",
+    "RETURN",
+    "    ADDCOLUMNS(",
+    "\tUserMonths,",
+    "\t\"UserStage\",",
+    "\t    IF(",
+    "\t\t[ActiveDays] >= 15",
+    "\t\t    || ([ActiveDays] >= 10 && [ValueFocusShare] >= 0.30 && [HasAgent]),",
+    "\t\t\"4 - Power\",",
+    "\t    IF([ActiveDays] >= 8 && [BehaviorCount] >= 5, \"3 - Habitual\",",
+    "\t    IF([ActiveDays] >= 3 && [BehaviorCount] >= 3, \"2 - Developing\",",
+    "\t    \"1 - Beginner\")))",
+    "    )",
+))
+USER_MONTH_OBJECTS = (
+    {"kind": "calculatedTable", "table": "UserMonthMetrics", "expression": USER_MONTH_METRICS},
+)
+
+# ---------------------------------------------------------------------------
 # Consumption Central: a blank or zero Cowork limit means "no limit set" (P9)
 # ---------------------------------------------------------------------------
 
@@ -448,8 +522,9 @@ CONSUMPTION_OBJECTS = (
     },
 )
 
-TARGETS = tuple((path, VALUELENS_OBJECTS) for path in VALUELENS) + tuple(
-    (path, CONSUMPTION_OBJECTS) for path in CONSUMPTION)
+TARGETS = tuple(
+    (path, VALUELENS_OBJECTS + (USER_MONTH_OBJECTS if path in USER_MONTH_TEMPLATES else ()))
+    for path in VALUELENS) + tuple((path, CONSUMPTION_OBJECTS) for path in CONSUMPTION)
 
 
 def model_text(expression):
