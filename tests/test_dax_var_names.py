@@ -134,7 +134,7 @@ class DaxVarNames(unittest.TestCase):
 
     def test_patcher_expressions_use_safe_var_names(self):
         reserved = reserved_names()
-        for spec in PATCHER.VALUELENS_OBJECTS + PATCHER.CONSUMPTION_OBJECTS:
+        for spec in PATCHER.VALUELENS_OBJECTS + PATCHER.USER_MONTH_OBJECTS + PATCHER.CONSUMPTION_OBJECTS:
             bad = [n for n in var_names(spec["expression"]) if n.upper() in reserved]
             self.assertEqual(bad, [], f"{spec['table']}[{spec.get('name', '')}]")
 
