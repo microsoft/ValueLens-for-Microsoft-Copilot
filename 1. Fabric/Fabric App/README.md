@@ -7,6 +7,10 @@ The app keeps no copy of your data. Each page queries the semantic model live, a
 viewing it, so row-level security applies. How each figure is worked out is in the
 [methodology](../../docs/METHODOLOGY.md).
 
+While it's open, the app holds up to 1,000 query results in memory, each for up to an hour, so a
+page you've seen opens again without asking the model. It asks the model again instead of reusing an
+error. Nothing is kept between opens.
+
 ## Deploy it by hand
 
 You need:
