@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { type CachedQueryResult } from "@microsoft/fabric-app-data";
-import { getFabricClient } from "@/lib/fabric-client";
+import { getFabricClient, QUERY_CACHE_MAX_AGE_MS } from "@/lib/fabric-client";
 
 interface UseSemanticModelQueryOptions {
     /** Connection alias from fabric.yaml (e.g., "salesModel"). */
@@ -22,12 +22,27 @@ interface UseSemanticModelQueryResult {
     data: CachedQueryResult | undefined;
     isLoading: boolean;
     error: Error | undefined;
+    /** Runs the query again. A cached error is asked again, not read back from the cache. */
     refetch: () => Promise<void>;
 }
 
 /**
+ * A result the cache gave that the model should be asked for again: one held
+ * longer than `QUERY_CACHE_MAX_AGE_MS`, or an error, such as data that hadn't
+ * loaded yet, which the model may have got past since.
+ */
+function askAgain(result: CachedQueryResult): boolean {
+    if (!result.fromCache) return false;
+    if (result.status === "error") return true;
+    return result.cachedAt !== undefined && Date.now() - result.cachedAt.getTime() > QUERY_CACHE_MAX_AGE_MS;
+}
+
+/**
  * React hook that executes a DAX query against a Power BI semantic model
- * via the Fabric SDK. Results are cached by the SDK's built-in LRU cache.
+ * via the Fabric SDK. Results are cached by the SDK's built-in LRU cache for
+ * the rest of the visit, up to an hour each (`QUERY_CACHE_MAX_AGE_MS`). A
+ * cached error isn't reused: the hook asks the model again, so a page you go
+ * back to, or "Try again", doesn't show an error the model may have got past.
  *
  * The connection alias is resolved from `fabric.generated.ts`
  * (managed by `npx fabric-app-data`).
@@ -80,9 +95,9 @@ export function useSemanticModelQuery(
         setError(undefined);
 
         try {
-            const result = await getFabricClient()
-                .semanticModel(connection)
-                .query(query, { bypassCache });
+            const model = getFabricClient().semanticModel(connection);
+            let result = await model.query(query, { bypassCache });
+            if (askAgain(result)) result = await model.query(query, { bypassCache: true });
 
             setData(result);
 

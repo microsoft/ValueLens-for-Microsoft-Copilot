@@ -17,6 +17,30 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased — Fabric App: pages you go back to open from the cache
+
+**Why.** The app keeps query results in memory while it's open, but only the SDK's default of 64.
+It has well over a hundred distinct queries (128 `.dax` files alone), so by the time you went back
+to a page its results had usually been pushed out, and every query on it ran again.
+
+- **Up to 1,000 results, each for up to an hour.** A page you've seen in the same visit opens again
+  without asking the model. A result held longer than an hour is fetched again, so in a tab left open
+  all day, going back to a page picks up the model's refresh within the hour. Before, a result that
+  stayed among the last 64 was used however old it was.
+- **Errors aren't reused.** If the cache kept an error, such as *Data not loaded yet*, the app asks
+  the model again rather than show it, both on a page you go back to and on **Try again**. Before,
+  **Try again** could show the kept error again straight away.
+- Nothing is kept between opens: closing or reloading the app clears it. As before, results stay in
+  the browser tab that asked for them. The time this saves hasn't been measured.
+- The Azure host serves the same app, so it gets this too. The Power Automate + Dataverse,
+  SharePoint and Local CSV paths have no app and don't change.
+
+Redeploy the app to pick this up. On Fabric, choose **Repair or change** in the installer, or run
+`npx rayfin up` if you deployed it by hand. On Azure, **Repair or change** with the next installer
+pulls a `valuelens-web` image that has it. The models don't change.
+
+---
+
 ## Unreleased — UserMonthMetrics no longer fails on blank and whitespace-only user IDs
 
 **Why.** In the Power Automate + Dataverse, SharePoint and Local CSV templates, `UserMonthMetrics` has a row per

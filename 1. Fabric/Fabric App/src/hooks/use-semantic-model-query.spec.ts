@@ -15,6 +15,7 @@ const mockSemanticModelClearCache = vi.fn();
 const mockQuery = vi.fn();
 
 vi.mock("@/lib/fabric-client", () => ({
+    QUERY_CACHE_MAX_AGE_MS: 60 * 60 * 1000,
     getFabricClient: () => ({
         clearCache: mockClearCache,
         semanticModel: () => ({
@@ -97,6 +98,87 @@ describe("useSemanticModelQuery", () => {
         });
 
         expect(mockQuery).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe("useSemanticModelQuery and the visit's cache", () => {
+    const HOUR = 60 * 60 * 1000;
+    const table = { columns: [{ name: "Value" }], rows: [[1]] };
+    const fresh = { status: "success" as const, table, fromCache: false, cachedAt: undefined };
+    const notLoaded = { status: "error" as const, error: { message: "Data not loaded yet" }, fromCache: false };
+
+    function heldFor(ms: number) {
+        return { status: "success" as const, table, fromCache: true, cachedAt: new Date(Date.now() - ms) };
+    }
+
+    async function mount() {
+        const { result } = renderHook(() => useSemanticModelQuery({ connection: "model", query: "Q" }));
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        return result;
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("uses a result the cache has held for under an hour", async () => {
+        const kept = heldFor(HOUR - 60_000);
+        mockQuery.mockResolvedValue(kept);
+
+        const result = await mount();
+
+        expect(mockQuery).toHaveBeenCalledOnce();
+        expect(result.current.data).toEqual(kept);
+    });
+
+    it("asks the model again for a result held over an hour", async () => {
+        mockQuery.mockResolvedValueOnce(heldFor(HOUR + 60_000)).mockResolvedValueOnce(fresh);
+
+        const result = await mount();
+
+        expect(mockQuery).toHaveBeenCalledTimes(2);
+        expect(mockQuery).toHaveBeenNthCalledWith(1, "Q", { bypassCache: undefined });
+        expect(mockQuery).toHaveBeenNthCalledWith(2, "Q", { bypassCache: true });
+        expect(result.current.data).toEqual(fresh);
+    });
+
+    it("asks the model again rather than show an error from the cache", async () => {
+        mockQuery.mockResolvedValueOnce({ ...notLoaded, fromCache: true, cachedAt: new Date() }).mockResolvedValueOnce(fresh);
+
+        const result = await mount();
+
+        expect(mockQuery).toHaveBeenCalledTimes(2);
+        expect(mockQuery).toHaveBeenNthCalledWith(2, "Q", { bypassCache: true });
+        expect(result.current.data).toEqual(fresh);
+        expect(result.current.error).toBeUndefined();
+    });
+
+    it("shows an error the model has just returned without asking again", async () => {
+        mockQuery.mockResolvedValue(notLoaded);
+
+        const result = await mount();
+
+        expect(mockQuery).toHaveBeenCalledOnce();
+        expect(result.current.error?.message).toBe("Data not loaded yet");
+    });
+
+    it("asks the model on Try again, not the cache that kept the error", async () => {
+        mockQuery
+            .mockResolvedValueOnce(notLoaded)
+            .mockResolvedValueOnce({ ...notLoaded, fromCache: true, cachedAt: new Date() })
+            .mockResolvedValueOnce(fresh);
+
+        const result = await mount();
+        expect(result.current.error?.message).toBe("Data not loaded yet");
+
+        await act(async () => {
+            await result.current.refetch();
+        });
+
+        expect(mockQuery).toHaveBeenCalledTimes(3);
+        expect(mockQuery).toHaveBeenNthCalledWith(3, "Q", { bypassCache: true });
+        expect(result.current.data).toEqual(fresh);
+        expect(result.current.error).toBeUndefined();
     });
 });
 
