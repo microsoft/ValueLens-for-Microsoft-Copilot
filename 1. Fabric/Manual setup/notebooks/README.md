@@ -66,6 +66,7 @@ Run these before the processor.
 | `INCLUDE_RAW_PASSTHROUGH` | Processor, registry ingester | `True` to keep the raw payloads. They can hold names, file names and URLs, so review privacy first. Then run the processor once with `WRITE_MODE = 'overwrite'`. |
 | `MAX_CONCURRENT_QUERIES`, `CHUNK_HOURS` | Audit ingester | Lower them if audit windows fail on a large tenant. See [A large tenant](#a-large-tenant). |
 | `WINDOW_RETRIES`, `MIN_CHUNK_HOURS` | Audit ingester | How often a failing audit window is resent (default `3`), and the smallest size it is split down to (default `1` hour). |
+| `RUN_OPTIMIZE` | Processor, M365 activity ingester, Agent Evaluator | `False` to skip compacting the tables after the writes. On by default: each run ends with `OPTIMIZE ... VORDER` on the tables it wrote, so the semantic model reads a few large files. In the M365 activity ingester and Agent Evaluator a failed compaction is reported and the run carries on. |
 | `TIME_BUDGET_MIN` | Audit ingester | Minutes to spend fetching before the run stops and leaves the rest to the next run (default `0`, no limit). Set it below the pipeline activity's timeout. |
 
 ## An audit window keeps failing
