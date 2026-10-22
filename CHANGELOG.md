@@ -25,10 +25,11 @@ cut work the refresh didn't need to do. The results are the same. Mirrored from 
 - **Consumption Central, all four versions (Fabric, Power Automate + Dataverse, SharePoint / Viva
   Direct, Local CSV).** The Studio and GitHub usage intensity groups (`Group By`) find each
   percentile cut once instead of ranking every user against every other user. `Weeks Ago` no longer
-  looks up the latest week separately for every row. The Cowork usage cohorts (`UsageCohortRank`,
-  `UsageCohort`) swap a per-row ranking for a per-row count, which is cheaper but still runs once
-  per row. `Weeks Active` and `Weeks Over Limit` are unchanged. Azure builds its Consumption
-  Central model from the Fabric template, so it gets this too.
+  looks up the latest week separately for every row. The Cowork usage cohorts are now worked out
+  in the `CoworkBilling` query, which sorts the credits once and compares each user with five cut
+  values, instead of ranking every user for every user. `UsageCohortRank` keeps its name and is
+  still what `UsageCohort` sorts by. `Weeks Active` and `Weeks Over Limit` are unchanged. Azure
+  builds its Consumption Central model from the Fabric template, so it gets this too.
 - **Fabric notebooks compact what they wrote.** The Microsoft 365 activity ingester and the Agent
   Evaluator transcript parser now run `OPTIMIZE ... VORDER` once at the end of each run, on the
   tables that run wrote. Daily and incremental writes no longer pile up small files that slow down
@@ -39,7 +40,9 @@ cut work the refresh didn't need to do. The results are the same. Mirrored from 
   other than the user's UPN (which **Unique Users** counts). Refresh reads less and the model is
   smaller. A source that still has the columns loads as before.
 
-How much time this saves hasn't been measured on a large copy yet. The changes are applied by
+How much time this saves hasn't been measured on a large copy yet. The new `CoworkBilling` query
+steps were checked offline in Power BI Desktop, but the full query hasn't been refreshed against a
+lakehouse. The changes are applied by
 `scripts/Update-Model-Refresh-Fixes.py` (`--check` reports templates that need it). **Repair or
 change** deploys the updated models and notebooks; refresh the models afterwards. On the Power
 Automate + Dataverse, SharePoint and Local CSV paths, open the new Consumption Central template.

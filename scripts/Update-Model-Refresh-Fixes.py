@@ -8,9 +8,11 @@ Consumption Central (all four variants: Fabric, Power Automate + Dataverse, Viva
   * Refresh-time DAX that ranked every user against every other user is rewritten to give the
     same results. The Group By table finds each percentile cut once with TOPN instead of RANKX
     over every user for every user, and CreditsWeekly[Weeks Ago] drops a per-row CALCULATE.
-    CoworkBilling[UsageCohortRank] counts the smaller values instead of RANKX(ALL(...)): cheaper,
-    but still one scan of the table per row. CoworkBilling[UsageCohort] reads its bucket from
-    UsageCohortRank instead of ranking again. Weeks Active and Weeks Over Limit are unchanged.
+    CoworkBilling[UsageCohortRank] moves from a calculated column that ranked the whole table
+    per row into CoworkBilling's query, which sorts the credits once, reads the five cut values
+    and compares each row to them (COHORT_RANK_QUERY). CoworkBilling[UsageCohort] reads its
+    bucket from UsageCohortRank instead of ranking again. Weeks Active and Weeks Over Limit are
+    unchanged.
 
 Agent Evaluator:
   * 'Agent Turns'[Response Seconds] scans its own conversation with FILTER(ALL(...)) instead of
@@ -47,7 +49,8 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 AGENT_EVALUATOR = Path("1. Fabric") / "Manual setup" / "Add Agent Evaluator" / "Agent Evaluator.pbit"
 CONSUMPTION = Path("1. Fabric") / "Manual setup" / "Add Credit Consumption" / "Consumption Central - Fabric.pbit"
-# The other Consumption Central variants share the Fabric model's DAX but not its Lakehouse queries.
+# The other Consumption Central variants share the Fabric model's DAX and CoworkBilling's query
+# ending, but not its Lakehouse queries.
 CONSUMPTION_VARIANTS = (
     Path("3. Power Automate + Dataverse") / "Add Credit Consumption"
     / "Consumption Central - Power Automate + Dataverse.pbit",
@@ -119,8 +122,52 @@ def cohort_rank(results):
 
 
 COHORT_LABELS = ('"1. Light"', '"2. Regular"', '"3. Engaged"', '"4. Native"', '"5. Power"', '"6. Frontier"')
-USAGE_COHORT_RANK_OLD, USAGE_COHORT_RANK = cohort_rank(("1", "2", "3", "4", "5", "6"))
+# The calculated forms UsageCohortRank may still have: the original RANKX, and the per-row count
+# an earlier version of this script wrote. Both become the imported column below.
+USAGE_COHORT_RANK_OLD, USAGE_COHORT_RANK_COUNT = cohort_rank(("1", "2", "3", "4", "5", "6"))
 USAGE_COHORT_OLD, _ = cohort_rank(COHORT_LABELS)
+
+COWORK_BILLING = "CoworkBilling"
+USAGE_COHORT_RANK = "UsageCohortRank"
+COHORT_QUERY_END = "\n".join((
+    '\tAddedRecency = Table.AddColumn(AddedDays, "RecencyBucket", each if [DaysSinceActivity] <= 7 then "0-7 days" '
+    'else if [DaysSinceActivity] <= 30 then "8-30 days" else if [DaysSinceActivity] <= 60 then "31-60 days" '
+    'else "60+ days", type text)',
+    "in",
+    "\tAddedRecency",
+))
+COHORT_QUERY_STEPS = "\n".join((
+    COHORT_QUERY_END.split("\n")[0] + ",",
+    "\t// UsageCohortRank: the cohort (1-6) of each user's ascending credit rank, ties skipped, as a",
+    "\t// share of all users, cut at 50/75/90/95/99%. That rank is at most m exactly when the credits",
+    "\t// are at most the m-th smallest value, so each cut is read once from the sorted credits",
+    "\t// instead of ranking every user against every other user. m is the largest whole number",
+    "\t// with m / N <= k, and a blank counts as 0, as it did in RANKX.",
+    "\tLoaded = Table.Buffer(AddedRecency),",
+    "\tSortedUsed = List.Sort(List.Transform(Loaded[MonthlyCreditsUsed], each if _ = null then 0 else _)),",
+    "\tUserCount = List.Count(SortedUsed),",
+    "\tCutValue = (k as number) =>",
+    "\t\tlet",
+    "\t\t\tNear = Number.RoundDown(k * UserCount),",
+    "\t\t\tRank = List.Max(List.Select({Near - 2 .. Near + 2}, each _ >= 1 and _ <= UserCount and _ / UserCount <= k))",
+    "\t\tin",
+    "\t\t\tif Rank = null then null else SortedUsed{Rank - 1},",
+    "\tCohortCuts = List.Buffer(List.Transform({"
+    + ", ".join(cut for _, cut in COHORT_CUTS) + "}, CutValue)),",
+    "\tAddedCohortRank = Table.AddColumn(Loaded, \"UsageCohortRank\", (row) =>",
+    "\t\tlet",
+    "\t\t\tUsed = if row[MonthlyCreditsUsed] = null then 0 else row[MonthlyCreditsUsed],",
+    "\t\t\tCohort = List.PositionOf(List.Transform(CohortCuts, each _ <> null and Used <= _), true)",
+    "\t\tin",
+    "\t\t\tif Cohort < 0 then 6 else Cohort + 1, Int64.Type)",
+    "in",
+    "\tAddedCohortRank",
+))
+COHORT_RANK_QUERY = (COHORT_QUERY_END, COHORT_QUERY_STEPS)
+# Every variant's CoworkBilling query ends with the same AddedRecency step.
+COHORT_QUERIES = {COWORK_BILLING: (COHORT_RANK_QUERY,)}
+CONSUMPTION_QUERIES.update(COHORT_QUERIES)
+
 # Same percentile as UsageCohortRank, so read the bucket from it instead of ranking again.
 USAGE_COHORT = "\n".join(
     ("SWITCH('CoworkBilling'[UsageCohortRank],",)
@@ -142,7 +189,6 @@ WEEKS_AGO = "\n".join((
     "",
 ))
 CONSUMPTION_COLUMNS = {
-    ("CoworkBilling", "UsageCohortRank"): (USAGE_COHORT_RANK_OLD, USAGE_COHORT_RANK),
     ("CoworkBilling", "UsageCohort"): (USAGE_COHORT_OLD, USAGE_COHORT),
     ("CreditsWeekly", "Weeks Ago"): (WEEKS_AGO_OLD, WEEKS_AGO),
 }
@@ -583,9 +629,40 @@ def calculated_partition_source(model, table_name):
     return partitions[0]["source"]
 
 
+def imported_cohort_rank(column):
+    """UsageCohortRank as a column CoworkBilling's query loads, keeping its name, tag and format."""
+    record = {}
+    for key, value in column.items():
+        if key in ("type", "expression", "isDataTypeInferred"):
+            continue
+        if key == "lineageTag":
+            record["sourceColumn"] = USAGE_COHORT_RANK
+        record[key] = value
+    record.setdefault("sourceColumn", USAGE_COHORT_RANK)
+    return record
+
+
+def edit_cohort_rank_column(model):
+    table = one(model["tables"], COWORK_BILLING, "DataModelSchema tables")
+    columns = table.get("columns", [])
+    column = one(columns, USAGE_COHORT_RANK, COWORK_BILLING)
+    if column.get("type", "data") == "data":
+        if column.get("sourceColumn") != USAGE_COHORT_RANK or "expression" in column:
+            raise ValueError(f"{COWORK_BILLING}[{USAGE_COHORT_RANK}] has changed; review it before patching")
+        return []
+    if column.get("type") != "calculated" or joined(column["expression"]) not in (
+            USAGE_COHORT_RANK_OLD, USAGE_COHORT_RANK_COUNT):
+        raise ValueError(f"{COWORK_BILLING}[{USAGE_COHORT_RANK}] has changed; review it before patching")
+    if column.get("dataType") != "int64":
+        raise ValueError(f"{COWORK_BILLING}[{USAGE_COHORT_RANK}] is not a whole number")
+    columns[columns.index(column)] = imported_cohort_rank(column)
+    return [f"{COWORK_BILLING}[{USAGE_COHORT_RANK}] loaded by the query"]
+
+
 def edit_consumption_dax(document):
     changed = []
     model = document["model"]
+    changed += edit_cohort_rank_column(model)
     for (table_name, column_name), (old, new) in CONSUMPTION_COLUMNS.items():
         table = one(model["tables"], table_name, "DataModelSchema tables")
         column = one(table.get("columns", []), column_name, table_name)
@@ -674,6 +751,9 @@ def owned_mask_model(document, queries, functions, dax):
             table = one(model["tables"], table_name, "tables")
             table["columns"] = [c for c in table["columns"] if c["name"] != column_name]
     if dax == "consumption":
+        cowork = one(model["tables"], COWORK_BILLING, "tables")
+        cowork["columns"] = [c if c["name"] != USAGE_COHORT_RANK else {"name": c["name"], "owned": True}
+                             for c in cowork["columns"]]
         for table_name, column_name in CONSUMPTION_COLUMNS:
             one(one(model["tables"], table_name, "tables")["columns"], column_name, table_name)["expression"] = "<owned>"
         calculated_partition_source(model, GROUP_BY)["expression"] = "<owned>"
@@ -696,7 +776,7 @@ def owned_mask_pending(document, queries, functions):
 TARGETS = (
     (AGENT_EVALUATOR, AGENT_EVALUATOR_QUERIES, True, "agent-evaluator"),
     (CONSUMPTION, CONSUMPTION_QUERIES, False, "consumption"),
-) + tuple((path, {}, False, "consumption") for path in CONSUMPTION_VARIANTS)
+) + tuple((path, COHORT_QUERIES, False, "consumption") for path in CONSUMPTION_VARIANTS)
 
 # ---------------------------------------------------------------------------
 # Archive handling
