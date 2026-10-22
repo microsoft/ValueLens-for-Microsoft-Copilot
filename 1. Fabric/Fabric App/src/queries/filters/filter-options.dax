@@ -31,6 +31,11 @@ UNION(
     ROW(
         "Kind", "lastDate",
         "Value", FORMAT(MAX('Chat + Agent Interactions (Audit Logs)'[ActivityDate]), "yyyy-MM-dd")
+    ),
+    // The people with activity, as each query counts them to decide the tenant's default date window.
+    ROW(
+        "Kind", "people",
+        "Value", FORMAT(CALCULATE(DISTINCTCOUNTNOBLANK('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]), REMOVEFILTERS()), "0")
     )
 )
 ORDER BY [Kind], [Value]

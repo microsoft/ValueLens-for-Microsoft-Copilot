@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { defaultFilters, formatDateRange } from "@/lib/filters";
+import { defaultFilters, formatDateRange, tenantDefaultFilters } from "@/lib/filters";
 import {
     blockTitle,
     buildPptx,
@@ -235,5 +235,27 @@ describe("print", () => {
         await expect(printReport(document_())).resolves.toBe("downloaded");
         expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "exec-pre-read-data-to-2026-10-05.html");
         expect(document.getElementById(PRINT_ROOT_ID)).toBeNull();
+    });
+});
+
+describe("describeFilters under the tenant's default dates", () => {
+    const tenant = { firstDate: "2026-01-01", lastDate: "2026-10-04" };
+
+    it("names the last 12 weeks and their dates on a large tenant", () => {
+        expect(describeFilters(tenantDefaultFilters, ["dateRange"], "Department", { ...tenant, largeTenant: true })).toBe(
+            `Date: Last 12 weeks, ${formatDateRange("2026-07-13", "2026-10-04")}`,
+        );
+    });
+
+    it("leaves them out on a small tenant, where they cover every date", () => {
+        expect(describeFilters(tenantDefaultFilters, ["dateRange"], "Department", { ...tenant, largeTenant: false })).toBe(
+            "All data, no filters",
+        );
+    });
+
+    it("says what they are when the options couldn't say", () => {
+        expect(describeFilters(tenantDefaultFilters, ["dateRange"], "Department")).toBe(
+            "Date: Default, the last 12 weeks for a large organization",
+        );
     });
 });

@@ -8,7 +8,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { FilterContext } from "@/hooks/filter.context";
 import { useSemanticModelQuery } from "@/hooks/use-semantic-model-query";
-import { defaultFilters, type FilterKey, type FilterState } from "@/lib/filters";
+import { tenantDefaultFilters, type FilterKey, type FilterState } from "@/lib/filters";
 import { DEFAULT_ORG_ATTRIBUTE, describeOrgAttribute } from "@/lib/org-attribute";
 import {
     filterOptions,
@@ -33,7 +33,8 @@ const FALLBACK_ATTRIBUTES = [DEFAULT_ORG_ATTRIBUTE];
  * column is empty — falls back to the first column worth grouping by.
  */
 export function FilterProvider({ applicable, children }: { applicable: readonly FilterKey[]; children: ReactNode }) {
-    const [state, setFilters] = useState<FilterState>(defaultFilters);
+    // The tenant's default date window from the first query: each query decides in the model whether it narrows.
+    const [state, setFilters] = useState<FilterState>(tenantDefaultFilters);
     const { data, error } = useSemanticModelQuery(optionsConfig);
     const attributesResult = useSemanticModelQuery(attributesConfig);
 

@@ -17,6 +17,34 @@ Deployment instructions do **not** live here. They live in the path READMEs:
 
 ---
 
+## Unreleased — Fabric App: large tenants open on the last 12 weeks
+
+**Why.** On a large tenant, the first pages took several seconds because every query read every
+date. Measured at 20,000 people, a three-month window made the Adoption summary about 30% quicker
+and drilling from an organization to a person about 15% quicker. The gain should grow with the
+tenant.
+
+- **Large tenants start on Last 12 weeks.** When more than 10,000 people have Copilot activity, the
+  date filter starts on the 12 weeks up to the last day with activity, not today. Smaller tenants
+  still start on **All dates**.
+- **No wait.** Each query works out the tenant's size and the 12 weeks in the model itself, so the
+  first queries don't wait for the filter choices to load. Nothing is asked again when they arrive.
+- **The filter bar says so.** It shows *Last 12 weeks* with its dates, notes that it's the default
+  for large organizations, and has a **Show all dates** button. Until the filter choices load, it
+  says *Default dates*.
+- **Reset filters** (was **Clear filters**) goes back to where the tenant starts: the last 12 weeks
+  on a large tenant, all dates on a small one.
+- The Executive summary's range and the filters listed in PDF and PowerPoint downloads use the same
+  dates. Cost vs value already uses the days with activity inside the date filter, so on a large
+  tenant it compares the same 12 weeks.
+- The Azure host serves the same app, so it gets this too. The Power Automate + Dataverse,
+  SharePoint and Local CSV paths have no app and don't change.
+
+Redeploy the app to pick this up, in the same way as the cache entry below. The models don't
+change. The AnalyticsHub app made the same change in microsoft/AnalyticsHub-Dashboard#177.
+
+---
+
 ## Unreleased — Shorter refreshes: Consumption Central cohorts, Lakehouse compaction, Agent Evaluator columns
 
 **Why.** On a large tenant, refresh time grew much faster than the number of users. These changes

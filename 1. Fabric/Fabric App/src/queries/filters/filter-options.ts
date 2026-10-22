@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 import type { QueryTable } from "@microsoft/fabric-app-data";
+import { isLargeTenant } from "@/lib/filters";
 import { pickOrgAttributes, withOrgAttribute, type OrgAttribute, type OrgColumnStatistic } from "@/lib/org-attribute";
 import { connection } from "../shared";
 import query from "./filter-options.dax?raw";
@@ -21,6 +22,12 @@ export interface FilterOptions {
     firstDate: string | undefined;
     /** Last date with activity, ISO `yyyy-mm-dd`. */
     lastDate: string | undefined;
+    /**
+     * Whether more than `LARGE_TENANT_PEOPLE` people have activity, so the
+     * default date window is the last 12 weeks. `undefined` when the count
+     * didn't come back.
+     */
+    largeTenant?: boolean;
 }
 
 /**
@@ -57,6 +64,7 @@ export function toFilterOptions(table: QueryTable): FilterOptions {
         else if (kind === "activity") options.activities.push(value);
         else if (kind === "firstDate") options.firstDate = value;
         else if (kind === "lastDate") options.lastDate = value;
+        else if (kind === "people" && Number.isFinite(Number(value))) options.largeTenant = isLargeTenant(Number(value));
     }
 
     return options;
