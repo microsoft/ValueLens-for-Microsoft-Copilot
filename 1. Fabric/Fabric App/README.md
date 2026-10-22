@@ -59,6 +59,13 @@ off into `fabric.config.json`; those pages stay hidden without probing until the
 module on. Everything shows while the check runs, or if it fails, and a page comes back on the next
 open once its data loads.
 
+On a large tenant, where more than 10,000 people have Copilot activity, the date filter starts on
+**Last 12 weeks**: the 12 weeks up to the last day with activity. Smaller tenants start on **All
+dates**. Each query works out the tenant's size and the window in the model, so the first pages
+don't wait for the filter choices. The filter bar shows the dates, with **Show all dates** to widen
+them. **Reset filters** goes back to the tenant's default. Consumption and Agent Evaluation have no
+date filter and are unaffected.
+
 ## Settings in the app
 
 Anyone who can open the app can change these, and the change applies for everyone. Share the item

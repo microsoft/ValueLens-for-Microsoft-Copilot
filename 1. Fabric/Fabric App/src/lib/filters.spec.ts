@@ -8,11 +8,21 @@
 import { describe, expect, it } from "vitest";
 import {
     availablePresets,
+    dateFilter,
     defaultFilters,
+    differsFromTenantDefault,
     filterExpressions,
     formatDateRange,
     isFilterActive,
+    isFilterInEffect,
+    isLargeTenant,
+    isTenantDefaultRange,
+    LARGE_TENANT_PEOPLE,
     presetRange,
+    shownDateRange,
+    TENANT_DEFAULT_RANGE,
+    tenantDefaultDates,
+    tenantDefaultFilters,
     selectedCohort,
     summariseSelection,
     unlicensedOnly,
@@ -168,5 +178,62 @@ describe("unlicensedOnly", () => {
         expect(unlicensedOnly(licence("licensed"), ["licence"])).toBe(false);
         expect(unlicensedOnly(licence("all"), ["licence"])).toBe(false);
         expect(unlicensedOnly(licence("unlicensed"), ["audience"])).toBe(false);
+    });
+});
+describe("the tenant's default dates", () => {
+    const LARGE = { firstDate: "2026-01-01", lastDate: "2026-10-04", largeTenant: true };
+    const SMALL = { ...LARGE, largeTenant: false };
+
+    it("works out the tenant's size and the last 12 weeks in the query, past every filter", () => {
+        const audit = "'Chat + Agent Interactions (Audit Logs)'";
+        expect(tenantDefaultDates()).toBe(
+            [
+                `VAR __TenantLastDate = CALCULATE(MAX(${audit}[ActivityDate]), REMOVEFILTERS())`,
+                `VAR __TenantIsLarge = CALCULATE(DISTINCTCOUNTNOBLANK(${audit}[Audit_UserId]), REMOVEFILTERS()) > 10000`,
+                "RETURN FILTER(ALL('Calendar'[Date]), NOT __TenantIsLarge || ('Calendar'[Date] > __TenantLastDate - 84 && 'Calendar'[Date] <= __TenantLastDate))",
+            ].join("\n    "),
+        );
+        expect(filterExpressions(tenantDefaultFilters, ["dateRange"])).toEqual([tenantDefaultDates()]);
+        expect(dateFilter(TENANT_DEFAULT_RANGE, "'Other'[Day]")).toContain("FILTER(ALL('Other'[Day]), NOT __TenantIsLarge");
+        // Every other filter is as it is by default.
+        expect(filterExpressions(tenantDefaultFilters, ["organizations", "licence", "audience", "agentTypes", "agentNames"])).toEqual([]);
+    });
+
+    it("counts a tenant as large above the threshold", () => {
+        expect(LARGE_TENANT_PEOPLE).toBe(10_000);
+        expect(isLargeTenant(10_000)).toBe(false);
+        expect(isLargeTenant(10_001)).toBe(true);
+    });
+
+    it("shows the last 12 weeks to the last day with activity on a large tenant, as the preset does", () => {
+        expect(isTenantDefaultRange(tenantDefaultFilters.dateRange)).toBe(true);
+        expect(isTenantDefaultRange(presetRange("12w", "2026-01-01", "2026-10-04"))).toBe(false);
+        expect(shownDateRange(TENANT_DEFAULT_RANGE, LARGE)).toEqual(presetRange("12w", "2026-01-01", "2026-10-04"));
+        expect(shownDateRange(TENANT_DEFAULT_RANGE, LARGE)).toMatchObject({ from: "2026-07-13", to: "2026-10-04" });
+    });
+
+    it("shows every date on a small tenant, and while the options load", () => {
+        expect(shownDateRange(TENANT_DEFAULT_RANGE, SMALL)).toBeUndefined();
+        expect(shownDateRange(TENANT_DEFAULT_RANGE, undefined)).toBeUndefined();
+        expect(shownDateRange(TENANT_DEFAULT_RANGE, { ...LARGE, largeTenant: undefined })).toBeUndefined();
+        const fixed = { preset: "custom" as const, from: "2026-02-01", to: "2026-02-28" };
+        expect(shownDateRange(fixed, SMALL)).toBe(fixed);
+    });
+
+    it("is always applied to queries, but in effect only on a large tenant", () => {
+        expect(isFilterActive(tenantDefaultFilters, "dateRange")).toBe(true);
+        expect(isFilterInEffect(tenantDefaultFilters, "dateRange", LARGE)).toBe(true);
+        expect(isFilterInEffect(tenantDefaultFilters, "dateRange", SMALL)).toBe(false);
+        expect(isFilterInEffect(tenantDefaultFilters, "dateRange", undefined)).toBe(false);
+        expect(isFilterInEffect({ ...defaultFilters, licence: "licensed" }, "licence", SMALL)).toBe(true);
+    });
+
+    it("differs from where the tenant starts only when a filter is changed", () => {
+        expect(differsFromTenantDefault(tenantDefaultFilters, "dateRange", LARGE)).toBe(false);
+        expect(differsFromTenantDefault(defaultFilters, "dateRange", LARGE)).toBe(true);
+        // On a small tenant every date is the default too.
+        expect(differsFromTenantDefault(defaultFilters, "dateRange", SMALL)).toBe(false);
+        expect(differsFromTenantDefault(defaultFilters, "dateRange", undefined)).toBe(true);
+        expect(differsFromTenantDefault({ ...tenantDefaultFilters, licence: "licensed" }, "licence", SMALL)).toBe(true);
     });
 });

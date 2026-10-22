@@ -7,6 +7,7 @@
 
 import { useMemo } from "react";
 import { useFilterContext } from "@/hooks/filter.context";
+import { shownDateRange } from "@/lib/filters";
 import { executiveRange, type ExecutiveRange } from "./executive-data";
 
 export interface ExecutiveRangeState {
@@ -16,11 +17,16 @@ export interface ExecutiveRangeState {
     settled: boolean;
 }
 
-/** The days the Executive summary covers: the date range, held to the days with activity. */
+/**
+ * The days the Executive summary covers: the date range, held to the days with
+ * activity. The tenant's default window counts as its last 12 weeks once the
+ * options say the tenant is large, and as every date otherwise.
+ */
 export function useExecutiveRange(): ExecutiveRangeState {
     const { filters, options, optionsError } = useFilterContext();
-    const from = filters.dateRange?.from;
-    const to = filters.dateRange?.to;
+    const shown = shownDateRange(filters.dateRange, options);
+    const from = shown?.from;
+    const to = shown?.to;
     const firstDate = options?.firstDate;
     const lastDate = options?.lastDate;
     const range = useMemo(() => executiveRange(from, to, firstDate, lastDate), [from, to, firstDate, lastDate]);

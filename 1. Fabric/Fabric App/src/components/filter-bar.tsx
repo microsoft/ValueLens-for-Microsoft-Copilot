@@ -13,12 +13,15 @@ import {
     AUDIENCE_LABELS,
     AUDIENCE_VALUES,
     DATE_PRESET_LABELS,
-    defaultFilters,
+    differsFromTenantDefault,
     FILTER_KEYS,
     filterLabel,
     formatDateRange,
-    isFilterActive,
+    isFilterInEffect,
+    isTenantDefaultRange,
     presetRange,
+    shownDateRange,
+    tenantDefaultFilters,
     summariseSelection,
     type Audience,
     type FilterKey,
@@ -40,111 +43,136 @@ function DateFilter() {
     const { filters, setFilters, options } = useFilterContext();
     const first = options?.firstDate;
     const last = options?.lastDate;
-    const [from, setFrom] = useState(filters.dateRange?.from ?? first ?? "");
-    const [to, setTo] = useState(filters.dateRange?.to ?? last ?? "");
     const fromId = useId();
     const toId = useId();
 
-    const range = filters.dateRange;
-    const summary = !range
-        ? DATE_PRESET_LABELS.all
-        : range.preset === "custom"
-          ? formatDateRange(range.from, range.to)
-          : DATE_PRESET_LABELS[range.preset];
+    const tenantDefault = isTenantDefaultRange(filters.dateRange);
+    // The dates the filter covers: the tenant default resolves to the last 12 weeks only on a large tenant.
+    const range = shownDateRange(filters.dateRange, options);
+    const [from, setFrom] = useState(range?.from ?? first ?? "");
+    const [to, setTo] = useState(range?.to ?? last ?? "");
+    // The tenant default before the options say whether the tenant is large.
+    const undecided = tenantDefault && !range && options?.largeTenant !== false;
+    const summary = undecided
+        ? "Default dates"
+        : !range
+          ? DATE_PRESET_LABELS.all
+          : range.preset === "custom" || tenantDefault
+            ? `${tenantDefault ? `${DATE_PRESET_LABELS[range.preset]} · ` : ""}${formatDateRange(range.from, range.to)}`
+            : DATE_PRESET_LABELS[range.preset];
     const presets = first && last ? availablePresets(first, last) : [];
     const customValid = Boolean(from && to && from <= to);
+    const allDates = !range && !undecided;
 
     return (
-        <FilterMenu label={filterLabel("dateRange", "")} summary={summary} active={Boolean(range)}>
-            {(close) => (
-                <div className="flex flex-col gap-300">
-                    <div className="flex flex-col gap-100">
-                        <button
-                            type="button"
-                            aria-pressed={!range}
-                            className={optionClass(!range)}
-                            onClick={() => {
-                                setFilters((current) => ({ ...current, dateRange: undefined }));
+        <div className="flex items-center gap-200">
+            <FilterMenu label={filterLabel("dateRange", "")} summary={summary} active={Boolean(range)}>
+                {(close) => (
+                    <div className="flex flex-col gap-300">
+                        <div className="flex flex-col gap-100">
+                            <button
+                                type="button"
+                                aria-pressed={allDates}
+                                className={optionClass(allDates)}
+                                onClick={() => {
+                                    // On a small tenant the default already covers every date, so keep it and its queries.
+                                    if (!allDates) setFilters((current) => ({ ...current, dateRange: undefined }));
+                                    close();
+                                }}
+                            >
+                                {DATE_PRESET_LABELS.all}
+                                {allDates && <Check className="icon-size-200" aria-hidden="true" />}
+                            </button>
+                            {presets.map((preset) => {
+                                const selected = range?.preset === preset;
+                                return (
+                                    <button
+                                        key={preset}
+                                        type="button"
+                                        aria-pressed={selected}
+                                        className={optionClass(selected)}
+                                        onClick={() => {
+                                            // Picking the window the default already shows keeps the default and its queries.
+                                            if (!(selected && tenantDefault)) {
+                                                setFilters((current) => ({ ...current, dateRange: presetRange(preset, first!, last!) }));
+                                            }
+                                            close();
+                                        }}
+                                    >
+                                        {DATE_PRESET_LABELS[preset]}
+                                        {selected && <Check className="icon-size-200" aria-hidden="true" />}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <form
+                            className="flex flex-col gap-200 border-t border-border pt-300"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                if (!customValid) return;
+                                setFilters((current) => ({ ...current, dateRange: { preset: "custom", from, to } }));
                                 close();
                             }}
                         >
-                            {DATE_PRESET_LABELS.all}
-                            {!range && <Check className="icon-size-200" aria-hidden="true" />}
-                        </button>
-                        {presets.map((preset) => {
-                            const selected = range?.preset === preset;
-                            return (
-                                <button
-                                    key={preset}
-                                    type="button"
-                                    aria-pressed={selected}
-                                    className={optionClass(selected)}
-                                    onClick={() => {
-                                        setFilters((current) => ({ ...current, dateRange: presetRange(preset, first!, last!) }));
-                                        close();
-                                    }}
-                                >
-                                    {DATE_PRESET_LABELS[preset]}
-                                    {selected && <Check className="icon-size-200" aria-hidden="true" />}
-                                </button>
-                            );
-                        })}
+                            <span className="text-[length:var(--text-200)] leading-200 font-semibold text-foreground">
+                                {DATE_PRESET_LABELS.custom}
+                            </span>
+                            <div className="grid grid-cols-2 gap-200">
+                                <label htmlFor={fromId} className="flex flex-col gap-100 text-[length:var(--text-200)] leading-200 text-muted-foreground">
+                                    From
+                                    <input
+                                        id={fromId}
+                                        type="date"
+                                        value={from}
+                                        min={first}
+                                        max={last}
+                                        onChange={(event) => setFrom(event.target.value)}
+                                        className="h-[32px] rounded-md border border-input bg-card px-200 text-[length:var(--text-300)] text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                                    />
+                                </label>
+                                <label htmlFor={toId} className="flex flex-col gap-100 text-[length:var(--text-200)] leading-200 text-muted-foreground">
+                                    To
+                                    <input
+                                        id={toId}
+                                        type="date"
+                                        value={to}
+                                        min={first}
+                                        max={last}
+                                        onChange={(event) => setTo(event.target.value)}
+                                        className="h-[32px] rounded-md border border-input bg-card px-200 text-[length:var(--text-300)] text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                                    />
+                                </label>
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={!customValid}
+                                className="h-[32px] rounded-md bg-primary px-300 text-[length:var(--text-300)] font-semibold text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Apply range
+                            </button>
+                            {first && last && (
+                                <p className="text-[length:var(--text-200)] leading-200 text-muted-foreground">
+                                    Activity is loaded for {formatDateRange(first, last)}.
+                                </p>
+                            )}
+                        </form>
                     </div>
-
-                    <form
-                        className="flex flex-col gap-200 border-t border-border pt-300"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            if (!customValid) return;
-                            setFilters((current) => ({ ...current, dateRange: { preset: "custom", from, to } }));
-                            close();
-                        }}
+                )}
+            </FilterMenu>
+            {tenantDefault && range && (
+                <>
+                    <span className="text-[length:var(--text-200)] leading-200 text-muted-foreground">Default for large organizations</span>
+                    <button
+                        type="button"
+                        onClick={() => setFilters((current) => ({ ...current, dateRange: undefined }))}
+                        className="h-[32px] rounded-md px-200 text-[length:var(--text-200)] font-semibold text-primary transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     >
-                        <span className="text-[length:var(--text-200)] leading-200 font-semibold text-foreground">
-                            {DATE_PRESET_LABELS.custom}
-                        </span>
-                        <div className="grid grid-cols-2 gap-200">
-                            <label htmlFor={fromId} className="flex flex-col gap-100 text-[length:var(--text-200)] leading-200 text-muted-foreground">
-                                From
-                                <input
-                                    id={fromId}
-                                    type="date"
-                                    value={from}
-                                    min={first}
-                                    max={last}
-                                    onChange={(event) => setFrom(event.target.value)}
-                                    className="h-[32px] rounded-md border border-input bg-card px-200 text-[length:var(--text-300)] text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
-                                />
-                            </label>
-                            <label htmlFor={toId} className="flex flex-col gap-100 text-[length:var(--text-200)] leading-200 text-muted-foreground">
-                                To
-                                <input
-                                    id={toId}
-                                    type="date"
-                                    value={to}
-                                    min={first}
-                                    max={last}
-                                    onChange={(event) => setTo(event.target.value)}
-                                    className="h-[32px] rounded-md border border-input bg-card px-200 text-[length:var(--text-300)] text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
-                                />
-                            </label>
-                        </div>
-                        <button
-                            type="submit"
-                            disabled={!customValid}
-                            className="h-[32px] rounded-md bg-primary px-300 text-[length:var(--text-300)] font-semibold text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            Apply range
-                        </button>
-                        {first && last && (
-                            <p className="text-[length:var(--text-200)] leading-200 text-muted-foreground">
-                                Activity is loaded for {formatDateRange(first, last)}.
-                            </p>
-                        )}
-                    </form>
-                </div>
+                        Show all dates
+                    </button>
+                </>
             )}
-        </FilterMenu>
+        </div>
     );
 }
 
@@ -310,8 +338,15 @@ export function FilterBar({ destinationLabel }: { destinationLabel: string }) {
     const refreshing = useIsRefreshing();
 
     const has = (key: FilterKey) => applicable.includes(key);
-    const anyActive = FILTER_KEYS.some((key) => isFilterActive(filters, key));
-    const notApplied = FILTER_KEYS.filter((key) => isFilterActive(filters, key) && !has(key));
+    // Reset filters returns to where the tenant starts: the last 12 weeks on a large tenant, every date on a small one.
+    const changed = FILTER_KEYS.some((key) => differsFromTenantDefault(filters, key, options));
+    // The tenant's default dates aren't the user's choice, so they go unmentioned where they don't apply.
+    const notApplied = FILTER_KEYS.filter(
+        (key) =>
+            isFilterInEffect(filters, key, options) &&
+            !(key === "dateRange" && isTenantDefaultRange(filters.dateRange)) &&
+            !has(key),
+    );
 
     // Offer Cowork even before the tenant has any, so the option is visible,
     // but only make it selectable once the data holds Cowork activity.
@@ -390,14 +425,14 @@ export function FilterBar({ destinationLabel }: { destinationLabel: string }) {
                         Updating
                     </span>
                 )}
-                {anyActive && (
+                {changed && (
                     <button
                         type="button"
-                        onClick={() => setFilters(defaultFilters)}
+                        onClick={() => setFilters(tenantDefaultFilters)}
                         className="flex h-[32px] items-center gap-100 rounded-md px-300 text-[length:var(--text-200)] font-semibold text-primary transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     >
                         <X className="icon-size-200" aria-hidden="true" />
-                        Clear filters
+                        Reset filters
                     </button>
                 )}
             </div>

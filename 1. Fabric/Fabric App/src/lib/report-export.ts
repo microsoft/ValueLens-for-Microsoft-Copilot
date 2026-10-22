@@ -10,11 +10,16 @@ import type { StageId } from "@/components/destinations";
 import { downloadBlob } from "@/lib/download";
 import {
     AUDIENCE_LABELS,
+    DATE_PRESET_LABELS,
     filterLabel,
     formatDateRange,
-    isFilterActive,
+    isFilterInEffect,
+    isTenantDefaultRange,
+    shownDateRange,
+    TENANT_DEFAULT_RANGE,
     type FilterKey,
     type FilterState,
+    type TenantDates,
 } from "@/lib/filters";
 import { isRefreshPending } from "@/lib/refresh-tracker";
 import { exportFileName, isStageId, stageDestination, stageLabel } from "@/lib/report-pack";
@@ -72,17 +77,34 @@ function listed(values: readonly string[]): string {
 /**
  * The filters a report was drawn with, in words: "Date: 12 May – 6 Jul 2026 ·
  * Organization: Finance, Sales". Only filters among `keys` that narrow the
- * data are named.
+ * data are named. The tenant's default window is named as the last 12 weeks
+ * with its dates on a large tenant, and left out on a small one, where it
+ * covers every date; `tenant` is what the filter options say.
  */
-export function describeFilters(state: FilterState, keys: readonly FilterKey[], orgLabel: string): string {
+export function describeFilters(
+    state: FilterState,
+    keys: readonly FilterKey[],
+    orgLabel: string,
+    tenant?: TenantDates,
+): string {
     const parts: string[] = [];
     for (const key of keys) {
-        if (!isFilterActive(state, key)) continue;
+        const undecided = key === "dateRange" && isTenantDefaultRange(state.dateRange) && tenant?.largeTenant === undefined;
+        if (!undecided && !isFilterInEffect(state, key, tenant)) continue;
         const label = filterLabel(key, orgLabel);
         switch (key) {
-            case "dateRange":
-                parts.push(`${label}: ${formatDateRange(state.dateRange!.from, state.dateRange!.to)}`);
+            case "dateRange": {
+                const shown = shownDateRange(state.dateRange, tenant);
+                const preset = DATE_PRESET_LABELS[TENANT_DEFAULT_RANGE.preset];
+                parts.push(
+                    !shown
+                        ? `${label}: Default, the ${preset.toLowerCase()} for a large organization`
+                        : isTenantDefaultRange(state.dateRange)
+                          ? `${label}: ${preset}, ${formatDateRange(shown.from, shown.to)}`
+                          : `${label}: ${formatDateRange(shown.from, shown.to)}`,
+                );
                 break;
+            }
             case "organizations":
                 parts.push(`${label}: ${listed(state.organizations)}`);
                 break;

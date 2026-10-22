@@ -7,7 +7,7 @@
 
 import { Info } from "lucide-react";
 import { useFilterContext } from "@/hooks/filter.context";
-import { filterLabel, isFilterActive, type FilterKey } from "@/lib/filters";
+import { filterLabel, isFilterInEffect, type FilterKey } from "@/lib/filters";
 
 function joinLabels(keys: readonly FilterKey[], orgLabel: string): string {
     const labels = keys.map((key) => filterLabel(key, orgLabel));
@@ -30,8 +30,8 @@ export function FilterNote({
     reason: string;
     scope?: string;
 }) {
-    const { filters, applicable, orgAttribute } = useFilterContext();
-    const skipped = ignored.filter((key) => applicable.includes(key) && isFilterActive(filters, key));
+    const { filters, applicable, orgAttribute, options } = useFilterContext();
+    const skipped = ignored.filter((key) => applicable.includes(key) && isFilterInEffect(filters, key, options));
     if (skipped.length === 0) return null;
 
     return (
