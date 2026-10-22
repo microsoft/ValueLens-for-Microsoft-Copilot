@@ -1,0 +1,338 @@
+[
+ {
+  "signal": "Outlook/OutlookSidepane + Send/Draft + EmailMessage",
+  "behavior": "Email Drafting",
+  "useCase": "Composing replies, cold outreach, formal correspondence",
+  "valueOutcome": "Time Saved (Email)",
+  "description": "Writing or replying to an email in Outlook."
+ },
+ {
+  "signal": "Outlook/OutlookSidepane + EmailMessage + Read",
+  "behavior": "Email Summarising",
+  "useCase": "Triaging inbox, summarising threads, catching up after leave",
+  "valueOutcome": "Time Saved (Email)",
+  "description": "Reading emails in Outlook to summarise or sort them."
+ },
+ {
+  "signal": "TeamsMessage/TeamsChat/TeamsChannel + Post/CreateChat",
+  "behavior": "Teams Messaging",
+  "useCase": "Team coordination, quick decisions, status updates",
+  "valueOutcome": "Communication Time Saved",
+  "description": "Writing or posting a message in a Teams chat or channel."
+ },
+ {
+  "signal": "Event/TeamsMeeting + Read",
+  "behavior": "Meeting Prep",
+  "useCase": "Reviewing agendas, catching up on missed meetings, recap summaries",
+  "valueOutcome": "Time Saved (Meetings)",
+  "description": "Reading a meeting invite or calendar event to prepare or catch up."
+ },
+ {
+  "signal": "Action = mcp_MeetingManagement",
+  "behavior": "Meeting Scheduling",
+  "useCase": "Calendar management, finding availability, booking rooms",
+  "valueOutcome": "Communication Time Saved",
+  "description": "Booking meetings, finding free time or managing a calendar."
+ },
+ {
+  "signal": "Word AppHost + Post/Write/Create",
+  "behavior": "Document Drafting",
+  "useCase": "Reports, proposals, briefs, documentation",
+  "valueOutcome": "Content Output",
+  "description": "Writing or editing a document in Word."
+ },
+ {
+  "signal": "Word AppHost + docx/doc/rtf + Read",
+  "behavior": "Document Summarising",
+  "useCase": "Executive summaries, long doc digests, research synthesis",
+  "valueOutcome": "Time Saved (Documents)",
+  "description": "Reading a Word document to summarise it or answer questions about it."
+ },
+ {
+  "signal": "PowerPoint AppHost + Post/Write/Create",
+  "behavior": "Presentation Creation",
+  "useCase": "Slide decks, pitch materials, training content",
+  "valueOutcome": "Content Output",
+  "description": "Building or editing slides in PowerPoint."
+ },
+ {
+  "signal": "PowerPoint AppHost + pptx/ppt/potx + Read",
+  "behavior": "Presentation Summarising",
+  "useCase": "Deck reviews, extracting key points",
+  "valueOutcome": "Time Saved (Documents)",
+  "description": "Reading a PowerPoint deck to summarise it or pull out key points."
+ },
+ {
+  "signal": "Designer AppHost OR png/jpg/svg + Active",
+  "behavior": "Image Generation",
+  "useCase": "Marketing visuals, presentations, social content",
+  "valueOutcome": "Content Output",
+  "description": "Creating or editing an image, for example in Designer."
+ },
+ {
+  "signal": "png/jpg/gif + Read",
+  "behavior": "Image / Media Analysis",
+  "useCase": "Accessibility descriptions, content cataloguing, image review",
+  "valueOutcome": "Content Output",
+  "description": "Looking at an image to describe or review it."
+ },
+ {
+  "signal": "Stream AppHost + mp4/mov/StreamVideo",
+  "behavior": "Video Summarising",
+  "useCase": "Meeting recordings, training videos, podcast recaps",
+  "valueOutcome": "Time Saved (Meetings)",
+  "description": "Summarising or asking about a video or meeting recording."
+ },
+ {
+  "signal": "WebSearchQuery resource type",
+  "behavior": "Web Searching",
+  "useCase": "Market research, fact-checking, competitive analysis",
+  "valueOutcome": "Search Time Saved",
+  "description": "Searching the public web to answer a question."
+ },
+ {
+  "signal": "EnterpriseSearch plugin + aspx/ListItem",
+  "behavior": "Enterprise Searching",
+  "useCase": "Finding internal docs, policy lookup, knowledge retrieval",
+  "valueOutcome": "Search Time Saved",
+  "description": "Searching your organisation's own pages, lists and sites."
+ },
+ {
+  "signal": "PDF resource + Read",
+  "behavior": "PDF Analysis",
+  "useCase": "Contract review, report analysis, compliance checking",
+  "valueOutcome": "Search Time Saved",
+  "description": "Reading a PDF to summarise it or answer questions about it."
+ },
+ {
+  "signal": "SharePoint AppHost",
+  "behavior": "SharePoint Access",
+  "useCase": "Site browsing, file discovery, team content",
+  "valueOutcome": "Search Time Saved",
+  "description": "Finding or browsing team content in SharePoint."
+ },
+ {
+  "signal": "docx/pptx + Read (outside native app)",
+  "behavior": "File Retrieval",
+  "useCase": "Cross-referencing documents, gathering context in M365 Chat",
+  "valueOutcome": "Search Time Saved",
+  "description": "Pulling a Word or PowerPoint file into a chat for context."
+ },
+ {
+  "signal": "PeopleInferenceAnswer resource",
+  "behavior": "People Lookup",
+  "useCase": "Org navigation, finding experts, team-building",
+  "valueOutcome": "Search Time Saved",
+  "description": "Finding colleagues, experts or who works with whom."
+ },
+ {
+  "signal": "Excel AppHost + ExecuteDatasetQuery/GetItems/GetAllTables",
+  "behavior": "Data Querying",
+  "useCase": "Building reports, answering data questions, KPI tracking",
+  "valueOutcome": "Data-Driven Decisions",
+  "description": "Querying a dataset, list or table to answer a data question."
+ },
+ {
+  "signal": "Excel AppHost + Active actions",
+  "behavior": "Excel Assistance",
+  "useCase": "Formulas, formatting, ad-hoc analysis inside Excel",
+  "valueOutcome": "Spreadsheet Time Saved",
+  "description": "Getting help with formulas, formatting or analysis in Excel."
+ },
+ {
+  "signal": "xlsx/csv/xlsm + Read",
+  "behavior": "Spreadsheet Review",
+  "useCase": "Reviewing spreadsheets, validating numbers, light analysis",
+  "valueOutcome": "Spreadsheet Time Saved",
+  "description": "Reading a spreadsheet or CSV file to check or explain the numbers."
+ },
+ {
+  "signal": "py/js/java/tsx/jsx/css/php/sh + Active",
+  "behavior": "Code Writing",
+  "useCase": "Feature development, scripting, automation",
+  "valueOutcome": "Coding Capability",
+  "description": "Writing or changing code or scripts."
+ },
+ {
+  "signal": "py/sql/json/xml/yaml/yml + Read OR coding URLs (github, stackoverflow, etc.)",
+  "behavior": "Code Analysis",
+  "useCase": "Code review, debugging, understanding codebases",
+  "valueOutcome": "Coding Capability",
+  "description": "Reading code or developer websites to explain, review or debug code."
+ },
+ {
+  "signal": "Flow/Connector/http + Invoke",
+  "behavior": "Running a Workflow",
+  "useCase": "Automating approvals, notifications, data flows, Power Automate triggers",
+  "valueOutcome": "Workflow Triggered",
+  "description": "Starting an automated flow or connector."
+ },
+ {
+  "signal": "Workflow + LOB system",
+  "behavior": "Specialist / Line-of-Business Workflow",
+  "useCase": "Automating line-of-business systems (ServiceNow, Salesforce, Dynamics, Workday)",
+  "valueOutcome": "Workflow Triggered",
+  "description": "Running an automated flow in a business system such as ServiceNow, Salesforce, Dynamics or Workday."
+ },
+ {
+  "signal": "Workflow + email",
+  "behavior": "Email Workflow",
+  "useCase": "Automating email triage, routing, and response",
+  "valueOutcome": "Workflow Triggered",
+  "description": "Running an automated flow that sorts, routes or answers email."
+ },
+ {
+  "signal": "Workflow + calendar",
+  "behavior": "Meeting Workflow",
+  "useCase": "Automating scheduling, calendar, and meeting logistics",
+  "valueOutcome": "Workflow Triggered",
+  "description": "Running an automated flow that handles scheduling or meeting logistics."
+ },
+ {
+  "signal": "Workflow + data/report",
+  "behavior": "Data & Reporting Workflow",
+  "useCase": "Automating report generation, data refresh, and analytics delivery",
+  "valueOutcome": "Workflow Triggered",
+  "description": "Running an automated flow that refreshes data or produces a report."
+ },
+ {
+  "signal": "Workflow + document",
+  "behavior": "Document Workflow",
+  "useCase": "Automating document creation, filing, and collaboration",
+  "valueOutcome": "Workflow Triggered",
+  "description": "Running an automated flow that creates, files or shares documents."
+ },
+ {
+  "signal": "Workflow + task/approval",
+  "behavior": "Coordination Workflow",
+  "useCase": "Automating tasks, approvals, and team notifications",
+  "valueOutcome": "Workflow Triggered",
+  "description": "Running an automated flow that handles tasks, approvals or team notifications."
+ },
+ {
+  "signal": "Workflow + general",
+  "behavior": "General Workflow",
+  "useCase": "Automating multi-step business processes",
+  "valueOutcome": "Workflow Triggered",
+  "description": "Running an automated multi-step flow that fits no narrower group."
+ },
+ {
+  "signal": "OneNote AppHost",
+  "behavior": "Note Taking",
+  "useCase": "Meeting notes, personal knowledge management",
+  "valueOutcome": "Time Saved (Documents)",
+  "description": "Capturing or organising notes in OneNote."
+ },
+ {
+  "signal": "Forms AppHost",
+  "behavior": "Form / Survey Work",
+  "useCase": "Feedback collection, quizzes, data gathering",
+  "valueOutcome": "Team Collaboration",
+  "description": "Building a form, quiz or survey in Forms, or reviewing its answers."
+ },
+ {
+  "signal": "Planner AppHost + PlanId/TaskIds",
+  "behavior": "Task Management",
+  "useCase": "Sprint planning, task tracking, project coordination",
+  "valueOutcome": "Task Coordination",
+  "description": "Creating, tracking or updating tasks in Planner."
+ },
+ {
+  "signal": "Loop/Whiteboard/VivaEngage AppHost",
+  "behavior": "Real-time Collaboration",
+  "useCase": "Brainstorming, shared editing, team ideation",
+  "valueOutcome": "Team Collaboration",
+  "description": "Working on something together in Loop, Whiteboard or Viva Engage."
+ },
+ {
+  "signal": "Agent name: coach/mentor/learning/career OR learning URLs",
+  "behavior": "Coaching",
+  "useCase": "Writing coaching, prompt improvement, career guidance, training",
+  "valueOutcome": "Skills Development",
+  "description": "Using a coaching or learning agent to build skills or improve work."
+ },
+ {
+  "signal": "Agent name: research/analyst/analy/insight/intelligence",
+  "behavior": "Research & Analysis",
+  "useCase": "Market research, competitive analysis, data interpretation, trend spotting",
+  "valueOutcome": "Data-Driven Decisions",
+  "description": "Using a research or analyst agent to gather and make sense of information."
+ },
+ {
+  "signal": "Agent name: sales/commercial/customer/crm/revenue OR dynamics.com URLs",
+  "behavior": "Sales & Customer",
+  "useCase": "Sales intelligence, customer insights, deal support, CRM assistance",
+  "valueOutcome": "Revenue Enablement",
+  "description": "Using a sales or customer agent for accounts, deals or customer insight."
+ },
+ {
+  "signal": "Agent name: hr/recruit/talent/onboard/people OR description matches",
+  "behavior": "HR & People",
+  "useCase": "Job descriptions, candidate screening, onboarding guidance, policy Q&A",
+  "valueOutcome": "HR Process Automation",
+  "description": "Using an HR agent for hiring, onboarding or people questions."
+ },
+ {
+  "signal": "Agent name: policy/compliance/legal/audit/risk",
+  "behavior": "Compliance & Policy",
+  "useCase": "Policy lookup, compliance checking, risk assessment, audit support",
+  "valueOutcome": "Compliance & Risk",
+  "description": "Using a policy, legal or risk agent to check rules and compliance."
+ },
+ {
+  "signal": "Agent name: service/support/help/ticket/incident OR servicenow.com URLs",
+  "behavior": "IT & Service Desk",
+  "useCase": "IT troubleshooting, ticket creation, knowledge base queries",
+  "valueOutcome": "Service Desk Deflection",
+  "description": "Using an IT or service desk agent to fix a problem or raise a ticket."
+ },
+ {
+  "signal": "Agent name: summar/draft/translat/editor",
+  "behavior": "Content Generation",
+  "useCase": "Drafting communications, summarising documents, translation",
+  "valueOutcome": "Content Output",
+  "description": "Using a writing agent to draft, summarise or translate content."
+ },
+ {
+  "signal": "Agent name: data/report/dashboard/metric OR has code interpreter",
+  "behavior": "Data & Reporting",
+  "useCase": "Building reports, querying data, KPI tracking, dashboard creation",
+  "valueOutcome": "Data-Driven Decisions",
+  "description": "Using a data or reporting agent to query data or build a report."
+ },
+ {
+  "signal": "Agent name: knowledge/faq/wiki/buddy/guide OR has SharePoint access",
+  "behavior": "Knowledge Base",
+  "useCase": "Policy lookup, process guidance, FAQ resolution, documentation search",
+  "valueOutcome": "Search Time Saved",
+  "description": "Using a knowledge agent to answer questions from your organisation's guidance and documents."
+ },
+ {
+  "signal": "Agent name: idea/brainstorm/creative/design OR has image generation",
+  "behavior": "Ideation & Creative",
+  "useCase": "Brainstorming, design concepts, creative briefs, innovation workshops",
+  "valueOutcome": "Content Output",
+  "description": "Using a creative agent to brainstorm ideas or design concepts."
+ },
+ {
+  "signal": "Agent — no keyword/capability match",
+  "behavior": "General Assistance",
+  "useCase": "Unclassified agent interactions — review agent metadata for better categorisation",
+  "valueOutcome": "General AI Productivity",
+  "description": "Using an agent whose name and tools don't show what kind of work it did."
+ },
+ {
+  "signal": "AppHost = Copilot Studio",
+  "behavior": "Domain-Specific Agent",
+  "useCase": "Specialist agent built in Copilot Studio for one function",
+  "valueOutcome": "Specialist Expertise",
+  "description": "Using a specialist agent built in Copilot Studio."
+ },
+ {
+  "signal": "No specific resource/plugin/action signals matched",
+  "behavior": "General Chat",
+  "useCase": "General Q&A or conversational usage without document grounding",
+  "valueOutcome": "General AI Productivity",
+  "description": "Asking a question or chatting with AI, without a file, app or tool."
+ }
+]
