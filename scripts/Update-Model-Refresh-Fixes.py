@@ -4,9 +4,21 @@ Consumption Central (Fabric):
   * The partitions that read a Lakehouse table column by column buffer it first. Unbuffered, the
     SQL endpoint is queried once per column, which on a large tenant exhausts the connection pool.
 
+Consumption Central (all four variants: Fabric, Power Automate + Dataverse, Viva Direct, Local CSV):
+  * Refresh-time DAX that ranked every user against every other user is rewritten to give the
+    same results. The Group By table finds each percentile cut once with TOPN instead of RANKX
+    over every user for every user, and CreditsWeekly[Weeks Ago] drops a per-row CALCULATE.
+    CoworkBilling[UsageCohortRank] counts the smaller values instead of RANKX(ALL(...)): cheaper,
+    but still one scan of the table per row. CoworkBilling[UsageCohort] reads its bucket from
+    UsageCohortRank instead of ranking again. Weeks Active and Weeks Over Limit are unchanged.
+
 Agent Evaluator:
   * 'Agent Turns'[Response Seconds] scans its own conversation with FILTER(ALL(...)) instead of
     CALCULATE(..., ALLEXCEPT(...)), which ran out of memory on large transcript tables.
+  * Imported columns nothing reads are no longer loaded (UNUSED_IMPORTED_COLUMNS): error_message,
+    content_preview, the bot message and variable copies in Agent Performance. Agent Errors and
+    Agent Performance drop them with Table.RemoveColumns(..., MissingField.Ignore), so a source
+    without them still loads; Conversation Transcripts (Raw) no longer builds content_preview.
   * In Fabric mode the credit tables read credit_consumption_<name> when it has rows, else the
     Consumption Central add-on's studio_* tables (FabricCreditTable). Nothing in Fabric writes
     credit_consumption_*, so the Credit Consumption page used to stay empty.
@@ -35,6 +47,13 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 AGENT_EVALUATOR = Path("1. Fabric") / "Manual setup" / "Add Agent Evaluator" / "Agent Evaluator.pbit"
 CONSUMPTION = Path("1. Fabric") / "Manual setup" / "Add Credit Consumption" / "Consumption Central - Fabric.pbit"
+# The other Consumption Central variants share the Fabric model's DAX but not its Lakehouse queries.
+CONSUMPTION_VARIANTS = (
+    Path("3. Power Automate + Dataverse") / "Add Credit Consumption"
+    / "Consumption Central - Power Automate + Dataverse.pbit",
+    Path("4. SharePoint") / "Add Credit Consumption" / "Consumption Central - Viva Direct.pbit",
+    Path("5. Local CSV") / "Add Credit Consumption" / "Consumption Central - Local CSV.pbit",
+)
 MEMBERS = ("DataModelSchema", "UnappliedChanges")
 ZIP_METADATA = (
     "filename", "orig_filename", "date_time", "compress_type", "comment", "extra",
@@ -65,6 +84,128 @@ def buffered_raw(lakehouse_table):
 
 
 CONSUMPTION_QUERIES = {name: (buffered_raw(table),) for name, table in BUFFERED_TABLES.items()}
+
+# ---------------------------------------------------------------------------
+# Consumption Central: calculated columns and tables that ranked every user per user
+# ---------------------------------------------------------------------------
+
+COHORT_CUTS = (
+    ("50", "0.50"),
+    ("75", "0.75"),
+    ("90", "0.90"),
+    ("95", "0.95"),
+    ("99", "0.99"),
+)
+
+
+def cohort_rank(results):
+    rank = (
+        "VAR Rk = RANKX(ALL('CoworkBilling'), 'CoworkBilling'[MonthlyCreditsUsed],, ASC)",
+    )
+    exact = (
+        "// RANKX(ALL('CoworkBilling'), ..., ASC) re-ranked the whole table for every row. An",
+        "// ascending rank that skips ties is 1 + the number of rows with a smaller value.",
+        "VAR v = 'CoworkBilling'[MonthlyCreditsUsed]",
+        "VAR Rk = 1 + COUNTROWS(FILTER(ALL('CoworkBilling'), 'CoworkBilling'[MonthlyCreditsUsed] < v))",
+    )
+    rest = (
+        "VAR Tot = COUNTROWS(ALL('CoworkBilling'))",
+        "VAR P = DIVIDE(Rk, Tot)",
+        "RETURN SWITCH(TRUE(),",
+    ) + tuple(f"    P <= {cut}, {result}," for (_, cut), result in zip(COHORT_CUTS, results)) + (
+        f"    {results[-1]})",
+    )
+    return "\n".join(rank + rest), "\n".join(exact + rest)
+
+
+COHORT_LABELS = ('"1. Light"', '"2. Regular"', '"3. Engaged"', '"4. Native"', '"5. Power"', '"6. Frontier"')
+USAGE_COHORT_RANK_OLD, USAGE_COHORT_RANK = cohort_rank(("1", "2", "3", "4", "5", "6"))
+USAGE_COHORT_OLD, _ = cohort_rank(COHORT_LABELS)
+# Same percentile as UsageCohortRank, so read the bucket from it instead of ranking again.
+USAGE_COHORT = "\n".join(
+    ("SWITCH('CoworkBilling'[UsageCohortRank],",)
+    + tuple(f"    {rank}, {label}," for rank, label in enumerate(COHORT_LABELS[:-1], start=1))
+    + (f"    {COHORT_LABELS[-1]})",)
+)
+WEEKS_AGO_OLD = "\n".join((
+    "",
+    "VAR MaxWk = CALCULATE( MAX('CreditsWeekly'[MetricDate]), ALL('CreditsWeekly') )",
+    "RETURN DATEDIFF( 'CreditsWeekly'[MetricDate], MaxWk, DAY ) / 7",
+    "",
+))
+# A calculated column has no filter context, so MAX already sees every row; the CALCULATE
+# only added a context transition over the whole row for each of the table's rows.
+WEEKS_AGO = "\n".join((
+    "",
+    "VAR MaxWk = MAX('CreditsWeekly'[MetricDate])",
+    "RETURN DATEDIFF( 'CreditsWeekly'[MetricDate], MaxWk, DAY ) / 7",
+    "",
+))
+CONSUMPTION_COLUMNS = {
+    ("CoworkBilling", "UsageCohortRank"): (USAGE_COHORT_RANK_OLD, USAGE_COHORT_RANK),
+    ("CoworkBilling", "UsageCohort"): (USAGE_COHORT_OLD, USAGE_COHORT),
+    ("CreditsWeekly", "Weeks Ago"): (WEEKS_AGO_OLD, WEEKS_AGO),
+}
+
+GROUP_BY = "Group By"
+INTENSITY_LABELS = (
+    '"1. Light (Bottom 50%)"',
+    '"2. Regular (Top 25\u201350%)"',
+    '"3. Engaged (Top 10\u201325%)"',
+    '"4. Native (Top 5\u201310%)"',
+    '"5. Power (Top 1\u20135%)"',
+    '"6. Frontier (Top 1%)"',
+)
+
+
+def intensity_rows(product):
+    """Replace RANKX inside ADDCOLUMNS over the same table, which re-ranks every user per user."""
+    by_user = f"{product}ByUser"
+    tail = (
+        f'        "Attribute", "Usage Intensity ({product})",',
+        '        "Group", SWITCH( TRUE(),',
+        '            [@Used] <= 0, "0. Not used",',
+    )
+    old = (
+        f"VAR {product}Rows =",
+        "    SELECTCOLUMNS(",
+        "        ADDCOLUMNS(",
+        f"            {by_user},",
+        '            "@P", DIVIDE(',
+        f"                RANKX( {by_user}, [@Used], , ASC ),",
+        f"                COUNTROWS( {by_user} )",
+        "            )",
+        "        ),",
+    ) + tail + tuple(
+        f"            [@P] <= {cut}, {label}," for (_, cut), label in zip(COHORT_CUTS, INTENSITY_LABELS)
+    )
+    new = (
+        "// A user's ascending rank (ties skipped) is at most m exactly when their credits are",
+        "// at most the m-th smallest value. So for each cut k, find once the largest m with",
+        "// DIVIDE( m, N ) <= k and the m-th smallest value with TOPN, then compare each user",
+        "// to it. Same buckets as DIVIDE( RANKX( ... ), N ) <= k, without ranking per user.",
+        f"VAR {product}N = COUNTROWS( {by_user} )",
+        f"VAR {product}Steps = GENERATESERIES( 1, MAX( {product}N, 1 ) )",
+    ) + tuple(
+        f"VAR {product}M{name} = MAXX( FILTER( {product}Steps, DIVIDE( [Value], {product}N ) <= {cut} ), [Value] ) + 0"
+        for name, cut in COHORT_CUTS
+    ) + (
+        "// No m fits only when N = 1; the blank cut then fails every user past the <= 0 branch.",
+    ) + tuple(
+        f"VAR {product}T{name} = IF( {product}M{name} >= 1, "
+        f"MAXX( TOPN( {product}M{name}, {by_user}, [@Used], ASC ), [@Used] ) )"
+        for name, _ in COHORT_CUTS
+    ) + (
+        f"VAR {product}Rows =",
+        "    SELECTCOLUMNS(",
+        f"        {by_user},",
+    ) + tail + tuple(
+        f"            [@Used] <= {product}T{name}, {label}," for (name, _), label in zip(COHORT_CUTS, INTENSITY_LABELS)
+    )
+    return "\n".join(old), "\n".join(new)
+
+
+GROUP_BY_EDITS = (intensity_rows("Studio"), intensity_rows("GitHub"))
 
 # ---------------------------------------------------------------------------
 # Agent Evaluator
@@ -212,6 +353,15 @@ def credit_source(name):
     )
 
 
+AGENT_PERFORMANCE_UNREAD = (
+    "FirstBotMessage",
+    "LastBotMessage",
+    "Var_ESS_Message_Disclaimer",
+    "Var_ESS_UserContext_RefreshInterval_Hours",
+    "Var_ESS_UserContext_Conversation_Initialized",
+    "AllVariables",
+)
+
 AGENT_EVALUATOR_QUERIES = {
     "Credit Consumption (Agent)": (credit_source("agent"),),
     "Credit Consumption (User)": (credit_source("user"),),
@@ -225,6 +375,54 @@ AGENT_EVALUATOR_QUERIES = {
             "\tT = Table.FromRecords(Rows, type table [",
             "\t// Both key columns are relationship keys, so each must be unique.\n"
             "\tT = Table.FromRecords(AgentNameMapRows(Rows), type table [",
+        ),
+    ),
+    "Agent Errors": (
+        (
+            '    Typed = Table.TransformColumnTypes(Promoted, {\n'
+            '        {"conversation_id", type text},\n'
+            '        {"error_timestamp_utc", type datetime},\n'
+            '        {"error_code", type text},\n'
+            '        {"error_sub_code", type text},\n'
+            '        {"error_message", type text},\n',
+            "    // Nothing in the report reads error_message, so it isn't loaded.\n"
+            '    Kept = Table.RemoveColumns(Promoted, {"error_message"}, MissingField.Ignore),\n'
+            '    Typed = Table.TransformColumnTypes(Kept, {\n'
+            '        {"conversation_id", type text},\n'
+            '        {"error_timestamp_utc", type datetime},\n'
+            '        {"error_code", type text},\n'
+            '        {"error_sub_code", type text},\n',
+        ),
+    ),
+    "Agent Performance": (
+        (
+            "    ChangedTypes = Table.TransformColumnTypes(\n        PromotedHeaders,\n",
+            "    // Nothing in the report reads these, so they aren't loaded. Var_ESS_UserContext_UPN stays:\n"
+            "    // [Unique Users] counts it.\n"
+            "    Trimmed = Table.RemoveColumns(PromotedHeaders, {"
+            + ", ".join(f'"{c}"' for c in AGENT_PERFORMANCE_UNREAD)
+            + "}, MissingField.Ignore),\n"
+            "    ChangedTypes = Table.TransformColumnTypes(\n        Trimmed,\n",
+        ),
+    ),
+    "Conversation Transcripts (Raw)": (
+        (
+            '"content_length", "content_preview"}, {}),',
+            '"content_length"}, {}),',
+        ),
+        (
+            '                WithPrev = Table.AddColumn(WithLen, "content_preview", each if [content] = null then null'
+            ' else Text.Start(Text.From([content]), 500), type text),\n'
+            "                Ren = Table.RenameColumns(WithPrev, ",
+            "                Ren = Table.RenameColumns(WithLen, ",
+        ),
+        (
+            '"content_length", "content_preview"}, MissingField.UseNull)',
+            '"content_length"}, MissingField.UseNull)',
+        ),
+        (
+            '{"name", type text}, {"content_preview", type text}})',
+            '{"name", type text}})',
         ),
     ),
 }
@@ -377,7 +575,92 @@ def edit_response_seconds(document):
     return [f"{TURNS}[Response Seconds]"]
 
 
-def owned_mask_model(document, queries, functions, response_seconds):
+def calculated_partition_source(model, table_name):
+    table = one(model["tables"], table_name, "DataModelSchema tables")
+    partitions = table.get("partitions", [])
+    if len(partitions) != 1 or partitions[0]["source"].get("type") != "calculated":
+        raise ValueError(f"{table_name} is not a single-partition calculated table")
+    return partitions[0]["source"]
+
+
+def edit_consumption_dax(document):
+    changed = []
+    model = document["model"]
+    for (table_name, column_name), (old, new) in CONSUMPTION_COLUMNS.items():
+        table = one(model["tables"], table_name, "DataModelSchema tables")
+        column = one(table.get("columns", []), column_name, table_name)
+        if column.get("type") != "calculated":
+            raise ValueError(f"{table_name}[{column_name}] is not a calculated column")
+        current = joined(column["expression"])
+        if current == new:
+            continue
+        if current != old:
+            raise ValueError(f"{table_name}[{column_name}] has changed; review it before patching")
+        column["expression"] = lines(new)
+        changed.append(f"{table_name}[{column_name}]")
+    source = calculated_partition_source(model, GROUP_BY)
+    old = joined(source["expression"])
+    new = replace_snippets(GROUP_BY, old, GROUP_BY_EDITS)
+    if new != old:
+        source["expression"] = lines(new)
+        changed.append(GROUP_BY)
+    return changed
+
+
+def model_references(model, table_name, column_name):
+    """Where the model still uses a column: DAX text, sort-by, hierarchies, relationships."""
+    ref = f"[{column_name}]".lower()
+    uses = []
+    for table in model["tables"]:
+        for kind in ("columns", "measures"):
+            for item in table.get(kind, []):
+                if (table["name"], item["name"]) == (table_name, column_name):
+                    continue
+                if ref in joined(item.get("expression", "")).lower():
+                    uses.append(f"{table['name']}[{item['name']}]")
+                if kind == "columns" and table["name"] == table_name and item.get("sortByColumn") == column_name:
+                    uses.append(f"{table['name']}[{item['name']}] sort-by")
+        for partition in table.get("partitions", []):
+            if partition["source"].get("type") == "calculated" and ref in joined(
+                    partition["source"].get("expression", "")).lower():
+                uses.append(table["name"])
+        for hierarchy in table.get("hierarchies", []):
+            if table["name"] == table_name and any(level["column"] == column_name for level in hierarchy["levels"]):
+                uses.append(f"{table['name']} hierarchy {hierarchy['name']}")
+    for rel in model.get("relationships", []):
+        if (rel["fromTable"], rel["fromColumn"]) == (table_name, column_name) or (
+                rel["toTable"], rel["toColumn"]) == (table_name, column_name):
+            uses.append(f"relationship {rel['name']}")
+    return uses
+
+
+def edit_unused_columns(document):
+    changed = []
+    model = document["model"]
+    for table_name, column_name in UNUSED_IMPORTED_COLUMNS:
+        table = one(model["tables"], table_name, "DataModelSchema tables")
+        hits = [c for c in table.get("columns", []) if c["name"] == column_name]
+        if not hits:
+            continue
+        if hits[0].get("type", "data") != "data" or hits[0].get("sourceColumn") != column_name:
+            raise ValueError(f"{table_name}[{column_name}] is not an imported column")
+        uses = model_references(model, table_name, column_name)
+        if uses:
+            raise ValueError(f"{table_name}[{column_name}] is still used by {', '.join(uses)}")
+        table["columns"] = [c for c in table["columns"] if c["name"] != column_name]
+        changed.append(f"drop {table_name}[{column_name}]")
+    return changed
+
+
+# Imported columns nothing reads; AGENT_EVALUATOR_QUERIES stops loading them.
+UNUSED_IMPORTED_COLUMNS = (
+    ("Agent Errors", "error_message"),
+    *(("Agent Performance", name) for name in AGENT_PERFORMANCE_UNREAD),
+    ("Conversation Transcripts (Raw)", "content_preview"),
+)
+
+
+def owned_mask_model(document, queries, functions, dax):
     result = copy.deepcopy(document)
     model = result["model"]
     for name in queries:
@@ -385,8 +668,15 @@ def owned_mask_model(document, queries, functions, response_seconds):
     if functions:
         names = {name for name, _, _ in NEW_FUNCTIONS}
         model["expressions"] = [e for e in model["expressions"] if e["name"] not in names]
-    if response_seconds:
+    if dax == "agent-evaluator":
         one(one(model["tables"], TURNS, "tables")["columns"], "Response Seconds", TURNS)["expression"] = "<owned>"
+        for table_name, column_name in UNUSED_IMPORTED_COLUMNS:
+            table = one(model["tables"], table_name, "tables")
+            table["columns"] = [c for c in table["columns"] if c["name"] != column_name]
+    if dax == "consumption":
+        for table_name, column_name in CONSUMPTION_COLUMNS:
+            one(one(model["tables"], table_name, "tables")["columns"], column_name, table_name)["expression"] = "<owned>"
+        calculated_partition_source(model, GROUP_BY)["expression"] = "<owned>"
     return result
 
 
@@ -402,10 +692,11 @@ def owned_mask_pending(document, queries, functions):
     return result
 
 
+# (template, M query edits, add the Agent Evaluator functions, which model DAX edits apply)
 TARGETS = (
-    (AGENT_EVALUATOR, AGENT_EVALUATOR_QUERIES, True, True),
-    (CONSUMPTION, CONSUMPTION_QUERIES, False, False),
-)
+    (AGENT_EVALUATOR, AGENT_EVALUATOR_QUERIES, True, "agent-evaluator"),
+    (CONSUMPTION, CONSUMPTION_QUERIES, False, "consumption"),
+) + tuple((path, {}, False, "consumption") for path in CONSUMPTION_VARIANTS)
 
 # ---------------------------------------------------------------------------
 # Archive handling
@@ -440,7 +731,7 @@ def read_archive(data):
         return infos, {info.filename: archive.read(info) for info in infos}, archive.comment
 
 
-def build(original, queries, functions, response_seconds):
+def build(original, queries, functions, dax):
     infos, payloads, comment = read_archive(original)
     changed = []
 
@@ -449,11 +740,13 @@ def build(original, queries, functions, response_seconds):
     edits = edit_queries_model(model, queries)
     if functions:
         edits += edit_functions_model(model)
-    if response_seconds:
+    if dax == "agent-evaluator":
         edits += edit_response_seconds(model)
+        edits += edit_unused_columns(model)
+    elif dax == "consumption":
+        edits += edit_consumption_dax(model)
     if edits:
-        if owned_mask_model(before, queries, functions, response_seconds) != owned_mask_model(
-                model, queries, functions, response_seconds):
+        if owned_mask_model(before, queries, functions, dax) != owned_mask_model(model, queries, functions, dax):
             raise ValueError("unrelated DataModelSchema fields changed")
         payloads["DataModelSchema"] = encode_model(model)
         changed += [f"DataModelSchema {e}" for e in edits]
@@ -493,10 +786,10 @@ def main(argv=None):
     parser.add_argument("--check", action="store_true", help="report stale templates without writing")
     args = parser.parse_args(argv)
     stale = 0
-    for relative, queries, functions, response_seconds in TARGETS:
+    for relative, queries, functions, dax in TARGETS:
         path = ROOT / relative
         original = path.read_bytes()
-        rebuilt, changed = build(original, queries, functions, response_seconds)
+        rebuilt, changed = build(original, queries, functions, dax)
         if not changed:
             print(f"current  {relative}")
             continue

@@ -384,6 +384,8 @@ test('model: before the parser first runs, the empty fallbacks have the columns 
     return [...cols.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
   };
   const perf = fallback(bim.model, 'Agent Performance');
+  const perfText = [bim.model.tables.find((/** @type {any} */ t) => t.name === 'Agent Performance').partitions[0].source.expression].flat().join('\n');
+  assert.match(perfText, /Table\.RemoveColumns\(PromotedHeaders, \{[^}]*"AllVariables"[^}]*\}, MissingField\.Ignore\)/, 'drops columns nothing reads');
   for (const c of ['ConversationTranscriptId', 'SessionOutcomeExplicit', 'TotalTokenCount', 'ErrorCategory']) assert.ok(perf.includes(c), c);
   assert.ok(!perf.includes('InteractionDate'), 'columns the query adds itself stay out');
   assert.equal(new Set(perf).size, perf.length);

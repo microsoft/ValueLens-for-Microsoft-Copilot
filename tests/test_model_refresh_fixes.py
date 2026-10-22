@@ -60,11 +60,18 @@ def load_script():
 class ModelRefreshFixes(unittest.TestCase):
     def test_templates_are_current(self):
         script = load_script()
-        for relative, queries, functions, response_seconds in script.TARGETS:
+        for relative, queries, functions, dax in script.TARGETS:
             original = (ROOT / relative).read_bytes()
-            rebuilt, changed = script.build(original, queries, functions, response_seconds)
+            rebuilt, changed = script.build(original, queries, functions, dax)
             self.assertEqual(changed, [], relative)
             self.assertEqual(rebuilt, original, relative)
+
+    def test_every_consumption_central_variant_is_a_target(self):
+        script = load_script()
+        targets = {(ROOT / relative).resolve() for relative, _, _, dax in script.TARGETS if dax == "consumption"}
+        shipped = {path.resolve() for path in ROOT.glob("*/**/Consumption Central - *.pbit")}
+        self.assertEqual(len(shipped), 4)
+        self.assertEqual(targets, shipped)
 
     def test_pending_query_copies_match_the_model(self):
         for path in (AGENT_EVALUATOR, CONSUMPTION):
@@ -83,6 +90,59 @@ class ModelRefreshFixes(unittest.TestCase):
             for name, text in read.items():
                 self.assertRegex(text, r"Raw = let r = GetTable\(\"\w+\"\) in if r = null then null else Table\.Buffer\(r\),",
                                  (member, name))
+
+    def test_unread_agent_evaluator_imports_are_not_loaded(self):
+        script = load_script()
+        model, _ = members(AGENT_EVALUATOR)
+        tables = {t["name"]: {c["name"] for c in t.get("columns", [])} for t in model["tables"]}
+        dropped = script.UNUSED_IMPORTED_COLUMNS
+        self.assertEqual({c for _, c in dropped}, {
+            "error_message", "content_preview", "FirstBotMessage", "LastBotMessage", "AllVariables",
+            "Var_ESS_Message_Disclaimer", "Var_ESS_UserContext_RefreshInterval_Hours",
+            "Var_ESS_UserContext_Conversation_Initialized"})
+        for table_name, column_name in dropped:
+            self.assertIn(table_name, tables)
+            self.assertNotIn(column_name, tables[table_name])
+        with zipfile.ZipFile(AGENT_EVALUATOR) as archive:
+            report = "\n".join(archive.read(n).decode("utf-8", errors="ignore")
+                               for n in archive.namelist() if n.startswith("Report/definition/"))
+        self.assertRegex(report, r'"Property": ?"Unique Users"')
+        for _, column_name in dropped:
+            self.assertNotIn(column_name, report)
+
+        for member, queries in both_copies(AGENT_EVALUATOR):
+            errors = queries["Agent Errors"]
+            self.assertIn('Kept = Table.RemoveColumns(Promoted, {"error_message"}, MissingField.Ignore),', errors, member)
+            self.assertIn("Typed = Table.TransformColumnTypes(Kept, {", errors, member)
+            self.assertNotIn('{"error_message", type', errors, member)
+            perf = queries["Agent Performance"]
+            trimmed = re.search(r"Trimmed = Table\.RemoveColumns\(PromotedHeaders, \{([^}]*)\}, MissingField\.Ignore\),", perf)
+            self.assertIsNotNone(trimmed, member)
+            self.assertEqual(re.findall(r'"([^"]+)"', trimmed.group(1)), list(script.AGENT_PERFORMANCE_UNREAD), member)
+            self.assertIn("ChangedTypes = Table.TransformColumnTypes(\n        Trimmed,", perf, member)
+            self.assertEqual(perf.count("PromotedHeaders"), 2, member)
+            self.assertNotIn("content_preview", queries["Conversation Transcripts (Raw)"], member)
+            self.assertIn("Ren = Table.RenameColumns(WithLen, ", queries["Conversation Transcripts (Raw)"], member)
+
+    def test_unique_users_still_reads_the_upn_column(self):
+        script = load_script()
+        model, _ = members(AGENT_EVALUATOR)
+        perf = next(t for t in model["tables"] if t["name"] == "Agent Performance")
+        self.assertIn("Var_ESS_UserContext_UPN", {c["name"] for c in perf["columns"]})
+        self.assertNotIn("Var_ESS_UserContext_UPN", script.AGENT_PERFORMANCE_UNREAD)
+        measure = next(m for m in perf["measures"] if m["name"] == "Unique Users")
+        self.assertIn("'Agent Performance'[Var_ESS_UserContext_UPN]", joined(measure["expression"]))
+
+    def test_dropping_a_read_imported_column_is_refused(self):
+        script = load_script()
+        model, _ = members(AGENT_EVALUATOR)
+        original = script.UNUSED_IMPORTED_COLUMNS
+        try:
+            script.UNUSED_IMPORTED_COLUMNS = (("Agent Performance", "Var_ESS_UserContext_UPN"),)
+            with self.assertRaisesRegex(ValueError, "Unique Users"):
+                script.edit_unused_columns({"model": model})
+        finally:
+            script.UNUSED_IMPORTED_COLUMNS = original
 
     def test_response_seconds_does_not_use_allexcept(self):
         model, _ = members(AGENT_EVALUATOR)

@@ -212,8 +212,8 @@ export function buildAgentEvaluatorModel(template, settings) {
   return { compatibilityLevel: template.compatibilityLevel, model };
 }
 
-/** M steps that keep the Lakehouse table's columns as they are, apart from adding some. */
-const PASS_THROUGH_STEPS = new Set(['AddColumn', 'ColumnNames', 'HasColumns', 'TransformColumnTypes', 'TransformColumns']);
+/** M steps that keep the Lakehouse table's columns as they are, apart from adding some or dropping unread ones. */
+const PASS_THROUGH_STEPS = new Set(['AddColumn', 'ColumnNames', 'HasColumns', 'RemoveColumns', 'TransformColumnTypes', 'TransformColumns']);
 
 /**
  * Until the parser first runs, a table falls back to an empty one. Some of those lack columns the
