@@ -11,6 +11,7 @@ import { adminConsentUrl, apiPermissionsUrl, resolveAppRoles } from '../clients/
 import { secretMode } from '../config.js';
 import { HttpError } from '../http.js';
 import { commandLine } from '../launch.js';
+import { PRODUCT } from '../product.js';
 import { c } from '../ui.js';
 import { APP_NAME } from './plan.js';
 import { addTrackedSecret, adoptAttempts, promoteSecret, settleFailedSecret } from './secrets.js';
@@ -20,7 +21,7 @@ import { addTrackedSecret, adoptAttempts, promoteSecret, settleFailedSecret } fr
 export const SECRET_LIFETIME_MONTHS = 12;
 
 /** The Key Vault secret's name on the app, before the ref of the run that made it. */
-const VAULT_SECRET_LABEL = 'Analytics Hub installer';
+const VAULT_SECRET_LABEL = PRODUCT.installer;
 
 /** Without Key Vault the secret is readable in the workspace, so it lasts days, not months, and every run of the installer replaces it. */
 export const NOTEBOOK_SECRET_DAYS = 90;
@@ -315,7 +316,7 @@ export function handoffCommands(config, o = {}) {
   }
   lines.push(
     `az keyvault secret set --vault-name ${kv.name} --name ${kv.secretName} --content-type "Client secret for ${appId}" ` +
-      `--value "$(az ad app credential reset --id ${appId} --append --display-name "Analytics Hub" --years 1 --query password -o tsv)" --query id -o tsv`,
+      `--value "$(az ad app credential reset --id ${appId} --append --display-name "${PRODUCT.name}" --years 1 --query password -o tsv)" --query id -o tsv`,
   );
   return lines;
 }
@@ -435,7 +436,7 @@ export async function ensureApp(ctx) {
     app.objectId = application.id;
     app.displayName = application.displayName;
     try {
-      if (await api.graph.ensureRequiredAccess(application, roles)) ui.ok('Added the Analytics Hub permissions to its API permissions');
+      if (await api.graph.ensureRequiredAccess(application, roles)) ui.ok(`Added the ${PRODUCT.name} permissions to its API permissions`);
     } catch (err) {
       if (!isStatus(err, 403)) throw err;
       ui.warn(`You can't edit ${application.displayName}'s API permissions. An admin must add these Graph application permissions: ${roles.map((r) => r.value).join(', ')}.`);
@@ -813,7 +814,7 @@ export function reportAppCheck(ctx, check, who = {}) {
   // Someone who can grant consent gets it granted during the install.
   if (check.unconsented.length && !who.canConsent) missing.push(`Admin consent for: ${check.unconsented.join(', ')}`);
   if (!missing.length) {
-    ui.ok(`${check.displayName ?? appId} has everything Analytics Hub needs`);
+    ui.ok(`${check.displayName ?? appId} has everything ${PRODUCT.name} needs`);
     return true;
   }
   ui.warn(`${check.displayName ?? appId} isn't ready yet. It still needs:`);
@@ -824,7 +825,7 @@ export function reportAppCheck(ctx, check, who = {}) {
   return false;
 }
 
-export const ADMIN_PACK_FILE = 'analytics-hub-admin-pack.md';
+export const ADMIN_PACK_FILE = PRODUCT.adminPack;
 
 /**
  * The steps an admin runs to register the app for someone who can't: an Azure Cloud Shell
@@ -862,13 +863,13 @@ export function adminPack(ctx) {
       `  echo "${kv.name} already has a secret called ${kv.secretName} for another app. Ask the installer user to choose another secret name."`,
       'else',
       `  az keyvault secret set --vault-name ${kv.name} --name ${kv.secretName} --content-type "${ours}" ` +
-        '--value "$(az ad app credential reset --id "$APP_ID" --append --display-name "Analytics Hub" --years 1 --query password -o tsv)" --query id -o tsv',
+        `--value "$(az ad app credential reset --id "$APP_ID" --append --display-name "${PRODUCT.name}" --years 1 --query password -o tsv)" --query id -o tsv`,
       'fi',
     );
   } else {
     script.push(
       '# The client secret. Send it with the client ID through a secure channel, never by plain email or chat:',
-      'az ad app credential reset --id "$APP_ID" --append --display-name "Analytics Hub" --years 1 --query password -o tsv',
+      `az ad app credential reset --id "$APP_ID" --append --display-name "${PRODUCT.name}" --years 1 --query password -o tsv`,
     );
   }
   const checklist = [
@@ -894,9 +895,9 @@ export function writeAdminPack(ctx) {
   const { script, checklist } = adminPack(ctx);
   const file = join(ctx.configFile ? dirname(ctx.configFile) : process.cwd(), ADMIN_PACK_FILE);
   const body = [
-    '# Analytics Hub: register the app',
+    `# ${PRODUCT.name}: register the app`,
     '',
-    'The person setting up Analytics Hub can\'t register apps or grant admin consent in this tenant.',
+    `The person setting up ${PRODUCT.name} can't register apps or grant admin consent in this tenant.`,
     'Run the script, or follow the portal steps, then send them the client ID.',
     '',
     '## Azure Cloud Shell (Bash)',

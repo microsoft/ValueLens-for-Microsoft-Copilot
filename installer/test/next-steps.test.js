@@ -16,7 +16,7 @@ function installed(answers = /** @type {any[]} */ ([])) {
   const fake = fakeUi({ answers });
   const t = fakeCtx({ ui: fake.ui, fabric: fakeFabric().api });
   t.config.access = { groupId: 'g-1', groupName: VIEWER_GROUP_NAME, contact: 'admin@contoso.com', createdGroup: true };
-  t.config.fabric.workspaceName = 'Analytics Hub';
+  t.config.fabric.workspaceName = 'ValueLens';
   return { ...t, ...fake };
 }
 
@@ -103,11 +103,11 @@ test('summary: what is left comes first, as cards, before the next steps', async
 test("summary: after a failed step it says the setup is partly done, not set up", async () => {
   const t = installed();
   await summary(t.ctx);
-  assert.match(t.text(), /Analytics Hub is set up/);
+  assert.match(t.text(), /ValueLens is set up/);
   const p = installed();
   await summary(p.ctx, { ok: false });
-  assert.match(p.text(), /Analytics Hub is partly set up/);
-  assert.doesNotMatch(p.text(), /Analytics Hub is set up/);
+  assert.match(p.text(), /ValueLens is partly set up/);
+  assert.doesNotMatch(p.text(), /ValueLens is set up/);
   assert.match(p.text(), /run the installer again/);
 });
 

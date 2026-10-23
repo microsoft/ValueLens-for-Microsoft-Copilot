@@ -14,6 +14,7 @@ import { isConnected } from '../clients/connections.js';
 import { orgUrl } from '../clients/dataverse.js';
 import { flowIdentity, secretMode } from '../config.js';
 import { commandLine } from '../launch.js';
+import { PRODUCT } from '../product.js';
 import {
   AGENT_INVENTORY_DIR,
   AGENT_INVENTORY_FLOW_NAME,
@@ -44,8 +45,8 @@ import { ensureWorkspaceRole } from './model.js';
 
 const MAKER = 'https://make.powerautomate.com/';
 export const FLOW_FILES = /** @type {Record<FlowKind, string>} */ ({
-  feedback: 'analytics-hub-feedback-flow.json',
-  agents: 'analytics-hub-agent-inventory-flow.json',
+  feedback: PRODUCT.flows.feedbackFile,
+  agents: PRODUCT.flows.agentInventoryFile,
 });
 
 /** @type {Record<FlowKind, string>} */
@@ -165,12 +166,12 @@ export function flowDefinitions(config, tenantId) {
   return {
     feedback: {
       name: FEEDBACK_FLOW_NAME,
-      description: `Saves product feedback exports emailed with the subject "${FEEDBACK_SUBJECT}" to ${where}. Created by the Analytics Hub installer.`,
+      description: `Saves product feedback exports emailed with the subject "${FEEDBACK_SUBJECT}" to ${where}. Created by the ${PRODUCT.installer}.`,
       definition: nameByConnection(feedbackFlowDefinition(t), t),
     },
     agents: {
       name: AGENT_INVENTORY_FLOW_NAME,
-      description: `Saves the Power Platform inventory of Copilot Studio agents, environments and agent flows to ${inventoryWhere} each day, for when Azure Resource Graph won't return agents. The inventory API takes delegated sign-ins only, so its connection signs in as a Power Platform or Global Reader-type administrator. Created by the Analytics Hub installer.`,
+      description: `Saves the Power Platform inventory of Copilot Studio agents, environments and agent flows to ${inventoryWhere} each day, for when Azure Resource Graph won't return agents. The inventory API takes delegated sign-ins only, so its connection signs in as a Power Platform or Global Reader-type administrator. Created by the ${PRODUCT.installer}.`,
       definition: nameByConnection(agentInventoryFlowDefinition(t, schedule, AGENT_INVENTORY_DIR), t),
     },
   };
@@ -304,7 +305,7 @@ function missingConnection(err) {
 function writeFlowFile(ctx, kind, name, definition) {
   const { ui, config } = ctx;
   const file = join(ctx.configFile ? dirname(ctx.configFile) : process.cwd(), FLOW_FILES[kind]);
-  const note = `Written by the Analytics Hub installer because the flow couldn't be created. In Power Automate, create an automated or scheduled cloud flow, open it in the code view (or use the Power Automate Management connector) and paste "definition". Then sign in to its connections: ${labels(connectorsUsed(definition))}.`;
+  const note = `Written by the ${PRODUCT.installer} because the flow couldn't be created. In Power Automate, create an automated or scheduled cloud flow, open it in the code view (or use the Power Automate Management connector) and paste "definition". Then sign in to its connections: ${labels(connectorsUsed(definition))}.`;
   try {
     writeFileSync(file, `${JSON.stringify(flowFile(name, definition, note), null, 2)}\n`);
     config.uploads.flowFiles = { ...config.uploads.flowFiles, [kind]: file };
@@ -319,12 +320,12 @@ function writeFlowFile(ctx, kind, name, definition) {
  * The names of the connections the installer makes. Cleaning up only ever deletes these.
  */
 export const CONNECTION_NAMES = {
-  ppApi: 'Analytics Hub - Power Platform API',
-  oneLake: 'Analytics Hub - OneLake',
+  ppApi: PRODUCT.flows.platformConnection,
+  oneLake: PRODUCT.flows.oneLakeConnection,
 };
-const OWNED_NAME = /^Analytics Hub - (Power Platform API|OneLake)$/;
+const OWNED_NAMES = new Set(Object.values(CONNECTION_NAMES));
 /** Whether a connection's display name is one the installer gives. @param {string | undefined} name */
-export const isOwnedConnectionName = (name) => OWNED_NAME.test(name ?? '');
+export const isOwnedConnectionName = (name) => OWNED_NAMES.has(name ?? '');
 
 /**
  * The name of the connection the installer makes for a connection reference, if it makes one.

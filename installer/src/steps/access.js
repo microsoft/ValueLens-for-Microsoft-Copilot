@@ -1,9 +1,10 @@
 // @ts-check
 /**
- * Who can view Analytics Hub: one Entra security group, whose members get Build on the semantic
+ * Who can view ValueLens: one Entra security group, whose members get Build on the semantic
  * model the report reads. Sharing is then adding people to the group, from the installer or My Groups.
  */
 import { HttpError } from '../http.js';
+import { PRODUCT } from '../product.js';
 import { rlsOn } from '../transform/access.js';
 import { asksAdvanced } from './advanced.js';
 import { orgAccessCommand } from './org-access.js';
@@ -11,8 +12,8 @@ import { orgAccessCommand } from './org-access.js';
 /** @typedef {import('../install.js').Ctx} Ctx */
 /** @typedef {{ workspaceId: string, datasetId: string, name: string }} ModelRef */
 
-export const VIEWER_GROUP_NAME = 'Analytics Hub Viewers';
-const GROUP_DESCRIPTION = 'People who can view Analytics Hub. Add members to share it.';
+export const VIEWER_GROUP_NAME = PRODUCT.viewerGroup;
+const GROUP_DESCRIPTION = `People who can view ${PRODUCT.name}. Add members to share it.`;
 
 /** Where a group's owners add and remove members themselves. @param {string} groupId */
 export const myGroupsUrl = (groupId) => `https://myaccount.microsoft.com/groups/${groupId}`;
@@ -46,7 +47,7 @@ export async function planAccess(ctx) {
   const access = { ...(config.access ?? {}) };
   access.contact = await contactInTenant(ctx, access.contact);
   if (!asksAdvanced(ctx)) {
-    // The saved group, or a new "Analytics Hub Viewers"; Manage access changes it later.
+    // The saved group, or a new viewer group; Manage access changes it later.
     if (!access.groupId) access.groupName = access.createdGroup ? access.groupName ?? VIEWER_GROUP_NAME : VIEWER_GROUP_NAME;
     access.contact ??= user.upn;
     config.access = access;
@@ -54,7 +55,7 @@ export async function planAccess(ctx) {
   }
   ui.heading('Who can view');
   const mode = await ui.select(
-    'Who can view Analytics Hub?',
+    `Who can view ${PRODUCT.name}?`,
     [
       { name: `A new group, "${VIEWER_GROUP_NAME}" (recommended)`, value: 'new', description: 'Created with you as owner. Share by adding people to it.' },
       { name: 'A group I already have', value: 'existing', description: 'A security group, by name or object ID. Its members can view.' },
@@ -94,7 +95,7 @@ export function accessReview(config, where) {
   // You may not own a group you picked. You own one the installer creates.
   const owners = a.groupId && !a.createdGroup ? 'Its owners share it by adding people to it.' : 'You are its owner; share by adding people to it.';
   return {
-    creates: [{ kind: 'Entra group', name, isNew: !a.groupId, detail: `Who can view Analytics Hub. ${owners}` }],
+    creates: [{ kind: 'Entra group', name, isNew: !a.groupId, detail: `Who can view ${PRODUCT.name}. ${owners}` }],
     grants: [{ who: `${name} (group)`, what: 'Build (ReadExplore)', where, detail: 'So its members can view the report.' }],
   };
 }

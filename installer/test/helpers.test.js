@@ -11,7 +11,7 @@ import { help, parseCli } from '../src/cli.js';
 import { allowsAction, armLocation, parseResourceId, validateVaultName } from '../src/clients/azure.js';
 import { notebookDefinition, notebookJobParameters, scheduleBody } from '../src/clients/fabric.js';
 import { resolveAppRoles } from '../src/clients/graph.js';
-import { emptyConfig, loadConfig, saveConfig } from '../src/config.js';
+import { AH_CONFIG_FILE, AH_RELEASES, DEFAULT_CONFIG_FILE, emptyConfig, foreignRecord, loadConfig, saveConfig } from '../src/config.js';
 import { bundled, CLOUD_SHELL_ENV, commandLine, EXE_ENV, fromExe, inCloudShell, INSTALLED_NODE_ENV, installerWindow, LAUNCHER_ENV, launcher, reopenHint, SCRIPT_COMMAND, SCRIPT_URL, updateHint } from '../src/launch.js';
 import { describeSchedule, sameSchedule } from '../src/steps/fabric.js';
 import { addDays, addMonths, notebookSecretDays } from '../src/steps/identity.js';
@@ -355,7 +355,7 @@ test('parseCli: commands, sign-in methods and validation', () => {
   assert.equal(d.method, 'browser');
   assert.equal(d.wait, true);
   assert.equal(d.yes, false);
-  assert.match(d.configFile, /valuelens-install\.json$/);
+  assert.match(d.configFile, /valuelens-setup\.json$/);
 
   const r = parseCli(['run', '--backfill-days', '30', '--use-az', '-y', '--no-wait', '--config', 'x.json']);
   assert.equal(r.command, 'run');
@@ -378,7 +378,7 @@ test('parseCli: commands, sign-in methods and validation', () => {
 });
 
 test('install record round-trips, fills defaults and refuses secrets', () => {
-  const file = join(dir, 'valuelens-install.json');
+  const file = join(dir, 'valuelens-setup.json');
   assert.equal(loadConfig(file).existed, false);
 
   const config = emptyConfig();
@@ -390,7 +390,7 @@ test('install record round-trips, fills defaults and refuses secrets', () => {
   assert.equal(existed, true);
   assert.deepEqual(back, config);
 
-  writeFileSync(file, JSON.stringify({ version: 1, schedule: { time: '05:00' }, modules: { agent365: true } }));
+  writeFileSync(file, JSON.stringify({ product: 'valuelens', version: 1, schedule: { time: '05:00' }, modules: { agent365: true } }));
   const partial = loadConfig(file).config;
   assert.equal(partial.schedule.time, '05:00');
   assert.equal(partial.schedule.frequency, 'daily');
@@ -402,13 +402,38 @@ test('install record round-trips, fills defaults and refuses secrets', () => {
   assert.throws(() => saveConfig(file, leaky), /Refusing to keep a secret/);
   assert.equal(JSON.parse(readFileSync(file, 'utf8')).schedule.time, '05:00', 'the old record is untouched');
 
-  writeFileSync(file, JSON.stringify({ version: 2 }));
+  writeFileSync(file, JSON.stringify({ product: 'valuelens', version: 2 }));
   assert.throws(() => loadConfig(file), /version 2/);
   writeFileSync(file, '{not json');
   assert.throws(() => loadConfig(file), /not valid JSON/);
 
-  writeFileSync(file, JSON.stringify({ version: 1, modules: { orgData: false } }));
+  writeFileSync(file, JSON.stringify({ product: 'valuelens', version: 1, modules: { orgData: false } }));
   assert.equal(loadConfig(file).config.modules.orgData, true, 'org data is always collected, even in older records');
+});
+
+test("install record: another installer's record is refused and left as it is", () => {
+  const file = join(dir, 'valuelens-setup.json');
+  /**
+   * @param {string} text
+   * @param {RegExp} why
+   */
+  const refused = (text, why) => {
+    writeFileSync(file, text);
+    assert.throws(() => loadConfig(file), why, text);
+    assert.equal(readFileSync(file, 'utf8'), text, `${text} is left as it is`);
+  };
+  // Analytics Hub's records, and those from this repo's earlier installer, have no product.
+  refused(JSON.stringify({ version: 1, tenantId: 't', fabric: { workspaceId: 'w', notebooks: {} } }), /is an Analytics Hub install record, or one from this repo's earlier installer/);
+  refused(JSON.stringify({ version: 1 }), new RegExp(`Analytics Hub installer \\(${AH_RELEASES.replace(/[.]/g, '\\.')}\\)`));
+  refused(JSON.stringify({ product: 'consumption-central', version: 1 }), /the install record of another installer \("consumption-central"\)/);
+  refused(JSON.stringify({ product: 'ValueLens', version: 1 }), /another installer \("ValueLens"\)/);
+  for (const text of ['[]', '"valuelens"', '42', 'null', JSON.stringify({ product: 7, version: 1 })]) refused(text, /isn't an install record/);
+  assert.throws(() => loadConfig(file), /pass --config with a new file name/);
+
+  assert.equal(foreignRecord(emptyConfig(), file), undefined);
+  assert.equal(emptyConfig().product, 'valuelens');
+  assert.equal(DEFAULT_CONFIG_FILE, 'valuelens-setup.json');
+  assert.notEqual(DEFAULT_CONFIG_FILE, AH_CONFIG_FILE, "the Analytics Hub installer's record has its own name");
 });
 
 test('messages name the exe when it started the installer', () => {
@@ -416,12 +441,12 @@ test('messages name the exe when it started the installer', () => {
   assert.equal(fromExe({}), false);
   assert.equal(fromExe({ [EXE_ENV]: '0' }), false);
   assert.equal(fromExe(exe), true);
-  assert.equal(commandLine('status', {}), 'valuelens-install status');
-  assert.equal(commandLine('status', exe), 'AnalyticsHubInstaller.exe status');
-  assert.equal(commandLine('', exe), 'AnalyticsHubInstaller.exe');
+  assert.equal(commandLine('status', {}), 'valuelens-installer status');
+  assert.equal(commandLine('status', exe), 'ValueLensInstaller.exe status');
+  assert.equal(commandLine('', exe), 'ValueLensInstaller.exe');
   assert.equal(installerWindow({}), 'your terminal');
   assert.equal(installerWindow(exe), 'the installer window');
-  assert.match(help(), /Usage: (valuelens-install|AnalyticsHubInstaller\.exe) \[command\] \[options\]/);
+  assert.match(help(), /Usage: (valuelens-installer|ValueLensInstaller\.exe) \[command\] \[options\]/);
 });
 
 test('messages name the PowerShell command when install.ps1 started the installer', () => {
@@ -433,22 +458,22 @@ test('messages name the PowerShell command when install.ps1 started the installe
   assert.equal(bundled(pwsh), true);
   assert.equal(bundled({ [EXE_ENV]: '1' }), true);
   assert.equal(bundled({}), false);
-  assert.equal(commandLine('status', pwsh), '& $env:LOCALAPPDATA\\AnalyticsHub\\analytics-hub.cmd status');
+  assert.equal(commandLine('status', pwsh), '& $env:LOCALAPPDATA\\ValueLens\\valuelens.cmd status');
   assert.equal(installerWindow(pwsh), 'the PowerShell window');
-  assert.match(reopenHint(pwsh), /analytics-hub\.cmd in PowerShell/);
-  assert.match(reopenHint({ [EXE_ENV]: '1' }), /AnalyticsHubInstaller\.exe/);
-  assert.match(reopenHint({}), /valuelens-install --ui/);
-  assert.match(updateHint('https://example.test/r', pwsh), /irm https:\/\/github\.com\/microsoft\/AnalyticsHub-Dashboard\/releases\/latest\/download\/install\.ps1 \| iex/);
+  assert.match(reopenHint(pwsh), /valuelens\.cmd in PowerShell/);
+  assert.match(reopenHint({ [EXE_ENV]: '1' }), /ValueLensInstaller\.exe/);
+  assert.match(reopenHint({}), /valuelens-installer --ui/);
+  assert.match(updateHint('https://example.test/r', pwsh), /irm https:\/\/github\.com\/microsoft\/ValueLens-for-Microsoft-Copilot\/releases\/latest\/download\/install\.ps1 \| iex/);
   assert.equal(updateHint('https://example.test/r', {}), 'Download it from https://example.test/r, then choose Repair or change.');
   assert.equal(SCRIPT_COMMAND, `irm ${SCRIPT_URL} | iex`);
 });
 
 test('messages keep -UseInstalledNode when install.ps1 ran the installer with the installed Node.js', () => {
   const installed = { [LAUNCHER_ENV]: 'pwsh', [INSTALLED_NODE_ENV]: '1' };
-  assert.equal(INSTALLED_NODE_ENV, 'ANALYTICS_HUB_USE_INSTALLED_NODE');
+  assert.equal(INSTALLED_NODE_ENV, 'VALUELENS_USE_INSTALLED_NODE');
   assert.equal(bundled(installed), true, "the app is still the zip's prebuilt one");
-  assert.ok(reopenHint(installed).includes(`"$env:ANALYTICS_HUB_USE_INSTALLED_NODE = '1'; ${SCRIPT_COMMAND}" again`));
-  assert.ok(updateHint('https://example.test/r', installed).includes(`"$env:ANALYTICS_HUB_USE_INSTALLED_NODE = '1'; ${SCRIPT_COMMAND}" again in PowerShell`));
+  assert.ok(reopenHint(installed).includes(`"$env:VALUELENS_USE_INSTALLED_NODE = '1'; ${SCRIPT_COMMAND}" again`));
+  assert.ok(updateHint('https://example.test/r', installed).includes(`"$env:VALUELENS_USE_INSTALLED_NODE = '1'; ${SCRIPT_COMMAND}" again in PowerShell`));
   assert.doesNotMatch(reopenHint({ [LAUNCHER_ENV]: 'pwsh' }), /INSTALLED_NODE/);
   assert.doesNotMatch(reopenHint({ [LAUNCHER_ENV]: 'cloudshell', [INSTALLED_NODE_ENV]: '1' }), /INSTALLED_NODE/);
   assert.doesNotMatch(reopenHint({ [EXE_ENV]: '1', [INSTALLED_NODE_ENV]: '1' }), /INSTALLED_NODE/);
@@ -466,9 +491,9 @@ test('in Azure Cloud Shell: noticed from its environment, with commands for its 
   assert.equal(inCloudShell({ [CLOUD_SHELL_ENV]: '0', ACC_CLOUD: 'PROD' }), false, 'the override wins');
   assert.equal(launcher(cs), 'cloudshell');
   assert.equal(bundled(cs), false, 'it runs from source, so it builds the app');
-  assert.equal(commandLine('status', cs), '~/.analytics-hub/analytics-hub status');
+  assert.equal(commandLine('status', cs), '~/.valuelens/valuelens status');
   assert.equal(installerWindow(cs), 'Cloud Shell');
-  assert.match(reopenHint(cs), /~\/\.analytics-hub\/analytics-hub in Cloud Shell/);
+  assert.match(reopenHint(cs), /~\/\.valuelens\/valuelens in Cloud Shell/);
   assert.match(updateHint('https://example.test/r', cs), /install\.ps1 \| iex" again in Cloud Shell's PowerShell/);
 });
 

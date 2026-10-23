@@ -1,12 +1,12 @@
 {
-  "name": "valuelens-fabric-installer",
-  "version": "0.6.8-rc.2",
-  "description": "Analytics Hub installer. Sets up the ValueLens data pipeline in Microsoft Fabric: app registration, Key Vault secret, workspace, Lakehouse, notebooks, pipeline, schedule and first load.",
+  "name": "valuelens-installer",
+  "version": "0.1.0",
+  "description": "ValueLens installer. Sets up ValueLens for Microsoft Copilot on Microsoft Fabric (app registration, Key Vault secret, workspace, Lakehouse, notebooks, pipeline, schedule and first load), or without Fabric with PAX and SharePoint.",
   "license": "MIT",
   "private": true,
   "type": "module",
   "bin": {
-    "valuelens-install": "bin/valuelens-install.js"
+    "valuelens-installer": "bin/valuelens-installer.js"
   },
   "files": [
     "bin",
@@ -16,7 +16,7 @@
     "node": ">=20.12"
   },
   "scripts": {
-    "start": "node bin/valuelens-install.js",
+    "start": "node bin/valuelens-installer.js",
     "build:exe": "node packaging/build-exe.js",
     "test": "node --test",
     "typecheck": "tsc -p jsconfig.json"

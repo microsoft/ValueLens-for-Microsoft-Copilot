@@ -34,7 +34,7 @@ export { BUSY_RETRIES, BUSY_WAIT_MS };
 const STUCK_MS = 24 * 3_600_000;
 
 /**
- * Evaluates the few pipeline expressions the Analytics Hub pipeline uses: `pipeline().parameters.X`,
+ * Evaluates the few pipeline expressions the installer's pipeline uses: `pipeline().parameters.X`,
  * `if`, `equals`, `not`, `and`, `or`, `string`, and number, string and boolean literals.
  * @param {string} text  With or without the leading `@`.
  * @param {Record<string, any>} params

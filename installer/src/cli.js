@@ -1,14 +1,15 @@
 // @ts-check
 /** Command-line entry point. */
 import { readFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { AZ_LOGIN } from './auth.js';
 import { orgUrl } from './clients/dataverse.js';
-import { archiveConfig, DEFAULT_CONFIG_FILE, loadConfig, normaliseResourceGraph } from './config.js';
+import { AH_CONFIG_FILE, archiveConfig, DEFAULT_CONFIG_FILE, loadConfig, normaliseResourceGraph } from './config.js';
 import { HttpError } from './http.js';
 import { connect, createCtx, preview, runCommand } from './install.js';
 import { adoptUploadedRecord, cloudShellKeepsFiles, cloudShellRecordMessage, commandLine, inCloudShell } from './launch.js';
+import { PRODUCT } from './product.js';
 import { runWizard } from './server.js';
 import { loadSources } from './sources.js';
 import { recordWorkspaceGone, staleRecordMessage } from './steps/fabric.js';
@@ -21,13 +22,13 @@ import { DATA_SOURCE_IDS, modulesFromSources, parseDataFlags } from './uploads.j
 const COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'status', 'rotate-secret', 'access', 'upload', 'uninstall', 'prereqs', 'preview'];
 
 /** The `--help` text, naming the command the way it was started. */
-export const help = () => `Sets up Analytics Hub in Microsoft Fabric: the data pipeline, the semantic model and the report.
+export const help = () => `Sets up ${PRODUCT.name} in Microsoft Fabric: the data pipeline, the semantic model and the report.
 
 Usage: ${commandLine('[command] [options]')}
        ${commandLine('--ui [options]')}
 
 Commands:
-  install          Set up Analytics Hub, or repair it from the install record (default)
+  install          Set up ${PRODUCT.name}, or repair it from the install record (default)
   update           Push the notebooks, pipeline and semantic model from this checkout to Fabric
   run              Run the pipeline now, then the data check
   rerun-failed     Run again only the loads that failed in the latest pipeline run
@@ -311,7 +312,7 @@ export async function main(argv) {
     const sources = loadSources(args.sourceDir);
     applyDataFlags(config, args);
 
-    ui.line(c.bold(`Analytics Hub installer ${version()}`));
+    ui.line(c.bold(`${PRODUCT.name} installer ${version()}`));
     if (args.command === 'preview') {
       preview({ ui, config, sources, outDir: args.outDir });
       return 0;
@@ -319,6 +320,9 @@ export async function main(argv) {
     if (args.command !== 'install' && args.command !== 'prereqs' && !existed) throw new Error(`No install record at ${args.configFile}. Run the installer first, or pass --config.`);
     if (uploaded) ui.note(`Moved the install record you uploaded from ${uploaded}.`);
     if (existed) ui.note(`Install record: ${args.configFile}`);
+    else if (existsSync(join(dirname(args.configFile), AH_CONFIG_FILE))) {
+      ui.note(`${AH_CONFIG_FILE} in this folder is the Analytics Hub installer's record. This installer leaves it, and what it set up, alone.`);
+    }
     if (args.cloudShell && args.command !== 'prereqs') {
       ui.note('Azure Cloud Shell signs you out after 20 minutes without input. If that stops the installer, run the same command again: it carries on from the install record. --no-wait saves waiting for the first load.');
     }

@@ -44,17 +44,17 @@ const fabricThat = (getWorkspace) => ({ getWorkspace: async (/** @type {string} 
 
 test('record: archiving renames it beside itself with the date and time, and never overwrites', () =>
   inDir((dir) => {
-    const file = join(dir, 'valuelens-install.json');
+    const file = join(dir, 'valuelens-setup.json');
     saveConfig(file, record());
     const at = new Date(2026, 4, 7, 9, 3, 2);
     const to = archiveConfig(file, at);
-    assert.equal(to, join(dir, 'valuelens-install.20260507-090302.json'));
+    assert.equal(to, join(dir, 'valuelens-setup.20260507-090302.json'));
     assert.ok(!existsSync(file));
     assert.equal(loadConfig(to).config.fabric.workspaceId, 'ws-1');
 
     saveConfig(file, record());
-    assert.equal(archiveConfig(file, at), join(dir, 'valuelens-install.20260507-090302-2.json'));
-    assert.deepEqual(readdirSync(dir).sort(), ['valuelens-install.20260507-090302-2.json', 'valuelens-install.20260507-090302.json']);
+    assert.equal(archiveConfig(file, at), join(dir, 'valuelens-setup.20260507-090302-2.json'));
+    assert.deepEqual(readdirSync(dir).sort(), ['valuelens-setup.20260507-090302-2.json', 'valuelens-setup.20260507-090302.json']);
   }));
 
 /** @param {string} code */
@@ -62,7 +62,7 @@ const locked = (code) => Object.assign(new Error(code), { code });
 
 test('record: a rename blocked for a moment (a synced folder) is retried', () =>
   inDir((dir) => {
-    const file = join(dir, 'valuelens-install.json');
+    const file = join(dir, 'valuelens-setup.json');
     let calls = 0;
     /** @type {number[]} */
     const waits = [];
@@ -74,24 +74,24 @@ test('record: a rename blocked for a moment (a synced folder) is retried', () =>
     assert.equal(calls, 3);
     assert.deepEqual(waits, [100, 200]);
     assert.equal(loadConfig(file).config.fabric.workspaceId, 'ws-1');
-    assert.deepEqual(readdirSync(dir), ['valuelens-install.json']);
+    assert.deepEqual(readdirSync(dir), ['valuelens-setup.json']);
   }));
 
 test('record: a rename that stays blocked writes the record in place, so progress is kept', () =>
   inDir((dir) => {
-    const file = join(dir, 'valuelens-install.json');
+    const file = join(dir, 'valuelens-setup.json');
     saveConfig(file, emptyConfig());
     let calls = 0;
     const rename = () => { calls++; throw locked('EBUSY'); };
     saveConfig(file, record(), { rename, wait: () => {}, tries: 3 });
     assert.equal(calls, 3);
     assert.equal(loadConfig(file).config.fabric.workspaceId, 'ws-1');
-    assert.deepEqual(readdirSync(dir), ['valuelens-install.json']);
+    assert.deepEqual(readdirSync(dir), ['valuelens-setup.json']);
   }));
 
 test('record: any other rename error is not retried', () =>
   inDir((dir) => {
-    const file = join(dir, 'valuelens-install.json');
+    const file = join(dir, 'valuelens-setup.json');
     let calls = 0;
     const rename = () => { calls++; throw locked('ENOSPC'); };
     assert.throws(() => saveConfig(file, record(), { rename, wait: () => {} }), /ENOSPC/);
@@ -100,7 +100,7 @@ test('record: any other rename error is not retried', () =>
 
 test("record: a save that doesn't read back as written fails, so no step counts as done", () =>
   inDir((dir) => {
-    const file = join(dir, 'valuelens-install.json');
+    const file = join(dir, 'valuelens-setup.json');
     assert.throws(() => saveConfig(file, record(), { read: () => '{}\n' }), /didn't save: it reads back different/);
     saveConfig(file, record(), { read: (f) => readFileSync(f, 'utf8') });
     assert.equal(loadConfig(file).config.fabric.workspaceId, 'ws-1');
@@ -108,13 +108,13 @@ test("record: a save that doesn't read back as written fails, so no step counts 
 
 test('record: the access command saving while the install waits on its first load keeps its changes when the install saves after it', () =>
   inDir((dir) => {
-    const file = join(dir, 'valuelens-install.json');
+    const file = join(dir, 'valuelens-setup.json');
     // The install: a new record, then the viewer group.
     const install = loadConfig(file).config;
     Object.assign(install, { tenantId: 'tenant-1' });
-    Object.assign(install.fabric, { workspaceId: 'ws-1', workspaceName: 'Analytics Hub', lakehouseId: 'lh-1' });
+    Object.assign(install.fabric, { workspaceId: 'ws-1', workspaceName: 'ValueLens', lakehouseId: 'lh-1' });
     saveConfig(file, install);
-    install.access = { groupId: 'group-1', groupName: 'Analytics Hub Viewers', contact: 'admin@contoso.com', createdGroup: true, grantedModels: [] };
+    install.access = { groupId: 'group-1', groupName: 'ValueLens Viewers', contact: 'admin@contoso.com', createdGroup: true, grantedModels: [] };
     const access = install.access;
     saveConfig(file, install);
     // The first load starts; the install waits for it, for hours on a large tenant.
@@ -149,9 +149,9 @@ test('record: the access command saving while the install waits on its first loa
 
 test('record: when two commands change the same field the later save wins; a field the other removed stays removed', () =>
   inDir((dir) => {
-    const file = join(dir, 'valuelens-install.json');
+    const file = join(dir, 'valuelens-setup.json');
     const first = loadConfig(file).config;
-    first.access = { groupId: 'group-1', groupName: 'Analytics Hub Viewers', contact: 'admin@contoso.com' };
+    first.access = { groupId: 'group-1', groupName: 'ValueLens Viewers', contact: 'admin@contoso.com' };
     first.uploads.flowIds = { feedback: 'flow-1' };
     saveConfig(file, first);
 
@@ -169,14 +169,14 @@ test('record: when two commands change the same field the later save wins; a fie
       assert.equal(config.schedule.time, '03:00');
       assert.equal(config.history.days, 90);
       assert.equal(config.access?.contact, 'helpdesk@contoso.com');
-      assert.equal(config.access?.groupName, 'Analytics Hub Viewers');
+      assert.equal(config.access?.groupName, 'ValueLens Viewers');
       assert.equal(config.uploads.flowIds, undefined);
     }
   }));
 
 test('record: a record saved to another file, such as the setup draft, is written as it is', () =>
   inDir((dir) => {
-    const file = join(dir, 'valuelens-install.json');
+    const file = join(dir, 'valuelens-setup.json');
     const draft = `${file}.draft.json`;
     const live = loadConfig(file).config;
     saveConfig(draft, live);
@@ -190,7 +190,7 @@ test('record: a record saved to another file, such as the setup draft, is writte
 
 test("record: a half-written record from another command is waited for; if it stays unreadable, this command's changes are saved", () =>
   inDir((dir) => {
-    const file = join(dir, 'valuelens-install.json');
+    const file = join(dir, 'valuelens-setup.json');
     saveConfig(file, record());
     const install = loadConfig(file).config;
     const other = loadConfig(file).config;
@@ -254,7 +254,7 @@ test('record: only a definite not-found, or another tenant, makes the workspace 
  * @param {string} [tenantId]
  */
 function session(dir, getWorkspace, tenantId = 'tenant-1') {
-  const configFile = join(dir, 'valuelens-install.json');
+  const configFile = join(dir, 'valuelens-setup.json');
   saveConfig(configFile, record());
   const ui = createWebUi({ now: () => 1000 });
   /** @type {any} */
@@ -279,7 +279,7 @@ test('web session: a workspace that has gone stops the command, and the home pag
     const fresh = s.startFresh();
     assert.equal(fresh.ok, true);
     const archived = /** @type {{ archived: string }} */ (fresh).archived;
-    assert.match(archived, /valuelens-install\.\d{8}-\d{6}\.json$/);
+    assert.match(archived, /valuelens-setup\.\d{8}-\d{6}\.json$/);
     assert.ok(existsSync(archived) && !existsSync(configFile));
     const st = s.state();
     assert.equal(st.record, null, 'the home page is a fresh install');
@@ -336,7 +336,7 @@ test('web session: start fresh waits for a running command, and works with no re
 
 test('terminal: install offers to start fresh, other commands and --yes stop and say how', () =>
   inDir(async (dir) => {
-    const file = join(dir, 'valuelens-install.json');
+    const file = join(dir, 'valuelens-setup.json');
     const missing = fabricThat(async () => { throw httpError(404); });
 
     saveConfig(file, record());
@@ -344,7 +344,7 @@ test('terminal: install offers to start fresh, other commands and --yes stop and
     assert.equal(await startFresh({ ui: yes.ui, config: record(), file, fabric: missing, tenantId: 'tenant-1', command: 'install' }), true);
     assert.match(yes.asked[0], /^Start fresh\? The old install record is kept/);
     assert.match(yes.text(), /This workspace no longer exists: "Analytics"/);
-    assert.match(yes.text(), /The old install record is now .*valuelens-install\.\d{8}-\d{6}\.json/);
+    assert.match(yes.text(), /The old install record is now .*valuelens-setup\.\d{8}-\d{6}\.json/);
     assert.ok(!existsSync(file));
 
     saveConfig(file, record());
@@ -404,8 +404,8 @@ test('Cloud Shell: without a storage account, the end of a run says how to downl
   const home = mkdtempSync(join(tmpdir(), 'ah-cs-'));
   try {
     assert.equal(cloudShellKeepsFiles(home), false);
-    const msg = cloudShellRecordMessage(join(home, 'analytics-hub', 'valuelens-install.json'), home);
-    assert.match(msg, /Manage files > Download and enter analytics-hub[\\/]valuelens-install\.json\./);
+    const msg = cloudShellRecordMessage(join(home, 'valuelens', 'valuelens-setup.json'), home);
+    assert.match(msg, /Manage files > Download and enter valuelens[\\/]valuelens-setup\.json\./);
     assert.match(msg, /Manage files > Upload, then run the installer again\./);
     mkdirSync(join(home, 'clouddrive'));
     assert.equal(cloudShellKeepsFiles(home), true);
@@ -417,19 +417,19 @@ test('Cloud Shell: without a storage account, the end of a run says how to downl
 test('Cloud Shell: an uploaded install record is moved to where the installer looks', () => {
   const home = mkdtempSync(join(tmpdir(), 'ah-cs-'));
   try {
-    const file = join(home, 'analytics-hub', 'valuelens-install.json');
+    const file = join(home, 'valuelens', 'valuelens-setup.json');
     assert.equal(adoptUploadedRecord(file, home), undefined);
 
-    writeFileSync(join(home, 'valuelens-install.json'), '{"installId":"up"}');
-    assert.equal(adoptUploadedRecord(file, home), join(home, 'valuelens-install.json'));
+    writeFileSync(join(home, 'valuelens-setup.json'), '{"installId":"up"}');
+    assert.equal(adoptUploadedRecord(file, home), join(home, 'valuelens-setup.json'));
     assert.equal(readFileSync(file, 'utf8'), '{"installId":"up"}');
-    assert.equal(existsSync(join(home, 'valuelens-install.json')), false);
+    assert.equal(existsSync(join(home, 'valuelens-setup.json')), false);
 
     // A record already in place wins over a later upload, which stays put.
-    writeFileSync(join(home, 'valuelens-install.json'), '{"installId":"old"}');
+    writeFileSync(join(home, 'valuelens-setup.json'), '{"installId":"old"}');
     assert.equal(adoptUploadedRecord(file, home), undefined);
     assert.equal(readFileSync(file, 'utf8'), '{"installId":"up"}');
-    assert.equal(existsSync(join(home, 'valuelens-install.json')), true);
+    assert.equal(existsSync(join(home, 'valuelens-setup.json')), true);
   } finally {
     rmSync(home, { recursive: true, force: true });
   }

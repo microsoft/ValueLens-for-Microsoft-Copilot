@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The install record, `valuelens-install.json`. It holds IDs and choices so a
+ * The install record, `valuelens-setup.json`. It holds IDs and choices so a
  * re-run picks up where the last one stopped. It never holds a secret.
  */
 import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -8,13 +8,18 @@ import { resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { normaliseModules } from './catalog.js';
 import { normaliseReporting } from './currency.js';
+import { PRODUCT } from './product.js';
 import { normaliseDataSources } from './uploads.js';
 
 export const CONFIG_VERSION = 1;
-export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
+export const DEFAULT_CONFIG_FILE = PRODUCT.recordFile;
+/** The Analytics Hub installer's record, which this installer never reads or changes. */
+export const AH_CONFIG_FILE = 'valuelens-install.json';
+export const AH_RELEASES = 'https://github.com/microsoft/AnalyticsHub-Dashboard/releases';
 
 /**
  * @typedef {object} InstallConfig
+ * @property {string} product  Which installer the record belongs to: always PRODUCT.id.
  * @property {number} version
  * @property {'fabric'} [target]
  * @property {string} [tenantId]
@@ -30,7 +35,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @property {{ capacityId?: string, workspaceId?: string, workspaceName?: string, lakehouseId?: string, lakehouseName?: string, notebooks: Partial<Record<import('./catalog.js').NotebookKey, string>>, notebookNames?: Partial<Record<import('./catalog.js').NotebookKey, string>>, notebookHashes?: Partial<Record<import('./catalog.js').NotebookKey, string>>, pipelineId?: string, pipelineName?: string, pipelineModules?: string, pipelineVersion?: number, scheduleId?: string, vaultEndpointId?: string,  deployedRouter?: string, secretInNotebooks?: boolean, createdWorkspace?: boolean, pendingItems?: Record<string, { name: string, ref: string, at?: string, operation?: string }> }} fabric  pendingItems: the name and description ref of each item being created, and when, so a run stopped mid-create finds that item again and nothing else. operation: Fabric's URL for the create once it accepted it, to ask how it went.
   * @property {{ jobId?: string, status?: string, startedAt?: string, finishedAt?: string }} [firstRun]
   * @property {SemanticModelConfig} semanticModel
-  * @property {AccessConfig} [access]  Who can view Analytics Hub. Absent until the installer has set it up.
+  * @property {AccessConfig} [access]  Who can view ValueLens. Absent until the installer has set it up.
   * @property {ResourceGraphConfig} resourceGraph
   * @property {{ completed: string[], runFirstLoad?: boolean, reloadHistoryDays?: number, baseRevision?: string, approved?: boolean, uploads?: { token?: string, name: string }[] }} [setup] Browser setup draft progress; never contains secrets. runFirstLoad and reloadHistoryDays are kept only in the draft, never in the install record.
  */
@@ -46,7 +51,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  */
 
 /**
- * The one Entra group whose members can view Analytics Hub.
+ * The one Entra group whose members can view ValueLens.
  * @typedef {object} AccessConfig
  * @property {string} [groupId]
  * @property {string} [groupName]
@@ -171,12 +176,13 @@ export const flowIdentity = (config) => (config.uploads?.flowIdentity === 'app' 
  */
 
 // Names for items a new install creates. An existing install keeps the names saved in its record.
-export const MODEL_NAME = 'Analytics Hub Model';
-export const REPORT_NAME = 'ValueLens';
+export const MODEL_NAME = PRODUCT.fabric.model;
+export const REPORT_NAME = PRODUCT.fabric.report;
 
 /** @returns {InstallConfig} */
 export function emptyConfig() {
   return {
+    product: PRODUCT.id,
     version: CONFIG_VERSION,
     target: 'fabric',
     modules: normaliseModules(undefined),
@@ -185,7 +191,7 @@ export function emptyConfig() {
     history: { days: 30 },
     schedule: { frequency: 'daily', time: '02:00', weekday: 'Sunday', timeZone: 'UTC' },
     app: {},
-    keyVault: { secretName: 'valuelens-client-secret' },
+    keyVault: { secretName: `${PRODUCT.id}-client-secret` },
     fabric: { notebooks: {} },
     semanticModel: { name: MODEL_NAME },
     resourceGraph: { managementGroup: '', agents: true, foundry: true },
@@ -218,12 +224,31 @@ export function loadConfig(file) {
 }
 
 /**
+ * Why a record from another installer is refused, or undefined for one of this installer's.
+ * Records from the Analytics Hub installer, and from the installer this repo shipped before
+ * Analytics Hub moved to its own repo, have no `product`.
+ * @param {any} raw
+ * @param {string} file
+ */
+export function foreignRecord(raw, file) {
+  if (raw?.product === PRODUCT.id) return undefined;
+  const another = `To set up ${PRODUCT.name} separately, run this installer in another folder or pass --config with a new file name.`;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.product === undefined) {
+    return `${file} is an Analytics Hub install record, or one from this repo's earlier installer, so this installer leaves it alone. Manage that install with the Analytics Hub installer (${AH_RELEASES}). ${another}`;
+  }
+  if (typeof raw?.product === 'string') return `${file} is the install record of another installer ("${raw.product}"), so this installer leaves it alone. ${another}`;
+  return `${file} isn't an install record. ${another}`;
+}
+
+/**
  * A record as read from disk, with the defaults for anything it doesn't have yet.
  * @param {any} raw
  * @param {string} file
  * @returns {InstallConfig}
  */
 function normaliseConfig(raw, file) {
+  const foreign = foreignRecord(raw, file);
+  if (foreign) throw new Error(foreign);
   if (raw.version !== CONFIG_VERSION) throw new Error(`${file} has version ${raw.version}; this installer reads version ${CONFIG_VERSION}.`);
   const base = emptyConfig();
   /** @type {InstallConfig} */
@@ -430,7 +455,7 @@ export function saveConfig(file, config, io = {}) {
 
 /**
  * Sets an install record aside so the next install starts fresh. It's renamed beside itself, as
- * `valuelens-install.<yyyyMMdd-HHmmss>.json`, so nothing in it is lost.
+ * `valuelens-setup.<yyyyMMdd-HHmmss>.json`, so nothing in it is lost.
  * A synced folder can hold the file for a moment, so the rename is retried like saveConfig's.
  * @param {string} file
  * @param {Date} [now]

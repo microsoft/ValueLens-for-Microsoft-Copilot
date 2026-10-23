@@ -22,7 +22,7 @@ function setup(o = {}) {
   config.semanticModel.enabled = true;
   config.semanticModel.reports = true;
   const made = fakeCtx({ ui: ui.ui, fabric: fabric.api, config });
-  const model = fabric.add('SemanticModel', 'Analytics Hub Model', null);
+  const model = fabric.add('SemanticModel', 'ValueLens Model', null);
   config.semanticModel.id = model.id;
   return { ...made, fabric, ui, model };
 }
@@ -127,7 +127,7 @@ test('deployReport: a redeployed model is picked up without asking; a deleted re
   await deployReport(t.ctx, w);
   const r = /** @type {import('../src/config.js').ReportConfig} */ (t.config.semanticModel.report);
 
-  const model = t.fabric.add('SemanticModel', 'Analytics Hub Model 2', null);
+  const model = t.fabric.add('SemanticModel', 'ValueLens Model 2', null);
   t.config.semanticModel.id = model.id;
   await deployReport(t.ctx, w);
   assert.deepEqual(t.fabric.calls.slice(1), ['updateReport ValueLens']);

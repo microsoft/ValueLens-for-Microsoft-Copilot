@@ -256,13 +256,13 @@ test('Entra role: a Global Administrator gives the app Global Reader once, and t
   const ui = fakeUi();
   const { ctx, config } = fakeCtx({ graph: graph.api, ui: ui.ui });
   turnOn(config);
-  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'Analytics Hub Data Collector', appId: 'app-1' }), 'assigned');
+  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'ValueLens (Fabric)', appId: 'app-1' }), 'assigned');
   assert.deepEqual(graph.calls, ['list sp-1', 'mine', `assign sp-1 ${GLOBAL_READER_ROLE}`]);
   assert.equal(config.resourceGraph.roleAssigned, AGENT_ROLE);
-  assert.match(ui.text(), /Gave Analytics Hub Data Collector the Global Reader Entra role/);
+  assert.match(ui.text(), /Gave ValueLens \(Fabric\) the Global Reader Entra role/);
 
   graph.calls.length = 0;
-  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'Analytics Hub Data Collector' }), 'has');
+  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'ValueLens (Fabric)' }), 'has');
   assert.deepEqual(graph.calls, [], 'a repair trusts the record');
   assert.deepEqual(resourceGraphGrants(config, 'tenant-1', 'App', { canAssign: true }).filter((g) => /Entra/.test(g.what)), [], 'nothing left to give');
 });
@@ -291,7 +291,7 @@ test('Entra role: without the rights, the steps for an admin, with the app\'s ob
   const ui = fakeUi();
   const { ctx, config } = fakeCtx({ graph: graph.api, ui: ui.ui });
   turnOn(config);
-  const who = { id: 'sp-1', name: 'Analytics Hub Data Collector', appId: 'app-1' };
+  const who = { id: 'sp-1', name: 'ValueLens (Fabric)', appId: 'app-1' };
   assert.equal(await ensureAgentDirectoryRole(ctx, who), 'handoff');
   assert.ok(!graph.calls.some((c) => c.startsWith('assign')), 'not tried without the rights');
   assert.equal(config.resourceGraph.roleAssigned, undefined);

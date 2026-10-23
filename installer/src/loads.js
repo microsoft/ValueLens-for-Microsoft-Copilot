@@ -292,7 +292,7 @@ function innerName(activities, name) {
 /**
  * Puts the rerun instruction into a fix text, capitalised at the start of a sentence.
  * @param {string} text
- * @param {string} phrase  e.g. `run "AnalyticsHubInstaller.exe rerun-failed"`.
+ * @param {string} phrase  e.g. `run "ValueLensInstaller.exe rerun-failed"`.
  */
 export function fillRerun(text, phrase) {
   const cap = phrase.charAt(0).toUpperCase() + phrase.slice(1);

@@ -378,7 +378,7 @@ test('ensureFlows: a repair moves an app flow to the user identity, turning it o
   assert.ok(refs.shared_webcontents && !isBound(refs.shared_webcontents));
   assert.equal(refs.shared_keyvault, undefined);
   assert.equal(dv.flows.get('flow-2').statecode, 0);
-  assert.match(text(), /so Analytics Hub - Agent inventory was replaced\. Sign in to all its connections again .*HTTP with Microsoft Entra ID \(preauthorized\), for OneLake.*Then turn it on\./);
+  assert.match(text(), /so ValueLens - Agent inventory was replaced\. Sign in to all its connections again .*HTTP with Microsoft Entra ID \(preauthorized\), for OneLake.*Then turn it on\./);
 });
 
 test('ensureFlows: a changed flow with nothing signed in to yet is replaced, not patched (FlowMissingConnection)', async () => {
@@ -395,7 +395,7 @@ test('ensureFlows: a changed flow with nothing signed in to yet is replaced, not
   assert.deepEqual(dv.calls.slice(1), [`deleteFlow ${AGENT_INVENTORY_FLOW_NAME}`, `createFlow ${AGENT_INVENTORY_FLOW_NAME}`]);
   assert.equal(config.uploads.flowIds?.agents, 'flow-2');
   assert.equal(dv.flows.size, 1);
-  assert.match(text(), /Replaced the flow Analytics Hub - Agent inventory with the new version/);
+  assert.match(text(), /Replaced the flow ValueLens - Agent inventory with the new version/);
   assert.doesNotMatch(text(), /Couldn't create the flow/);
 });
 
@@ -442,7 +442,7 @@ test('ensureFlows: when the flow can\'t be created, it is written to a file to i
   const dv = fakeDataverse(true);
   const { ui, text } = fakeUi();
   const { ctx, config } = fakeCtx({ ui, fabric: fabric.api, dataverse: () => dv.api });
-  ctx.configFile = join(tmp, 'valuelens-install.json');
+  ctx.configFile = join(tmp, 'valuelens-setup.json');
   config.dataSources.productFeedback = 'api';
   config.uploads = { flowEnvironment: { url: 'https://org1.crm.dynamics.com' } };
 
@@ -586,8 +586,8 @@ test('connections client: create, sign-in link, list, look up and delete in the 
   assert.equal(isConnected({ name: 'x', properties: { statuses: [{ status: 'Connected' }] } }), true);
   assert.equal(isConnected({ name: 'x', properties: { statuses: [{ status: 'Error', error: { code: 'Unauthenticated' } }] } }), false);
   assert.equal(isConnected(undefined), false);
-  assert.equal(isOwnedConnectionName('Analytics Hub - OneLake'), true);
-  assert.equal(isOwnedConnectionName('Analytics Hub - OneLake (copy)'), false);
+  assert.equal(isOwnedConnectionName('ValueLens - OneLake'), true);
+  assert.equal(isOwnedConnectionName('ValueLens - OneLake (copy)'), false);
   assert.equal(isOwnedConnectionName('HTTP with Microsoft Entra ID'), false);
 });
 
@@ -602,8 +602,8 @@ test('ensureFlows: makes the two connections with their URLs, one sign-in link e
   assert.ok(conns.calls.includes(`consentLink shared-webcontents-1 ${PAGE}`));
   const out = text();
   assert.equal(out.match(/https:\/\/consent\.example\//g)?.length, 2, 'one sign-in link per connection');
-  assert.match(out, /Analytics Hub - Power Platform API.*sign in as a Power Platform administrator\./);
-  assert.match(out, /Analytics Hub - OneLake.*sign in as someone with Contributor or higher on Analytics/);
+  assert.match(out, /ValueLens - Power Platform API.*sign in as a Power Platform administrator\./);
+  assert.match(out, /ValueLens - OneLake.*sign in as someone with Contributor or higher on Analytics/);
   assert.match(out, /your browser blocked the pop-up: allow pop-ups for make\.powerautomate\.com/);
   assert.match(out, /Premium connector: whoever signs in, and you as the flows' owner, need a Power Automate Premium licence/);
   assert.deepEqual(asked, ['Signed in to the connections?']);
@@ -614,7 +614,7 @@ test('ensureFlows: makes the two connections with their URLs, one sign-in link e
   assert.equal(dv.flows.get('flow-1').statecode, 1);
   assert.deepEqual(config.uploads.flowsConnected, { agents: 'flow-1' });
   assert.deepEqual(config.uploads.flowConnections, { shared_webcontents: 'shared-webcontents-1', shared_webcontents_storage: 'shared-webcontents-2' });
-  assert.match(out, /Pointed Analytics Hub - Agent inventory at its connections and turned it on/);
+  assert.match(out, /Pointed ValueLens - Agent inventory at its connections and turned it on/);
   assert.doesNotMatch(out, /To finish/);
   assert.ok(!conns.calls.some((x) => x.startsWith('remove')));
 
@@ -641,8 +641,8 @@ test('ensureFlows: "Do this later" leaves the flow off with its steps, and the n
   const out = text();
   assert.match(out, /run ".*update" to point the flows at them and turn them on/);
   assert.match(out, /To finish .*Agent inventory.* in Power Automate:/);
-  assert.match(out, /Or pick the connection "Analytics Hub - Power Platform API" the installer made, once it's signed in to\./);
-  assert.match(out, /Or pick the connection "Analytics Hub - OneLake" the installer made/);
+  assert.match(out, /Or pick the connection "ValueLens - Power Platform API" the installer made, once it's signed in to\./);
+  assert.match(out, /Or pick the connection "ValueLens - OneLake" the installer made/);
   assert.match(out, /5\. Save, then turn it on\./);
 
   conns.signIn('shared-webcontents-1');
@@ -667,8 +667,8 @@ test('ensureFlows: --yes gives the links without waiting; checking gives up afte
   await ensureFlows(ctx);
   assert.equal(sleeps.filter((ms) => ms === CONNECT_POLL_MS).length, CONNECT_POLLS);
   assert.equal(asked.length, 2);
-  assert.match(text(), /Not signed in to yet: Analytics Hub - Power Platform API, Analytics Hub - OneLake\./);
-  assert.ok(text().includes(`${PAGE} (find "Analytics Hub - OneLake" and click Fix connection)`), 'no consent link: the Connections page instead');
+  assert.match(text(), /Not signed in to yet: ValueLens - Power Platform API, ValueLens - OneLake\./);
+  assert.ok(text().includes(`${PAGE} (find "ValueLens - OneLake" and click Fix connection)`), 'no consent link: the Connections page instead');
 });
 
 test('ensureFlows: reuses signed-in connections by name, and deletes only its own unsigned, unused ones', async () => {
@@ -728,7 +728,7 @@ test('ensureFlows: when the connections can\'t be made or bound, it says so and 
   const { ui, text } = fakeUi({ answers: ['check'] });
   const { ctx, config } = connectCtx({ ui, conns, failSet: true });
   await ensureFlows(ctx);
-  assert.match(text(), /Couldn't turn on Analytics Hub - Agent inventory \(400 InvalidConnection\)/);
+  assert.match(text(), /Couldn't turn on ValueLens - Agent inventory \(400 InvalidConnection\)/);
   assert.equal(config.uploads.flowsConnected, undefined);
   assert.match(text(), /To finish .*Agent inventory/);
 });

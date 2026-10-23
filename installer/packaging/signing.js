@@ -1,9 +1,9 @@
 // @ts-check
 /**
- * What a published AnalyticsHubInstaller.exe has to pass: its Authenticode signature, the
- * SHA-256 file next to it and the release notes. Shared by finish-exe.js, the installer-exe
+ * What a published ValueLensInstaller.exe has to pass: its Authenticode signature, the
+ * SHA-256 file next to it and the release notes. Shared by finish-exe.js, the valuelens-installer-exe
  * workflow and the ESRP signing pipeline, so each checks the same way. Those run it without
- * `npm ci`, so it imports nothing outside Node.js, src/launch.js and script.js.
+ * `npm ci`, so it imports nothing outside Node.js, src/launch.js and script.js, and what they import.
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -31,7 +31,7 @@ export const INSTALLED_NODE_DOCS = 'blob/main/docs/INSTALL.md#it-approved-nodejs
 export const sha256File = (file) => createHash('sha256').update(readFileSync(file)).digest('hex');
 
 /**
- * The line in AnalyticsHubInstaller.exe.sha256, in the format `sha256sum -c` reads.
+ * The line in ValueLensInstaller.exe.sha256, in the format `sha256sum -c` reads.
  * @param {string} hash
  * @param {string} [name]
  */

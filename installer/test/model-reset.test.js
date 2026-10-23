@@ -29,7 +29,7 @@ function deployed(o = {}) {
   const t = fakeCtx({ fabric: fabric.api, graph: fakeGraph().api, powerBi: powerBi.api, ui: ui.ui });
   const sm = t.config.semanticModel;
   sm.enabled = true;
-  const item = fabric.add('SemanticModel', 'Analytics Hub Model', 'v1');
+  const item = fabric.add('SemanticModel', 'ValueLens Model', 'v1');
   Object.assign(sm, { id: item.id, name: item.displayName, signature: 'old', bound: true });
   const deploy = () => deployModel(t.ctx, sm, { signature: 'new', definition: () => 'v2' });
   return { ...t, fabric, powerBi, ui, sm, item, deploy };
@@ -38,7 +38,7 @@ function deployed(o = {}) {
 test('a model update keeps its data by default: no purge option unless Fabric asks for one', async () => {
   const t = deployed({ yes: true });
   await t.deploy();
-  assert.deepEqual(t.fabric.calls.filter((c) => c.startsWith('updateSemanticModel')), ['updateSemanticModel Analytics Hub Model']);
+  assert.deepEqual(t.fabric.calls.filter((c) => c.startsWith('updateSemanticModel')), ['updateSemanticModel ValueLens Model']);
   assert.equal(t.item.content, 'v2');
   assert.deepEqual(t.sm.reload, { since: '2026-06-01T12:00:00.000Z' }, 'owed a reload, data kept');
   assert.deepEqual(t.ui.asked, []);
@@ -49,13 +49,13 @@ for (const [kind, reset] of Object.entries(RESETS)) {
     const t = deployed({ yes: true });
     t.fabric.failures.updateSemanticModel = [reset()];
     assert.ok(needsDataReset(reset()));
-    await assert.rejects(t.deploy(), /Analytics Hub Model wasn't changed.*--allow-model-reset/s);
-    assert.deepEqual(t.fabric.calls.filter((c) => c.startsWith('updateSemanticModel')), ['updateSemanticModel Analytics Hub Model'], 'never retried with purge');
+    await assert.rejects(t.deploy(), /ValueLens Model wasn't changed.*--allow-model-reset/s);
+    assert.deepEqual(t.fabric.calls.filter((c) => c.startsWith('updateSemanticModel')), ['updateSemanticModel ValueLens Model'], 'never retried with purge');
     assert.equal(t.item.content, 'v1');
     assert.equal(t.sm.signature, 'old', 'the next run tries again');
     assert.equal(t.sm.bound, true);
     assert.equal(t.sm.reload, undefined, 'Fabric changed nothing, so nothing is owed');
-    assert.match(t.ui.text(), /can't apply this version of Analytics Hub Model and keep its data.*show no data/s);
+    assert.match(t.ui.text(), /can't apply this version of ValueLens Model and keep its data.*show no data/s);
     assert.deepEqual(t.ui.asked, []);
   });
 
@@ -64,7 +64,7 @@ for (const [kind, reset] of Object.entries(RESETS)) {
     t.fabric.failures.updateSemanticModel = [reset()];
     await assert.rejects(t.deploy(), /wasn't changed/);
     assert.equal(t.ui.asked.length, 1);
-    assert.match(t.ui.asked[0], /Clear Analytics Hub Model's data and reload it now\?/);
+    assert.match(t.ui.asked[0], /Clear ValueLens Model's data and reload it now\?/);
     assert.equal(t.fabric.calls.filter((c) => c.includes('allowPurgeData')).length, 0);
     assert.equal(t.item.content, 'v1');
     assert.equal(t.sm.signature, 'old');
@@ -74,7 +74,7 @@ for (const [kind, reset] of Object.entries(RESETS)) {
     const asked = deployed({ answers: [true] });
     asked.fabric.failures.updateSemanticModel = [reset()];
     await asked.deploy();
-    assert.deepEqual(asked.fabric.calls.filter((c) => c.startsWith('updateSemanticModel')), ['updateSemanticModel Analytics Hub Model', 'updateSemanticModel Analytics Hub Model allowPurgeData']);
+    assert.deepEqual(asked.fabric.calls.filter((c) => c.startsWith('updateSemanticModel')), ['updateSemanticModel ValueLens Model', 'updateSemanticModel ValueLens Model allowPurgeData']);
     assert.equal(asked.item.content, 'v2');
     assert.equal(asked.sm.bound, false);
     assert.deepEqual(asked.sm.reload, { since: '2026-06-01T12:00:00.000Z', cleared: true });
@@ -84,7 +84,7 @@ for (const [kind, reset] of Object.entries(RESETS)) {
     flag.fabric.failures.updateSemanticModel = [reset()];
     await flag.deploy();
     assert.deepEqual(flag.ui.asked, []);
-    assert.ok(flag.fabric.calls.includes('updateSemanticModel Analytics Hub Model allowPurgeData'));
+    assert.ok(flag.fabric.calls.includes('updateSemanticModel ValueLens Model allowPurgeData'));
     assert.match(flag.ui.text(), /--allow-model-reset allows/);
     assert.equal(flag.sm.reload?.cleared, true);
   });
@@ -105,8 +105,8 @@ test('a model a stopped run created is updated with the same consent rule', asyn
     const ui = fakeUi(o);
     const t = fakeCtx({ fabric: fabric.api, graph: fakeGraph().api, ui: ui.ui });
     t.config.semanticModel.enabled = true;
-    const item = fabric.add('SemanticModel', 'Analytics Hub Model', 'half-made', 'ValueLens. (ref cc33)');
-    t.config.fabric.pendingItems = { 'SemanticModel:main': { name: 'Analytics Hub Model', ref: 'cc33' } };
+    const item = fabric.add('SemanticModel', 'ValueLens Model', 'half-made', 'ValueLens. (ref cc33)');
+    t.config.fabric.pendingItems = { 'SemanticModel:main': { name: 'ValueLens Model', ref: 'cc33' } };
     fabric.failures.updateSemanticModel = [RESETS.operation()];
     return { ...t, fabric, ui, item, deploy: () => deployModel(t.ctx, t.config.semanticModel, { signature: 's', definition: () => 'v2' }) };
   };
@@ -118,7 +118,7 @@ test('a model a stopped run created is updated with the same consent rule', asyn
 
   const ok = setup({ answers: [true] });
   await ok.deploy();
-  assert.ok(ok.fabric.calls.includes('updateSemanticModel Analytics Hub Model allowPurgeData'));
+  assert.ok(ok.fabric.calls.includes('updateSemanticModel ValueLens Model allowPurgeData'));
   assert.equal(ok.item.content, 'v2');
   assert.equal(ok.config.semanticModel.reload?.cleared, true);
   assert.equal(yes.config.semanticModel.reload, undefined);
@@ -138,7 +138,7 @@ test('an unchanged model is not updated, and a new one is created, not updated',
   const n = fakeCtx({ fabric: fabric.api, graph: fakeGraph().api, ui: fakeUi().ui });
   n.config.semanticModel.enabled = true;
   await deployModel(n.ctx, n.config.semanticModel, { signature: 's', definition: () => 'v1' });
-  assert.deepEqual(fabric.calls.filter((c) => /SemanticModel /.test(c)), ['createSemanticModel Analytics Hub Model']);
+  assert.deepEqual(fabric.calls.filter((c) => /SemanticModel /.test(c)), ['createSemanticModel ValueLens Model']);
   assert.equal(n.config.semanticModel.reload, undefined, 'a new model has nothing to reload');
 });
 
@@ -174,7 +174,7 @@ test('update: a failed refresh is reported, not "Up to date", and the model stay
   assert.equal(await finishUpdate(t.ctx), false);
   const text = t.ui.text();
   assert.doesNotMatch(text, /Up to date/);
-  assert.match(text, /Analytics Hub Model has no data until a refresh finishes/);
+  assert.match(text, /ValueLens Model has no data until a refresh finishes/);
   assert.match(text, /The update isn't finished: the model wasn't reloaded/);
   assert.equal(t.sm.reload?.cleared, true);
 });
@@ -185,7 +185,7 @@ test('update: a replaced model that can\'t be refreshed is reported, not "Up to 
   assert.equal(await finishUpdate(t.ctx), false);
   assert.ok(!t.powerBi.calls.some((c) => c.startsWith('refresh ')));
   assert.doesNotMatch(t.ui.text(), /Up to date/);
-  assert.match(t.ui.text(), /Analytics Hub Model needs reloading after its update, but isn't connected to its data/);
+  assert.match(t.ui.text(), /ValueLens Model needs reloading after its update, but isn't connected to its data/);
   assert.equal(t.sm.reload?.cleared, true);
 });
 
@@ -196,7 +196,7 @@ test('update without waiting: the refresh started is success, but said as still 
   assert.equal(t.powerBi.calls.filter((c) => c.startsWith('getRefresh ')).length, 0);
   const text = t.ui.text();
   assert.doesNotMatch(text, /Up to date/);
-  assert.match(text, /Updated\. Analytics Hub Model is still reloading: reports on it can show no data or miss new columns until that finishes/);
+  assert.match(text, /Updated\. ValueLens Model is still reloading: reports on it can show no data or miss new columns until that finishes/);
   assert.equal(t.sm.reload?.cleared, true, 'kept until a refresh is seen to finish');
 });
 
@@ -209,7 +209,7 @@ test('update on the page says the same: still reloading, or not finished, never 
     assert.equal(await finishUpdate(t.ctx, { wait }), outcome !== 'failed');
     const lines = web.history().filter((/** @type {any} */ e) => e.type === 'line').map((/** @type {any} */ e) => `${e.kind}: ${e.text}`);
     assert.ok(!lines.some((l) => /Up to date/.test(l)), lines.join('\n'));
-    if (outcome === 'reloading') assert.ok(lines.some((l) => /^ok: Updated\. Analytics Hub Model is still reloading/.test(l)), lines.join('\n'));
+    if (outcome === 'reloading') assert.ok(lines.some((l) => /^ok: Updated\. ValueLens Model is still reloading/.test(l)), lines.join('\n'));
     else assert.ok(lines.some((l) => /^fail: The update isn't finished: the model wasn't reloaded/.test(l)), lines.join('\n'));
   }
 });
@@ -231,7 +231,7 @@ test('update: after a step that failed, not "Up to date", even once the models r
   const reloading = await replacedAndBound();
   assert.equal(await finishUpdate(reloading.ctx, { wait: false, failed: true }), false);
   assert.match(reloading.ui.text(), /a step above failed/);
-  assert.match(reloading.ui.text(), /! Analytics Hub Model is still reloading/);
+  assert.match(reloading.ui.text(), /! ValueLens Model is still reloading/);
   assert.doesNotMatch(reloading.ui.text(), /Up to date|Updated\./);
 });
 
@@ -271,8 +271,8 @@ test('refresh: only the installer\'s own refresh, finished cleanly, takes the ob
 test('settleReloads: a load still running leaves the models pending; waiting, that is not finished', async () => {
   const t = await replacedAndBound();
   const reachable = () => true;
-  assert.deepEqual(await settleReloads(t.ctx, { wait: false, load: 'running', reachable }), { ok: true, pending: ['Analytics Hub Model'] });
-  assert.deepEqual(await settleReloads(t.ctx, { wait: true, load: 'running', reachable }), { ok: false, pending: ['Analytics Hub Model'] });
+  assert.deepEqual(await settleReloads(t.ctx, { wait: false, load: 'running', reachable }), { ok: true, pending: ['ValueLens Model'] });
+  assert.deepEqual(await settleReloads(t.ctx, { wait: true, load: 'running', reachable }), { ok: false, pending: ['ValueLens Model'] });
   assert.equal(t.powerBi.calls.filter((c) => c.startsWith('refresh ')).length, 0, 'no refresh competes with the load');
   assert.match(t.ui.text(), /still reloading, so this couldn't confirm it finished/);
 });
@@ -304,7 +304,7 @@ test('loadState: how far a pipeline run got with reloading the models', () => {
 /** Writes the record on every save, as the installer does, so a new context can read it back. */
 function persisted(/** @type {{ ctx: any, config: any }} */ t) {
   const dir = mkdtempSync(join(tmpdir(), 'ah-reload-'));
-  const file = join(dir, 'valuelens-install.json');
+  const file = join(dir, 'valuelens-setup.json');
   t.ctx.save = () => saveConfig(file, t.config);
   t.ctx.save();
   return { file, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
@@ -336,7 +336,7 @@ test('a reload owed after a failed refresh survives the record being saved and r
     assert.deepEqual(t.fabric.calls.filter((c) => c.startsWith('updateSemanticModel')), []);
     assert.deepEqual(await settleReloads(next.ctx, { wait: true, load: 'none', reachable: () => true }), { ok: true, pending: [] });
     assert.equal(powerBi.calls.filter((c) => c.startsWith('refresh ')).length, 1);
-    assert.match(ui.text(), /Analytics Hub Model has no data until it reloads after its update, so refreshing it now/);
+    assert.match(ui.text(), /ValueLens Model has no data until it reloads after its update, so refreshing it now/);
     assert.equal(loadConfig(record.file).config.semanticModel.reload, undefined, 'taken back on disk too');
   } finally {
     record.cleanup();
@@ -370,7 +370,7 @@ test('the reload is recorded before each request that can change the model, so a
       ['GET', false, { since: '2026-06-01T12:00:00.000Z', unsettled: true, cleared: true }],
     ]);
     assert.equal(t.sm.signature, 'old', 'the outcome is unknown, so the next run sends it again');
-    assert.match(t.ui.text(), /Analytics Hub Model's data may have been cleared\. Run the installer again once the problem below is fixed: it applies the update again and then reloads the data/);
+    assert.match(t.ui.text(), /ValueLens Model's data may have been cleared\. Run the installer again once the problem below is fixed: it applies the update again and then reloads the data/);
     assert.deepEqual(loadConfig(record.file).config.semanticModel.reload, { since: '2026-06-01T12:00:00.000Z', unsettled: true, cleared: true });
   } finally {
     record.cleanup();
@@ -681,7 +681,7 @@ test('a change that may not have finished is applied again before anything count
   t.powerBi.calls.length = 0;
   assert.deepEqual(await settleReloads(t.ctx, { wait: true, load: 'none', reachable: () => true }), { ok: false, pending: [] });
   assert.equal(t.powerBi.calls.filter((c) => c.startsWith('refresh ')).length, 0);
-  assert.match(t.ui.text(), /Analytics Hub Model's last update may not have finished, so it can't be reloaded yet/);
+  assert.match(t.ui.text(), /ValueLens Model's last update may not have finished, so it can't be reloaded yet/);
   // A refresh on its own (the refresh command) doesn't settle it either.
   assert.equal((await refreshModel(t.ctx, { wait: true })).ok, true);
   assert.equal(t.sm.reload?.unsettled, true);
@@ -689,7 +689,7 @@ test('a change that may not have finished is applied again before anything count
   // The same version, unchanged: applied again all the same, then reloaded.
   t.fabric.calls.length = 0;
   await t.deploy();
-  assert.deepEqual(t.fabric.calls.filter((c) => c.startsWith('updateSemanticModel')), ['updateSemanticModel Analytics Hub Model']);
+  assert.deepEqual(t.fabric.calls.filter((c) => c.startsWith('updateSemanticModel')), ['updateSemanticModel ValueLens Model']);
   assert.match(t.ui.text(), /last update may not have finished, so applying it again/);
   assert.deepEqual(t.sm.reload, { since: '2026-06-01T12:00:00.000Z', cleared: true });
   t.sm.bound = true;

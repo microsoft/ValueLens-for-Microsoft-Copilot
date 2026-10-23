@@ -20,7 +20,7 @@ function setup(o = {}) {
   const ui = fakeUi({ answers: o.answers, yes: o.yes });
   const config = o.config ?? emptyConfig();
   config.semanticModel.enabled = true;
-  config.app.displayName = 'ValueLens Data Collector';
+  config.app.displayName = 'ValueLens (Fabric)';
   const made = fakeCtx({ ui: ui.ui, fabric: fabric.api, graph: graph.api, powerBi: powerBi.api, config });
   return { ...made, fabric, graph, powerBi, ui };
 }
@@ -30,7 +30,7 @@ test('semantic model: created from the template, left alone on re-run, updated w
   await ensureSemanticModel(t.ctx);
   const item = t.fabric.items.find((i) => i.type === 'SemanticModel');
   assert.ok(item);
-  assert.equal(item.displayName, 'Analytics Hub Model');
+  assert.equal(item.displayName, 'ValueLens Model');
   assert.deepEqual(item.content.parts.map((/** @type {any} */ p) => p.path), ['model.bim', 'definition.pbism']);
   const bim = modelBim(item);
   assert.ok(bim.model.expressions.find((/** @type {any} */ e) => e.name === 'Fabric SQL Endpoint').expression.startsWith('"abc.datawarehouse.fabric.microsoft.com"'));
@@ -40,12 +40,12 @@ test('semantic model: created from the template, left alone on re-run, updated w
 
   t.config.semanticModel.bound = true;
   await ensureSemanticModel(t.ctx);
-  assert.deepEqual(t.fabric.calls, ['createSemanticModel Analytics Hub Model']);
+  assert.deepEqual(t.fabric.calls, ['createSemanticModel ValueLens Model']);
   assert.equal(t.config.semanticModel.bound, true);
 
   t.config.modules.agent365 = !t.config.modules.agent365;
   await ensureSemanticModel(t.ctx);
-  assert.deepEqual(t.fabric.calls.slice(1), ['updateSemanticModel Analytics Hub Model']);
+  assert.deepEqual(t.fabric.calls.slice(1), ['updateSemanticModel ValueLens Model']);
   assert.equal(t.config.semanticModel.bound, false, 'an update needs the connection bound again');
 
   await ensureSemanticModel(t.ctx, { force: true });
@@ -55,15 +55,15 @@ test('semantic model: created from the template, left alone on re-run, updated w
 test('semantic model: waits for the SQL endpoint; a same-name model that is not ours is left alone', async () => {
   const t = setup();
   t.fabric.sqlStates.push({ provisioningStatus: 'InProgress' }, { connectionString: null });
-  const existing = t.fabric.add('SemanticModel', 'Analytics Hub Model', 'theirs');
+  const existing = t.fabric.add('SemanticModel', 'ValueLens Model', 'theirs');
   await ensureSemanticModel(t.ctx);
   assert.equal(t.sleeps.length, 2);
   assert.deepEqual(t.ui.asked, [], 'never asks to replace it');
   assert.notEqual(t.config.semanticModel.id, existing.id);
-  assert.equal(t.config.semanticModel.name, 'Analytics Hub Model 2');
-  assert.deepEqual(t.fabric.calls, ['createSemanticModel Analytics Hub Model 2']);
+  assert.equal(t.config.semanticModel.name, 'ValueLens Model 2');
+  assert.deepEqual(t.fabric.calls, ['createSemanticModel ValueLens Model 2']);
   assert.equal(existing.content, 'theirs');
-  assert.match(t.ui.text(), /"Analytics Hub Model" is already in the workspace/);
+  assert.match(t.ui.text(), /"ValueLens Model" is already in the workspace/);
 
   const failed = setup();
   failed.fabric.sqlStates.push({ provisioningStatus: 'Failed' });
@@ -75,7 +75,7 @@ test('semantic model: a deleted model is deployed again', async () => {
   Object.assign(t.config.semanticModel, { id: 'gone', bound: true, signature: 'x' });
   await ensureSemanticModel(t.ctx);
   assert.notEqual(t.config.semanticModel.id, 'gone');
-  assert.deepEqual(t.fabric.calls, ['createSemanticModel Analytics Hub Model']);
+  assert.deepEqual(t.fabric.calls, ['createSemanticModel ValueLens Model']);
   assert.match(t.ui.text(), /was deleted/);
 });
 
@@ -87,11 +87,11 @@ test('semantic model: a re-run redeploys a model whose definition changed, such 
   sm.bound = true;
 
   await ensureSemanticModel(t.ctx);
-  assert.deepEqual(t.fabric.calls, ['createSemanticModel Analytics Hub Model'], 'the same definition is left in place');
+  assert.deepEqual(t.fabric.calls, ['createSemanticModel ValueLens Model'], 'the same definition is left in place');
 
   sm.signature = String(sm.signature).replace(/;[0-9a-f]{16}$/, '');
   await ensureSemanticModel(t.ctx);
-  assert.deepEqual(t.fabric.calls.slice(1), ['updateSemanticModel Analytics Hub Model'], 'a record without the hash (0.3.3) is updated');
+  assert.deepEqual(t.fabric.calls.slice(1), ['updateSemanticModel ValueLens Model'], 'a record without the hash (0.3.3) is updated');
   assert.equal(sm.bound, false, 'so the connection is bound again and the repair refreshes it');
 
   sm.signature = `${String(sm.signature).slice(0, -16)}0000000000000000`;
@@ -141,7 +141,7 @@ test('connection: the app gets Viewer and its own secret; the model is bound to 
   await ensureModelConnection(t.ctx);
   const sm = t.config.semanticModel;
   const name = connectionName('ws-1');
-  assert.deepEqual(t.fabric.calls, ['addRoleAssignment sp-1 Viewer', `createConnection ${name}`, `bindConnection Analytics Hub Model ${sm.connectionId} abc.datawarehouse.fabric.microsoft.com;ValueLens`]);
+  assert.deepEqual(t.fabric.calls, ['addRoleAssignment sp-1 Viewer', `createConnection ${name}`, `bindConnection ValueLens Model ${sm.connectionId} abc.datawarehouse.fabric.microsoft.com;ValueLens`]);
   assert.deepEqual(unref(t.graph.calls), [`addPassword ${CONNECTION_SECRET_NAME}`]);
   assert.match(t.graph.passwords[0].displayName, new RegExp(`^${CONNECTION_SECRET_NAME} \\(ref [0-9a-f]{12}\\)$`), 'named with the ref saved before Entra was asked');
   const body = /** @type {any} */ (t.fabric.connections[0].body);
@@ -183,7 +183,7 @@ test('connection: one a throttled create made anyway is reused when the retry fi
   t.fabric.api.createConnection = throttled.createConnection;
   await ensureModelConnection(t.ctx);
   assert.deepEqual(throttled.sent, [`POST ${name}`, `POST ${name}`], 'the client sends it again after the 429, and Fabric answers 409');
-  assert.deepEqual(t.fabric.calls, ['addRoleAssignment sp-1 Viewer', 'updateConnection conn-throttled', `bindConnection Analytics Hub Model conn-throttled abc.datawarehouse.fabric.microsoft.com;ValueLens`]);
+  assert.deepEqual(t.fabric.calls, ['addRoleAssignment sp-1 Viewer', 'updateConnection conn-throttled', `bindConnection ValueLens Model conn-throttled abc.datawarehouse.fabric.microsoft.com;ValueLens`]);
   assert.equal(t.fabric.connections.length, 1);
   assert.equal(/** @type {any} */ (t.fabric.connections[0].body).credentialDetails.credentials.servicePrincipalSecret, 'secret-1', 'given the secret again');
   const sm = t.config.semanticModel;
@@ -288,7 +288,7 @@ test('probe: a model whose Calendar has days passes; an empty or broken one fail
 
   t.powerBi.failures.executeQueries = [httpError(500, 'Boom')];
   assert.deepEqual(await verifyModel(t.ctx), { ok: true, skipped: true }, 'a service hiccup does not fail a finished install');
-  assert.match(t.ui.text(), /Couldn't query Analytics Hub Model to check it \(Boom\)/);
+  assert.match(t.ui.text(), /Couldn't query ValueLens Model to check it \(Boom\)/);
 
   t.config.semanticModel.bound = false;
   const before = t.powerBi.calls.length;

@@ -205,7 +205,7 @@ test('access: the group gets Build on each model once, and a failed grant only w
 
   pbi.denied.add('ds-x');
   await grantModelAccess(ctx, [{ workspaceId: 'ws-1', datasetId: 'ds-x', name: 'Other' }]);
-  assert.match(text(), /Couldn't give Analytics Hub Viewers Build on Other/);
+  assert.match(text(), /Couldn't give ValueLens Viewers Build on Other/);
   assert.ok(!ctx.config.access.grantedModels?.includes('ds-x'));
 });
 
@@ -223,7 +223,7 @@ test('access: a group Power BI does not know yet is retried, then reported if it
 
   pbi.unseen['ds-y'] = NEW_GROUP_ATTEMPTS;
   await grantModelAccess(ctx, [{ workspaceId: 'ws-1', datasetId: 'ds-y', name: 'Other' }]);
-  assert.match(text(), /Couldn't give Analytics Hub Viewers Build on Other/);
+  assert.match(text(), /Couldn't give ValueLens Viewers Build on Other/);
   assert.equal(sleeps.length, 2 + NEW_GROUP_ATTEMPTS - 1);
 });
 

@@ -21,7 +21,7 @@ test('script: fills in every placeholder', () => {
   assert.equal(scriptSha256(s), HASH);
   assert.match(s, /^\s*\$Version = '1\.2\.3'$/m);
   assert.match(s, /^\s*\$Id = '1\.2\.3-748ed2f139'$/m);
-  assert.ok(s.includes(`$ZipUrl = 'https://github.com/octo/hub/releases/download/installer-v1.2.3/${ZIP_NAME}'`));
+  assert.ok(s.includes(`$ZipUrl = 'https://github.com/octo/hub/releases/download/valuelens-installer-v1.2.3/${ZIP_NAME}'`));
   assert.match(s, /^\s*\$SizeMb = '152'$/m);
   assert.ok(s.includes('irm https://github.com/octo/hub/releases/latest/download/install.ps1 | iex'));
   assert.match(s, /^\s*\$Commit = 'd793f32a{33}'$/m);
@@ -57,36 +57,36 @@ test('script: the whole launcher runs in a script block, so iex leaves nothing b
   assert.match(body, /^& \{/);
   assert.match(body, /\} @args\r?\nif \(\$MyInvocation\.MyCommand\.Path -and \$LASTEXITCODE\) \{ exit \$LASTEXITCODE \}\r?\n$/);
   assert.doesNotMatch(TEMPLATE, /\bparam\s*\(/i, 'a param block would bind installer commands such as "status" as launcher options');
-  assert.match(TEMPLATE, /ANALYTICS_HUB_LAUNCHER=pwsh/);
-  assert.match(TEMPLATE, /ANALYTICS_HUB_LAUNCHER = 'pwsh'/);
+  assert.match(TEMPLATE, /VALUELENS_LAUNCHER=pwsh/);
+  assert.match(TEMPLATE, /VALUELENS_LAUNCHER = 'pwsh'/);
 });
 
 test('script: commands and URLs agree between the launcher and the installer', () => {
   assert.equal(SCRIPT_NAME, 'install.ps1');
   assert.equal(scriptCommand(REPO), SCRIPT_COMMAND);
   assert.equal(SCRIPT_URL, `https://github.com/${REPO}/releases/latest/download/install.ps1`);
-  assert.equal(scriptCommand('octo/hub', '1.2.3'), 'irm https://github.com/octo/hub/releases/download/installer-v1.2.3/install.ps1 | iex');
-  assert.equal(zipUrl('octo/hub', '1.2.3'), 'https://github.com/octo/hub/releases/download/installer-v1.2.3/AnalyticsHubInstaller.zip');
-  assert.ok(TEMPLATE.includes("Join-Path $AhHome 'analytics-hub.cmd'"));
-  assert.equal(SCRIPT_SHIM, '& $env:LOCALAPPDATA\\AnalyticsHub\\analytics-hub.cmd');
+  assert.equal(scriptCommand('octo/hub', '1.2.3'), 'irm https://github.com/octo/hub/releases/download/valuelens-installer-v1.2.3/install.ps1 | iex');
+  assert.equal(zipUrl('octo/hub', '1.2.3'), 'https://github.com/octo/hub/releases/download/valuelens-installer-v1.2.3/ValueLensInstaller.zip');
+  assert.ok(TEMPLATE.includes("Join-Path $VlHome 'valuelens.cmd'"));
+  assert.equal(SCRIPT_SHIM, '& $env:LOCALAPPDATA\\ValueLens\\valuelens.cmd');
 });
 
 test('script: in Azure Cloud Shell, gets the pinned commit and runs the installer in the terminal', () => {
   const cloud = TEMPLATE.slice(TEMPLATE.indexOf('if ($CloudShell) {'), TEMPLATE.indexOf("if ($env:OS -ne 'Windows_NT')"));
   assert.ok(cloud.length > 1000, 'the Cloud Shell branch comes before the Windows-only check');
-  assert.match(cloud, /\$env:ANALYTICS_HUB_LAUNCHER = 'cloudshell'/);
-  assert.match(cloud, /export ANALYTICS_HUB_LAUNCHER=cloudshell/);
+  assert.match(cloud, /\$env:VALUELENS_LAUNCHER = 'cloudshell'/);
+  assert.match(cloud, /export VALUELENS_LAUNCHER=cloudshell/);
   assert.match(cloud, /fetch --quiet --depth 1 \$RepoUrl \$Commit/);
   assert.match(cloud, /rev-parse HEAD[\s\S]*\$head -ne \$Commit/, 'checks it got the commit it asked for');
   assert.match(cloud, /npm ci --omit=dev/);
   assert.match(cloud, /SHASUMS256\.txt[\s\S]*Get-FileHash[\s\S]*\$got -ne \$want/, 'checks the Node.js it downloads');
   assert.doesNotMatch(cloud, /--ui/, 'Cloud Shell has no browser for the wizard');
-  assert.ok(cloud.includes("$AhHome = Join-Path $HOME '.analytics-hub'") && cloud.includes("$Shim = Join-Path $AhHome 'analytics-hub'"));
-  assert.equal(CLOUD_SHELL_SHIM, '~/.analytics-hub/analytics-hub');
+  assert.ok(cloud.includes("$VlHome = Join-Path $HOME '.valuelens'") && cloud.includes("$Shim = Join-Path $VlHome 'valuelens'"));
+  assert.equal(CLOUD_SHELL_SHIM, '~/.valuelens/valuelens');
 });
 test('script: -UseInstalledNode runs the installer with an installed Node.js and keeps the same folders and command', () => {
   const win = TEMPLATE.slice(TEMPLATE.indexOf("if ($env:OS -ne 'Windows_NT')"));
-  assert.match(TEMPLATE, /\$UseInstalledNode = \$env:ANALYTICS_HUB_USE_INSTALLED_NODE -eq '1'/);
+  assert.match(TEMPLATE, /\$UseInstalledNode = \$env:VALUELENS_USE_INSTALLED_NODE -eq '1'/);
   assert.match(TEMPLATE, /\$a -eq '-UseInstalledNode'\) \{ \$UseInstalledNode = \$true \}/);
   assert.ok(TEMPLATE.includes(`$env:${INSTALLED_NODE_ENV}`), 'the launcher and the installer agree on the variable');
   // The same Node.js check serves Cloud Shell and Windows.
@@ -95,15 +95,15 @@ test('script: -UseInstalledNode runs the installer with an installed Node.js and
   assert.match(win, /\(\$sys\.Major -eq 22 -and \$sys\.Minor -ge 13\) -or \$sys\.Major -eq 24/, "rayfin supports Node.js 22 and 24");
   assert.match(win, /-p 'process\.arch'[\s\S]*\$arch -ne 'x64'/, 'the native packages in the zip are x64');
   // Same unpacked folder, install record and command, so either route finds the other's install.
-  assert.equal(win.match(/\$Root = Join-Path \$AhHome \$Id/g)?.length, 1);
-  assert.equal(win.match(/\$Work = Join-Path \$Docs 'Analytics Hub'/g)?.length, 1);
+  assert.equal(win.match(/\$Root = Join-Path \$VlHome \$Id/g)?.length, 1);
+  assert.equal(win.match(/\$Work = Join-Path \$Docs 'ValueLens'/g)?.length, 1);
   assert.match(win, /\$node = \$Installed\r?\n\s*if \(-not \$node\) \{ \$node = Join-Path \$Root 'node\\node\.exe' \}/);
   assert.match(win, /& \$node \$script @Forward/);
-  assert.match(win, /set `"AH_NODE=\$Installed`"/);
-  assert.match(win, /'set "ANALYTICS_HUB_USE_INSTALLED_NODE=1"'/);
-  assert.match(win, /"%AH_NODE%" "%AH_ROOT%\\f\\installer\\bin\\valuelens-install\.js" %\*/);
-  assert.doesNotMatch(win, /"%AH_ROOT%\\node\\node\.exe" "%AH_ROOT%/, 'the command runs whichever Node.js install.ps1 used');
-  assert.match(win, /\$Again = "`\$env:ANALYTICS_HUB_USE_INSTALLED_NODE = '1'; \$Again"/);
+  assert.match(win, /set `"VL_NODE=\$Installed`"/);
+  assert.match(win, /'set "VALUELENS_USE_INSTALLED_NODE=1"'/);
+  assert.match(win, /"%VL_NODE%" "%VL_ROOT%\\f\\installer\\bin\\valuelens-installer\.js" %\*/);
+  assert.doesNotMatch(win, /"%VL_ROOT%\\node\\node\.exe" "%VL_ROOT%/, 'the command runs whichever Node.js install.ps1 used');
+  assert.match(win, /\$Again = "`\$env:VALUELENS_USE_INSTALLED_NODE = '1'; \$Again"/);
 });
 
 test('script: the command it leaves behind escapes the | in the install command for cmd.exe', () => {
@@ -140,7 +140,7 @@ test('script: generated Windows commands run and report missing files with speci
       const root = join(dir, installed ? 'installed (Node) & tools' : 'bundled (Node) & tools');
       const payload = join(root, 'payload');
       const node = join(installed ? join(root, 'approved (Node) & tools') : join(payload, 'node'), 'node.exe');
-      const entry = join(payload, 'f', 'installer', 'bin', 'valuelens-install.js');
+      const entry = join(payload, 'f', 'installer', 'bin', 'valuelens-installer.js');
       const work = join(root, 'work');
       for (const folder of [dirname(node), dirname(entry), work]) mkdirSync(folder, { recursive: true });
       copyFileSync(process.execPath, node);
@@ -151,7 +151,7 @@ test('script: generated Windows commands run and report missing files with speci
       writeFileSync(generate, [
         "$ErrorActionPreference = 'Stop'",
         "$Id = 'payload'",
-        "$Shim = Join-Path $PSScriptRoot 'analytics-hub.cmd'",
+        "$Shim = Join-Path $PSScriptRoot 'valuelens.cmd'",
         "$Work = Join-Path $PSScriptRoot 'work'",
         `$Again = '${again}'`,
         '$Installed = $null',
@@ -164,7 +164,7 @@ test('script: generated Windows commands run and report missing files with speci
         env: { ...process.env, SHIM_TEST_INSTALLED: installed ? '1' : '0', SHIM_TEST_NODE: node },
       });
       assert.equal(generated.status, 0, generated.error?.message ?? generated.stdout + generated.stderr);
-      const shim = join(root, 'analytics-hub.cmd');
+      const shim = join(root, 'valuelens.cmd');
       /** @param {string} args */
       const run = (args) => spawnSync(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', `""${shim}" ${args}"`], {
         encoding: 'utf8', windowsHide: true, windowsVerbatimArguments: true, timeout: 30_000,
@@ -255,13 +255,13 @@ test("script: a pinned release whose zip is gone says so and gives the current r
         '$Proxy = $null',
         "$Again = 'irm https://github.com/octo/hub/releases/latest/download/install.ps1 | iex'",
       ];
-      const gone = await runBlock(shell, prelude('gone/AnalyticsHubInstaller.zip'), block);
+      const gone = await runBlock(shell, prelude('gone/ValueLensInstaller.zip'), block);
       assert.notEqual(gone.status, 0, `${shell}: ${gone.out}`);
-      assert.match(gone.out, /Release installer-v1\.2\.3 is no longer available/, `${shell}: ${gone.out}`);
+      assert.match(gone.out, /Release valuelens-installer-v1\.2\.3 is no longer available/, `${shell}: ${gone.out}`);
       assert.match(gone.out, /To install the current release instead, run: irm https:\/\/github\.com\/octo\/hub\/releases\/latest\/download\/install\.ps1 \| iex/);
       assert.doesNotMatch(gone.out, /proxy/i);
 
-      const broken = await runBlock(shell, prelude('broken/AnalyticsHubInstaller.zip'), block);
+      const broken = await runBlock(shell, prelude('broken/ValueLensInstaller.zip'), block);
       assert.notEqual(broken.status, 0);
       assert.match(broken.out, /Couldn't download .*If a proxy blocks it/, `${shell}: ${broken.out}`);
       assert.doesNotMatch(broken.out, /no longer available/);
@@ -294,7 +294,7 @@ test("script: a node.exe blocked by device policy says what to do instead of the
       assert.match(r.out, /Your organisation's policy blocks the Node\.js that comes with the installer/, `${shell}: ${r.out}`);
       assert.match(r.out, /Don't work around it/);
       assert.match(r.out, /Company Portal/);
-      assert.match(r.out, /\$env:ANALYTICS_HUB_USE_INSTALLED_NODE = '1'; irm https:\/\/github\.com\/octo\/hub\/releases\/latest\/download\/install\.ps1 \| iex/);
+      assert.match(r.out, /\$env:VALUELENS_USE_INSTALLED_NODE = '1'; irm https:\/\/github\.com\/octo\/hub\/releases\/latest\/download\/install\.ps1 \| iex/);
       assert.match(r.out, /docs\/INSTALL\.md#locked-down-tenant--azure-cloud-shell/);
       assert.match(r.out, /ask your IT team/);
     }

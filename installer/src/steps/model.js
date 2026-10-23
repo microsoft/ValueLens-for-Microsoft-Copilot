@@ -8,6 +8,7 @@ import { enabledModules, MODEL_MODULES } from '../catalog.js';
 import { servicePrincipalCredentials, semanticModelDefinition, sqlConnectionBody } from '../clients/fabric.js';
 import { HttpError } from '../http.js';
 import { commandLine } from '../launch.js';
+import { PRODUCT } from '../product.js';
 import { EVERYONE_ROLE, rlsSettings, SCOPED_ROLE } from '../transform/access.js';
 import { buildModel, datasourcePath, loadTemplateModel, PBISM } from '../transform/model.js';
 import { formatDuration } from '../ui.js';
@@ -21,7 +22,7 @@ import { addTrackedSecret, adoptAttempts, promoteSecret, removeRetired, settleFa
 export const CONNECTION_SECRET_NAME = 'ValueLens semantic model connection';
 
 /** @param {string} workspaceId */
-export const connectionName = (workspaceId) => `Analytics Hub SQL ${workspaceId.slice(0, 8)}`;
+export const connectionName = (workspaceId) => `${PRODUCT.fabric.sqlConnection} ${workspaceId.slice(0, 8)}`;
 
 /** @param {string} workspaceId @param {string} modelId */
 export const modelSettingsUrl = (workspaceId, modelId) => `https://app.powerbi.com/groups/${workspaceId}/settings/datasets/${modelId}`;

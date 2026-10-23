@@ -365,7 +365,7 @@ test('notebook mode: the secret is written into the notebooks and nowhere else',
   const rotate = fakeUi({ answers: [true] });
   t.ctx.ui = rotate.ui;
   await rotateSecret(t.ctx);
-  assert.deepEqual(unref(graph.calls), ['addPassword Analytics Hub installer', 'removePassword key-1']);
+  assert.deepEqual(unref(graph.calls), ['addPassword ValueLens installer', 'removePassword key-1']);
   assert.equal(t.config.app.secretKeyId, 'key-2');
   assert.ok(fabric.items.every((i) => !String(i.content).includes('secret-1')));
   assert.equal(fabric.items.filter((i) => String(i.content).includes('secret-2')).length, holding.length);
@@ -386,7 +386,7 @@ test('notebook mode: each install or repair replaces the secret, then removes th
   graph.calls.length = 0;
   fabric.calls.length = 0;
   await ensureNotebooks(t.ctx, { rotate: true });
-  assert.deepEqual(unref(graph.calls), ['addPassword Analytics Hub installer', 'removePassword key-1']);
+  assert.deepEqual(unref(graph.calls), ['addPassword ValueLens installer', 'removePassword key-1']);
   assert.equal(fabric.calls.length, holding, 'only the notebooks that hold the secret are rewritten');
   assert.equal(t.config.app.secretKeyId, 'key-2');
   assert.ok(fabric.items.every((i) => !String(i.content).includes('secret-1')));
@@ -445,14 +445,14 @@ test('notebook mode: a rotation that stops part-way removes the old secret on th
   };
   graph.calls.length = 0;
   await assert.rejects(ensureNotebooks(t.ctx, { force: true }), /Fabric is busy/);
-  assert.deepEqual(unref(graph.calls), ['addPassword Analytics Hub installer'], 'the old secret stays while notebooks still use it');
+  assert.deepEqual(unref(graph.calls), ['addPassword ValueLens installer'], 'the old secret stays while notebooks still use it');
   assert.equal(t.config.app.secretKeyId, 'key-2');
   assert.deepEqual(t.config.app.retiredSecretKeyIds, ['key-1']);
 
   fabric.api.updateNotebook = update;
   graph.calls.length = 0;
   await ensureNotebooks(t.ctx, { force: true });
-  assert.deepEqual(unref(graph.calls), ['addPassword Analytics Hub installer', 'removePassword key-1', 'removePassword key-2']);
+  assert.deepEqual(unref(graph.calls), ['addPassword ValueLens installer', 'removePassword key-1', 'removePassword key-2']);
   assert.equal(t.config.app.secretKeyId, 'key-3');
   assert.equal(t.config.app.retiredSecretKeyIds, undefined);
   assert.doesNotMatch(JSON.stringify(t.config), /secret-\d/);
@@ -494,7 +494,7 @@ test('a run stopped while Fabric creates a notebook: the next run uses that note
   assert.equal(new Set(names).size, names.length);
   assert.ok(fabric.items.length > count, 'the rest are created');
   assert.ok(fabric.items.every((i) => !String(i.content).includes('secret-1')), 'the stopped run\'s notebook is rewritten');
-  assert.deepEqual(unref(graph.calls), ['addPassword Analytics Hub installer', 'removePassword key-1']);
+  assert.deepEqual(unref(graph.calls), ['addPassword ValueLens installer', 'removePassword key-1']);
   assert.equal(next.config.app.secretKeyId, 'key-2');
   assert.equal(next.config.app.pendingSecretKeyIds, undefined);
   assert.equal(next.config.fabric.pendingItems, undefined);
@@ -509,30 +509,30 @@ test('a run stopped before Fabric created the item: the next run creates it unde
   fabric.calls.length = 0;
   // Fabric says that create failed, so nothing is coming.
   const failedOp = 'https://api.fabric.microsoft.com/v1/operations/op-f';
-  t.config.fabric.pendingItems = { DataPipeline: { name: 'AnalyticsHub_Pipeline', ref: 'aa11', at: t.ctx.now().toISOString(), operation: failedOp } };
+  t.config.fabric.pendingItems = { DataPipeline: { name: 'ValueLens_Pipeline', ref: 'aa11', at: t.ctx.now().toISOString(), operation: failedOp } };
   fabric.operations[failedOp] = 'Failed';
   await ensurePipeline(t.ctx);
-  assert.deepEqual(fabric.calls, ['operationStatus op-f', 'createPipeline AnalyticsHub_Pipeline']);
+  assert.deepEqual(fabric.calls, ['operationStatus op-f', 'createPipeline ValueLens_Pipeline']);
   assert.equal(t.config.fabric.pendingItems, undefined);
   assert.match(String(fabric.items.find((i) => i.type === 'DataPipeline')?.description), /^\(ref [0-9a-f]{12}\)$/, 'each create gets a fresh ref');
 
   // Not pending: a same-name item is someone else's and is left alone.
   const other = fakeFabric();
-  other.add('DataPipeline', 'AnalyticsHub_Pipeline', 'theirs');
+  other.add('DataPipeline', 'ValueLens_Pipeline', 'theirs');
   const o = fakeCtx({ fabric: other.api, graph: fakeGraph().api, ui: fakeUi().ui });
   await ensureNotebooks(o.ctx);
   await ensurePipeline(o.ctx);
-  assert.equal(o.config.fabric.pipelineName, 'AnalyticsHub_Pipeline_2');
+  assert.equal(o.config.fabric.pipelineName, 'ValueLens_Pipeline_2');
 
   // Pending and there with the stopped run's ref: that pipeline is used and brought up to date.
   const resumed = fakeFabric();
   const r = fakeCtx({ fabric: resumed.api, graph: fakeGraph().api, ui: fakeUi().ui });
   await ensureNotebooks(r.ctx);
-  const ours = resumed.add('DataPipeline', 'AnalyticsHub_Pipeline', 'half-made', 'Analytics Hub daily load. (ref aa11)');
-  r.config.fabric.pendingItems = { DataPipeline: { name: 'AnalyticsHub_Pipeline', ref: 'aa11' } };
+  const ours = resumed.add('DataPipeline', 'ValueLens_Pipeline', 'half-made', 'ValueLens daily load. (ref aa11)');
+  r.config.fabric.pendingItems = { DataPipeline: { name: 'ValueLens_Pipeline', ref: 'aa11' } };
   resumed.calls.length = 0;
   await ensurePipeline(r.ctx);
-  assert.deepEqual(resumed.calls, ['updatePipeline AnalyticsHub_Pipeline']);
+  assert.deepEqual(resumed.calls, ['updatePipeline ValueLens_Pipeline']);
   assert.equal(r.config.fabric.pipelineId, ours.id);
   assert.notEqual(ours.content, 'half-made');
 
@@ -540,12 +540,12 @@ test('a run stopped before Fabric created the item: the next run creates it unde
   const taken = fakeFabric();
   const k = fakeCtx({ fabric: taken.api, graph: fakeGraph().api, ui: fakeUi().ui });
   await ensureNotebooks(k.ctx);
-  const theirs = taken.add('DataPipeline', 'AnalyticsHub_Pipeline', 'theirs', 'Analytics Hub daily load. (ref bb22)');
-  k.config.fabric.pendingItems = { DataPipeline: { name: 'AnalyticsHub_Pipeline', ref: 'aa11', at: k.ctx.now().toISOString(), operation: failedOp } };
+  const theirs = taken.add('DataPipeline', 'ValueLens_Pipeline', 'theirs', 'ValueLens daily load. (ref bb22)');
+  k.config.fabric.pendingItems = { DataPipeline: { name: 'ValueLens_Pipeline', ref: 'aa11', at: k.ctx.now().toISOString(), operation: failedOp } };
   taken.operations[failedOp] = 'Failed';
   taken.calls.length = 0;
   await ensurePipeline(k.ctx);
-  assert.deepEqual(taken.calls.filter((c) => /Pipeline /.test(c)), ['createPipeline AnalyticsHub_Pipeline_2']);
+  assert.deepEqual(taken.calls.filter((c) => /Pipeline /.test(c)), ['createPipeline ValueLens_Pipeline_2']);
   assert.equal(theirs.content, 'theirs');
   assert.notEqual(k.config.fabric.pipelineId, theirs.id);
 });
@@ -555,15 +555,15 @@ test('a run stopped while Fabric creates a model: planning keeps its name and th
   const ui = fakeUi();
   const t = fakeCtx({ fabric: fabric.api, graph: fakeGraph().api, ui: ui.ui });
   t.config.semanticModel.enabled = true;
-  const ours = fabric.add('SemanticModel', 'Analytics Hub Model', 'half-made', 'ValueLens. (ref cc33)');
-  t.config.fabric.pendingItems = { 'SemanticModel:main': { name: 'Analytics Hub Model', ref: 'cc33' } };
+  const ours = fabric.add('SemanticModel', 'ValueLens Model', 'half-made', 'ValueLens. (ref cc33)');
+  t.config.fabric.pendingItems = { 'SemanticModel:main': { name: 'ValueLens Model', ref: 'cc33' } };
 
   await reserveNames(t.ctx);
-  assert.equal(t.config.semanticModel.name, 'Analytics Hub Model', 'not renamed to "… 2"');
+  assert.equal(t.config.semanticModel.name, 'ValueLens Model', 'not renamed to "… 2"');
   assert.doesNotMatch(ui.text(), /not from this install/);
   fabric.calls.length = 0;
   await deployModel(t.ctx, t.config.semanticModel, { signature: 's', definition: () => ({ parts: [] }) });
-  assert.deepEqual(fabric.calls, ['updateSemanticModel Analytics Hub Model']);
+  assert.deepEqual(fabric.calls, ['updateSemanticModel ValueLens Model']);
   assert.equal(t.config.semanticModel.id, ours.id);
   assert.equal(t.config.fabric.pendingItems, undefined);
 
@@ -571,14 +571,14 @@ test('a run stopped while Fabric creates a model: planning keeps its name and th
   const other = fakeFabric();
   const o = fakeCtx({ fabric: other.api, graph: fakeGraph().api, ui: fakeUi().ui });
   o.config.semanticModel.enabled = true;
-  const theirs = other.add('SemanticModel', 'Analytics Hub Model', 'theirs');
+  const theirs = other.add('SemanticModel', 'ValueLens Model', 'theirs');
   const failedOp = 'https://api.fabric.microsoft.com/v1/operations/op-f';
-  o.config.fabric.pendingItems = { 'SemanticModel:main': { name: 'Analytics Hub Model', ref: 'cc33', at: o.ctx.now().toISOString(), operation: failedOp } };
+  o.config.fabric.pendingItems = { 'SemanticModel:main': { name: 'ValueLens Model', ref: 'cc33', at: o.ctx.now().toISOString(), operation: failedOp } };
   other.operations[failedOp] = 'Failed';
   await reserveNames(o.ctx);
-  assert.equal(o.config.semanticModel.name, 'Analytics Hub Model 2');
+  assert.equal(o.config.semanticModel.name, 'ValueLens Model 2');
   await deployModel(o.ctx, o.config.semanticModel, { signature: 's', definition: () => ({ parts: [] }) });
-  assert.deepEqual(other.calls.filter((c) => /SemanticModel /.test(c)), ['createSemanticModel Analytics Hub Model 2']);
+  assert.deepEqual(other.calls.filter((c) => /SemanticModel /.test(c)), ['createSemanticModel ValueLens Model 2']);
   assert.equal(theirs.content, 'theirs');
 });
 
@@ -587,18 +587,18 @@ test('a run stopped moments ago: waits for the item Fabric is still creating, ra
   const t = fakeCtx({ fabric: fabric.api, graph: fakeGraph().api, ui: fakeUi().ui });
   await ensureNotebooks(t.ctx);
   const at = new Date(t.ctx.now().getTime() - 60_000).toISOString();
-  t.config.fabric.pendingItems = { DataPipeline: { name: 'AnalyticsHub_Pipeline', ref: 'ee55', at } };
+  t.config.fabric.pendingItems = { DataPipeline: { name: 'ValueLens_Pipeline', ref: 'ee55', at } };
   const list = fabric.api.listItems;
   let lists = 0;
   /** @type {any} */
   let ours;
   fabric.api.listItems = async (/** @type {string} */ ws, /** @type {string} */ type) => {
-    if (type === 'DataPipeline' && ++lists === 3) ours = fabric.add('DataPipeline', 'AnalyticsHub_Pipeline', 'half-made', 'Analytics Hub daily load. (ref ee55)');
+    if (type === 'DataPipeline' && ++lists === 3) ours = fabric.add('DataPipeline', 'ValueLens_Pipeline', 'half-made', 'ValueLens daily load. (ref ee55)');
     return list(ws, type);
   };
   fabric.calls.length = 0;
   await ensurePipeline(t.ctx);
-  assert.deepEqual(fabric.calls, ['updatePipeline AnalyticsHub_Pipeline']);
+  assert.deepEqual(fabric.calls, ['updatePipeline ValueLens_Pipeline']);
   assert.equal(t.config.fabric.pipelineId, ours.id);
   assert.equal(fabric.items.filter((i) => i.type === 'DataPipeline').length, 1);
 
@@ -608,7 +608,7 @@ test('a run stopped moments ago: waits for the item Fabric is still creating, ra
   const l = fakeCtx({ fabric: late.api, graph: fakeGraph().api, ui: lateUi.ui });
   await ensureNotebooks(l.ctx);
   const old = new Date(l.ctx.now().getTime() - CREATE_SETTLE_MS).toISOString();
-  l.config.fabric.pendingItems = { DataPipeline: { name: 'AnalyticsHub_Pipeline', ref: 'ee55', at: old } };
+  l.config.fabric.pendingItems = { DataPipeline: { name: 'ValueLens_Pipeline', ref: 'ee55', at: old } };
   late.calls.length = 0;
   const sleeps = l.sleeps.length;
   await assert.rejects(ensurePipeline(l.ctx), /wasn't created again, so there won't be two\. Run the installer again later: it uses that item if Fabric made it\. If it never appears, run the installer again without --yes and answer yes to create it\./);
@@ -621,10 +621,10 @@ test('a run stopped moments ago: waits for the item Fabric is still creating, ra
   const sure = fakeFabric();
   const s = fakeCtx({ fabric: sure.api, graph: fakeGraph().api, ui: fakeUi({ answers: [true] }).ui });
   await ensureNotebooks(s.ctx);
-  s.config.fabric.pendingItems = { DataPipeline: { name: 'AnalyticsHub_Pipeline', ref: 'ee55', at: old } };
+  s.config.fabric.pendingItems = { DataPipeline: { name: 'ValueLens_Pipeline', ref: 'ee55', at: old } };
   sure.calls.length = 0;
   await ensurePipeline(s.ctx);
-  assert.deepEqual(sure.calls.filter((c) => /Pipeline /.test(c)), ['createPipeline AnalyticsHub_Pipeline']);
+  assert.deepEqual(sure.calls.filter((c) => /Pipeline /.test(c)), ['createPipeline ValueLens_Pipeline']);
   assert.equal(s.config.fabric.pendingItems, undefined);
 
   // Days on, still not there: time alone doesn't show it isn't coming, so --yes still stops.
@@ -633,7 +633,7 @@ test('a run stopped moments ago: waits for the item Fabric is still creating, ra
   const g = fakeCtx({ fabric: gone.api, graph: fakeGraph().api, ui: goneUi.ui });
   await ensureNotebooks(g.ctx);
   const days = new Date(g.ctx.now().getTime() - 3 * 24 * 60 * 60_000).toISOString();
-  g.config.fabric.pendingItems = { DataPipeline: { name: 'AnalyticsHub_Pipeline', ref: 'ee55', at: days } };
+  g.config.fabric.pendingItems = { DataPipeline: { name: 'ValueLens_Pipeline', ref: 'ee55', at: days } };
   gone.calls.length = 0;
   await assert.rejects(ensurePipeline(g.ctx), /wasn't created again, so there won't be two/);
   assert.deepEqual(gone.calls.filter((c) => /Pipeline /.test(c)), []);
@@ -648,7 +648,7 @@ test("a stopped run's create with no time in the record: asked about at once, th
     const ui = fakeUi({ yes: true });
     const t = fakeCtx({ fabric: fabric.api, graph: fakeGraph().api, ui: ui.ui });
     await ensureNotebooks(t.ctx);
-    t.config.fabric.pendingItems = { DataPipeline: { name: 'AnalyticsHub_Pipeline', ref: 'ab12', ...(at ? { at } : {}) } };
+    t.config.fabric.pendingItems = { DataPipeline: { name: 'ValueLens_Pipeline', ref: 'ab12', ...(at ? { at } : {}) } };
     const before = JSON.stringify(t.config.fabric.pendingItems);
     fabric.calls.length = 0;
     const sleeps = t.sleeps.length;
@@ -668,10 +668,10 @@ test("a stopped run's create with no time in the record: asked about at once, th
     const sure = fakeFabric();
     const s = fakeCtx({ fabric: sure.api, graph: fakeGraph().api, ui: fakeUi({ answers: [true] }).ui });
     await ensureNotebooks(s.ctx);
-    s.config.fabric.pendingItems = { DataPipeline: { name: 'AnalyticsHub_Pipeline', ref: 'ab12', ...(at ? { at } : {}) } };
+    s.config.fabric.pendingItems = { DataPipeline: { name: 'ValueLens_Pipeline', ref: 'ab12', ...(at ? { at } : {}) } };
     sure.calls.length = 0;
     await ensurePipeline(s.ctx);
-    assert.deepEqual(sure.calls.filter((c) => /Pipeline /.test(c)), ['createPipeline AnalyticsHub_Pipeline']);
+    assert.deepEqual(sure.calls.filter((c) => /Pipeline /.test(c)), ['createPipeline ValueLens_Pipeline']);
   }
 });
 
@@ -684,7 +684,7 @@ test("a stopped run's create that Fabric gave an operation for: asked about, not
     await ensureNotebooks(t.ctx);
     // Asked a second ago, so the name-only wait would be long.
     const at = new Date(t.ctx.now().getTime() - 1000).toISOString();
-    t.config.fabric.pendingItems = { DataPipeline: { name: 'AnalyticsHub_Pipeline', ref: 'ee55', at, operation: OP } };
+    t.config.fabric.pendingItems = { DataPipeline: { name: 'ValueLens_Pipeline', ref: 'ee55', at, operation: OP } };
     if (state) fabric.operations[OP] = state;
     fabric.calls.length = 0;
     return { fabric, ui, t };
@@ -694,12 +694,12 @@ test("a stopped run's create that Fabric gave an operation for: asked about, not
   // Failed: there's nothing coming, so a new one is made at once.
   const failed = await setup('Failed');
   await ensurePipeline(failed.t.ctx);
-  assert.deepEqual(pipelineCalls(failed.fabric.calls), ['operationStatus op-x', 'createPipeline AnalyticsHub_Pipeline']);
+  assert.deepEqual(pipelineCalls(failed.fabric.calls), ['operationStatus op-x', 'createPipeline ValueLens_Pipeline']);
   assert.equal(failed.t.sleeps.length, 0);
 
   // Still running throughout: an error to run again later, and the record (with the operation) kept.
   const running = await setup('Running');
-  await assert.rejects(ensurePipeline(running.t.ctx), /Fabric is still creating AnalyticsHub_Pipeline\. Run the installer again in a few minutes/);
+  await assert.rejects(ensurePipeline(running.t.ctx), /Fabric is still creating ValueLens_Pipeline\. Run the installer again in a few minutes/);
   assert.deepEqual(running.fabric.calls.filter((c) => /Pipeline /.test(c)), []);
   assert.equal(running.t.config.fabric.pendingItems?.DataPipeline?.operation, OP);
   assert.equal(running.t.sleeps.length, CREATE_SETTLE_MS / 15_000);
@@ -711,12 +711,12 @@ test("a stopped run's create that Fabric gave an operation for: asked about, not
   done.fabric.api.operationStatus = async (/** @type {string} */ url) => {
     if (++asks === 3) {
       done.fabric.operations[OP] = 'Succeeded';
-      done.fabric.add('DataPipeline', 'AnalyticsHub_Pipeline', 'half-made', 'Analytics Hub daily load. (ref ee55)');
+      done.fabric.add('DataPipeline', 'ValueLens_Pipeline', 'half-made', 'ValueLens daily load. (ref ee55)');
     }
     return status(url);
   };
   await ensurePipeline(done.t.ctx);
-  assert.deepEqual(done.fabric.calls.filter((c) => /Pipeline /.test(c)), ['updatePipeline AnalyticsHub_Pipeline']);
+  assert.deepEqual(done.fabric.calls.filter((c) => /Pipeline /.test(c)), ['updatePipeline ValueLens_Pipeline']);
   assert.equal(done.fabric.items.filter((i) => i.type === 'DataPipeline').length, 1);
   assert.equal(done.t.config.fabric.pendingItems, undefined);
 
@@ -725,11 +725,11 @@ test("a stopped run's create that Fabric gave an operation for: asked about, not
   const lagList = lag.fabric.api.listItems;
   let lagLists = 0;
   lag.fabric.api.listItems = async (/** @type {string} */ ws, /** @type {string} */ type) => {
-    if (type === 'DataPipeline' && ++lagLists === 3) lag.fabric.add('DataPipeline', 'AnalyticsHub_Pipeline', 'half-made', 'Analytics Hub daily load. (ref ee55)');
+    if (type === 'DataPipeline' && ++lagLists === 3) lag.fabric.add('DataPipeline', 'ValueLens_Pipeline', 'half-made', 'ValueLens daily load. (ref ee55)');
     return lagList(ws, type);
   };
   await ensurePipeline(lag.t.ctx);
-  assert.deepEqual(lag.fabric.calls.filter((c) => /Pipeline /.test(c)), ['updatePipeline AnalyticsHub_Pipeline']);
+  assert.deepEqual(lag.fabric.calls.filter((c) => /Pipeline /.test(c)), ['updatePipeline ValueLens_Pipeline']);
   assert.equal(lag.fabric.items.filter((i) => i.type === 'DataPipeline').length, 1);
 
   // Succeeded but never there (deleted since, or still lagging): not made again without asking.
@@ -737,11 +737,11 @@ test("a stopped run's create that Fabric gave an operation for: asked about, not
   await assert.rejects(ensurePipeline(deleted.t.ctx), /wasn't created again, so there won't be two/);
   assert.deepEqual(pipelineCalls(deleted.fabric.calls), ['operationStatus op-x']);
   assert.equal(deleted.t.sleeps.length, 8, 'looked for it for two minutes');
-  assert.match(deleted.ui.text(), /Fabric says it created AnalyticsHub_Pipeline for the run that stopped, but it isn't in the workspace/);
+  assert.match(deleted.ui.text(), /Fabric says it created ValueLens_Pipeline for the run that stopped, but it isn't in the workspace/);
   assert.equal(deleted.t.config.fabric.pendingItems?.DataPipeline?.ref, 'ee55');
   const agreed = await setup('Succeeded', { answers: [true] });
   await ensurePipeline(agreed.t.ctx);
-  assert.deepEqual(pipelineCalls(agreed.fabric.calls), ['operationStatus op-x', 'createPipeline AnalyticsHub_Pipeline']);
+  assert.deepEqual(pipelineCalls(agreed.fabric.calls), ['operationStatus op-x', 'createPipeline ValueLens_Pipeline']);
   // However long ago Fabric said it made it: still not made again without asking.
   const old = await setup('Succeeded');
   /** @type {any} */ (old.t.config.fabric.pendingItems).DataPipeline.at = new Date(old.t.ctx.now().getTime() - 2 * 60 * 60_000).toISOString();
@@ -850,7 +850,7 @@ test('notebook mode: a secret Entra made just before the run stopped is found by
   assert.equal(saved.app.pendingSecretKeyIds, undefined, 'the key ID was never saved');
 
   // Someone else's secrets, named like the installer's, are left alone.
-  graph.passwords.push({ keyId: 'theirs-1', displayName: 'Analytics Hub installer' }, { keyId: 'theirs-2', displayName: secretLabel('123456abcdef') });
+  graph.passwords.push({ keyId: 'theirs-1', displayName: 'ValueLens installer' }, { keyId: 'theirs-2', displayName: secretLabel('123456abcdef') });
   graph.api.addPassword = add;
   const ui = fakeUi();
   const next = fakeCtx({ fabric: fabric.api, graph: graph.api, ui: ui.ui, config: saved });
@@ -892,7 +892,7 @@ test('notebook mode: a secret attempt that matches more than one secret, or none
     ['aaaaaaaaaaaa', 'bbbbbbbbbbbb', 'cccccccccccc'],
     'two matches: left alone; none yet: checked again; old with none: kept, with a warning; already tracked: dropped',
   );
-  assert.match(ui.text(), /asked Entra for a client secret called "Analytics Hub installer \(ref cccccccccccc\)" .*the app has none by that name\. The install record keeps watching for it/);
+  assert.match(ui.text(), /asked Entra for a client secret called "ValueLens installer \(ref cccccccccccc\)" .*the app has none by that name\. The install record keeps watching for it/);
   assert.doesNotMatch(ui.text(), /ref bbbbbbbbbbbb\)" .*has none by that name/, 'no warning while Entra may still be catching up');
   assert.deepEqual(t.config.app.pendingSecretKeyIds, ['d-1']);
 
@@ -901,7 +901,7 @@ test('notebook mode: a secret attempt that matches more than one secret, or none
   await settleSecretAttempts(t.ctx);
   assert.deepEqual(t.config.app.secretAttempts?.map((a) => a.ref), ['aaaaaaaaaaaa', 'bbbbbbbbbbbb']);
   assert.ok(graph.calls.includes('removePassword c-1'));
-  assert.match(ui.text(), /More than one client secret on the app is called "Analytics Hub installer \(ref aaaaaaaaaaaa\)" \(keys a-1, a-2\), so none is removed/);
+  assert.match(ui.text(), /More than one client secret on the app is called "ValueLens installer \(ref aaaaaaaaaaaa\)" \(keys a-1, a-2\), so none is removed/);
   assert.ok(!graph.calls.some((c) => /removePassword (a-|d-1)/.test(c)), 'neither the ambiguous ones nor a tracked one is removed by the check');
 });
 
@@ -1284,7 +1284,7 @@ test('app check: the user can check again once an admin has fixed it, or carry o
   assert.equal(t.config.app.appId, APP_GUID);
   assert.equal(t.config.app.displayName, 'Their app');
   assert.match(ui.text(), /Their app isn't ready yet/);
-  assert.match(ui.text(), /Their app has everything Analytics Hub needs/);
+  assert.match(ui.text(), /Their app has everything ValueLens needs/);
 
   const stuck = appGraph({ application: THEIR_APP, sp: { id: 'their-sp' } });
   const go = fakeUi({ answers: [APP_GUID, 'go'] });
@@ -1307,11 +1307,11 @@ test('admin pack: a script and portal steps for every permission, with the secre
   const dir = mkdtempSync(join(tmpdir(), 'vl-pack-'));
   try {
     const t = fakeCtx();
-    t.ctx.configFile = join(dir, 'valuelens-install.json');
+    t.ctx.configFile = join(dir, 'valuelens-setup.json');
     const file = writeAdminPack(t.ctx);
     assert.equal(file, join(dir, ADMIN_PACK_FILE));
     const body = readFileSync(file, 'utf8');
-    assert.match(body, /az ad app create --display-name "Analytics Hub Data Collector"/);
+    assert.match(body, /az ad app create --display-name "ValueLens \(Fabric\)"/);
     assert.match(body, /for P in AuditLogsQuery\.Read\.All Reports\.Read\.All User\.Read\.All; do/);
     assert.match(body, /az ad app permission admin-consent --id "\$APP_ID"/);
     assert.match(body, /Grant admin consent/);
@@ -1334,7 +1334,7 @@ test('admin pack: the install stops until the admin sends the client ID, then ch
   try {
     const quiet = fakeUi({ yes: true });
     const q = fakeCtx({ ui: quiet.ui });
-    q.ctx.configFile = join(dir, 'valuelens-install.json');
+    q.ctx.configFile = join(dir, 'valuelens-setup.json');
     delete q.config.app.appId;
     await assert.rejects(planAdminPack(q.ctx, { canConsent: false }), (err) => isResumeLater(err));
     assert.equal(q.config.app.adminPack, join(dir, ADMIN_PACK_FILE));

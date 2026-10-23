@@ -7,6 +7,7 @@
 import { allowsAction, ROLES } from './clients/azure.js';
 import { APP_ROLES, CONSENT_ROLES, FABRIC_ADMIN_ROLE } from './clients/graph.js';
 import { secretMode } from './config.js';
+import { PRODUCT } from './product.js';
 import { copilotLicences } from './seats.js';
 import { canWriteSecrets } from './steps/identity.js';
 import { blockedSettings, runsFabric } from './steps/plan.js';
@@ -285,7 +286,7 @@ export async function checkPrereqs(ctx) {
       {
         id: 'fabric-capacity',
         label: 'Active Fabric capacity',
-        neededFor: 'The Analytics Hub workspace, Lakehouse, notebooks and pipeline run on it.',
+        neededFor: `The ${PRODUCT.name} workspace, Lakehouse, notebooks and pipeline run on it.`,
         howTo: 'Start a Fabric trial, or ask a capacity admin to make you a contributor on an F2 or larger capacity.',
       },
       async () => {
@@ -360,7 +361,7 @@ export async function checkPrereqs(ctx) {
         const off = blockedSettings(Object.fromEntries(list.map((s) => [s.settingName, s])), { reports: true });
         return off.length
           ? { status: 'missing', detail: `Off: ${off.map((s) => s.title).join('; ')}.` }
-          : { status: 'met', detail: 'The settings Analytics Hub needs are on.' };
+          : { status: 'met', detail: `The settings ${PRODUCT.name} needs are on.` };
       },
     ),
     ...(config.dataSources?.resourceGraph === 'api' ? [resourceGraphPrereq(api, config, guard)] : []),

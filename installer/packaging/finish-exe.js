@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // @ts-check
 /**
- * Checks AnalyticsHubInstaller.exe's signature, then writes or checks its .sha256 and writes the
+ * Checks ValueLensInstaller.exe's signature, then writes or checks its .sha256 and writes the
  * release notes. Run it on the exe that gets published, after any signing, because signing
  * changes the hash.
  *

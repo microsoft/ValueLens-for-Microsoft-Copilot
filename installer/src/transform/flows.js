@@ -10,10 +10,11 @@
  * The writer only needs a DFS base URL. A target can name a SharePoint folder instead, which they
  * write through the SharePoint connector.
  */
+import { PRODUCT } from '../product.js';
 import { UPLOAD_DIR } from '../uploads.js';
 
-export const FEEDBACK_FLOW_NAME = 'Analytics Hub - Product feedback';
-export const AGENT_INVENTORY_FLOW_NAME = 'Analytics Hub - Agent inventory';
+export const FEEDBACK_FLOW_NAME = PRODUCT.flows.feedback;
+export const AGENT_INVENTORY_FLOW_NAME = PRODUCT.flows.agentInventory;
 /** Where the agent inventory flow saves on a Lakehouse; the notebook reads the newest file there. */
 export const AGENT_INVENTORY_DIR = 'Files/arg_inventory';
 /** The Power Platform inventory types the Resource Graph collector reads. */

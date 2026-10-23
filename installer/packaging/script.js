@@ -1,13 +1,14 @@
 // @ts-check
 /**
- * install.ps1, the PowerShell launcher published next to AnalyticsHubInstaller.exe. It downloads
+ * install.ps1, the PowerShell launcher published next to ValueLensInstaller.exe. It downloads
  * the exe's payload as a zip, checks its SHA-256 and runs the installer with the Node.js inside, for
  * organisations that block downloaded exes. In Azure Cloud Shell, for tenants where no PC can run
  * it, it gets the release's commit from GitHub instead and runs the installer in the terminal.
  * build-exe.js fills in the template in launcher/install.ps1 for each release.
  */
+import { PRODUCT } from '../src/product.js';
 
-export const ZIP_NAME = 'AnalyticsHubInstaller.zip';
+export const ZIP_NAME = PRODUCT.zip;
 export const SCRIPT_NAME = 'install.ps1';
 
 /**
@@ -15,7 +16,7 @@ export const SCRIPT_NAME = 'install.ps1';
  * @param {string} repo  owner/name
  * @param {string} version
  */
-export const zipUrl = (repo, version) => `https://github.com/${repo}/releases/download/installer-v${version}/${ZIP_NAME}`;
+export const zipUrl = (repo, version) => `https://github.com/${repo}/releases/download/${PRODUCT.tagPrefix}${version}/${ZIP_NAME}`;
 
 /**
  * The PowerShell command that runs a release's install.ps1, or the latest release's.
@@ -23,7 +24,7 @@ export const zipUrl = (repo, version) => `https://github.com/${repo}/releases/do
  * @param {string} [version]
  */
 export function scriptCommand(repo, version) {
-  const path = version ? `download/installer-v${version}` : 'latest/download';
+  const path = version ? `download/${PRODUCT.tagPrefix}${version}` : 'latest/download';
   return `irm https://github.com/${repo}/releases/${path}/${SCRIPT_NAME} | iex`;
 }
 

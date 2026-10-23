@@ -4,6 +4,7 @@
  * source file: fills in the tenant and app IDs, reads the client secret from
  * Key Vault, tags the parameters cell and binds the default Lakehouse.
  */
+import { PRODUCT } from '../product.js';
 
 /**
  * @typedef {{ cell_type: string, source: string | string[], metadata?: Record<string, any>, [k: string]: any }} Cell
@@ -21,7 +22,7 @@
  * @property {import('../catalog.js').NotebookPatch[]} [patches]  Text changes to code cells.
  */
 
-export const MARKER = 'Set by the Analytics Hub installer';
+export const MARKER = PRODUCT.marker;
 
 /** @param {Cell} cell */
 export function cellText(cell) {

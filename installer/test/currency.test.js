@@ -35,10 +35,10 @@ test('currency: a saved choice is cleaned; a rate an older record kept is droppe
 test('currency: the install record keeps the choice and older records have none', () => {
   const dir = mkdtempSync(join(tmpdir(), 'vl-currency-'));
   try {
-    const file = join(dir, 'valuelens-install.json');
-    writeFileSync(file, JSON.stringify({ version: 1, reporting: { currency: 'gbp', exchangeRate: 0.79 } }));
+    const file = join(dir, 'valuelens-setup.json');
+    writeFileSync(file, JSON.stringify({ product: 'valuelens', version: 1, reporting: { currency: 'gbp', exchangeRate: 0.79 } }));
     assert.deepEqual(loadConfig(file).config.reporting, { currency: 'GBP' });
-    writeFileSync(file, JSON.stringify({ version: 1 }));
+    writeFileSync(file, JSON.stringify({ product: 'valuelens', version: 1 }));
     assert.equal('reporting' in loadConfig(file).config, false);
   } finally {
     rmSync(dir, { recursive: true, force: true });

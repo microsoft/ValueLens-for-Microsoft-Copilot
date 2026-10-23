@@ -170,7 +170,7 @@ test('failed deployment -> edit only Fabric placement -> successful retry, witho
   // What the rest of the install reads and writes.
   delete config.keyVault.uri;
   config.keyVault.mode = 'notebook';
-  graph.applications.push({ id: 'obj-1', appId: 'app-1', displayName: 'Analytics Hub' });
+  graph.applications.push({ id: 'obj-1', appId: 'app-1', displayName: 'ValueLens' });
   Object.assign(ctx.api.graph, {
     subscribedSkus: async () => {
       throw new Error('Forbidden');

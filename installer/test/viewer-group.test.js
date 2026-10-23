@@ -20,9 +20,9 @@ const OWNER = `https://graph.microsoft.com/v1.0/users/${ME.id}`;
 /** The group the installer asks Graph for, without its owner. */
 const GROUP = {
   displayName: VIEWER_GROUP_NAME,
-  description: 'People who can view Analytics Hub. Add members to share it.',
+  description: 'People who can view ValueLens. Add members to share it.',
   mailEnabled: false,
-  mailNickname: 'analytics-hub-viewers',
+  mailNickname: 'valuelens-viewers',
   securityEnabled: true,
 };
 
@@ -97,7 +97,7 @@ test('an Entra admin keeps "A new group": one create, naming them as owner, as b
   assert.deepEqual(t.groups.get('g-1')?.owners, [ME.id]);
   assert.equal(config.access.groupId, 'g-1');
   assert.equal(config.access.createdGroup, true);
-  assert.match(text(), /Created the group "Analytics Hub Viewers", with you as owner/);
+  assert.match(text(), /Created the group "ValueLens Viewers", with you as owner/);
 });
 
 test(`${who(false)} keeps "A new group": Graph's duplicate-values 400 is sent again without naming them, and they own the group`, async () => {
@@ -113,7 +113,7 @@ test(`${who(false)} keeps "A new group": Graph's duplicate-values 400 is sent ag
   assert.deepEqual(t.groups.get('g-1')?.owners, [ME.id]);
   assert.equal(config.access.groupId, 'g-1');
   assert.equal(config.access.createdGroup, true);
-  assert.match(text(), /Created the group "Analytics Hub Viewers", with you as owner/);
+  assert.match(text(), /Created the group "ValueLens Viewers", with you as owner/);
   assert.doesNotMatch(text(), /duplicate values|Couldn't create/);
 
   assert.equal((await ensureViewerGroup(ctx))?.id, 'g-1');
@@ -134,7 +134,7 @@ test('another failure to create the group is not sent again, and warns with what
   config.access = { groupName: VIEWER_GROUP_NAME };
   assert.equal(await ensureViewerGroup(ctx), null);
   assert.equal(config.access.groupId, undefined);
-  assert.match(text(), /Couldn't create the group "Analytics Hub Viewers", so there's no viewer group yet: .*mailNickname/);
+  assert.match(text(), /Couldn't create the group "ValueLens Viewers", so there's no viewer group yet: .*mailNickname/);
   assert.match(text(), /Run "access" and choose "A group I already have" to use a security group you own, or ask an Entra admin for one/);
 });
 
@@ -158,12 +158,12 @@ for (const admin of [true, false]) {
 
     await accessCommand(ctx, [], undefined);
 
-    assert.equal(asked[0], 'Who can view Analytics Hub?', 'kept the default, "A new group"');
+    assert.equal(asked[0], 'Who can view ValueLens?', 'kept the default, "A new group"');
     assert.equal(t.creates.length, admin ? 1 : 2);
     assert.deepEqual(t.groups.get('g-1')?.owners, [ME.id]);
     assert.equal(config.access?.groupId, 'g-1');
     assert.equal(config.access?.createdGroup, true);
-    assert.match(text(), /Created the group "Analytics Hub Viewers", with you as owner/);
+    assert.match(text(), /Created the group "ValueLens Viewers", with you as owner/);
     assert.match(text(), /0 members; owners: admin@contoso\.com/);
     assert.ok(asked.includes('What next?'), 'carries on to the menu');
   });
@@ -194,7 +194,7 @@ for (const admin of [true, false]) {
     assert.equal(t.creates.length, admin ? 1 : 2);
     assert.deepEqual(t.groups.get('g-1')?.owners, [ME.id]);
     assert.equal(config.access?.groupId, 'g-1');
-    assert.match(ui.text(), /Created the group "Analytics Hub Viewers", with you as owner/);
+    assert.match(ui.text(), /Created the group "ValueLens Viewers", with you as owner/);
     assert.equal(config.access?.rls?.enabled, true);
     assert.equal(redeployed, 1);
   });

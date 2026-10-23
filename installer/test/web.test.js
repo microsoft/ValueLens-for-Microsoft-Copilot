@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { emptyConfig } from '../src/config.js';
 import { memoApi, rewindable } from '../src/install.js';
+import { PRODUCT } from '../src/product.js';
 import { mirror, reopenOnEnter, startServer } from '../src/server.js';
 import { collectChoices } from '../src/steps/plan.js';
 import { createWebUi, plainText, SECRET_MASK, toSegments } from '../src/web-ui.js';
@@ -327,14 +328,14 @@ test('server: only the printed link opens it, and every call needs its cookie', 
     assert.equal((await call(server.port, { path: '/?t=wrong' })).status, 403);
     const opened = await call(server.port, { path: '/?t=tok' });
     assert.equal(opened.status, 303);
-    assert.match(String(opened.headers['set-cookie']), new RegExp(`^valuelens_${server.port}=tok; HttpOnly; SameSite=Strict`));
+    assert.match(String(opened.headers['set-cookie']), new RegExp(`^${PRODUCT.id}_${server.port}=tok; HttpOnly; SameSite=Strict`));
     assert.equal((await call(server.port, { path: '/' })).status, 401);
-    assert.equal((await call(server.port, { path: '/api/state', headers: { Cookie: `valuelens_${server.port}=nope` } })).status, 401);
+    assert.equal((await call(server.port, { path: '/api/state', headers: { Cookie: `${PRODUCT.id}_${server.port}=nope` } })).status, 401);
     const state = await call(server.port, { path: '/api/state', headers: { Cookie: cookie } });
     assert.equal(state.status, 200);
     assert.deepEqual(JSON.parse(state.body), { installed: false });
     const html = await call(server.port, { path: '/', headers: { Cookie: cookie } });
-    assert.match(html.body, /<title>Analytics Hub installer<\/title>/);
+    assert.match(html.body, /<title>ValueLens installer<\/title>/);
     assert.match(String(html.headers['content-security-policy']), /default-src 'none'/);
   } finally {
     server.close();
@@ -405,7 +406,7 @@ test('server: start passes through; quit waits for a running command', async () 
 });
 
 test('server: start fresh and keep the record pass through, behind the same checks', async () => {
-  let fresh = /** @type {any} */ ({ ok: true, archived: 'C:\\Docs\\valuelens-install.20260507-090302.json' });
+  let fresh = /** @type {any} */ ({ ok: true, archived: 'C:\\Docs\\valuelens-setup.20260507-090302.json' });
   let kept = 0;
   const { server, post } = await serve({ startFresh: () => fresh, keepRecord: () => (kept++, { ok: true }) });
   try {
@@ -687,14 +688,19 @@ test('page: every script under web/ parses', async () => {
 
 test('page: the stages and the finish it waits for are headings the installer prints', async () => {
   const app = await readFile(new URL('web/app.js', SRC), 'utf8');
+  // A heading may carry the product's name: PRODUCT_NAME in the page, PRODUCT.name in the installer.
+  const named = (/** @type {string} */ s) => s.replaceAll('${PRODUCT_NAME}', PRODUCT.name).replaceAll('${PRODUCT.name}', PRODUCT.name);
   const list = (/** @type {string} */ name) => {
     const m = new RegExp(`const ${name} = (?:new Set\\()?\\[([^\\]]*)\\]`).exec(app);
     assert.ok(m, `${name} is in app.js`);
-    return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+    return [...m[1].matchAll(/'([^']+)'|`((?:[^`$]|\$\{PRODUCT_NAME\})+)`/g)].map((x) => named(x[1] ?? x[2]));
   };
   const files = (await readdir(SRC, { recursive: true })).filter((f) => f.endsWith('.js') && !/^web[\\/]/.test(f));
   const printed = new Set();
-  for (const f of files) for (const m of (await readFile(new URL(f.replaceAll('\\', '/'), SRC), 'utf8')).matchAll(/\bheading\('([^']+)'\)/g)) printed.add(m[1]);
+  for (const f of files) {
+    const text = await readFile(new URL(f.replaceAll('\\', '/'), SRC), 'utf8');
+    for (const m of text.matchAll(/\bheading\((?:'([^']+)'|`((?:[^`$]|\$\{PRODUCT\.name\})+)`)\)/g)) printed.add(named(m[1] ?? m[2]));
+  }
 
   // Sign in comes from the sign-in event, Setting up from the numbered steps, and Done from the finish.
   const fromHeadings = list('INSTALL_STAGES').filter((s) => !['Sign in', 'Setting up', 'Done'].includes(s));
@@ -707,7 +713,7 @@ test('page: the stages and the finish it waits for are headings the installer pr
   // Done is last, so nothing ahead of it is skipped; each target-only stage is one of the stages.
   const stages = list('INSTALL_STAGES');
   assert.equal(stages.at(-1), 'Done');
-  assert.ok(!stages.includes('Where should Analytics Hub run?'), 'the target question comes first, so it slots in');
+  assert.ok(!stages.includes(`Where should ${PRODUCT.name} run?`), 'the target question comes first, so it slots in');
   const only = /const TARGET_STAGES = \{([\s\S]*?)\n\};/.exec(app)?.[1] ?? '';
   const tagged = [...only.matchAll(/'([^']+)'/g)].map((x) => x[1]);
   assert.ok(tagged.includes('Fabric'));

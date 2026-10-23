@@ -17,7 +17,7 @@ const PRE = /** @type {any} */ ({
 /** The questions behind Advanced settings, which a default install doesn't ask. */
 const ADVANCED_QUESTIONS = [
   'Deploy the semantic model?',
-  'Who can view Analytics Hub?',
+  'Who can view ValueLens?',
   'Who should people ask for access? (email)',
   'How much audit history should the first load pull?',
   'How many people are in the tenant?',
@@ -58,13 +58,13 @@ test('advanced: a Fabric plan with No asks only the essentials and keeps the def
   assert.equal(config.reporting, undefined, 'the Value page stays in US dollars');
   assert.equal(config.history.days, 30);
   assert.equal(config.scale, 'large', 'from the F64');
-  assert.equal(config.fabric.lakehouseName, 'Analytics_Hub', 'a new install suggests the new name');
+  assert.equal(config.fabric.lakehouseName, 'ValueLens', 'a new install suggests the ValueLens name');
   assert.equal(config.schedule.frequency, 'daily');
   assert.equal(ctx.runFirstLoad, true);
-  assert.equal(config.access?.groupName, 'Analytics Hub Viewers');
+  assert.equal(config.access?.groupName, 'ValueLens Viewers');
 });
 
-test('plan: a new install suggests Analytics Hub names and says what capacity size suits', async () => {
+test('plan: a new install suggests ValueLens names and says what capacity size suits', async () => {
   const t = fakeUi();
   const fabric = fakeFabric().api;
   const { ctx, config } = fakeCtx({ ui: t.ui, fabric: { ...fabric, listWorkspaces: async () => [{ id: 'ws-x', type: 'Workspace', displayName: 'Other' }] } });
@@ -73,9 +73,49 @@ test('plan: a new install suggests Analytics Hub names and says what capacity si
   delete config.fabric.lakehouseId;
   delete config.fabric.lakehouseName;
   await plan(ctx, PRE);
-  assert.equal(config.fabric.workspaceName, 'Analytics Hub');
-  assert.equal(config.fabric.lakehouseName, 'Analytics_Hub');
+  assert.equal(config.fabric.workspaceName, 'ValueLens');
+  assert.equal(config.fabric.lakehouseName, 'ValueLens');
   assert.match(t.text(), /F64 or larger is recommended for more than 10,000 people; small or trial capacities work but loads are slower\./);
+});
+
+test('plan: a workspace that holds an Analytics Hub install is refused and offered no more', async () => {
+  const workspaces = [
+    { id: 'ws-ah', type: 'Workspace', displayName: 'Analytics Hub' },
+    { id: 'ws-old', type: 'Workspace', displayName: 'Copilot reporting' },
+    { id: 'ws-mine', type: 'Workspace', displayName: 'Mine' },
+  ];
+  /** @type {Record<string, { id: string, type: string, displayName: string, description?: string }[]>} */
+  const held = {
+    'ws-ah': [{ id: 'nb-1', type: 'Notebook', displayName: 'AnalyticsHub_Data_Check' }],
+    'ws-old': [{ id: 'sm-1', type: 'SemanticModel', displayName: 'Copilot Model', description: 'Deployed by the Analytics Hub installer.' }],
+    'ws-mine': [{ id: 'nb-2', type: 'Notebook', displayName: 'Copilot_Audit_Log_Processor' }],
+  };
+  const t = fakeUi();
+  const select = t.ui.select;
+  /** @type {string[][]} */
+  const offered = [];
+  const picks = ['ws-ah', 'ws-old', 'ws-mine'];
+  /** @type {any} */ (t.ui).select = async (/** @type {string} */ message, /** @type {any[]} */ choices, /** @type {any} */ def) => {
+    if (message !== 'Workspace') return select(message, choices, def);
+    offered.push(choices.map((c) => c.value));
+    return picks.shift();
+  };
+  const fabric = {
+    ...fakeFabric().api,
+    listWorkspaces: async () => workspaces,
+    listItems: async (/** @type {string} */ ws, /** @type {string} */ type) => (held[ws] ?? []).filter((i) => !type || i.type === type),
+  };
+  const { ctx, config } = fakeCtx({ ui: t.ui, fabric });
+  delete config.fabric.workspaceId;
+  delete config.fabric.workspaceName;
+  delete config.fabric.lakehouseId;
+  delete config.fabric.lakehouseName;
+  await plan(ctx, PRE);
+  assert.deepEqual(offered, [['', 'ws-ah', 'ws-old', 'ws-mine'], ['', 'ws-old', 'ws-mine'], ['', 'ws-mine']]);
+  assert.equal(config.fabric.workspaceId, 'ws-mine', "a workspace with only ValueLens's manual setup in it is fine");
+  assert.equal(config.fabric.workspaceName, 'Mine');
+  assert.match(t.text(), /The workspace "Analytics Hub" holds an Analytics Hub install, which already includes the ValueLens report\. Choose another workspace or create a new one\./);
+  assert.match(t.text(), /The workspace "Copilot reporting" holds an Analytics Hub install/);
 });
 
 test('plan: an existing record keeps its names', async () => {

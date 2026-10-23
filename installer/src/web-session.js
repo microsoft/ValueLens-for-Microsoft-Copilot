@@ -9,6 +9,7 @@ import { archiveConfig, loadConfig, secretMode } from './config.js';
 import { connect as realConnect, createCtx, runCommand, showPrereqs } from './install.js';
 import { bundled, commandLine, installerWindow, launcher, reopenHint, updateHint } from './launch.js';
 import { checkPrereqs } from './prereqs.js';
+import { PRODUCT } from './product.js';
 import { loadSources } from './sources.js';
 import { describeSchedule, recordWorkspaceGone, staleRecordMessage } from './steps/fabric.js';
 import { isResumeLater } from './steps/identity.js';
@@ -181,7 +182,7 @@ export function createSession(o) {
     try {
       const { config, existed } = loadConfig(o.configFile);
       currentConfig = config;
-      if (!NO_RECORD.includes(command) && !existed) throw new Error(`No install record at ${o.configFile}. Set up Analytics Hub first.`);
+      if (!NO_RECORD.includes(command) && !existed) throw new Error(`No install record at ${o.configFile}. Set up ${PRODUCT.name} first.`);
       const sources = loadSources(o.sourceDir);
       const tenant = (req.tenant ?? '').trim() || config.tenantId || '';
       const reuse = signedIn && signedIn.method === method && (!tenant || tenant === signedIn.tenant || tenant === signedIn.user.tenantId);
@@ -239,7 +240,7 @@ export function createSession(o) {
       await checking;
     },
     /**
-     * Sets the install record aside, as `valuelens-install.<date>.json`, so the next install starts fresh.
+     * Sets the install record aside, as `valuelens-setup.<date>.json`, so the next install starts fresh.
      * @returns {{ ok: true, archived: string | null } | { ok: false, status: number, error: string }}
      */
     startFresh() {

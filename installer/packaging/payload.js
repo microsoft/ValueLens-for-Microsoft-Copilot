@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * What goes into AnalyticsHubInstaller.exe, kept apart from the build so it can be tested.
+ * What goes into ValueLensInstaller.exe, kept apart from the build so it can be tested.
  * The payload unpacks to:
  *   node/node.exe            Node.js, which runs everything below
  *   f/installer/             the installer, with its production dependencies
@@ -9,15 +9,16 @@
  */
 import { posix } from 'node:path';
 import { NOTEBOOKS, NOTEBOOKS_DIR } from '../src/catalog.js';
+import { PRODUCT } from '../src/product.js';
 import { PIPELINE_TEMPLATE } from '../src/sources.js';
 import { MODEL_TEMPLATE } from '../src/transform/model.js';
 
-export const EXE_NAME = 'AnalyticsHubInstaller.exe';
+export const EXE_NAME = PRODUCT.exe;
 /** The source folder (the repo root) inside the payload. */
 export const SOURCE_ROOT = 'f';
 /**
  * Longest path allowed inside the payload. It unpacks to
- * `%LOCALAPPDATA%\AnalyticsHub\<version>-<hash>\`, about 70 characters for a typical profile, so
+ * `%LOCALAPPDATA%\ValueLens\<version>-<hash>\`, about 70 characters for a typical profile, so
  * the deepest dependencies end up past Windows' 260-character limit. The launcher and Node.js
  * both use extended-length paths, which don't have that limit; this catches a dependency tree
  * that suddenly nests much deeper.

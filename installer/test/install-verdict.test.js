@@ -48,7 +48,7 @@ const turnedAway = { status: 'Failed', error: { errorCode: 'TooManyRequestsForCa
 async function runInstall(t, o = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'installer-verdict-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const file = join(dir, 'valuelens-install.json');
+  const file = join(dir, 'valuelens-setup.json');
   const config = loadConfig(file).config;
   config.target = 'fabric';
   config.tenantId = 'tenant-1';
@@ -57,7 +57,7 @@ async function runInstall(t, o = {}) {
   config.keyVault.mode = 'notebook';
   config.semanticModel.enabled = true;
   if (o.access) {
-    config.access = /** @type {any} */ ({ groupId: 'group-1', groupName: 'Analytics Hub Viewers', rls: { enabled: true, orgAttribute: 'department', applied: [] } });
+    config.access = /** @type {any} */ ({ groupId: 'group-1', groupName: 'ValueLens Viewers', rls: { enabled: true, orgAttribute: 'department', applied: [] } });
   }
   // A reload is a repair or change, once the first load has completed.
   if (o.reload) config.firstRun = { jobId: 'job-0', status: 'Completed' };
@@ -100,7 +100,7 @@ async function runInstall(t, o = {}) {
     ...loads.flatMap(([activityName, attempts]) => attempts.map((a, i) => ({ activityName, activityRunStart: `2026-06-01T12:0${i + 2}:00Z`, ...a }))),
   ];
   const graph = fakeAzureGraph();
-  graph.applications.push({ id: 'obj-1', appId: 'app-1', displayName: 'Analytics Hub' });
+  graph.applications.push({ id: 'obj-1', appId: 'app-1', displayName: 'ValueLens' });
   const powerBi = fakePowerBi();
   const ui = fakeUi();
   if (o.reload) {
@@ -124,7 +124,7 @@ async function runInstall(t, o = {}) {
         usersCanRegisterApps: async () => true,
         ensureRequiredAccess: async () => false,
         findGroupByName: async (/** @type {string} */ name) => ({ id: 'group-1', displayName: name }),
-        getGroup: async (/** @type {string} */ id) => ({ id, displayName: 'Analytics Hub Viewers' }),
+        getGroup: async (/** @type {string} */ id) => ({ id, displayName: 'ValueLens Viewers' }),
         appRoleAssignments: async () => (await graph.api.graphServicePrincipal()).appRoles.map((r) => ({ resourceId: 'graph-sp', appRoleId: r.id })),
       },
       powerBi: { ...powerBi.api, datasetUsers: async () => [], addDatasetUser: async () => null },
@@ -163,16 +163,16 @@ async function runInstall(t, o = {}) {
 /** @param {{ ok: boolean, text: string }} run */
 function setUp({ ok, text }) {
   assert.equal(ok, true);
-  assert.match(text, /Analytics Hub is set up/);
+  assert.match(text, /ValueLens is set up/);
   assert.doesNotMatch(text, /partly set up/);
 }
 
 /** @param {{ ok: boolean, text: string }} run */
 function partlySetUp({ ok, text }) {
   assert.equal(ok, false);
-  assert.match(text, /Analytics Hub is partly set up/);
+  assert.match(text, /ValueLens is partly set up/);
   assert.match(text, /A step above didn't finish\. Fix what it says, then run the installer again/);
-  assert.doesNotMatch(text, /Analytics Hub is set up/);
+  assert.doesNotMatch(text, /ValueLens is set up/);
 }
 
 test('install: with nothing failing it is set up', async (t) => {

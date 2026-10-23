@@ -4,6 +4,7 @@
  * branches out, and run-time parameters for the audit load mode.
  */
 import { NOTEBOOKS } from '../catalog.js';
+import { PRODUCT } from '../product.js';
 
 /** Activities whose notebooks are archived. The installer never deploys them. */
 export const ARCHIVED_ACTIVITIES = ['Conditionally_Run_Dataverse_Transcripts', 'Conditionally_Run_Credit_Consumption'];
@@ -141,7 +142,7 @@ export const PIPELINE_CHANGE =
   'This version gives the Agent 365 registry and Defender loads more time, sized by tenant size, and gives the registry load a time budget so a long weekly refresh finishes on the next run instead of timing out. Your data and settings are kept.';
 
 /** Notebooks with the same tag share one high-concurrency Spark session (letters, digits and underscores only). */
-export const SESSION_TAG = 'analytics_hub';
+export const SESSION_TAG = PRODUCT.id;
 /** Last step: records each load's outcome in dbo.load_log and fails the run when a load failed. */
 export const STATUS_ACTIVITY = 'Record_Load_Status';
 
@@ -449,7 +450,7 @@ export function buildPipeline(template, settings) {
   applySessionTag(filled.properties.activities);
 
   filled.properties.description =
-    'Created by the Analytics Hub installer. The loads run in two lanes rather than all at once, so a trial or small capacity isn\'t overloaded. ' +
+    `Created by the ${PRODUCT.installer}. The loads run in two lanes rather than all at once, so a trial or small capacity isn't overloaded. ` +
     'Every notebook shares one Spark session (high concurrency for pipelines must be on in the workspace\'s Spark settings). ' +
     `Lane 1 loads the audit log, then runs the Audit Log Processor${settings.semanticModelId ? ', then refreshes the semantic model' : ''}. ` +
     'Lane 2 runs the other loads one after another; a load that fails doesn\'t stop the next. ' +

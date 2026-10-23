@@ -8,6 +8,7 @@ import { randomBytes } from 'node:crypto';
 import { closeSync, existsSync, mkdtempSync, openSync, readSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
+import { PRODUCT } from './product.js';
 import { dataSource, decodeStart, detectSource, MAX_UPLOAD_BYTES, parseCsvHeader, routedSources } from './uploads.js';
 
 /**
@@ -95,7 +96,7 @@ function readHead(path) {
  */
 export function stageUpload(name, bytes) {
   const clean = basename(String(name).replace(/\\/g, '/')) || 'upload.csv';
-  stageDir ??= mkdtempSync(join(tmpdir(), 'analytics-hub-uploads-'));
+  stageDir ??= mkdtempSync(join(tmpdir(), PRODUCT.stagingPrefix));
   const token = randomBytes(12).toString('hex');
   const path = join(stageDir, `${token}.csv`);
   writeFileSync(path, bytes);

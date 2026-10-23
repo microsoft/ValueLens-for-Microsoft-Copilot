@@ -248,7 +248,7 @@ function failedRun() {
   const fabric = fakeFabric();
   const ui = fakeUi();
   const { ctx, config, sleeps } = fakeCtx({ fabric: fabric.api, ui: ui.ui });
-  const pipe = fabric.add('DataPipeline', 'AnalyticsHub_Pipeline', build({ workspaceId: 'ws-1' }));
+  const pipe = fabric.add('DataPipeline', 'ValueLens_Pipeline', build({ workspaceId: 'ws-1' }));
   config.fabric.pipelineId = pipe.id;
   fabric.jobList.push({ id: 'j-1', status: 'Failed', startTimeUtc: '2026-06-01T02:00:00', endTimeUtc: '2026-06-01T03:00:00' });
   const ran = (/** @type {string} */ activityName, /** @type {string} */ status = 'Succeeded', /** @type {any} */ error = undefined) => ({

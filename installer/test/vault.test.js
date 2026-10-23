@@ -207,7 +207,7 @@ test('new secret: one a stopped run may have put in the vault is replaced, then 
 
 test('new secret: a stopped run that Entra gave a secret before its key was saved: found by its ref and tracked', async () => {
   // Stopped between addPassword and saving the key: only the attempt is in the record.
-  const apis = fakeSecretApis({ passwords: [{ keyId: 'key-lost', displayName: 'Analytics Hub installer (ref aaaaaaaaaaaa)' }, { keyId: 'key-theirs', displayName: 'Analytics Hub installer' }] });
+  const apis = fakeSecretApis({ passwords: [{ keyId: 'key-lost', displayName: 'ValueLens installer (ref aaaaaaaaaaaa)' }, { keyId: 'key-theirs', displayName: 'ValueLens installer' }] });
   const ui = fakeUi();
   const t = secretCtx(apis, { ui: ui.ui });
   t.config.app.existing = false;
@@ -222,8 +222,8 @@ test('new secret: a stopped run that Entra gave a secret before its key was save
   // Two with the same ref: neither is adopted or removed, and the attempt stays.
   const twice = fakeSecretApis({
     passwords: [
-      { keyId: 'k1', displayName: 'Analytics Hub installer (ref bbbbbbbbbbbb)' },
-      { keyId: 'k2', displayName: 'Analytics Hub installer (ref bbbbbbbbbbbb)' },
+      { keyId: 'k1', displayName: 'ValueLens installer (ref bbbbbbbbbbbb)' },
+      { keyId: 'k2', displayName: 'ValueLens installer (ref bbbbbbbbbbbb)' },
     ],
   });
   const tw = fakeUi();
@@ -390,7 +390,7 @@ test('private vault: another workspace\'s approved endpoint with the same name i
   const { ctx } = endpointCtx(apis);
   assert.equal(await ensureVaultEndpoint(ctx), true);
   assert.deepEqual(apis.calls.filter((c) => c.startsWith('approve')), ['approve pec-1']);
-  assert.deepEqual(apis.state('pec-1'), { status: 'Approved', description: 'Approved by the Analytics Hub installer for Fabric workspace ws-1.' });
+  assert.deepEqual(apis.state('pec-1'), { status: 'Approved', description: 'Approved by the ValueLens installer for Fabric workspace ws-1.' });
   assert.deepEqual(apis.state('ws-0.valuelens-kv-test-conn'), { status: 'Approved', description: 'Approved by the ValueLens installer.' }, 'the other workspace\'s is left alone');
 });
 

@@ -3,7 +3,11 @@
  * What the installer deploys: the notebooks, the modules that switch them on,
  * and the Graph application permissions each module needs.
  */
+import { PRODUCT } from './product.js';
 import { routerWanted } from './uploads.js';
+
+/** The installer's own notebooks are named for the product, so they never clash with another installer's. */
+const own = (/** @type {string} */ name) => `${PRODUCT.fabric.notebookPrefix}${name}`;
 
 /** Microsoft Graph's application ID. Same in every tenant. */
 export const GRAPH_APP_ID = '00000003-0000-0000-c000-000000000000';
@@ -153,7 +157,7 @@ export const NOTEBOOKS = [
   {
     key: 'dataCheck',
     file: 'ValueLens_Data_Check.ipynb',
-    displayName: 'AnalyticsHub_Data_Check',
+    displayName: own('Data_Check'),
     module: 'core',
     credentials: false,
     parameters: [],
@@ -185,7 +189,7 @@ export const NOTEBOOKS = [
   {
     key: 'uploadRouter',
     file: 'AnalyticsHub_Upload_Router.ipynb',
-    displayName: 'AnalyticsHub_Upload_Router',
+    displayName: own('Upload_Router'),
     module: 'core',
     credentials: false,
     parameters: [],
@@ -205,7 +209,7 @@ export const NOTEBOOKS = [
   {
     key: 'loadStatus',
     file: 'AnalyticsHub_Load_Status.ipynb',
-    displayName: 'AnalyticsHub_Load_Status',
+    displayName: own('Load_Status'),
     module: 'core',
     credentials: false,
     parameters: ['PIPELINE_RUN_ID', 'PIPELINE_TRIGGER_TIME'],
@@ -243,7 +247,7 @@ export const NOTEBOOKS = [
       {
         find: '          f"Preserving any existing {OUTPUT_TABLE} snapshot.")\n',
         replace: `          f"Preserving any existing {OUTPUT_TABLE} snapshot.")
-    if not _table_exists(OUTPUT_TABLE):  # Set by the Analytics Hub installer: an empty table, not a missing one
+    if not _table_exists(OUTPUT_TABLE):  # ${PRODUCT.marker}: an empty table, not a missing one
         from pyspark.sql.types import StructField, StructType, StringType, TimestampType
         _empty_cols, _ = _build_alias_plan()
         (spark.createDataFrame([], StructType([StructField(c, StringType(), True) for c in _empty_cols]
@@ -281,7 +285,7 @@ export const NOTEBOOKS = [
   {
     key: 'refreshModel',
     file: 'ValueLens_Refresh_Model.ipynb',
-    displayName: 'AnalyticsHub_Refresh_Model',
+    displayName: own('Refresh_Model'),
     module: 'core',
     credentials: false,
     parameters: ['WORKSPACE_ID', 'SEMANTIC_MODEL_ID', 'WRITE_MODE', 'CHECK_AUDIT_STATE'],
@@ -291,7 +295,7 @@ export const NOTEBOOKS = [
   {
     key: 'accessScope',
     file: 'AnalyticsHub_Access_Scope.ipynb',
-    displayName: 'AnalyticsHub_Access_Scope',
+    displayName: own('Access_Scope'),
     module: 'core',
     credentials: false,
     parameters: ['MODE', 'ROLES_B64', 'ROLES_FILE', 'WORKSPACE_ID'],

@@ -70,10 +70,10 @@ test('signing: signed release notes point to the signature', () => {
 
 test('signing: release notes with a version lead with the pinned PowerShell command, and keep the exe as an option', () => {
   const notes = releaseNotes({ repo: 'octo/hub', sha256: HASH, signed: true, version: '1.2.3' });
-  const cmd = 'irm https://github.com/octo/hub/releases/download/installer-v1.2.3/install.ps1 | iex';
+  const cmd = 'irm https://github.com/octo/hub/releases/download/valuelens-installer-v1.2.3/install.ps1 | iex';
   assert.ok(notes.includes(cmd));
   assert.ok(notes.indexOf(cmd) < notes.indexOf(`Download **${EXE_NAME}**`), 'the one-liner comes first');
-  assert.ok(notes.includes('run `.\\install.ps1 -ZipPath .\\AnalyticsHubInstaller.zip`'));
+  assert.ok(notes.includes('run `.\\install.ps1 -ZipPath .\\ValueLensInstaller.zip`'));
   assert.match(notes, /-UseInstalledNode/);
   assert.match(notes, /octo\/hub\/blob\/main\/docs\/INSTALL\.md#from-powershell/);
   assert.match(notes, /octo\/hub\/blob\/main\/docs\/INSTALL\.md#it-approved-nodejs/);
@@ -97,5 +97,5 @@ test('signing: release candidate notes say it is a pre-release, and pin its own 
   assert.match(notes, /for testing 1\.2\.3 before it's released/);
   assert.match(notes, /doesn't offer it as an update/);
   assert.ok(notes.includes('https://github.com/octo/hub/releases/latest stays on the last release'));
-  assert.ok(notes.includes('irm https://github.com/octo/hub/releases/download/installer-v1.2.3-rc.2/install.ps1 | iex'));
+  assert.ok(notes.includes('irm https://github.com/octo/hub/releases/download/valuelens-installer-v1.2.3-rc.2/install.ps1 | iex'));
 });

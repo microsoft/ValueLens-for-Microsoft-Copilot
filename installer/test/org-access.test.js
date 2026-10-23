@@ -57,7 +57,7 @@ function viewerGraph(members = ['Ana@contoso.com', 'ben@contoso.com']) {
   /** @type {string[]} */
   const added = [];
   const graph = {
-    getGroup: async (/** @type {string} */ id) => (id === 'g-1' ? { id: 'g-1', displayName: 'Analytics Hub Viewers' } : null),
+    getGroup: async (/** @type {string} */ id) => (id === 'g-1' ? { id: 'g-1', displayName: 'ValueLens Viewers' } : null),
     groupUsers: async () => members.map((m, i) => ({ id: `u-${i}`, userPrincipalName: m })),
     addGroupMember: async (/** @type {string} */ _g, /** @type {string} */ id) => {
       added.push(id);
@@ -86,7 +86,7 @@ function fabricInstall(o = {}) {
   config.semanticModel.id = 'ds-vl';
   config.semanticModel.bound = true;
   config.fabric.notebooks.accessScope = 'nb-access';
-  config.access = /** @type {any} */ ({ ...config.access, groupId: 'g-1', groupName: 'Analytics Hub Viewers', ...(o.rls === false ? {} : { rls: { enabled: true, orgAttribute: 'department', applied: [] } }) });
+  config.access = /** @type {any} */ ({ ...config.access, groupId: 'g-1', groupName: 'ValueLens Viewers', ...(o.rls === false ? {} : { rls: { enabled: true, orgAttribute: 'department', applied: [] } }) });
   return { ctx, config, fabric, lakeFiles, powerBi, ui };
 }
 

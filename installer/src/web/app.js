@@ -1,6 +1,11 @@
-/* Analytics Hub installer wizard. Plain modules, no build step.
+/* ValueLens installer wizard. Plain modules, no build step.
    Everything the installer says arrives as events from /events; answers go back to /api/answer.
    The page never keeps a secret: a typed secret is sent once and the field is cleared. */
+
+// The page has no imports, so test/product.test.js keeps these equal to src/product.js.
+const PRODUCT_NAME = 'ValueLens';
+const PRODUCT_ID = 'valuelens';
+const PRODUCT_COMMAND = 'valuelens-installer';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const ICONS = {
@@ -35,7 +40,7 @@ const ICONS = {
 
 const COMMANDS = {
   install: {
-    title: 'Set up Analytics Hub', short: 'Set up', icon: 'sliders',
+    title: `Set up ${PRODUCT_NAME}`, short: 'Set up', icon: 'sliders',
     row: 'Repair or change set-up', button: 'Repair or change',
     desc: 'Review your saved settings and edit only the category you need. Nothing deploys until you approve the plan.',
   },
@@ -69,7 +74,7 @@ const COMMANDS = {
     off: 'The data check notebook isn\'t deployed.',
   },
   update: {
-    title: 'Update Analytics Hub', short: 'Update', icon: 'upload', section: 'Update', adopt: true,
+    title: `Update ${PRODUCT_NAME}`, short: 'Update', icon: 'upload', section: 'Update', adopt: true,
     row: 'Update', button: 'Update',
     desc: 'Push the notebooks, pipeline and semantic model from this checkout to Fabric, then refresh the model. If Fabric can\'t update the model and keep its data, the page asks before the data is cleared and reloaded.',
     off: 'Nothing is installed yet.',
@@ -83,7 +88,7 @@ const COMMANDS = {
   access: {
     title: 'Manage access', short: 'Access', icon: 'shield', section: 'Viewer access',
     row: 'Manage access', button: 'Manage access',
-    desc: 'Choose the viewer group, add viewers or owners, and give the group Build on the model again. To share Analytics Hub, add people to the group.',
+    desc: `Choose the viewer group, add viewers or owners, and give the group Build on the model again. To share ${PRODUCT_NAME}, add people to the group.`,
     off: 'Viewers need the semantic model first.',
   },
   upload: {
@@ -93,7 +98,7 @@ const COMMANDS = {
     off: 'No source is set to Upload CSV. Choose Repair or change set-up to change that.',
   },
   uninstall: {
-    title: 'Uninstall Analytics Hub', short: 'Uninstall', icon: 'x', section: 'Uninstall', adopt: true,
+    title: `Uninstall ${PRODUCT_NAME}`, short: 'Uninstall', icon: 'x', section: 'Uninstall', adopt: true,
     row: 'Uninstall', button: 'Uninstall',
     desc: 'Delete the Fabric workspace, after its managed private endpoints.',
     off: 'Nothing is installed yet.',
@@ -118,7 +123,7 @@ const TARGET_STAGES = {
 };
 const stageTarget = (title) => Object.keys(TARGET_STAGES).find((k) => TARGET_STAGES[k].has(title));
 const applies = (run, s) => !s.only || s.only === run.platform;
-const DONE_HEADINGS = new Set(['Analytics Hub is set up', 'Analytics Hub is partly set up', 'Connect Power BI']);
+const DONE_HEADINGS = new Set([`${PRODUCT_NAME} is set up`, `${PRODUCT_NAME} is partly set up`, 'Connect Power BI']);
 
 const METHODS = [
   { value: 'browser', name: 'Browser', tag: 'Recommended', desc: 'A Microsoft sign-in window opens on this computer.' },
@@ -137,7 +142,7 @@ const NEEDS = [
   'A Global Administrator or Privileged Role Administrator to grant admin consent. If that isn\'t you, you get a link to send them.',
 ];
 const launcher = () => app.state?.launcher ?? {};
-const installerName = () => launcher().command ?? 'valuelens-install';
+const installerName = () => launcher().command ?? PRODUCT_COMMAND;
 const installerWindow = () => launcher().window ?? 'your terminal';
 const GLYPH = { ok: 'check', warn: 'warn', fail: 'x' };
 const STATUS_ICON = { done: 'check', failed: 'x', stopped: 'stop', current: 'current', upcoming: 'circle', skipped: 'minus' };
@@ -368,7 +373,7 @@ async function quit() {
     h('main', { class: 'closed' },
       h('h1', null, 'The installer has stopped'),
       h('p', { class: 'lede' }, 'You can close this tab.'),
-      h('p', { class: 'sub' }, launcher().reopen ?? 'To open it again, run valuelens-install --ui in your terminal.'),
+      h('p', { class: 'sub' }, launcher().reopen ?? `To open it again, run ${PRODUCT_COMMAND} --ui in your terminal.`),
     ),
   );
 }
@@ -1449,7 +1454,7 @@ function staleBanner(busy) {
     h('p', null, other
       ? `Your install record is for "${gone.workspace}", in another tenant.`
       : `Fabric can't find "${gone.workspace}", the workspace in your install record. It may have been deleted.`),
-    h('p', null, 'Start fresh to set up Analytics Hub again. The old record is kept beside the new one, renamed with the date and time.'),
+    h('p', null, `Start fresh to set up ${PRODUCT_NAME} again. The old record is kept beside the new one, renamed with the date and time.`),
     h('div', { class: 'actions' },
       h('button', { type: 'button', class: 'btn primary', disabled: busy, onclick: () => act('/api/fresh') }, 'Start fresh'),
       h('button', { type: 'button', class: 'btn', disabled: busy, onclick: () => act('/api/keep') }, 'Keep this record')),
@@ -1472,12 +1477,12 @@ function renderHome() {
   }
 
   if (!rec?.installed) {
-    kids.unshift(head('sliders', 'Set up Analytics Hub', `Fabric installer ${st.version}`));
+    kids.unshift(head('sliders', `Set up ${PRODUCT_NAME}`, `Installer ${st.version}`));
     kids.push(updateBanner());
     kids.push(staleBanner(busy));
     if (running) kids.push(runningBanner());
     kids.push(h('p', { class: 'lede' },
-      'Answer a few questions and review the plan. Then the installer builds Analytics Hub in your tenant: an app registration with its secret in the notebooks (or, if you choose, in Key Vault), a Fabric workspace and Lakehouse, the notebooks and pipeline, and the semantic model with the Analytics Hub app on top.'));
+      `Answer a few questions and review the plan. Then the installer builds ${PRODUCT_NAME} in your tenant: an app registration with its secret in the notebooks (or, if you choose, in Key Vault), a Fabric workspace and Lakehouse, the notebooks and pipeline, and the semantic model with the ${PRODUCT_NAME} report on top.`));
     if (rec) kids.push(h('p', { class: 'hint' }, 'Your answers from last time are saved, so the questions start from them.'));
 
     const tenantInput = h('input', {
@@ -1496,7 +1501,7 @@ function renderHome() {
           h('p', { class: 'hint', id: 'tenant-hint' }, 'Your tenant ID or domain, such as contoso.onmicrosoft.com. Leave it blank to use your home tenant.')),
       ],
       h('div', { class: 'actions' },
-        h('button', { type: 'submit', class: `btn primary${app.starting ? ' busy' : ''}`, disabled: busy }, 'Set up Analytics Hub'),
+        h('button', { type: 'submit', class: `btn primary${app.starting ? ' busy' : ''}`, disabled: busy }, `Set up ${PRODUCT_NAME}`),
         h('p', { class: 'hint' }, 'Nothing is created until you\'ve reviewed the plan and chosen Go ahead.')),
       startError());
     form.addEventListener('submit', (ev) => {
@@ -1508,7 +1513,7 @@ function renderHome() {
     return h('div', { class: 'page' }, kids);
   }
 
-  kids.unshift(head('home', 'Manage Analytics Hub', `Tenant ${rec.tenantId}`));
+  kids.unshift(head('home', `Manage ${PRODUCT_NAME}`, `Tenant ${rec.tenantId}`));
   kids.push(updateBanner());
   kids.push(staleBanner(busy));
   if (running) kids.push(runningBanner());
@@ -1651,7 +1656,7 @@ function renderRail() {
   const where = app.view === 'run' && run ? (target(run)?.title ?? run.title) : 'Home';
 
   const top = h('div', { class: 'rail-top' },
-    h('div', { class: 'brand' }, h('span', { class: 'brand-name' }, 'Analytics Hub'), h('span', { class: 'brand-sub' }, 'Fabric installer')),
+    h('div', { class: 'brand' }, h('span', { class: 'brand-name' }, PRODUCT_NAME), h('span', { class: 'brand-sub' }, 'Installer')),
     h('button', {
       type: 'button', class: 'rail-toggle', 'data-key': 'toggle', 'aria-expanded': String(app.railOpen), 'aria-controls': 'rail-menu',
       onclick: () => {
@@ -1919,20 +1924,20 @@ function saveRecord(run) {
   const L = [`# ${headTitle(run)}`, '', ...runFacts(run)];
   if (run.error) L.push('', `**Error:** ${run.error}`);
   for (const s of run.stages) if (applies(run, s)) L.push(...stageMarkdown(s, 2));
-  L.push('', '---', '', '_Written by the Analytics Hub installer. Secrets are masked and sign-in codes left out._');
-  download(`valuelens-${run.command}-${stamp(run.startedAt)}.md`, L);
+  L.push('', '---', '', `_Written by the ${PRODUCT_NAME} installer. Secrets are masked and sign-in codes left out._`);
+  download(`${PRODUCT_ID}-${run.command}-${stamp(run.startedAt)}.md`, L);
 }
 
 function savePlan(run) {
   if (!run) return;
   const review = run.stages.flatMap((s) => s.items).find((it) => it.t === 'review');
   const answers = run.stages.flatMap((s) => s.items).filter((it) => it.t === 'qa');
-  const L = ['# Analytics Hub set-up plan', '', ...runFacts(run), '', '## The plan', ''];
+  const L = [`# ${PRODUCT_NAME} set-up plan`, '', ...runFacts(run), '', '## The plan', ''];
   if (review) L.push(...reviewMarkdown(review.plan));
   L.push('', '## Your answers', '');
   for (const a of answers) L.push(...itemMarkdown(a, 2));
   L.push('', '---', '', '_Nothing had been created when this plan was saved._');
-  download(`valuelens-plan-${stamp(Date.now())}.md`, L);
+  download(`${PRODUCT_ID}-plan-${stamp(Date.now())}.md`, L);
 }
 
 /* ---------- Start ---------- */

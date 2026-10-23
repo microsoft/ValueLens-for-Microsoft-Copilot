@@ -185,7 +185,7 @@ export function fakeFabric() {
       return operations[url];
     },
     /** @param {string} _ws @param {string} type */
-    listItems: async (_ws, type) => items.filter((i) => i.type === type).map(({ id, type: t, displayName, description }) => ({ id, type: t, displayName, description })),
+    listItems: async (_ws, type) => items.filter((i) => !type || i.type === type).map(({ id, type: t, displayName, description }) => ({ id, type: t, displayName, description })),
     /** @param {string} _ws @param {string} name @param {string} content @param {ItemRef} [ref] */
     createNotebook: async (_ws, name, content, ref) => {
       calls.push(`createNotebook ${name}`);
@@ -399,7 +399,7 @@ export function fakeGraph() {
   const failures = {};
   const api = {
     /** @param {string} _objectId @param {Date} end @param {string} [displayName] */
-    addPassword: async (_objectId, end, displayName = 'Analytics Hub installer') => {
+    addPassword: async (_objectId, end, displayName = 'ValueLens installer') => {
       calls.push(`addPassword ${displayName}`);
       const err = failures.addPassword?.shift();
       if (err) throw err;
@@ -517,7 +517,7 @@ export function fakeAzureGraph() {
       servicePrincipals.push(sp);
       return sp;
     },
-    addPassword: async (/** @type {string} */ _id, /** @type {Date} */ end, /** @type {string} */ displayName = 'Analytics Hub installer') => {
+    addPassword: async (/** @type {string} */ _id, /** @type {Date} */ end, /** @type {string} */ displayName = 'ValueLens installer') => {
       calls.push(`addPassword ${displayName}`);
       const keyId = `key-${++n}`;
       passwords.push({ keyId, displayName });
@@ -651,7 +651,7 @@ export function fakeCtx(o = {}) {
     /** @type {unknown} */ ({
       ui: o.ui ?? fakeUi().ui,
       config,
-      file: join(TEST_RECORD_DIR, 'valuelens-install.json'),
+      file: join(TEST_RECORD_DIR, 'valuelens-setup.json'),
       save: () => {
         saves++;
       },

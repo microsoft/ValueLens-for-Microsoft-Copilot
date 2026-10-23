@@ -17,6 +17,7 @@
  * them over XMLA after every deploy (see `roleDefinitions`).
  */
 import { createHash } from 'node:crypto';
+import { PRODUCT } from '../product.js';
 
 export const ACCESS_SCOPE_TABLE = 'Access Scope';
 export const ACCESS_PEOPLE_TABLE = 'Access People';
@@ -271,7 +272,7 @@ export function addAccessScope(model, kind, opts = {}) {
     },
     {
       name: SCOPED_ROLE,
-      description: 'Org-scoped access: Analytics Hub Viewers, filtered to their scopes. Members are applied by the installer.',
+      description: `Org-scoped access: ${PRODUCT.viewerGroup}, filtered to their scopes. Members are applied by the installer.`,
       modelPermission: 'read',
       tablePermissions: filters,
     },

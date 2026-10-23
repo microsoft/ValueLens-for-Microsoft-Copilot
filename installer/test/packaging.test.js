@@ -19,8 +19,8 @@ test('packaging: ships every template the installer reads, and they exist', () =
 });
 
 test('packaging: ships the installer code, not its tests or tooling', () => {
-  for (const f of ['bin/valuelens-install.js', 'src/cli.js', 'src/web/index.html', 'package.json', 'package-lock.json', 'README.md']) assert.ok(installerFile(f), f);
-  for (const f of ['test/cli.test.js', 'packaging/build-exe.js', 'jsconfig.json', '.gitignore', 'valuelens-install.json']) assert.ok(!installerFile(f), f);
+  for (const f of ['bin/valuelens-installer.js', 'src/cli.js', 'src/web/index.html', 'package.json', 'package-lock.json', 'README.md']) assert.ok(installerFile(f), f);
+  for (const f of ['test/cli.test.js', 'packaging/build-exe.js', 'jsconfig.json', '.gitignore', 'valuelens-setup.json', 'valuelens-install.json']) assert.ok(!installerFile(f), f);
 });
 
 test('packaging: payload IDs change with the content', () => {

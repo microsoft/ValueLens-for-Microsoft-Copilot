@@ -1,4 +1,4 @@
-/* Analytics Hub installer wizard. Tokens are Analytics Hub's (app/src/global.css),
+/* ValueLens installer wizard. Tokens follow the ValueLens app's (1. Fabric/Fabric App/src/global.css),
    so the installer and the app it deploys read as one product. */
 
 :root {

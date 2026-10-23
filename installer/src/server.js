@@ -8,6 +8,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { installerWindow, updateHint } from './launch.js';
+import { PRODUCT } from './product.js';
 import { createSession } from './web-session.js';
 import { clearStaged, sizeOk, stageUpload } from './staging.js';
 import { c } from './ui.js';
@@ -49,7 +50,7 @@ function json(res, status, body) {
  */
 function page(res, status, message) {
   res.writeHead(status, { ...HEADERS, 'Content-Type': 'text/html; charset=utf-8' });
-  res.end(`<!doctype html><meta charset="utf-8"><title>Analytics Hub installer</title><p style="font:16px system-ui;margin:48px">${message}</p>`);
+  res.end(`<!doctype html><meta charset="utf-8"><title>${PRODUCT.name} installer</title><p style="font:16px system-ui;margin:48px">${message}</p>`);
 }
 
 /**
@@ -165,7 +166,7 @@ export async function startServer(o) {
     return b.length === expected.length && timingSafeEqual(b, expected);
   };
   const origins = () => [`127.0.0.1:${port}`, `localhost:${port}`];
-  const cookieName = () => `valuelens_${port}`;
+  const cookieName = () => `${PRODUCT.id}_${port}`;
 
   /** @param {import('./web-ui.js').UiEvent} e */
   const frame = (e) => `id: ${e.seq}\ndata: ${JSON.stringify(e)}\n\n`;
@@ -386,7 +387,7 @@ export function mirror(write) {
 }
 
 /**
- * `valuelens-install --ui`: serves the wizard until the page closes it or Ctrl+C.
+ * `valuelens-installer --ui`: serves the wizard until the page closes it or Ctrl+C.
  * @param {{ configFile: string, sourceDir?: string, tenantId?: string, method?: import('./web-session.js').Method, open: boolean, version: string, debug?: (m: string) => void, write?: (s: string) => void, checkUpdate?: () => Promise<import('./update-check.js').Update | null>, stdin?: NodeJS.ReadableStream & { isTTY?: boolean } }} o
  */
 export async function runWizard(o) {
@@ -395,7 +396,7 @@ export async function runWizard(o) {
   const session = createSession({ ui, configFile: o.configFile, sourceDir: o.sourceDir, version: o.version, tenantId: o.tenantId, method: o.method, debug: o.debug });
   const server = await startServer({ ui, session });
   ui.subscribe(mirror(write));
-  write(`${c.bold(`Analytics Hub installer ${o.version}`)}\n`);
+  write(`${c.bold(`${PRODUCT.name} installer ${o.version}`)}\n`);
   write(`${o.open ? 'The installer is opening in your browser. If it doesn\'t, go to:' : 'Open the installer in your browser:'}\n\n  ${server.launchUrl}\n\n`);
   write(`${c.dim('Only this computer can reach it. Keep this window open; press Ctrl+C to stop.')}\n`);
   const input = o.stdin ?? process.stdin;

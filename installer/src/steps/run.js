@@ -6,6 +6,7 @@
 import { isTransientNetworkError } from '../auth.js';
 import { commandLine } from '../launch.js';
 import { failedCards, fillRerun, loadCards } from '../loads.js';
+import { PRODUCT } from '../product.js';
 import { DATA_CHECK_FILE } from '../transform/notebook.js';
 import { firstRunParameters, REFRESH_ACTIVITY } from '../transform/pipeline.js';
 import { formatDuration } from '../ui.js';
@@ -512,7 +513,7 @@ export async function status(ctx) {
     ui.warn('Nothing is installed yet.');
     return;
   }
-  ui.heading('Analytics Hub');
+  ui.heading(PRODUCT.name);
   ui.info(`Workspace: ${f.workspaceName ?? f.workspaceId}`);
   ui.info(`Lakehouse: ${f.lakehouseName ?? f.lakehouseId}`);
   ui.info(`Pipeline:  ${f.pipelineName ?? f.pipelineId}`);

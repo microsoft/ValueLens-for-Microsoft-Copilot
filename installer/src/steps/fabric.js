@@ -9,8 +9,9 @@ import { routedSources, routerSignaturesJson, routerWanted } from '../uploads.js
 import { statusConfigJson } from '../loads.js';
 import { parseResourceId } from '../clients/azure.js';
 import { scheduleBody } from '../clients/fabric.js';
-import { normaliseResourceGraph, secretMode } from '../config.js';
+import { normaliseResourceGraph, secretMode, AH_RELEASES } from '../config.js';
 import { HttpError } from '../http.js';
+import { PRODUCT } from '../product.js';
 import { rlsOn } from '../transform/access.js';
 import { prepareNotebook, serialiseNotebook } from '../transform/notebook.js';
 import { buildPipeline, PIPELINE_CHANGE, PIPELINE_VERSION } from '../transform/pipeline.js';
@@ -19,7 +20,7 @@ import { dropAttempt, findAttempts, refused, removeRetired, SECRET_SETTLE_MS, wi
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
-export const PIPELINE_NAME = 'AnalyticsHub_Pipeline';
+export const PIPELINE_NAME = PRODUCT.fabric.pipeline;
 
 /** @param {unknown} err */
 const isNotFound = (err) => err instanceof HttpError && (err.status === 404 || err.code === 'ItemNotFound' || err.code === 'WorkspaceNotFound');
@@ -56,7 +57,7 @@ export const displayNames = (items) => items.map((i) => String(i.displayName));
  * @param {string} name
  */
 export function noteRenamed(ctx, wanted, name) {
-  if (name !== wanted) ctx.ui.note(`"${wanted}" is already in the workspace and isn't from this install, so it's left as it is. Analytics Hub's is called "${name}".`);
+  if (name !== wanted) ctx.ui.note(`"${wanted}" is already in the workspace and isn't from this install, so it's left as it is. ${PRODUCT.name}'s is called "${name}".`);
 }
 
 /**
@@ -274,10 +275,37 @@ export const staleRecordMessage = (gone) =>
     ? `The install record is for workspace "${gone.workspace}" in another tenant, not the one you signed in to.`
     : `This workspace no longer exists: "${gone.workspace}".`;
 
+/**
+ * Whether a workspace's items include an Analytics Hub install. Its own notebooks and pipeline are
+ * named AnalyticsHub_…, and every item it creates says "Analytics Hub" in its description. This
+ * repo's earlier installer (installer-v0.4.2 and before) was the Analytics Hub one, so its installs
+ * match too. That install already has the ValueLens report, so this installer stays out of it.
+ * @param {{ displayName?: string, description?: string }[]} items
+ */
+export const foreignInstall = (items) =>
+  items.some((i) => /^AnalyticsHub_/i.test(String(i.displayName ?? '')) || /\bAnalytics Hub\b/i.test(String(i.description ?? '')));
+
+/** @param {string} name */
+export const foreignWorkspaceMessage = (name) =>
+  `The workspace "${name}" holds an Analytics Hub install, which already includes the ${PRODUCT.name} report. Choose another workspace or create a new one. To change that install, use the Analytics Hub installer: ${AH_RELEASES}`;
+
+/**
+ * Stops before this install puts anything in a workspace that holds an Analytics Hub install.
+ * Once this install has items there, it leaves the workspace alone, so repairs still run.
+ * @param {Ctx} ctx
+ */
+export async function refuseForeignWorkspace(ctx) {
+  const f = ctx.config.fabric;
+  const ours = [f.notebooks, f.pendingItems].some((m) => Object.keys(m ?? {}).length);
+  if (!f.workspaceId || f.createdWorkspace || f.lakehouseId || f.pipelineId || ours) return;
+  if (foreignInstall(await ctx.api.fabric.listItems(f.workspaceId))) throw new Error(foreignWorkspaceMessage(f.workspaceName ?? f.workspaceId));
+}
+
 /** @param {Ctx} ctx */
 export async function ensureWorkspace(ctx) {
   const { ui, config, api } = ctx;
   const f = config.fabric;
+  await refuseForeignWorkspace(ctx);
   if (f.workspaceId) {
     /** @type {any} */
     let ws;
@@ -326,7 +354,7 @@ export async function ensureLakehouse(ctx) {
       delete f.lakehouseId;
     }
   }
-  const wanted = f.lakehouseName ?? 'ValueLens';
+  const wanted = f.lakehouseName ?? PRODUCT.fabric.lakehouse;
   const made = await createItem(ctx, 'Lakehouse', 'Lakehouse', wanted, await api.fabric.listItems(ws, 'Lakehouse'), (name, ref) => api.fabric.createLakehouse(ws, name, ref));
   f.lakehouseId = made.id;
   f.lakehouseName = made.name;
@@ -345,7 +373,7 @@ export const endpointName = (vaultName) => `valuelens-${vaultName}`.slice(0, 64)
  * the installer can tell its own request from others.
  * @param {string} workspaceId
  */
-export const endpointRequest = (workspaceId) => `Analytics Hub: Fabric workspace ${workspaceId} reads the app secret.`;
+export const endpointRequest = (workspaceId) => `${PRODUCT.name}: Fabric workspace ${workspaceId} reads the app secret.`;
 
 /**
  * Whether a private endpoint connection on the vault comes from this workspace. Fabric names
@@ -396,7 +424,7 @@ async function approveOnVault(ctx) {
     const pending = mine.filter((conn) => conn.properties?.privateLinkServiceConnectionState?.status === 'Pending');
     if (pending.length) {
       try {
-        for (const conn of pending) await api.arm.approvePrivateEndpointConnection(conn.id, `Approved by the Analytics Hub installer for Fabric workspace ${ws}.`);
+        for (const conn of pending) await api.arm.approvePrivateEndpointConnection(conn.id, `Approved by the ${PRODUCT.installer} for Fabric workspace ${ws}.`);
       } catch (err) {
         if (err instanceof HttpError && err.status === 403) return false;
         throw err;
@@ -820,7 +848,7 @@ async function settleInlineSecret(ctx, fresh, outcome) {
 }
 
 /** What a notebook secret is called on the app, before the ref. */
-const NOTEBOOK_SECRET_LABEL = 'Analytics Hub installer';
+const NOTEBOOK_SECRET_LABEL = PRODUCT.installer;
 
 /** The name a notebook secret gets on the app, with the ref of the run that asked for it. @param {string} ref */
 export const secretLabel = (ref) => withSecretRef(NOTEBOOK_SECRET_LABEL, ref);

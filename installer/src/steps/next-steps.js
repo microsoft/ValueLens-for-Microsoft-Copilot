@@ -4,6 +4,7 @@
  * the steps the user does, then hand-offs, each with a message to copy and send to the admin who does it.
  * One list, in the order it should be done, so new steps only need adding here.
  */
+import { PRODUCT } from '../product.js';
 import { FEEDBACK_SUBJECT } from '../transform/flows.js';
 import { connectionSteps, FLOW_NAMES, flowsWanted } from './flows.js';
 import { APP_NAME } from './plan.js';
@@ -102,7 +103,7 @@ function flowsStep(config, user) {
     steps,
     message: letter(
       [
-        `Could you sign in to the connections of the Analytics Hub ${one ? 'flow' : 'flows'} in Power Automate and turn ${one ? 'it' : 'them'} on? ${one ? 'It is' : 'They are'} in ${where}: ${link}`,
+        `Could you sign in to the connections of the ${PRODUCT.name} ${one ? 'flow' : 'flows'} in Power Automate and turn ${one ? 'it' : 'them'} on? ${one ? 'It is' : 'They are'} in ${where}: ${link}`,
         '',
         ...details,
         'Signing in with a dedicated admin account and adding a co-owner keeps the flows running if people move on.',
@@ -145,7 +146,7 @@ function entraRoleStep(config, user) {
     steps,
     message: letter(
       [
-        `Could you give the app "${app}" the Global Reader role in Microsoft Entra? Analytics Hub uses it to read Copilot Studio agents from Azure Resource Graph, which returns none until the app has one of ${roles}. Global Reader is read-only.`,
+        `Could you give the app "${app}" the Global Reader role in Microsoft Entra? ${PRODUCT.name} uses it to read Copilot Studio agents from Azure Resource Graph, which returns none until the app has one of ${roles}. Global Reader is read-only.`,
         '',
         `App: ${app}`,
         ...(appId ? [`Application (client) ID: ${appId}`] : []),
@@ -183,7 +184,7 @@ function m365ExportStep(config, user) {
     steps,
     message: letter(
       [
-        'Could you schedule the Microsoft 365 product feedback export for Analytics Hub? A flow saves it when it arrives by email.',
+        `Could you schedule the Microsoft 365 product feedback export for ${PRODUCT.name}? A flow saves it when it arrives by email.`,
         '',
         ...numbered(steps),
         `The subject must be exactly "${FEEDBACK_SUBJECT}", so the flow picks it up.`,

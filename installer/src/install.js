@@ -34,6 +34,7 @@ import {
 import { ensureModelConnection, ensureSemanticModel, modelUrl, pendingReloads, refreshModel, rotateModelSecret, settleReloads, verifyModel } from './steps/model.js';
 import { confirmPlan, plan, preflight } from './steps/plan.js';
 import { checkPrereqs } from './prereqs.js';
+import { PRODUCT } from './product.js';
 import { ensureReports, reportsOn, reportsSummary } from './steps/report.js';
 import { dataSourcesSummary, ensureUploads, uploadCommand } from './steps/data-sources.js';
 import { ensureFlows, FLOW_FILES, flowDefinitions, flowsSummary, flowsWanted } from './steps/flows.js';
@@ -485,7 +486,7 @@ export async function update(ctx, opts = {}) {
   const { ui, config } = ctx;
   if (!config.fabric.workspaceId || !config.fabric.lakehouseId) throw new Error('Nothing is installed yet. Run the installer first.');
   const sm = config.semanticModel;
-  ui.heading('Updating Analytics Hub');
+  ui.heading(`Updating ${PRODUCT.name}`);
   ui.note(`From ${ctx.sources.dir}`);
   await ensureKeyVault(ctx);
   await ensureApp(ctx);
@@ -708,14 +709,14 @@ export async function summary(ctx, opts = {}) {
   const sql = lakehouse?.properties?.sqlEndpointProperties;
 
   if (opts.ok === false) {
-    ui.heading('Analytics Hub is partly set up');
+    ui.heading(`${PRODUCT.name} is partly set up`);
     ui.warn('A step above didn\'t finish. Fix what it says, then run the installer again: it picks up where it stopped.');
     if (opts.pending?.length) ui.warn(reloadingNote(opts.pending));
   } else if (opts.pending?.length) {
-    ui.heading('Analytics Hub is set up, still reloading');
+    ui.heading(`${PRODUCT.name} is set up, still reloading`);
     ui.warn(reloadingNote(opts.pending));
   } else {
-    ui.heading('Analytics Hub is set up');
+    ui.heading(`${PRODUCT.name} is set up`);
   }
   const left = nextSteps(config, ctx.user);
   if (left.length) ui.nextSteps(stepsLeftTitle(left), left);
@@ -753,7 +754,7 @@ export async function summary(ctx, opts = {}) {
       ui.info('2. Scheduled runs read the Key Vault secret as you, the schedule\'s owner, and refresh the model');
       ui.info('   as you. Anyone who takes over the pipeline needs "get" on the secret and Contributor on the workspace.');
     }
-    ui.info(`3. Keep ${c.bold('valuelens-install.json')}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);
+    ui.info(`3. Keep ${c.bold(PRODUCT.recordFile)}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);
     dataSourcesSummary(ctx);
     flowsSummary(ctx);
     return;
@@ -779,7 +780,7 @@ export async function summary(ctx, opts = {}) {
     ui.info('3. Scheduled runs read the Key Vault secret as you, the schedule\'s owner. Anyone who edits the');
     ui.info('   pipeline or takes over the schedule needs "get" on the secret first.');
   }
-  ui.info(`4. Keep ${c.bold('valuelens-install.json')}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);
+  ui.info(`4. Keep ${c.bold(PRODUCT.recordFile)}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);
   dataSourcesSummary(ctx);
   flowsSummary(ctx);
 }
@@ -805,7 +806,7 @@ export function preview(o) {
         ...f,
         workspaceId: f.workspaceId ?? fake(2),
         lakehouseId: f.lakehouseId ?? fake(3),
-        lakehouseName: f.lakehouseName ?? 'ValueLens',
+        lakehouseName: f.lakehouseName ?? PRODUCT.fabric.lakehouse,
         notebooks: { ...f.notebooks },
       },
       semanticModel: withModel ? { ...sm, id: sm.id ?? fake(4), bound: true } : { ...sm, enabled: false },

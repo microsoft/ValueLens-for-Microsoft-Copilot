@@ -49,12 +49,12 @@ test('uninstall on Fabric: the managed private endpoints are deleted and gone be
   const ui = fakeUi();
   const { ctx, config, sleeps } = fakeCtx({ fabric: fabric.api, ui: ui.ui });
   config.fabric.createdWorkspace = true;
-  config.fabric.workspaceName = 'Analytics Hub';
+  config.fabric.workspaceName = 'ValueLens';
   assert.equal(await runCommand(ctx, 'uninstall', { wait: true }), true);
   assert.deepEqual(fabric.calls, ['list ws-1', 'deleteEndpoint ws-1 a', 'deleteEndpoint ws-1 b', 'list ws-1', 'list ws-1', 'list ws-1', 'deleteWorkspace ws-1']);
   assert.deepEqual(sleeps, [ENDPOINT_POLL_MS, ENDPOINT_POLL_MS]);
   assert.match(ui.text(), /Deleted 2 managed private endpoints \(mpe-a, mpe-b\)/);
-  assert.match(ui.text(), /Deleted workspace "Analytics Hub"/);
+  assert.match(ui.text(), /Deleted workspace "ValueLens"/);
   assert.match(ui.text(), /Left alone: the app registration/);
 });
 
@@ -105,11 +105,11 @@ test('uninstall on Fabric: the model\'s SQL connection goes after the workspace;
   const { ctx, config } = fakeCtx({ fabric: fabric.api, ui: ui.ui });
   config.fabric.createdWorkspace = true;
   config.semanticModel.connectionId = 'conn-1';
-  config.semanticModel.connectionName = 'Analytics Hub SQL ws-1';
+  config.semanticModel.connectionName = 'ValueLens SQL ws-1';
   config.keyVault.mode = 'notebook';
   assert.equal(await fabricUninstall(ctx), true);
   assert.deepEqual(fabric.calls.slice(-2), ['deleteWorkspace ws-1', 'deleteConnection conn-1']);
-  assert.match(ui.text(), /Deleted the connection "Analytics Hub SQL ws-1"/);
+  assert.match(ui.text(), /Deleted the connection "ValueLens SQL ws-1"/);
   assert.doesNotMatch(ui.text(), /Key Vault/);
 
   const gone = fakeWorkspace({ connectionFails: httpError(404) });

@@ -10,6 +10,7 @@ import { allowsAction, armLocation, validateVaultName } from '../clients/azure.j
 import { APP_ROLES, CONSENT_ROLES } from '../clients/graph.js';
 import { HttpError } from '../http.js';
 import { inCloudShell } from '../launch.js';
+import { PRODUCT } from '../product.js';
 import { c } from '../ui.js';
 import { CURRENCIES, DEFAULT_CURRENCY, describeReporting } from '../currency.js';
 import { flowIdentity, MODEL_NAME, secretMode } from '../config.js';
@@ -17,7 +18,7 @@ import { FLOW_NAMES, flowsSkipped, flowsWanted, planFlows } from './flows.js';
 import { adminPack, canWriteSecrets, checkExistingApp, MAX_SECRET_DAYS, NOTEBOOK_SECRET_DAYS, notebookSecretDays, reportAppCheck, ResumeLater, writeAdminPack } from './identity.js';
 import { planResourceGraph, resourceGraphGrants, resourceGraphKinds, resourceGraphOn, scopeName } from './resource-graph.js';
 import { askAdvanced, asksAdvanced } from './advanced.js';
-import { describeSchedule, displayNames, freeName, PIPELINE_NAME, stoppedRunItem } from './fabric.js';
+import { describeSchedule, displayNames, foreignInstall, foreignWorkspaceMessage, freeName, PIPELINE_NAME, refuseForeignWorkspace, stoppedRunItem } from './fabric.js';
 import { connectionName, MODEL_UPDATE_NOTE } from './model.js';
 import { reportsWanted } from './report.js';
 import { planDataSources } from './data-sources.js';
@@ -27,7 +28,7 @@ import { BIG_CAPACITY_SEATS, copilotSeats, LARGE_TENANT_SEATS, seatCount } from 
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
-export const APP_NAME = 'Analytics Hub Data Collector';
+export const APP_NAME = PRODUCT.fabric.app;
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** @param {string} v */
@@ -54,7 +55,7 @@ export const validateNewLakehouseName = (taken) => (/** @type {string} */ v) => 
   const ok = validateLakehouseName(name);
   if (ok !== true) return ok;
   return taken.some((t) => t.toLowerCase() === name.toLowerCase())
-    ? `There's already a Lakehouse called ${name} here. Analytics Hub only writes to a Lakehouse it creates, so choose another name.`
+    ? `There's already a Lakehouse called ${name} here. ${PRODUCT.name} only writes to a Lakehouse it creates, so choose another name.`
     : true;
 };
 
@@ -415,20 +416,32 @@ export async function plan(ctx, pre, section) {
       ui.ok(`Workspace: ${config.fabric.workspaceName ?? config.fabric.workspaceId}`);
     } else {
       const workspaces = (await api.fabric.listWorkspaces()).filter((w) => w.type === 'Workspace');
-      const choice = await ui.select(
-        'Workspace',
-        [{ name: 'Create a new workspace', value: '' }, ...workspaces.map((w) => ({ name: `Use "${w.displayName}"`, value: w.id }))],
-        '',
-      );
-      if (choice) {
-        config.fabric.workspaceId = choice;
-        config.fabric.workspaceName = workspaces.find((w) => w.id === choice)?.displayName;
-      } else {
-        const taken = new Set(workspaces.map((w) => w.displayName.toLowerCase()));
-        config.fabric.workspaceName = await ui.input('New workspace name', {
-          default: config.fabric.workspaceName ?? uniqueName(DEFAULT_WORKSPACE_NAME, taken),
-          validate: (v) => (!v.trim() ? 'Required' : taken.has(v.trim().toLowerCase()) ? 'A workspace with that name exists.' : true),
-        });
+      // A workspace that holds an Analytics Hub install is offered no more once refused.
+      /** @type {Set<string>} */
+      const refused = new Set();
+      for (;;) {
+        const offered = workspaces.filter((w) => !refused.has(w.id));
+        const choice = await ui.select(
+          'Workspace',
+          [{ name: 'Create a new workspace', value: '' }, ...offered.map((w) => ({ name: `Use "${w.displayName}"`, value: w.id }))],
+          '',
+        );
+        if (choice && foreignInstall(await api.fabric.listItems(choice))) {
+          refused.add(choice);
+          ui.warn(foreignWorkspaceMessage(workspaces.find((w) => w.id === choice)?.displayName ?? choice));
+          continue;
+        }
+        if (choice) {
+          config.fabric.workspaceId = choice;
+          config.fabric.workspaceName = workspaces.find((w) => w.id === choice)?.displayName;
+        } else {
+          const taken = new Set(workspaces.map((w) => w.displayName.toLowerCase()));
+          config.fabric.workspaceName = await ui.input('New workspace name', {
+            default: config.fabric.workspaceName ?? uniqueName(DEFAULT_WORKSPACE_NAME, taken),
+            validate: (v) => (!v.trim() ? 'Required' : taken.has(v.trim().toLowerCase()) ? 'A workspace with that name exists.' : true),
+          });
+        }
+        break;
       }
     }
     if (!config.fabric.lakehouseId) {
@@ -854,9 +867,9 @@ export function uniqueName(base, taken) {
 }
 
 /** Names a new install suggests. Existing installs keep the names in their record. */
-export const DEFAULT_WORKSPACE_NAME = 'Analytics Hub';
+export const DEFAULT_WORKSPACE_NAME = PRODUCT.fabric.workspace;
 /** Fabric Lakehouse names can't have spaces. */
-export const DEFAULT_LAKEHOUSE_NAME = 'Analytics_Hub';
+export const DEFAULT_LAKEHOUSE_NAME = PRODUCT.fabric.lakehouse;
 
 export const CAPACITY_HINT = 'F64 or larger is recommended for more than 10,000 people; small or trial capacities work but loads are slower.';
 
@@ -887,6 +900,7 @@ export async function reserveNames(ctx) {
   const f = config.fabric;
   const sm = config.semanticModel;
   const ws = f.workspaceId;
+  await refuseForeignWorkspace(ctx);
   const list = async (/** @type {string} */ type) => (ws ? /** @type {any[]} */ (await api.fabric.listItems(ws, type)) : []);
   const [notebookItems, pipelineItems, modelItems, reportItems] = await Promise.all([list('Notebook'), list('DataPipeline'), list('SemanticModel'), list('Report')]);
   const [notebookNames, pipelineNames, modelNames, reportNames] = [notebookItems, pipelineItems, modelItems, reportItems].map(displayNames);
@@ -922,7 +936,7 @@ export async function reserveNames(ctx) {
 
   if (renamed.length) {
     ui.note(
-      `The workspace already has ${renamed.map((n) => `"${n}"`).join(', ')}, not from this install. They're left as they are; Analytics Hub's own items get the names shown in the plan.`,
+      `The workspace already has ${renamed.map((n) => `"${n}"`).join(', ')}, not from this install. They're left as they are; ${PRODUCT.name}'s own items get the names shown in the plan.`,
     );
   }
 }

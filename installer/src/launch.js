@@ -3,27 +3,28 @@
 import { copyFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative } from 'node:path';
+import { PRODUCT } from './product.js';
 import { REPO } from './update-check.js';
 
-/** Set by AnalyticsHubInstaller.exe, which runs the installer with the Node.js it carries. */
-export const EXE_ENV = 'ANALYTICS_HUB_EXE';
-export const EXE_NAME = 'AnalyticsHubInstaller.exe';
+/** Set by the exe, which runs the installer with the Node.js it carries. */
+export const EXE_ENV = PRODUCT.env.exe;
+export const EXE_NAME = PRODUCT.exe;
 /**
  * Set by install.ps1 and the command it leaves behind: `pwsh` on Windows, where they run the same
  * download as the exe, and `cloudshell` in Azure Cloud Shell, where they run the release's source.
  */
-export const LAUNCHER_ENV = 'ANALYTICS_HUB_LAUNCHER';
+export const LAUNCHER_ENV = PRODUCT.env.launcher;
 /** The PowerShell one-liner that downloads and starts the latest installer. */
 export const SCRIPT_URL = `https://github.com/${REPO}/releases/latest/download/install.ps1`;
 export const SCRIPT_COMMAND = `irm ${SCRIPT_URL} | iex`;
 /** The command install.ps1 leaves behind, as typed in PowerShell. */
-export const SCRIPT_SHIM = '& $env:LOCALAPPDATA\\AnalyticsHub\\analytics-hub.cmd';
+export const SCRIPT_SHIM = `& $env:LOCALAPPDATA\\${PRODUCT.home}\\${PRODUCT.shim}`;
 /** The command install.ps1 leaves behind in Azure Cloud Shell, for Bash or PowerShell. */
-export const CLOUD_SHELL_SHIM = '~/.analytics-hub/analytics-hub';
+export const CLOUD_SHELL_SHIM = `~/${PRODUCT.cloudShell.home}/${PRODUCT.cloudShell.shim}`;
 /** `1` makes the installer and install.ps1 treat this shell as Azure Cloud Shell, `0` as not. */
-export const CLOUD_SHELL_ENV = 'ANALYTICS_HUB_CLOUD_SHELL';
+export const CLOUD_SHELL_ENV = PRODUCT.env.cloudShell;
 /** `1` makes install.ps1 run the installer with the Node.js installed on the PC instead of the zip's. */
-export const INSTALLED_NODE_ENV = 'ANALYTICS_HUB_USE_INSTALLED_NODE';
+export const INSTALLED_NODE_ENV = PRODUCT.env.installedNode;
 
 /**
  * Whether this runs in Azure Cloud Shell, which has no browser, signs in with a code, and ends a
@@ -110,7 +111,7 @@ export const bundled = (env = process.env) => ['exe', 'pwsh'].includes(launcher(
  */
 export function commandLine(args = '', env = process.env) {
   const how = launcher(env);
-  const name = how === 'exe' ? EXE_NAME : how === 'pwsh' ? SCRIPT_SHIM : how === 'cloudshell' ? CLOUD_SHELL_SHIM : 'valuelens-install';
+  const name = how === 'exe' ? EXE_NAME : how === 'pwsh' ? SCRIPT_SHIM : how === 'cloudshell' ? CLOUD_SHELL_SHIM : PRODUCT.command;
   return args ? `${name} ${args}` : name;
 }
 
@@ -142,7 +143,7 @@ export function reopenHint(env = process.env) {
     return `To open it again, run ${SCRIPT_SHIM} in PowerShell, or ${again} again.`;
   }
   if (how === 'cloudshell') return `To run it again, run ${CLOUD_SHELL_SHIM} in Cloud Shell.`;
-  return 'To open it again, run valuelens-install --ui in your terminal.';
+  return `To open it again, run ${PRODUCT.command} --ui in your terminal.`;
 }
 
 /**
