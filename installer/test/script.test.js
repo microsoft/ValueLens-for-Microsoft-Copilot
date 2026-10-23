@@ -1,14 +1,16 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { payloadId } from '../packaging/payload.js';
 import { SCRIPT_NAME, ZIP_NAME, installScript, scriptCommand, scriptSha256, zipUrl } from '../packaging/script.js';
 import { CLOUD_SHELL_SHIM, INSTALLED_NODE_ENV, SCRIPT_COMMAND, SCRIPT_SHIM, SCRIPT_URL } from '../src/launch.js';
+import { PRODUCT } from '../src/product.js';
 import { REPO } from '../src/update-check.js';
 
 const TEMPLATE = readFileSync(fileURLToPath(new URL('../packaging/launcher/install.ps1', import.meta.url)), 'utf8');
@@ -330,4 +332,116 @@ test('script: cleanup falls back to Remove-Item when policy blocks node.exe', ()
   const catchAt = tree.indexOf('} catch { }');
   assert.ok(tryAt >= 0 && tryAt < nodeAt && nodeAt < catchAt, tree);
   assert.match(tree, /Remove-Item -LiteralPath \$Dir -Recurse -Force/);
+});
+
+test('script: cleanup and -Uninstall know the folders the launcher makes by the same patterns as Launcher.cs', () => {
+  const cs = readFileSync(fileURLToPath(new URL('../packaging/launcher/Launcher.cs', import.meta.url)), 'utf8');
+  const fn = TEMPLATE.slice(TEMPLATE.indexOf('function Test-Unpacked'), TEMPLATE.indexOf('# Azure Cloud Shell runs Linux'));
+  const patterns = [...fn.matchAll(/-cmatch '([^']+)'/g)].map((m) => m[1]);
+  assert.equal(patterns.length, 2, fn);
+  assert.deepEqual([...patterns].sort(), [...cs.matchAll(/new Regex\(@"([^"]+)"\)/g)].map((m) => m[1]).sort());
+  const made = (/** @type {string} */ name) => patterns.some((p) => new RegExp(p).test(name));
+  for (const version of ['0.1.0', '12.34.56', '0.2.0-rc.1']) {
+    const id = payloadId(version, HASH);
+    for (const name of [id, `${id}.partial-4242`, '~0123456789abcdef', '~42424242']) assert.ok(made(name), name);
+  }
+  for (const name of [PRODUCT.pax.folder, 'notes', 'node', '~', '~pax', `${V.id}.zip.partial-1`, V.id.toUpperCase()]) assert.ok(!made(name), name);
+});
+
+test("script: cleanup and -Uninstall keep the PAX refresh's folder, and anything else the launcher didn't make", WIN_ONLY, async () => {
+  const s = installScript(TEMPLATE, V);
+  /** @param {string} from @param {string} to */
+  const block = (from, to) => {
+    const start = s.indexOf(from);
+    const end = s.indexOf(to, start + from.length);
+    assert.ok(start >= 0 && end > start, `finds ${from.trim()}`);
+    return s.slice(start, end);
+  };
+  const helpers = [
+    block('  function Test-Unpacked', '  # Azure Cloud Shell runs Linux'),
+    block('  # Removes a folder whose paths', '  # An installed Node.js'),
+  ];
+  const cloudCleanup = block('    # Remove other versions, and a Node.js', '    # A command for later');
+  const cleanup = block('  # Remove what other versions unpacked', '  # The install record lives here');
+  const uninstall = block('\n  if ($Uninstall) {', '\n  if (-not (Test-Path -LiteralPath (Join-Path $Root $Marker))) {');
+  const id = V.id;
+  const stale = '0.0.9-0123456789.partial-2';
+  const installer = [id, `${id}.partial-1`, '0.1.0-0123456789', stale, '~1234567'];
+  const others = [PRODUCT.pax.folder, 'notes', 'node', '0.1.0-ABCDEF0123'];
+  const dir = mkdtempSync(join(realpathSync.native(tmpdir()), 'ahc-'));
+  /**
+   * A launcher home holding these folders, each with a file named after it, and these files.
+   * @param {string} name
+   * @param {{ dirs: string[], files?: string[], marked?: string[] }} spec
+   */
+  const home = (name, { dirs, files = [], marked = [] }) => {
+    const root = join(dir, name);
+    for (const d of dirs) {
+      mkdirSync(join(root, d), { recursive: true });
+      writeFileSync(join(root, d, 'file.txt'), d);
+    }
+    for (const d of marked) writeFileSync(join(root, d, '.unpacked'), 'done');
+    for (const f of files) writeFileSync(join(root, f), f);
+    // Stopped two hours ago, so no copy is still unpacking it.
+    const old = new Date(Date.now() - 2 * 3600_000);
+    if (dirs.includes(stale)) utimesSync(join(root, stale), old, old);
+    return root;
+  };
+  /** @param {string} root */
+  const left = (root) => (existsSync(root) ? readdirSync(root).sort() : null);
+  /** @param {string} root */
+  const prelude = (root) => [
+    `$VlHome = '${root.replace(/'/g, "''")}'`,
+    `$Id = '${id}'`,
+    "$Marker = '.unpacked'",
+    `$Shim = Join-Path $VlHome '${PRODUCT.shim}'`,
+    '$Installed = $null',
+    '$Uninstall = $true',
+    '$node = $null',
+    "$NodeDir = Join-Path $VlHome 'node-v24.11.1-linux-x64'",
+    ...helpers,
+  ];
+  try {
+    for (const [n, shell] of SHELLS.entries()) {
+      const win = home(`${n}-win`, { dirs: [...installer, ...others] });
+      const w = await runBlock(shell, prelude(win), cleanup);
+      assert.equal(w.status, 0, `${shell}: ${w.out}`);
+      assert.deepEqual(left(win), [id, `${id}.partial-1`, ...others].sort(), `${shell}: removes older versions, a stopped unpack and a folder moved aside, nothing else`);
+      assert.equal(readFileSync(join(win, PRODUCT.pax.folder, 'file.txt'), 'utf8'), PRODUCT.pax.folder);
+
+      const nodes = ['node-v24.11.1-linux-x64', 'node-v22.13.0-linux-x64', 'node-v22.13.0-linux-x64.partial-3'];
+      const cloud = home(`${n}-cloud`, { dirs: [...installer, ...others, ...nodes] });
+      const c = await runBlock(shell, prelude(cloud), cloudCleanup);
+      assert.equal(c.status, 0, `${shell}: ${c.out}`);
+      assert.deepEqual(left(cloud), [id, `${id}.partial-1`, ...others, nodes[0], nodes[2]].sort(), `${shell}: in Cloud Shell, also removes a Node.js this version doesn't use`);
+
+      // Only node.exe from a complete unpacked installer, to remove the rest with.
+      const found = home(`${n}-find`, { dirs: [`${PRODUCT.pax.folder}/node`, 'notes/node', `${id}.partial-1/node`], marked: [PRODUCT.pax.folder, 'notes'] });
+      for (const d of [PRODUCT.pax.folder, 'notes', `${id}.partial-1`]) writeFileSync(join(found, d, 'node', 'node.exe'), '');
+      const find = "[Console]::Out.WriteLine('found:' + [string](Find-Node) + ':')";
+      assert.match((await runBlock(shell, prelude(found), find)).out, /found::/, `${shell}: no node.exe outside a complete unpacked installer`);
+      mkdirSync(join(found, id, 'node'), { recursive: true });
+      writeFileSync(join(found, id, '.unpacked'), 'done');
+      writeFileSync(join(found, id, 'node', 'node.exe'), '');
+      assert.ok((await runBlock(shell, prelude(found), find)).out.includes(`found:${join(found, id, 'node', 'node.exe')}:`), shell);
+
+      const mixed = home(`${n}-mixed`, { dirs: [...installer, ...others], files: [PRODUCT.shim, `${id}.zip.partial-77`, 'notes.txt'], marked: [id] });
+      const u = await runBlock(shell, prelude(mixed), uninstall);
+      assert.equal(u.status, 0, `${shell}: ${u.out}`);
+      assert.deepEqual(left(mixed), [...others, 'notes.txt'].sort(), `${shell}: -Uninstall removes the command, what the launcher made and a stopped download`);
+      assert.ok(u.out.includes(`Removed the installer from ${mixed}. Your install record in Documents\\ValueLens is still there.`), u.out);
+      assert.ok(u.out.includes(`The scheduled PAX refresh still runs from ${join(mixed, PRODUCT.pax.folder)}. To remove it too, run the installer again and use its uninstall command.`), u.out);
+      const kept = /Left (.*?) in .*, because the installer didn't put them there\./.exec(u.out);
+      assert.deepEqual(kept?.[1].split(', ').sort(), [...others.slice(1), 'notes.txt'].sort(), u.out);
+
+      const only = home(`${n}-only`, { dirs: installer, files: [PRODUCT.shim], marked: [id] });
+      const o = await runBlock(shell, prelude(only), uninstall);
+      assert.equal(o.status, 0, `${shell}: ${o.out}`);
+      assert.equal(left(only), null, `${shell}: with nothing else in it, the folder goes too`);
+      assert.ok(o.out.includes(`Removed ${only}. Your install record in Documents\\ValueLens is still there.`), o.out);
+      assert.doesNotMatch(o.out, /PAX|Left /);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

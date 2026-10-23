@@ -22,7 +22,8 @@ Options:
                      team approved, instead of the zip's. It needs x64 Node.js 22.13 or later on
                      22.x, or 24.x. The zip is still downloaded: it holds the installer and the app.
   -Uninstall         Remove the unpacked installer and its command. Your install record in
-                     Documents\ValueLens stays.
+                     Documents\ValueLens stays, and so does the pax folder that a scheduled
+                     PAX refresh runs from. The installer's uninstall command removes the refresh.
 Anything else goes to the installer, for example: status, or install --device-code.
 With irm | iex, set $env:VALUELENS_ZIP, $env:VALUELENS_PROXY or
 $env:VALUELENS_USE_INSTALLED_NODE = '1' instead.
@@ -74,6 +75,14 @@ by installer/packaging/build-exe.js from installer/packaging/launcher/install.ps
     @{ Path = $cmd.Source; Version = $v; Major = [int]$Matches[1]; Minor = [int]$Matches[2] }
   }
 
+  # Whether a folder in the launcher's home is one the launcher made, so cleanup and -Uninstall may
+  # remove it: "<version>-<hash>", with ".partial-<n>" while it's being unpacked, or "~<n>" once moved
+  # aside to be deleted. Anything else stays, such as the pax folder a scheduled PAX refresh runs from.
+  # Launcher.cs has the same patterns.
+  function Test-Unpacked([string]$Name) {
+    ($Name -cmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.+-]*)?-[0-9a-f]{10}(?:\.partial-[0-9]+)?$') -or ($Name -cmatch '^~[0-9a-f]+$')
+  }
+
   # Azure Cloud Shell runs Linux, so the zip's Windows Node.js and packages are no use there.
   $CloudShell = $env:VALUELENS_CLOUD_SHELL -eq '1' -or ($env:VALUELENS_CLOUD_SHELL -ne '0' -and ([string]$env:AZUREPS_HOST_ENVIRONMENT -like 'cloud-shell*' -or [bool]$env:ACC_CLOUD))
   if ($CloudShell) {
@@ -90,6 +99,7 @@ by installer/packaging/build-exe.js from installer/packaging/launcher/install.ps
 
     if ($Uninstall) {
       if (-not (Test-Path -LiteralPath $VlHome)) { Write-Host 'Nothing to remove.'; return }
+      # Only the launcher's files live here: a scheduled PAX refresh needs Windows.
       Remove-Item -LiteralPath $VlHome -Recurse -Force
       Write-Host "Removed $VlHome. Your install record in $Work is still there."
       return
@@ -167,9 +177,10 @@ by installer/packaging/build-exe.js from installer/packaging/launcher/install.ps
       }
     }
 
-    # Remove other versions, and a Node.js this version doesn't use.
+    # Remove other versions, and a Node.js this version doesn't use. Only what this launcher made.
     foreach ($dir in @(Get-ChildItem -LiteralPath $VlHome -Directory -ErrorAction SilentlyContinue)) {
       if ($dir.Name -eq $Id -or ($NodeDir -and $dir.FullName -eq $NodeDir)) { continue }
+      if (-not (Test-Unpacked $dir.Name) -and $dir.Name -cnotmatch '^node-v[0-9]+\.[0-9]+\.[0-9]+-linux-x64(?:\.partial-[0-9]+)?$') { continue }
       if ($dir.Name -like '*.partial-*' -and $dir.LastWriteTimeUtc -gt (Get-Date).ToUniversalTime().AddHours(-1)) { continue }
       Remove-Item -LiteralPath $dir.FullName -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -234,8 +245,10 @@ by installer/packaging/build-exe.js from installer/packaging/launcher/install.ps
     Remove-Item -LiteralPath $Dir -Recurse -Force -ErrorAction SilentlyContinue
   }
 
+  # node.exe from a complete unpacked installer, or nothing.
   function Find-Node {
     Get-ChildItem -LiteralPath $VlHome -Directory -ErrorAction SilentlyContinue |
+      Where-Object { (Test-Unpacked $_.Name) -and (Test-Path -LiteralPath (Join-Path $_.FullName $Marker)) } |
       ForEach-Object { Join-Path $_.FullName 'node\node.exe' } |
       Where-Object { Test-Path -LiteralPath $_ } |
       Select-Object -First 1
@@ -258,21 +271,41 @@ by installer/packaging/build-exe.js from installer/packaging/launcher/install.ps
 
   if ($Uninstall) {
     if (-not (Test-Path -LiteralPath $VlHome)) { Write-Host 'Nothing to remove.'; return }
-    $node = $null
-    if (-not $Installed) { $node = Find-Node }
-    if ($Installed) {
-      Remove-Tree $VlHome $Installed
-    } elseif ($node) {
-      # Node.js can't remove the folder it runs from, so run a copy.
-      $copy = Join-Path $env:TEMP "valuelens-node-$PID.exe"
-      Copy-Item -LiteralPath $node -Destination $copy -Force
-      Remove-Tree $VlHome $copy
-      Remove-Item -LiteralPath $copy -Force -ErrorAction SilentlyContinue
-    } else {
-      Remove-Tree $VlHome $null
+    $tool = $Installed
+    $copy = $null
+    if (-not $tool) {
+      $found = Find-Node
+      if ($found) {
+        # Node.js can't remove the folder it runs from, so run a copy.
+        $copy = Join-Path $env:TEMP "valuelens-node-$PID.exe"
+        Copy-Item -LiteralPath $found -Destination $copy -Force
+        $tool = $copy
+      }
     }
-    if (Test-Path -LiteralPath $VlHome) { throw "Couldn't remove all of $VlHome. Close the installer and try again." }
-    Write-Host "Removed $VlHome. Your install record in Documents\ValueLens is still there."
+    # The command, and what the launcher made. A download that was stopped leaves "<version>-<hash>.zip.partial-<n>".
+    $ShimName = Split-Path $Shim -Leaf
+    function Test-Ours([string]$Name) { $Name -eq $ShimName -or (Test-Unpacked ($Name -creplace '\.zip(?=\.partial-[0-9]+$)', '')) }
+    try {
+      foreach ($item in @(Get-ChildItem -LiteralPath $VlHome -Force -ErrorAction SilentlyContinue)) {
+        if (-not (Test-Ours $item.Name)) { continue }
+        if ($item.PSIsContainer) { Remove-Tree $item.FullName $tool } else { Remove-Item -LiteralPath $item.FullName -Force -ErrorAction SilentlyContinue }
+      }
+    } finally {
+      if ($copy) { Remove-Item -LiteralPath $copy -Force -ErrorAction SilentlyContinue }
+    }
+    $left = @(Get-ChildItem -LiteralPath $VlHome -Force -ErrorAction SilentlyContinue | ForEach-Object { $_.Name })
+    if (@($left | Where-Object { Test-Ours $_ }).Count) { throw "Couldn't remove all of the installer from $VlHome. Close the installer and try again." }
+    if (-not $left.Count) {
+      Remove-Item -LiteralPath $VlHome -Force -ErrorAction SilentlyContinue
+      Write-Host "Removed $VlHome. Your install record in Documents\ValueLens is still there."
+      return
+    }
+    Write-Host "Removed the installer from $VlHome. Your install record in Documents\ValueLens is still there."
+    # A scheduled PAX refresh runs from its own folder, so it keeps working.
+    $PaxName = 'pax'
+    if ($left -contains $PaxName) { Write-Host "The scheduled PAX refresh still runs from $(Join-Path $VlHome $PaxName). To remove it too, run the installer again and use its uninstall command." }
+    $other = @($left | Where-Object { $_ -ne $PaxName })
+    if ($other.Count) { Write-Host "Left $($other -join ', ') in $VlHome, because the installer didn't put them there." }
     return
   }
 
@@ -384,9 +417,9 @@ by installer/packaging/build-exe.js from installer/packaging/launcher/install.ps
     throw "Your organisation's policy blocks the Node.js that comes with the installer ($node). Don't work around it. If your IT team offers Node.js, for example in Company Portal, install the x64 LTS version, then run: `$env:VALUELENS_USE_INSTALLED_NODE = '1'; $Again ($docs#it-approved-nodejs). Otherwise run the installer in Azure Cloud Shell ($docs#locked-down-tenant--azure-cloud-shell), or ask your IT team."
   }
 
-  # Remove what other versions unpacked, unless they're still running.
+  # Remove what other versions unpacked, unless they're still running. Only what the launcher made.
   foreach ($dir in @(Get-ChildItem -LiteralPath $VlHome -Directory -ErrorAction SilentlyContinue)) {
-    if ($dir.Name -eq $Id) { continue }
+    if ($dir.Name -eq $Id -or -not (Test-Unpacked $dir.Name)) { continue }
     if ($dir.Name -like '*.partial-*' -and $dir.LastWriteTimeUtc -gt (Get-Date).ToUniversalTime().AddHours(-1)) { continue }
     $doomed = $dir.FullName
     if (-not $dir.Name.StartsWith('~')) {

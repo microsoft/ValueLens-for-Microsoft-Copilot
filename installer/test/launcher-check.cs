@@ -145,6 +145,31 @@ internal static class LauncherCheck
         return File.Exists(path) ? File.ReadAllText(path) : null;
     }
 
+    // Only the folders the launcher made are removed. Others in its home stay, such as the pax folder a
+    // scheduled PAX refresh runs from.
+    private static void CheckCleanup(string home)
+    {
+        foreach (string name in new[] { "0.1.0-0123456789", "12.34.56-abcdef0123", "0.1.0-rc.1-0123456789", "0.1.0-0123456789.partial-4242", "~0123456789abcdef0123456789abcdef", "~12345678904242" })
+        {
+            Check(Launcher.Disposable(name), "the launcher made " + name);
+        }
+        foreach (string name in new[] { "pax", "PAX", "notes", "node", "0.1.0", "0.1.0-012345678", "0.1.0-0123456789x", "0.1.0-ABCDEF0123", "0.1.0-0123456789.partial-", "0.1.0-0123456789.zip.partial-1", "x0.1.0-0123456789", "~", "~pax", "~0123.partial-1" })
+        {
+            Check(!Launcher.Disposable(name), "the launcher didn't make " + name);
+        }
+
+        string[] kept = { "0.2.0-aaaaaaaaaa", "0.1.0-0123456789.partial-1", "pax", "notes", "0.1.0-ABCDEF0123" };
+        string[] removed = { "0.1.0-0123456789", "0.0.9-0123456789.partial-2", "~0123456789abcdef" };
+        foreach (string name in kept) File.WriteAllText(Path.Combine(Directory.CreateDirectory(Path.Combine(home, name)).FullName, "file.txt"), name);
+        foreach (string name in removed) File.WriteAllText(Path.Combine(Directory.CreateDirectory(Path.Combine(home, name)).FullName, "file.txt"), name);
+        // Unpacking stopped two hours ago, so no copy is still unpacking it.
+        Directory.SetLastWriteTimeUtc(Path.Combine(home, "0.0.9-0123456789.partial-2"), DateTime.UtcNow.AddHours(-2));
+        Launcher.RemoveOtherVersions(home, "0.2.0-aaaaaaaaaa");
+        foreach (string name in kept) Check(Read(Path.Combine(home, name, "file.txt")) == name, "cleanup keeps " + name);
+        foreach (string name in removed) Check(!Directory.Exists(Path.Combine(home, name)), "cleanup removes " + name);
+        Check(Directory.GetDirectories(home).Length == kept.Length, "cleanup leaves nothing moved aside");
+    }
+
     private static int Main(string[] args)
     {
         string dest = Path.Combine(args[0], "unpacked");
@@ -182,6 +207,7 @@ internal static class LauncherCheck
         Check(!Directory.Exists(dest), "unpacked folder removed");
 
         CheckMoves(Path.Combine(args[0], "home"));
+        CheckCleanup(Path.Combine(args[0], "cleanup"));
 
         Check(Launcher.AwakeFlags == 0x80000001, "keep-awake asks for ES_CONTINUOUS | ES_SYSTEM_REQUIRED");
         Check(Launcher.KeepAwake(true), "keep-awake turned on");

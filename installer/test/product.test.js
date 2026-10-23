@@ -82,6 +82,7 @@ test('product: the page, the launcher, install.ps1, the signing pipeline and pac
     `Join-Path $env:LOCALAPPDATA '${PRODUCT.home}'`,
     `Join-Path $VlHome '${PRODUCT.shim}'`,
     `Join-Path $Docs '${PRODUCT.workFolder}'`,
+    `$PaxName = '${PRODUCT.pax.folder}'`,
     `installer/bin/${PRODUCT.command}.js`,
     `installer\\bin\\${PRODUCT.command}.js`,
   ]) assert.ok(ps1.includes(want), want);

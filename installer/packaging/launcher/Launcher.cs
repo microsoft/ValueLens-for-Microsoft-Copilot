@@ -15,6 +15,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 // Some installed packages nest past Windows' 260-character path limit once unpacked. Targeting
@@ -239,8 +240,23 @@ internal static class Launcher
         return @"\\?\" + full;
     }
 
+    // The folders the launcher and install.ps1 make: "<version>-<hash>" (packaging/payload.js), with
+    // ".partial-<n>" while it's being unpacked, or "~<hex>" once moved aside to be deleted. install.ps1
+    // has the same patterns (test/script.test.js).
+    private static readonly Regex PayloadFolder = new Regex(@"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.+-]*)?-[0-9a-f]{10}(?:\.partial-[0-9]+)?$");
+    private static readonly Regex MovedAside = new Regex(@"^~[0-9a-f]+$");
+
+    /// <summary>
+    /// Whether a folder in the launcher's home is one it made, so it may remove it. Anything else stays,
+    /// such as the pax folder the scheduled PAX refresh runs from.
+    /// </summary>
+    internal static bool Disposable(string name)
+    {
+        return PayloadFolder.IsMatch(name) || MovedAside.IsMatch(name);
+    }
+
     /// <summary>Removes what earlier versions unpacked, unless they're still running.</summary>
-    private static void RemoveOtherVersions(string home, string id)
+    internal static void RemoveOtherVersions(string home, string id)
     {
         string[] dirs;
         try { dirs = Directory.GetDirectories(home); }
@@ -249,7 +265,7 @@ internal static class Launcher
         foreach (string dir in dirs)
         {
             string name = Path.GetFileName(dir);
-            if (name == id) continue;
+            if (name == id || !Disposable(name)) continue;
             // Another copy may be unpacking right now.
             if (name.Contains(Partial) && Directory.GetLastWriteTimeUtc(dir) > DateTime.UtcNow.AddHours(-1)) continue;
             string doomed = dir;
