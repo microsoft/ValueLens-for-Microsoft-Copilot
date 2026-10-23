@@ -1,8 +1,21 @@
 # ValueLens: App Edition
 
-A Copilot Managed App version of the ValueLens Power BI report. It shows the same information as the report: every measure, chart and table, calculated with the same DAX rules ported to TypeScript. The layout is simpler, with seven data tabs and short sub-views instead of sixteen report pages.
+An app version of the ValueLens Power BI report. It shows the same information as the report: every measure, chart and table, calculated with the same DAX rules ported to TypeScript. The layout is simpler, with seven data tabs and short sub-views instead of sixteen report pages.
 
 Everything runs in the browser. The app reads your CSV files locally and calculates every number on the page. No data is sent anywhere.
+
+## Get the app
+
+None of these options needs a Power BI licence.
+
+| Option | What you do | Best for |
+|---|---|---|
+| **Open it on your PC** | Open [`download/ValueLens-App.html`](download/ValueLens-App.html), choose **Download raw file**, then open the downloaded file in Edge or Chrome. Nothing to install. | Trying it out, or one person looking at the numbers. It works offline. |
+| **Copilot Managed App** | See [Deploy](#as-a-copilot-managed-app). | Tenants that use Copilot Managed Apps. |
+
+The downloaded page opens with a labelled synthetic sample. To see your own numbers, choose **Change data** and drop in your CSVs (see [Data](#data)). The files are read in the browser and never leave your PC.
+
+If you use the Fabric path, you get the app through Analytics Hub.
 
 ## Tabs
 
@@ -71,10 +84,13 @@ The Guide tab lists these differences too.
 
 ```powershell
 npm install
-npm run dev       # local dev server
+npm run dev         # local dev server
 npm run lint
-npm run build     # type-check and build to dist/
+npm run build       # type-check and build to dist/ (Fabric App and Managed App hosting)
+npm run build:file  # build the single-file download to download/ValueLens-App.html
 ```
+
+`download/ValueLens-App.html` is committed so people can download it. Whenever you change the app, run `npm run build:file` and commit the result. The single-file build inlines the code and styles and embeds the sample CSVs gzipped, so the page needs no server and makes no network calls.
 
 The code is organised like this:
 - `src/data/`: CSV loading, header detection and the report's reference tables.
@@ -86,7 +102,7 @@ The design system is in [DESIGN.md](DESIGN.md) and the product brief is in [PROD
 
 ## Deploy
 
-Deployment is up to you, and nothing in this repo deploys the app automatically. The same build runs in two hosts. Pick one.
+Deployment is up to you, and nothing in this repo deploys the app automatically. Most people should use [Get the app](#get-the-app). This section is for deploying from a clone of the repo. The same `npm run build` output runs in two hosts. Pick one.
 
 ### As a Fabric App in a Fabric workspace
 

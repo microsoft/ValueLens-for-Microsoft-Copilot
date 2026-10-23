@@ -69,8 +69,15 @@ with the DAX ported to TypeScript, and groups them into seven tabs that are easi
 
 It reads the same CSVs as the Local CSV and SharePoint paths. Every path can produce those files.
 Everything is calculated in your browser, and no data leaves your tenant. A labelled synthetic sample
-is built in. See the **[App Edition README](app/README.md)** for the input files, local development
-and deployment.
+is built in.
+
+- **Open it on your PC:** open [`app/download/ValueLens-App.html`](app/download/ValueLens-App.html),
+  choose **Download raw file**, and open the file in Edge or Chrome. It works offline with nothing to
+  install. Choose **Change data** to load your CSVs.
+- **Copilot Managed App:** see [Deploy](app/README.md#as-a-copilot-managed-app).
+- **Fabric path:** you get the app through Analytics Hub.
+
+See the **[App Edition README](app/README.md)** for the input files, local development and deployment.
 
 ## Report interpretation guide
 
