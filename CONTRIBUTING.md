@@ -81,7 +81,8 @@ signature. A release that fails goes back to being a draft.
 - Make each report or app change in every active variant: [the app](app/), `1. Fabric`
   (including the Fabric App), `2. Azure`, `4. SharePoint` and `5. Local CSV`. Leave
   [`archive/`](archive/) alone. The Power Automate + Dataverse path has been frozen since
-  23 October 2026, and the patch scripts in [`scripts/`](scripts/) and the tests skip it.
+  23 October 2026: the patch scripts in [`scripts/`](scripts/) and the template tests skip
+  its templates, but tests still cover its scripts.
 - Preserve existing names, formatting and README tone. Separate measured signals
   from estimates, and document optional sources, toggles and blank-data behaviour.
 - Use fabricated fixtures only. Never commit tenant exports, user identities,
