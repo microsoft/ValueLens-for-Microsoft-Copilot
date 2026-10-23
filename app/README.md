@@ -66,7 +66,7 @@ These files were chosen because two of the variants already produce them, and th
 
 ### Sample data
 
-The app opens with a synthetic sample in `public/sample/`. It is labelled **Sample data** in the header until you load your own files. To rebuild the sample from `5. Local CSV/sample-data`, run `node scripts/prepare-sample.mjs`.
+The app opens with a synthetic sample. It is labelled **Sample data** in the header until you load your own files. `npm run dev`, `npm run build` and `npm run build:file` first run `scripts/prepare-sample.mjs`, which builds the sample in `public/sample/` from `5. Local CSV/sample-data`. Git ignores the generated files, so build the app from a full clone of the repo.
 
 The sample registry has no `Total Users` column. Without it, agent lifecycle and usage review fall back to the users seen in the audit log. The same fallback applies to your own registry export if it lacks that column.
 

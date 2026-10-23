@@ -4,8 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/prepare-sample.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/prepare-sample.mjs",
     "build": "tsc -b && vite build",
+    "prebuild:file": "node scripts/prepare-sample.mjs",
     "build:file": "tsc -b && vite build --mode file",
     "lint": "eslint .",
     "preview": "vite preview"

@@ -36,6 +36,10 @@ between and keep up to date.
   DESIGN.md say so, and `app/download/ValueLens-App.html` was rebuilt. The Fabric App deploy keeps
   `id: valuelens-app-edition` in `app/rayfin/rayfin.yml`, so redeploying still updates the existing
   item instead of creating a second one.
+- **The app's builds make the sample data first.** Git ignores `app/public/sample/`, so an app
+  deployed from a fresh clone stopped at "Couldn't load the sample data", without the **Change
+  data** button. `npm run dev`, `npm run build` and `npm run build:file` now run
+  `scripts/prepare-sample.mjs` first, so `ms app deploy` and `npx rayfin up` ship the sample.
 - **Power Automate + Dataverse moved to
   [`archive/3. Power Automate + Dataverse/`](archive/3.%20Power%20Automate%20%2B%20Dataverse/README.md).**
   Installs you already have keep running, but the path is unsupported and no longer gets dashboard
