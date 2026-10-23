@@ -8,10 +8,10 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { payloadId } from '../packaging/payload.js';
-import { SCRIPT_NAME, ZIP_NAME, installScript, scriptCommand, scriptSha256, zipUrl } from '../packaging/script.js';
-import { CLOUD_SHELL_SHIM, INSTALLED_NODE_ENV, SCRIPT_COMMAND, SCRIPT_SHIM, SCRIPT_URL } from '../src/launch.js';
+import { SCRIPT_NAME, ZIP_NAME, installScript, scriptSha256, zipUrl } from '../packaging/script.js';
+import { CLOUD_SHELL_SHIM, INSTALLED_NODE_ENV, installerVersion, SCRIPT_SHIM, scriptCommand, scriptUrl } from '../src/launch.js';
 import { PRODUCT } from '../src/product.js';
-import { REPO } from '../src/update-check.js';
+import { RELEASES_PAGE, REPO } from '../src/update-check.js';
 
 const TEMPLATE = readFileSync(fileURLToPath(new URL('../packaging/launcher/install.ps1', import.meta.url)), 'utf8');
 const HASH = '748ed2f139d14f8babdabea867a809c4fe6da12ef9da3d07ecd93dba616224db';
@@ -25,7 +25,10 @@ test('script: fills in every placeholder', () => {
   assert.match(s, /^\s*\$Id = '1\.2\.3-748ed2f139'$/m);
   assert.ok(s.includes(`$ZipUrl = 'https://github.com/octo/hub/releases/download/valuelens-installer-v1.2.3/${ZIP_NAME}'`));
   assert.match(s, /^\s*\$SizeMb = '152'$/m);
-  assert.ok(s.includes('irm https://github.com/octo/hub/releases/latest/download/install.ps1 | iex'));
+  const again = scriptCommand('1.2.3', 'octo/hub');
+  assert.ok(s.includes(`\r\n  ${again}\r\n`), "its help names this release's install.ps1");
+  assert.ok(s.includes(`$Again = '${again}'`));
+  assert.doesNotMatch(s, /releases\/latest/, "GitHub's Latest is often a dashboard release");
   assert.match(s, /^\s*\$Commit = 'd793f32a{33}'$/m);
   assert.match(s, /^\s*\$NodeVersion = '24\.11\.1'$/m);
   assert.ok(s.includes("$RepoUrl = 'https://github.com/octo/hub.git'"));
@@ -65,12 +68,25 @@ test('script: the whole launcher runs in a script block, so iex leaves nothing b
 
 test('script: commands and URLs agree between the launcher and the installer', () => {
   assert.equal(SCRIPT_NAME, 'install.ps1');
-  assert.equal(scriptCommand(REPO), SCRIPT_COMMAND);
-  assert.equal(SCRIPT_URL, `https://github.com/${REPO}/releases/latest/download/install.ps1`);
-  assert.equal(scriptCommand('octo/hub', '1.2.3'), 'irm https://github.com/octo/hub/releases/download/valuelens-installer-v1.2.3/install.ps1 | iex');
+  assert.equal(scriptUrl('1.2.3', 'octo/hub'), `https://github.com/octo/hub/releases/download/valuelens-installer-v1.2.3/${SCRIPT_NAME}`);
+  assert.equal(scriptCommand('1.2.3', 'octo/hub'), 'irm https://github.com/octo/hub/releases/download/valuelens-installer-v1.2.3/install.ps1 | iex');
+  assert.equal(scriptCommand('1.2.3'), `irm https://github.com/${REPO}/releases/download/valuelens-installer-v1.2.3/install.ps1 | iex`);
   assert.equal(zipUrl('octo/hub', '1.2.3'), 'https://github.com/octo/hub/releases/download/valuelens-installer-v1.2.3/ValueLensInstaller.zip');
   assert.ok(TEMPLATE.includes("Join-Path $VlHome 'valuelens.cmd'"));
   assert.equal(SCRIPT_SHIM, '& $env:LOCALAPPDATA\\ValueLens\\valuelens.cmd');
+});
+
+test("script: the installer README shows this version's install command and links the installer releases", () => {
+  const readme = readFileSync(fileURLToPath(new URL('../README.md', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
+  const { version } = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'));
+  assert.equal(installerVersion(), version);
+  assert.ok(readme.includes(`\n${scriptCommand(version)}\n`), `README.md shows: ${scriptCommand(version)}`);
+  assert.ok(readme.includes(`installer ${version} as a zip`));
+  assert.ok(readme.includes(`(${scriptUrl(version).replace(/install\.ps1$/, PRODUCT.exe)})`), 'links this version of the exe');
+  const tags = [...readme.matchAll(/releases\/download\/([^/\s)]+)\//g)].map((m) => m[1]);
+  assert.deepEqual(tags, [`${PRODUCT.tagPrefix}${version}`, `${PRODUCT.tagPrefix}${version}`], 'no other version');
+  assert.ok(readme.includes(`(${RELEASES_PAGE})`), RELEASES_PAGE);
+  assert.doesNotMatch(readme, /releases\/latest/, "GitHub's Latest is often a dashboard release");
 });
 
 test('script: in Azure Cloud Shell, gets the pinned commit and runs the installer in the terminal', () => {
@@ -255,12 +271,13 @@ test("script: a pinned release whose zip is gone says so and gives the current r
         `$ZipName = '${ZIP_NAME}'`,
         `$zip = '${join(dir, 'x.zip.partial')}'`,
         '$Proxy = $null',
-        "$Again = 'irm https://github.com/octo/hub/releases/latest/download/install.ps1 | iex'",
+        `$Again = '${scriptCommand('1.2.3', 'octo/hub')}'`,
       ];
       const gone = await runBlock(shell, prelude('gone/ValueLensInstaller.zip'), block);
       assert.notEqual(gone.status, 0, `${shell}: ${gone.out}`);
       assert.match(gone.out, /Release valuelens-installer-v1\.2\.3 is no longer available/, `${shell}: ${gone.out}`);
-      assert.match(gone.out, /To install the current release instead, run: irm https:\/\/github\.com\/octo\/hub\/releases\/latest\/download\/install\.ps1 \| iex/);
+      assert.match(gone.out, /Get the current release's install command from https:\/\/github\.com\/octo\/hub\/releases\?q=valuelens-installer-v/);
+      assert.doesNotMatch(gone.out, /irm /, "this release's own command would fail the same way");
       assert.doesNotMatch(gone.out, /proxy/i);
 
       const broken = await runBlock(shell, prelude('broken/ValueLensInstaller.zip'), block);
@@ -282,7 +299,7 @@ test("script: a node.exe blocked by device policy says what to do instead of the
   const block = s.slice(start, end);
   /** @param {string} node @param {boolean} [installed] */
   const prelude = (node, installed = false) => [
-    "$Again = 'irm https://github.com/octo/hub/releases/latest/download/install.ps1 | iex'",
+    `$Again = '${scriptCommand('1.2.3', 'octo/hub')}'`,
     `$Installed = ${installed ? "'C:\\approved\\node.exe'" : '$null'}`,
     `$node = ${node}`,
   ];
@@ -296,7 +313,7 @@ test("script: a node.exe blocked by device policy says what to do instead of the
       assert.match(r.out, /Your organisation's policy blocks the Node\.js that comes with the installer/, `${shell}: ${r.out}`);
       assert.match(r.out, /Don't work around it/);
       assert.match(r.out, /Company Portal/);
-      assert.match(r.out, /\$env:VALUELENS_USE_INSTALLED_NODE = '1'; irm https:\/\/github\.com\/octo\/hub\/releases\/latest\/download\/install\.ps1 \| iex/);
+      assert.match(r.out, /\$env:VALUELENS_USE_INSTALLED_NODE = '1'; irm https:\/\/github\.com\/octo\/hub\/releases\/download\/valuelens-installer-v1\.2\.3\/install\.ps1 \| iex/);
       assert.match(r.out, /docs\/INSTALL\.md#locked-down-tenant--azure-cloud-shell/);
       assert.match(r.out, /ask your IT team/);
     }

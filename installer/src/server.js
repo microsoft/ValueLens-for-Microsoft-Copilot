@@ -407,7 +407,7 @@ export async function runWizard(o) {
     .then((u) => {
       if (!u) return;
       session.setUpdate(u);
-      write(`\n${c.yellow('!')} Installer ${u.version} is available. ${updateHint(u.url)}\n`);
+      write(`\n${c.yellow('!')} Installer ${u.version} is available. ${updateHint(u)}\n`);
     })
     .catch(() => {});
   await server.done;

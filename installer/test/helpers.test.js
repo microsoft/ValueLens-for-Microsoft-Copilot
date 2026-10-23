@@ -12,7 +12,7 @@ import { allowsAction, armLocation, parseResourceId, validateVaultName } from '.
 import { notebookDefinition, notebookJobParameters, scheduleBody } from '../src/clients/fabric.js';
 import { resolveAppRoles } from '../src/clients/graph.js';
 import { AH_CONFIG_FILE, AH_RELEASES, DEFAULT_CONFIG_FILE, emptyConfig, foreignRecord, loadConfig, saveConfig } from '../src/config.js';
-import { bundled, CLOUD_SHELL_ENV, commandLine, EXE_ENV, fromExe, inCloudShell, INSTALLED_NODE_ENV, installerWindow, LAUNCHER_ENV, launcher, reopenHint, SCRIPT_COMMAND, SCRIPT_URL, updateHint } from '../src/launch.js';
+import { bundled, CLOUD_SHELL_ENV, commandLine, EXE_ENV, fromExe, inCloudShell, INSTALLED_NODE_ENV, installerVersion, installerWindow, LAUNCHER_ENV, launcher, reopenHint, scriptCommand, scriptUrl, updateHint } from '../src/launch.js';
 import { describeSchedule, sameSchedule } from '../src/steps/fabric.js';
 import { addDays, addMonths, notebookSecretDays } from '../src/steps/identity.js';
 import { jobIdFrom, utc } from '../src/steps/run.js';
@@ -463,22 +463,27 @@ test('messages name the PowerShell command when install.ps1 started the installe
   assert.match(reopenHint(pwsh), /valuelens\.cmd in PowerShell/);
   assert.match(reopenHint({ [EXE_ENV]: '1' }), /ValueLensInstaller\.exe/);
   assert.match(reopenHint({}), /valuelens-installer --ui/);
-  assert.match(updateHint('https://example.test/r', pwsh), /irm https:\/\/github\.com\/microsoft\/ValueLens-for-Microsoft-Copilot\/releases\/latest\/download\/install\.ps1 \| iex/);
-  assert.equal(updateHint('https://example.test/r', {}), 'Download it from https://example.test/r, then choose Repair or change.');
-  assert.equal(SCRIPT_COMMAND, `irm ${SCRIPT_URL} | iex`);
+  const update = { version: '0.7.0', url: 'https://example.test/r' };
+  assert.equal(updateHint(update, pwsh), 'Close the installer and run "irm https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/valuelens-installer-v0.7.0/install.ps1 | iex" in PowerShell, then choose Repair or change.', "the update's own install.ps1, not releases/latest");
+  assert.equal(updateHint(update, {}), 'Download it from https://example.test/r, then choose Repair or change.');
+  assert.equal(scriptUrl('0.7.0'), 'https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/valuelens-installer-v0.7.0/install.ps1');
+  assert.equal(scriptUrl('0.7.0', 'octo/hub'), 'https://github.com/octo/hub/releases/download/valuelens-installer-v0.7.0/install.ps1');
+  assert.equal(scriptCommand('0.7.0'), `irm ${scriptUrl('0.7.0')} | iex`);
+  assert.equal(installerVersion(), JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
 });
 
 test('messages keep -UseInstalledNode when install.ps1 ran the installer with the installed Node.js', () => {
   const installed = { [LAUNCHER_ENV]: 'pwsh', [INSTALLED_NODE_ENV]: '1' };
+  const update = { version: '0.7.0', url: 'https://example.test/r' };
   assert.equal(INSTALLED_NODE_ENV, 'VALUELENS_USE_INSTALLED_NODE');
   assert.equal(bundled(installed), true, "the app is still the zip's prebuilt one");
-  assert.ok(reopenHint(installed).includes(`"$env:VALUELENS_USE_INSTALLED_NODE = '1'; ${SCRIPT_COMMAND}" again`));
-  assert.ok(updateHint('https://example.test/r', installed).includes(`"$env:VALUELENS_USE_INSTALLED_NODE = '1'; ${SCRIPT_COMMAND}" again in PowerShell`));
+  assert.ok(reopenHint(installed).includes(`"$env:VALUELENS_USE_INSTALLED_NODE = '1'; ${scriptCommand(installerVersion())}" again`), 'this release, which is unpacked already');
+  assert.ok(updateHint(update, installed).includes(`"$env:VALUELENS_USE_INSTALLED_NODE = '1'; ${scriptCommand('0.7.0')}" in PowerShell`));
   assert.doesNotMatch(reopenHint({ [LAUNCHER_ENV]: 'pwsh' }), /INSTALLED_NODE/);
   assert.doesNotMatch(reopenHint({ [LAUNCHER_ENV]: 'cloudshell', [INSTALLED_NODE_ENV]: '1' }), /INSTALLED_NODE/);
   assert.doesNotMatch(reopenHint({ [EXE_ENV]: '1', [INSTALLED_NODE_ENV]: '1' }), /INSTALLED_NODE/);
-  assert.doesNotMatch(updateHint('https://example.test/r', { [LAUNCHER_ENV]: 'pwsh' }), /INSTALLED_NODE/);
-  assert.doesNotMatch(updateHint('https://example.test/r', { [LAUNCHER_ENV]: 'cloudshell', [INSTALLED_NODE_ENV]: '1' }), /INSTALLED_NODE/);
+  assert.doesNotMatch(updateHint(update, { [LAUNCHER_ENV]: 'pwsh' }), /INSTALLED_NODE/);
+  assert.doesNotMatch(updateHint(update, { [LAUNCHER_ENV]: 'cloudshell', [INSTALLED_NODE_ENV]: '1' }), /INSTALLED_NODE/);
 });
 
 test('in Azure Cloud Shell: noticed from its environment, with commands for its shell', () => {
@@ -494,7 +499,7 @@ test('in Azure Cloud Shell: noticed from its environment, with commands for its 
   assert.equal(commandLine('status', cs), '~/.valuelens/valuelens status');
   assert.equal(installerWindow(cs), 'Cloud Shell');
   assert.match(reopenHint(cs), /~\/\.valuelens\/valuelens in Cloud Shell/);
-  assert.match(updateHint('https://example.test/r', cs), /install\.ps1 \| iex" again in Cloud Shell's PowerShell/);
+  assert.match(updateHint({ version: '0.7.0', url: 'https://example.test/r' }, cs), /releases\/download\/valuelens-installer-v0\.7\.0\/install\.ps1 \| iex" in Cloud Shell's PowerShell/);
 });
 
 test('parseCli: in Azure Cloud Shell, signs in with a code and stays in the terminal', () => {

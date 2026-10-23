@@ -5,6 +5,21 @@ loads the first data and checks it. This page is the reference. To get going, fo
 [Getting started](../README.md#getting-started) steps:
 [Prerequisites](../docs/PREREQUISITES.md) → [Install](../docs/INSTALL.md) → [Check it worked](../docs/INSTALL.md#check-it-worked).
 
+## Install
+
+Paste this into PowerShell. It needs no admin rights: it downloads installer 0.1.0 as a zip,
+checks its SHA-256 and opens the installer in your browser.
+
+```powershell
+irm https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/valuelens-installer-v0.1.0/install.ps1 | iex
+```
+
+Or download
+[ValueLensInstaller.exe](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/valuelens-installer-v0.1.0/ValueLensInstaller.exe)
+and run it. Other versions are on the
+[installer releases](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases?q=valuelens-installer-v).
+The repo's "Latest" release is usually a dashboard release, not the installer.
+
 ## Editing setup and recovering from failures
 
 The browser installer opens **Review and fix setup**, with a summary card for each category.

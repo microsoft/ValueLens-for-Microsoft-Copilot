@@ -156,7 +156,7 @@ export function createSession(o) {
     return {
       version: o.version,
       exe: bundled(),
-      launcher: { command: commandLine(), window: installerWindow(), reopen: reopenHint(), update: update && launcher() === 'pwsh' ? updateHint(update.url) : null },
+      launcher: { command: commandLine(), window: installerWindow(), reopen: reopenHint(), update: update && launcher() === 'pwsh' ? updateHint(update) : null },
       configFile: o.configFile,
       record,
       recordError,

@@ -1,6 +1,6 @@
 // @ts-check
 /** How the installer was started, so messages name the command people actually run. */
-import { copyFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative } from 'node:path';
 import { PRODUCT } from './product.js';
@@ -14,9 +14,21 @@ export const EXE_NAME = PRODUCT.exe;
  * download as the exe, and `cloudshell` in Azure Cloud Shell, where they run the release's source.
  */
 export const LAUNCHER_ENV = PRODUCT.env.launcher;
-/** The PowerShell one-liner that downloads and starts the latest installer. */
-export const SCRIPT_URL = `https://github.com/${REPO}/releases/latest/download/install.ps1`;
-export const SCRIPT_COMMAND = `irm ${SCRIPT_URL} | iex`;
+/**
+ * Where a release's install.ps1 downloads from. Always a named release: the repo's dashboard
+ * releases take GitHub's "Latest", so releases/latest/download/install.ps1 would find nothing.
+ * @param {string} version  The installer's version, such as 0.1.0.
+ * @param {string} [repo]  owner/name
+ */
+export const scriptUrl = (version, repo = REPO) => `https://github.com/${repo}/releases/download/${PRODUCT.tagPrefix}${version}/install.ps1`;
+/**
+ * The PowerShell one-liner that downloads and starts a release of the installer.
+ * @param {string} version
+ * @param {string} [repo]
+ */
+export const scriptCommand = (version, repo = REPO) => `irm ${scriptUrl(version, repo)} | iex`;
+/** The installer's own version, from its package.json. */
+export const installerVersion = () => String(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
 /** The command install.ps1 leaves behind, as typed in PowerShell. */
 export const SCRIPT_SHIM = `& $env:LOCALAPPDATA\\${PRODUCT.home}\\${PRODUCT.shim}`;
 /** The command install.ps1 leaves behind in Azure Cloud Shell, for Bash or PowerShell. */
@@ -125,11 +137,12 @@ export function installerWindow(env = process.env) {
 }
 
 /**
- * The PowerShell install command, keeping the runtime selected by the launcher.
+ * The PowerShell install command for a release, keeping the runtime selected by the launcher.
+ * @param {string} version
  * @param {NodeJS.ProcessEnv} env
  */
-const powerShellCommand = (env) =>
-  env[INSTALLED_NODE_ENV] === '1' ? `$env:${INSTALLED_NODE_ENV} = '1'; ${SCRIPT_COMMAND}` : SCRIPT_COMMAND;
+const powerShellCommand = (version, env) =>
+  env[INSTALLED_NODE_ENV] === '1' ? `$env:${INSTALLED_NODE_ENV} = '1'; ${scriptCommand(version)}` : scriptCommand(version);
 
 /**
  * How to start the installer again once it has stopped.
@@ -139,7 +152,7 @@ export function reopenHint(env = process.env) {
   const how = launcher(env);
   if (how === 'exe') return `To open it again, run ${EXE_NAME}.`;
   if (how === 'pwsh') {
-    const again = env[INSTALLED_NODE_ENV] === '1' ? `"${powerShellCommand(env)}"` : 'the install command';
+    const again = env[INSTALLED_NODE_ENV] === '1' ? `"${powerShellCommand(installerVersion(), env)}"` : 'the install command';
     return `To open it again, run ${SCRIPT_SHIM} in PowerShell, or ${again} again.`;
   }
   if (how === 'cloudshell') return `To run it again, run ${CLOUD_SHELL_SHIM} in Cloud Shell.`;
@@ -148,13 +161,13 @@ export function reopenHint(env = process.env) {
 
 /**
  * How to get a newer installer, after "Installer x.y.z is available."
- * @param {string} url  The release page.
+ * @param {import('./update-check.js').Update} update  The newer release: its version and page.
  * @param {NodeJS.ProcessEnv} [env]
  */
-export function updateHint(url, env = process.env) {
+export function updateHint(update, env = process.env) {
   const how = launcher(env);
-  if (how === 'cloudshell') return `Run "${SCRIPT_COMMAND}" again in Cloud Shell's PowerShell, then install to repair or change.`;
+  if (how === 'cloudshell') return `Run "${scriptCommand(update.version)}" in Cloud Shell's PowerShell, then install to repair or change.`;
   return how === 'pwsh'
-    ? `Close the installer and run "${powerShellCommand(env)}" again in PowerShell, then choose Repair or change.`
-    : `Download it from ${url}, then choose Repair or change.`;
+    ? `Close the installer and run "${powerShellCommand(update.version, env)}" in PowerShell, then choose Repair or change.`
+    : `Download it from ${update.url}, then choose Repair or change.`;
 }

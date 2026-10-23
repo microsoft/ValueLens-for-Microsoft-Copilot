@@ -19,16 +19,6 @@ export const SCRIPT_NAME = 'install.ps1';
 export const zipUrl = (repo, version) => `https://github.com/${repo}/releases/download/${PRODUCT.tagPrefix}${version}/${ZIP_NAME}`;
 
 /**
- * The PowerShell command that runs a release's install.ps1, or the latest release's.
- * @param {string} repo
- * @param {string} [version]
- */
-export function scriptCommand(repo, version) {
-  const path = version ? `download/${PRODUCT.tagPrefix}${version}` : 'latest/download';
-  return `irm https://github.com/${repo}/releases/${path}/${SCRIPT_NAME} | iex`;
-}
-
-/**
  * Fills in the launcher template.
  * @param {string} template  launcher/install.ps1
  * @param {{ version: string, sha256: string, id: string, repo: string, sizeMb: number, commit: string, nodeVersion: string }} v

@@ -7,14 +7,14 @@
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { EXE_NAME } from '../src/launch.js';
-import { SCRIPT_NAME, ZIP_NAME, scriptCommand } from './script.js';
+import { EXE_NAME, scriptCommand } from '../src/launch.js';
+import { SCRIPT_NAME, ZIP_NAME } from './script.js';
 
 export const PUBLISHER = 'Microsoft Corporation';
 
 /**
- * An installer release's version: x.y.z, or x.y.z-rc.N for a release candidate. installer-exe
- * drafts a release candidate as a pre-release, which releases/latest and the update check skip.
+ * An installer release's version: x.y.z, or x.y.z-rc.N for a release candidate. The exe workflow
+ * drafts a release candidate as a pre-release, which the update check skips.
  */
 export const RELEASE_VERSION = /^\d+\.\d+\.\d+(?:-rc\.\d+)?$/;
 
@@ -89,7 +89,7 @@ export function releaseNotes({ repo, sha256, signed, publisher = PUBLISHER, vers
   const lines = [];
   if (version && isReleaseCandidate(version)) {
     lines.push(
-      `**Release candidate.** This pre-release is for testing ${version.replace(/-rc\.\d+$/, '')} before it's released. The installer doesn't offer it as an update, and ${base}/releases/latest stays on the last release.`,
+      `**Release candidate.** This pre-release is for testing ${version.replace(/-rc\.\d+$/, '')} before it's released. The installer doesn't offer it as an update.`,
       '',
     );
   }
@@ -100,7 +100,7 @@ export function releaseNotes({ repo, sha256, signed, publisher = PUBLISHER, vers
       'Paste this into PowerShell. It needs no admin rights: it downloads this release\'s installer as a zip, checks its SHA-256 and opens the installer in your browser.',
       '',
       '```powershell',
-      `${scriptCommand(repo, version)}`,
+      `${scriptCommand(version, repo)}`,
       '```',
       '',
       `To keep the files, download \`${SCRIPT_NAME}\` and \`${ZIP_NAME}\` from this release and, where your execution policy allows scripts, run \`.\\${SCRIPT_NAME} -ZipPath .\\${ZIP_NAME}\`. With a Node.js your IT team has approved, add \`-UseInstalledNode\`: ${base}/${INSTALLED_NODE_DOCS}. More: ${base}/${PWSH_DOCS}`,

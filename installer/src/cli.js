@@ -1,6 +1,6 @@
 // @ts-check
 /** Command-line entry point. */
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { AZ_LOGIN } from './auth.js';
@@ -8,7 +8,7 @@ import { orgUrl } from './clients/dataverse.js';
 import { AH_CONFIG_FILE, archiveConfig, DEFAULT_CONFIG_FILE, loadConfig, normaliseResourceGraph } from './config.js';
 import { HttpError } from './http.js';
 import { connect, createCtx, preview, runCommand } from './install.js';
-import { adoptUploadedRecord, cloudShellKeepsFiles, cloudShellRecordMessage, commandLine, inCloudShell } from './launch.js';
+import { adoptUploadedRecord, cloudShellKeepsFiles, cloudShellRecordMessage, commandLine, inCloudShell, installerVersion } from './launch.js';
 import { PRODUCT } from './product.js';
 import { runWizard } from './server.js';
 import { loadSources } from './sources.js';
@@ -230,10 +230,7 @@ export function parseCli(argv, env = process.env) {
   };
 }
 
-export function version() {
-  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  return String(pkg.version);
-}
+export const version = installerVersion;
 
 /**
  * Applies --data, the flow flags and the currency to the install record's answers. The Data

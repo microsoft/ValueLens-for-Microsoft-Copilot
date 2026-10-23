@@ -96,6 +96,6 @@ test('signing: release candidate notes say it is a pre-release, and pin its own 
   assert.ok(notes.startsWith('**Release candidate.**'), 'the notice comes first');
   assert.match(notes, /for testing 1\.2\.3 before it's released/);
   assert.match(notes, /doesn't offer it as an update/);
-  assert.ok(notes.includes('https://github.com/octo/hub/releases/latest stays on the last release'));
+  assert.doesNotMatch(notes, /releases\/latest/, "GitHub's Latest is often a dashboard release");
   assert.ok(notes.includes('irm https://github.com/octo/hub/releases/download/valuelens-installer-v1.2.3-rc.2/install.ps1 | iex'));
 });
