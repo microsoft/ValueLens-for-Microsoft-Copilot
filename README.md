@@ -63,8 +63,8 @@ affected.
 
 ## App Edition (preview)
 
-The **[`app/`](app/)** folder holds an app version of the dashboard. It runs as a Copilot
-**Managed App** in Copilot Studio or Cowork. It keeps every measure, chart and table from the report,
+The **[`app/`](app/)** folder holds an app version of the dashboard. It runs as a Fabric App in your
+Fabric workspace, or as a Copilot **Managed App** in Copilot Studio or Cowork. It keeps every measure, chart and table from the report,
 with the DAX ported to TypeScript, and groups them into seven tabs that are easier to navigate.
 
 It reads the same CSVs as the Local CSV and SharePoint paths. Every path can produce those files.
