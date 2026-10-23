@@ -61,6 +61,17 @@ use [`SUMMARIZECOLUMNS`](https://learn.microsoft.com/dax/summarizecolumns-functi
 in ways those releases don't fully support. Reports in the Power BI service and Fabric aren't
 affected.
 
+## App Edition (preview)
+
+The **[`app/`](app/)** folder holds an app version of the dashboard. It runs as a Fabric App in your
+Fabric workspace, or as a Copilot **Managed App** in Copilot Studio or Cowork. It keeps every measure, chart and table from the report,
+with the DAX ported to TypeScript, and groups them into seven tabs that are easier to navigate.
+
+It reads the same CSVs as the Local CSV and SharePoint paths. Every path can produce those files.
+Everything is calculated in your browser, and no data leaves your tenant. A labelled synthetic sample
+is built in. See the **[App Edition README](app/README.md)** for the input files, local development
+and deployment.
+
 ## Report interpretation guide
 
 A page-by-page guide to reading the ValueLens report — 15 report pages, with the key questions each one answers. Built for both internal teams and external customers.
