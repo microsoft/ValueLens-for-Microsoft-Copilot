@@ -141,7 +141,8 @@ class DaxVarNames(unittest.TestCase):
     def test_shipped_templates_use_safe_var_names(self):
         reserved = reserved_names()
         templates = shipped_templates()
-        self.assertGreaterEqual(len(templates), 10)
+        # Eight active templates; the archived Power Automate + Dataverse ones aren't counted.
+        self.assertGreaterEqual(len(templates), 8)
         problems = []
         checked = 0
         for path in templates:

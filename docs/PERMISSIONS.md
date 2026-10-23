@@ -198,7 +198,6 @@ Caveats:
 - **+ Feedback:** an admin exports the feedback CSV and lands it, by hand or with the flow. No extra API permission. With the installer, choose **Upload CSV** on its Data sources card, or drop it in `Files/analytics_hub_uploads`.
 - **+ Agents 365:** add `CopilotPackages.Read.All` + `Application.Read.All` (+ `User.Read.All`) to the same app reg, and confirm the tenant has an Agent 365 licence.
 
-See the path README you're following for the step-by-step —
-[1](../1.%20Fabric/README.md) · [2](../2.%20Azure/README.md) ·
-[3](../3.%20Power%20Automate%20+%20Dataverse/README.md) · [4](../4.%20SharePoint/README.md) ·
-[5](../5.%20Local%20CSV/README.md).
+See the README for what you're deploying for the step-by-step —
+[the app](../app/README.md) · [1](../1.%20Fabric/README.md) · [2](../2.%20Azure/README.md) ·
+[4](../4.%20SharePoint/README.md) · [5](../5.%20Local%20CSV/README.md).

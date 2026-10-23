@@ -1,7 +1,7 @@
 {
   "pathway": "3. Power Automate + Dataverse",
   "summary": "Additional Power Automate + Dataverse route for the same ValueLens dashboard. Full raw CopilotInteraction audit payloads are retained in Dataverse, transformed through the existing canonical ValueLens processor, then published as curated Dataverse tables consumed directly by the PBIT.",
-  "status": "Preview with representative live bounded collection, scoped snapshot and Power BI Desktop refresh validated; production-scale and unattended refresh remain outside this validation",
+  "status": "Archived on 23 October 2026 and unsupported. Before that: preview with representative live bounded collection, scoped snapshot and Power BI Desktop refresh validated; production-scale and unattended refresh remain outside this validation",
   "snapshotContract": {
     "parameter": "Core Snapshot ID",
     "manifestEntitySet": "poc_valuelensruns",
@@ -20,7 +20,7 @@
       "modelTable": "Chat + Agent Interactions (Audit Logs)",
       "required": true,
       "sourceType": "Dataverse curated JSON payload rows",
-      "producer": "3. Power Automate + Dataverse\\scripts\\Build-DataverseCoreFeeds.py",
+      "producer": "archive\\3. Power Automate + Dataverse\\scripts\\Build-DataverseCoreFeeds.py",
       "sourceContract": "poc_valuelensinteractions[poc_payloadjson]",
       "upstreamRequiredEvidence": "Full original Graph/Purview CopilotInteraction AuditData including CopilotEventData.Messages with original Id values",
       "reason": "Reuses Purview_CopilotInteraction_Processor_v4.0.0.py so behavior/value/rollup semantics stay aligned with the original ValueLens model."
@@ -29,7 +29,7 @@
       "modelTable": "Copilot Licensed",
       "required": true,
       "sourceType": "Dataverse curated JSON payload rows",
-      "producer": "3. Power Automate + Dataverse\\scripts\\Build-DataverseCoreFeeds.py",
+      "producer": "archive\\3. Power Automate + Dataverse\\scripts\\Build-DataverseCoreFeeds.py",
       "sourceContract": "poc_valuelensusers[poc_payloadjson]",
       "upstreamRequiredEvidence": "Actual Graph/Admin Center Entra user and Copilot licence attributes, or a BYOD CSV with equivalent userPrincipalName and Has license fields",
       "reason": "License status is not inferred from activity. It is carried through the canonical users output."
@@ -38,7 +38,7 @@
       "modelTable": "Chat + Agent Org Data",
       "required": true,
       "sourceType": "Dataverse curated JSON payload rows",
-      "producer": "3. Power Automate + Dataverse\\scripts\\Build-DataverseCoreFeeds.py",
+      "producer": "archive\\3. Power Automate + Dataverse\\scripts\\Build-DataverseCoreFeeds.py",
       "sourceContract": "poc_valuelensusers[poc_payloadjson]",
       "upstreamRequiredEvidence": "Actual Graph Entra user/org attributes or equivalent BYOD export",
       "reason": "Preserves the shared UserKey/UserId surrogate map and the existing ValueLens user/org relationship contract."

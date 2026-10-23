@@ -2,7 +2,7 @@
 
 Power BI Desktop only: no tenant setup is needed to try it, and it ships with a fabricated sample dataset.
 
-Use Power BI Desktop from June 2024 or later. In older releases, the habit-stage charts and cards on the Habit Formation page can show errors, because their measures use `SUMMARIZECOLUMNS` in ways those releases don't fully support. Reports published to the Power BI service aren't affected.
+Use Power BI Desktop from June 2024 or later. In older releases, the habit-stage charts and cards on the Habit Formation page can show errors, because their measures use [`SUMMARIZECOLUMNS`](https://learn.microsoft.com/dax/summarizecolumns-function-dax#contextual-summarizecolumns) in ways those releases don't fully support. Reports published to the Power BI service aren't affected.
 
 ## 1. Try it with sample data
 

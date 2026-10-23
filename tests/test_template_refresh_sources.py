@@ -17,10 +17,10 @@ SPEC = importlib.util.spec_from_file_location(
 PATCHER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PATCHER)
 
-# The parameters each template may pass to Web.Contents as the base URL.
+# The parameters each template may pass to Web.Contents as the base URL. The archived Power Automate +
+# Dataverse template is frozen, so it isn't checked.
 WEB_BASES = {
     PATCHER.SHAREPOINT: {"Copilot Interactions File", "Org Data File", "SharePoint Site URL"},
-    PATCHER.POWER_AUTOMATE: {"Dataverse URL", "SharePoint Site URL"},
     PATCHER.LOCAL_CSV: set(),
 }
 FEEDBACK_GUARD = 'if FilePath = null or Text.Trim(FilePath) = "" then EmptyTable(Expected)'
@@ -67,7 +67,7 @@ def base_parameter(m, argument):
 
 class TemplatesAreCurrent(unittest.TestCase):
     def test_every_template_is_current_and_the_patcher_is_idempotent(self):
-        self.assertEqual(len(PATCHER.TARGETS), 3)
+        self.assertEqual(len(PATCHER.TARGETS), 2)
         for relative, edits in PATCHER.TARGETS:
             original = (ROOT / relative).read_bytes()
             rebuilt, changed = PATCHER.build(original, edits)
@@ -104,33 +104,22 @@ class StaticDataSources(unittest.TestCase):
                     self.assertNotRegex(call, r"Text\.|\bif\b|\?\?|&", (relative, name))
 
     def test_optional_files_are_read_through_the_site(self):
-        for relative in (PATCHER.SHAREPOINT, PATCHER.POWER_AUTOMATE):
-            sources = dict(m_sources(load(relative)))
-            optional = ["ProductFeedback", "Agents 365 Staging"]
-            if relative == PATCHER.POWER_AUTOMATE:
-                optional += ["Chat + Agent Interactions (Audit Logs)", "Copilot Licensed", "Chat + Agent Org Data"]
-            for name in optional:
-                self.assertIn(PATCHER.READ_SITE_CSV, sources[name], (relative, name))
-                self.assertNotIn(PATCHER.READ_CSV, sources[name], (relative, name))
+        sources = dict(m_sources(load(PATCHER.SHAREPOINT)))
+        for name in ("ProductFeedback", "Agents 365 Staging"):
+            self.assertIn(PATCHER.READ_SITE_CSV, sources[name], name)
+            self.assertNotIn(PATCHER.READ_CSV, sources[name], name)
 
     def test_site_function_calls_web_contents_on_the_site_parameter(self):
-        for relative in (PATCHER.SHAREPOINT, PATCHER.POWER_AUTOMATE):
-            function = dict(m_sources(load(relative)))[PATCHER.SITE_FUNCTION]
-            self.assertEqual(function, PATCHER.SITE_FUNCTION_M)
-            self.assertIn("Web.Contents(Site, [RelativePath = RelativePath])", function)
-            self.assertIn('Site = #"SharePoint Site URL",', function)
-            self.assertIn("_api/web/GetFileByServerRelativeUrl(", function)
-
-    def test_dataverse_reads_from_the_parameter(self):
-        dataverse = dict(m_sources(load(PATCHER.POWER_AUTOMATE)))[PATCHER.DATAVERSE]
-        self.assertIn('Web.Contents(#"Dataverse URL", [RelativePath = ApiPath & relativePath', dataverse)
-        self.assertNotIn("Web.Contents(BaseUrl", dataverse)
+        function = dict(m_sources(load(PATCHER.SHAREPOINT)))[PATCHER.SITE_FUNCTION]
+        self.assertEqual(function, PATCHER.SITE_FUNCTION_M)
+        self.assertIn("Web.Contents(Site, [RelativePath = RelativePath])", function)
+        self.assertIn('Site = #"SharePoint Site URL",', function)
+        self.assertIn("_api/web/GetFileByServerRelativeUrl(", function)
 
 
 class OptionalParametersStayOptional(unittest.TestCase):
     def test_site_parameter_is_required_only_in_sharepoint(self):
         self.assertTrue(parameters(load(PATCHER.SHAREPOINT))["SharePoint Site URL"])
-        self.assertFalse(parameters(load(PATCHER.POWER_AUTOMATE))["SharePoint Site URL"])
         self.assertNotIn("SharePoint Site URL", parameters(load(PATCHER.LOCAL_CSV)))
 
     def test_blank_feedback_file_loads_an_empty_table(self):
@@ -143,12 +132,11 @@ class OptionalParametersStayOptional(unittest.TestCase):
             self.assertNotIn('Text.Trim(#"Feedback File")', feedback, relative)
 
     def test_blank_agent_file_loads_an_empty_table(self):
-        for relative in (PATCHER.SHAREPOINT, PATCHER.POWER_AUTOMATE):
-            model = load(relative)
-            self.assertFalse(parameters(model)["Agent 365"], relative)
-            agents = dict(m_sources(model))["Agents 365 Staging"]
-            self.assertRegex(agents, r'FilePath = #"Agent 365"', relative)
-            self.assertIn("EmptyTable", agents, relative)
+        model = load(PATCHER.SHAREPOINT)
+        self.assertFalse(parameters(model)["Agent 365"])
+        agents = dict(m_sources(model))["Agents 365 Staging"]
+        self.assertRegex(agents, r'FilePath = #"Agent 365"')
+        self.assertIn("EmptyTable", agents)
 
 
 if __name__ == "__main__":

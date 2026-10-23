@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "cowork_scheduled_runs.jsonl"
 INGESTER = ROOT / "1. Fabric" / "Manual setup" / "notebooks" / "Copilot_Audit_Log_Direct_Ingester.ipynb"
 CSV_PROCESSOR = ROOT / "5. Local CSV" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
-DATAVERSE_BUILDER = ROOT / "3. Power Automate + Dataverse" / "scripts" / "Build-DataverseCoreFeeds.py"
+DATAVERSE_BUILDER = ROOT / "archive" / "3. Power Automate + Dataverse" / "scripts" / "Build-DataverseCoreFeeds.py"
 
 
 def load_module(name: str, path: Path):

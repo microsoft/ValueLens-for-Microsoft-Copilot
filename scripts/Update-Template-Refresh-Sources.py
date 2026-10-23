@@ -5,14 +5,13 @@ running the query. The base URL must be a parameter (or literal) with a value. A
 (Text.Trim, if/else, concatenation) or a blank parameter, even in an unused branch, makes the
 source dynamic and blocks scheduled refresh with "Data source for Query1".
 
-This script owns the M that reads web sources in the SharePoint and Power Automate + Dataverse
-templates, and the matching optional-file read in the Local CSV template:
+This script owns the M that reads web sources in the SharePoint template, and the matching
+optional-file read in the Local CSV template. The archived Power Automate + Dataverse template is
+frozen, so it's no longer patched:
 
-* Optional SharePoint files (Feedback File, Agent 365) and the PA CSV fallback are read through
-  a SharePoint Site URL parameter and the SharePoint REST API (ValueLensSharePointFile), so a
-  blank file parameter no longer blocks scheduled refresh.
-* The Dataverse reader passes the Dataverse URL parameter as the base URL, with the API path
-  in RelativePath.
+* Optional SharePoint files (Feedback File, Agent 365) are read through a SharePoint Site URL
+  parameter and the SharePoint REST API (ValueLensSharePointFile), so a blank file parameter no
+  longer blocks scheduled refresh.
 * ProductFeedback passes the Feedback File parameter straight through, guarded for blank.
 
 It leaves every other model field and ZIP member untouched, and is idempotent.
@@ -31,7 +30,6 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 SHAREPOINT = Path("4. SharePoint") / "ValueLens - SharePoint.pbit"
-POWER_AUTOMATE = Path("3. Power Automate + Dataverse") / "ValueLens - Power Automate + Dataverse.pbit"
 LOCAL_CSV = Path("5. Local CSV") / "ValueLens - Local CSV.pbit"
 ZIP_METADATA = (
     "filename", "orig_filename", "date_time", "compress_type", "comment", "extra",
@@ -124,41 +122,6 @@ SHAREPOINT_EDITS = (
     feedback_read("Web.Contents"),
 )
 
-DATAVERSE = "ValueLensDataverseEntity"
-POWER_AUTOMATE_EDITS = (
-    new_expression(
-        SITE_PARAMETER, parameter(False),
-        "SharePoint site that holds the SharePoint CSVs (CSV fallback, Agent 365, Feedback File), e.g. "
-        "https://contoso.sharepoint.com/sites/ValueLens. For scheduled refresh in the Power BI service, set "
-        "both this and Dataverse URL; if you use only one source, set both to the same URL.",
-        "Text", "Dataverse URL"),
-    SITE_FUNCTION_SPEC,
-    AGENTS_365,
-    FEEDBACK_FILE_PATH,
-    feedback_read("Web.Contents"),
-    replace("Chat + Agent Interactions (Audit Logs)", READ_CSV, READ_SITE_CSV),
-    replace("Copilot Licensed", READ_CSV, READ_SITE_CSV),
-    replace("Chat + Agent Org Data", READ_CSV, READ_SITE_CSV),
-    replace(
-        DATAVERSE,
-        '        if Parts[Scheme] <> "https" or Parts[Host] = ""\n',
-        '        if Parts[Scheme] <> "https" or Parts[Host] = ""\n'
-        '            or (Text.From(DataverseUrl) <> BaseUrl and Text.From(DataverseUrl) <> BaseUrl & "/")\n'),
-    replace(
-        DATAVERSE,
-        '"Use the HTTPS environment origin only, without credentials, path or query."',
-        '"Use the HTTPS environment origin only, without spaces, credentials, path or query."'),
-    replace(
-        DATAVERSE,
-        "        Json.Document(Web.Contents(ApiRoot, [RelativePath = relativePath, Query = query, Headers = Headers])),",
-        "        // The base URL is the Dataverse URL parameter itself: the Power BI service cannot schedule refresh of a computed URL.\n"
-        "        Json.Document(Web.Contents(#\"Dataverse URL\", [RelativePath = ApiPath & relativePath, Query = query, Headers = Headers])),"),
-    {"kind": "description", "name": "Dataverse URL", "description": [
-        "Dataverse environment URL for the Power Automate + Dataverse core pathway.",
-        "For scheduled refresh in the Power BI service, set it even with Use SharePoint CSV fallback (use the SharePoint Site URL).",
-    ]},
-)
-
 LOCAL_CSV_EDITS = (
     FEEDBACK_FILE_PATH,
     feedback_read("File.Contents"),
@@ -166,7 +129,6 @@ LOCAL_CSV_EDITS = (
 
 TARGETS = (
     (SHAREPOINT, SHAREPOINT_EDITS),
-    (POWER_AUTOMATE, POWER_AUTOMATE_EDITS),
     (LOCAL_CSV, LOCAL_CSV_EDITS),
 )
 

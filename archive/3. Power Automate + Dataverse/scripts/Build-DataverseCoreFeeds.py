@@ -24,9 +24,10 @@ from urllib import error, request
 from urllib.parse import quote, urlencode, urlsplit
 from datetime import datetime, timezone
 
-ROOT = Path(__file__).resolve().parents[2]
+PATHWAY = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 PROCESSOR = ROOT / "5. Local CSV" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
-CORE_SCHEMA = ROOT / "3. Power Automate + Dataverse" / "dataverse-core-schema.json"
+CORE_SCHEMA = PATHWAY / "dataverse-core-schema.json"
 DEFAULT_RAW_TABLE = "poc_valuelensrawaudits"
 INTERACTIONS_TABLE = "poc_valuelensinteractions"
 USERS_TABLE = "poc_valuelensusers"
@@ -710,7 +711,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--raw-end-utc", help="Inclusive UTC CreationTime upper bound for retained raw records")
     parser.add_argument("--entra", type=Path, help="Graph Entra users/org CSV or BYOD equivalent")
     parser.add_argument("--licensing", type=Path, help="Optional Graph/Admin Center licensing CSV")
-    parser.add_argument("--out-dir", type=Path, default=Path("3. Power Automate + Dataverse") / "processed")
+    parser.add_argument("--out-dir", type=Path, default=PATHWAY / "processed")
     parser.add_argument("--run-id", default=f"valuelens-{uuid.uuid4()}")
     parser.add_argument("--publish", choices=("local", "dataverse", "none"), default="local")
     parser.add_argument("--emit-schema", action="store_true")

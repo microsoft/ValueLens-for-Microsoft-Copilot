@@ -53,7 +53,7 @@ export function DataSourceDialog({ open, onClose }: { open: boolean; onClose: ()
           Select the ValueLens CSV files. The Copilot interactions file is required; the organisation and licences file, the Agent 365 registry and the product feedback file are optional. Files are read in your browser and never uploaded.
         </p>
         <p>
-          The Local CSV and SharePoint editions already produce these files. For the Fabric, Azure and Power Automate editions, export the same tables to CSV first; the app README lists the columns it reads.
+          The Local CSV and SharePoint paths already produce these files. For the Fabric and Azure paths, export the same tables to CSV first; the app README lists the columns it reads.
         </p>
         <label className="drop">
           <input type="file" accept=".csv,text/csv" multiple disabled={busy} onChange={(e) => void pick(e.target.files)} />

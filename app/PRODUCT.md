@@ -1,15 +1,15 @@
 <!-- impeccable:product-schema 1 -->
-# ValueLens — App Edition
+# ValueLens app
 
 ## Platform
-A web app hosted as a Copilot Studio / Cowork **Managed App** on the Copilot Managed Runtime. It is designed for desktop first (1280–1600px) and still works at 390px wide.
+A web app hosted as a Copilot **Managed App** on Copilot Managed Runtime (preview), deployed with the `ms` CLI. It can also be hosted as a Fabric App or opened as a single offline HTML file. It is designed for desktop first (1280–1600px) and still works at 390px wide.
 
 ## Users
 - **Adoption and change leads.** They track Microsoft 365 Copilot, Copilot Chat and agent use, and see how habits form. They decide where to focus enablement.
 - **Value and ROI owners** in finance or the business. They estimate the hours and value Copilot saves using their own assumptions, and report that value to leadership.
 - **IT and licence owners.** They decide who gets a Copilot licence next, which seats to review and reclaim, and where to roll out Cowork.
 
-These users know Microsoft 365 well and often know the Power BI edition already. They open the app weekly or monthly, often to prepare for a review meeting.
+These users know Microsoft 365 well and often know the Power BI report already. They open the app weekly or monthly, often to prepare for a review meeting.
 
 ## Purpose
 This is the app version of the ValueLens Power BI report. It keeps **the same information as the report**: every measure, chart and table, with the same DAX definitions. Navigation is simpler: seven data tabs plus a Guide, with short sub-views, instead of sixteen report pages. The report's parameter tables become an Assumptions sheet: hourly rate, scenario, licence price and grading strictness.

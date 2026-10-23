@@ -1,4 +1,8 @@
-"""Structural checks for the Power Automate + Dataverse pathway."""
+"""Structural checks for the archived Power Automate + Dataverse pathway and the stub at its old path.
+
+The archived template is frozen: it no longer gets the report changes made to the active paths, so
+it isn't compared with them. These checks cover what still ships in the archive.
+"""
 import json
 import csv
 import importlib.util
@@ -8,16 +12,17 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
-PATHWAY = ROOT / "3. Power Automate + Dataverse"
-SOURCE = ROOT / "4. SharePoint" / "ValueLens - SharePoint.pbit"
-ONELAKE = ROOT / "1. Fabric" / "Manual setup" / "ValueLens - Fabric OneLake.pbit"
+PATHWAY = ROOT / "archive" / "3. Power Automate + Dataverse"
+OLD_PATH = ROOT / "3. Power Automate + Dataverse"
 TEMPLATE = PATHWAY / "ValueLens - Power Automate + Dataverse.pbit"
 BRIDGE = PATHWAY / "scripts" / "Build-DataverseCoreFeeds.py"
 SOURCE_MAP = PATHWAY / "source-map.json"
 FACT = "Chat + Agent Interactions (Audit Logs)"
-GLOSSARY = "\U0001f4d6 Metric Glossary"
+# Runtime audit payloads, curated tenant data and private adapted solutions stay out of git.
+RUNTIME_IGNORES = ("processed/", "private/", "*.jsonl", "*.zip", "*.settings.json")
 
 
 def text(value):
@@ -27,8 +32,6 @@ def text(value):
 class PowerAutomateDataversePathTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        with zipfile.ZipFile(SOURCE) as source_archive:
-            cls.source_members = {name: source_archive.read(name) for name in source_archive.namelist()}
         with zipfile.ZipFile(TEMPLATE) as template_archive:
             if template_archive.testzip() is not None:
                 raise AssertionError("Corrupt Power Automate + Dataverse template archive")
@@ -57,12 +60,6 @@ class PowerAutomateDataversePathTests(unittest.TestCase):
             self.assertTrue((PATHWAY / relative).exists(), relative)
         # The retired generator rebuilds the pre-lean model; it must not sit beside the live scripts.
         self.assertFalse((PATHWAY / "scripts" / "Build-PowerAutomateDataverse-Template.py").exists())
-
-    def test_template_report_matches_sharepoint(self):
-        self.assertEqual(
-            {name: data for name, data in self.source_members.items() if name.startswith("Report/")},
-            {name: data for name, data in self.template_members.items() if name.startswith("Report/")},
-        )
 
     def test_template_ships_the_applied_model_only(self):
         self.assertNotIn("UnappliedChanges", self.template_members)
@@ -112,18 +109,6 @@ class PowerAutomateDataversePathTests(unittest.TestCase):
                     self.assertNotIn("lineageTag:", text(column["expression"]), (table["name"], column["name"]))
         self.assertIn('{"Status", type text}', self.partition("Agents 365"))
 
-    def test_glossary_matches_the_sort_checked_onelake_glossary(self):
-        # test_onelake_source proves each Metric/Page maps to one sort order in this table.
-        with zipfile.ZipFile(ONELAKE) as archive:
-            onelake = json.loads(archive.read("DataModelSchema").decode("utf-16-le"))["model"]
-        mine = self.tables[GLOSSARY]
-        theirs = next(table for table in onelake["tables"] if table["name"] == GLOSSARY)
-        self.assertEqual(mine["partitions"][0]["source"], theirs["partitions"][0]["source"])
-        self.assertEqual(
-            {column["name"]: column.get("sortByColumn") for column in mine["columns"]},
-            {column["name"]: column.get("sortByColumn") for column in theirs["columns"]},
-        )
-
     def test_sharepoint_agent_inventory_is_not_modelled(self):
         self.assertNotIn("SharePoint Agents", self.tables)
         self.assertNotIn("Include SharePoint agent inventory", self.expressions)
@@ -160,6 +145,32 @@ class PowerAutomateDataversePathTests(unittest.TestCase):
         gaps = {item["lane"]: item["status"] for item in self.source_map["documentedGaps"]}
         self.assertEqual(gaps["E"], "Implemented upstream; not read by the current report")
         self.assertEqual(gaps["C"], "Implemented with raw-payload extension")
+
+
+class ArchiveStubTests(unittest.TestCase):
+    """The old path keeps a pointer to the archive, so existing links and clones still work."""
+
+    def test_old_path_holds_only_the_stub(self):
+        # Ignored run output (CSV, JSONL, ZIP) may remain in an existing clone; nothing that ships may.
+        leftovers = sorted(
+            path.relative_to(OLD_PATH).as_posix() for path in OLD_PATH.rglob("*")
+            if path.is_file() and path.suffix.lower() in {".pbit", ".py", ".ps1", ".md", ".example"}
+            and path.relative_to(OLD_PATH).as_posix() != "README.md"
+        )
+        self.assertEqual(leftovers, [])
+        self.assertTrue((OLD_PATH / "README.md").is_file())
+
+    def test_stub_links_to_the_archive(self):
+        stub = (OLD_PATH / "README.md").read_text(encoding="utf-8")
+        link = "../archive/3.%20Power%20Automate%20%2B%20Dataverse/README.md"
+        self.assertIn(f"]({link})", stub)
+        self.assertTrue((OLD_PATH / unquote(link)).resolve().is_file())
+
+    def test_old_path_still_ignores_runtime_data(self):
+        for folder in (OLD_PATH, PATHWAY):
+            lines = (folder / ".gitignore").read_text(encoding="utf-8").splitlines()
+            for pattern in RUNTIME_IGNORES:
+                self.assertIn(pattern, lines, (folder.relative_to(ROOT).as_posix(), pattern))
 
 
 class DataverseCoreBridgeTests(unittest.TestCase):

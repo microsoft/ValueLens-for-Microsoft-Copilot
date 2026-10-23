@@ -1,8 +1,9 @@
 """The agent-type classifier copies outside Fabric must not drift from the Fabric notebook rules.
 
 - Local CSV processor: an exact source copy of notebook cell 2's classifier, checked by AST and by output.
-- Power Query templates (Local CSV, SharePoint, Dataverse): ValueLensDescribeAgent is an M port. Its
+- Power Query templates (Local CSV, SharePoint): ValueLensDescribeAgent is an M port. Its
   shipped text is run with tests/m_eval.py over the samples and a combinatorial grid of inputs.
+  The archived Power Automate + Dataverse template is frozen, so it isn't checked.
 """
 import ast
 import csv
@@ -28,7 +29,6 @@ FABRIC_TEMPLATES = (
 M_TEMPLATES = (
     Path("5. Local CSV") / "ValueLens - Local CSV.pbit",
     Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
-    Path("3. Power Automate + Dataverse") / "ValueLens - Power Automate + Dataverse.pbit",
 )
 AGENTS_PAGE = "93c52bc8ecf242b91ee4"
 

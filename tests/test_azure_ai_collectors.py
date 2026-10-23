@@ -16,7 +16,6 @@ NOTEBOOK = "credit-consumption/Ingest_Azure_AI.ipynb"
 CSV_SCRIPT = ROOT / "5. Local CSV" / "Add Credit Consumption" / "pull_azure_ai.py"
 JOBS_COLLECTOR = ROOT / "2. Azure" / "jobs" / "valuelens_jobs" / "collect" / "azure_ai.py"
 SAMPLES = ROOT / "5. Local CSV" / "Add Credit Consumption" / "sample-data"
-DATAVERSE = ROOT / "3. Power Automate + Dataverse" / "Add Credit Consumption" / "dataverse-schema.json"
 SHARED_START = "# --- Shared with the Fabric notebook Ingest_Azure_AI.ipynb (section 4); keep identical. ---\n"
 SHARED_END = "# --- End of shared block. ---\n"
 CONSTANTS = {"HEALTH_HEADERS", "RECON_HEADERS", "SOLUTION_HEADERS", "APPLICATION_TAG_KEYS",
@@ -67,11 +66,8 @@ def test_shared_block_is_identical_in_notebook_and_csv_script():
 def test_headers_match_the_report_contract(table):
     with (SAMPLES / f"{table}.csv").open(encoding="utf-8-sig", newline="") as handle:
         sample = next(csv.reader(handle))
-    schema = json.loads(DATAVERSE.read_text(encoding="utf-8"))
-    dataverse = next(t for t in schema["tables"] if t["modelTable"] == table)
     headers = getattr(CSV_MODULE, TABLES[table])
     assert headers == sample
-    assert headers == [c["canonical"] for c in dataverse["columns"]]
     assert NOTEBOOK_NS[TABLES[table]] == headers
 
 

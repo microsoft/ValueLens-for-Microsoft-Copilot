@@ -1,6 +1,6 @@
-# ValueLens: App Edition
+# ValueLens app
 
-An app version of the ValueLens Power BI report. It shows the same information as the report: every measure, chart and table, calculated with the same DAX rules ported to TypeScript. The layout is simpler, with seven data tabs and short sub-views instead of sixteen report pages.
+The ValueLens dashboard as an app (preview). It shows the same information as the Power BI report: every measure, chart and table, calculated with the same DAX rules ported to TypeScript. The layout is simpler, with seven data tabs and short sub-views instead of sixteen report pages.
 
 Everything runs in the browser. The app reads your CSV files locally and calculates every number on the page. No data is sent anywhere.
 
@@ -10,12 +10,13 @@ None of these options needs a Power BI licence.
 
 | Option | What you do | Best for |
 |---|---|---|
+| **Copilot Managed App** (recommended, preview) | Deploy it once with the `ms` CLI: see [As a Copilot Managed App](#as-a-copilot-managed-app). People open it at [managedapps.cloud.microsoft](https://managedapps.cloud.microsoft). | Sharing it across your organisation. Each viewer needs a Power Apps Premium licence or Copilot Credits. |
 | **Open it on your PC** | Open [`download/ValueLens-App.html`](download/ValueLens-App.html), choose **Download raw file**, then open the downloaded file in Edge or Chrome. Nothing to install. | Trying it out, or one person looking at the numbers. It works offline. |
-| **Copilot Managed App** | See [Deploy](#as-a-copilot-managed-app). | Tenants that use Copilot Managed Apps. |
+| **Fabric App** (alternative) | Host it in your Fabric workspace: see [As a Fabric App](#as-a-fabric-app-in-a-fabric-workspace). | Tenants with Fabric capacity. |
 
-The downloaded page opens with a labelled synthetic sample. To see your own numbers, choose **Change data** and drop in your CSVs (see [Data](#data)). The files are read in the browser and never leave your PC.
+The app opens with a labelled synthetic sample. To see your own numbers, choose **Change data** and drop in your CSVs (see [Data](#data)). The files are read in the browser and never leave your PC.
 
-If you use the Fabric path, you get the app through Analytics Hub.
+On the Fabric path, the Analytics Hub installer deploys a different app, the [Analytics Hub app](../1.%20Fabric/Fabric%20App/), which reads your semantic model live instead of CSV files.
 
 ## Tabs
 
@@ -51,7 +52,7 @@ The app reads the same CSV files as the **Local CSV** and **SharePoint** variant
 
 The interactions file must be the **processed** output, not the raw Purview export. It needs the processor's derived columns, such as `Behavior_Enriched_Full`, `Value_Outcome`, `Expertise_Role`, `AI_Model`, `Agent_Type` and `License Status`.
 
-These files were chosen because two of the variants already produce them, and the processor that writes them is shared by most of the others. That keeps one input format for every variant.
+These files were chosen because two of the variants already produce them, and the processor that writes them is shared by most of the others. That keeps one input format for every active variant.
 
 ### Getting the files from each variant
 
@@ -59,9 +60,9 @@ These files were chosen because two of the variants already produce them, and th
 |---|---|
 | 5. Local CSV | Use the files you give the template: the processor's `*_Interactions_*.csv` and `*_Users_*.csv`, plus the optional agent and feedback exports. |
 | 4. SharePoint + PAX | Download `copilot_interactions_rollup.csv`, `copilot_users_rollup.csv` and `agents_365.csv` from the SharePoint folder that `Upload-Rollups-SharePoint.ps1` writes to. |
-| 3. Power Automate + Dataverse | The snapshot uses the Local CSV processor, but its Dataverse tables have prefixed column names. Run [`Purview_CopilotInteraction_Processor`](../5.%20Local%20CSV/scripts/) on a Purview audit export to get CSVs the app reads, and add `agents_365.csv` if you use one. |
 | 1. Fabric | Export the Lakehouse tables to CSV from a notebook (for example `spark.table("copilot_interactions_curated").toPandas().to_csv(...)`). The curated table has the processor's columns. For the users file, export your org data with a UPN, `Organization` and `Has License`. |
 | 2. Azure | The run job writes the same curated table to `curated/copilot_interactions_curated` and to Azure SQL, under the Fabric table names. Export it to CSV the same way, or run the Local CSV processor on a Purview export. |
+| 3. Power Automate + Dataverse ([archived](../archive/3.%20Power%20Automate%20%2B%20Dataverse/README.md)) | The snapshot uses the Local CSV processor, but its Dataverse tables have prefixed column names. Run [`Purview_CopilotInteraction_Processor`](../5.%20Local%20CSV/scripts/) on a Purview audit export to get CSVs the app reads, and add `agents_365.csv` if you use one. |
 
 ### Sample data
 
@@ -102,11 +103,27 @@ The design system is in [DESIGN.md](DESIGN.md) and the product brief is in [PROD
 
 ## Deploy
 
-Deployment is up to you, and nothing in this repo deploys the app automatically. Most people should use [Get the app](#get-the-app). This section is for deploying from a clone of the repo. The same `npm run build` output runs in two hosts. Pick one.
+The same `npm run build` output runs in two hosts. Pick one. Nothing in this repo deploys the app automatically.
+
+### As a Copilot Managed App
+
+This is the recommended host. It runs on Copilot Managed Runtime, which is in preview. The [main README](../README.md#start-here-the-app-preview) has the full steps, including the two admin settings and the licence each viewer needs.
+
+In short: install Node.js 24.11 or later and the `ms` CLI (`npm install -g @microsoft/managed-apps-cli@0.29.0`, the version these steps were checked with). Then, from this folder:
+
+```powershell
+ms auth login
+npm ci
+ms app init -n "ValueLens" --repo none -b ./dist -S "npm run build"   # add -e <environment-id> if environment lookup times out
+ms app deploy
+ms app share alice@contoso.com,valuelens-viewers@contoso.com
+```
+
+`ms app init` writes `ms.config.json` with your tenant's app and environment IDs. The file is gitignored, so each deployer runs `ms app init` once. To update the app, run `ms app deploy` again. In Windows PowerShell, if running scripts is disabled, use `ms.cmd` and `npm.cmd`.
 
 ### As a Fabric App in a Fabric workspace
 
-You need a workspace on Fabric capacity (F2 or larger, or a trial; *My workspace* won't work) and the **Fabric Apps (preview)** tenant setting turned on. The project config is [`rayfin/rayfin.yml`](rayfin/rayfin.yml). The app keeps no server-side data, so only auth and static hosting are on.
+An alternative host, also in preview. You need a workspace on Fabric capacity (F2 or larger, or a trial; *My workspace* won't work) and the **Fabric Apps (preview)** tenant setting turned on. The project config is [`rayfin/rayfin.yml`](rayfin/rayfin.yml). The app keeps no server-side data, so only auth and static hosting are on.
 
 ```powershell
 npx rayfin up --dry-run
@@ -114,14 +131,3 @@ npx rayfin up --tenant <tenant-id> --workspace-id <workspace-id> -y
 ```
 
 It prints the item's portal link. People need access to the item (share it, or give them a workspace role) to open it. To update, run `npx rayfin up` again. The deploy state it writes (`rayfin/.deployments.json`, `rayfin/.env`) is gitignored.
-
-### As a Copilot Managed App
-
-You need the `ms` CLI, signed in to the target tenant.
-
-`ms app init` writes `ms.config.json` with your tenant's app and environment IDs. The file is gitignored, so each deployer runs `ms app init` once.
-
-```powershell
-ms app init -n "ValueLens" --repo none -b ./dist -S "npm run build"   # add -e <environment-id> if environment lookup times out
-ms app deploy
-```

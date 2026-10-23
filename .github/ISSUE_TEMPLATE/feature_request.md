@@ -12,10 +12,10 @@ What decision or deployment task is difficult today? Do not include tenant data.
 
 ### Affected deployment paths
 
+- [ ] The app (preview)
 - [ ] 1. Fabric
 - [ ] 1. Fabric/Fabric App (preview)
 - [ ] 2. Azure
-- [ ] 3. Power Automate + Dataverse (preview)
 - [ ] 4. SharePoint
 - [ ] 5. Local CSV
 

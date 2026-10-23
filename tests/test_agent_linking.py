@@ -333,7 +333,7 @@ class PowerAutomateBridgeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import importlib.util
-        path = ROOT / "3. Power Automate + Dataverse" / "scripts" / "Build-DataverseCoreFeeds.py"
+        path = ROOT / "archive" / "3. Power Automate + Dataverse" / "scripts" / "Build-DataverseCoreFeeds.py"
         spec = importlib.util.spec_from_file_location("valuelens_bridge_linking", path)
         cls.bridge = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.bridge)

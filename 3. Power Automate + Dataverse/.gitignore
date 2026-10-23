@@ -1,8 +1,7 @@
-# Runtime audit payloads, curated customer data and private adapted solutions.
+# This path moved to archive/. Run output, settings and adapted solutions from before the move can
+# still sit here in an existing clone, so keep them out of git.
 processed/
 private/
 *.jsonl
 *.zip
-!Add Credit Consumption/flows/*.zip
 *.settings.json
-!scripts/power-automate-dataverse.settings.json.example

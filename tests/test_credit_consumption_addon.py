@@ -8,12 +8,12 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 ADDON = "Add Credit Consumption"
-# Folder that holds each path's add-on folder.
+# Folder that holds each active path's add-on folder. The archived Power Automate + Dataverse
+# add-on is frozen, so it isn't checked.
 PBITS = {
     "5. Local CSV": "Consumption Central - Local CSV.pbit",
     "4. SharePoint": "Consumption Central - Viva Direct.pbit",
     "1. Fabric/Manual setup": "Consumption Central - Fabric.pbit",
-    "3. Power Automate + Dataverse": "Consumption Central - Power Automate + Dataverse.pbit",
 }
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})")

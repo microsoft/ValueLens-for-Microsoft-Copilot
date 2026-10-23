@@ -175,7 +175,7 @@ export default function App() {
       <main id="main" className="main" tabIndex={-1}>
         <Page route={route} />
       </main>
-      <footer className="foot">ValueLens App Edition. Everything is calculated in your browser and never leaves it.</footer>
+      <footer className="foot">ValueLens. Everything is calculated in your browser and never leaves it.</footer>
       <DataSourceDialog open={sourceOpen} onClose={() => setSourceOpen(false)} />
     </div>
   )
