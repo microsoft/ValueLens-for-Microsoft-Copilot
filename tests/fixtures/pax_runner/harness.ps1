@@ -13,7 +13,10 @@
 #   holdLock   true to hold refresh.lock for the whole case
 #   tokenError true to fail every sign-in as Entra ID does for a wrong secret
 #   remote     the library's items by path: { folder, content, modified, size }
-#   status     forced HTTP statuses, keyed GET:<path> or POST:<parent>/<name>
+#   status     forced HTTP statuses, keyed GET:<path> or POST:<parent>/<name>, or
+#              GET:sites/<site> and GET:sites/<site ID>/drives for the site lookups
+#   sites      Graph sites by the ID or path form the runner asks for: { id, webUrl }
+#   drives     each site's document libraries by Graph site ID, one per page: [{ id, name, webUrl }]
 #   runs       each run's { args, env, python }; python is ok, old, store or none
 param(
   [Parameter(Mandatory = $true)] [string]$CasePath,
@@ -93,6 +96,52 @@ function global:Invoke-RestMethod {
       $PSCmdlet.ThrowTerminatingError($record)
     }
     return [pscustomobject]@{ token_type = 'Bearer'; access_token = 'stub-token' }
+  }
+
+  if ($Uri -match '^https://graph\.microsoft\.com/v1\.0/sites/(?<rest>[^?]+)(?:\?(?<query>.*))?$') {
+    $rest = $Matches['rest']
+    $query = [string]$Matches['query']
+    $call = [ordered]@{
+      kind   = 'site'
+      method = $Method.ToUpperInvariant()
+      path   = $rest
+      query  = $query
+      status = 0
+      authOk = (@($Headers.Values) -contains 'Bearer stub-token')
+    }
+    if ($call.method -ne 'GET') { throw "Harness: unexpected request $Method $Uri" }
+    $sites = if ($global:HarnessCase.Contains('sites') -and $global:HarnessCase.sites) { $global:HarnessCase.sites } else { @{} }
+    $drives = if ($global:HarnessCase.Contains('drives') -and $global:HarnessCase.drives) { $global:HarnessCase.drives } else { @{} }
+    if ($global:HarnessStatus.ContainsKey("GET:sites/$rest")) {
+      $status = $global:HarnessStatus["GET:sites/$rest"]
+      $result = New-HarnessError 'accessDenied' 'Access denied'
+    } elseif ($rest -match '^(?<site>.+)/drives$') {
+      $site = $Matches['site']
+      if (-not $drives.Contains($site)) {
+        $status = 404
+        $result = New-HarnessError 'itemNotFound' 'Requested site could not be found'
+      } else {
+        # One library per page, so the runner has to follow nextLink.
+        $page = if ($query -match '(?:^|&)\$skiptoken=(?<n>\d+)') { [int]$Matches['n'] } else { 0 }
+        $all = @($drives[$site])
+        $status = 200
+        $result = @{ value = @($all | Select-Object -Skip $page -First 1) }
+        if ($page + 1 -lt $all.Count) {
+          $result['@odata.nextLink'] = "https://graph.microsoft.com/v1.0/sites/$site/drives?`$select=id,name,webUrl&`$skiptoken=$($page + 1)"
+        }
+      }
+    } elseif ($sites.Contains($rest)) {
+      $status = 200
+      $result = @{ id = $sites[$rest].id; webUrl = $sites[$rest].webUrl }
+    } else {
+      $status = 404
+      $result = New-HarnessError 'itemNotFound' 'Requested site could not be found'
+    }
+    $call.status = $status
+    $global:HarnessCalls.Add($call)
+    if ($StatusCodeVariable) { Set-Variable -Name $StatusCodeVariable -Value $status -Scope 1 }
+    if ($status -ge 400 -and -not $SkipHttpErrorCheck) { throw "Harness: HTTP $status for $Method $Uri" }
+    return ($result | ConvertTo-Json -Depth 6 | ConvertFrom-Json)
   }
 
   if ($Uri -notmatch '^https://graph\.microsoft\.com/v1\.0/drives/(?<drive>[^/]+)/root(?<rest>.*)$') {

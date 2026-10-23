@@ -23,6 +23,15 @@
   -Upload puts one file into the SharePoint folder, or a subfolder of it, with the same app
   and secret.
 
+  -Check signs in as the app, finds the site, library and folder, creates the folder if it's
+  missing, and prints one line of JSON: {"ok":true,"siteId":...,"driveId":...,"folder":...}, or
+  {"ok":false,"error":...,"status":<HTTP status, when Graph refused>}.
+
+  refresh.json names the document library by driveId, or by library: its name or the last
+  part of its address, such as Documents or Shared Documents. A library is looked up on each
+  run with the app's own access, because the installer's sign-in may not be able to read the
+  site. siteId can be Graph's site ID or its path form, such as contoso.sharepoint.com:/sites/Analytics.
+
   Product names come only from refresh.json, so other products can reuse this script.
 
 .PARAMETER Config
@@ -41,6 +50,9 @@
 .PARAMETER RemoteFolder
   A subfolder of the SharePoint folder, such as Exports/2026. Missing folders are created.
 
+.PARAMETER Check
+  Checks that the app can reach the SharePoint folder, and prints the result as JSON.
+
 .NOTES
   Exit codes: 0 success; 1 failed; 2 another run holds the lock; 3 PAX found no Copilot
   activity yet, so there was nothing to upload.
@@ -51,7 +63,8 @@ param(
   [Parameter(ParameterSetName = 'Refresh')] [ValidateRange(1, 180)] [int]$Days,
   [Parameter(ParameterSetName = 'Upload', Mandatory = $true)] [string]$Upload,
   [Parameter(ParameterSetName = 'Upload')] [string]$RemoteName,
-  [Parameter(ParameterSetName = 'Upload')] [string]$RemoteFolder
+  [Parameter(ParameterSetName = 'Upload')] [string]$RemoteFolder,
+  [Parameter(ParameterSetName = 'Check', Mandatory = $true)] [switch]$Check
 )
 
 $ErrorActionPreference = 'Stop'
@@ -59,6 +72,7 @@ $ProgressPreference = 'SilentlyContinue'
 $PSNativeCommandUseErrorActionPreference = $false
 
 $script:ExitCode = 1
+$script:LastGraphStatus = $null
 $script:RepairHint = "Run the installer's repair command."
 $script:Streams = [ordered]@{
   interactions = @{ Local = 'cumulative_Interactions.csv'; Manifest = 'interactions_csv' }
@@ -164,6 +178,7 @@ function Read-RefreshConfig {
     credentialTarget = $null
     siteId           = $null
     driveId          = $null
+    library          = $null
     folderPath       = '/'
     paxReleaseTag    = $null
     paxSha256        = $null
@@ -196,8 +211,15 @@ function Read-RefreshConfig {
   foreach ($key in 'tenantId', 'clientId') {
     if (-not ($config[$key] -is [string] -and [guid]::TryParse($config[$key], [ref]$guid))) { $problems.Add("$key must be a GUID.") }
   }
-  foreach ($key in 'product', 'credentialTarget', 'siteId', 'driveId', 'paxReleaseTag') {
+  foreach ($key in 'product', 'credentialTarget', 'siteId', 'paxReleaseTag') {
     if (-not ($config[$key] -is [string] -and $config[$key].Trim())) { $problems.Add("$key is missing.") }
+  }
+  foreach ($key in 'driveId', 'library') {
+    if ($null -ne $config[$key] -and $config[$key] -isnot [string]) { $problems.Add("$key must be text.") }
+    elseif ($config[$key] -is [string]) { $config[$key] = $config[$key].Trim() }
+  }
+  if (-not ($config.driveId -is [string] -and $config.driveId) -and -not ($config.library -is [string] -and $config.library)) {
+    $problems.Add('driveId and library are both missing. One of them must name the document library.')
   }
   if ($config.paxReleaseTag -eq 'latest') { $problems.Add("paxReleaseTag must name one PAX release, not 'latest'.") }
   if (-not ($config.paxSha256 -is [string] -and $config.paxSha256 -match '^[0-9a-fA-F]{64}$')) {
@@ -452,6 +474,7 @@ function Invoke-Graph {
 
 function Format-GraphError {
   param($Response, [string]$Doing)
+  $script:LastGraphStatus = $Response.Status
   $text = "$Doing failed with HTTP $($Response.Status)"
   $message = $null
   if ($Response.Body -and $Response.Body.error) { $message = ([string]$Response.Body.error.message).Trim() }
@@ -469,6 +492,54 @@ function Get-FolderSegments {
   param([string]$Subfolder)
   Split-FolderPath $script:Cfg.folderPath
   Split-FolderPath $Subfolder
+}
+
+function Get-UrlLeaf {
+  # The last part of an address's path, decoded: Shared Documents for .../Shared%20Documents.
+  param([string]$Url)
+  $uri = $null
+  if (-not [uri]::TryCreate($Url, [UriKind]::Absolute, [ref]$uri)) { return $null }
+  $parts = @($uri.AbsolutePath -split '/' | Where-Object { $_ })
+  if (-not $parts) { return $null }
+  return [uri]::UnescapeDataString($parts[-1])
+}
+
+function Resolve-Drive {
+  # Finds the site's Graph ID and, when refresh.json names the library rather than its drive
+  # ID, the library's drive, with the app's own access.
+  $cfg = $script:Cfg
+  if ($cfg.driveId) { return }
+  $site = Invoke-Graph -Path ('sites/' + $cfg.siteId + '?$select=id,webUrl')
+  if ($site.Status -ne 200) { throw (Format-GraphError $site "Finding the SharePoint site $($cfg.siteId)") }
+  $siteId = [string]$site.Body.id
+  $siteUrl = [string]$site.Body.webUrl
+  $drives = [System.Collections.Generic.List[object]]::new()
+  $base = 'https://graph.microsoft.com/v1.0/'
+  $path = 'sites/' + $siteId + '/drives?$select=id,name,webUrl'
+  while ($path) {
+    $page = Invoke-Graph -Path $path
+    if ($page.Status -ne 200) { throw (Format-GraphError $page "Listing the document libraries on $siteUrl") }
+    foreach ($drive in @($page.Body.value)) { if ($drive) { $drives.Add($drive) } }
+    $next = [string]$page.Body.'@odata.nextLink'
+    $path = if ($next.StartsWith($base, [StringComparison]::OrdinalIgnoreCase)) { $next.Substring($base.Length) } else { $null }
+  }
+  # The address's last part first: a library's name can change, and English sites call
+  # Shared Documents "Documents".
+  $wanted = $cfg.library
+  $byUrl = @($drives | Where-Object { (Get-UrlLeaf ([string]$_.webUrl)) -eq $wanted })
+  $byName = @($drives | Where-Object { [string]$_.name -eq $wanted })
+  $match = @($byUrl + $byName) | Select-Object -First 1
+  if (-not $match) {
+    $known = @($drives | ForEach-Object {
+        $leaf = Get-UrlLeaf ([string]$_.webUrl)
+        if ($leaf -and $leaf -ne [string]$_.name) { "$($_.name) ($leaf)" } else { [string]$_.name }
+      })
+    $list = if ($known) { 'Its libraries are: ' + ($known -join ', ') + '.' } else { 'The app can see no libraries there.' }
+    throw "$siteUrl has no document library called '$wanted'. $list $script:RepairHint"
+  }
+  $cfg.siteId = $siteId
+  $cfg.driveId = [string]$match.id
+  Write-Host "Library: $($match.name) on $siteUrl"
 }
 
 function Get-DrivePath {
@@ -808,11 +879,13 @@ function Invoke-Refresh {
   $now = [datetime]::UtcNow.ToString('yyyy-MM-dd HH:mm', [cultureinfo]::InvariantCulture)
   Write-Host "$($cfg.product): PAX refresh at $now UTC"
   Write-Host "Tenant $($cfg.tenantId), app $($cfg.clientId)"
-  Write-Host "SharePoint site $($cfg.siteId), library $($cfg.driveId), folder $($cfg.folderPath)"
+  $library = if ($cfg.driveId) { $cfg.driveId } else { $cfg.library }
+  Write-Host "SharePoint site $($cfg.siteId), library $library, folder $($cfg.folderPath)"
   New-Item -ItemType Directory -Force -Path $script:DataDir, $script:WorkDir | Out-Null
   Get-AppSecret
   Test-Python
   Connect-Graph
+  Resolve-Drive
   Restore-Stream 'interactions'
   Restore-Stream 'users'
   Set-RunWindow
@@ -847,15 +920,35 @@ function Invoke-Upload {
   }
   Get-AppSecret
   Connect-Graph
+  Resolve-Drive
   $segments = @(Get-FolderSegments $RemoteFolder)
   Confirm-RemoteFolder $segments
   Send-File -Path $script:UploadPath -Name $name -Segments $segments
   Write-Host "Uploaded $name to /$($segments -join '/') in the SharePoint library."
 }
 
+function Invoke-Check {
+  $script:Cfg = Read-RefreshConfig $script:ConfigPath
+  Get-AppSecret
+  Connect-Graph
+  Resolve-Drive
+  $segments = @(Get-FolderSegments)
+  Confirm-RemoteFolder $segments
+  return [ordered]@{ ok = $true; siteId = $script:Cfg.siteId; driveId = $script:Cfg.driveId; folder = '/' + ($segments -join '/') }
+}
+
+function Write-CheckResult {
+  # One line, last and plain ASCII, so the installer can read it under anything the scripts
+  # printed, whatever the console's code page.
+  param($Result)
+  [Console]::Out.WriteLine(($Result | ConvertTo-Json -Compress -EscapeHandling EscapeNonAscii))
+}
+
 $script:ConfigPath = $PSCmdlet.GetUnresolvedProviderPathFromPSPath($Config)
 if (-not (Test-Path -LiteralPath $script:ConfigPath -PathType Leaf)) {
-  Write-Host "ERROR: There's no refresh config at $($script:ConfigPath). $script:RepairHint"
+  $missing = "There's no refresh config at $($script:ConfigPath). $script:RepairHint"
+  if ($PSCmdlet.ParameterSetName -eq 'Check') { Write-CheckResult ([ordered]@{ ok = $false; error = $missing }) }
+  else { Write-Host "ERROR: $missing" }
   exit 1
 }
 $script:Root = Split-Path -Parent $script:ConfigPath
@@ -864,6 +957,23 @@ $script:WorkDir = Join-Path $script:Root 'work'
 $script:LogsDir = Join-Path $script:Root 'logs'
 $script:StatePath = Join-Path $script:Root 'state.json'
 if ($PSBoundParameters.ContainsKey('Days')) { $script:DaysOverride = $Days }
+
+if ($PSCmdlet.ParameterSetName -eq 'Check') {
+  # Like -Upload, a check keeps no state and doesn't wait for a scheduled refresh.
+  try {
+    $checkResult = Invoke-Check
+    $script:ExitCode = 0
+  } catch {
+    $checkResult = [ordered]@{ ok = $false; error = $_.Exception.Message }
+    if ($script:LastGraphStatus) { $checkResult.status = $script:LastGraphStatus }
+    $script:ExitCode = 1
+  } finally {
+    $script:Secret = $null
+    $script:GraphToken = $null
+  }
+  Write-CheckResult $checkResult
+  exit $script:ExitCode
+}
 
 if ($PSCmdlet.ParameterSetName -eq 'Upload') {
   $script:UploadPath = $PSCmdlet.GetUnresolvedProviderPathFromPSPath($Upload)

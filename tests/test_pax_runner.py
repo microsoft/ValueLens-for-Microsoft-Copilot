@@ -97,6 +97,17 @@ PYTHON_MESSAGE = ("PAX needs Python 3.10 or later to build the rollup files, and
                   "Then run the refresh again.")
 GRANT_MESSAGE = "The app needs write access to the SharePoint site, through a Sites.Selected grant."
 BUSY_MESSAGE = "Another refresh is running, so this one stopped. The next scheduled run starts as usual."
+# A site as the installer writes it from a folder address, and its libraries as Graph lists them.
+SITE_PATH = "example.sharepoint.com:/sites/Analytics"
+SITE_URL = "https://example.sharepoint.com/sites/Analytics"
+LOCKED_SITE = "example.sharepoint.com:/sites/Locked"
+LIBRARIES = [
+    {"id": "b!site-assets", "name": "Site Assets", "webUrl": f"{SITE_URL}/SiteAssets"},
+    {"id": DRIVE, "name": "Documents", "webUrl": f"{SITE_URL}/Shared%20Documents"},
+]
+SITE_LOOKUP = "$select=id,webUrl"
+DRIVES_PAGE_1 = "$select=id,name,webUrl"
+DRIVES_PAGE_2 = "$select=id,name,webUrl&$skiptoken=1"
 
 
 def default_config(**overrides):
@@ -311,6 +322,16 @@ class Case:
         return [(call["method"], call["path"], call["name"], call["status"])
                 for call in self.run_result(n)["calls"] if call["kind"] == "graph"]
 
+    def sites(self, n=1):
+        """The run's site and library lookups: (path under sites/, query, status)."""
+        return [(call["path"], call["query"], call["status"])
+                for call in self.run_result(n)["calls"] if call["kind"] == "site"]
+
+    def check_result(self, n=1):
+        """-Check's JSON, which is the run's last line of output."""
+        lines = [line for line in self.output(n).splitlines() if line.strip()]
+        return json.loads(lines[-1]) if lines else None
+
     def tokens(self, n=1):
         return [call for call in self.run_result(n)["calls"] if call["kind"] == "token"]
 
@@ -498,6 +519,47 @@ def _agents_on(c):
     c.config(agent365=True, deidentify=True).state(1).local().run().run(env={"STUB_AGENTS": "none"})
 
 
+def _site_with_libraries(c):
+    c.spec["sites"] = {SITE_PATH: {"id": SITE, "webUrl": SITE_URL}}
+    c.spec["drives"] = {SITE: LIBRARIES}
+    return c
+
+
+@refresh_case("library")
+def _library(c):
+    # refresh.json names the site by path and the library by its address, as the installer
+    # writes them when its own sign-in can't read the site.
+    _site_with_libraries(c).config(siteId=SITE_PATH, driveId=None, library="Shared Documents").state(1).local().run()
+    source = c.files / "export.csv"
+    source.write_text("a,b\n", encoding="utf-8")
+    c.run(Upload=source, RemoteFolder="Exports")
+
+
+# Each -Check run's refresh.json changes, and what the check prints.
+CHECK_RUNS = [
+    ({"library": "Shared Documents"}, {"ok": True, "siteId": SITE, "driveId": DRIVE, "folder": "/Reports"}),
+    ({"library": "Documents", "folderPath": "/Reports/New/Sub"},
+     {"ok": True, "siteId": SITE, "driveId": DRIVE, "folder": "/Reports/New/Sub"}),
+    ({"library": "Archive"}, {"ok": False, "error": (
+        f"{SITE_URL} has no document library called 'Archive'. Its libraries are: Site Assets (SiteAssets), "
+        f"Documents (Shared Documents). {HINT}")}),
+    ({"library": "Documents", "siteId": LOCKED_SITE}, {"ok": False, "status": 403, "error": (
+        f"Finding the SharePoint site {LOCKED_SITE} failed with HTTP 403: Access denied. {GRANT_MESSAGE} {HINT}")}),
+    ({"siteId": SITE, "driveId": DRIVE}, {"ok": True, "siteId": SITE, "driveId": DRIVE, "folder": "/Reports"}),
+]
+
+
+@refresh_case("check")
+def _check(c):
+    # The lock is held throughout: a check doesn't wait for a scheduled refresh.
+    c.spec["holdLock"] = True
+    _site_with_libraries(c).spec["status"] = {f"GET:sites/{LOCKED_SITE}": 403}
+    for n, (changes, _) in enumerate(CHECK_RUNS, start=1):
+        path = c.install / f"check-{n}.json"
+        c.config(path=path, **{"siteId": SITE_PATH, "driveId": None, **changes}).run(Config=path, Check=True)
+    c.run(Config=c.install / "missing.json", Check=True)
+
+
 INVALID_CONFIG = {
     "schema": 2,
     "product": "",
@@ -526,7 +588,7 @@ INVALID_CONFIG_PROBLEMS = [
     "product is missing.",
     "credentialTarget is missing.",
     "siteId is missing.",
-    "driveId is missing.",
+    "driveId and library are both missing. One of them must name the document library.",
     "paxReleaseTag must name one PAX release, not 'latest'.",
     "paxSha256 must be the pinned PAX script's SHA-256, as 64 hex characters.",
     "folderPath has a folder name that SharePoint can't use: 'bad:folder'.",
@@ -541,6 +603,7 @@ INVALID_CONFIG_PROBLEMS = [
 ]
 WRONG_SHAPE_PROBLEMS = [
     "files must be an object of file names.",
+    "library must be text.",
     "folderPath must be a folder path in the library, such as /Reports.",
 ]
 
@@ -549,7 +612,7 @@ WRONG_SHAPE_PROBLEMS = [
 def _invalid_config(c):
     c.config(raw=INVALID_CONFIG).run()
     second = c.install / "refresh-2.json"
-    c.config(path=second, raw=default_config(files=["a.csv"], folderPath=7)).run(Config=second)
+    c.config(path=second, raw=default_config(files=["a.csv"], folderPath=7, library=5)).run(Config=second)
 
 
 @refresh_case("missing-config")
@@ -654,6 +717,9 @@ class RefreshTests(unittest.TestCase):
                         ("POST", TENANT, CLIENT, True, GRAPH_SCOPE, "client_credentials"))
                     continue
                 self.assertTrue(call["authOk"], call)
+                if call["kind"] == "site":
+                    self.assertEqual(call["method"], "GET", call)
+                    continue
                 self.assertEqual(call["drive"], DRIVE, call)
                 if call["method"] == "POST":
                     self.assertEqual((call["conflict"], call["folderFacet"]), ("fail", True), call)
@@ -1018,6 +1084,48 @@ class RefreshTests(unittest.TestCase):
         self.assertIn(f"ERROR: Creating the SharePoint folder Reports/New failed with HTTP 403: Access denied. "
                       f"{GRANT_MESSAGE} {HINT}", c.output(2))
         self.assertEqual(c.log("upload"), [])
+
+    def test_a_library_and_a_site_path_resolve_with_the_apps_own_access(self):
+        c = self.case("library")
+        self.assertEqual((c.exit(1), c.exit(2)), (0, 0), c.stdout)
+        self.assertIn(f"SharePoint site {SITE_PATH}, library Shared Documents, folder /Reports", c.output(1))
+        for n in (1, 2):
+            with self.subTest(run=n):
+                self.assertEqual(c.sites(n), [(SITE_PATH, SITE_LOOKUP, 200), (f"{SITE}/drives", DRIVES_PAGE_1, 200),
+                                              (f"{SITE}/drives", DRIVES_PAGE_2, 200)])
+                self.assertIn(f"Library: Documents on {SITE_URL}", c.output(n))
+        self.assertState(c, 1, lastResult="success")
+        # The shared checks hold every upload to Graph's site ID and the library's drive ID.
+        self.assertEqual(self.remote_names(c, 1), [INTERACTIONS, USERS])
+        self.assertEqual(self.uploads(c, 2), [(str(c.files / "export.csv"), "export.csv", "/Reports/Exports")])
+
+    def test_check_finds_the_library_makes_the_folder_and_prints_one_line_of_json(self):
+        c = self.case("check")
+        for n, (_, expected) in enumerate(CHECK_RUNS, start=1):
+            with self.subTest(run=n):
+                self.assertEqual(c.check_result(n), expected, c.output(n))
+                self.assertEqual(c.exit(n), 0 if expected["ok"] else 1, c.output(n))
+                self.assertEqual((len(c.tokens(n)), len(c.log("credential", n))), (1, 1))
+        lookups = [(SITE_PATH, SITE_LOOKUP, 200), (f"{SITE}/drives", DRIVES_PAGE_1, 200),
+                   (f"{SITE}/drives", DRIVES_PAGE_2, 200)]
+        self.assertEqual([c.sites(n) for n in (1, 2, 3)], [lookups] * 3)
+        self.assertEqual(c.graph(1), [G("Reports", 200)])
+        self.assertEqual(c.graph(2), [G("Reports/New/Sub", 404), P("", "Reports", 409), P("Reports", "New", 201),
+                                      P("Reports/New", "Sub", 201)])
+        self.assertEqual((c.sites(4), c.graph(3), c.graph(4)), ([(LOCKED_SITE, SITE_LOOKUP, 403)], [], []))
+        # A drive ID needs no lookup.
+        self.assertEqual((c.sites(5), c.graph(5)), ([], [G("Reports", 200)]))
+        missing = len(CHECK_RUNS) + 1
+        self.assertEqual(c.exit(missing), 1, c.output(missing))
+        self.assertEqual(c.check_result(missing), {"ok": False, "error": (
+            f"There's no refresh config at {c.install / 'missing.json'}. Run the installer's repair command.")})
+        self.assertEqual((c.tokens(missing), c.log("credential", missing)), ([], []))
+        for n in range(1, missing + 1):
+            with self.subTest(run=n):
+                # A check keeps no state or log, and leaves no run files.
+                files = c.files_after(n)
+                self.assertEqual([path for path in files if path == "state.json" or "/" in path], [])
+        self.assertEqual((c.log("pax"), c.log("upload")), ([], []))
 
 
 @needs_pwsh
