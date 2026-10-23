@@ -57,14 +57,17 @@ found and what `rayfin up` would do, without deploying. Sign in when asked, then
 
 The script:
 
-1. **Finds the models** in the target workspace through the Fabric REST API, by their default names:
+1. **Finds the models** in the target workspace through the Fabric REST API, by name:
 
-   | Product | Names tried, in order | Then |
-   |---|---|---|
-   | ValueLens | `Analytics Hub Model`, `ValueLens Model`, `ValueLens - Fabric`, `ValueLens - Fabric OneLake` | the only other model starting `Analytics Hub Model` or `ValueLens`, leaving out consumption models |
-   | Consumption Central | `Analytics Hub Consumption Model`, `ValueLens Consumption Model`, `Consumption Central - Fabric` | the only other model starting with one of those or `Consumption Central` |
+   | Product | A model matches when its name is | or starts with | or contains |
+   |---|---|---|---|
+   | ValueLens | `Analytics Hub Model`, `ValueLens Model`, `ValueLens - Fabric`, `ValueLens - Fabric OneLake` | `Analytics Hub Model`, `ValueLens` | ` - ValueLens`, as in `<owner> - ValueLens (sample)` |
+   | Consumption Central | `Analytics Hub Consumption Model`, `ValueLens Consumption Model`, `Consumption Central - Fabric` | those, or `Consumption Central` | ` - Consumption Central` |
 
-   Two candidates is ambiguous, so it stops and lists them. Name a model yourself with
+   Names are matched ignoring case, and consumption models never count as ValueLens. When
+   exactly one model matches, it is used. When several match, the script never picks one: it
+   lists them and asks which to use, or, with `--yes` or no terminal to ask in, stops and asks
+   you to name it. Name a model yourself with
    `--vl-model <id>` or `--cc-model <id>` (the id is in its URL:
    `app.powerbi.com/groups/<workspaceId>/datasets/<itemId>`), and add
    `--model-workspace-id <id>` when the models live in another workspace. A single-product app

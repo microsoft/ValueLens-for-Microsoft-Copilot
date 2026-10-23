@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { describe, expect, it } from "vitest";
-import { buildFabricConfig, parseArgs, pickModel, VARIANTS, variantRayfinYml, workspaceIdFromUri } from "./deploy.mjs";
+import { buildFabricConfig, choiceFromAnswer, parseArgs, pickModel, VARIANTS, variantRayfinYml, workspaceIdFromUri } from "./deploy.mjs";
 
 const model = (displayName, id = displayName) => ({ id, displayName });
 
@@ -42,10 +42,36 @@ describe("workspaceIdFromUri", () => {
 });
 
 describe("pickModel", () => {
-    it("prefers the default names, in order", () => {
-        const models = [model("ValueLens - Fabric"), model("Analytics Hub Model"), model("Analytics Hub Consumption Model")];
+    const names = (result) => result.ambiguous?.map((candidate) => candidate.displayName);
+
+    it("takes each product's only default-named model", () => {
+        const models = [model("Analytics Hub Model"), model("Analytics Hub Consumption Model")];
         expect(pickModel(models, "vl").model.displayName).toBe("Analytics Hub Model");
         expect(pickModel(models, "cc").model.displayName).toBe("Analytics Hub Consumption Model");
+    });
+
+    it("never picks one of several matches silently, and lists default names first", () => {
+        const models = [model("ValueLens - Fabric"), model("Analytics Hub Model"), model("Analytics Hub Consumption Model")];
+        expect(pickModel(models, "vl").model).toBeUndefined();
+        expect(names(pickModel(models, "vl"))).toEqual(["Analytics Hub Model", "ValueLens - Fabric"]);
+        expect(pickModel(models, "cc").model.displayName).toBe("Analytics Hub Consumption Model");
+    });
+
+    it("matches an installer's `<owner> - <Product> (<suffix>)` names", () => {
+        const models = [model("someone - ValueLens (sample)"), model("someone - Consumption Central (sample)"), model("Unrelated report model")];
+        expect(pickModel(models, "vl").model.displayName).toBe("someone - ValueLens (sample)");
+        expect(pickModel(models, "cc").model.displayName).toBe("someone - Consumption Central (sample)");
+    });
+
+    it("lists several `<owner> - <Product>` models for the person deploying to choose", () => {
+        const models = [
+            model("someone - ValueLens (sample)"),
+            model("someone - ValueLens (large data)"),
+            model("someone - Consumption Central (sample)"),
+            model("someone - Consumption Central (large data)"),
+        ];
+        expect(names(pickModel(models, "vl"))).toEqual(["someone - ValueLens (large data)", "someone - ValueLens (sample)"]);
+        expect(names(pickModel(models, "cc"))).toEqual(["someone - Consumption Central (large data)", "someone - Consumption Central (sample)"]);
     });
 
     it("matches names case-insensitively", () => {
@@ -63,12 +89,26 @@ describe("pickModel", () => {
     });
 
     it("reports two prefixed models as ambiguous", () => {
-        expect(pickModel([model("ValueLens A"), model("ValueLens B")], "vl")).toEqual({ ambiguous: ["ValueLens A", "ValueLens B"] });
+        expect(names(pickModel([model("ValueLens A"), model("ValueLens B")], "vl"))).toEqual(["ValueLens A", "ValueLens B"]);
     });
 
     it("finds nothing in an unrelated workspace", () => {
         expect(pickModel([model("Sales")], "vl")).toEqual({});
         expect(pickModel([], "cc")).toEqual({});
+    });
+});
+
+describe("choiceFromAnswer", () => {
+    const candidates = [model("someone - ValueLens (large data)", "aa"), model("someone - ValueLens (sample)", "bb")];
+
+    it("takes a list number, an id or an exact name", () => {
+        expect(choiceFromAnswer("2", candidates).id).toBe("bb");
+        expect(choiceFromAnswer(" AA ", candidates).id).toBe("aa");
+        expect(choiceFromAnswer("someone - ValueLens (sample)", candidates).id).toBe("bb");
+    });
+
+    it("takes nothing from a blank, out-of-range or unknown answer", () => {
+        for (const answer of ["", "0", "3", "large", undefined]) expect(choiceFromAnswer(answer, candidates)).toBeUndefined();
     });
 });
 

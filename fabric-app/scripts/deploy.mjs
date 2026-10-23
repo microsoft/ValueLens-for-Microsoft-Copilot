@@ -10,10 +10,11 @@
 //
 //   node scripts/deploy.mjs --variant both --workspace-uri https://app.fabric.microsoft.com/groups/<id>/list
 //
-// 1. Finds the products' semantic models in the workspace by their default
-//    names (or takes --vl-model / --cc-model), and writes
-//    public/fabric.config.json naming only the models it found. The joined
-//    app deploys with one product missing; its switcher then shows the other.
+// 1. Finds the products' semantic models in the workspace by name (or takes
+//    --vl-model / --cc-model), asking which to use when several match, and
+//    writes public/fabric.config.json naming only the models it found. The
+//    joined app deploys with one product missing; its switcher then shows
+//    the other.
 // 2. Gives `rayfin up` the variant's own item id and deployment record, so the
 //    three variants deploy side by side into one workspace without updating
 //    each other's item. Records are kept in rayfin/.variants/<variant>/.
@@ -39,21 +40,24 @@ export const VARIANTS = {
 };
 
 /**
- * Each product's model names, most likely first. Failing those, a single
- * model whose name starts with one of `prefixes` (an installer adds " 2" when
- * the name is taken), leaving out names that match `exclude`.
+ * How each product's model is recognised: one of its default `names`, a name
+ * starting with one of `prefixes` (an installer adds " 2" when the name is
+ * taken), or a name containing one of `contains`, as in an installer's
+ * `<owner> - <Product> (<suffix>)`. Names matching `exclude` never count.
  */
 export const MODEL_NAMES = {
     vl: {
         label: "ValueLens",
         names: ["Analytics Hub Model", "ValueLens Model", "ValueLens - Fabric", "ValueLens - Fabric OneLake"],
         prefixes: ["Analytics Hub Model", "ValueLens"],
+        contains: [" - ValueLens"],
         exclude: /consumption/i,
     },
     cc: {
         label: "Consumption Central",
         names: ["Analytics Hub Consumption Model", "ValueLens Consumption Model", "Consumption Central - Fabric"],
         prefixes: ["Analytics Hub Consumption Model", "ValueLens Consumption Model", "Consumption Central"],
+        contains: [" - Consumption Central"],
     },
 };
 
@@ -97,23 +101,56 @@ export function workspaceIdFromUri(uri) {
 }
 
 /**
- * The model for one product among a workspace's semantic models: the first
- * default name present, else the only model whose name starts with the
- * product's name. Two such models are ambiguous, so neither is picked.
+ * The model for one product among a workspace's semantic models: the only
+ * one that matches its `MODEL_NAMES`. When several match, none is picked:
+ * they come back as `ambiguous`, default names first, for the person
+ * deploying to choose from.
  */
 export function pickModel(models, product) {
-    const { names, prefixes, exclude } = MODEL_NAMES[product];
-    const byName = (name) => models.find((model) => model.displayName.trim().toLowerCase() === name.toLowerCase());
-    for (const name of names) {
-        const found = byName(name);
-        if (found) return { model: found };
+    const { names, prefixes, contains, exclude } = MODEL_NAMES[product];
+    const lower = (text) => text.trim().toLowerCase();
+    const rank = (model) => {
+        const name = lower(model.displayName);
+        const index = names.findIndex((candidate) => lower(candidate) === name);
+        return index === -1 ? names.length : index;
+    };
+    const matches = models
+        .filter((model) => {
+            const name = lower(model.displayName);
+            if (exclude?.test(name)) return false;
+            return (
+                names.some((candidate) => lower(candidate) === name) ||
+                prefixes.some((prefix) => name.startsWith(lower(prefix))) ||
+                contains.some((part) => name.includes(lower(part)))
+            );
+        })
+        .sort((a, b) => rank(a) - rank(b) || a.displayName.localeCompare(b.displayName));
+    if (matches.length === 1) return { model: matches[0] };
+    return matches.length > 1 ? { ambiguous: matches } : {};
+}
+
+/** The model a typed answer picks from a numbered list: its number, id or exact name. */
+export function choiceFromAnswer(answer, candidates) {
+    const text = (answer ?? "").trim();
+    if (!text) return undefined;
+    if (/^\d+$/.test(text)) return candidates[Number(text) - 1];
+    return candidates.find((model) => model.id.toLowerCase() === text.toLowerCase() || model.displayName.trim() === text);
+}
+
+async function askWhichModel(label, candidates) {
+    const { createInterface } = await import("node:readline/promises");
+    const prompt = createInterface({ input: process.stdin, output: process.stdout });
+    try {
+        console.log(`  ${label}: several models match:`);
+        candidates.forEach((model, i) => console.log(`    ${i + 1}) ${model.displayName} (${model.id})`));
+        for (;;) {
+            const choice = choiceFromAnswer(await prompt.question(`  Which is the ${label} model? [1-${candidates.length}] `), candidates);
+            if (choice) return choice;
+            console.log(`  Type a number from 1 to ${candidates.length}, or the model's id.`);
+        }
+    } finally {
+        prompt.close();
     }
-    const prefixed = models.filter((model) => {
-        const name = model.displayName.trim();
-        return prefixes.some((prefix) => name.toLowerCase().startsWith(prefix.toLowerCase())) && !exclude?.test(name);
-    });
-    if (prefixed.length === 1) return { model: prefixed[0] };
-    return prefixed.length > 1 ? { ambiguous: prefixed.map((model) => model.displayName) } : {};
 }
 
 /**
@@ -146,6 +183,7 @@ const HELP = `Deploys the app into a Fabric workspace.
   --workspace-uri <url>      The workspace to deploy into, as its portal URL...
   --workspace-id <guid>      ...or its id.
   --vl-model <guid>          The ValueLens semantic model, instead of finding it by name.
+                             Needed when several models match and there is no prompt.
   --cc-model <guid>          The Consumption Central semantic model, instead of finding it by name.
   --model-workspace-id <guid>  Where --vl-model / --cc-model live, when not the target workspace.
   --data-agent <guid>        A Fabric data agent in the target workspace for the Ask page.
@@ -153,7 +191,8 @@ const HELP = `Deploys the app into a Fabric workspace.
   --token <token>            A Fabric API token for finding the models (else FABRIC_TOKEN,
                              your rayfin login, then the Azure CLI).
   --dry-run, -n              Find the models and preview \`rayfin up\` without deploying.
-  --yes, -y                  Accept rayfin's prompts.
+  --yes, -y                  Accept rayfin's prompts. Several matching models then stop the
+                             deploy instead of asking which to use.
 `;
 
 async function rayfinToken(tenant) {
@@ -213,18 +252,24 @@ async function findModels(options, workspaceId, products) {
     }
     const models = await listSemanticModels(workspaceId, token);
     for (const product of toFind) {
-        const { model, ambiguous } = pickModel(models, product);
+        const { model: only, ambiguous } = pickModel(models, product);
         const { label } = MODEL_NAMES[product];
+        let model = only;
+        if (ambiguous) {
+            if (options.yes || !process.stdin.isTTY) {
+                throw new Error(
+                    `Several ${label} models are in this workspace, so pass --${product}-model <id> to say which:\n` +
+                        ambiguous.map((candidate) => `  ${candidate.displayName} (${candidate.id})`).join("\n"),
+                );
+            }
+            model = await askWhichModel(label, ambiguous);
+        }
         if (model) {
             found[product] = { workspaceId, itemId: model.id };
             console.log(`  ${label}: "${model.displayName}" (${model.id})`);
         } else {
             missing.push(product);
-            console.log(
-                ambiguous
-                    ? `  ${label}: several models could be it (${ambiguous.join(", ")}); pass --${product}-model <id>.`
-                    : `  ${label}: not in this workspace.`,
-            );
+            console.log(`  ${label}: not in this workspace.`);
         }
     }
     return { found, missing };
