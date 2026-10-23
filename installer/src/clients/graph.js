@@ -1,0 +1,500 @@
+// @ts-check
+/** Microsoft Graph calls for the app registration and the signed-in user's roles. */
+import crypto from 'node:crypto';
+import { GRAPH_APP_ID } from '../catalog.js';
+import { HttpError } from '../http.js';
+
+/** Directory roles that can grant admin consent for Microsoft Graph application permissions. */
+export const CONSENT_ROLES = {
+  '62e90394-69f5-4237-9190-012177145e10': 'Global Administrator',
+  'e8611ab8-c189-46e8-94e1-60213ab1f814': 'Privileged Role Administrator',
+};
+
+/** Roles that can create app registrations even when users can't. */
+export const APP_ROLES = {
+  '9b895d92-2cd3-44c7-9d02-a6ac2d5ea5c3': 'Application Administrator',
+  '158c047a-c907-4556-b7ef-446551a6b5f7': 'Cloud Application Administrator',
+};
+
+/** Directory roles that can publish a custom app to the org's Teams app catalog. */
+export const TEAMS_PUBLISH_ROLES = {
+  '69091246-20e8-4a56-aa4d-066075b2a7a8': 'Teams Administrator',
+  '62e90394-69f5-4237-9190-012177145e10': 'Global Administrator',
+};
+
+export const FABRIC_ADMIN_ROLE = 'a9ea8996-122f-4c74-9520-8edcd192826c';
+export const GLOBAL_READER_ROLE = 'f2ef992c-3afb-46b9-b7cf-a126ee74c451';
+export const AI_ADMIN_ROLE = 'd2562ede-74db-457e-a7b6-544e236ebb61';
+export const POWER_PLATFORM_ADMIN_ROLE = '11648597-926c-4cf3-9c36-bcebb0ba8dcc';
+
+export const POWER_BI_APP_ID = '00000009-0000-0000-c000-000000000000';
+
+/**
+ * Maps permission names to Graph app role IDs. A missing required permission is an
+ * error; a missing optional one is returned in `missing` so the caller can warn.
+ * @param {{ appRoles: { id: string, value: string }[] }} graphSp
+ * @param {string[]} permissions
+ * @param {string[]} [optional]  Names that may be absent in some tenants (e.g. preview permissions).
+ */
+export function resolveAppRoles(graphSp, permissions, optional = []) {
+  const byValue = new Map(graphSp.appRoles.map((r) => [r.value, r.id]));
+  const absent = permissions.filter((p) => !byValue.has(p));
+  const fatal = absent.filter((p) => !optional.includes(p));
+  if (fatal.length) throw new Error(`Microsoft Graph in this tenant has no application permission named ${fatal.join(', ')}.`);
+  const roles = permissions.filter((p) => byValue.has(p)).map((p) => ({ value: p, id: /** @type {string} */ (byValue.get(p)) }));
+  return { roles, missing: absent };
+}
+
+/**
+ * Direct admin-consent link. Entra may show a reply-address error after approval
+ * because the app has no redirect URI; the consent still applies.
+ * @param {string} tenantId
+ * @param {string} appId
+ */
+export function adminConsentUrl(tenantId, appId) {
+  return `https://login.microsoftonline.com/${tenantId}/adminconsent?client_id=${appId}`;
+}
+
+/**
+ * The app's "API permissions" page in the Entra admin center, with the
+ * "Grant admin consent" button.
+ * @param {string} appId
+ */
+export function apiPermissionsUrl(appId) {
+  return `https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/CallAnAPI/appId/${appId}`;
+}
+
+/**
+ * The web app's pre-authorised clients with `scopeId` added for each of `clientIds`. Every other client and
+ * permission an admin added stays. Nothing is listed twice, a permission the app no longer has goes because
+ * Graph refuses it, and so does a client left with none.
+ * @param {{ appId: string, delegatedPermissionIds?: string[] }[] | undefined} current
+ * @param {string[]} clientIds
+ * @param {string} scopeId
+ * @param {{ id: string }[]} scopes  The app's oauth2PermissionScopes as they will be saved.
+ */
+export function mergePreAuthorizedApplications(current, clientIds, scopeId, scopes) {
+  const known = new Set(scopes.map((s) => s.id.toLowerCase()));
+  /** @type {Map<string, { appId: string, delegatedPermissionIds: string[] }>} */
+  const clients = new Map();
+  /** @param {string} appId @param {string[]} ids */
+  const add = (appId, ids) => {
+    const client = clients.get(appId.toLowerCase()) ?? { appId, delegatedPermissionIds: [] };
+    clients.set(appId.toLowerCase(), client);
+    for (const id of ids) {
+      const have = client.delegatedPermissionIds.some((d) => d.toLowerCase() === id.toLowerCase());
+      if (!have && known.has(id.toLowerCase())) client.delegatedPermissionIds.push(id);
+    }
+  };
+  for (const client of current ?? []) if (client?.appId) add(client.appId, client.delegatedPermissionIds ?? []);
+  for (const appId of clientIds) add(appId, [scopeId]);
+  return [...clients.values()].filter((c) => c.delegatedPermissionIds.length);
+}
+
+/**
+ * The web app's delegated Graph permissions: User.Read, and with the viewer group GroupMember.ReadWrite.All and
+ * User.ReadBasic.All, so that Share can change the group and find people by email.
+ * @param {{ graphUserReadScopeId: string, graphGroupScopeId?: string, graphPeopleScopeId?: string }} o
+ */
+const webAppGraphAccess = (o) => ({
+  resourceAppId: GRAPH_APP_ID,
+  resourceAccess: [o.graphUserReadScopeId, o.graphGroupScopeId, o.graphPeopleScopeId].flatMap((id) => (id ? [{ id, type: 'Scope' }] : [])),
+});
+
+/**
+ * Entra takes a little while to replicate a new app and service principal, so
+ * "not found" style 400/404 answers are retried for up to two minutes.
+ * @type {import('../http.js').RequestOptions}
+ */
+const replicationRetry = {
+  maxRetries: 20,
+  maxWaitMs: 120_000,
+  retryIf: (status, data) => (status === 400 || status === 404) && !/already exists/i.test(JSON.stringify(data ?? '')),
+};
+
+/** @param {import('../http.js').HttpClient} http */
+export function graphApi(http) {
+  /** @param {string} path */
+  async function getOrNull(path) {
+    try {
+      return await http.get(path);
+    } catch (err) {
+      if (err instanceof HttpError && err.status === 404) return null;
+      throw err;
+    }
+  }
+
+  /** @param {string} path @param {string} objectId */
+  async function addRef(path, objectId) {
+    try {
+      await http.post(path, { '@odata.id': `https://graph.microsoft.com/v1.0/directoryObjects/${objectId}` });
+      return true;
+    } catch (err) {
+      if (err instanceof HttpError && err.status === 400 && /already exist/i.test(JSON.stringify(err.body ?? err.message))) return false;
+      throw err;
+    }
+  }
+
+  return {
+    me: () => http.get('/me', { query: { $select: 'id,displayName,userPrincipalName' } }),
+    organization: async () => (await http.get('/organization', { query: { $select: 'id,displayName' } })).value?.[0],
+    /** @returns {Promise<{ roleTemplateId: string, displayName: string }[]>} */
+    myDirectoryRoles: () =>
+      http.list('/me/transitiveMemberOf/microsoft.graph.directoryRole', { query: { $select: 'roleTemplateId,displayName' } }),
+    /**
+     * A principal's tenant-wide directory role assignments.
+     * @param {string} principalId
+     * @returns {Promise<{ id: string, roleDefinitionId: string, directoryScopeId?: string }[]>}
+     */
+    directoryRoleAssignments: (principalId) =>
+      http.list('/roleManagement/directory/roleAssignments', { query: { $filter: `principalId eq '${principalId}'`, $select: 'id,roleDefinitionId,directoryScopeId' } }),
+    /**
+     * Gives a principal a directory role across the tenant.
+     * @param {string} principalId
+     * @param {string} roleDefinitionId
+     */
+    assignDirectoryRole: (principalId, roleDefinitionId) =>
+      http.post('/roleManagement/directory/roleAssignments', { principalId, roleDefinitionId, directoryScopeId: '/' }, replicationRetry),
+    /** Whether ordinary users may register apps. */
+    usersCanRegisterApps: async () => {
+      const policy = await http.get('/policies/authorizationPolicy');
+      return policy?.defaultUserRolePermissions?.allowedToCreateApps !== false;
+    },
+    /** IDs of the groups the signed-in user is in, directly or through other groups. */
+    myGroupIds: async () =>
+      (await http.list('/me/transitiveMemberOf/microsoft.graph.group', { query: { $select: 'id' } })).map((g) => String(g.id)),
+    /** @returns {Promise<{ skuPartNumber?: string, servicePlans?: { servicePlanName: string, provisioningStatus: string }[] }[]>} */
+    myLicenseDetails: () => http.list('/me/licenseDetails'),
+    /** @returns {Promise<{ skuPartNumber?: string, capabilityStatus?: string, consumedUnits?: number, prepaidUnits?: { enabled?: number }, servicePlans?: { servicePlanName: string, provisioningStatus?: string }[] }[]>} */
+    subscribedSkus: () => http.list('/subscribedSkus'),
+    /** The tenant's verified domain names, lower case. */
+    verifiedDomains: async () =>
+      /** @type {{ name?: string }[]} */ ((await http.get('/organization', { query: { $select: 'verifiedDomains' } })).value?.[0]?.verifiedDomains ?? [])
+        .map((d) => String(d.name ?? '').toLowerCase())
+        .filter(Boolean),
+    /**
+     * Directory roles the user could activate through PIM. Only rows for this principal are kept,
+     * whatever the filter returned.
+     * @param {string} principalId
+     * @returns {Promise<{ roleDefinitionId: string, principalId: string }[]>}
+     */
+    myEligibleRoles: async (principalId) =>
+      (await http.list('/roleManagement/directory/roleEligibilityScheduleInstances', {
+        query: { $filter: `principalId eq '${principalId}'`, $select: 'roleDefinitionId,principalId' },
+      })).filter((r) => r.principalId === principalId),
+
+    graphServicePrincipal: () =>
+      http.get(`/servicePrincipals(appId='${GRAPH_APP_ID}')`, { query: { $select: 'id,appId,appRoles' } }),
+    /** @param {string} appId */
+    servicePrincipalByAppId: (appId) =>
+      http.get(`/servicePrincipals(appId='${appId}')`, { query: { $select: 'id,appId,appRoles,oauth2PermissionScopes' } }),
+
+    /** @param {string} appId */
+    findApplication: (appId) => getOrNull(`/applications(appId='${appId}')`),
+    /** @param {string} appId */
+    findServicePrincipal: (appId) => getOrNull(`/servicePrincipals(appId='${appId}')`),
+
+    /**
+     * @param {string} displayName
+     * @param {{ id: string }[]} appRoles
+     */
+    createApplication: (displayName, appRoles) =>
+      http.post('/applications', {
+        displayName,
+        signInAudience: 'AzureADMyOrg',
+        notes: 'Created by the Analytics Hub installer. Reads Copilot audit, usage report and directory data for ValueLens.',
+        requiredResourceAccess: appRoles.length ? [{ resourceAppId: GRAPH_APP_ID, resourceAccess: appRoles.map((r) => ({ id: r.id, type: 'Role' })) }] : [],
+      }),
+    /**
+     * Creates the Azure-hosted web application registration.
+     * @param {{ displayName: string, fqdn: string, pbiScopeId: string, graphUserReadScopeId: string, graphGroupScopeId?: string, graphPeopleScopeId?: string, groupClaims?: boolean, teamsClientIds: string[] }} o
+     */
+    createAzureWebApplication(o) {
+      const scopeId = crypto.randomUUID();
+      // No identifierUris here: tenant policy needs the URI to contain the app ID, so
+      // updateAzureWebApplication sets api://<fqdn>/<appId> once the app ID exists.
+      return http.post('/applications', {
+        displayName: o.displayName,
+        signInAudience: 'AzureADMyOrg',
+        spa: { redirectUris: [`https://${o.fqdn}/`, `https://${o.fqdn}/?host=teams&auth=popup`] },
+        api: {
+          oauth2PermissionScopes: [
+            {
+              id: scopeId,
+              adminConsentDescription: 'Allow users to access Analytics Hub.',
+              adminConsentDisplayName: 'Access Analytics Hub',
+              isEnabled: true,
+              type: 'User',
+              userConsentDescription: 'Allow you to access Analytics Hub.',
+              userConsentDisplayName: 'Access Analytics Hub',
+              value: 'access_as_user',
+            },
+          ],
+          preAuthorizedApplications: o.teamsClientIds.map((appId) => ({ appId, delegatedPermissionIds: [scopeId] })),
+        },
+        appRoles: [
+          { id: crypto.randomUUID(), allowedMemberTypes: ['User'], displayName: 'Analytics Hub User', value: 'AnalyticsHub.User', description: 'Can use Analytics Hub.', isEnabled: true },
+          { id: crypto.randomUUID(), allowedMemberTypes: ['User'], displayName: 'Analytics Hub Admin', value: 'AnalyticsHub.Admin', description: 'Can administer Analytics Hub.', isEnabled: true },
+        ],
+        requiredResourceAccess: [
+          { resourceAppId: POWER_BI_APP_ID, resourceAccess: [{ id: o.pbiScopeId, type: 'Scope' }] },
+          webAppGraphAccess(o),
+        ],
+        ...(o.groupClaims ? { groupMembershipClaims: 'SecurityGroup' } : {}),
+        notes: 'Created by the Analytics Hub installer for the Azure-hosted web app.',
+      });
+    },
+
+    /**
+     * Brings the web app registration up to date on every install, upgrade and Repair. Other scopes and
+     * pre-authorised clients on it stay.
+     * @param {any} application
+     * @param {{ fqdn: string, clientId: string, pbiScopeId: string, graphUserReadScopeId: string, graphGroupScopeId?: string, graphPeopleScopeId?: string, groupClaims?: boolean, teamsClientIds: string[] }} o
+     */
+    async updateAzureWebApplication(application, o) {
+      /** @type {any[]} */
+      const scopes = application.api?.oauth2PermissionScopes ?? [];
+      const scope = scopes.find((s) => s.value === 'access_as_user') ?? { id: crypto.randomUUID() };
+      const accessAsUser = {
+        ...scope,
+        adminConsentDescription: scope.adminConsentDescription ?? 'Allow users to access Analytics Hub.',
+        adminConsentDisplayName: scope.adminConsentDisplayName ?? 'Access Analytics Hub',
+        isEnabled: true,
+        type: 'User',
+        userConsentDescription: scope.userConsentDescription ?? 'Allow you to access Analytics Hub.',
+        userConsentDisplayName: scope.userConsentDisplayName ?? 'Access Analytics Hub',
+        value: 'access_as_user',
+      };
+      // Graph won't drop an enabled scope, and another pre-authorised client may use one.
+      const oauth2PermissionScopes = scopes.includes(scope) ? scopes.map((s) => (s === scope ? accessAsUser : s)) : [...scopes, accessAsUser];
+      await http.patch(`/applications/${application.id}`, {
+        spa: { redirectUris: [`https://${o.fqdn}/`, `https://${o.fqdn}/?host=teams&auth=popup`] },
+        identifierUris: [`api://${o.fqdn}/${o.clientId}`],
+        // The web app lets the viewer group in by the groups claim.
+        groupMembershipClaims: o.groupClaims ? 'SecurityGroup' : application.groupMembershipClaims ?? null,
+        api: {
+          ...(application.api ?? {}),
+          oauth2PermissionScopes,
+          preAuthorizedApplications: mergePreAuthorizedApplications(application.api?.preAuthorizedApplications, o.teamsClientIds, scope.id, oauth2PermissionScopes),
+        },
+        appRoles: application.appRoles?.length
+          ? application.appRoles
+          : [
+              { id: crypto.randomUUID(), allowedMemberTypes: ['User'], displayName: 'Analytics Hub User', value: 'AnalyticsHub.User', description: 'Can use Analytics Hub.', isEnabled: true },
+              { id: crypto.randomUUID(), allowedMemberTypes: ['User'], displayName: 'Analytics Hub Admin', value: 'AnalyticsHub.Admin', description: 'Can administer Analytics Hub.', isEnabled: true },
+            ],
+        requiredResourceAccess: [
+          { resourceAppId: POWER_BI_APP_ID, resourceAccess: [{ id: o.pbiScopeId, type: 'Scope' }] },
+          webAppGraphAccess(o),
+        ],
+      });
+      return scope.id;
+    },
+    /**
+     * Adds Graph app roles to the app's required permissions, keeping what is there.
+     * @param {any} application
+     * @param {{ id: string }[]} appRoles
+     */
+    async ensureRequiredAccess(application, appRoles) {
+      const current = /** @type {any[]} */ (application.requiredResourceAccess ?? []);
+      const graph = current.find((r) => r.resourceAppId === GRAPH_APP_ID) ?? { resourceAppId: GRAPH_APP_ID, resourceAccess: [] };
+      const have = new Set(graph.resourceAccess.map((/** @type {any} */ a) => a.id));
+      const add = appRoles.filter((r) => !have.has(r.id));
+      if (!add.length) return false;
+      graph.resourceAccess = [...graph.resourceAccess, ...add.map((r) => ({ id: r.id, type: 'Role' }))];
+      const others = current.filter((r) => r.resourceAppId !== GRAPH_APP_ID);
+      await http.patch(`/applications/${application.id}`, { requiredResourceAccess: [...others, graph] });
+      return true;
+    },
+
+    /** New apps take a few seconds to replicate, so 400/404 are retried briefly. @param {string} appId */
+    createServicePrincipal: (appId) => http.post('/servicePrincipals', { appId }, replicationRetry),
+
+    /** @param {string} applicationObjectId */
+    deleteApplication: (applicationObjectId) => http.del(`/applications/${applicationObjectId}`),
+
+    /**
+     * @param {string} applicationObjectId
+     * @param {{ name: string, issuer: string, subject: string, audiences: string[] }} credential
+     */
+    addFederatedIdentityCredential: (applicationObjectId, credential) =>
+      http.post(`/applications/${applicationObjectId}/federatedIdentityCredentials`, credential, replicationRetry),
+
+    /**
+     * @param {string} applicationObjectId
+     * @param {Date} endDateTime
+     * @param {string} [displayName]
+     * @returns {Promise<{ secretText: string, endDateTime: string, keyId: string }>}
+     */
+    addPassword: (applicationObjectId, endDateTime, displayName = 'Analytics Hub installer') =>
+      http.post(`/applications/${applicationObjectId}/addPassword`, {
+        passwordCredential: { displayName, endDateTime: endDateTime.toISOString() },
+      }, { once: true }),
+    /**
+     * The app's client secrets, without their values.
+     * @param {string} applicationObjectId
+     * @returns {Promise<{ keyId: string, displayName?: string, endDateTime?: string }[]>}
+     */
+    listPasswords: async (applicationObjectId) =>
+      (await http.get(`/applications/${applicationObjectId}`, { query: { $select: 'passwordCredentials' } })).passwordCredentials ?? [],
+    /** @param {string} applicationObjectId @param {string} keyId */
+    removePassword: (applicationObjectId, keyId) => http.post(`/applications/${applicationObjectId}/removePassword`, { keyId }),
+
+    /** A user by UPN or email-style sign-in name. Null when there's no such user. @param {string} upn */
+    getUser: (upn) => getOrNull(`/users/${encodeURIComponent(upn)}?$select=id,displayName,userPrincipalName`),
+
+    /** @param {string} id */
+    getGroup: (id) => getOrNull(`/groups/${encodeURIComponent(id)}?$select=id,displayName,securityEnabled`),
+    /** The first group with this exact display name, or null. @param {string} name */
+    findGroupByName: async (name) =>
+      (await http.list('/groups', { query: { $filter: `displayName eq '${name.replace(/'/g, "''")}'`, $select: 'id,displayName,securityEnabled' } }))[0] ?? null,
+    /**
+     * Creates a security group (not mail-enabled) owned by `ownerId`, the signed-in user. Entra doesn't make an admin
+     * an owner of a security group they create, so the request names them. It does make a user who isn't an admin
+     * one, and Graph refuses a request that names them as well, with 400 "Request contains a property with duplicate
+     * values". Then the group is created without naming them.
+     * @param {{ displayName: string, description: string, ownerId: string }} o
+     */
+    createSecurityGroup: async (o) => {
+      const group = {
+        displayName: o.displayName,
+        description: o.description,
+        mailEnabled: false,
+        mailNickname: o.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'analytics-hub-viewers',
+        securityEnabled: true,
+      };
+      try {
+        return await http.post('/groups', { ...group, 'owners@odata.bind': [`https://graph.microsoft.com/v1.0/users/${o.ownerId}`] });
+      } catch (err) {
+        if (!(err instanceof HttpError) || err.status !== 400 || !/property with duplicate values/i.test(JSON.stringify(err.body ?? err.message))) throw err;
+        // Graph created nothing, so sending it again can't make a second group.
+        return http.post('/groups', group);
+      }
+    },
+    /** Direct members of a group. @param {string} groupId @returns {Promise<{ id: string, displayName?: string, userPrincipalName?: string }[]>} */
+    groupMembers: (groupId) => http.list(`/groups/${groupId}/members`, { query: { $select: 'id,displayName,userPrincipalName' } }),
+    /**
+     * The users in a group, including through nested groups.
+     * @param {string} groupId
+     * @returns {Promise<{ id: string, displayName?: string, userPrincipalName?: string }[]>}
+     */
+    groupUsers: async (groupId) =>
+      (await http.list(`/groups/${groupId}/transitiveMembers`, { query: { $select: 'id,displayName,userPrincipalName' } }))
+        .filter((/** @type {any} */ m) => !m['@odata.type'] || m['@odata.type'] === '#microsoft.graph.user'),
+    /** @param {string} groupId @returns {Promise<{ id: string, displayName?: string, userPrincipalName?: string }[]>} */
+    groupOwners: (groupId) => http.list(`/groups/${groupId}/owners`, { query: { $select: 'id,displayName,userPrincipalName' } }),
+    /** Adds a user or group to a group. Already being a member is fine. @param {string} groupId @param {string} memberId */
+    addGroupMember: (groupId, memberId) => addRef(`/groups/${groupId}/members/$ref`, memberId),
+    /** @param {string} groupId @param {string} ownerId */
+    addGroupOwner: (groupId, ownerId) => addRef(`/groups/${groupId}/owners/$ref`, ownerId),
+    /**
+     * A user by UPN, or else a group by display name.
+     * @param {string} name
+     * @returns {Promise<{ id: string, displayName: string, kind: 'user' | 'group' } | null>}
+     */
+    async resolvePrincipal(name) {
+      if (name.includes('@')) {
+        const user = await getOrNull(`/users/${encodeURIComponent(name)}?$select=id,displayName,userPrincipalName`);
+        if (user) return { id: user.id, displayName: user.userPrincipalName ?? user.displayName, kind: 'user' };
+      }
+      const group = /^[0-9a-f-]{36}$/i.test(name)
+        ? await getOrNull(`/groups/${name}?$select=id,displayName`)
+        : (await http.list('/groups', { query: { $filter: `displayName eq '${name.replace(/'/g, "''")}'`, $select: 'id,displayName' } }))[0];
+      return group ? { id: group.id, displayName: group.displayName, kind: 'group' } : null;
+    },
+
+    /** Makes a user an owner of the app registration. @param {string} applicationObjectId @param {string} userId */
+    addOwner: (applicationObjectId, userId) =>
+      http.post(`/applications/${applicationObjectId}/owners/$ref`, { '@odata.id': `https://graph.microsoft.com/v1.0/directoryObjects/${userId}` }),
+
+    /** @param {string} servicePrincipalId */
+    appRoleAssignments: (servicePrincipalId) => http.list(`/servicePrincipals/${servicePrincipalId}/appRoleAssignments`),
+
+    /**
+     * Grants one application permission (admin consent for that role).
+     * @param {string} resourceId  Graph's service principal ID.
+     * @param {string} principalId  Our app's service principal ID.
+     * @param {string} appRoleId
+     */
+    grantAppRole: (resourceId, principalId, appRoleId) =>
+      http.post(`/servicePrincipals/${resourceId}/appRoleAssignedTo`, { principalId, resourceId, appRoleId }, replicationRetry),
+
+    /**
+     * Admin consent for a delegated scope for all users. Reuses an existing grant, adding the scope if it's missing.
+     * @param {{ clientId: string, resourceId: string, scope: string }} o
+     */
+    async grantOauth2Permission(o) {
+      const existing = /** @type {any[]} */ (await http.list('/oauth2PermissionGrants', { query: { $filter: `clientId eq '${o.clientId}' and resourceId eq '${o.resourceId}'` } }).catch(() => [])).find((g) => g.consentType === 'AllPrincipals');
+      if (!existing) return http.post('/oauth2PermissionGrants', { clientId: o.clientId, consentType: 'AllPrincipals', resourceId: o.resourceId, scope: o.scope }, replicationRetry);
+      const scopes = String(existing.scope ?? '').split(' ').filter(Boolean);
+      if (scopes.includes(o.scope)) return existing;
+      return http.patch(`/oauth2PermissionGrants/${existing.id}`, { scope: [...scopes, o.scope].join(' ') });
+    },
+
+    /** @param {string} principalId @param {string} resourceId @param {string} appRoleId */
+    assignPrincipalToAppRole: (principalId, resourceId, appRoleId) =>
+      http.post(`/servicePrincipals/${resourceId}/appRoleAssignedTo`, { principalId, resourceId, appRoleId }, replicationRetry),
+
+    /** Users, groups and apps assigned to this service principal's app roles. @param {string} resourceId */
+    appRoleAssignedTo: (resourceId) => http.list(`/servicePrincipals/${resourceId}/appRoleAssignedTo`),
+
+    /** A SharePoint site by Graph ID or path form (contoso.sharepoint.com:/sites/Analytics). @param {string} siteId */
+    site: (siteId) => http.get(`/sites/${siteId}`, { query: { $select: 'id,webUrl,displayName' } }),
+
+    /**
+     * Gives an app read on one site, for apps holding Sites.Selected. Needs a SharePoint admin (Sites.FullControl.All).
+     * @param {string} siteId  Graph site ID.
+     * @param {string} appId
+     * @param {string} displayName
+     */
+    grantSiteRead: (siteId, appId, displayName) =>
+      http.post(`/sites/${siteId}/permissions`, { roles: ['read'], grantedToIdentities: [{ application: { id: appId, displayName } }] }),
+  };
+}
+
+/** @typedef {ReturnType<typeof graphApi>} GraphApi */
+
+/**
+ * An app in the org's Teams app catalog, with its versions when asked for.
+ * @typedef {object} TeamsCatalogApp
+ * @property {string} id  The app's ID in the catalog, not the manifest's.
+ * @property {string} [externalId]  The manifest's `id`.
+ * @property {string} [displayName]
+ * @property {string} [distributionMethod]  `organization` for an app your org published.
+ * @property {{ id?: string, version?: string, publishingState?: string }[]} [appDefinitions]  `publishingState` is `published`, or `submitted` while it waits for an admin.
+ */
+
+/**
+ * The org's Teams app catalog. Every call needs the delegated AppCatalog.ReadWrite.All scope, and
+ * publishing straight to the catalog, not for review, needs a Teams Administrator or Global Administrator.
+ * https://learn.microsoft.com/graph/api/teamsapp-publish
+ * @param {import('../http.js').HttpClient} http
+ * @param {(o?: { abortSignal?: AbortSignal }) => Promise<unknown>} [signIn]  Gets the scope's token, so the sign-in can come before any call.
+ */
+export function appCatalogApi(http, signIn = async () => {}) {
+  /** Not retried after a network error: a second upload could add a second app. @type {import('../http.js').RequestOptions} */
+  const zipped = { headers: { 'Content-Type': 'application/zip' }, once: true };
+  return {
+    /** @param {{ abortSignal?: AbortSignal }} [o]  abortSignal: stop waiting for the sign-in. */
+    signIn: async (o) => {
+      await signIn(o);
+    },
+    /**
+     * The org's own apps with this manifest ID, with their versions. Store apps are left out.
+     * @param {string} externalId
+     * @returns {Promise<TeamsCatalogApp[]>}
+     */
+    find: async (externalId) => {
+      const apps = await http.list('/appCatalogs/teamsApps', { query: { $filter: `distributionMethod eq 'organization' and externalId eq '${externalId.replace(/'/g, "''")}'`, $expand: 'appDefinitions' } });
+      return apps.filter((a) => a.distributionMethod === 'organization');
+    },
+    /** Adds a new app to the org's catalog. @param {Uint8Array} zip @returns {Promise<TeamsCatalogApp>} */
+    publish: (zip) => http.post('/appCatalogs/teamsApps', zip, zipped),
+    /** Uploads a new version of an app already in the catalog. @param {string} id @param {Uint8Array} zip */
+    update: (id, zip) => http.post(`/appCatalogs/teamsApps/${encodeURIComponent(id)}/appDefinitions`, zip, zipped),
+    /** @param {string} id */
+    remove: (id) => http.del(`/appCatalogs/teamsApps/${encodeURIComponent(id)}`),
+  };
+}
+
+/** @typedef {ReturnType<typeof appCatalogApi>} AppCatalogApi */

@@ -1,0 +1,175 @@
+// @ts-check
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { defaultModules, MODULES, NOTEBOOKS_DIR, notebooksFor, OPTIONAL_MODULES, permissionsFor } from '../src/catalog.js';
+import { realSources } from './fakes.js';
+import { addM365Activity, addM365CalendarRange, CALENDAR_RANGE, M365_COLUMNS, M365_REFRESH_POLICY, M365_RELATIONSHIPS, M365_REWRITE_DAYS, M365_SOURCE_TABLE, M365_TABLE, stableGuid } from '../src/transform/m365.js';
+import { AUDIT_TABLE, buildModel, loadTemplateModel } from '../src/transform/model.js';
+import { buildPipeline, findActivity, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const NOTEBOOK = join(here, '..', '..', NOTEBOOKS_DIR, 'Copilot_M365_Activity_Ingester.ipynb');
+
+const WS = 'f0000000-0000-0000-0000-000000000000';
+const ids = {
+  auditIngester: 'nb-a',
+  licensedUsers: 'nb-b',
+  processor: 'nb-c',
+  orgData: 'nb-d',
+  m365Activity: 'nb-m',
+  refreshModel: 'nb-r',
+};
+const on = { orgData: true, m365Activity: true, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false };
+const off = { ...on, m365Activity: false };
+const sources = realSources();
+const template = loadTemplateModel(/** @type {string} */ (sources.modelFile));
+const lake = { server: 'abc.datawarehouse.fabric.microsoft.com', database: 'ValueLens' };
+
+test('catalog: on by default, the first extra, deploys its notebook with credentials and needs no new permission', () => {
+  assert.equal(defaultModules().m365Activity, true);
+  assert.equal(OPTIONAL_MODULES[0], 'm365Activity');
+  assert.deepEqual(MODULES.m365Activity.permissions, ['Reports.Read.All']);
+  assert.deepEqual(permissionsFor(on), permissionsFor(off));
+  const nb = notebooksFor(on).find((n) => n.key === 'm365Activity');
+  assert.equal(nb?.file, 'Copilot_M365_Activity_Ingester.ipynb');
+  assert.equal(nb?.credentials, true);
+  assert.equal(nb?.placeholder, 'REPLACE_WITH_M365_ACTIVITY_NOTEBOOK_ID');
+  assert.ok(!notebooksFor(off).some((n) => n.key === 'm365Activity'));
+});
+
+test('pipeline: the M365 branch runs in lane 2 after the org data when on, and is removed when off', () => {
+  const doc = buildPipeline(sources.pipeline, { workspaceId: WS, notebookIds: ids, modules: on });
+  const branch = findActivity(doc.properties.activities, 'Conditionally_Run_M365_Activity');
+  assert.deepEqual(branch.dependsOn, [{ activity: 'Conditionally_Run_Org_Data', dependencyConditions: ['Completed'] }]);
+  assert.equal(findActivity(doc.properties.activities, 'Run_M365_Activity_Ingester').typeProperties.notebookId, 'nb-m');
+  assert.equal(doc.properties.parameters.EnableM365Activity.defaultValue, true);
+
+  const without = buildPipeline(sources.pipeline, { workspaceId: WS, notebookIds: ids, modules: off });
+  assert.equal(findActivity(without.properties.activities, 'Conditionally_Run_M365_Activity'), undefined);
+  assert.equal(without.properties.parameters.EnableM365Activity, undefined);
+
+  const { m365Activity, ...rest } = ids;
+  assert.throws(() => buildPipeline(sources.pipeline, { workspaceId: WS, notebookIds: rest, modules: on }), /REPLACE_WITH_M365_ACTIVITY_NOTEBOOK_ID/);
+});
+
+test('pipeline: the model refresh waits for the M365 load, whether or not it succeeded', () => {
+  const doc = buildPipeline(sources.pipeline, { workspaceId: WS, notebookIds: ids, modules: on, semanticModelId: 'model-1' });
+  const refresh = findActivity(doc.properties.activities, REFRESH_ACTIVITY);
+  assert.deepEqual(refresh.dependsOn, [
+    { activity: 'Run_Audit_Log_Processor', dependencyConditions: ['Succeeded'] },
+    { activity: 'Conditionally_Run_Org_Data', dependencyConditions: ['Completed'] },
+    { activity: 'Conditionally_Run_M365_Activity', dependencyConditions: ['Completed'] },
+  ]);
+});
+
+test('model: the table reads the Lakehouse when on, is empty when off, and the template is untouched', () => {
+  const before = JSON.stringify(template);
+  const bim = buildModel(template, { ...lake, modules: on });
+  assert.equal(JSON.stringify(template), before);
+  const table = bim.model.tables.find((t) => t.name === M365_TABLE);
+  assert.ok(table);
+  const expr = table.partitions[0].source.expression.join('\n');
+  assert.match(expr, new RegExp(`try FabricTable\\("${M365_SOURCE_TABLE}"\\) otherwise EmptyTable\\(Columns\\)`));
+  assert.deepEqual(table.columns.map((/** @type {any} */ c) => c.name), M365_COLUMNS.map((c) => c.name));
+  for (const c of M365_COLUMNS) assert.match(expr, new RegExp(`\\{"${c.name}", `), `${c.name} is typed`);
+
+  const empty = buildModel(template, { ...lake, modules: off }).model.tables.find((t) => t.name === M365_TABLE);
+  const offExpr = empty.partitions[0].source.expression.join('\n');
+  assert.doesNotMatch(offExpr, /FabricTable/);
+  assert.match(offExpr, /Source = EmptyTable\(Columns\)/);
+});
+
+test('model: relationships point at real columns, lineage is stable and unique', () => {
+  const model = buildModel(template, { ...lake, modules: on }).model;
+  const rels = model.relationships.filter((/** @type {any} */ r) => r.fromTable === M365_TABLE);
+  assert.equal(rels.length, M365_RELATIONSHIPS.length);
+  for (const r of rels) {
+    const to = model.tables.find((t) => t.name === r.toTable);
+    assert.ok(to?.columns.some((/** @type {any} */ c) => c.name === r.toColumn), `${r.toTable}[${r.toColumn}] exists`);
+    assert.ok(M365_COLUMNS.some((c) => c.name === r.fromColumn));
+  }
+  const again = buildModel(template, { ...lake, modules: on }).model;
+  assert.deepEqual(again.relationships, model.relationships);
+  const table = model.tables.find((t) => t.name === M365_TABLE);
+  const tags = [table.lineageTag, ...table.columns.map((/** @type {any} */ c) => c.lineageTag), ...rels.map((/** @type {any} */ r) => r.name)];
+  assert.equal(new Set(tags).size, tags.length);
+  assert.match(stableGuid('x'), /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-a[0-9a-f]{3}-[0-9a-f]{12}$/);
+
+  const twice = buildModel({ compatibilityLevel: 1600, model }, { ...lake, modules: on }).model;
+  assert.equal(twice.tables.filter((t) => t.name === M365_TABLE).length, 1, 'a model that has the table already is left alone');
+});
+
+test('model: the Calendar spans the activity dates as well as the audit and feedback dates', () => {
+  const calendar = (/** @type {any} */ doc) => {
+    const model = doc.model ?? doc;
+    const expr = model.tables.find((/** @type {any} */ t) => t.name === 'Calendar').partitions[0].source.expression;
+    return Array.isArray(expr) ? expr.join('\n') : expr;
+  };
+  const original = calendar(template);
+  for (const [before] of CALENDAR_RANGE) assert.ok(original.includes(before), `the template has: ${before}`);
+  assert.doesNotMatch(original, /M365 Activity/, 'the template itself stays source-agnostic');
+
+  for (const modules of [on, off]) {
+    const model = buildModel(template, { ...lake, modules }).model;
+    const expr = calendar(model);
+    assert.match(expr, /MINX\(\{ AuditMin, FeedbackMin, MIN\('M365 Activity'\[ActivityDate\]\) \}, \[Value\]\)/);
+    assert.match(expr, /MAXX\(\{ AuditMax, FeedbackMax, MAX\('M365 Activity'\[ActivityDate\]\) \}, \[Value\]\)/);
+    assert.match(expr, /RunDate - 364/, 'keeps the rolling fallback for a model with no dates');
+    const once = structuredClone(model);
+    addM365CalendarRange(once);
+    assert.equal(calendar(once), expr, 'idempotent');
+  }
+  assert.equal(calendar(template), original, 'the template is untouched');
+
+  const legacy = { tables: [{ name: 'Calendar', partitions: [{ source: { type: 'calculated', expression: ['VAR MinDate = MIN(x)'] } }] }] };
+  addM365CalendarRange(/** @type {any} */ (legacy));
+  assert.deepEqual(legacy.tables[0].partitions[0].source.expression, ['VAR MinDate = MIN(x)'], 'an older Calendar is left alone');
+});
+
+test('model: the table refreshes incrementally like the audit table, over every day the ingester can rewrite', () => {
+  const audit = template.model.tables.find((t) => t.name === AUDIT_TABLE).refreshPolicy;
+  const { sourceExpression: _, ...auditShape } = audit;
+  assert.deepEqual(Object.keys(M365_REFRESH_POLICY), Object.keys(auditShape), 'the same policy properties as the audit table');
+  for (const key of ['policyType', 'rollingWindowGranularity', 'rollingWindowPeriods', 'incrementalGranularity', 'incrementalPeriodsOffset']) {
+    assert.equal(M365_REFRESH_POLICY[/** @type {keyof typeof M365_REFRESH_POLICY} */ (key)], audit[key], `${key} matches the audit table`);
+  }
+  assert.equal(M365_REFRESH_POLICY.rollingWindowPeriods, 12);
+  assert.equal(M365_REFRESH_POLICY.incrementalGranularity, 'day');
+
+  const nb = JSON.parse(readFileSync(NOTEBOOK, 'utf8'));
+  const source = nb.cells.map((/** @type {any} */ c) => [].concat(c.source).join('')).join('\n');
+  const window = Number(/def days_to_load\([^)]*window_days=(\d+)\)/.exec(source)?.[1]);
+  assert.equal(window, M365_REWRITE_DAYS, 'the ingester rewrites days within Microsoft\'s 28-day window');
+  assert.ok(M365_REFRESH_POLICY.incrementalPeriods >= window + 7, 'the refreshed window covers the ingester\'s with a week to spare');
+
+  const filter = 'Filtered = Table.SelectRows(Source, each [ActivityDate] >= Date.From(RangeStart) and [ActivityDate] < Date.From(RangeEnd)),';
+  for (const modules of [on, off]) {
+    const table = buildModel(template, { ...lake, modules }).model.tables.find((t) => t.name === M365_TABLE);
+    const { sourceExpression, ...shape } = table.refreshPolicy;
+    assert.deepEqual(shape, { ...M365_REFRESH_POLICY });
+    assert.deepEqual(table.partitions[0].source.expression, sourceExpression, 'the partition matches the policy, as the audit table\'s does');
+    const expr = sourceExpression.join('\n');
+    assert.ok(expr.includes(filter), 'filters on the date column between RangeStart and RangeEnd');
+    assert.match(expr, /Kept = Table\.SelectColumns\(Filtered, /, 'everything after the filter reads it');
+    assert.ok(expr.indexOf('Filtered =') < expr.indexOf('Kept ='), 'filters straight after the source, so it folds');
+    assert.match(expr, /\{"ActivityDate", type date\}/, 'ActivityDate is a date, so the datetime parameters are compared as dates');
+  }
+  assert.ok(['RangeStart', 'RangeEnd'].every((n) => template.model.expressions?.some((e) => e.name === n)));
+
+  const older = structuredClone(template.model);
+  older.expressions = older.expressions?.filter((e) => e.name !== 'RangeStart' && e.name !== 'RangeEnd');
+  addM365Activity(older, true);
+  const plain = older.tables.find((t) => t.name === M365_TABLE);
+  assert.equal(plain.refreshPolicy, undefined, 'a template without RangeStart and RangeEnd gets no policy');
+  assert.doesNotMatch(plain.partitions[0].source.expression.join('\n'), /RangeStart|Filtered/);
+});
+
+test('model columns are all written by the notebook', () => {
+  const nb = JSON.parse(readFileSync(NOTEBOOK, 'utf8'));
+  const source = nb.cells.map((/** @type {any} */ c) => [].concat(c.source).join('')).join('\n');
+  assert.match(source, new RegExp(`OUTPUT_TABLE\\s*=\\s*'dbo\\.${M365_SOURCE_TABLE}'`));
+  for (const c of M365_COLUMNS) assert.ok(source.includes(`'${c.name}'`), `the notebook writes ${c.name}`);
+});
