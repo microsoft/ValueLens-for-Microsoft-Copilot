@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { VIEWER_GROUP_NAME } from '../src/steps/access.js';
+import { shareReport, shareReportPending, VIEWER_GROUP_NAME } from '../src/steps/access.js';
 import { flowsWanted } from '../src/steps/flows.js';
 import { GLOBAL_READER_ROLE_ID, nextSteps, stepsLeftTitle } from '../src/steps/next-steps.js';
 import { summary } from '../src/install.js';
@@ -18,6 +18,13 @@ function installed(answers = /** @type {any[]} */ ([])) {
   t.config.access = { groupId: 'g-1', groupName: VIEWER_GROUP_NAME, contact: 'admin@contoso.com', createdGroup: true };
   t.config.fabric.workspaceName = 'ValueLens';
   return { ...t, ...fake };
+}
+
+/** The same, with the report published on the model, as deployReport records it. */
+function published(answers = /** @type {any[]} */ ([])) {
+  const t = installed(answers);
+  Object.assign(t.config.semanticModel, { enabled: true, reports: true, id: 'sm-1', report: { id: 'rep-1', name: 'ValueLens', modelId: 'sm-1', signature: 'sig-1' } });
+  return t;
 }
 
 const ids = (/** @type {{ id: string }[]} */ steps) => steps.map((s) => s.id);
@@ -81,6 +88,110 @@ test('next steps: the product feedback export only with its flow; optional steps
   const steps = [{ id: 'b', title: 'B', why: '', who: '', optional: true }];
   assert.equal(stepsLeftTitle(steps), '1 optional step');
   assert.equal(stepsLeftTitle([{ id: 'a', title: 'A', why: '', who: '' }, ...steps]), '1 step left, and 1 optional');
+});
+
+test("share the report: asked once, with the clicks; once it's shared it isn't asked again", async () => {
+  const t = published([true]);
+  assert.equal(shareReportPending(t.config), true);
+  await shareReport(t.ctx);
+  assert.deepEqual(t.asked, ['Have you shared the report?']);
+  assert.equal(t.config.access?.reportShared, true);
+  assert.equal(t.saves(), 1);
+  const text = t.text();
+  assert.match(text, /1\. Open the ValueLens workspace \(https:\/\/app\.fabric\.microsoft\.com\/groups\/ws-1\?ctid=tenant-1\) and choose … \(More options\) next to the ValueLens report\./);
+  assert.match(text, /2\. Choose Manage permissions, then Add user\./);
+  assert.match(text, /3\. Enter "ValueLens Viewers" and choose Grant\./);
+  assert.match(text, /Keep them off workspace roles: a role lets them read the notebooks/);
+  assert.match(text, /The report is shared with "ValueLens Viewers"/);
+  assert.equal(shareReportPending(t.config), false);
+  assert.deepEqual(nextSteps(t.config, USER), []);
+
+  await shareReport(t.ctx);
+  assert.equal(t.asked.length, 1, 'not asked again');
+  assert.equal(t.saves(), 1);
+});
+
+test('share the report: Later leaves a card, first in the list, until it is shared', async () => {
+  const t = published([false]);
+  await shareReport(t.ctx);
+  assert.equal(t.config.access?.reportShared, undefined);
+  assert.equal(t.saves(), 0);
+  assert.match(t.text(), /Until it's shared, people in the group can't open the report/);
+
+  t.config.dataSources.resourceGraph = 'api';
+  const steps = nextSteps(t.config, USER);
+  assert.deepEqual(ids(steps), ['share-report', 'entra-role']);
+  const [card] = steps;
+  assert.equal(card.title, 'Share the report with ValueLens Viewers');
+  assert.equal(card.who, 'You');
+  assert.ok(!card.optional, 'viewers can\'t open the report without it');
+  assert.equal(card.link, 'https://app.fabric.microsoft.com/groups/ws-1?ctid=tenant-1');
+  assert.equal(card.linkText, 'Open the workspace');
+  assert.equal(card.steps?.length, 3);
+  assert.match(String(card.steps?.[2]), /^Enter "ValueLens Viewers" and choose Grant\.$/);
+  assert.match(card.why, /myaccount\.microsoft\.com\/groups\/g-1/);
+  assert.match(card.why, /not by giving them a workspace role/);
+  assert.equal(stepsLeftTitle(steps), '2 steps left');
+
+  /** @type {any} */ (t.config.access).reportShared = true;
+  assert.deepEqual(ids(nextSteps(t.config, USER)), ['entra-role']);
+});
+
+test('share the report: nothing to ask without a group or a published report', async () => {
+  const noGroup = published();
+  delete noGroup.config.access?.groupId;
+  await shareReport(noGroup.ctx);
+  assert.deepEqual(noGroup.asked, []);
+  assert.match(noGroup.text(), /There's no viewer group yet, so there's nothing to share/);
+  assert.deepEqual(nextSteps(noGroup.config, USER), []);
+
+  const unpublished = installed();
+  Object.assign(unpublished.config.semanticModel, { enabled: true, reports: true, id: 'sm-1' });
+  await shareReport(unpublished.ctx);
+  assert.deepEqual(unpublished.asked, []);
+  assert.match(unpublished.text(), /The report isn't published, so there's nothing to share yet/);
+  assert.deepEqual(nextSteps(unpublished.config, USER), []);
+
+  const off = published();
+  off.config.semanticModel.reports = false;
+  assert.equal(shareReportPending(off.config), false, 'reports turned off');
+  assert.deepEqual(nextSteps(off.config, USER), []);
+});
+
+test('install: the report is shared after the group gets Build and before the first load, until it is', async () => {
+  const src = await readFile(new URL('../src/install.js', import.meta.url), 'utf8');
+  const at = (/** @type {string} */ s) => {
+    const i = src.indexOf(s);
+    assert.ok(i >= 0, s);
+    return i;
+  };
+  assert.ok(at("step('Viewer access')") < at("step('Share the report')"));
+  assert.ok(at("step('Share the report')") < at("step('First load')"));
+  assert.match(src, /const withShare = withReports && withAccess && config\.access\?\.reportShared !== true;/);
+  assert.match(src, /\.\.\.\(withShare \? \['Share the report'\] : \[\]\)/);
+});
+
+test('summary: viewers get the group and the report, never a workspace role', async () => {
+  const t = published([false]);
+  await summary(t.ctx);
+  const text = t.text();
+  assert.ok(text.indexOf('Share the report with ValueLens Viewers') < text.indexOf('Next steps'), 'the card leads');
+  assert.match(text, /1\. Give people access by adding them to "ValueLens Viewers"/);
+  assert.match(text, /The group already has Build on the model\./);
+  assert.match(text, /Keep viewers off workspace roles: a role lets them read the notebooks/);
+  assert.doesNotMatch(text, /Viewer on the workspace|choose Share|Share each report you publish/);
+
+  const shared = published();
+  /** @type {any} */ (shared.config.access).reportShared = true;
+  await summary(shared.ctx);
+  assert.doesNotMatch(shared.text(), /Share the report with/);
+
+  const noGroup = published();
+  delete noGroup.config.access;
+  await summary(noGroup.ctx);
+  assert.match(noGroup.text(), /1\. Share the report: choose … \(More options\) next to it in the workspace, then Manage permissions > Add user\. Add people or a group and choose Grant\./);
+  assert.match(noGroup.text(), /Keep viewers off workspace roles/);
+  assert.doesNotMatch(noGroup.text(), /Viewer on the workspace|choose Share/);
 });
 
 test('summary: what is left comes first, as cards, before the next steps', async () => {

@@ -6,6 +6,7 @@
  */
 import { PRODUCT } from '../product.js';
 import { FEEDBACK_SUBJECT } from '../transform/flows.js';
+import { myGroupsUrl, shareReportPending, shareReportSteps, VIEWER_GROUP_NAME, viewerReport, workspaceUrl } from './access.js';
 import { connectionSteps, FLOW_NAMES, flowsWanted } from './flows.js';
 import { APP_NAME } from './plan.js';
 import { AGENT_DIRECTORY_ROLES, resourceGraphOn } from './resource-graph.js';
@@ -41,14 +42,15 @@ const letter = (body, from) => ['Hi,', '', ...body, '', 'Thanks', ...(from ? [fr
 const numbered = (steps) => steps.map((s, i) => `${i + 1}. ${s}`);
 
 /**
- * The cards, in the order to do them: sign in to the flows, then hand-offs to other admins. Empty
- * when nothing is left.
+ * The cards, in the order to do them: share the report, sign in to the flows, then hand-offs to other
+ * admins. Empty when nothing is left.
  * @param {import('../config.js').InstallConfig} config
  * @param {{ tenantId?: string, upn?: string }} [user]
  * @returns {NextStep[]}
  */
 export function nextSteps(config, user = {}) {
   return [
+    shareReportStep(config, user),
     flowsStep(config, user),
     entraRoleStep(config, user),
     m365ExportStep(config, user),
@@ -64,6 +66,29 @@ export function stepsLeftTitle(steps) {
   const optional = steps.length - needed;
   if (!needed) return `${optional} optional ${optional === 1 ? 'step' : 'steps'}`;
   return `${needed} ${needed === 1 ? 'step' : 'steps'} left${optional ? `, and ${optional} optional` : ''}`;
+}
+
+/**
+ * Sharing the report with the viewer group, until the user says it's done. Power BI has no API for it,
+ * and the group gets no workspace role instead, which would let its members read the notebooks.
+ * @param {import('../config.js').InstallConfig} config
+ * @param {{ tenantId?: string }} user
+ * @returns {NextStep | null}
+ */
+function shareReportStep(config, user) {
+  const report = viewerReport(config);
+  if (!report || !shareReportPending(config)) return null;
+  const a = /** @type {import('../config.js').AccessConfig} */ (config.access);
+  const group = a.groupName ?? VIEWER_GROUP_NAME;
+  return {
+    id: 'share-report',
+    title: `Share the report with ${group}`,
+    why: `Once only. Until it's shared, people in the group can't open the report. After that, give people access by adding them to the group (${myGroupsUrl(/** @type {string} */ (a.groupId))}), not by giving them a workspace role.`,
+    who: 'You',
+    link: workspaceUrl(report.workspaceId, user.tenantId),
+    linkText: 'Open the workspace',
+    steps: shareReportSteps(config, user.tenantId),
+  };
 }
 
 /**

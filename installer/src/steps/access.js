@@ -1,13 +1,16 @@
 // @ts-check
 /**
  * Who can view ValueLens: one Entra security group, whose members get Build on the semantic
- * model the report reads. Sharing is then adding people to the group, from the installer or My Groups.
+ * model the report reads, and the report shared with it once. Sharing is then adding people to the
+ * group, from the installer or My Groups. The group never gets a workspace role: that would let its
+ * members read the notebooks, and the client secret when the notebooks hold it.
  */
 import { HttpError } from '../http.js';
 import { PRODUCT } from '../product.js';
 import { rlsOn } from '../transform/access.js';
 import { asksAdvanced } from './advanced.js';
 import { orgAccessCommand } from './org-access.js';
+import { reportsOn } from './report.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 /** @typedef {{ workspaceId: string, datasetId: string, name: string }} ModelRef */
@@ -63,13 +66,17 @@ export async function planAccess(ctx) {
     access.groupId && !access.createdGroup ? 'existing' : 'new',
   );
   if (mode === 'new') {
-    if (!access.createdGroup) delete access.groupId;
+    if (!access.createdGroup) {
+      delete access.groupId;
+      delete access.reportShared;
+    }
     access.groupName = access.createdGroup ? access.groupName ?? VIEWER_GROUP_NAME : VIEWER_GROUP_NAME;
   } else {
     for (;;) {
       const name = (await ui.input('Group name or object ID', { default: access.createdGroup ? undefined : access.groupName ?? access.groupId })).trim();
       const found = await api.graph.resolvePrincipal(name).catch(() => null);
       if (found?.kind === 'group') {
+        if (found.id !== access.groupId) delete access.reportShared;
         Object.assign(access, { groupId: found.id, groupName: found.displayName, createdGroup: false });
         ui.ok(`Viewers: ${found.displayName}`);
         break;
@@ -118,6 +125,7 @@ export async function ensureViewerGroup(ctx) {
     }
     ui.warn(`The viewer group ${a.groupName ?? a.groupId} is gone.${a.createdGroup ? ' Creating it again.' : ''}`);
     delete a.groupId;
+    delete a.reportShared;
     a.grantedModels = [];
     if (!a.createdGroup) {
       ctx.save();
@@ -202,6 +210,85 @@ export async function grantModelAccess(ctx, models) {
 }
 
 /**
+ * The workspace in the Fabric portal, where the report's … (More options) menu is.
+ * @param {string} workspaceId
+ * @param {string} [tenantId]
+ */
+export const workspaceUrl = (workspaceId, tenantId) => `https://app.fabric.microsoft.com/groups/${workspaceId}${tenantId ? `?ctid=${tenantId}` : ''}`;
+
+/**
+ * The report viewers open, once it's published: its workspace and name.
+ * @param {import('../config.js').InstallConfig} config
+ * @returns {{ workspaceId: string, reportId: string, name: string } | undefined}
+ */
+export function viewerReport(config) {
+  const ws = config.fabric?.workspaceId;
+  const r = config.semanticModel?.report;
+  if (!ws || !r?.id || !reportsOn(config)) return undefined;
+  return { workspaceId: ws, reportId: r.id, name: r.name };
+}
+
+/**
+ * The clicks that share the report with the viewer group, one whole step each.
+ * @param {import('../config.js').InstallConfig} config
+ * @param {string} [tenantId]
+ */
+export function shareReportSteps(config, tenantId) {
+  const group = config.access?.groupName ?? VIEWER_GROUP_NAME;
+  const r = viewerReport(config);
+  const ws = config.fabric?.workspaceName;
+  return [
+    `Open ${ws ? `the ${ws} workspace` : 'the workspace'}${r ? ` (${workspaceUrl(r.workspaceId, tenantId)})` : ''} and choose … (More options) next to the ${r?.name ?? config.semanticModel?.report?.name ?? PRODUCT.fabric.report} report.`,
+    'Choose Manage permissions, then Add user.',
+    `Enter "${group}" and choose Grant.`,
+  ];
+}
+
+/**
+ * The report still needs sharing with the viewer group: there is a group and a published report, and
+ * nobody has said it's done. Power BI has no API to check.
+ * @param {import('../config.js').InstallConfig} config
+ */
+export const shareReportPending = (config) => !!config.access?.groupId && !!viewerReport(config) && config.access.reportShared !== true;
+
+/**
+ * Asks the user to share the report with the viewer group, once. Power BI has no API for it, so it's a
+ * few clicks in the portal. Asked straight after the group gets Build on the model and before the first
+ * load, so viewers can open the report as soon as it has data. Not asked again once done.
+ * @param {Ctx} ctx
+ */
+export async function shareReport(ctx) {
+  const { ui, config, user } = ctx;
+  const a = config.access;
+  if (a?.reportShared === true) return;
+  if (!shareReportPending(config)) {
+    ui.warn(a?.groupId
+      ? "The report isn't published, so there's nothing to share yet. Once it is, run the installer again: it asks then."
+      : "There's no viewer group yet, so there's nothing to share. The summary at the end says what to do.");
+    return;
+  }
+  const group = a?.groupName ?? VIEWER_GROUP_NAME;
+  ui.info(`Members of "${group}" can open the report once it's shared with the group. Power BI has no API for this, so it's a few clicks:`);
+  shareReportSteps(config, user.tenantId).forEach((s, i) => ui.info(`  ${i + 1}. ${s}`));
+  ui.note('After that, give people access by adding them to the group. Keep them off workspace roles: a role lets them read the notebooks.');
+  const done = await ui.select(
+    'Have you shared the report?',
+    [
+      { name: 'I\'ve shared it', value: true, description: `Members of "${group}" can open the report.` },
+      { name: 'Later', value: false, description: 'The summary at the end reminds you, and Repair or change asks again.' },
+    ],
+    false,
+  );
+  if (!done) {
+    ui.note('Until it\'s shared, people in the group can\'t open the report.');
+    return;
+  }
+  /** @type {import('../config.js').AccessConfig} */ (a).reportShared = true;
+  ctx.save();
+  ui.ok(`The report is shared with "${group}"`);
+}
+
+/**
  * The `access` command: shows the viewer group and adds viewers or owners to it.
  * @param {Ctx} ctx
  * @param {ModelRef[]} models  The models the group should have Build on.
@@ -223,6 +310,7 @@ export async function accessCommand(ctx, models, redeploy) {
       [
         { name: 'Add viewers', value: 'members', description: 'People or groups, by email or group name.' },
         { name: 'Add an owner', value: 'owner', description: 'Owners can add and remove viewers themselves.' },
+        ...(shareReportPending(config) ? [{ name: 'Share the report with the group', value: 'share', description: 'Once, in Power BI, so members can open the report.' }] : []),
         { name: 'Give the group Build on the models again', value: 'grants', description: 'Repairs access to the model the report reads.' },
         ...(redeploy
           ? [{ name: rlsOn(config) ? 'Org-scoped access: who sees which orgs' : 'Turn on org-scoped access', value: 'orgs', description: 'Row-level security: each viewer sees only the orgs you give them.' }]
@@ -234,6 +322,10 @@ export async function accessCommand(ctx, models, redeploy) {
     if (action === 'done') return;
     if (action === 'orgs' && redeploy) {
       await orgAccessCommand(ctx, redeploy);
+      continue;
+    }
+    if (action === 'share') {
+      await shareReport(ctx);
       continue;
     }
     if (action === 'grants') {

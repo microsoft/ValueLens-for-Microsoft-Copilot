@@ -67,6 +67,8 @@ export async function deployReport(ctx, w) {
     const made = await createItem(ctx, 'Report:main', 'Report', r.name, items, (name, ref) => api.fabric.createReport(ws, name, definition, ref));
     r.id = made.id;
     r.name = made.name;
+    // A new report is shared with nobody, so the viewer group is asked about again.
+    if (ctx.config.access) delete ctx.config.access.reportShared;
     if (made.resumed) await api.fabric.updateReport(ws, made.id, definition);
     ui.ok(`Published the ${made.name} report, on ${m.name}`);
   } else if (r.signature !== signature) {

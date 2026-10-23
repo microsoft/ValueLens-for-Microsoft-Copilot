@@ -48,7 +48,7 @@ import { buildModel, loadTemplateModel } from './transform/model.js';
 import { buildPipeline } from './transform/pipeline.js';
 import { c } from './ui.js';
 import { fabricUninstall } from './steps/fabric-uninstall.js';
-import { accessCommand, ensureViewerGroup, grantModelAccess, myGroupsUrl } from './steps/access.js';
+import { accessCommand, ensureViewerGroup, grantModelAccess, myGroupsUrl, shareReport } from './steps/access.js';
 import { nextSteps, stepsLeftTitle } from './steps/next-steps.js';
 import { ensureOrgAccess, verifyOrgAccess } from './steps/org-access.js';
 import { reviewSetup } from './setup.js';
@@ -292,6 +292,8 @@ export async function install(ctx, opts) {
   const withResourceGraph = resourceGraphOn(config);
   const withReports = reportsOn(config);
   const withAccess = withModel && !!config.access;
+  // Asked once: Power BI has no API to share a report, and the group gets no workspace role instead.
+  const withShare = withReports && withAccess && config.access?.reportShared !== true;
   const titles = [
     'Key Vault',
     'App registration',
@@ -303,6 +305,7 @@ export async function install(ctx, opts) {
     ...(withUploads ? ['Data uploads'] : []),
     'Notebooks, pipeline and schedule',
     ...(withAccess ? ['Viewer access'] : []),
+    ...(withShare ? ['Share the report'] : []),
     ...(ctx.runFirstLoad ? ['First load'] : ctx.reloadHistoryDays ? ['Reload audit history'] : withModel ? ['Model refresh'] : []),
   ];
   let n = 0;
@@ -349,6 +352,10 @@ export async function install(ctx, opts) {
   if (withAccess) {
     step('Viewer access');
     if (await ensureViewerGroup(ctx)) await grantModelAccess(ctx, fabricViewerModels(config));
+  }
+  if (withShare) {
+    step('Share the report');
+    await shareReport(ctx);
   }
 
   let ok = true;
@@ -737,15 +744,17 @@ export async function summary(ctx, opts = {}) {
     reportsSummary(ctx);
 
     const group = config.access?.groupId ? config.access : undefined;
+    const noRoles = `Keep viewers off workspace roles: a role lets them read the notebooks${secretMode(config) === 'notebook' ? ', and the client secret in them' : ''}.`;
+    const sharePath = 'choose … (More options) next to it in the workspace, then Manage permissions > Add user';
     ui.heading('Next steps');
     if (group) {
       ui.info(`1. Give people access by adding them to "${group.groupName}": run "${commandLine('access')}",`);
-      ui.info(`   or open ${myGroupsUrl(/** @type {string} */ (group.groupId))}. The group already has Build on the model. Keep viewers off workspace roles.`);
-      if (reportsOn(config)) ui.info(`   Share the report with "${group.groupName}" once: open it in the workspace, choose Share, and add the group.`);
+      ui.info(`   or open ${myGroupsUrl(/** @type {string} */ (group.groupId))}. The group already has Build on the model.`);
+      if (!reportsOn(config)) ui.info(`   Share each report you publish with "${group.groupName}": ${sharePath}, enter the group and choose Grant.`);
+      ui.info(`   ${noRoles}`);
     } else {
-      const shared = reportsOn(config) ? 'report' : 'reports you publish';
-      ui.info(`1. Share the ${shared}: open ${reportsOn(config) ? 'it' : 'them'} in the workspace, choose Share, and add people or a group.`);
-      ui.info(`   They also need Build on ${sm.name} (its Manage permissions page), or Viewer on the workspace.`);
+      ui.info(`1. Share ${reportsOn(config) ? 'the report' : 'each report you publish'}: ${sharePath}. Add people or a group and choose Grant.`);
+      ui.info(`   ${noRoles}`);
     }
     if (secretMode(config) === 'notebook') {
       ui.info('2. Scheduled runs refresh the model as you, the schedule\'s owner. Anyone with a role in the workspace can');

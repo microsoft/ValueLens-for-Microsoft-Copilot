@@ -88,7 +88,7 @@ const COMMANDS = {
   access: {
     title: 'Manage access', short: 'Access', icon: 'shield', section: 'Viewer access',
     row: 'Manage access', button: 'Manage access',
-    desc: `Choose the viewer group, add viewers or owners, and give the group Build on the model again. To share ${PRODUCT_NAME}, add people to the group.`,
+    desc: `Choose the viewer group, add viewers or owners, share the report with the group, and give the group Build on the model again. Once the report is shared, share ${PRODUCT_NAME} by adding people to the group.`,
     off: 'Viewers need the semantic model first.',
   },
   upload: {

@@ -126,6 +126,7 @@ test('deployReport: a redeployed model is picked up without asking; a deleted re
   const [w] = reportsWanted(t.ctx);
   await deployReport(t.ctx, w);
   const r = /** @type {import('../src/config.js').ReportConfig} */ (t.config.semanticModel.report);
+  t.config.access = { groupId: 'g-1', groupName: 'ValueLens Viewers', reportShared: true };
 
   const model = t.fabric.add('SemanticModel', 'ValueLens Model 2', null);
   t.config.semanticModel.id = model.id;
@@ -135,12 +136,14 @@ test('deployReport: a redeployed model is picked up without asking; a deleted re
   const item = t.fabric.items.find((i) => i.id === r.id);
   assert.equal(partJson(item, 'definition.pbir').datasetReference.byConnection.connectionString, `semanticmodelid=${model.id}`);
   assert.equal(t.ui.asked.length, 0);
+  assert.equal(t.config.access.reportShared, true, 'the same report stays shared');
 
   t.fabric.items.splice(t.fabric.items.indexOf(/** @type {any} */ (item)), 1);
   await deployReport(t.ctx, w);
   assert.match(t.ui.text(), /The ValueLens report was deleted/);
   assert.deepEqual(t.fabric.calls.slice(2), ['createReport ValueLens']);
   assert.notEqual(r.id, item?.id);
+  assert.equal(t.config.access.reportShared, undefined, 'a new report is shared with nobody, so the group is asked about again');
 });
 
 test('ensureReports: a failure is reported rather than thrown, with what to run once fixed', async () => {

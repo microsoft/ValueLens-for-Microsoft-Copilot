@@ -1,6 +1,7 @@
 // @ts-check
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
 import { accessCommand, accessReview, ensureViewerGroup, grantModelAccess, myGroupsUrl, NEW_GROUP_ATTEMPTS, NEW_GROUP_RETRY_MS, planAccess, VIEWER_GROUP_NAME } from '../src/steps/access.js';
 import { fabricViewerModels } from '../src/install.js';
 import { HttpError } from '../src/http.js';
@@ -246,4 +247,96 @@ test('access: the viewer group gets Build on the deployed ValueLens model', () =
   config.semanticModel.enabled = true;
   config.semanticModel.id = 'ds-vl';
   assert.deepEqual(fabricViewerModels(config).map((m) => `${m.workspaceId}/${m.datasetId}`), ['ws-1/ds-vl']);
+});
+
+/** The report published on the model, as deployReport records it. @param {import('../src/config.js').InstallConfig} config */
+function publish(config) {
+  Object.assign(config.semanticModel, { enabled: true, reports: true, id: 'ds-vl', report: { id: 'rep-1', name: 'ValueLens', modelId: 'ds-vl', signature: 'sig-1' } });
+}
+
+test('access: another viewer group, or a lost one, is asked about sharing the report again', async () => {
+  const dir = directory();
+  dir.groups.set('g-9', { id: 'g-9', displayName: 'Copilot Leads', members: [], owners: [] });
+  dir.groups.set('g-8', { id: 'g-8', displayName: 'Copilot Pilots', members: [], owners: [] });
+  const chosen = () => ({ groupId: 'g-9', groupName: 'Copilot Leads', createdGroup: false, contact: 'leads@contoso.com', reportShared: true });
+  /** @param {any[]} answers @param {import('../src/config.js').AccessConfig} access */
+  const plan = async (answers, access) => {
+    const t = fakeCtx({ graph: dir.graph, ui: fakeUi({ answers }).ui });
+    t.config.access = access;
+    await planAccess(t.ctx);
+    return t.config.access;
+  };
+
+  const same = await plan(['existing', 'Copilot Leads', 'leads@contoso.com', ''], chosen());
+  assert.equal(same?.groupId, 'g-9');
+  assert.equal(same?.reportShared, true, 'the same group keeps it');
+
+  const other = await plan(['existing', 'Copilot Pilots', 'leads@contoso.com', ''], chosen());
+  assert.equal(other?.groupId, 'g-8');
+  assert.equal(other?.reportShared, undefined);
+
+  const fresh = await plan(['new', 'leads@contoso.com', ''], chosen());
+  assert.equal(fresh?.groupId, undefined, 'a new group is created at install');
+  assert.equal(fresh?.reportShared, undefined);
+
+  const kept = await plan(['new', 'admin@contoso.com', ''], { groupId: 'g-9', groupName: VIEWER_GROUP_NAME, createdGroup: true, reportShared: true });
+  assert.equal(kept?.groupId, 'g-9', 'the group the installer made is kept');
+  assert.equal(kept?.reportShared, true);
+
+  const { ctx: gone } = fakeCtx({ graph: dir.graph });
+  gone.config.access = { groupId: 'gone', groupName: VIEWER_GROUP_NAME, createdGroup: true, reportShared: true };
+  assert.equal((await ensureViewerGroup(gone))?.id, 'g-3');
+  assert.equal(gone.config.access.reportShared, undefined, 'a group made again has nothing shared with it');
+});
+
+test('access: the menu offers to share the report until it is shared', async () => {
+  const dir = directory();
+  dir.groups.set('g-1', { id: 'g-1', displayName: VIEWER_GROUP_NAME, members: [], owners: ['user-1'] });
+  const t = fakeUi({ answers: ['share', true, 'done'] });
+  /** @type {string[][]} */
+  const menus = [];
+  const select = t.ui.select;
+  t.ui.select = /** @type {any} */ (
+    async (/** @type {string} */ message, /** @type {{ name: string, value: any }[]} */ choices, /** @type {any} */ def) => {
+      if (message === 'What next?') menus.push(choices.map((ch) => String(ch.value)));
+      return select(message, choices, def);
+    }
+  );
+  const { ctx, saves } = fakeCtx({ graph: dir.graph, powerBi: datasets().powerBi, ui: t.ui });
+  ctx.config.access = { groupId: 'g-1', groupName: VIEWER_GROUP_NAME };
+  publish(ctx.config);
+  await accessCommand(ctx, MODELS);
+  assert.deepEqual(t.asked, ['What next?', 'Have you shared the report?', 'What next?']);
+  assert.ok(menus[0].includes('share'));
+  assert.ok(!menus[1].includes('share'), 'not offered once shared');
+  assert.equal(ctx.config.access.reportShared, true);
+  assert.ok(saves() >= 2);
+
+  const unpublished = fakeUi({ answers: ['done'] });
+  /** @type {string[]} */
+  let offered = [];
+  const pick = unpublished.ui.select;
+  unpublished.ui.select = /** @type {any} */ (
+    async (/** @type {string} */ message, /** @type {{ name: string, value: any }[]} */ choices, /** @type {any} */ def) => {
+      offered = choices.map((ch) => String(ch.value));
+      return pick(message, choices, def);
+    }
+  );
+  const { ctx: none } = fakeCtx({ graph: dir.graph, powerBi: datasets().powerBi, ui: unpublished.ui });
+  none.config.access = { groupId: 'g-1', groupName: VIEWER_GROUP_NAME };
+  await accessCommand(none, MODELS);
+  assert.ok(!offered.includes('share'), 'nothing to share before the report is published');
+});
+
+test('access: the viewer group never gets a workspace role; only the app\'s service principal does', () => {
+  // Workspace Viewers can read notebook code, and with no Key Vault the notebooks hold the app's client secret.
+  const src = new URL('../src/', import.meta.url);
+  /** @type {string[]} */
+  const callers = [];
+  for (const rel of readdirSync(src, { recursive: true, encoding: 'utf8' })) {
+    if (!rel.endsWith('.js')) continue;
+    const text = readFileSync(new URL(rel.replaceAll('\\', '/'), src), 'utf8');
+    for (const m of text.matchAll(/\.(?:add|update)RoleAssignment\(([^)]*)\)/g)) callers.push(`${rel.replaceAll('\\', '/')}: ${m[1]}`);
+  }
+  assert.deepEqual(callers, ['steps/model.js: ws, mine.id, role', "steps/model.js: ws, spId, 'ServicePrincipal', role"]);
 });

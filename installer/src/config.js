@@ -59,6 +59,7 @@ export const AH_RELEASES = 'https://github.com/microsoft/AnalyticsHub-Dashboard/
  * @property {string} [contact]  Who people ask for access. Defaults to the installer.
  * @property {string} [requestUrl]  Optional link for access requests, e.g. a My Access package or a form.
  * @property {string[]} [grantedModels]  Semantic model IDs the group has Build (ReadExplore) on.
+ * @property {boolean} [reportShared]  The user said the report is shared with the group. Power BI has no API to check.
  * @property {RlsConfig} [rls]  Org-scoped access (row-level security). Off when absent.
  */
 

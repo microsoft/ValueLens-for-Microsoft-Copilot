@@ -179,6 +179,22 @@ test('install: with nothing failing it is set up', async (t) => {
   setUp(await runInstall(t));
 });
 
+test('install: the viewer group gets Build, then the report is shared with it once by hand, never a workspace role', async (t) => {
+  const run = await runInstall(t);
+  setUp(run);
+  const { text } = run;
+  assert.equal(run.ui.asked.filter((q) => q === 'Have you shared the report?').length, 1);
+  const viewers = text.search(/\[\d+\/\d+\] Viewer access/);
+  const share = text.search(/\[\d+\/\d+\] Share the report/);
+  const load = text.search(/\[\d+\/\d+\] First load/);
+  assert.ok(viewers >= 0 && viewers < share && share < load, text);
+  assert.match(text.slice(share, load), /Enter "ValueLens Viewers" and choose Grant\./);
+  assert.equal(run.config.access?.reportShared, undefined, 'Later is the default');
+  assert.match(text.slice(load), /Share the report with ValueLens Viewers/, 'a card at the end');
+  const roles = run.fabric.calls.filter((call) => call.includes('RoleAssignment'));
+  assert.deepEqual(roles, ['addRoleAssignment sp-1 Viewer'], "only the app's service principal, so the model can read the Lakehouse");
+});
+
 test('install: a report that fails to publish leaves it partly set up', async (t) => {
   const run = await runInstall(t, { report: true });
   assert.match(run.text, /The ValueLens report wasn't published: Report publish failed/);
