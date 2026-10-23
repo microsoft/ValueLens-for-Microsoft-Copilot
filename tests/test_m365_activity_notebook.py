@@ -159,7 +159,18 @@ class M365ActivityNotebookTests(unittest.TestCase):
         later = days_to_load(today, loaded, concealed, 4)
         self.assertEqual(later, sorted({today - timedelta(days=20), today - timedelta(days=10)} | {today - timedelta(days=n) for n in range(1, 5)}))
 
-    def run_tidy_cell(self, todo, fail=(), **settings):
+    def test_each_day_read_records_per_report_status_before_skipping_empty_days(self):
+        loop = cell("def write_status")
+        self.assertIn("STATUS_TABLE = 'dbo.m365_report_status'", loop)
+        for name in ("'ActivityDate'", "'Report'", "'GraphFunction'", "'Status'", "'Rows'", "'ActiveRows'", "'CheckedAtUtc'"):
+            self.assertIn(f"StructField({name}", loop)
+        body = loop[loop.index("for day in todo:"):]
+        self.assertLess(body.index("kept the loaded day"), body.index("write_status(day, status)"))
+        self.assertLess(body.index("write_status(day, status)"), body.index("if not rows:"))
+        self.assertIn("returned rows with no usage", cell("returned rows with no usage"))
+
+
+    def run_tidy_cell(self, todo, existing=("dbo.m365_activity_daily", "dbo.m365_report_status"), fail=(), **settings):
         sqls = []
 
         def sql(statement):
@@ -167,31 +178,33 @@ class M365ActivityNotebookTests(unittest.TestCase):
             if any(table in statement for table in fail):
                 raise RuntimeError("compaction is busy")
 
-        spark = types.SimpleNamespace(sql=sql, catalog=types.SimpleNamespace(tableExists=lambda t: True))
-        ns = {"spark": spark, "OUTPUT_TABLE": "dbo.m365_activity_daily", "RETAIN_DAYS": 0, "RUN_OPTIMIZE": True,
-              "todo": todo, "today": date(2026, 10, 1), "timedelta": timedelta}
+        spark = types.SimpleNamespace(sql=sql, catalog=types.SimpleNamespace(tableExists=lambda t: t in existing))
+        ns = {"spark": spark, "OUTPUT_TABLE": "dbo.m365_activity_daily", "STATUS_TABLE": "dbo.m365_report_status",
+              "RETAIN_DAYS": 0, "RUN_OPTIMIZE": True, "todo": todo, "today": date(2026, 10, 1), "timedelta": timedelta}
         ns.update(settings)
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             exec(compile(cell("if RETAIN_DAYS and RETAIN_DAYS > 0:"), NAME, "exec"), ns)
         return sqls, output.getvalue()
 
-    def test_the_table_is_compacted_once_after_the_writes(self):
+    def test_both_tables_are_compacted_once_after_the_writes(self):
         self.assertRegex(cell("# === CONFIG ==="), r"(?m)^RUN_OPTIMIZE\s+= True\b")
-        sqls, output = self.run_tidy_cell([date(2026, 9, 29), date(2026, 9, 30)], RETAIN_DAYS=400)
+        sqls, _ = self.run_tidy_cell([date(2026, 9, 29), date(2026, 9, 30)], RETAIN_DAYS=400)
         self.assertTrue(sqls[0].startswith("DELETE FROM dbo.m365_activity_daily"))
-        self.assertEqual(sqls[1:], ["OPTIMIZE dbo.m365_activity_daily VORDER"])
-        self.assertIn("Compacted dbo.m365_activity_daily.", output)
+        self.assertEqual(sqls[1:], ["OPTIMIZE dbo.m365_activity_daily VORDER", "OPTIMIZE dbo.m365_report_status VORDER"])
         self.assertNotIn("OPTIMIZE", cell("def write_day"))
 
     def test_compaction_is_skipped_when_nothing_was_read_or_it_is_turned_off(self):
         self.assertEqual(self.run_tidy_cell([])[0], [])
         self.assertEqual(self.run_tidy_cell([date(2026, 9, 30)], RUN_OPTIMIZE=False)[0], [])
+        sqls, _ = self.run_tidy_cell([date(2026, 9, 30)], existing=("dbo.m365_activity_daily",))
+        self.assertEqual(sqls, ["OPTIMIZE dbo.m365_activity_daily VORDER"])
 
     def test_a_failed_compaction_never_fails_the_run(self):
         sqls, output = self.run_tidy_cell([date(2026, 9, 30)], fail=("dbo.m365_activity_daily",))
-        self.assertEqual(sqls, ["OPTIMIZE dbo.m365_activity_daily VORDER"])
+        self.assertEqual(len(sqls), 2)
         self.assertIn("! dbo.m365_activity_daily: not compacted (RuntimeError: compaction is busy)", output)
+        self.assertIn("Compacted dbo.m365_report_status.", output)
 
 
 if __name__ == "__main__":

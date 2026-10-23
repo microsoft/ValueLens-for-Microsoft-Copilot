@@ -34,7 +34,7 @@ automates the same steps.
    loads 30 days (`BACKFILL_DAYS`, up to 180). Afterwards, set it back to `'incremental'`. On a
    large tenant, read [A large tenant](#a-large-tenant) first.
 5. **Run `Copilot_Audit_Log_Processor`** once the ingesters finish.
-6. **Open the template** in Power BI Desktop and publish it:
+6. **Open the template** in Power BI Desktop, June 2024 or later, and publish it:
    - [`ValueLens - Fabric.pbit`](../ValueLens%20-%20Fabric.pbit): enter the Lakehouse's **SQL analytics endpoint** and its name.
    - Or [`ValueLens - Fabric OneLake.pbit`](../ValueLens%20-%20Fabric%20OneLake.pbit): enter the workspace ID and the Lakehouse ID.
 7. **Schedule it** with the [pipeline](../pipelines/README.md).
@@ -55,7 +55,7 @@ Run these before the processor.
 | `Copilot_Resource_Graph_Ingester` | `arg_agent_config`, `arg_environments`, `arg_agent_flows`, `arg_foundry_resources`, `arg_status` | Agent configuration (sign-in, quarantine, connectors, web search, sharing) and Foundry accounts and projects, from Azure Resource Graph. Fill in the first cell. Run it after the Agent 365 notebook, so agents link to their Title ID. The app registration needs the roles in [PERMISSIONS](../../../docs/PERMISSIONS.md#azure-resource-graph). When Resource Graph won't return agents, it reads the newest file the **Analytics Hub - Agent inventory** flow drops in `Files/arg_inventory/`. A refused probe never fails the notebook; `arg_status` says why. |
 | [Workday org data](workday-org-data/README.md) | `copilot_org_data` | Adds HR columns to the org data. Follow its README. |
 | `AnalyticsHub_Upload_Router` | `analytics_hub_upload_log` | Run it first. It reads any export dropped in `Files/analytics_hub_uploads`, recognises it from its headers, moves it to the folder its notebook reads, and archives it to `_processed`. Set `ENABLED_SOURCES` to the sources you use. The installer sets this up for you. |
-| `AnalyticsHub_Load_Status` | `load_log` | The pipeline's last step, run whatever happened before it. It writes one row per source with its status and, for a failure, the reason in plain words. It fails when a load failed, so the run shows as failed. Run by hand, it does nothing: it needs the pipeline's run ID. |
+| `AnalyticsHub_Load_Status` | `load_log` | The pipeline's last step, run whatever happened before it. It writes one row per source with its status and, for a failure, the reason in plain words. A source that loaded but couldn't read everything is a `Warning`, with `reason_kind` set to `empty`, `forbidden` or `unlicensed`. The notebook reads that from `arg_status`, `defender_status` and `evaluator_status`. It fails when a load failed, so the run shows as failed; warnings don't fail it. Run by hand, it does nothing: it needs the pipeline's run ID. |
 
 ## Settings you might change
 
@@ -66,6 +66,8 @@ Run these before the processor.
 | `INCLUDE_RAW_PASSTHROUGH` | Processor, registry ingester | `True` to keep the raw payloads. They can hold names, file names and URLs, so review privacy first. Then run the processor once with `WRITE_MODE = 'overwrite'`. |
 | `MAX_CONCURRENT_QUERIES`, `CHUNK_HOURS` | Audit ingester | Lower them if audit windows fail on a large tenant. See [A large tenant](#a-large-tenant). |
 | `WINDOW_RETRIES`, `MIN_CHUNK_HOURS` | Audit ingester | How often a failing audit window is resent (default `3`), and the smallest size it is split down to (default `1` hour). |
+| `INCREMENTAL_LOOKBACK_DAYS` | Processor | Days before the newest audit record whose months each `merge` run recomputes (default `14`), for records that arrive late. Other months are recomputed only when their rows change. |
+| `WRITE_MODE` | Processor | `'overwrite'` once to rebuild every month of `copilot_interactions_curated`, for example after a large licence or agent-registry change. Months a `merge` run doesn't recompute keep the licence and agent values from when they were processed. |
 | `RUN_OPTIMIZE` | Processor, M365 activity ingester, Agent Evaluator | `False` to skip compacting the tables after the writes. On by default: each run ends with `OPTIMIZE ... VORDER` on the tables it wrote, so the semantic model reads a few large files. In the M365 activity ingester and Agent Evaluator a failed compaction is reported and the run carries on. |
 | `TIME_BUDGET_MIN` | Audit ingester | Minutes to spend fetching before the run stops and leaves the rest to the next run (default `0`, no limit). Set it below the pipeline activity's timeout. |
 
@@ -108,9 +110,16 @@ a manual Purview search of the same 8h fails too. For more than about 10,000 peo
 - Start with the default 30 days. Load more later with a backfill run.
 - Use an F64 or larger capacity, and don't run audit searches in the Purview portal while it runs.
 
-The installer does this when you choose **More than 10,000** people. It also gives the loads and
-the model refresh longer time limits. For a smaller tenant it uses 24h windows, which need fewer
-queries each day.
+The installer does this when you choose **More than 10,000** people, which it chooses for a new
+install with more than 10,000 Copilot seats assigned. It also gives the loads and the model refresh
+longer time limits. For a smaller tenant it uses 24h windows, which need fewer queries each day.
+
+The Agent 365 registry ingester refreshes each agent's detail on its own day of the week (a hash of
+the agent ID picks it), so a daily run refreshes about a seventh of the agents, not all of them on
+one day. New and changed agents are always fetched first. `TIME_BUDGET_MIN` (default 75 minutes;
+the installer sets 120, or 270 for more than 10,000) caps the time spent on those scheduled
+refreshes: when it runs out, the ingester leaves the rest to the next run and writes what it has.
+`0` means no limit. Set it below the pipeline activity's timeout.
 
 ## People show as IDs
 

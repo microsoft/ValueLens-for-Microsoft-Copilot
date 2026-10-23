@@ -248,8 +248,8 @@ class CalendarRange(unittest.TestCase):
                 self.assertIn(f"[{name}]", sources, (relative, name))
 
     def test_the_installer_range_lines_match_the_template(self):
-        # 1. Fabric/installer/src/transform/m365.js widens these two lines with the M365 dates.
-        source = (ROOT / "1. Fabric" / "installer" / "src" / "transform" / "m365.js").read_text(encoding="utf-8")
+        # installer/src/transform/m365.js widens these two lines with the M365 dates.
+        source = (ROOT / "installer" / "src" / "transform" / "m365.js").read_text(encoding="utf-8")
         for line in ("VAR MinDate = MINX({ AuditMin, FeedbackMin }, [Value])",
                      "VAR MaxDate = MAXX({ AuditMax, FeedbackMax }, [Value])"):
             self.assertIn(line, PATCHER.CALENDAR)
