@@ -95,6 +95,23 @@ export const PRODUCT = deepFreeze({
     folder: 'pax',
     /** Windows Credential Manager target for the PAX app's secret, followed by the tenant ID. */
     credentialPrefix: 'PAX-ValueLens-',
+    /** The Power BI workspace the SharePoint report is published to. */
+    workspace: 'ValueLens',
+    /**
+     * The model and report share a name, because Power BI Desktop names both after the .pbix
+     * file. A Desktop publish then lands on the same names as the API's.
+     */
+    model: 'ValueLens',
+    report: 'ValueLens',
+    /**
+     * The files the refresh keeps in the SharePoint folder, which the report reads. The same
+     * names as a manual setup with 4. SharePoint/scripts.
+     */
+    files: {
+      interactions: 'copilot_interactions_rollup.csv',
+      users: 'copilot_users_rollup.csv',
+      agents365: 'agents_365.csv',
+    },
   },
   flows: {
     feedback: 'ValueLens - Product feedback',

@@ -94,6 +94,8 @@ import { reviewSetup } from './setup.js';
  * @property {(resource: import('./auth.js').Resource) => Promise<string>} [getToken]  The signed-in user's tokens, for tools the installer runs.
  * @property {string} [setupSection] Open this settings category directly after a failure.
  * @property {boolean} [setupRetry] Revalidate saved choices without reopening every question.
+ * @property {boolean} [targetChosen]  --target was given, so the route isn't asked about.
+ * @property {import('./steps/pax/local.js').PaxHost} [paxHost]  This machine, for the PAX route's local steps.
  */
 
 /**
@@ -155,8 +157,8 @@ export function createCtx(o) {
   };
 }
 
-/** @param {Ctx} ctx */
-async function canConsent(ctx) {
+/** Whether the signed-in user holds a directory role that can grant admin consent. @param {Ctx} ctx */
+export async function canConsent(ctx) {
   const roles = await ctx.api.graph.myDirectoryRoles().catch(() => []);
   return roles.some((r) => r.roleTemplateId in CONSENT_ROLES);
 }

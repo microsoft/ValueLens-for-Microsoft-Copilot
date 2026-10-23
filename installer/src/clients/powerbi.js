@@ -8,12 +8,25 @@ export function powerBiApi(http) {
     datasources: async (workspaceId, datasetId) => (await http.get(`/groups/${workspaceId}/datasets/${datasetId}/datasources`))?.value ?? [],
     /** @returns {Promise<any[]>} */
     groups: async () => (await http.get('/groups'))?.value ?? [],
-    /** @param {string} name */
-    createGroup: (name) => http.post('/groups', { name }),
+    /** Creates a workspace. Not sent twice, since a retry could make a second. @param {string} name */
+    createGroup: (name) => http.post('/groups', { name }, { query: { workspaceV2: 'True' }, once: true }),
     /** Deletes a workspace and everything in it. @param {string} workspaceId */
     deleteGroup: (workspaceId) => http.del(`/groups/${workspaceId}`),
     /** @param {string} workspaceId @param {{ identifier: string, principalType: 'App' | 'User' | 'Group', groupUserAccessRight: 'Admin' | 'Member' | 'Contributor' | 'Viewer' }} body */
     addGroupUser: (workspaceId, body) => http.post(`/groups/${workspaceId}/users`, body),
+    /** The workspace's semantic models, with id and name. @param {string} workspaceId @returns {Promise<any[]>} */
+    datasets: async (workspaceId) => (await http.get(`/groups/${workspaceId}/datasets`))?.value ?? [],
+    /** The workspace's reports, with id, name and datasetId. @param {string} workspaceId @returns {Promise<any[]>} */
+    reports: async (workspaceId) => (await http.get(`/groups/${workspaceId}/reports`))?.value ?? [],
+    /**
+     * Starts a standard refresh, the kind a Pro workspace has, and returns its request ID when Power BI gives one.
+     * @param {string} workspaceId @param {string} datasetId
+     * @returns {Promise<string | undefined>}
+     */
+    async refreshNow(workspaceId, datasetId) {
+      const res = await http.request('POST', `/groups/${workspaceId}/datasets/${datasetId}/refreshes`, { body: { notifyOption: 'NoNotification' } });
+      return res.headers.get('requestid') ?? undefined;
+    },
     /** Who has direct access to a semantic model. @param {string} workspaceId @param {string} datasetId @returns {Promise<any[]>} */
     datasetUsers: async (workspaceId, datasetId) => (await http.get(`/groups/${workspaceId}/datasets/${datasetId}/users`))?.value ?? [],
     /**

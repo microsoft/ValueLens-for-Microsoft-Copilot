@@ -21,7 +21,7 @@ export const AH_RELEASES = 'https://github.com/microsoft/AnalyticsHub-Dashboard/
  * @typedef {object} InstallConfig
  * @property {string} product  Which installer the record belongs to: always PRODUCT.id.
  * @property {number} version
- * @property {'fabric'} [target]
+ * @property {'fabric' | 'pax'} [target]  The route: Fabric, or no Fabric (PAX + SharePoint). Fabric when absent.
  * @property {string} [tenantId]
  * @property {import('./catalog.js').ModuleChoice} modules  Follows `dataSources`.
  * @property {import('./uploads.js').DataSourceModes} dataSources  How each source arrives: API, uploaded CSV, or skipped.
@@ -37,6 +37,9 @@ export const AH_RELEASES = 'https://github.com/microsoft/AnalyticsHub-Dashboard/
   * @property {SemanticModelConfig} semanticModel
   * @property {AccessConfig} [access]  Who can view ValueLens. Absent until the installer has set it up.
   * @property {ResourceGraphConfig} resourceGraph
+  * @property {SharePointConfig} [sharePoint]  The PAX route: the SharePoint folder the refresh writes to and the report reads.
+  * @property {PaxConfig} [pax]  The PAX route: the scheduled refresh on this PC.
+  * @property {PowerBiConfig} [powerBi]  The PAX route: how the report was published and is refreshed. Its workspace is in `fabric`.
   * @property {{ completed: string[], runFirstLoad?: boolean, reloadHistoryDays?: number, baseRevision?: string, approved?: boolean, uploads?: { token?: string, name: string }[] }} [setup] Browser setup draft progress; never contains secrets. runFirstLoad and reloadHistoryDays are kept only in the draft, never in the install record.
  */
 
@@ -180,6 +183,46 @@ export const flowIdentity = (config) => (config.uploads?.flowIdentity === 'app' 
 export const MODEL_NAME = PRODUCT.fabric.model;
 export const REPORT_NAME = PRODUCT.fabric.report;
 
+/**
+ * The PAX route's SharePoint folder. The refresh writes its files there and the report reads them.
+ * @typedef {object} SharePointConfig
+ * @property {string} folderUrl  The folder's address, e.g. https://contoso.sharepoint.com/sites/Analytics/Shared Documents/ValueLens.
+ * @property {string} siteUrl  The site's address, e.g. https://contoso.sharepoint.com/sites/Analytics.
+ * @property {string} sitePath  Graph's path form of the site, e.g. contoso.sharepoint.com:/sites/Analytics.
+ * @property {string} library  The document library's name in the address, e.g. Shared Documents.
+ * @property {string} folderPath  The folder in the library, e.g. /ValueLens, or / for the library itself.
+ * @property {string} [siteId]  Graph's ID for the site, once the installer could read it.
+ * @property {boolean} [granted]  The PAX app can write to the site.
+ * @property {string} [grantId]  The site permission the installer added, which uninstall removes.
+ * @property {boolean} [pendingAdminGrant]  A SharePoint or Global Administrator still has to give the app write access to the site.
+ */
+
+/**
+ * The PAX route's scheduled refresh on this PC.
+ * @typedef {object} PaxConfigFields
+ * @property {string} [version]  The PAX release the refresh runs, e.g. purview-v1.11.15.
+ * @property {string} [workRoot]  The local folder that holds refresh.json, the scripts and the data.
+ * @property {string} [credentialTarget]  The Windows Credential Manager entry that holds the app's client secret.
+ * @property {string} [secretSetAt]  When the installer last wrote the secret there.
+ * @property {string} [secretExpires]
+ * @property {{ name: string, at: string, registeredAt?: string }} [task]  The scheduled task.
+ * @property {boolean} [agent365]  Also export the Agent 365 registry.
+ * @property {number} [seedDays]  How many days the first refresh asks PAX for.
+ * @property {string} [scriptsHash]  What the installed scripts were copied from.
+ * @property {string} [firstRunAt]  When the installer started the first refresh.
+ * @typedef {PaxConfigFields & import('./steps/secrets.js').SecretSlot} PaxConfig
+ */
+
+/**
+ * The PAX route's report in the Power BI service. Its workspace is in `fabric`, and the model and
+ * report in `semanticModel`.
+ * @typedef {object} PowerBiConfig
+ * @property {'api' | 'desktop'} [publishedBy]  The installer published it, or handed the template to Power BI Desktop.
+ * @property {'set' | 'later'} [credentials]  The model has been signed in to SharePoint, or the user chose to do it later.
+ * @property {string} [refreshAt]  The model's daily refresh time, HH:mm. Set once the refresh is scheduled.
+ * @property {string} [timeZone]  The schedule's Windows time zone ID.
+ */
+
 /** @returns {InstallConfig} */
 export function emptyConfig() {
   return {
@@ -278,6 +321,9 @@ function normaliseConfig(raw, file) {
         }
       : {}),
     resourceGraph: normaliseResourceGraph(raw.resourceGraph),
+    ...(raw.sharePoint ? { sharePoint: { ...raw.sharePoint } } : {}),
+    ...(raw.pax ? { pax: { ...raw.pax, ...(raw.pax.task ? { task: { ...raw.pax.task } } : {}) } } : {}),
+    ...(raw.powerBi ? { powerBi: { ...raw.powerBi } } : {}),
   };
   if (!config.reporting) delete config.reporting;
   assertNoSecrets(config);

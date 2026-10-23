@@ -10,7 +10,7 @@
 import { posix } from 'node:path';
 import { NOTEBOOKS, NOTEBOOKS_DIR } from '../src/catalog.js';
 import { PRODUCT } from '../src/product.js';
-import { PIPELINE_TEMPLATE } from '../src/sources.js';
+import { PAX_MODEL_TEMPLATE, PAX_SCRIPTS, PAX_SCRIPTS_DIR, PIPELINE_TEMPLATE } from '../src/sources.js';
 import { MODEL_TEMPLATE } from '../src/transform/model.js';
 
 export const EXE_NAME = PRODUCT.exe;
@@ -43,6 +43,8 @@ export function sourceFiles() {
     PIPELINE_TEMPLATE,
     ...NOTEBOOKS.map((nb) => posix.join(nb.dir ?? NOTEBOOKS_DIR, nb.file)),
     MODEL_TEMPLATE,
+    PAX_MODEL_TEMPLATE,
+    ...PAX_SCRIPTS.map((s) => posix.join(PAX_SCRIPTS_DIR, s)),
   ].map(slash);
 }
 

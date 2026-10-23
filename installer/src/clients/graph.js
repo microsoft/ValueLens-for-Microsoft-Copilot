@@ -312,6 +312,22 @@ export function graphApi(http) {
      */
     grantSiteRead: (siteId, appId, displayName) =>
       http.post(`/sites/${siteId}/permissions`, { roles: ['read'], grantedToIdentities: [{ application: { id: appId, displayName } }] }),
+
+    /**
+     * Gives an app a role on one site, for apps holding Sites.Selected. Needs a SharePoint admin (Sites.FullControl.All).
+     * @param {string} siteId  Graph site ID.
+     * @param {string} appId
+     * @param {string} displayName
+     * @param {'read' | 'write'} role
+     */
+    grantSitePermission: (siteId, appId, displayName, role) =>
+      http.post(`/sites/${siteId}/permissions`, { roles: [role], grantedToIdentities: [{ application: { id: appId, displayName } }] }),
+
+    /** The apps granted access to one site. Needs a SharePoint admin. @param {string} siteId @returns {Promise<any[]>} */
+    sitePermissions: (siteId) => http.list(`/sites/${siteId}/permissions`),
+
+    /** Takes back one app's access to a site. @param {string} siteId @param {string} permissionId */
+    deleteSitePermission: (siteId, permissionId) => http.del(`/sites/${siteId}/permissions/${permissionId}`),
   };
 }
 
