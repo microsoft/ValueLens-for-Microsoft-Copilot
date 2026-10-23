@@ -18,6 +18,28 @@ Deployment instructions do **not** live here. They live in the READMEs:
 
 ---
 
+## Unreleased — Org data: Department becomes Organization only when there's no Organization column
+
+**Why.** The org query renamed the first department-like column to Organization, even when the org
+data already had an Organization column. The Graph org data load always writes Organization, and
+Workday org data adds any column the table lacks. So a Workday export with a Department column, or
+an org data CSV with both columns, failed the refresh.
+
+- **The rename checks first.** *Chat + Agent Org Data* renames Department to Organization only when
+  there's no Organization column. With both, it leaves both as they are, and a blank Organization
+  stays blank rather than being filled from Department.
+- **Every active variant.** The Fabric, Fabric OneLake, SharePoint and Local CSV templates and the
+  Agent Evaluator get the same change. The installer builds its Fabric model from
+  `ValueLens - Fabric.pbit`, so it gets it too. The archived Power Automate + Dataverse template is
+  frozen, so it doesn't.
+- `scripts/Update-Org-Department-Rename.py` makes the change, and `--check` reports a stale
+  template. Nothing else in the templates changes.
+
+Download the template again to pick this up. The Analytics Hub made the same change in
+microsoft/AnalyticsHub-Dashboard#144.
+
+---
+
 ## Unreleased — The app comes first, and Power Automate + Dataverse is archived
 
 **Why.** The app is now the recommended way to use ValueLens, so the README starts with it and has
