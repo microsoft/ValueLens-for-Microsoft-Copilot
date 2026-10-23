@@ -40,6 +40,7 @@ export const AH_RELEASES = 'https://github.com/microsoft/AnalyticsHub-Dashboard/
   * @property {SharePointConfig} [sharePoint]  The PAX route: the SharePoint folder the refresh writes to and the report reads.
   * @property {PaxConfig} [pax]  The PAX route: the scheduled refresh on this PC.
   * @property {PowerBiConfig} [powerBi]  The PAX route: how the report was published and is refreshed. Its workspace is in `fabric`.
+  * @property {ManagedAppConfig} [managedApp]  The PAX route: the app, deployed as a Copilot Managed App and shared with the viewer group.
   * @property {{ completed: string[], runFirstLoad?: boolean, reloadHistoryDays?: number, baseRevision?: string, approved?: boolean, uploads?: { token?: string, name: string }[] }} [setup] Browser setup draft progress; never contains secrets. runFirstLoad and reloadHistoryDays are kept only in the draft, never in the install record.
  */
 
@@ -233,6 +234,20 @@ export const REPORT_NAME = PRODUCT.fabric.report;
  * @property {string} [timeZone]  The schedule's Windows time zone ID.
  */
 
+/**
+ * The app, deployed with the `ms` CLI as a Copilot Managed App.
+ * @typedef {object} ManagedAppConfig
+ * @property {boolean} [enabled]  The user wants it. On by default on the PAX route.
+ * @property {string} [name]  Its name in the Copilot Managed Apps portal.
+ * @property {string} [appId]  The managed app's ID, once deployed.
+ * @property {string} [environmentId]  The Power Platform environment it's deployed to.
+ * @property {string} [url]  Where people open it.
+ * @property {string} [deployedAt]
+ * @property {string} [sourceHash]  What was deployed, so `update` deploys again only when the app changed.
+ * @property {string} [sharedWith]  The group or person it's shared with.
+ * @property {string[]} [notReady]  The tenant settings that stopped the last deploy, until one succeeds.
+ */
+
 /** @returns {InstallConfig} */
 export function emptyConfig() {
   return {
@@ -334,6 +349,7 @@ function normaliseConfig(raw, file) {
     ...(raw.sharePoint ? { sharePoint: { ...raw.sharePoint } } : {}),
     ...(raw.pax ? { pax: { ...raw.pax, ...(raw.pax.task ? { task: { ...raw.pax.task } } : {}) } } : {}),
     ...(raw.powerBi ? { powerBi: { ...raw.powerBi } } : {}),
+    ...(raw.managedApp ? { managedApp: { ...raw.managedApp, ...(raw.managedApp.notReady ? { notReady: [...raw.managedApp.notReady] } : {}) } } : {}),
   };
   if (!config.reporting) delete config.reporting;
   assertNoSecrets(config);

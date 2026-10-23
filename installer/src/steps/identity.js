@@ -5,15 +5,17 @@
  */
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { GRAPH_APP_ID, permissionsFor } from '../catalog.js';
+import { GRAPH_APP_ID } from '../catalog.js';
 import { allowsAction, isPrivateVault, networkBlocked, ROLES } from '../clients/azure.js';
 import { adminConsentUrl, apiPermissionsUrl, resolveAppRoles } from '../clients/graph.js';
 import { secretMode } from '../config.js';
 import { HttpError } from '../http.js';
 import { commandLine } from '../launch.js';
 import { PRODUCT } from '../product.js';
+import { appName, isPax, requiredPermissions } from '../target.js';
 import { c } from '../ui.js';
 import { APP_NAME } from './plan.js';
+import { pnpGrantCommand, siteGrantCommands, SITE_ADMIN } from './pax/site.js';
 import { addTrackedSecret, adoptAttempts, promoteSecret, settleFailedSecret } from './secrets.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
@@ -89,7 +91,7 @@ export function addDays(from, days) {
 export async function graphRoles(ctx) {
   if (!ctx.graphRoles) {
     const sp = await ctx.api.graph.graphServicePrincipal();
-    const { roles, missing } = resolveAppRoles(sp, permissionsFor(ctx.config.modules, ctx.config.dataSources), OPTIONAL_PERMISSIONS);
+    const { roles, missing } = resolveAppRoles(sp, requiredPermissions(ctx.config), OPTIONAL_PERMISSIONS);
     for (const m of missing) {
       ctx.ui.warn(`Microsoft Graph in this tenant has no ${m} permission yet. ${OPTIONAL_PERMISSION_EFFECTS[/** @type {keyof typeof OPTIONAL_PERMISSION_EFFECTS} */ (m)] ?? ''}`.trim());
     }
@@ -416,12 +418,14 @@ async function addAdminOwner(ctx, email) {
 }
 
 /**
- * Creates or adopts the app registration and its service principal, and puts a client secret in Key Vault.
+ * Creates or adopts the app registration and its service principal. On the Fabric route it also puts a
+ * client secret in Key Vault; the PAX route keeps its secret in Credential Manager on the PC instead.
  * @param {Ctx} ctx
  */
 export async function ensureApp(ctx) {
   const { ui, config, api } = ctx;
   const app = config.app;
+  const name = appName(config);
   const { roles } = await graphRoles(ctx);
 
   if (app.appId) {
@@ -446,7 +450,7 @@ export async function ensureApp(ctx) {
     /** @type {any} */
     let application;
     try {
-      application = await api.graph.createApplication(APP_NAME, roles);
+      application = await api.graph.createApplication(name, roles);
     } catch (err) {
       if (!isStatus(err, 403)) throw err;
       throw new Error(
@@ -459,7 +463,7 @@ export async function ensureApp(ctx) {
     app.displayName = application.displayName;
     app.existing = false;
     ctx.save();
-    ui.ok(`Created app registration "${APP_NAME}" (${app.appId})`);
+    ui.ok(`Created app registration "${name}" (${app.appId})`);
   }
 
   if (!app.servicePrincipalId) {
@@ -473,7 +477,7 @@ export async function ensureApp(ctx) {
   }
   ctx.save();
 
-  await ensureSecret(ctx);
+  if (!isPax(config)) await ensureSecret(ctx);
 }
 
 /** @param {Ctx} ctx */
@@ -830,19 +834,21 @@ export const ADMIN_PACK_FILE = PRODUCT.adminPack;
 /**
  * The steps an admin runs to register the app for someone who can't: an Azure Cloud Shell
  * script and the same steps in the portal. The client secret goes where the install keeps it,
- * so in the vault admin mode it never leaves Azure.
+ * so in the vault admin mode it never leaves Azure. On the PAX route, `site` is the PowerShell that
+ * gives the app the SharePoint folder's site, which needs a SharePoint or Global Administrator.
  * @param {Ctx} ctx
- * @returns {{ script: string[], checklist: string[] }}
+ * @returns {{ script: string[], checklist: string[], site?: string[] }}
  */
 export function adminPack(ctx) {
   const { config } = ctx;
   const kv = config.keyVault;
-  const perms = permissionsFor(config.modules, config.dataSources);
+  const perms = requiredPermissions(config);
+  const name = appName(config);
   const mode = secretMode(config);
   const script = [
     '# Run in Azure Cloud Shell (Bash) as someone who can register apps and grant admin consent,',
     '# such as a Privileged Role Administrator or Global Administrator.',
-    `APP_ID=$(az ad app create --display-name "${APP_NAME}" --sign-in-audience AzureADMyOrg --query appId -o tsv)`,
+    `APP_ID=$(az ad app create --display-name "${name}" --sign-in-audience AzureADMyOrg --query appId -o tsv)`,
     'az ad sp create --id "$APP_ID" -o none',
     `GRAPH=${GRAPH_APP_ID}`,
     `for P in ${perms.join(' ')}; do`,
@@ -873,7 +879,7 @@ export function adminPack(ctx) {
     );
   }
   const checklist = [
-    `Entra admin center > App registrations > New registration. Name it "${APP_NAME}", single tenant, no redirect URI.`,
+    `Entra admin center > App registrations > New registration. Name it "${name}", single tenant, no redirect URI.`,
     'Copy the Application (client) ID from its Overview page.',
     `API permissions > Add a permission > Microsoft Graph > Application permissions. Add: ${perms.join(', ')}.`,
     'Select "Grant admin consent" and confirm every permission shows "Granted".',
@@ -884,7 +890,19 @@ export function adminPack(ctx) {
       ? 'Send the installer user the client ID. They don\'t need the secret.'
       : 'Send the installer user the client ID and the secret value through a secure channel.',
   ];
-  return { script, checklist };
+  if (!isPax(config) || !config.sharePoint) return { script, checklist };
+  const site = [
+    `# Run in PowerShell 7 as ${SITE_ADMIN.replace(/^A /, 'a ')}. It gives the app write access to`,
+    `# ${config.sharePoint.siteUrl} and to no other site (Sites.Selected).`,
+    "$appId = '<the client ID from above>'",
+    ...siteGrantCommands(config, '$appId'),
+  ];
+  checklist.splice(
+    checklist.length - 1,
+    0,
+    `Give the app write access to ${config.sharePoint.siteUrl}: run the PowerShell below as ${SITE_ADMIN.replace(/^A /, 'a ')}, or with PnP PowerShell: ${pnpGrantCommand(config, '$appId')}`,
+  );
+  return { script, checklist, site };
 }
 
 /**
@@ -892,7 +910,7 @@ export function adminPack(ctx) {
  * @param {Ctx} ctx
  */
 export function writeAdminPack(ctx) {
-  const { script, checklist } = adminPack(ctx);
+  const { script, checklist, site } = adminPack(ctx);
   const file = join(ctx.configFile ? dirname(ctx.configFile) : process.cwd(), ADMIN_PACK_FILE);
   const body = [
     `# ${PRODUCT.name}: register the app`,
@@ -906,6 +924,7 @@ export function writeAdminPack(ctx) {
     ...script,
     '```',
     '',
+    ...(site ? ['## Then the SharePoint site (PowerShell 7)', '', '```powershell', ...site, '```', ''] : []),
     '## Or in the portal',
     '',
     ...checklist.map((s, i) => `${i + 1}. ${s}`),

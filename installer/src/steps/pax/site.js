@@ -336,11 +336,13 @@ const connectLine = (config) =>
  * What an administrator runs in PowerShell 7 to give the app write access to the folder's site,
  * and no other, with Microsoft Graph PowerShell. For the terminal, the steps left and the admin pack.
  * @param {InstallConfig} config
+ * @param {string} [appIdVar]  A PowerShell variable that holds the client ID, such as `$appId`, for steps
+ *   written before the app exists. By default, the record's client ID.
  * @returns {string[]}
  */
-export function siteGrantCommands(config) {
+export function siteGrantCommands(config, appIdVar) {
   const sp = sharePointOf(config);
-  const identity = `@{ application = @{ id = ${psQuote(appIdOf(config))}; displayName = ${psQuote(appLabel(config))} } }`;
+  const identity = `@{ application = @{ id = ${appIdVar ?? psQuote(appIdOf(config))}; displayName = ${psQuote(appLabel(config))} } }`;
   return [
     'Install-Module Microsoft.Graph.Authentication -Scope CurrentUser',
     connectLine(config),
@@ -353,9 +355,10 @@ export function siteGrantCommands(config) {
 /**
  * The same grant with PnP PowerShell, for administrators who use it.
  * @param {InstallConfig} config
+ * @param {string} [appIdVar]  As for siteGrantCommands.
  */
-export const pnpGrantCommand = (config) =>
-  `Grant-PnPAzureADAppSitePermission -AppId ${psQuote(appIdOf(config))} -DisplayName ${psQuote(appLabel(config))} -Site ${psQuote(sharePointOf(config).siteUrl)} -Permissions Write`;
+export const pnpGrantCommand = (config, appIdVar) =>
+  `Grant-PnPAzureADAppSitePermission -AppId ${appIdVar ?? psQuote(appIdOf(config))} -DisplayName ${psQuote(appLabel(config))} -Site ${psQuote(sharePointOf(config).siteUrl)} -Permissions Write`;
 
 /**
  * What an administrator runs to take back the app's access to one site.

@@ -112,6 +112,17 @@ export const PRODUCT = deepFreeze({
       users: 'copilot_users_rollup.csv',
       agents365: 'agents_365.csv',
     },
+    /**
+     * The SharePoint template's parameters. Each file parameter takes the file's full address in
+     * the folder, and an optional one left blank loads an empty table.
+     */
+    parameters: {
+      interactions: 'Copilot Interactions File',
+      users: 'Org Data File',
+      site: 'SharePoint Site URL',
+      agents365: 'Agent 365',
+      feedback: 'Feedback File',
+    },
   },
   flows: {
     feedback: 'ValueLens - Product feedback',
