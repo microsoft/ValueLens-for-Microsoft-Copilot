@@ -8,8 +8,6 @@ import { test } from 'node:test';
 import { startFresh } from '../src/cli.js';
 import { archiveConfig, emptyConfig, loadConfig, saveConfig } from '../src/config.js';
 import { HttpError } from '../src/http.js';
-import { appDeployedSince } from '../src/steps/app.js';
-import { confirmAzurePlan } from '../src/steps/azure/index.js';
 import { recordWorkspaceGone, staleRecordMessage } from '../src/steps/fabric.js';
 import { adoptUploadedRecord, CLOUD_SHELL_ENV, cloudShellKeepsFiles, cloudShellRecordMessage } from '../src/launch.js';
 import { confirmPlan, KEEP_AWAKE, KEEP_CLOUD_SHELL_OPEN, keepAwake } from '../src/steps/plan.js';
@@ -108,73 +106,44 @@ test("record: a save that doesn't read back as written fails, so no step counts 
     assert.equal(loadConfig(file).config.fabric.workspaceId, 'ws-1');
   }));
 
-const APP_KEY = 'analytics-hub';
-/** What rayfin keeps about a deployment it started: the item, and nothing about how to reach it yet. */
-const startedDeployment = () => ({ fabricItemId: 'app-item-1', fabricWorkspaceId: 'ws-1', fabricTenantId: 'tenant-1' });
-
-test('record: deploy-app saving while the install waits on its first load keeps the app when the install saves after it', () =>
+test('record: the access command saving while the install waits on its first load keeps its changes when the install saves after it', () =>
   inDir((dir) => {
     const file = join(dir, 'valuelens-install.json');
-    // The install: a new record, then an app step that fails part way, keeping the item rayfin started.
+    // The install: a new record, then the viewer group.
     const install = loadConfig(file).config;
     Object.assign(install, { tenantId: 'tenant-1' });
     Object.assign(install.fabric, { workspaceId: 'ws-1', workspaceName: 'Analytics Hub', lakehouseId: 'lh-1' });
-    install.fabricApp.enabled = true;
     saveConfig(file, install);
-    const app = install.fabricApp;
-    app.rayfin = { deployments: { deployments: { [APP_KEY]: startedDeployment() }, active: APP_KEY } };
+    install.access = { groupId: 'group-1', groupName: 'Analytics Hub Viewers', contact: 'admin@contoso.com', createdGroup: true, grantedModels: [] };
+    const access = install.access;
     saveConfig(file, install);
     // The first load starts; the install waits for it, for hours on a large tenant.
     install.firstRun = { jobId: 'job-1', status: 'NotStarted', startedAt: '2026-06-01T12:30:00.000Z' };
     saveConfig(file, install);
 
-    // Meanwhile deploy-app, as the install told the user to run it, in another window.
-    const deployApp = loadConfig(file).config;
-    const deployedAt = '2026-06-01T13:00:00.000Z';
-    deployApp.fabricApp.rayfin = {
-      deployments: {
-        deployments: {
-          [APP_KEY]: {
-            ...startedDeployment(),
-            fabricApiUrl: 'https://api.example.test/',
-            publishableKey: 'pk-test',
-            hostingUrl: 'https://app.example.test/',
-            fabricDeepLink: 'https://app.fabric.example.test/app-item-1',
-            deployedAt,
-          },
-        },
-        active: APP_KEY,
-      },
-      env: 'RAYFIN_PUBLIC_EXAMPLE=1\n',
-    };
-    saveConfig(file, deployApp);
-    Object.assign(deployApp.fabricApp, {
-      enabled: true, itemId: 'app-item-1', name: 'Analytics Hub', url: 'https://app.fabric.example.test/app-item-1', models: ['vl'], deployedAt,
-      reporting: { currency: 'USD' }, access: { groupId: 'group-1', groupName: 'Analytics Hub Viewers', contact: 'admin@contoso.com' },
-    });
-    saveConfig(file, deployApp);
-    const deployed = structuredClone(deployApp.fabricApp);
+    // Meanwhile the access command, in another window, grants the model and turns on org-scoped access.
+    const other = loadConfig(file).config;
+    other.access = { ...other.access, grantedModels: ['vl'] };
+    saveConfig(file, other);
+    Object.assign(/** @type {import('../src/config.js').AccessConfig} */ (other.access), { rls: { enabled: true, orgAttribute: 'country', applied: [] } });
+    saveConfig(file, other);
+    const changed = structuredClone(other.access);
 
     // The first load finishes and the install saves what it holds in memory.
     install.firstRun = { ...install.firstRun, status: 'Completed', finishedAt: '2026-06-01T16:00:00.000Z' };
     saveConfig(file, install);
 
     const saved = loadConfig(file).config;
-    assert.deepEqual(saved.fabricApp, deployed, "deploy-app's app survives the install's save");
+    assert.deepEqual(saved.access, changed, "the access command's changes survive the install's save");
     assert.equal(saved.firstRun?.status, 'Completed');
     assert.equal(saved.firstRun?.finishedAt, '2026-06-01T16:00:00.000Z');
-    assert.deepEqual(install.fabricApp, deployed, 'and the install has it in memory, for its summary');
-    assert.equal(install.fabricApp, app, 'in the same object, so code holding it sees the app too');
-    assert.equal(app.rayfin?.deployments.deployments[APP_KEY].publishableKey, 'pk-test');
-    assert.equal(
-      appDeployedSince(install, { since: Date.parse('2026-06-01T12:10:00.000Z'), workspaceId: 'ws-1', deployedAt: undefined }),
-      deployedAt,
-      'so its summary counts the app as deployed, though its own app step failed',
-    );
+    assert.deepEqual(install.access, changed, 'and the install has them in memory, for its summary');
+    assert.equal(install.access, access, 'in the same object, so code holding it sees them too');
+    assert.equal(access.rls?.orgAttribute, 'country');
 
     install.history.days = 90;
     saveConfig(file, install);
-    assert.deepEqual(loadConfig(file).config.fabricApp, deployed, 'and later saves keep it');
+    assert.deepEqual(loadConfig(file).config.access, changed, 'and later saves keep it');
     assert.equal(loadConfig(file).config.history.days, 90);
   }));
 
@@ -182,14 +151,14 @@ test('record: when two commands change the same field the later save wins; a fie
   inDir((dir) => {
     const file = join(dir, 'valuelens-install.json');
     const first = loadConfig(file).config;
-    first.access = { groupId: 'group-1', groupName: 'Analytics Hub Viewers', appShared: false };
-    first.uploads.flowIds = { studio: 'flow-1' };
+    first.access = { groupId: 'group-1', groupName: 'Analytics Hub Viewers', contact: 'admin@contoso.com' };
+    first.uploads.flowIds = { feedback: 'flow-1' };
     saveConfig(file, first);
 
     const install = loadConfig(file).config;
     const other = loadConfig(file).config;
     other.schedule.time = '04:00';
-    other.access = { ...other.access, appShared: true };
+    other.access = { ...other.access, contact: 'helpdesk@contoso.com' };
     delete other.uploads.flowIds;
     saveConfig(file, other);
     install.schedule.time = '03:00';
@@ -199,7 +168,7 @@ test('record: when two commands change the same field the later save wins; a fie
     for (const config of [loadConfig(file).config, install]) {
       assert.equal(config.schedule.time, '03:00');
       assert.equal(config.history.days, 90);
-      assert.equal(config.access?.appShared, true);
+      assert.equal(config.access?.contact, 'helpdesk@contoso.com');
       assert.equal(config.access?.groupName, 'Analytics Hub Viewers');
       assert.equal(config.uploads.flowIds, undefined);
     }
@@ -225,7 +194,7 @@ test("record: a half-written record from another command is waited for; if it st
     saveConfig(file, record());
     const install = loadConfig(file).config;
     const other = loadConfig(file).config;
-    other.fabricApp.itemId = 'app-item-1';
+    other.semanticModel.id = 'model-1';
     const whole = `${JSON.stringify(other, null, 2)}\n`;
     // Written in place, as a save does when a synced folder keeps blocking the rename, and caught part way.
     writeFileSync(file, whole.slice(0, 40), 'utf8');
@@ -234,7 +203,7 @@ test("record: a half-written record from another command is waited for; if it st
     const waits = [];
     saveConfig(file, install, { wait: (ms) => { waits.push(ms); writeFileSync(file, whole, 'utf8'); } });
     assert.deepEqual(waits, [100]);
-    assert.equal(loadConfig(file).config.fabricApp.itemId, 'app-item-1');
+    assert.equal(loadConfig(file).config.semanticModel.id, 'model-1');
     assert.equal(loadConfig(file).config.history.days, 90);
 
     writeFileSync(file, '{\n  "version": 1,\n  "fabr', 'utf8');
@@ -245,7 +214,7 @@ test("record: a half-written record from another command is waited for; if it st
     const saved = loadConfig(file).config;
     assert.equal(saved.schedule.time, '05:00');
     assert.equal(saved.history.days, 90);
-    assert.equal(saved.fabricApp.itemId, 'app-item-1');
+    assert.equal(saved.semanticModel.id, 'model-1');
   }));
 
 test('record: only a definite not-found, or another tenant, makes the workspace gone', async () => {
@@ -272,8 +241,6 @@ test('record: only a definite not-found, or another tenant, makes the workspace 
   assert.equal(asked, false, 'another tenant is gone without asking Fabric');
   assert.equal(await gone(async () => ({}), 'TENANT-1'), null, 'tenant IDs match whatever their case');
 
-  const azure = { ...record(), target: /** @type {const} */ ('azure') };
-  assert.equal(await recordWorkspaceGone({ config: azure, fabric: fabricThat(async () => { throw httpError(404); }), tenantId: 'tenant-2' }), null);
   assert.equal(await recordWorkspaceGone({ config: emptyConfig(), fabric: fabricThat(async () => { throw httpError(404); }), tenantId: 'tenant-1' }), null);
 
   assert.equal(staleRecordMessage({ workspace: 'Analytics', reason: 'not-found' }), 'This workspace no longer exists: "Analytics".');
@@ -409,27 +376,12 @@ test('wording: the run says the web page can be closed, and the terminal Ctrl+C'
   }
 });
 
-test('wording: no user-facing text names Rayfin', () => {
-  const app = readFileSync(new URL('steps/app.js', SRC), 'utf8');
-  const shown = [...app.matchAll(/(?:ui\.(?:info|ok|warn|note|fail|line)|new Error)\(\s*(['`"])(.*?)\1/g)].map((m) => m[2]);
-  assert.ok(shown.length > 10);
-  assert.deepEqual(shown.filter((s) => /rayfin/i.test(s)), []);
-  assert.match(app, /A browser window may open for sign-in\./);
-});
-
 test('wording: the plan says to keep the PC awake, just before Go ahead', async () => {
   const ui = fakeUi({ answers: [true] });
   const t = fakeCtx({ ui: ui.ui });
   assert.equal(await confirmPlan(t.ctx), true);
   assert.match(ui.text(), new RegExp(`${KEEP_AWAKE.replace('.', '\\.')}\\n$`));
   assert.equal(ui.asked.at(-1), 'Go ahead?');
-
-  const az = fakeUi({ answers: [true] });
-  const a = fakeCtx({ ui: az.ui });
-  a.config.target = 'azure';
-  a.config.azure = { ...a.config.azure, subscriptionId: 'sub-1', resourceGroup: 'rg', location: 'uksouth', namePrefix: 'ah' };
-  assert.equal(await confirmAzurePlan(a.ctx), true);
-  assert.match(az.text(), /Keep this PC plugged in and awake until setup finishes\./);
 });
 
 test('wording: in Cloud Shell the plan says to keep the tab open, not the PC awake', async () => {
@@ -441,14 +393,6 @@ test('wording: in Cloud Shell the plan says to keep the tab open, not the PC awa
     assert.equal(await confirmPlan(t.ctx), true);
     assert.match(ui.text(), new RegExp(`${KEEP_CLOUD_SHELL_OPEN.replace('.', '\\.')}\\n$`));
     assert.doesNotMatch(ui.text(), /plugged in/);
-
-    const az = fakeUi({ answers: [true] });
-    const a = fakeCtx({ ui: az.ui });
-    a.config.target = 'azure';
-    a.config.azure = { ...a.config.azure, subscriptionId: 'sub-1', resourceGroup: 'rg', location: 'uksouth', namePrefix: 'ah' };
-    assert.equal(await confirmAzurePlan(a.ctx), true);
-    assert.match(az.text(), /Keep this Cloud Shell tab open until setup finishes\./);
-    assert.doesNotMatch(az.text(), /plugged in/);
   } finally {
     if (before === undefined) delete process.env[CLOUD_SHELL_ENV];
     else process.env[CLOUD_SHELL_ENV] = before;

@@ -11,7 +11,7 @@ import { commandLine } from '../launch.js';
 import { EVERYONE_ROLE, rlsSettings, SCOPED_ROLE } from '../transform/access.js';
 import { buildModel, datasourcePath, loadTemplateModel, PBISM } from '../transform/model.js';
 import { formatDuration } from '../ui.js';
-import { createItem, modelKey } from './fabric.js';
+import { createItem } from './fabric.js';
 import { addMonths, SECRET_LIFETIME_MONTHS } from './identity.js';
 import { addTrackedSecret, adoptAttempts, promoteSecret, removeRetired, settleFailedSecret } from './secrets.js';
 
@@ -102,20 +102,11 @@ export const MODEL_UPDATE_NOTE = 'Updated in place if this version changed it, k
 /**
  * The installer's models that are owed a reload: their definition was, or may have been, replaced
  * and no refresh has finished since. Kept in the install record, so a later run still reloads them.
- * A Consumption model kept while credit consumption is off, or in Azure's demo mode, waits until
- * it's used again.
- * An Agent Evaluator model kept while its module is off, or in Azure's demo mode, waits until it's
- * used again.
  * @param {import('../config.js').InstallConfig} config
  * @returns {import('../config.js').ModelConfig[]}
  */
 export function pendingReloads(config) {
-  const azure = config.target === 'azure';
-  return [
-    config.semanticModel,
-    config.modules?.consumption && !(azure && config.azure?.sampleData === true) && config.consumption?.model,
-    config.modules?.agentEvaluator && !(azure && config.azure?.sampleData === true) && config.agentEvaluator?.model,
-  ].filter((m) => !!m && !!m.id && !!m.reload).map((m) => /** @type {import('../config.js').ModelConfig} */ (m));
+  return [config.semanticModel].filter((m) => !!m && !!m.id && !!m.reload);
 }
 
 /**
@@ -181,7 +172,7 @@ export function needsDataReset(err) {
 async function allowDataReset(ctx, name) {
   const { ui } = ctx;
   ui.warn(`Fabric can't apply this version of ${name} and keep its data. To apply it, Fabric clears the data and the installer reloads it ` +
-    `from the ${ctx.config.target === 'azure' ? 'Azure SQL database' : 'Lakehouse'}, which isn't changed. Until that reload finishes, reports and the app on ${name} show no data, ` +
+    `from the Lakehouse, which isn't changed. Until that reload finishes, reports and the app on ${name} show no data, ` +
     'which can take an hour or more with a lot of history.');
   if (ctx.allowModelReset) {
     ui.note('Clearing it, as --allow-model-reset allows.');
@@ -256,7 +247,7 @@ export async function deployModel(ctx, m, o) {
   const unsettled = !!m.id && !!m.reload?.unsettled;
   const deployed = !m.id || !!o.force || m.signature !== signature || unsettled;
   if (!m.id) {
-    const made = await createItem(ctx, `SemanticModel:${modelKey(ctx.config, m)}`, 'SemanticModel', m.name, items, (name, ref) => api.fabric.createSemanticModel(ws, name, definition, ref));
+    const made = await createItem(ctx, 'SemanticModel:main', 'SemanticModel', m.name, items, (name, ref) => api.fabric.createSemanticModel(ws, name, definition, ref));
     m.id = made.id;
     m.name = made.name;
     if (made.resumed) await replaceDefinition(ctx, ws, m, definition);
@@ -457,8 +448,6 @@ export async function ensureModelConnection(ctx) {
       throw new Error(`Fabric couldn't set up the model's connection: ${/** @type {Error} */ (err).message}`);
     }
     Object.assign(sm, { connectionId: conn.id, connectionName: name, secretExpires: secret.expires, bound: false });
-    if (config.consumption?.model) config.consumption.model.bound = false;
-    if (config.agentEvaluator?.model) config.agentEvaluator.model.bound = false;
     // Saved with the record above; the secrets it replaces are then removed from the app.
     await promoteSecret(ctx, sm, objectId, secret.keyId);
   }
@@ -642,8 +631,7 @@ export async function refreshModel(ctx, opts = {}) {
   const sm = opts.model ?? config.semanticModel;
   const ws = /** @type {string} */ (config.fabric.workspaceId);
   if (!sm.id) throw new Error('There is no semantic model yet. Run the installer first.');
-  // Azure models read the database through their data source credentials, not a Fabric connection.
-  if (!sm.bound && config.target !== 'azure') {
+  if (!sm.bound) {
     ui.warn(`${sm.name} isn't connected to the Lakehouse yet, so it can't refresh. Run the installer again to connect it.`);
     return { ok: false };
   }

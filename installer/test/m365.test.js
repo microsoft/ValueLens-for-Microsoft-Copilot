@@ -22,7 +22,7 @@ const ids = {
   m365Activity: 'nb-m',
   refreshModel: 'nb-r',
 };
-const on = { orgData: true, m365Activity: true, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false };
+const on = { orgData: true, m365Activity: true, agent365: false, productFeedback: false };
 const off = { ...on, m365Activity: false };
 const sources = realSources();
 const template = loadTemplateModel(/** @type {string} */ (sources.modelFile));

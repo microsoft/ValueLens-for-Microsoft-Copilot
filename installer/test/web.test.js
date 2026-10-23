@@ -133,12 +133,12 @@ test('web ui: input defaults and validates; checkbox refuses disabled options', 
   ui.answer(id, '');
   assert.equal(await name, 'ValueLens');
 
-  const picked = ui.checkbox('What else?', [{ name: 'Credit', value: 'cc' }, { name: 'Viva', value: 'viva', disabled: 'Not licensed' }, { name: 'M365', value: 'm365' }]);
+  const picked = ui.checkbox('What else?', [{ name: 'Product feedback', value: 'feedback' }, { name: 'Defender', value: 'defender', disabled: 'Not licensed' }, { name: 'M365', value: 'm365' }]);
   const box = ui.history().at(-1)?.id;
   assert.equal(ui.answer(box, [1]).ok, false);
   ui.answer(box, [2, 0, 2]);
-  assert.deepEqual(await picked, ['cc', 'm365']);
-  assert.equal(ui.history().at(-1)?.display, 'Credit, M365');
+  assert.deepEqual(await picked, ['feedback', 'm365']);
+  assert.equal(ui.history().at(-1)?.display, 'Product feedback, M365');
 });
 
 test('what to collect: the essentials are ticked and locked, every extra has a description, and only extras can be unticked', async () => {
@@ -150,8 +150,6 @@ test('what to collect: the essentials are ticked and locked, every extra has a d
     ['m365Activity', true, false],
     ['agent365', false, false],
     ['productFeedback', false, false],
-    ['consumption', false, false],
-    ['agentEvaluator', false, false],
     ['defender', false, false],
   ]);
   for (const ch of choices) assert.match(ch.description, /^From .+\. (Shows|Adds|Lists) /, ch.value);
@@ -160,9 +158,9 @@ test('what to collect: the essentials are ticked and locked, every extra has a d
   const asked = ui.checkbox('Tick the data you want.', choices);
   const id = ui.history().at(-1)?.id;
   assert.deepEqual(ui.history().at(-1)?.choices?.slice(0, 2).map((/** @type {any} */ ch) => [ch.checked, ch.disabled]), [[true, 'Always collected'], [true, 'Always collected']]);
-  ui.answer(id, [6]);
-  assert.deepEqual(await asked, ['core', 'orgData', 'agentEvaluator']);
-  assert.equal(ui.history().at(-1)?.display, 'Copilot usage and licences, Org data, Agent Evaluator');
+  ui.answer(id, [4]);
+  assert.deepEqual(await asked, ['core', 'orgData', 'productFeedback']);
+  assert.equal(ui.history().at(-1)?.display, 'Copilot usage and licences, Org data, Product feedback');
 
   const again = ui.checkbox('Tick the data you want.', choices);
   ui.answer(ui.history().at(-1)?.id, [0, 1]);
@@ -203,7 +201,7 @@ test('web ui: Back asks again from the start, gives the earlier answers again an
     offered = [{ id: 'a' }, { id: 'b' }];
     const ws = await ui.select('Workspace', offered.map((v) => ({ name: v.id.toUpperCase(), value: v })));
     const name = await ui.input('Lakehouse name', { default: 'ValueLens' });
-    const extras = await ui.checkbox('Extras', [{ name: 'Credit', value: 'cc' }, { name: 'M365', value: 'm365' }]);
+    const extras = await ui.checkbox('Extras', [{ name: 'Product feedback', value: 'feedback' }, { name: 'M365', value: 'm365' }]);
     const go = await ui.confirm('Go ahead?', true);
     return { ws, name, extras, go };
   });
@@ -244,7 +242,7 @@ test('web ui: Back asks again from the start, gives the earlier answers again an
   await tick();
   ui.answer(latest(ui).id, true);
   const result = await done;
-  assert.deepEqual(result, { ws: { id: 'b' }, name: 'Lake2', extras: ['cc'], go: true });
+  assert.deepEqual(result, { ws: { id: 'b' }, name: 'Lake2', extras: ['feedback'], go: true });
   assert.equal(result.ws, offered[1], 'a choice given again is the one offered this time');
   assert.equal(ui.back(), false, 'no question is open');
 
@@ -549,7 +547,7 @@ test('web ui: load cards become one event, and the terminal shows each source wi
     /** @type {any} */ ({ name: 'Licensed users', state: 'ok', fix: [] }),
     /** @type {any} */ ({ name: 'Copilot audit log', state: 'failed', reason: 'The capacity was busy.', fix: ['Try again later.'] }),
     /** @type {any} */ ({ name: 'Agent 365 (API)', state: 'skipped', fix: [] }),
-    /** @type {any} */ ({ name: 'Agent transcripts', state: 'warning', reason: 'It ran, but found nothing to load in Default.', fix: ['Choose more environments.'] }),
+    /** @type {any} */ ({ name: 'Shadow AI and agent risk (Defender)', state: 'warning', reason: 'It ran, but found nothing to load in cloud_discovery.', fix: ['Check the source has data for the period it reads.'] }),
   ];
   ui.loads(cards);
   const e = latest(ui);
@@ -562,9 +560,9 @@ test('web ui: load cards become one event, and the terminal shows each source wi
     'The capacity was busy.',
     'Try again later.',
     '! Agent 365 (API): skipped',
-    '! Agent transcripts: loaded with a warning',
-    'It ran, but found nothing to load in Default.',
-    'Choose more environments.',
+    '! Shadow AI and agent risk (Defender): loaded with a warning',
+    'It ran, but found nothing to load in cloud_discovery.',
+    'Check the source has data for the period it reads.',
   ]);
 });
 
@@ -712,7 +710,7 @@ test('page: the stages and the finish it waits for are headings the installer pr
   assert.ok(!stages.includes('Where should Analytics Hub run?'), 'the target question comes first, so it slots in');
   const only = /const TARGET_STAGES = \{([\s\S]*?)\n\};/.exec(app)?.[1] ?? '';
   const tagged = [...only.matchAll(/'([^']+)'/g)].map((x) => x[1]);
-  assert.ok(tagged.includes('Fabric') && tagged.includes('Checking Azure'));
+  assert.ok(tagged.includes('Fabric'));
   assert.deepEqual(tagged.filter((s) => !stages.includes(s)), []);
 });
 
@@ -730,7 +728,7 @@ test('page: every command has a row, or for prerequisites its own panel; Check t
   assert.equal(describeRecord(config).can.check, true);
   config.history.days = 90;
   assert.equal(describeRecord(config).historyDays, 90, 'the installed view shows how much audit history is loaded');
-  assert.equal(describeRecord({ ...config, target: 'azure' }).target, 'azure', 'the page shows only that target\'s stages');
+  assert.equal(describeRecord(config).target, 'fabric', 'the page shows only that target\'s stages');
   assert.match(app, /backfillDays/, 'the Run row can load more history');
 });
 

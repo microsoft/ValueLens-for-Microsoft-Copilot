@@ -1,8 +1,8 @@
 // @ts-check
 /**
  * Agent configuration and Foundry, from Azure Resource Graph: the management group it reads, Reader
- * there for whoever runs the load, and the Entra role agents need: Global Reader, given when the
- * person running the installer can, or else the steps for someone who can.
+ * there for the app registration that runs the load, and the Entra role agents need: Global Reader,
+ * given when the person running the installer can, or else the steps for someone who can.
  */
 import { ROLES } from '../clients/azure.js';
 import { AI_ADMIN_ROLE, GLOBAL_READER_ROLE, POWER_PLATFORM_ADMIN_ROLE } from '../clients/graph.js';
@@ -25,8 +25,6 @@ export const AGENT_DIRECTORY_ROLES = Object.values(AGENT_DIRECTORY_ROLE_IDS);
 export const AGENT_ROLE = 'Global Reader';
 /** Roles and administrators in the Entra admin center. */
 export const ENTRA_ROLES_URL = 'https://entra.microsoft.com/#view/Microsoft_AAD_IAM/RolesManagementMenuBlade/~/AllRoles';
-/** Where the record keeps the role given to each kind of principal. */
-const ROLE_FIELD = /** @type {const} */ ({ access: 'roleAssigned', azureAccess: 'azureRoleAssigned' });
 
 /** @param {import('../config.js').InstallConfig} config */
 export const resourceGraphOn = (config) => config.dataSources?.resourceGraph === 'api';
@@ -107,7 +105,6 @@ export async function planResourceGraph(ctx) {
   if (mg !== (rg.managementGroup ?? '')) {
     rg.managementGroup = mg;
     delete rg.access;
-    delete rg.azureAccess;
   }
   const kinds = await ui.checkbox('Read:', [
     { name: 'Copilot Studio agents, their environments and agent flows', value: 'agents', checked: rg.agents },
@@ -123,23 +120,22 @@ export async function planResourceGraph(ctx) {
 }
 
 /**
- * The roles the plan review lists for whoever runs the load.
+ * The roles the plan review lists for the app registration that runs the load.
  * @param {import('../config.js').InstallConfig} config
  * @param {string} tenantId
  * @param {string} who
- * @param {'access' | 'azureAccess'} key
  * @param {{ canAssign?: boolean }} [o]  Whether the signed-in user can give Entra roles, when known.
  * @returns {import('./plan.js').ReviewGrant[]}
  */
-export function resourceGraphGrants(config, tenantId, who, key, o = {}) {
+export function resourceGraphGrants(config, tenantId, who, o = {}) {
   if (!resourceGraphOn(config)) return [];
   const rg = config.resourceGraph;
   /** @type {import('./plan.js').ReviewGrant[]} */
   const grants = [];
-  if (rg?.foundry !== false && !rg?.[key]) {
+  if (rg?.foundry !== false && !rg?.access) {
     grants.push({ who, what: 'Reader', where: `Azure ${scopeName(config)} (${resourceGraphScope(config, tenantId)})`, detail: 'So Resource Graph can list Foundry resources and projects.' });
   }
-  if (rg?.agents !== false && !rg?.[ROLE_FIELD[key]]) {
+  if (rg?.agents !== false && !rg?.roleAssigned) {
     const why = 'So Resource Graph returns Copilot Studio agents. Skipped when it already has Global Reader, Power Platform Administrator or AI Administrator.';
     grants.push({
       who,
@@ -157,25 +153,24 @@ export function resourceGraphGrants(config, tenantId, who, key, o = {}) {
 }
 
 /**
- * Gives the app, or the Azure jobs' managed identity, Reader on the management group so Resource
- * Graph can list Foundry. A role you can't give is reported with the command for someone who can;
- * the load still runs and reports Foundry as not readable.
+ * Gives the app registration Reader on the management group so Resource Graph can list Foundry. A
+ * role you can't give is reported with the command for someone who can; the load still runs and
+ * reports Foundry as not readable.
  * @param {Ctx} ctx
  * @param {Principal} who
- * @param {'access' | 'azureAccess'} key  Where the record keeps that it's done.
  * @returns {Promise<boolean>}  Whether it has Reader, or Foundry is off.
  */
-export async function ensureResourceGraphAccess(ctx, who, key) {
+export async function ensureResourceGraphAccess(ctx, who) {
   const { ui, config, api, user } = ctx;
   if (!resourceGraphOn(config)) return false;
   const rg = (config.resourceGraph = normaliseResourceGraph(config.resourceGraph));
   const done = async () => {
-    await ensureAgentDirectoryRole(ctx, who, key);
+    await ensureAgentDirectoryRole(ctx, who);
     return true;
   };
   if (!rg.foundry) return done();
   const where = scopeName(config);
-  if (rg[key]) {
+  if (rg.access) {
     ui.ok(`${who.name} can read Foundry resources in ${where}`);
     return done();
   }
@@ -186,19 +181,19 @@ export async function ensureResourceGraphAccess(ctx, who, key) {
     if (!(err instanceof HttpError) || ![403, 404].includes(err.status)) throw err;
     ui.warn(`You can't assign Azure roles on ${where}, so Foundry can't be read yet.${err.status === 404 ? ' Check the management group ID.' : ''}`);
     ui.info(`An Owner or User Access Administrator there can give ${who.name} Reader with: ${readerCommand(who.appId ?? who.id, scope)}`);
-    await ensureAgentDirectoryRole(ctx, who, key);
+    await ensureAgentDirectoryRole(ctx, who);
     const has = !ui.yes && (await ui.select('Then:', [
       { name: 'Leave Foundry out for now', value: false, description: 'The load reports Foundry as not readable until the role is there. Run the installer again then.' },
       { name: 'It already has access', value: true },
     ], false));
     if (has) {
-      rg[key] = true;
+      rg.access = true;
       ctx.save();
       return true;
     }
     return false;
   }
-  rg[key] = true;
+  rg.access = true;
   ctx.save();
   ui.ok(`Gave ${who.name} Reader on ${where}`);
   ui.note('New Azure roles can take a few minutes to apply. Until then the load reports Foundry as not readable.');
@@ -211,21 +206,19 @@ export async function ensureResourceGraphAccess(ctx, who, key) {
  * one. Does nothing when it already has a role that covers agents, or agents aren't read.
  * @param {Ctx} ctx
  * @param {Principal} who
- * @param {'access' | 'azureAccess'} key
  * @returns {Promise<'off' | 'has' | 'assigned' | 'handoff'>}
  */
-export async function ensureAgentDirectoryRole(ctx, who, key) {
+export async function ensureAgentDirectoryRole(ctx, who) {
   const { ui, config, api } = ctx;
   if (!resourceGraphOn(config) || config.resourceGraph?.agents === false || !who.id) return 'off';
   const rg = config.resourceGraph;
-  const field = ROLE_FIELD[key];
   const has = (/** @type {string} */ role) => {
-    rg[field] = role;
+    rg.roleAssigned = role;
     ctx.save();
     ui.ok(`${who.name} has the ${role} Entra role, so Resource Graph returns Copilot Studio agents`);
     return /** @type {const} */ ('has');
   };
-  if (rg[field]) return has(rg[field]);
+  if (rg.roleAssigned) return has(rg.roleAssigned);
   try {
     /** @type {Record<string, string>} */
     const names = AGENT_DIRECTORY_ROLE_IDS;
@@ -253,7 +246,7 @@ export async function ensureAgentDirectoryRole(ctx, who, key) {
           continue;
         }
       }
-      rg[field] = AGENT_ROLE;
+      rg.roleAssigned = AGENT_ROLE;
       ctx.save();
       ui.ok(`Gave ${who.name} the ${AGENT_ROLE} Entra role, so Resource Graph returns Copilot Studio agents`);
       ui.note('Entra roles can take a few minutes to apply. Until then the load reports agents as not collected.');
@@ -268,8 +261,8 @@ export async function ensureAgentDirectoryRole(ctx, who, key) {
 }
 
 /**
- * Gives the app Reader for Foundry on the Fabric path.
+ * Gives the app registration Reader for Foundry, and the Entra role for agents.
  * @param {Ctx} ctx
  */
 export const ensureAppResourceGraphAccess = (ctx) =>
-  ensureResourceGraphAccess(ctx, { id: /** @type {string} */ (ctx.config.app.servicePrincipalId), name: ctx.config.app.displayName ?? 'the app', appId: ctx.config.app.appId }, 'access');
+  ensureResourceGraphAccess(ctx, { id: /** @type {string} */ (ctx.config.app.servicePrincipalId), name: ctx.config.app.displayName ?? 'the app', appId: ctx.config.app.appId });

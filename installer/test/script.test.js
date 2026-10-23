@@ -112,15 +112,29 @@ test('script: the command it leaves behind escapes the | in the install command 
   assert.doesNotMatch(win, /echo [^\r\n]*\$Again\b(?!Cmd)/);
 });
 
+const WINDOWS_POWERSHELL = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+
+/** Where Windows PowerShell's execution policy blocks script files, the test skips rather than bypass it. */
+function windowsPowerShellSkip() {
+  if (process.platform !== 'win32') return 'needs Windows PowerShell and cmd.exe';
+  // A PSModulePath inherited from PowerShell 7 stops Windows PowerShell loading its own Get-ExecutionPolicy.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toUpperCase() !== 'PSMODULEPATH'));
+  const policy = spawnSync(WINDOWS_POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', 'Get-ExecutionPolicy'], {
+    encoding: 'utf8', windowsHide: true, timeout: 30_000, env,
+  });
+  const name = policy.status === 0 ? policy.stdout.trim() : '';
+  return /^(Restricted|AllSigned)$/.test(name) ? `Windows PowerShell's execution policy is ${name}, which blocks script files (not bypassed)` : false;
+}
+
 test('script: generated Windows commands run and report missing files with special characters in Node paths', {
-  skip: process.platform !== 'win32' ? 'needs Windows PowerShell and cmd.exe' : false,
+  skip: windowsPowerShellSkip(),
 }, () => {
   const dir = mkdtempSync(join(realpathSync.native(tmpdir()), 'ahs-'));
   try {
     const start = TEMPLATE.indexOf('  $shimNode =');
     const end = TEMPLATE.indexOf('  if (-not $Forward.Count)', start);
     assert.ok(start >= 0 && end > start, 'finds the actual shim-generation block');
-    const powershell = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+    const powershell = WINDOWS_POWERSHELL;
     const again = 'irm https://example.test/install.ps1 | iex';
     for (const installed of [false, true]) {
       const root = join(dir, installed ? 'installed (Node) & tools' : 'bundled (Node) & tools');

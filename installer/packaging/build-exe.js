@@ -2,8 +2,8 @@
 // @ts-check
 /**
  * Builds AnalyticsHubInstaller.exe: one file a customer downloads and double-clicks. It holds
- * Node.js, the installer, the templates it deploys and the app already built, and unpacks them
- * under %LOCALAPPDATA%\AnalyticsHub the first time it runs.
+ * Node.js, the installer and the templates it deploys, and unpacks them under
+ * %LOCALAPPDATA%\AnalyticsHub the first time it runs.
  *
  * Next to it go the same payload as AnalyticsHubInstaller.zip, and install.ps1, which downloads that
  * zip, checks it and runs it from PowerShell, for organisations that block downloaded exes.
@@ -15,24 +15,20 @@
  *   --keep        Keep the working folder, to look at what went into the payload
  *   --release     Fail rather than warn when something a published download needs is missing
  *
- * Needs Windows, the app's and the installer's dependencies (npm ci in each), and the
- * .NET Framework C# compiler that ships with Windows.
+ * Needs Windows, the installer's dependencies (npm ci), and the .NET Framework C# compiler that
+ * ships with Windows.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
-  copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync,
+  copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync,
 } from 'node:fs';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { APP_DIR } from '../src/sources.js';
-import { FABRIC_CONFIG, PREBUILT_MARKER, PREBUILT_STATIC, nodeVersionOk } from '../src/steps/app.js';
 import {
-  EMPTY_GENERATED, EXE_NAME, SOURCE_ROOT, appFile, appPackageJson, fileVersion, installerFile, leakedIds, localIds, payloadId, prebuiltRayfinYml,
-  prunable, sourceFiles, tooLong,
+  EXE_NAME, SOURCE_ROOT, fileVersion, installerFile, leakedIds, localIds, payloadId, prunable, sourceFiles, tooLong,
 } from './payload.js';
 import { SCRIPT_NAME, ZIP_NAME, installScript } from './script.js';
 import { sha256File, sha256Line } from './signing.js';
@@ -40,7 +36,6 @@ import { REPO as GITHUB_REPO } from '../src/update-check.js';
 
 const INSTALLER = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE = resolve(INSTALLER, '..');
-const APP = join(SOURCE, APP_DIR);
 const LAUNCHER = join(INSTALLER, 'packaging', 'launcher');
 
 const { values: opts } = parseArgs({
@@ -125,61 +120,27 @@ const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const readIf = (file) => (existsSync(file) ? readFileSync(file, 'utf8') : '');
 
 if (process.platform !== 'win32') throw new Error('The exe builds on Windows only.');
-if (!nodeVersionOk()) throw new Error(`Build with Node.js 22.13 or later; the exe ships the Node.js that builds it. This is ${process.versions.node}.`);
+// The exe ships the Node.js that builds it, so it must be one the installer runs on.
+const engines = /^>=(\d+)\.(\d+)/.exec(String(readJson(join(INSTALLER, 'package.json')).engines?.node ?? ''));
+if (!engines) throw new Error('The installer\'s package.json has no "engines.node" of the form ">=major.minor".');
+const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number);
+if (nodeMajor < Number(engines[1]) || (nodeMajor === Number(engines[1]) && nodeMinor < Number(engines[2]))) {
+  throw new Error(`Build with Node.js ${engines[1]}.${engines[2]} or later; the exe ships the Node.js that builds it. This is ${process.versions.node}.`);
+}
 const CSC = join(process.env.WINDIR ?? 'C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe');
 const TAR = join(process.env.WINDIR ?? 'C:\\Windows', 'System32', 'tar.exe');
 for (const tool of [CSC, TAR]) if (!existsSync(tool)) throw new Error(`Can't find ${tool}.`);
-for (const dir of [APP, INSTALLER]) {
-  if (!existsSync(join(dir, 'node_modules'))) throw new Error(`Run "npm ci" in ${dir} first.`);
-}
+if (!existsSync(join(INSTALLER, 'node_modules'))) throw new Error(`Run "npm ci" in ${INSTALLER} first.`);
 
 const version = String(readJson(join(INSTALLER, 'package.json')).version);
 const commit = git(['rev-parse', 'HEAD']).trim();
 const outDir = resolve(opts.out ?? join(INSTALLER, 'dist-exe'));
 const work = mkdtempSync(join(realpathSync.native(tmpdir()), 'ahx-'));
-const appWork = join(work, 'app');
-const appModules = join(appWork, 'node_modules');
 const stage = join(work, 'stage');
-const stagedApp = join(stage, SOURCE_ROOT, APP_DIR);
 const stagedInstaller = join(stage, SOURCE_ROOT, 'installer');
-let linked = false;
 
 try {
-  step(`Building the app (installer ${version}, ${commit.slice(0, 7)})`);
-  // A copy of the committed app, so none of this checkout's settings reach the build.
-  for (const f of tracked(APP)) put(join(appWork, f.rel), f.read());
-  put(join(appWork, 'src', 'fabric.generated.ts'), EMPTY_GENERATED);
-  symlinkSync(join(APP, 'node_modules'), appModules, 'junction');
-  linked = true;
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^VITE_|^PROJECT_ROOT$/i.test(k)));
-  run(process.execPath, [join(appModules, 'vite', 'bin', 'vite.js'), 'build'], { cwd: appWork, env: { ...env, NODE_ENV: 'production' } });
-  unlinkSync(appModules);
-  linked = false;
-
-  step('Staging the app with the tools that deploy it');
-  cpSync(join(appWork, 'dist'), join(stagedApp, PREBUILT_STATIC), { recursive: true });
-  for (const f of tracked(APP)) {
-    if (appFile(f.rel)) put(join(stagedApp, f.rel), f.read());
-    if (f.rel === 'rayfin/rayfin.yml') put(join(stagedApp, f.rel), prebuiltRayfinYml(f.read().toString('utf8')));
-  }
-  const lock = readJson(join(APP, 'package-lock.json')).packages;
-  /** @param {string} name */
-  const locked = (name) => {
-    const v = lock[`node_modules/${name}`]?.version;
-    if (!v) throw new Error(`${name} isn't in the app's package-lock.json.`);
-    return String(v);
-  };
-  const rayfin = locked('@microsoft/rayfin-cli');
-  if (locked('@microsoft/rayfin-core') !== rayfin) throw new Error('The app\'s rayfin-cli and rayfin-core versions differ.');
-  put(join(stagedApp, 'package.json'), `${JSON.stringify(appPackageJson({ rayfin, vite: locked('vite'), version }), null, 2)}\n`);
-  run('npm install --omit=dev --no-package-lock --no-audit --no-fund', [], { cwd: stagedApp, shell: true });
-  put(join(stagedApp, PREBUILT_MARKER), `${JSON.stringify({ version, commit, builtAt: new Date().toISOString() }, null, 2)}\n`);
-  // Rayfin compiles the data schema on every deploy; prove it compiles here.
-  const tsc = createRequire(join(stagedApp, 'node_modules', '@microsoft', 'rayfin-cli', 'package.json')).resolve('typescript/lib/tsc.js');
-  run(process.execPath, [tsc, '-p', join('rayfin', 'tsconfig.json')], { cwd: stagedApp });
-  rmSync(join(stagedApp, 'rayfin', '.temp'), { recursive: true, force: true });
-
-  step('Staging the installer');
+  step(`Staging the installer ${version} (${commit.slice(0, 7)})`);
   for (const f of tracked(INSTALLER)) if (installerFile(f.rel)) put(join(stagedInstaller, f.rel), f.read());
   run('npm ci --omit=dev --no-audit --no-fund', [], { cwd: stagedInstaller, shell: true });
 
@@ -192,10 +153,7 @@ try {
   const { loadSources } = await import(pathToFileURL(join(stagedInstaller, 'src', 'sources.js')).href);
   const sources = loadSources();
   if (resolve(sources.dir) !== resolve(stage, SOURCE_ROOT)) throw new Error(`The staged installer reads its templates from ${sources.dir}.`);
-  for (const key of ['modelFile', 'consumptionModelFile', 'agentEvaluatorModelFile', 'appDir', 'ask']) {
-    if (!sources[key]) throw new Error(`The staged installer can't find its ${key}.`);
-  }
-  if (!existsSync(join(sources.appDir, PREBUILT_MARKER))) throw new Error('The staged app isn\'t marked prebuilt.');
+  if (!sources.modelFile) throw new Error('The staged installer can\'t find its modelFile.');
 
   step('Adding Node.js and the licences');
   put(join(stage, 'node', 'node.exe'), readFileSync(process.execPath));
@@ -215,11 +173,6 @@ try {
     pruned++;
   }
   process.stdout.write(`  ${pruned} files left out\n`);
-  // Prove Rayfin still starts, signs in and compiles the schema without them.
-  run(process.execPath, ['--input-type=module', '-e', "await import('@azure/msal-node-extensions'); await import('@microsoft/rayfin-cli/auth');"], { cwd: stagedApp });
-  run(process.execPath, [join(stagedApp, 'node_modules', '@microsoft', 'rayfin-cli', 'scripts', 'main'), '--version'], { cwd: stagedApp });
-  run(process.execPath, [tsc, '-p', join('rayfin', 'tsconfig.json')], { cwd: stagedApp });
-  rmSync(join(stagedApp, 'rayfin', '.temp'), { recursive: true, force: true });
 
   step('Checking the payload');
   const files = walk(stage);
@@ -227,18 +180,13 @@ try {
   if (long.length) throw new Error(`These paths are too long to unpack and run safely (see MAX_PAYLOAD_PATH in payload.js):\n  ${long.join('\n  ')}`);
   // IDs already in the repo, such as Microsoft Graph's, are public.
   const committed = git(['grep', '-I', '-h', '-o', '-i', '-E', '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', 'HEAD', '--', ':/']).split('\n');
-  const own = [
-    ...['.env', '.env.local', '.env.production', '.env.production.local', 'fabric.yaml', 'src/fabric.generated.ts', 'rayfin/rayfin.yml', 'rayfin/.env', 'rayfin/.deployments.json']
-      .map((f) => readIf(join(APP, f))),
-    ...readdirSync(INSTALLER).filter((f) => /^valuelens-install.*\.json$/i.test(f)).map((f) => readIf(join(INSTALLER, f))),
-  ];
+  const own = readdirSync(INSTALLER).filter((f) => /^valuelens-install.*\.json$/i.test(f)).map((f) => readIf(join(INSTALLER, f)));
   const ids = localIds(own, committed.map((l) => l.replace(/^HEAD:/, '').trim()));
   for (const rel of files) {
     if (/^node\/|\/node_modules\//.test(rel)) continue;
     const leaked = leakedIds(readFileSync(join(stage, rel), 'latin1'), ids);
     if (leaked.length) throw new Error(`${rel} holds IDs from this computer's own settings: ${leaked.join(', ')}.`);
   }
-  if (files.some((f) => f.endsWith(`/${FABRIC_CONFIG}`))) throw new Error(`The payload holds a ${FABRIC_CONFIG}; the installer writes it at deploy time.`);
   process.stdout.write(`  ${files.length} files, none from this computer's settings\n`);
 
   step('Packing');
@@ -285,15 +233,6 @@ try {
   writeFileSync(join(outDir, SCRIPT_NAME), script, 'ascii');
   process.stdout.write(`✓ ${zipOut}\n  ${mb(zipSize)}, sha256 ${zipHash}\n✓ ${join(outDir, SCRIPT_NAME)}, downloading from ${opts.repo}\n`);
 } finally {
-  if (linked) {
-    try {
-      unlinkSync(appModules);
-      linked = false;
-    } catch (err) {
-      process.stderr.write(`Couldn't unlink ${appModules}: ${/** @type {Error} */ (err).message}\n`);
-    }
-  }
-  // Never remove the working folder while it links to the app's node_modules.
-  if (opts.keep || linked) process.stdout.write(`\nWorking folder: ${work}\n`);
+  if (opts.keep) process.stdout.write(`\nWorking folder: ${work}\n`);
   else rmSync(work, { recursive: true, force: true });
 }

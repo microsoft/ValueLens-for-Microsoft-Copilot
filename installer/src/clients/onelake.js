@@ -1,7 +1,6 @@
 // @ts-check
 /**
  * Reads and writes small files, and makes folders, in a Lakehouse through the OneLake (ADLS Gen2) endpoint.
- * `dataLakeApi` does the same in an Azure storage account's container.
  */
 import { HttpError } from '../http.js';
 
@@ -40,22 +39,6 @@ export function oneLakeApi(http) {
         return asText(await http.get(url(workspaceId, lakehouseId, path), { headers }));
       } catch (err) {
         if (err instanceof HttpError && err.status === 404) return null;
-        throw err;
-      }
-    },
-
-    /**
-     * Whether a file or folder is there.
-     * @param {string} workspaceId
-     * @param {string} lakehouseId
-     * @param {string} path  Relative to the Lakehouse root.
-     */
-    async exists(workspaceId, lakehouseId, path) {
-      try {
-        await http.request('HEAD', url(workspaceId, lakehouseId, path), { headers });
-        return true;
-      } catch (err) {
-        if (err instanceof HttpError && err.status === 404) return false;
         throw err;
       }
     },
@@ -112,38 +95,3 @@ async function writeChunks(http, target, data) {
   }
   await http.patch(target, undefined, { query: { action: 'flush', position: data.length }, headers: HEADERS });
 }
-
-/** An Azure storage account's Data Lake endpoint. @param {string} account */
-export const dataLakeUrl = (account) => `https://${account}.dfs.core.windows.net`;
-
-/**
- * Small files in an Azure storage account (hierarchical namespace), e.g. the jobs' landing container.
- * @param {import('../http.js').HttpClient} http  A client whose base URL is `dataLakeUrl(account)`.
- */
-export function dataLakeApi(http) {
-  const url = (/** @type {string} */ container, /** @type {string} */ path) => `/${container}/${path.split('/').map(encodeURIComponent).join('/')}`;
-  return {
-    /**
-     * Returns the file's text, or null when the file isn't there.
-     * @param {string} container
-     * @param {string} path  Relative to the container, e.g. access/access_scope.csv.
-     */
-    async readText(container, path) {
-      try {
-        return asText(await http.get(url(container, path), { headers: HEADERS }));
-      } catch (err) {
-        if (err instanceof HttpError && err.status === 404) return null;
-        throw err;
-      }
-    },
-    /**
-     * Writes a file, replacing any file at that path. Missing folders are created.
-     * @param {string} container
-     * @param {string} path
-     * @param {Uint8Array} data
-     */
-    writeFile: (container, path, data) => writeChunks(http, url(container, path), data),
-  };
-}
-
-/** @typedef {ReturnType<typeof dataLakeApi>} DataLakeApi */

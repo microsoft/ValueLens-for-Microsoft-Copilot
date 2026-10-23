@@ -19,7 +19,7 @@ const setRls = (config, enabled) => {
 };
 
 const ids = { auditIngester: 'nb-a', licensedUsers: 'nb-b', processor: 'nb-c', orgData: 'nb-d', m365Activity: 'nb-m', refreshModel: 'nb-r', workdayLander: 'nb-w', accessScope: 'nb-acc' };
-const modules = { orgData: true, m365Activity: true, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false };
+const modules = { orgData: true, m365Activity: true, agent365: false, productFeedback: false };
 
 test('access notebook: deployed only with org-scoped access on, and it ships', () => {
   const ds = defaultDataSources();

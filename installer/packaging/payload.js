@@ -5,21 +5,16 @@
  *   node/node.exe            Node.js, which runs everything below
  *   f/installer/             the installer, with its production dependencies
  *   f/<templates>            the notebooks, pipeline and semantic model templates it deploys
- *   f/app/                   the app, already built, with only the tools that deploy it
  * `f` stands in for the repo root, which keeps paths short when unpacked under the user's profile.
  */
 import { posix } from 'node:path';
 import { NOTEBOOKS, NOTEBOOKS_DIR } from '../src/catalog.js';
-import { APP_DIR, DEFAULT_SOURCE_DIR, PIPELINE_TEMPLATE } from '../src/sources.js';
-import { PREBUILT_STATIC } from '../src/steps/app.js';
-import { askFiles, loadAsk } from '../src/transform/data-agent.js';
-import { AGENT_EVALUATOR_TEMPLATE, CONSUMPTION_TEMPLATE, MODEL_TEMPLATE } from '../src/transform/model.js';
+import { PIPELINE_TEMPLATE } from '../src/sources.js';
+import { MODEL_TEMPLATE } from '../src/transform/model.js';
 
 export const EXE_NAME = 'AnalyticsHubInstaller.exe';
 /** The source folder (the repo root) inside the payload. */
 export const SOURCE_ROOT = 'f';
-/** The app folder inside the payload. */
-export const APP_PAYLOAD_DIR = posix.join(SOURCE_ROOT, APP_DIR);
 /**
  * Longest path allowed inside the payload. It unpacks to
  * `%LOCALAPPDATA%\AnalyticsHub\<version>-<hash>\`, about 70 characters for a typical profile, so
@@ -47,9 +42,6 @@ export function sourceFiles() {
     PIPELINE_TEMPLATE,
     ...NOTEBOOKS.map((nb) => posix.join(nb.dir ?? NOTEBOOKS_DIR, nb.file)),
     MODEL_TEMPLATE,
-    CONSUMPTION_TEMPLATE,
-    AGENT_EVALUATOR_TEMPLATE,
-    ...askFiles(/** @type {import('../src/transform/data-agent.js').Ask} */ (loadAsk(DEFAULT_SOURCE_DIR)).catalogue),
   ].map(slash);
 }
 
@@ -60,61 +52,6 @@ export function sourceFiles() {
 export function installerFile(rel) {
   return /^(bin|src)\//.test(rel) || ['package.json', 'package-lock.json', 'README.md'].includes(rel);
 }
-
-/**
- * Whether a tracked app file ships with the prebuilt app, given its path relative to the app
- * folder. `rayfin up` compiles the data schema with `rayfin/tsconfig.json`, which extends the
- * app's `tsconfig.json`. `rayfin.yml` ships rewritten by {@link prebuiltRayfinYml}.
- * @param {string} rel
- */
-export function appFile(rel) {
-  return ['tsconfig.json', 'LICENSE', 'rayfin/tsconfig.json'].includes(rel) || /^rayfin\/data\/[^/]+\.ts$/.test(rel);
-}
-
-/**
- * Points static hosting at the built app and drops its build command, so `rayfin up` deploys the
- * files as they are.
- * @param {string} yml  The app's `rayfin/rayfin.yml`.
- */
-export function prebuiltRayfinYml(yml) {
-  const lines = yml.replace(/\r\n/g, '\n').split('\n');
-  const start = lines.findIndex((l) => /^ {2}staticHosting:\s*$/.test(l));
-  if (start < 0) throw new Error('rayfin.yml has no staticHosting section.');
-  let end = lines.findIndex((l, i) => i > start && /^ {0,2}\S/.test(l));
-  if (end < 0) end = lines.length;
-  const section = lines.slice(start + 1, end);
-  const folder = section.findIndex((l) => /^ {4}folder:/.test(l));
-  if (folder < 0) throw new Error('rayfin.yml has no staticHosting folder.');
-  section[folder] = `    folder: ${PREBUILT_STATIC}`;
-  const kept = section.filter((l) => !/^ {4}buildCommand:/.test(l));
-  return [...lines.slice(0, start + 1), ...kept, ...lines.slice(end)].join('\n');
-}
-
-/**
- * `package.json` for the prebuilt app: just the tools `rayfin up` needs. Listing vite lets
- * Rayfin recognise the app without installing it.
- * @param {{ rayfin: string, vite: string, version: string }} v
- */
-export function appPackageJson(v) {
-  return {
-    name: 'analytics-hub-app',
-    version: v.version,
-    private: true,
-    type: 'module',
-    dependencies: {
-      '@microsoft/rayfin-cli': v.rayfin,
-      '@microsoft/rayfin-core': v.rayfin,
-    },
-    devDependencies: { vite: v.vite },
-  };
-}
-
-/** `src/fabric.generated.ts` for the prebuilt build: no models, so the app reads them at runtime. */
-export const EMPTY_GENERATED = `// Built for the installer download. The app reads its semantic models from fabric.config.json.
-export const fabricConfig = {
-  semanticModels: {},
-} as const;
-`;
 
 /**
  * Names the payload by version and content, so a new download unpacks afresh.
@@ -136,19 +73,12 @@ export function fileVersion(version) {
 }
 
 /**
- * Whether an installed package's file can be left out of the payload. Nothing reads these when the
- * installer runs:
- * - source maps, a fifth of the download;
- * - esbuild (an unsigned exe) and tsx, which needs it. Rayfin lists tsx but never imports it, and
- *   compiles the data schema with TypeScript's tsc.js instead;
- * - msal-node-runtime's native sign-in broker for each OS. Rayfin doesn't use the broker, and
- *   msal-node-extensions carries on without it.
+ * Whether an installed package's file can be left out of the payload: source maps, which nothing
+ * reads when the installer runs.
  * @param {string} rel  Relative to the payload root.
  */
 export function prunable(rel) {
-  return /(^|\/)node_modules\/.+\.map$/i.test(rel)
-    || /(^|\/)node_modules\/(@esbuild|esbuild|tsx)\//i.test(rel)
-    || /(^|\/)node_modules\/@azure\/msal-node-runtime\/dist\/(windows|linux|macos)\//i.test(rel);
+  return /(^|\/)node_modules\/.+\.map$/i.test(rel);
 }
 
 /**

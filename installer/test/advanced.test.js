@@ -2,10 +2,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { askAdvanced, asksAdvanced } from '../src/steps/advanced.js';
-import { planAzure } from '../src/steps/azure/index.js';
 import { capacityLabel, defaultsToNoVault, plan } from '../src/steps/plan.js';
 import { planResourceGraph } from '../src/steps/resource-graph.js';
-import { fakeArm, fakeCtx, fakeFabric, fakePowerBi, fakeUi } from './fakes.js';
+import { fakeArm, fakeCtx, fakeFabric, fakeUi } from './fakes.js';
 
 const PRE = /** @type {any} */ ({
   subscriptions: [{ subscriptionId: 'sub-1', displayName: 'Sub' }],
@@ -25,7 +24,7 @@ const ADVANCED_QUESTIONS = [
   'Lakehouse name',
   'How often should the pipeline run?',
   'Run the first load as soon as setup finishes?',
-  'Which currency should the Value page report in?',
+  'Which currency should the report show money in?',
 ];
 
 test('advanced: one question, No by default, and asked about outside the plan', async () => {
@@ -126,9 +125,6 @@ test('plan: a new Fabric install keeps the secret in the notebooks by default; K
   const chosen = fresh(fakeUi());
   chosen.config.keyVault.name = 'kv-test';
   assert.equal(defaultsToNoVault(chosen.ctx), false);
-  const azure = fresh(fakeUi());
-  azure.config.target = 'azure';
-  assert.equal(defaultsToNoVault(azure.ctx), false);
 });
 
 test('capacityLabel: the SKU and region when Fabric gives them', () => {
@@ -160,52 +156,4 @@ test('advanced: Resource Graph reads the saved scope, or the whole tenant, witho
   config.resourceGraph = { managementGroup: 'mg-1', agents: true, foundry: false };
   await planResourceGraph(ctx);
   assert.deepEqual(config.resourceGraph, { managementGroup: 'mg-1', agents: true, foundry: false });
-});
-
-/** The Azure questions behind Advanced settings. */
-const AZURE_ADVANCED = [
-  'Which data should the dashboard show?',
-  'Azure SQL region',
-  'Name prefix',
-  'Extra tags (key=value, comma-separated)',
-  'Networking',
-  'Who can view Analytics Hub?',
-  'How much audit history should the first load pull?',
-  'How often should the job run?',
-  'Run the first load as soon as setup finishes?',
-  'Which currency should the Value page report in?',
-  'Workday org data?',
-];
-
-/** @param {{ ui: import('../src/ui.js').Ui }} u */
-function azureCtx(u) {
-  const t = fakeCtx({ ui: u.ui, arm: fakeArm().api, fabric: fakeFabric().api, powerBi: fakePowerBi().api });
-  delete t.config.fabric.workspaceId;
-  return t;
-}
-
-test('advanced: an Azure plan with No asks only the essentials and keeps the defaults', async () => {
-  const u = fakeUi();
-  const { ctx, config } = azureCtx(u);
-  await planAzure(ctx, PRE);
-  assert.ok(u.asked.includes('Change the advanced settings?'));
-  assert.ok(u.asked.includes('Azure subscription'));
-  assert.ok(u.asked.includes('Azure region'));
-  for (const q of AZURE_ADVANCED) assert.ok(!u.asked.includes(q), `didn't ask "${q}"`);
-  const az = /** @type {import('../src/config.js').AzureConfig} */ (config.azure);
-  assert.equal(az.sampleData, false);
-  assert.equal(az.namePrefix, 'vlens');
-  assert.deepEqual(az.tags, {});
-  assert.equal(az.publicNetworkAccess, true);
-  assert.equal(az.sqlLocation, undefined);
-  assert.equal(config.schedule.timeZone, 'UTC');
-  assert.equal(config.reporting, undefined);
-  assert.equal(ctx.runFirstLoad, true);
-});
-
-test('advanced: an Azure plan with Yes asks the settings behind it', async () => {
-  const u = fakeUi({ yesTo: ['Change the advanced settings?'] });
-  const { ctx } = azureCtx(u);
-  await planAzure(ctx, PRE);
-  for (const q of AZURE_ADVANCED) assert.ok(u.asked.includes(q), `asked "${q}"`);
 });

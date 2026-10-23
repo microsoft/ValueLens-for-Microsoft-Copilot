@@ -8,34 +8,25 @@ import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 import { archiveConfig, emptyConfig, loadConfig, removeFile, saveConfig } from '../src/config.js';
 import { install } from '../src/install.js';
-import { checkSetupChanges, restoreSetupDraft, reviewSetup, setupCategories, setupRecovery } from '../src/setup.js';
+import { restoreSetupDraft, reviewSetup, setupCategories, setupRecovery } from '../src/setup.js';
 import { checkStaged, stageUpload, releaseStaged } from '../src/staging.js';
 import { parseForm } from '../src/ui.js';
 import { createWebUi } from '../src/web-ui.js';
 import { HttpError } from '../src/http.js';
-import { azureUninstall, planAzure } from '../src/steps/azure/index.js';
-import { fakeArm, fakeAzureGraph, fakeCtx, fakeFabric, fakePowerBi, fakeUi, httpError } from './fakes.js';
+import { fakeArm, fakeAzureGraph, fakeCtx, fakeFabric, fakePowerBi } from './fakes.js';
 
 /** @param {import('node:test').TestContext} t */
 function fixture(t) {
   const dir = mkdtempSync(join(tmpdir(), 'installer-setup-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const arm = fakeArm();
-  arm.regions.locations.push({ name: 'swedencentral', displayName: 'Sweden Central' });
   const fabric = fakeFabric();
   const graph = fakeAzureGraph();
   const powerBi = fakePowerBi();
-  powerBi.setDatasources([{ datasourceType: 'Sql', gatewayId: 'gw', datasourceId: 'ds', connectionDetails: { server: 'vlens-sql.database.windows.net', database: 'valuelens' } }]);
   const ui = createWebUi();
   const config = emptyConfig();
-  config.target = 'azure';
   config.tenantId = 'tenant-1';
-  config.azure = {
-    subscriptionId: 'sub-1', resourceGroup: 'rg', location: 'uksouth', namePrefix: 'vlens',
-    installId: 'install-1', publicNetworkAccess: true, ask: { mode: 'off' }, outputs: {},
-    powerBi: { workspaceId: 'ws-1' },
-    deploymentConfig: { subscriptionId: 'sub-1', resourceGroup: 'rg', location: 'uksouth', namePrefix: 'vlens', publicNetworkAccess: true },
-  };
+  Object.assign(config.fabric, { workspaceId: 'ws-1', workspaceName: 'Analytics', lakehouseId: 'lh-1', lakehouseName: 'ValueLens', capacityId: 'cap-f' });
   config.setup = { completed: setupCategories(config).map((cat) => cat.id), runFirstLoad: false };
   const { ctx } = fakeCtx({ config, ui, arm: arm.api, fabric: fabric.api, graph: {
       ...graph.api, myDirectoryRoles: async () => [], usersCanRegisterApps: async () => true,
@@ -101,53 +92,31 @@ test('web settings and forms expose no validators, reject invalid values and sup
   assert.equal(ui.cancelSection(), false);
 });
 
-test('structured failure recovery recognises region, model, policy and unknown failures', () => {
+test('structured failure recovery recognises region, policy and unknown failures', () => {
   const config = emptyConfig();
-  config.target = 'azure';
-  const error = new HttpError('SQL capacity is locked', { method: 'POST', url: 'https://management.azure.com', status: 409,
-    body: { error: { code: 'RegionDoesNotAllowProvisioning', message: 'SQL capacity is locked' } } });
-  const region = setupRecovery(new Error('SQL region failed', { cause: error }), config);
+  const error = new HttpError('Key Vault capacity is locked', { method: 'PUT', url: 'https://management.azure.com', status: 409,
+    body: { error: { code: 'RegionDoesNotAllowProvisioning', message: 'Key Vault capacity is locked' } } });
+  const region = setupRecovery(new Error('Key Vault region failed', { cause: error }), config);
   assert.equal(region.section, 'placement');
   assert.match(region.code ?? '', /RegionDoesNotAllowProvisioning/);
-  assert.equal(setupRecovery(new Error('CognitiveServices deployment InsufficientQuota'), config).section, 'ask');
-  assert.equal(setupRecovery(new Error('RequestDisallowedByPolicy'), config).section, 'networking');
+  assert.equal(setupRecovery(new Error('RequestDisallowedByPolicy'), config).section, 'identity');
   assert.equal(setupRecovery(new Error('Unknown failure'), config).section, undefined);
-});
-
-test('partial ARM success locks existing resources even without deployment outputs, but SQL can move before creation', async (t) => {
-  const { ctx, config, arm } = fixture(t);
-  assert.ok(config.azure);
-  const before = structuredClone(config);
-  config.azure.sqlLocation = 'swedencentral';
-  arm.resources.push({ type: 'Microsoft.Storage/storageAccounts', tags: { 'valuelens-install-id': 'install-1' } });
-  await checkSetupChanges(ctx, before);
-  config.azure.location = 'swedencentral';
-  await assert.rejects(checkSetupChanges(ctx, before), /Resources already exist/);
-  config.azure.location = 'uksouth';
-  arm.resources.push({ type: 'Microsoft.Sql/servers', tags: { 'valuelens-install-id': 'install-1' } });
-  await assert.rejects(checkSetupChanges(ctx, before), /SQL server already exists/);
-  config.azure.sqlLocation = undefined;
-  config.azure.publicNetworkAccess = false;
-  arm.resources.push({ type: 'Microsoft.App/managedEnvironments', tags: { 'valuelens-install-id': 'install-1' } });
-  await assert.rejects(checkSetupChanges(ctx, before), /Networking cannot change/);
-  config.azure.resourceGroup = 'different';
-  await assert.rejects(checkSetupChanges(ctx, before), /Keep the subscription/);
 });
 
 test('a saved draft resumes without overwriting the deployed record; cancel restores the whole category', async (t) => {
   const { ctx, config, ui, draft } = fixture(t);
-  assert.ok(config.azure);
   const original = readFileSync(ctx.file, 'utf8');
   let visits = 0;
   respond(ui, (e) => {
-    if (e.kind === 'settings') return visits++ ? 'close' : 'networking';
-    if (e.kind === 'form') return { access: 'private', dns: 'none', dnsGroup: '' };
+    if (e.kind === 'settings') return visits++ ? 'close' : 'schedule';
+    if (e.kind === 'form') return { frequency: 'weekly', weekday: 'Friday', time: '03:00' };
+    if (e.kind === 'select' || e.kind === 'confirm') return e.default;
     throw new Error(`Unexpected question: ${e.message}`);
   });
   assert.equal(await reviewSetup(ctx), false);
-  assert.equal(config.azure.publicNetworkAccess, false);
+  assert.equal(config.schedule.frequency, 'weekly');
   assert.equal(readFileSync(ctx.file, 'utf8'), original);
-  assert.equal(loadConfig(draft).config.azure?.privateDns?.mode, 'none');
+  assert.equal(loadConfig(draft).config.schedule.frequency, 'weekly');
 
   const resumed = createWebUi();
   ctx.ui = resumed;
@@ -156,27 +125,36 @@ test('a saved draft resumes without overwriting the deployed record; cancel rest
     if (e.kind === 'settings') {
       if (restored) return 'close';
       restored = true;
-      assert.match(e.categories.find((/** @type {any} */ c) => c.id === 'networking').summary, /Private/);
-      return 'networking';
+      assert.match(e.categories.find((/** @type {any} */ c) => c.id === 'schedule').summary, /weekly, 03:00/);
+      return 'schedule';
     }
+    if (e.kind === 'select' && e.message.startsWith('How much audit history')) return 2;
     if (e.kind === 'form') return null;
     throw new Error(`Unexpected question: ${e.message}`);
   });
   await reviewSetup(ctx);
-  assert.equal(config.azure.privateDns?.mode, 'none');
+  assert.equal(config.schedule.frequency, 'weekly');
+  assert.equal(config.history.days, 30, 'the history answered before cancelling is restored too');
   assert.ok(existsSync(draft));
 });
 
 test('a validation failure keeps the overview open and refreshes availability for the next retry', async (t) => {
-  const { ctx, ui, arm } = fixture(t);
+  const { ctx, ui, fabric } = fixture(t);
   ctx.setupRetry = true;
-  arm.restrictedSqlRegions.add('uksouth');
+  const capacities = fabric.api.listCapacities;
+  let paused = true;
+  let lists = 0;
+  fabric.api.listCapacities = async () => {
+    lists++;
+    const listed = (await capacities()).map((cap) => (cap.id === 'cap-f' && paused ? { ...cap, state: 'Paused' } : cap));
+    return [...listed, { id: 'cap-2', displayName: 'Spare', sku: 'F2', region: 'West US 3', state: 'Active' }];
+  };
   let visits = 0;
   respond(ui, (e) => {
     if (e.kind === 'settings') {
-      assert.match(e.notice, /SQL/);
+      assert.match(e.notice, /Review Fabric placement/);
       visits++;
-      arm.restrictedSqlRegions.clear();
+      paused = false;
       return 'deploy';
     }
     if (e.kind === 'confirm' && e.message === 'Go ahead?') return true;
@@ -184,30 +162,47 @@ test('a validation failure keeps the overview open and refreshes availability fo
   });
   assert.equal(await reviewSetup(ctx), true);
   assert.equal(visits, 1);
-  assert.ok(arm.calls.filter((c) => c === 'sqlCapability uksouth').length >= 2);
+  assert.ok(lists >= 2);
 });
 
-test('failed deployment -> edit only SQL placement -> successful retry, without asking other categories', async (t) => {
-  const { ctx, config, ui, arm, draft } = fixture(t);
-  assert.ok(config.azure);
-  ctx.setupRetry = true;
-  let fail = true;
-  const deploy = arm.api.deployTemplate;
-  arm.api.deployTemplate = async (...args) => {
-    if (fail) {
-      fail = false;
-      arm.resources.push({ type: 'Microsoft.Storage/storageAccounts', tags: { 'valuelens-install-id': 'install-1' } });
-      throw new Error('RegionDoesNotAllowProvisioning: SQL capacity locked in UK South');
+test('failed deployment -> edit only Fabric placement -> successful retry, without asking other categories', async (t) => {
+  const { ctx, config, ui, fabric, graph, draft } = fixture(t);
+  // What the rest of the install reads and writes.
+  delete config.keyVault.uri;
+  config.keyVault.mode = 'notebook';
+  graph.applications.push({ id: 'obj-1', appId: 'app-1', displayName: 'Analytics Hub' });
+  Object.assign(ctx.api.graph, {
+    subscribedSkus: async () => {
+      throw new Error('Forbidden');
+    },
+    ensureRequiredAccess: async () => false,
+    appRoleAssignments: async () => (await graph.api.graphServicePrincipal()).appRoles.map((r) => ({ resourceId: 'graph-sp', appRoleId: r.id })),
+  });
+  Object.assign(ctx.api, /** @type {any} */ ({
+    keyVault: {},
+    discovery: {},
+    oneLake: { readJson: async () => null, readText: async () => null, createDirectory: async () => {}, writeFile: async () => {} },
+  }));
+  ctx.save();
+  const capacities = fabric.api.listCapacities;
+  fabric.api.listCapacities = async () => [...(await capacities()), { id: 'cap-2', displayName: 'Spare', sku: 'F2', region: 'West US 3', state: 'Active' }];
+  const assign = fabric.api.assignToCapacity;
+  let paused = true;
+  fabric.api.assignToCapacity = async (id, capacityId) => {
+    if (paused) {
+      paused = false;
+      throw new Error('CapacityNotActive: The capacity is paused.');
     }
-    return deploy(...args);
+    return assign(id, capacityId);
   };
+  ctx.setupRetry = true;
   respond(ui, (e) => {
     if (e.kind === 'confirm' && e.message === 'Go ahead?') return true;
     throw new Error(`Unexpected question: ${e.message}`);
   });
-  await assert.rejects(install(ctx, { wait: false }), /SQL capacity locked/);
+  await assert.rejects(install(ctx, { wait: false }), /CapacityNotActive/);
   assert.equal(existsSync(draft), false, 'approved draft must not be recreated');
-  assert.equal(loadConfig(ctx.file).config.azure?.deploymentConfig?.location, 'uksouth');
+  assert.equal(loadConfig(ctx.file).config.fabric.capacityId, 'cap-f');
 
   ctx.setupRetry = false;
   ctx.setupSection = 'placement';
@@ -216,25 +211,24 @@ test('failed deployment -> edit only SQL placement -> successful retry, without 
   const unrelated = { schedule: structuredClone(config.schedule), modules: structuredClone(config.modules), access: structuredClone(config.access) };
   const asked = respond(retryUi, (e) => {
     if (e.kind === 'settings') return 'deploy';
+    if (e.kind === 'select' && e.message === 'Which capacity should run it?') return e.choices.findIndex((/** @type {any} */ ch) => ch.name.startsWith('Spare'));
     if (e.kind === 'select') return e.default;
-    if (e.kind === 'input') return e.default;
-    if (e.kind === 'form') return { location: 'uksouth', sqlLocation: 'swedencentral', namePrefix: 'vlens', tags: '' };
-    if (e.kind === 'confirm') return e.message === 'Go ahead?' ? true : false;
+    if (e.kind === 'confirm') return e.message === 'Go ahead?';
     throw new Error(`Unrelated question: ${e.message}`);
   });
   assert.equal(await install(ctx, { wait: false }), true);
-  assert.equal(config.azure.sqlLocation, 'swedencentral');
-  assert.equal(config.azure.deploymentConfig?.sqlLocation, 'swedencentral');
+  assert.equal(config.fabric.capacityId, 'cap-2');
+  assert.equal(loadConfig(ctx.file).config.fabric.capacityId, 'cap-2');
   assert.deepEqual({ schedule: config.schedule, modules: config.modules, access: config.access }, unrelated);
   assert.ok(!asked.some((m) => /What to collect|How often|Who can view|advanced settings/i.test(m)));
   assert.equal(existsSync(draft), false);
-  assert.ok(config.azure.outputs?.webUrl);
+  assert.ok(fabric.calls.includes('assignToCapacity ws-1 cap-2'));
+  assert.ok(config.fabric.pipelineId, 'the rest of the install ran');
 });
 
 test('fresh setup refuses deployment until required categories have been reviewed', async (t) => {
   const { ctx, config, ui } = fixture(t);
-  assert.ok(config.azure);
-  delete config.azure.deploymentConfig;
+  delete config.fabric.lakehouseId;
   delete config.setup;
   ctx.setupRetry = true;
   respond(ui, (e) => {
@@ -268,42 +262,24 @@ test('newer deployment IDs are never overwritten by an older draft; conflict res
   assert.ok(existsSync(draft), 'a new draft uses the latest deployment state');
 });
 
-test('an existing AI account permits disabling Ask or using another deployment, without moving it', async (t) => {
-  const { ctx, config, arm } = fixture(t);
-  assert.ok(config.azure);
-  config.azure.ask = { mode: 'create', location: 'uksouth' };
-  const before = structuredClone(config);
-  arm.resources.push({ type: 'Microsoft.CognitiveServices/accounts', tags: { 'valuelens-install-id': 'install-1' } });
-  config.azure.ask = { mode: 'off' };
-  await checkSetupChanges(ctx, before);
-  config.azure.ask = { mode: 'existing', endpoint: 'https://other.openai.azure.com', deployment: 'model' };
-  await checkSetupChanges(ctx, before);
-  config.azure.ask = { mode: 'create', location: 'swedencentral' };
-  await assert.rejects(checkSetupChanges(ctx, before), /AI account already exists/);
-});
-
-test('switching demo to tenant data invalidates connections and governance even when modules do not change', async (t) => {
+test('a data change that switches a module on invalidates connections, access and governance', async (t) => {
   const { ctx, config, ui } = fixture(t);
-  assert.ok(config.azure);
-  config.azure.sampleData = true;
   ctx.setupSection = 'data';
   respond(ui, (e) => {
-    if (e.kind === 'checkbox') return e.choices.flatMap((/** @type {any} */ ch, /** @type {number} */ i) => ch.checked ? [i] : []);
-    if (e.kind === 'select') return 0;
+    if (e.kind === 'sources') return { modes: { productFeedback: 'csv' } };
     if (e.kind === 'settings') {
-      assert.equal(e.categories.find((/** @type {any} */ c) => c.id === 'sources').complete, false);
-      assert.equal(e.categories.find((/** @type {any} */ c) => c.id === 'governance').complete, false);
+      for (const id of ['sources', 'access', 'governance']) assert.equal(e.categories.find((/** @type {any} */ c) => c.id === id).complete, false, id);
+      assert.equal(e.categories.find((/** @type {any} */ c) => c.id === 'data').complete, true);
       return 'close';
     }
     throw new Error(`Unexpected question: ${e.message}`);
   });
   await reviewSetup(ctx);
-  assert.equal(config.azure.sampleData, false);
+  assert.equal(config.modules.productFeedback, true);
 });
 
 test('selected uploads survive Save and close, and missing staged files explicitly require reselection', async (t) => {
   const { ctx, config, ui } = fixture(t);
-  config.target = 'fabric';
   config.dataSources.agent365 = 'csv';
   const upload = stageUpload('agents.csv', new TextEncoder().encode('Agent name,Title ID,Publisher type,Availability,Created by\nA,1,x,y,z\n'));
   t.after(() => releaseStaged(upload.token));
@@ -384,95 +360,6 @@ test('a locked draft after approval does not block the next deployment with a fa
   assert.equal(existsSync(draft), false);
 });
 
-test('re-running setup into an existing resource group means uninstall deletes only tagged resources, never that group', async () => {
-  const arm = fakeArm();
-  const u = fakeUi();
-  const select = u.ui.select;
-  u.ui.select = async (message, choices, def) => message === 'Resource group' ? /** @type {any} */ ('rg-shared') : select(message, choices, def);
-  const { ctx, config } = fakeCtx({ ui: u.ui, arm: arm.api, fabric: fakeFabric().api, powerBi: fakePowerBi().api });
-  delete config.fabric.workspaceId;
-  config.target = 'azure';
-  // An earlier install created its own group.
-  config.azure = { subscriptionId: 'sub-1', resourceGroup: 'rg-analytics-hub', resourceGroupMode: 'new', createdResourceGroup: true, location: 'uksouth', installId: 'install-1' };
-  await arm.api.ensureResourceGroup('sub-1', 'rg-analytics-hub', 'uksouth', { 'valuelens-install-id': 'install-1' });
-  await arm.api.ensureResourceGroup('sub-1', 'rg-shared', 'uksouth');
-  arm.resources.push({ id: '/subscriptions/sub-1/resourceGroups/rg-shared/providers/Microsoft.Storage/storageAccounts/ours', type: 'Microsoft.Storage/storageAccounts', tags: { 'valuelens-install-id': 'install-1' } });
-  arm.resources.push({ id: '/subscriptions/sub-1/resourceGroups/rg-shared/providers/Microsoft.Storage/storageAccounts/theirs', type: 'Microsoft.Storage/storageAccounts', tags: {} });
-  await planAzure(ctx, { subscriptions: [{ subscriptionId: 'sub-1', displayName: 'Sub' }], capacities: [] });
-  assert.equal(config.azure.resourceGroup, 'rg-shared');
-  assert.equal(config.azure.createdResourceGroup, false);
-  await azureUninstall(ctx);
-  assert.ok(!arm.calls.some((c) => c.startsWith('deleteResourceGroup')), 'the existing group is never deleted');
-  assert.ok(arm.calls.includes('deleteResource /subscriptions/sub-1/resourceGroups/rg-shared/providers/Microsoft.Storage/storageAccounts/ours'));
-  assert.ok(!arm.calls.some((c) => c.endsWith('/theirs')));
-});
-
-/** listResources as ARM answers it: 404 ResourceGroupNotFound until the group exists. @param {ReturnType<typeof fakeArm>} arm */
-function groupMustExist(arm) {
-  arm.api.listResources = async (_sub, rg) => {
-    if (!arm.groups[rg]) throw httpError(404, 'ResourceGroupNotFound');
-    return arm.resources;
-  };
-}
-
-/** Retry from the Placement category, moving to a new resource group. @param {import('../src/install.js').Ctx} ctx */
-function moveToNewGroup(ctx) {
-  ctx.setupSection = 'placement';
-  const ui = createWebUi();
-  ctx.ui = ui;
-  respond(ui, (e) => {
-    if (e.kind === 'settings') return 'deploy';
-    if (e.kind === 'input' && e.message === 'New resource group name') return 'rg-other';
-    if (e.kind === 'select' || e.kind === 'input') return e.default;
-    if (e.kind === 'form') return { location: 'uksouth', sqlLocation: '', namePrefix: 'vlens2', tags: '' };
-    if (e.kind === 'confirm') return e.message === 'Go ahead?';
-    throw new Error(`Unexpected question: ${e.message}`);
-  });
-}
-
-test('a first deploy that fails before its resource group exists leaves placement editable for the retry', async (t) => {
-  const { ctx, config, ui, arm } = fixture(t);
-  assert.ok(config.azure);
-  delete config.azure.deploymentConfig;
-  ctx.save();
-  groupMustExist(arm);
-  const ensure = arm.api.ensureResourceGroup;
-  let denied = true;
-  arm.api.ensureResourceGroup = async (...args) => {
-    if (denied) { denied = false; throw httpError(403, 'AuthorizationFailed'); }
-    return ensure(...args);
-  };
-  ctx.setupRetry = true;
-  respond(ui, (e) => {
-    if (e.kind === 'confirm' && e.message === 'Go ahead?') return true;
-    throw new Error(`Unexpected question: ${e.message}`);
-  });
-  await assert.rejects(install(ctx, { wait: false }), /AuthorizationFailed/);
-  assert.equal(loadConfig(ctx.file).config.azure?.deploymentConfig, undefined, 'nothing to reuse yet');
-
-  ctx.setupRetry = false;
-  moveToNewGroup(ctx);
-  assert.equal(await install(ctx, { wait: false }), true);
-  assert.equal(config.azure.resourceGroup, 'rg-other');
-  assert.equal(loadConfig(ctx.file).config.azure?.deploymentConfig?.resourceGroup, 'rg-other');
-  assert.equal(config.azure.namePrefix, 'vlens2');
-});
-
-test('a record whose deployment config outlived a missing resource group can still change placement', async (t) => {
-  const { ctx, config, arm } = fixture(t);
-  assert.ok(config.azure);
-  groupMustExist(arm);
-  const before = structuredClone(config);
-  config.azure.resourceGroup = 'rg-other';
-  await checkSetupChanges(ctx, before);
-  config.azure.resourceGroup = 'rg';
-
-  moveToNewGroup(ctx);
-  assert.equal(await install(ctx, { wait: false }), true);
-  assert.equal(config.azure.resourceGroup, 'rg-other');
-  assert.equal(config.azure.deploymentConfig?.resourceGroup, 'rg-other');
-});
-
 /** A new session (fresh ctx) on the same install record, as the next repair would start. @param {ReturnType<typeof fixture>} f */
 function reopen(f) {
   const config = loadConfig(f.ctx.file).config;
@@ -509,7 +396,6 @@ test('an approved deployment keeps its first-load and reload choices out of the 
 
 test('a new session ignores first-load and reload choices an install record saved earlier', async (t) => {
   const f = fixture(t);
-  f.config.target = 'fabric';
   f.config.firstRun = { status: 'Completed' };
   f.config.setup = { completed: setupCategories(f.config).map((cat) => cat.id), runFirstLoad: true, reloadHistoryDays: 90 };
   f.ctx.save();
@@ -526,14 +412,6 @@ test('a new session ignores first-load and reload choices an install record save
   const incomplete = reopen(f);
   await reviewSetup(incomplete.ctx);
   assert.equal(incomplete.ctx.runFirstLoad, true, 'a record from before browser setup still finishes its first load');
-
-  rmSync(`${f.ctx.file}.draft.json`);
-  f.config.target = 'azure';
-  f.config.setup = { completed: setupCategories(f.config).map((cat) => cat.id), runFirstLoad: false };
-  f.ctx.save();
-  const azure = reopen(f);
-  await reviewSetup(azure.ctx);
-  assert.equal(azure.ctx.runFirstLoad, true, 'Azure runs the load on each setup, as before');
 });
 
 test('setupCategories: Governance says Resource Graph is off when that source is skipped', () => {
@@ -544,8 +422,4 @@ test('setupCategories: Governance says Resource Graph is off when that source is
   config.dataSources.resourceGraph = 'api';
   config.resourceGraph.foundry = false;
   assert.equal(governance(config), 'Resource Graph: agents on, Foundry off');
-  // Azure's demo data doesn't read it either.
-  config.target = 'azure';
-  config.azure = /** @type {any} */ ({ sampleData: true });
-  assert.equal(governance(config), 'Resource Graph: off');
 });

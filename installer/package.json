@@ -17,7 +17,6 @@
   },
   "scripts": {
     "start": "node bin/valuelens-install.js",
-    "build:arm": "az bicep build --file \"../azure/infra/main.bicep\" --outfile \"src/azure/main.arm.json\"",
     "build:exe": "node packaging/build-exe.js",
     "test": "node --test",
     "typecheck": "tsc -p jsconfig.json"

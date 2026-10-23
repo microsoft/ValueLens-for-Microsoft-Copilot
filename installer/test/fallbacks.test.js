@@ -14,7 +14,7 @@ import { parseCli } from '../src/cli.js';
 import { secretMode } from '../src/config.js';
 import { HttpError } from '../src/http.js';
 import { rotateSecret } from '../src/install.js';
-import { CREATE_SETTLE_MS, createdId, ensureNotebooks, ensurePipeline, modelKey, SECRET_SETTLE_MS, secretLabel, settleSecretAttempts, stoppedRunItem } from '../src/steps/fabric.js';
+import { CREATE_SETTLE_MS, createdId, ensureNotebooks, ensurePipeline, SECRET_SETTLE_MS, secretLabel, settleSecretAttempts, stoppedRunItem } from '../src/steps/fabric.js';
 import { flowsSkipped, flowsWanted } from '../src/steps/flows.js';
 import {
   ADMIN_PACK_FILE,
@@ -580,8 +580,6 @@ test('a run stopped while Fabric creates a model: planning keeps its name and th
   await deployModel(o.ctx, o.config.semanticModel, { signature: 's', definition: () => ({ parts: [] }) });
   assert.deepEqual(other.calls.filter((c) => /SemanticModel /.test(c)), ['createSemanticModel Analytics Hub Model 2']);
   assert.equal(theirs.content, 'theirs');
-  assert.equal(modelKey(o.config, o.config.consumption.model), 'consumption');
-  assert.equal(modelKey(o.config, o.config.agentEvaluator.model), 'agentEvaluator');
 });
 
 test('a run stopped moments ago: waits for the item Fabric is still creating, rather than making a second', async () => {
@@ -1082,14 +1080,11 @@ test('notebook mode: --no-key-vault (or --secret-in-notebook) goes with a Fabric
   assert.equal(parseCli(['install']).secretInNotebook, false);
   assert.throws(() => parseCli(['update', '--secret-in-notebook']), /--secret-in-notebook goes with install/);
   assert.throws(() => parseCli(['update', '--no-key-vault']), /--no-key-vault goes with install/);
-  assert.throws(() => parseCli(['install', '--target', 'azure', '--secret-in-notebook']), /Fabric target only/);
-  assert.throws(() => parseCli(['install', '--target', 'azure', '--no-key-vault']), /Fabric target only/);
   assert.throws(() => parseCli(['install', '--flow-identity', 'app', '--no-key-vault']), /can't go with --no-key-vault/);
   assert.equal(parseCli(['install', '--key-vault']).useKeyVault, true);
   assert.equal(parseCli(['install']).useKeyVault, false);
   assert.throws(() => parseCli(['install', '--key-vault', '--no-key-vault']), /--key-vault can't go with --no-key-vault/);
   assert.throws(() => parseCli(['update', '--key-vault']), /--key-vault goes with install/);
-  assert.throws(() => parseCli(['install', '--target', 'azure', '--key-vault']), /Fabric target only/);
 });
 
 test('--secret-days: a whole number of days up to 730, for a Fabric install or rotate-secret', () => {
@@ -1098,7 +1093,6 @@ test('--secret-days: a whole number of days up to 730, for a Fabric install or r
   assert.equal(parseCli(['rotate-secret', '--secret-days', '730']).secretDays, 730);
   for (const bad of ['0', '731', '1.5', 'soon']) assert.throws(() => parseCli(['install', '--secret-days', bad]), /--secret-days/);
   assert.throws(() => parseCli(['update', '--secret-days', '30']), /--secret-days/);
-  assert.throws(() => parseCli(['install', '--target', 'azure', '--secret-days', '30']), /--secret-days/);
 });
 
 test('planning: a vault the user can\'t write to recommends no Key Vault, then the vault admin', async () => {

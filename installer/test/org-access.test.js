@@ -2,15 +2,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { EVERYONE_ROLE, SCOPED_ROLE } from '../src/transform/access.js';
-import { buildAgentEvaluatorModel, buildModel, loadTemplateModel } from '../src/transform/model.js';
+import { buildModel, loadTemplateModel } from '../src/transform/model.js';
 import { deployedRoles, deployModel, definitionRoles } from '../src/steps/model.js';
 import { armApi, ROLES } from '../src/clients/azure.js';
 import { HttpError } from '../src/http.js';
 import {
   addScope,
   applyOrgAccess,
-  AZURE_ROLES_FILE,
-  AZURE_SCOPE_FILE,
   defaultAll,
   describeScope,
   ensureOrgAccess,
@@ -27,10 +25,8 @@ import {
   scopeCsv,
   scopeKey,
   seedRows,
-  STORAGE_ATTEMPTS,
-  STORAGE_RETRY_MS,
 } from '../src/steps/org-access.js';
-import { fakeArm, fakeCtx, fakeFabric, fakePowerBi, fakeUi, realSources } from './fakes.js';
+import { fakeCtx, fakeFabric, fakePowerBi, fakeUi, realSources } from './fakes.js';
 
 const now = new Date('2026-06-01T12:00:00Z');
 const by = { grantedBy: 'Admin@Contoso.com', now };
@@ -149,36 +145,21 @@ test('describeScope: in words', () => {
   assert.equal(describeScope({ ...newRow({ upn: '*', type: 'org', value: 'France' }, by), Status: 'pending_group' }, 'country'), 'Anyone without a scope: country "France" (waiting for an admin)');
 });
 
-test('rlsModels: the deployed models on each target', () => {
+test('rlsModels: the ValueLens model, once it is deployed', () => {
   const { config } = fakeCtx();
   config.semanticModel.enabled = true;
   config.semanticModel.id = 'ds-vl';
-  config.modules.consumption = true;
-  config.consumption.model.id = 'ds-cc';
-  config.modules.agentEvaluator = true;
-  assert.deepEqual(rlsModels(config).map((m) => [m.kind, m.datasetId]), [['valuelens', 'ds-vl'], ['consumption', 'ds-cc']]);
-  config.agentEvaluator.model.id = 'ds-ae';
-  assert.deepEqual(rlsModels(config).map((m) => m.kind), ['valuelens', 'consumption', 'agentEvaluator']);
-  config.target = 'azure';
-  config.azure = /** @type {any} */ ({ powerBi: { workspaceId: 'pbi-ws', datasetId: 'az-vl', consumptionDatasetId: 'az-cc' } });
-  assert.deepEqual(rlsModels(config).map((m) => [m.kind, m.workspaceId, m.datasetId]), [['valuelens', 'pbi-ws', 'az-vl'], ['consumption', 'pbi-ws', 'az-cc']]);
-  config.modules.consumption = false;
-  assert.deepEqual(rlsModels(config).map((m) => m.kind), ['valuelens'], 'a Consumption model kept after an untick is left out, as on Fabric');
-  config.modules.consumption = true;
-  /** @type {any} */ (config.azure).powerBi.agentEvaluatorDatasetId = 'az-ae';
-  assert.deepEqual(rlsModels(config).map((m) => [m.kind, m.workspaceId, m.datasetId]), [['valuelens', 'pbi-ws', 'az-vl'], ['consumption', 'pbi-ws', 'az-cc'], ['agentEvaluator', 'pbi-ws', 'az-ae']]);
-  assert.equal(rlsModels(config)[2].model, config.agentEvaluator.model);
+  assert.deepEqual(rlsModels(config).map((m) => [m.kind, m.workspaceId, m.datasetId]), [['valuelens', 'ws-1', 'ds-vl']]);
+  assert.equal(rlsModels(config)[0].model, config.semanticModel);
+  config.semanticModel.id = undefined;
+  assert.deepEqual(rlsModels(config), [], 'not deployed yet');
 });
 
-test('rlsBlockers: no model, a Pro workspace or private networking', () => {
+test('rlsBlockers: no model deployed yet', () => {
   const { ctx, config } = fakeCtx();
   assert.match(rlsBlockers(ctx).join('\n'), /No semantic model is deployed yet/);
-  config.target = 'azure';
-  config.azure = /** @type {any} */ ({ powerBi: { workspaceId: 'pbi-ws', datasetId: 'az-vl' }, publicNetworkAccess: false });
-  const blockers = rlsBlockers(ctx).join('\n');
-  assert.match(blockers, /private networking/);
-  assert.match(blockers, /Pro licence/);
-  config.azure = /** @type {any} */ ({ powerBi: { workspaceId: 'pbi-ws', datasetId: 'az-vl', capacityId: 'cap-1' } });
+  config.semanticModel.enabled = true;
+  config.semanticModel.id = 'ds-vl';
   assert.deepEqual(rlsBlockers(ctx), []);
 });
 
@@ -330,87 +311,6 @@ test('the menu: give someone a scope adds them to the group; turning it off keep
   assert.deepEqual(config.access?.rls, { enabled: false, orgAttribute: 'department', applied: [] });
 });
 
-test('apply on Azure: writes to the landing container, applies roles in the Power BI workspace, then runs only access and refresh', async () => {
-  const fabric = fakeFabric();
-  const arm = fakeArm();
-  const store = files();
-  /** @type {string[]} */
-  const accounts = [];
-  const dataLake = (/** @type {string} */ account) => {
-    accounts.push(account);
-    return {
-      readText: async (/** @type {string} */ container, /** @type {string} */ path) => store.read(`${container}/${path}`),
-      writeFile: async (/** @type {string} */ container, /** @type {string} */ path, /** @type {Uint8Array} */ bytes) => store.write(`${container}/${path}`, bytes),
-    };
-  };
-  const { ctx, config } = fakeCtx({ fabric: fabric.api, arm: arm.api, dataLake, powerBi: fakePowerBi().api });
-  config.target = 'azure';
-  config.azure = /** @type {any} */ ({
-    subscriptionId: 'sub-1',
-    resourceGroup: 'rg-vl',
-    outputs: { storageAccountName: 'vlensstabc', runJobName: 'vlens-run', migrateJobName: 'vlens-migrate' },
-    powerBi: { workspaceId: 'pbi-ws', datasetId: 'az-vl', capacityId: 'cap-1' },
-  });
-  config.fabric.workspaceId = 'pbi-ws';
-  config.access = /** @type {any} */ ({ ...config.access, groupId: 'g-1', rls: { enabled: true, orgAttribute: 'department', applied: [] } });
-  store.map.set(`landing/${AZURE_SCOPE_FILE}`, scopeCsv(seedRows(['ana@contoso.com'], by)));
-  deployedRoles(ctx).set('az-vl', builtRoles());
-  fabric.jobs.push({ status: 'Completed' });
-
-  assert.equal(await applyOrgAccess(ctx), true);
-
-  assert.ok(accounts.every((a) => a === 'vlensstabc'));
-  assert.ok(arm.calls.some((c) => c.startsWith('assignRole /subscriptions/sub-1/resourceGroups/rg-vl/providers/Microsoft.Storage/storageAccounts/vlensstabc')));
-  assert.ok(store.map.has(`landing/${AZURE_ROLES_FILE}`));
-  assert.ok(fabric.calls.includes('createNotebook AnalyticsHub_Access_Scope'));
-  assert.equal(config.azure?.powerBi?.accessNotebookId, 'notebook-1');
-  const [params] = notebookRuns(fabric.calls);
-  assert.equal(params.MODE.value, 'membership');
-  assert.equal(params.ROLES_FILE.value, 'abfss://landing@vlensstabc.dfs.core.windows.net/access/roles.json');
-  assert.equal(params.WORKSPACE_ID.value, 'pbi-ws');
-  assert.ok(arm.calls.includes('startJob vlens-run'));
-  assert.deepEqual(arm.jobTemplates[0].containers[0].args, ['run', '--steps', 'access,refresh']);
-  assert.deepEqual(config.access?.rls?.applied, ['az-vl']);
-  assert.ok(config.azure?.status?.lastAccess);
-});
-
-test('apply on Azure: the Agent Evaluator model gets its roles too', async () => {
-  const fabric = fakeFabric();
-  const store = files();
-  const dataLake = () => ({
-    readText: async (/** @type {string} */ container, /** @type {string} */ path) => store.read(`${container}/${path}`),
-    writeFile: async (/** @type {string} */ container, /** @type {string} */ path, /** @type {Uint8Array} */ bytes) => store.write(`${container}/${path}`, bytes),
-  });
-  const { ctx, config } = fakeCtx({ fabric: fabric.api, arm: fakeArm().api, dataLake, powerBi: fakePowerBi().api });
-  config.target = 'azure';
-  config.azure = /** @type {any} */ ({
-    subscriptionId: 'sub-1',
-    resourceGroup: 'rg-vl',
-    outputs: { storageAccountName: 'vlensstabc', runJobName: 'vlens-run', migrateJobName: 'vlens-migrate' },
-    powerBi: { workspaceId: 'pbi-ws', datasetId: 'az-vl', agentEvaluatorDatasetId: 'az-ae', capacityId: 'cap-1' },
-  });
-  config.modules.agentEvaluator = true;
-  config.fabric.workspaceId = 'pbi-ws';
-  config.access = /** @type {any} */ ({ ...config.access, groupId: 'g-1', rls: { enabled: true, orgAttribute: 'department', applied: [] } });
-  store.map.set(`landing/${AZURE_SCOPE_FILE}`, scopeCsv(seedRows(['ana@example.com'], by)));
-  deployedRoles(ctx).set('az-vl', builtRoles());
-  const evaluator = buildAgentEvaluatorModel(loadTemplateModel(/** @type {string} */ (realSources().agentEvaluatorModelFile)), { ...lake, access: { orgAttribute: 'department' } });
-  deployedRoles(ctx).set('az-ae', /** @type {any[]} */ (evaluator.model.roles));
-  fabric.jobs.push({ status: 'Completed' });
-
-  assert.equal(await applyOrgAccess(ctx), true);
-
-  const items = JSON.parse(store.map.get(`landing/${AZURE_ROLES_FILE}`) ?? '[]');
-  assert.deepEqual([...new Set(items.map((/** @type {any} */ i) => `${i.dataset}|${i.datasetId}`))], [`${config.semanticModel.name}|az-vl`, `${config.agentEvaluator.model.name}|az-ae`]);
-  assert.deepEqual(items.filter((/** @type {any} */ i) => i.datasetId === 'az-ae').map((/** @type {any} */ i) => i.role.name).sort(), [EVERYONE_ROLE, SCOPED_ROLE].sort());
-  assert.deepEqual(config.access?.rls?.applied, ['az-vl', 'az-ae']);
-});
-
-const TURN_ON = 'Turn on org-scoped access? The models are redeployed and refreshed.';
-const READ_SCOPES = `read ${AZURE_SCOPE_FILE}`;
-const WRITE_SCOPES = `write ${AZURE_SCOPE_FILE}`;
-const WRITE_ROLES = `write ${AZURE_ROLES_FILE}`;
-const WAIT = `wait ${STORAGE_RETRY_MS}`;
 /** ARM refusing a role assignment, as it does someone who can't assign roles. */
 const refused = () =>
   new HttpError('PUT /subscriptions/sub-1/resourceGroups/rg-vl/providers/Microsoft.Storage/storageAccounts/vlensstabc/providers/Microsoft.Authorization/roleAssignments/x returned 403 AuthorizationFailed', {
@@ -419,179 +319,6 @@ const refused = () =>
     url: 'https://management.azure.com/x',
     code: 'AuthorizationFailed',
   });
-
-/**
- * An Azure install with the ValueLens model deployed. Its landing container refuses you with 403
- * AuthorizationPermissionMismatch, as Azure does, until you have Storage Blob Data Contributor on the
- * storage account, then for `lag` more calls while the role takes effect. The role is yours once the
- * fake ARM assigns it; assigning it again gives false, as a 409 RoleAssignmentExists does. `log` has
- * the role assignments, storage calls and waits, in order.
- * @param {{ rls?: boolean, hasRole?: boolean, lag?: number, storageRole?: boolean, answers?: any[] }} [o]
- *   hasRole: you have the role already, given by hand or on an earlier run. storageRole: the install
- *   has given it before, maybe to someone else.
- */
-function azureInstall(o = {}) {
-  const fabric = fakeFabric();
-  const arm = fakeArm();
-  const store = files();
-  /** @type {string[]} */
-  const log = [];
-  let hasRole = !!o.hasRole;
-  let lag = o.lag ?? 0;
-  const assign = arm.api.assignRole;
-  /** @type {any} */ (arm.api).assignRole = async (/** @type {string} */ scope, /** @type {string} */ role, /** @type {string} */ principal, /** @type {string} */ type) => {
-    await assign(scope, role, principal, type);
-    log.push('assignRole');
-    const added = !hasRole;
-    hasRole = true;
-    return added;
-  };
-  /** @param {'GET' | 'PUT'} method @param {string} container @param {string} path */
-  const gate = (method, container, path) => {
-    const what = `${method === 'GET' ? 'read' : 'write'} ${path}`;
-    if (hasRole && lag-- <= 0) {
-      log.push(what);
-      return;
-    }
-    log.push(`${what}: 403`);
-    throw new HttpError(`${method} /${container}/${path} returned 403 AuthorizationPermissionMismatch: This request is not authorized to perform this operation using this permission.`, {
-      status: 403,
-      method,
-      url: `https://vlensstabc.dfs.core.windows.net/${container}/${path}`,
-      code: 'AuthorizationPermissionMismatch',
-    });
-  };
-  const dataLake = () => ({
-    readText: async (/** @type {string} */ container, /** @type {string} */ path) => {
-      gate('GET', container, path);
-      return store.read(`${container}/${path}`);
-    },
-    writeFile: async (/** @type {string} */ container, /** @type {string} */ path, /** @type {Uint8Array} */ bytes) => {
-      gate('PUT', container, path);
-      await store.write(`${container}/${path}`, bytes);
-    },
-  });
-  const ui = fakeUi({ answers: o.answers, yesTo: [TURN_ON] });
-  const { ctx, config } = fakeCtx({ fabric: fabric.api, arm: arm.api, dataLake, powerBi: fakePowerBi().api, graph: viewerGraph().graph, ui: ui.ui });
-  const sleep = ctx.sleep;
-  ctx.sleep = async (ms) => {
-    log.push(`wait ${ms}`);
-    await sleep(ms);
-  };
-  config.target = 'azure';
-  config.azure = /** @type {any} */ ({
-    subscriptionId: 'sub-1',
-    resourceGroup: 'rg-vl',
-    outputs: { storageAccountName: 'vlensstabc', runJobName: 'vlens-run', migrateJobName: 'vlens-migrate' },
-    powerBi: { workspaceId: 'pbi-ws', datasetId: 'az-vl', capacityId: 'cap-1' },
-    ...(o.storageRole ? { storageRole: true } : {}),
-  });
-  config.fabric.workspaceId = 'pbi-ws';
-  config.access = /** @type {any} */ ({ ...config.access, groupId: 'g-1', groupName: 'Analytics Hub Viewers', ...(o.rls === false ? {} : { rls: { enabled: true, orgAttribute: 'department', applied: [] } }) });
-  deployedRoles(ctx).set('az-vl', builtRoles());
-  fabric.jobs.push({ status: 'Completed' });
-  return { ctx, config, arm, store, log, ui };
-}
-
-test('turning it on, on Azure: gives you the storage role before reading the scope list, and waits while it takes effect', async () => {
-  const { ctx, config, arm, store, log, ui } = azureInstall({ rls: false, lag: 2 });
-  let redeployed = 0;
-
-  await orgAccessCommand(ctx, async () => {
-    redeployed++;
-  });
-
-  assert.deepEqual(log, ['assignRole', `${READ_SCOPES}: 403`, WAIT, `${READ_SCOPES}: 403`, WAIT, READ_SCOPES, WRITE_SCOPES]);
-  assert.deepEqual(
-    arm.calls.filter((c) => c.startsWith('assignRole ')),
-    [`assignRole /subscriptions/sub-1/resourceGroups/rg-vl/providers/Microsoft.Storage/storageAccounts/vlensstabc ${ROLES.storageBlobDataContributor} user-1 User`],
-    'asked for once a run',
-  );
-  assert.match(ui.text(), /Gave you Storage Blob Data Contributor on vlensstabc, for org-scoped access/);
-  assert.equal(ui.text().split('Waiting for your storage role to take effect').length, 2, 'said once');
-  assert.deepEqual(parseScopeCsv(store.map.get(`landing/${AZURE_SCOPE_FILE}`)).map(scopeKey), ['admin@contoso.com|all|', 'ana@contoso.com|all|', 'ben@contoso.com|all|']);
-  assert.equal(redeployed, 1);
-  assert.equal(config.access?.rls?.enabled, true);
-});
-
-test('the menu on Azure: a second admin gets the storage role too, though the install gave it to someone before', async () => {
-  const { ctx, store, log, ui } = azureInstall({ storageRole: true, lag: 2, answers: ['remove', 'ana@contoso.com|all|', 'done'] });
-  store.map.set(`landing/${AZURE_SCOPE_FILE}`, scopeCsv(seedRows(['ana@contoso.com', 'ben@contoso.com'], by)));
-
-  await orgAccessCommand(ctx, async () => assert.fail('no redeploy'));
-
-  assert.deepEqual(log, ['assignRole', `${READ_SCOPES}: 403`, WAIT, `${READ_SCOPES}: 403`, WAIT, READ_SCOPES, WRITE_SCOPES]);
-  assert.match(ui.text(), /ana@contoso\.com: everyone/);
-  assert.deepEqual(parseScopeCsv(store.map.get(`landing/${AZURE_SCOPE_FILE}`)).map(scopeKey), ['ben@contoso.com|all|']);
-});
-
-test('apply on Azure: gives you the storage role before reading the scope list, and waits while it takes effect', async () => {
-  const { ctx, config, arm, store, log } = azureInstall({ lag: 3 });
-  store.map.set(`landing/${AZURE_SCOPE_FILE}`, scopeCsv(seedRows(['ana@contoso.com'], by)));
-
-  assert.equal(await applyOrgAccess(ctx), true);
-
-  assert.deepEqual(log, ['assignRole', `${READ_SCOPES}: 403`, WAIT, `${READ_SCOPES}: 403`, WAIT, `${READ_SCOPES}: 403`, WAIT, READ_SCOPES, WRITE_SCOPES, WRITE_ROLES]);
-  assert.ok(store.map.has(`landing/${AZURE_ROLES_FILE}`));
-  assert.deepEqual(arm.jobTemplates[0].containers[0].args, ['run', '--steps', 'access,refresh']);
-  assert.deepEqual(config.access?.rls?.applied, ['az-vl']);
-});
-
-test("org-scoped access on Azure, when you can't assign roles and don't have the storage role: says what to do, not the raw 403", async () => {
-  const on = azureInstall({ rls: false });
-  on.arm.failures.assignRole = [refused()];
-  await assert.rejects(orgAccessCommand(on.ctx, async () => assert.fail('no redeploy')), (/** @type {Error} */ err) => {
-    assert.match(err.message, /^You need Storage Blob Data Contributor on the storage account vlensstabc for org-scoped access, and you can't assign roles on it\./);
-    assert.match(err.message, /\(Azure portal > the storage account > Access control \(IAM\)\), wait about 5 minutes, then try again from ".*access"\.$/);
-    assert.doesNotMatch(err.message, /AuthorizationPermissionMismatch|403/);
-    return true;
-  });
-  assert.deepEqual(on.log, [`${READ_SCOPES}: 403`], 'tried once, in case it was given by hand, without waiting');
-  assert.equal(on.config.access?.rls, undefined);
-
-  const apply = azureInstall();
-  apply.arm.failures.assignRole = [refused()];
-  apply.store.map.set(`landing/${AZURE_SCOPE_FILE}`, scopeCsv(seedRows(['ana@contoso.com'], by)));
-  assert.equal(await applyOrgAccess(apply.ctx), false);
-  assert.match(apply.ui.text(), /✗ You need Storage Blob Data Contributor on the storage account vlensstabc for org-scoped access/);
-  assert.doesNotMatch(apply.ui.text(), /AuthorizationPermissionMismatch/);
-  assert.deepEqual(apply.log, [`${READ_SCOPES}: 403`]);
-  assert.ok(!apply.arm.calls.includes('startJob vlens-run'));
-});
-
-test("apply on Azure, when you can't assign roles but were given the storage role by hand: applies it", async () => {
-  const { ctx, arm, store, log, ui } = azureInstall({ hasRole: true });
-  arm.failures.assignRole = [refused(), refused()];
-  store.map.set(`landing/${AZURE_SCOPE_FILE}`, scopeCsv(seedRows(['ana@contoso.com'], by)));
-
-  assert.equal(await applyOrgAccess(ctx), true);
-
-  assert.deepEqual(log, [READ_SCOPES, WRITE_SCOPES, WRITE_ROLES]);
-  assert.doesNotMatch(ui.text(), /can't assign roles|✗/);
-});
-
-test('turning it on, on Azure, when you have the storage role already: a 409 counts as done, with no wait', async () => {
-  const { ctx, config, log, ui } = azureInstall({ rls: false, hasRole: true });
-
-  await orgAccessCommand(ctx, async () => {});
-
-  assert.deepEqual(log, ['assignRole', READ_SCOPES, WRITE_SCOPES]);
-  assert.doesNotMatch(ui.text(), /Gave you|Waiting for your storage role/);
-  assert.equal(config.access?.rls?.enabled, true);
-});
-
-test('apply on Azure, when a new storage role takes longer than the retries: says to wait and try again', async () => {
-  const { ctx, arm, store, log, ui } = azureInstall({ lag: 100 });
-  store.map.set(`landing/${AZURE_SCOPE_FILE}`, scopeCsv(seedRows(['ana@contoso.com'], by)));
-
-  assert.equal(await applyOrgAccess(ctx), false);
-
-  assert.equal(log.filter((l) => l === `${READ_SCOPES}: 403`).length, STORAGE_ATTEMPTS);
-  assert.equal(log.filter((l) => l === WAIT).length, STORAGE_ATTEMPTS - 1);
-  assert.match(ui.text(), /✗ Your Storage Blob Data Contributor role on the storage account vlensstabc hasn't taken effect yet\. Wait about 5 minutes, then try again from ".*access"\./);
-  assert.doesNotMatch(ui.text(), /AuthorizationPermissionMismatch/);
-  assert.ok(!arm.calls.includes('startJob vlens-run'));
-});
 
 test('assigning a role you already have counts as done: ARM answers 409 RoleAssignmentExists, which gives false', async () => {
   const scope = '/subscriptions/sub-1/resourceGroups/rg-vl/providers/Microsoft.Storage/storageAccounts/vlensstabc';
@@ -610,15 +337,7 @@ test('assigning a role you already have counts as done: ARM answers 409 RoleAssi
   await assert.rejects(answering(denied).assignRole(scope, ROLES.storageBlobDataContributor, 'user-1', 'User'), (err) => err === denied);
 });
 
-test('org-scoped access asks Azure for no storage role with private networking, or on Fabric', async () => {
-  const priv = azureInstall();
-  /** @type {any} */ (priv.config.azure).publicNetworkAccess = false;
-  await assert.rejects(readScopes(priv.ctx), /vlensstabc only accepts traffic from its private endpoints/);
-  assert.equal(await applyOrgAccess(priv.ctx), false);
-  assert.deepEqual(priv.arm.calls, []);
-  assert.deepEqual(priv.log, []);
-
-  // OneLake's 403 surfaces as it is, without waiting.
+test("org-scoped access on Fabric: OneLake's 403 surfaces as it is, without waiting", async () => {
   const fabric = fabricInstall();
   const denied = new HttpError('GET /ws-1/lh-1/Files/analytics_hub_access/access_scope.csv returned 403', { status: 403, method: 'GET', url: 'https://onelake.dfs.fabric.microsoft.com/x' });
   fabric.ctx.api.oneLake.readText = async () => {

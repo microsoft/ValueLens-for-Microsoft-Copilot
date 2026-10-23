@@ -134,20 +134,10 @@ export function createUi(opts = {}) {
         else if (card.state === 'warning') line(`  ${c.yellow('!')} ${card.name}: loaded with a warning${tries}`);
         else if (card.state === 'failed') line(`  ${c.red('✗')} ${card.name}: failed${tries}`);
         else if (card.state === 'skipped') line(`  ${c.yellow('!')} ${card.name}: skipped`);
-        else if (card.state === 'todo') line(`  ${c.yellow('!')} ${card.name}: to do`);
         else line(`  ${c.yellow('!')} ${card.name}: still running`);
         if (card.reason) line(`    ${card.reason}`);
         for (const fix of card.fix) line(`    ${c.dim(fix)}`);
       }
-    },
-    /**
-     * Something left for the user to finish, such as signing in to the Cowork Dataflow.
-     * @param {import('./steps/consumption.js').CoworkNextStep} step
-     */
-    todo: (step) => {
-      line(`\n  ${c.yellow('!')} ${c.bold(step.title)}`);
-      step.steps.forEach((s, i) => line(`    ${i + 1}. ${s}`));
-      line(`    ${c.dim(step.note)}`);
     },
     /**
      * What's left, as numbered cards: who does each, why, the link and steps, and for a hand-off the message to send.

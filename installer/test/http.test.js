@@ -125,15 +125,12 @@ test('once: a create is sent once after a network or server error; throttling an
 test('the clients send each create once: Fabric items and connections, and Entra client secrets', async () => {
   /** @type {Record<string, (api: any) => Promise<any>>} */
   const fabricCreates = {
-    createItem: (a) => a.createItem('ws', 'AppBackend', 'x', { ref: 'r' }),
     createSemanticModel: (a) => a.createSemanticModel('ws', 'x', {}, { ref: 'r' }),
     createReport: (a) => a.createReport('ws', 'x', {}, { ref: 'r' }),
     createConnection: (a) => a.createConnection({}),
     createLakehouse: (a) => a.createLakehouse('ws', 'x', { ref: 'r' }),
     createNotebook: (a) => a.createNotebook('ws', 'x', '{}', { ref: 'r' }),
-    createDataflow: (a) => a.createDataflow('ws', 'x', 'd', { ref: 'r' }),
     createPipeline: (a) => a.createPipeline('ws', 'x', {}, { ref: 'r' }),
-    createDataAgent: (a) => a.createDataAgent('ws', 'x', {}, { ref: 'r' }),
   };
   for (const [name, call] of Object.entries(fabricCreates)) {
     const f = fakeFetch([() => ({ status: 503 }), () => ({ status: 201, body: {} })]);

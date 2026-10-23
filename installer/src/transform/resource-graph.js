@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * Agent configuration and Foundry resources from Azure Resource Graph. The installer adds these
- * tables to the ValueLens and Consumption models at deploy time, so the templates stay as they are.
+ * tables to the ValueLens model at deploy time, so the template stays as it is.
  * When the source is off, or before the first load, the tables are there but empty, so queries
  * against them never fail.
  */
@@ -106,14 +106,6 @@ export const valueLensExpression = (t, on) =>
   partitionExpression(t, on ? [`    Source = try FabricTable("${t.source}") otherwise EmptyTable(Columns),`] : null);
 
 /**
- * For the Consumption model, which reads tables with GetTable.
- * @param {ArgTable} t
- * @param {boolean} on
- */
-export const consumptionExpression = (t, on) =>
-  partitionExpression(t, on ? [`    Raw = GetTable("${t.source}"),`, '    Source = if Raw = null then #table(Columns, {}) else Raw,'] : null);
-
-/**
  * @param {string} table
  * @param {{ name: string, kind: ArgColumnKind }} c
  */
@@ -173,17 +165,4 @@ export function addResourceGraph(model, on) {
       toColumn: r.toColumn,
     });
   }
-}
-
-/**
- * Adds the Foundry resources table to the Consumption model, with no relationships. A template
- * that already has it is left alone.
- * @param {import('./model.js').ModelBim['model']} model
- * @param {boolean} on
- */
-export function addFoundryResources(model, on) {
-  const t = /** @type {ArgTable} */ (ARG_TABLES.find((x) => x.name === FOUNDRY_TABLE));
-  if (model.tables.some((x) => x.name === t.name)) return;
-  if (on && !model.expressions?.some((e) => e.name === 'GetTable')) throw new Error('The credit consumption model template has no "GetTable" function.');
-  addTable(model, t, consumptionExpression(t, on));
 }

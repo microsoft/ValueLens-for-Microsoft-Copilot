@@ -1,10 +1,9 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { defaultModules, MODULES, notebooksFor, OPTIONAL_MODULES, permissionsFor, azureGraphRolesFor } from '../src/catalog.js';
+import { defaultModules, MODULES, notebooksFor, OPTIONAL_MODULES, permissionsFor } from '../src/catalog.js';
 import { resolveAppRoles } from '../src/clients/graph.js';
 import { OPTIONAL_PERMISSIONS } from '../src/steps/identity.js';
-import { AZURE_SUPPORTED_MODULES, enabledAzureModuleIds } from '../src/steps/azure/index.js';
 import { defaultDataSources, DATA_SOURCES, modulesFromSources } from '../src/uploads.js';
 import { addDefender, DEFENDER_MEASURE_TABLE, DEFENDER_MEASURES, DEFENDER_RELATIONSHIPS, DEFENDER_TABLES, stableGuid } from '../src/transform/defender.js';
 import { buildModel, loadTemplateModel } from '../src/transform/model.js';
@@ -13,21 +12,18 @@ import { realSources } from './fakes.js';
 
 const WS = 'f0000000-0000-0000-0000-000000000000';
 const ids = { auditIngester: 'nb-a', licensedUsers: 'nb-b', processor: 'nb-c', orgData: 'nb-d', defender: 'nb-x', refreshModel: 'nb-r' };
-const on = { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false, defender: true };
+const on = { orgData: true, m365Activity: false, agent365: false, productFeedback: false, defender: true };
 const off = { ...on, defender: false };
 const sources = realSources();
 const template = loadTemplateModel(/** @type {string} */ (sources.modelFile));
 const lake = { server: 'abc.datawarehouse.fabric.microsoft.com', database: 'ValueLens' };
 
-test('defender catalog: off by default, optional, on Azure, and adds its Graph permissions only when picked', () => {
+test('defender catalog: off by default, optional, and adds its Graph permissions only when picked', () => {
   assert.equal(defaultModules().defender, false);
   assert.ok(OPTIONAL_MODULES.includes('defender'));
-  assert.equal(MODULES.defender.azure.supported, true);
   assert.deepEqual(MODULES.defender.permissions, ['ThreatHunting.Read.All', 'CloudApp-Discovery.Read.All']);
   assert.ok(permissionsFor(on).includes('ThreatHunting.Read.All'));
   assert.ok(!permissionsFor(off).includes('ThreatHunting.Read.All'));
-  assert.ok(azureGraphRolesFor(on).includes('ThreatHunting.Read.All'));
-  assert.ok(!azureGraphRolesFor(off).includes('CloudApp-Discovery.Read.All'));
   const nb = notebooksFor(on).find((n) => n.key === 'defender');
   assert.equal(nb?.file, 'Copilot_Defender_Ingester.ipynb');
   assert.equal(nb?.placeholder, 'REPLACE_WITH_DEFENDER_NOTEBOOK_ID');
@@ -41,12 +37,6 @@ test('defender data source: api or skip, skip by default, and drives the module'
   assert.equal(ds.defender, 'skip');
   assert.equal(modulesFromSources(ds).defender, false);
   assert.equal(modulesFromSources({ ...ds, defender: 'api' }).defender, true);
-});
-
-test('defender on Azure: a supported module, passed to the jobs only when ticked', () => {
-  assert.ok(AZURE_SUPPORTED_MODULES.includes('defender'));
-  assert.ok(enabledAzureModuleIds(on, {}).includes('defender'));
-  assert.ok(!enabledAzureModuleIds(off, {}).includes('defender'));
 });
 
 test('defender permissions are optional: a tenant without them warns instead of failing', () => {

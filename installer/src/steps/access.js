@@ -1,11 +1,10 @@
 // @ts-check
 /**
- * Who can view Analytics Hub: one Entra security group, on both targets. Its members get Build on the
- * semantic models the app queries; on Azure the web app also lets them in by that group. Sharing is
- * then adding people to the group, from the installer, the app's Share panel or My Groups.
+ * Who can view Analytics Hub: one Entra security group, whose members get Build on the semantic
+ * model the report reads. Sharing is then adding people to the group, from the installer or My Groups.
  */
 import { HttpError } from '../http.js';
-import { rlsOn, rlsSettings } from '../transform/access.js';
+import { rlsOn } from '../transform/access.js';
 import { asksAdvanced } from './advanced.js';
 import { orgAccessCommand } from './org-access.js';
 
@@ -63,17 +62,13 @@ export async function planAccess(ctx) {
     access.groupId && !access.createdGroup ? 'existing' : 'new',
   );
   if (mode === 'new') {
-    if (!access.createdGroup) {
-      delete access.groupId;
-      delete access.appShared;
-    }
+    if (!access.createdGroup) delete access.groupId;
     access.groupName = access.createdGroup ? access.groupName ?? VIEWER_GROUP_NAME : VIEWER_GROUP_NAME;
   } else {
     for (;;) {
       const name = (await ui.input('Group name or object ID', { default: access.createdGroup ? undefined : access.groupName ?? access.groupId })).trim();
       const found = await api.graph.resolvePrincipal(name).catch(() => null);
       if (found?.kind === 'group') {
-        if (found.id !== access.groupId) delete access.appShared;
         Object.assign(access, { groupId: found.id, groupName: found.displayName, createdGroup: false });
         ui.ok(`Viewers: ${found.displayName}`);
         break;
@@ -100,7 +95,7 @@ export function accessReview(config, where) {
   const owners = a.groupId && !a.createdGroup ? 'Its owners share it by adding people to it.' : 'You are its owner; share by adding people to it.';
   return {
     creates: [{ kind: 'Entra group', name, isNew: !a.groupId, detail: `Who can view Analytics Hub. ${owners}` }],
-    grants: [{ who: `${name} (group)`, what: 'Build (ReadExplore)', where, detail: 'So its members can view the app and reports.' }],
+    grants: [{ who: `${name} (group)`, what: 'Build (ReadExplore)', where, detail: 'So its members can view the report.' }],
   };
 }
 
@@ -122,7 +117,6 @@ export async function ensureViewerGroup(ctx) {
     }
     ui.warn(`The viewer group ${a.groupName ?? a.groupId} is gone.${a.createdGroup ? ' Creating it again.' : ''}`);
     delete a.groupId;
-    delete a.appShared;
     a.grantedModels = [];
     if (!a.createdGroup) {
       ctx.save();
@@ -207,111 +201,6 @@ export async function grantModelAccess(ctx, models) {
 }
 
 /**
- * What the app is told about access: the group and who to ask. Undefined without a group.
- * With org-scoped access on, also the org attribute, which turns on scoped delegation in the Share panel.
- * On Fabric, `appShared` says the app item has been shared with the group, so its members can open it.
- * @param {import('../config.js').InstallConfig} config
- * @returns {Record<string, string | boolean> | undefined}
- */
-export function publicAccess(config) {
-  const a = config.access;
-  if (!a?.groupId) return undefined;
-  /** @type {Record<string, string | boolean>} */
-  const out = { groupId: a.groupId };
-  for (const k of /** @type {const} */ (['groupName', 'contact', 'requestUrl'])) if (a[k]) out[k] = /** @type {string} */ (a[k]);
-  const rls = rlsSettings(config);
-  if (rls?.orgAttribute) out.rlsOrgAttribute = rls.orgAttribute;
-  if (config.target !== 'azure' && a.appShared === true) out.appShared = true;
-  return out;
-}
-
-/**
- * The app item in Fabric, where its Share button is. The deploy's own link when the item isn't known.
- * @param {import('../config.js').InstallConfig} config
- * @param {string} [tenantId]
- * @returns {string | undefined}
- */
-export function appItemUrl(config, tenantId) {
-  const ws = config.fabric?.workspaceId;
-  const id = config.fabricApp?.itemId;
-  if (!ws || !id) return config.fabricApp?.url;
-  return `https://app.fabric.microsoft.com/groups/${ws}/appbackends/${id}${tenantId ? `?ctid=${tenantId}` : ''}`;
-}
-
-/**
- * The clicks that share the app item with the viewer group, one whole step each.
- * @param {import('../config.js').InstallConfig} config
- * @param {string} [tenantId]
- */
-export function shareAppSteps(config, tenantId) {
-  const group = config.access?.groupName ?? VIEWER_GROUP_NAME;
-  const url = appItemUrl(config, tenantId);
-  const app = config.fabricApp?.name ?? 'the app';
-  return [
-    `Open ${app} in Fabric${url ? ` (${url})` : ''}, or in ${config.fabric?.workspaceName ?? 'the workspace'} choose … (More options) next to it.`,
-    'Choose Share.',
-    `Enter "${group}" and choose Grant.`,
-  ];
-}
-
-/**
- * The app item still needs sharing with the viewer group: there is a group and an app, and nobody has said it's done.
- * @param {import('../config.js').InstallConfig} config
- */
-export const shareAppPending = (config) =>
-  config.target !== 'azure' && !!config.access?.groupId && !!config.fabricApp?.itemId && config.access.appShared !== true;
-
-/**
- * Asks the user to share the app item with the viewer group, once. Fabric has no API for it, so it's
- * a few clicks in the portal. Asked straight after the app is deployed and before the first load,
- * which can take hours, so viewers can open the app while the history loads. Not asked again once done.
- * @param {Ctx} ctx
- */
-export async function shareApp(ctx) {
-  const { ui, config, user } = ctx;
-  const a = config.access;
-  if (a?.appShared === true) return;
-  if (!shareAppPending(config)) {
-    ui.warn(a?.groupId
-      ? "There's no app yet, so there's nothing to share. The summary at the end says how to deploy it and share it."
-      : "There's no viewer group yet, so there's nothing to share. The summary at the end says what to do.");
-    return;
-  }
-  const group = a?.groupName ?? VIEWER_GROUP_NAME;
-  ui.info(`Members of "${group}" can open the app once it's shared with the group. Fabric has no API for this, so do it now while the history loads:`);
-  shareAppSteps(config, user.tenantId).forEach((s, i) => ui.info(`  ${i + 1}. ${s}`));
-  ui.note('After that, give people access by adding them to the group.');
-  const done = await ui.select(
-    'Have you shared the app?',
-    [
-      { name: 'I\'ve shared it', value: true, description: `Members of "${group}" can open the app.` },
-      { name: 'Later', value: false, description: 'The summary at the end reminds you, and Repair asks again.' },
-    ],
-    false,
-  );
-  if (!done) {
-    ui.note('Until it\'s shared, people in the group get "no access" when they open the app.');
-    return;
-  }
-  /** @type {import('../config.js').AccessConfig} */ (a).appShared = true;
-  ctx.save();
-  ui.ok(`The app is shared with "${group}"`);
-}
-
-/**
- * Summary lines: who can view and how to share.
- * @param {import('../config.js').InstallConfig} config
- */
-export function accessSummaryLines(config) {
-  const a = config.access;
-  if (!a?.groupId) return [];
-  return [
-    `Viewers: members of "${a.groupName}". To share, add people to it: run "access", use Share in the app, or open ${myGroupsUrl(a.groupId)}.`,
-    `People without access are asked to contact ${a.contact ?? 'you'}${a.requestUrl ? ` or request it at ${a.requestUrl}` : ''}.`,
-  ];
-}
-
-/**
  * The `access` command: shows the viewer group and adds viewers or owners to it.
  * @param {Ctx} ctx
  * @param {ModelRef[]} models  The models the group should have Build on.
@@ -333,8 +222,7 @@ export async function accessCommand(ctx, models, redeploy) {
       [
         { name: 'Add viewers', value: 'members', description: 'People or groups, by email or group name.' },
         { name: 'Add an owner', value: 'owner', description: 'Owners can add and remove viewers themselves.' },
-        ...(shareAppPending(config) ? [{ name: 'Share the app with the group', value: 'share', description: 'Once, in Fabric, so members can open the app.' }] : []),
-        { name: 'Give the group Build on the models again', value: 'grants', description: 'Repairs access to the models the app queries.' },
+        { name: 'Give the group Build on the models again', value: 'grants', description: 'Repairs access to the model the report reads.' },
         ...(redeploy
           ? [{ name: rlsOn(config) ? 'Org-scoped access: who sees which orgs' : 'Turn on org-scoped access', value: 'orgs', description: 'Row-level security: each viewer sees only the orgs you give them.' }]
           : []),
@@ -345,10 +233,6 @@ export async function accessCommand(ctx, models, redeploy) {
     if (action === 'done') return;
     if (action === 'orgs' && redeploy) {
       await orgAccessCommand(ctx, redeploy);
-      continue;
-    }
-    if (action === 'share') {
-      await shareApp(ctx);
       continue;
     }
     if (action === 'grants') {

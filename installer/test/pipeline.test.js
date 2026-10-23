@@ -6,12 +6,9 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { PIPELINE_TEMPLATE } from '../src/sources.js';
 import {
-  AGENT_EVALUATOR_ACTIVITY,
-  AGENT_EVALUATOR_REFRESH_ACTIVITY,
   applyRetries,
   buildPipeline,
   chainLanes,
-  CONSUMPTION_REFRESH_ACTIVITY,
   findActivity,
   firstRunParameters,
   REFRESH_ACTIVITY,
@@ -38,7 +35,7 @@ const ids = {
 const names = (doc) => doc.properties.activities.map((/** @type {any} */ a) => a.name);
 
 test('core + org data: archived and unused branches are pruned', () => {
-  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules: { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false } });
+  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules: { orgData: true, m365Activity: false, agent365: false, productFeedback: false } });
   assert.deepEqual(names(doc), ['Run_Audit_Log_Ingester', 'Run_Licensed_Users_Ingester', 'Run_Audit_Log_Processor', 'Conditionally_Run_Org_Data']);
   const processor = findActivity(doc.properties.activities, 'Run_Audit_Log_Processor');
   assert.deepEqual(
@@ -50,7 +47,7 @@ test('core + org data: archived and unused branches are pruned', () => {
 });
 
 test('all modules: branches kept, switches on, fallback dependency kept', () => {
-  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules: { orgData: true, m365Activity: false, agent365: true, productFeedback: true, consumption: false, agentEvaluator: false } });
+  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules: { orgData: true, m365Activity: false, agent365: true, productFeedback: true } });
   assert.ok(names(doc).includes('Conditionally_Run_Agent365'));
   assert.ok(names(doc).includes('Run_Agent365_CSV_Fallback'));
   assert.ok(names(doc).includes('Conditionally_Run_Product_Feedback'));
@@ -65,14 +62,14 @@ test('all modules: branches kept, switches on, fallback dependency kept', () => 
 });
 
 test('core only: org data branch removed too', () => {
-  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules: { orgData: false, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false } });
+  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules: { orgData: false, m365Activity: false, agent365: false, productFeedback: false } });
   assert.deepEqual(names(doc), ['Run_Audit_Log_Ingester', 'Run_Licensed_Users_Ingester', 'Run_Audit_Log_Processor']);
   assert.equal(doc.properties.parameters.EnableOrgDataPull, undefined);
 });
 
 test('IDs are substituted everywhere and the template is untouched', () => {
   const before = JSON.stringify(template);
-  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules: { orgData: true, m365Activity: false, agent365: true, productFeedback: true, consumption: false, agentEvaluator: false } });
+  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules: { orgData: true, m365Activity: false, agent365: true, productFeedback: true } });
   assert.equal(JSON.stringify(template), before);
   const text = JSON.stringify(doc);
   assert.doesNotMatch(text, /REPLACE_WITH_/);
@@ -83,13 +80,13 @@ test('IDs are substituted everywhere and the template is untouched', () => {
 test('a missing notebook ID for an enabled module is an error', () => {
   const { agent365Lander, ...rest } = ids;
   assert.throws(
-    () => buildPipeline(template, { workspaceId: WS, notebookIds: rest, modules: { orgData: true, m365Activity: false, agent365: true, productFeedback: false, consumption: false, agentEvaluator: false } }),
+    () => buildPipeline(template, { workspaceId: WS, notebookIds: rest, modules: { orgData: true, m365Activity: false, agent365: true, productFeedback: false } }),
     /REPLACE_WITH_AGENT365_LANDER_NOTEBOOK_ID/,
   );
 });
 
 test('audit and processor notebooks take their mode from pipeline parameters', () => {
-  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules: { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false }, backfillDays: 90 });
+  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules: { orgData: true, m365Activity: false, agent365: false, productFeedback: false }, backfillDays: 90 });
   const audit = findActivity(doc.properties.activities, 'Run_Audit_Log_Ingester');
   assert.equal(audit.typeProperties.parameters.MODE.value.value, '@pipeline().parameters.AuditMode');
   assert.equal(audit.typeProperties.parameters.BACKFILL_DAYS.value.value, '@pipeline().parameters.BackfillDays');
@@ -105,7 +102,7 @@ test('first run backfills and rebuilds', () => {
 });
 
 test('the first load defaults to 30 days of history', () => {
-  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules: { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false } });
+  const doc = buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules: { orgData: true, m365Activity: false, agent365: false, productFeedback: false } });
   assert.equal(doc.properties.parameters.BackfillDays.defaultValue, 30);
 });
 
@@ -155,12 +152,9 @@ test('a large tenant pulls short audit windows, splits a failing one fast and ge
   assert.equal(findActivity(doc.properties.activities, 'Run_Licensed_Users_Ingester').policy.timeout, '0.00:30:00');
   assert.equal(findActivity(doc.properties.activities, 'Run_Org_Data_Ingester').policy.timeout, '0.01:00:00');
   assert.equal(findActivity(doc.properties.activities, 'Run_M365_Activity_Ingester').policy.timeout, '0.02:00:00');
-  for (const name of ['Refresh_Semantic_Model', 'Refresh_Consumption_Model', 'Refresh_Agent_Evaluator_Model']) {
-    const refresh = findActivity(doc.properties.activities, name);
-    if (!refresh) continue;
-    assert.equal(refresh.policy.timeout, '0.05:00:00', name);
-    assert.ok(refresh.typeProperties.parameters.TIMEOUT_MINUTES.value < 300, name);
-  }
+  const refresh = findActivity(doc.properties.activities, 'Refresh_Semantic_Model');
+  assert.equal(refresh.policy.timeout, '0.05:00:00');
+  assert.ok(refresh.typeProperties.parameters.TIMEOUT_MINUTES.value < 300);
 });
 
 test('the slow Graph loads get more time by tenant size, and the registry load a budget inside it', () => {
@@ -169,15 +163,15 @@ test('the slow Graph loads get more time by tenant size, and the registry load a
     const [h, m] = rest.split(':').map(Number);
     return Number(days) * 1440 + h * 60 + m;
   };
-  /** @type {Record<string, { registry: string, defender: string, transcripts: string, budget?: number, retry: number }>} */
+  /** @type {Record<string, { registry: string, defender: string, budget?: number, retry: number }>} */
   const expected = {
-    unsized: { registry: '0.02:00:00', defender: '0.00:30:00', transcripts: '0.02:00:00', retry: 1 },
-    standard: { registry: '0.03:00:00', defender: '0.01:00:00', transcripts: '0.03:00:00', budget: 120, retry: 1 },
-    large: { registry: '0.06:00:00', defender: '0.02:00:00', transcripts: '0.06:00:00', budget: 270, retry: 2 },
+    unsized: { registry: '0.02:00:00', defender: '0.00:30:00', retry: 1 },
+    standard: { registry: '0.03:00:00', defender: '0.01:00:00', budget: 120, retry: 1 },
+    large: { registry: '0.06:00:00', defender: '0.02:00:00', budget: 270, retry: 2 },
   };
   for (const [size, want] of Object.entries(expected)) {
     const scale = size === 'unsized' ? undefined : /** @type {'standard' | 'large'} */ (size);
-    const doc = buildPipeline(template, { workspaceId: WS, notebookIds: { ...allIds, defender: 'defender-1' }, modules: { ...allModules, defender: true }, agentTranscripts: true, scale });
+    const doc = buildPipeline(template, { workspaceId: WS, notebookIds: { ...allIds, defender: 'defender-1' }, modules: { ...allModules, defender: true }, scale });
     const registry = findActivity(doc.properties.activities, 'Run_Agent365_Registry_Ingester');
     assert.equal(registry.policy.timeout, want.registry, size);
     assert.equal(registry.policy.retry, want.retry, size);
@@ -185,9 +179,6 @@ test('the slow Graph loads get more time by tenant size, and the registry load a
     assert.deepEqual(registry.typeProperties.parameters?.TIME_BUDGET_MIN, want.budget === undefined ? undefined : { value: want.budget, type: 'int' }, size);
     if (want.budget) assert.ok(want.budget + 45 <= minutes(want.registry), `${size}: the budget leaves time to write before the timeout`);
     assert.equal(findActivity(doc.properties.activities, 'Run_Defender_Ingester').policy.timeout, want.defender, size);
-    const transcripts = findActivity(doc.properties.activities, AGENT_EVALUATOR_ACTIVITY);
-    assert.equal(transcripts.policy.timeout, want.transcripts, size);
-    assert.equal(transcripts.policy.retry, 2, size);
   }
 });
 
@@ -199,15 +190,11 @@ test('in CSV mode the Agent 365 lander gets neither the registry budget nor its 
   assert.equal(lander.policy.timeout, '0.02:00:00');
 });
 
-const allModules = { orgData: true, m365Activity: true, agent365: true, productFeedback: true, consumption: true, agentEvaluator: true };
+const allModules = { orgData: true, m365Activity: true, agent365: true, productFeedback: true };
 const allIds = {
   ...ids,
   m365Activity: '00000000-0000-0000-0000-000000000011',
   refreshModel: '00000000-0000-0000-0000-000000000012',
-  azureAi: '00000000-0000-0000-0000-000000000013',
-  studioConsumption: '00000000-0000-0000-0000-000000000014',
-  vivaConsumption: '00000000-0000-0000-0000-000000000015',
-  agentTranscripts: '00000000-0000-0000-0000-000000000016',
 };
 const everything = () =>
   buildPipeline(template, {
@@ -215,19 +202,11 @@ const everything = () =>
     notebookIds: allIds,
     modules: allModules,
     semanticModelId: 'model-1',
-    azureAi: true,
-    consumptionModelId: 'cc-1',
-    agentTranscripts: true,
-    agentEvaluatorModelId: 'ae-1',
   });
 
-test('only ValueLens refresh checks the processor historical-change marker', () => {
-  const activities = everything().properties.activities;
-  for (const name of [REFRESH_ACTIVITY, CONSUMPTION_REFRESH_ACTIVITY, AGENT_EVALUATOR_REFRESH_ACTIVITY]) {
-    const refresh = activities.find((a) => a.name === name);
-    assert.deepEqual(refresh.typeProperties.parameters.CHECK_AUDIT_STATE,
-      { value: name === REFRESH_ACTIVITY, type: 'bool' });
-  }
+test('the ValueLens refresh checks the processor historical-change marker', () => {
+  const refresh = everything().properties.activities.find((a) => a.name === REFRESH_ACTIVITY);
+  assert.deepEqual(refresh.typeProperties.parameters.CHECK_AUDIT_STATE, { value: true, type: 'bool' });
 });
 
 /** Each top-level activity's dependencies, as "activity:conditions". @param {any} doc @returns {Record<string, string[]>} */
@@ -247,18 +226,12 @@ test('lanes: the audit log loads in lane 1 while the other loads run one after a
     Conditionally_Run_Org_Data: ['Run_Agent365_CSV_Fallback:Completed|Skipped'],
     Conditionally_Run_M365_Activity: ['Conditionally_Run_Org_Data:Completed'],
     Conditionally_Run_Product_Feedback: ['Conditionally_Run_M365_Activity:Completed'],
-    Run_Consumption_Azure_AI: ['Conditionally_Run_Product_Feedback:Completed'],
-    Run_Consumption_Studio: ['Run_Consumption_Azure_AI:Completed'],
-    Run_Consumption_Viva: ['Run_Consumption_Studio:Completed'],
-    Run_Agent_Evaluator_Transcripts: [`${CONSUMPTION_REFRESH_ACTIVITY}:Completed|Skipped`],
     [REFRESH_ACTIVITY]: [
       'Run_Audit_Log_Processor:Succeeded',
       'Conditionally_Run_Org_Data:Completed',
       'Conditionally_Run_M365_Activity:Completed',
       'Conditionally_Run_Product_Feedback:Completed',
     ],
-    [CONSUMPTION_REFRESH_ACTIVITY]: ['Run_Consumption_Azure_AI:Succeeded', 'Run_Consumption_Studio:Succeeded', 'Run_Consumption_Viva:Succeeded', 'Conditionally_Run_Org_Data:Completed'],
-    [AGENT_EVALUATOR_REFRESH_ACTIVITY]: ['Run_Agent_Evaluator_Transcripts:Succeeded', 'Conditionally_Run_Org_Data:Completed'],
   });
   assert.match(doc.properties.description, /two lanes/);
   assert.match(doc.properties.description, /retries up to 3 times, 5 minutes apart/);
@@ -266,7 +239,7 @@ test('lanes: the audit log loads in lane 1 while the other loads run one after a
 
 test('lanes: a load that is switched off is skipped over', () => {
   /** @param {Partial<typeof allModules>} on */
-  const build = (on) => deps(buildPipeline(template, { workspaceId: WS, notebookIds: allIds, modules: { ...allModules, consumption: false, agentEvaluator: false, ...on } }));
+  const build = (on) => deps(buildPipeline(template, { workspaceId: WS, notebookIds: allIds, modules: { ...allModules, ...on } }));
 
   const noAgents = build({ agent365: false });
   assert.deepEqual(noAgents.Conditionally_Run_Org_Data, ['Run_Licensed_Users_Ingester:Completed']);
@@ -317,9 +290,7 @@ test('lanes: no more than two notebooks run at once, whichever modules are on', 
         workspaceId: WS,
         notebookIds: allIds,
         modules,
-        azureAi: true,
-        agentTranscripts: true,
-        ...(models ? { semanticModelId: 'model-1', consumptionModelId: 'cc-1', agentEvaluatorModelId: 'ae-1' } : {}),
+        ...(models ? { semanticModelId: 'model-1' } : {}),
       });
       assert.equal(threeAtOnce(doc), undefined, JSON.stringify({ modules, models }));
     }
@@ -327,7 +298,7 @@ test('lanes: no more than two notebooks run at once, whichever modules are on', 
   assert.equal(threeAtOnce(template), undefined, 'the Manual setup template');
 });
 
-test('retries: every load retries 5 minutes apart; the Agent 365 load and the refreshes keep their own', () => {
+test('retries: every load retries 5 minutes apart; the Agent 365 load and the model refresh keep their own', () => {
   const doc = everything();
   const policy = (/** @type {string} */ name) => {
     const { retry, retryIntervalInSeconds } = findActivity(doc.properties.activities, name).policy;
@@ -340,10 +311,7 @@ test('retries: every load retries 5 minutes apart; the Agent 365 load and the re
   assert.equal(policy('Run_ProductFeedback_Ingester'), '3/300');
   assert.equal(policy('Run_Agent365_CSV_Fallback'), '3/300');
   assert.equal(policy('Run_Agent365_Registry_Ingester'), '1/60', 'its fallback covers a failure');
-  assert.equal(policy('Run_Consumption_Azure_AI'), '2/300');
-  assert.equal(policy('Run_Consumption_Viva'), '3/300');
-  assert.equal(policy('Run_Agent_Evaluator_Transcripts'), '2/300');
-  for (const name of [REFRESH_ACTIVITY, CONSUMPTION_REFRESH_ACTIVITY, AGENT_EVALUATOR_REFRESH_ACTIVITY]) assert.equal(policy(name), '0/60', name);
+  assert.equal(policy(REFRESH_ACTIVITY), '0/60');
   assert.equal(findActivity(doc.properties.activities, 'Run_Audit_Log_Ingester').policy.timeout, '0.02:00:00', 'the timeout is kept');
 });
 

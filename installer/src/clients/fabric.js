@@ -177,11 +177,6 @@ export function fabricApi(http) {
       if (host?.protocol !== 'https:' || !/(^|\.)(fabric\.microsoft\.com|analysis\.windows\.net)$/i.test(host.hostname)) return undefined;
       return (await http.get(url))?.status;
     },
-    /** @param {string} workspaceId @param {string} itemId @param {string} displayName */
-    renameItem: (workspaceId, itemId, displayName) => http.patch(`/workspaces/${workspaceId}/items/${itemId}`, { displayName }),
-    /** An empty item, for types such as AppBackend that rayfin fills in. @param {string} workspaceId @param {string} type @param {string} displayName @param {ItemRef} [ref] */
-    createItem: (workspaceId, type, displayName, ref) =>
-      http.requestLro('POST', `/workspaces/${workspaceId}/items`, { body: { type, displayName, ...(ref ? { description: withRef('Deployed by the Analytics Hub installer.', ref) } : {}) }, lroResult: true, onAccepted: accepted(ref), once: true }),
 
     /** @param {string} workspaceId @returns {Promise<any[]>} */
     listRoleAssignments: (workspaceId) => http.list(`/workspaces/${workspaceId}/roleAssignments`),
@@ -264,13 +259,6 @@ export function fabricApi(http) {
      */
     getGitConnection: (workspaceId) => http.get(`/workspaces/${workspaceId}/git/connection`),
 
-    /** @returns {Promise<any[]>} */
-    listGateways: () => http.list('/gateways'),
-    /** @param {any} body */
-    createGateway: (body) => http.post('/gateways', body),
-    /** @param {string} id */
-    deleteGateway: (id) => http.del(`/gateways/${id}`),
-
     /** @param {string} workspaceId @param {string} id */
     getLakehouse: (workspaceId, id) => http.get(`/workspaces/${workspaceId}/lakehouses/${id}`),
     /** @param {string} workspaceId @param {string} displayName @param {ItemRef} [ref] */
@@ -292,29 +280,6 @@ export function fabricApi(http) {
     updateNotebook: (workspaceId, id, ipynb) =>
       http.requestLro('POST', `/workspaces/${workspaceId}/notebooks/${id}/updateDefinition`, { body: { definition: notebookDefinition(ipynb) } }),
 
-    /** @param {string} workspaceId @param {string} displayName @param {string} description @param {ItemRef} [ref] */
-    createDataflow: (workspaceId, displayName, description, ref) =>
-      http.requestLro('POST', `/workspaces/${workspaceId}/dataflows`, { body: { displayName, description: withRef(description, ref) }, lroResult: true, onAccepted: accepted(ref), once: true }),
-    /** @param {string} workspaceId @param {string} id @param {any} definition */
-    updateDataflow: (workspaceId, id, definition) =>
-      http.requestLro('POST', `/workspaces/${workspaceId}/dataflows/${id}/updateDefinition`, {
-        query: { updateMetadata: true },
-        body: { definition },
-      }),
-    /**
-     * The Dataflow's saved definition, each part decoded to text by its path. Its queryMetadata.json
-     * lists the connections the Dataflow was saved with: none until someone signs in and publishes.
-     * @param {string} workspaceId
-     * @param {string} id
-     * @returns {Promise<Record<string, string>>}
-     */
-    async getDataflowDefinition(workspaceId, id) {
-      const res = await http.requestLro('POST', `/workspaces/${workspaceId}/dataflows/${id}/getDefinition`, { lroResult: true });
-      const parts = res?.definition?.parts;
-      if (!Array.isArray(parts)) throw new Error('Fabric returned the Dataflow without its definition.');
-      return Object.fromEntries(parts.map((/** @type {any} */ p) => [p.path, Buffer.from(String(p.payload ?? ''), 'base64').toString('utf8')]));
-    },
-
     /** @param {string} workspaceId @param {string} displayName @param {any} pipeline @param {ItemRef} [ref] */
     createPipeline: (workspaceId, displayName, pipeline, ref) =>
       http.requestLro('POST', `/workspaces/${workspaceId}/dataPipelines`, {
@@ -332,7 +297,7 @@ export function fabricApi(http) {
      * Starts a job and returns the URL to poll.
      * @param {string} workspaceId
      * @param {string} itemId
-     * @param {'Pipeline' | 'RunNotebook' | 'Refresh'} jobType  Refresh runs a Dataflow.
+     * @param {'Pipeline' | 'RunNotebook'} jobType
      * @param {any} [executionData]
      */
     async runJob(workspaceId, itemId, jobType, executionData) {
@@ -390,25 +355,6 @@ export function fabricApi(http) {
       if (!part?.payload) throw new Error('Fabric returned the pipeline without its definition.');
       return JSON.parse(Buffer.from(part.payload, 'base64').toString('utf8'));
     },
-
-    /** @param {string} workspaceId @param {string} displayName @param {any} definition @param {ItemRef} [ref] */
-    createDataAgent: (workspaceId, displayName, definition, ref) =>
-      http.requestLro('POST', `/workspaces/${workspaceId}/dataAgents`, {
-        body: { displayName, description: withRef('Answers questions about Copilot and agents from the Analytics Hub models. Deployed by the Analytics Hub installer.', ref), definition },
-        onAccepted: accepted(ref), once: true,
-        lroResult: true,
-      }),
-    /** @param {string} workspaceId @param {string} id @param {any} definition */
-    updateDataAgent: (workspaceId, id, definition) =>
-      http.requestLro('POST', `/workspaces/${workspaceId}/dataAgents/${id}/updateDefinition`, { body: { definition } }),
-    /**
-     * Publishes the draft, so people other than its editors can chat with it.
-     * @param {string} workspaceId @param {string} id @param {string} [publishedDescription]
-     */
-    publishDataAgent: (workspaceId, id, publishedDescription) =>
-      http.requestLro('POST', `/workspaces/${workspaceId}/dataAgents/${id}/staging/publish`, {
-        body: publishedDescription ? { publishedDescription } : {},
-      }),
 
     /** Spark settings of a workspace. Needs workspace Admin. @param {string} workspaceId */
     getSparkSettings: (workspaceId) => http.get(`/workspaces/${workspaceId}/spark/settings`),

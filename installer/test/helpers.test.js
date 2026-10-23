@@ -88,7 +88,7 @@ test('createTokenProvider: a sign-in can be given up on, and then it isn\'t trie
       return { token: 't', expiresOnTimestamp: Date.now() + 3_600_000 };
     },
   };
-  const scope = 'https://graph.microsoft.com/AppCatalog.ReadWrite.All';
+  const scope = 'https://org.crm.dynamics.com/.default';
   await createTokenProvider(credential)(scope);
   assert.deepEqual(requests, [[scope]], 'without a signal, the scope alone, as before');
   const abort = new AbortController();
@@ -175,7 +175,7 @@ test('exitWhenDone: after a sign-in was given up on, it exits only once slow std
   const auth = new URL('../src/auth.js', import.meta.url).href;
   const size = 1024 * 1024;
   const streams = [
-    ['stdout', join(dir, 'slow-stdout.txt'), '\nUpload AnalyticsHub-Teams.zip to Teams by hand.\n'],
+    ['stdout', join(dir, 'slow-stdout.txt'), '\nSign in to the Power Automate flow by hand.\n'],
     ['stderr', join(dir, 'slow-stderr.txt'), '\nThe last error.\n'],
   ];
   // Slow stdout and stderr, like pipes to a slow reader on Linux or macOS, where pipes write asynchronously.
@@ -271,16 +271,16 @@ test('what to collect: audit log, licensed users and org data are essential; the
   assert.deepEqual([...ESSENTIAL_MODULES], ['core', 'orgData']);
   assert.ok(!OPTIONAL_MODULES.some((id) => ESSENTIAL_MODULES.includes(/** @type {any} */ (id))));
   assert.equal(normaliseModules({ orgData: false }).orgData, true);
-  assert.deepEqual(collectedLabels(normaliseModules({ m365Activity: false, agentEvaluator: true })), ['Copilot usage and licences', 'Org data', 'Agent Evaluator']);
+  assert.deepEqual(collectedLabels(normaliseModules({ m365Activity: false, productFeedback: true })), ['Copilot usage and licences', 'Org data', 'Product feedback']);
 });
 
 test('permissions follow the chosen modules', () => {
-  assert.deepEqual(permissionsFor({ orgData: false, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false }), [
+  assert.deepEqual(permissionsFor({ orgData: false, m365Activity: false, agent365: false, productFeedback: false }), [
     'AuditLogsQuery.Read.All',
     'Reports.Read.All',
     'User.Read.All',
   ]);
-  assert.deepEqual(permissionsFor({ orgData: true, m365Activity: false, agent365: true, productFeedback: true, consumption: false, agentEvaluator: false }), [
+  assert.deepEqual(permissionsFor({ orgData: true, m365Activity: false, agent365: true, productFeedback: true }), [
     'Application.Read.All',
     'AuditLogsQuery.Read.All',
     'CopilotPackages.Read.All',
@@ -394,7 +394,7 @@ test('install record round-trips, fills defaults and refuses secrets', () => {
   const partial = loadConfig(file).config;
   assert.equal(partial.schedule.time, '05:00');
   assert.equal(partial.schedule.frequency, 'daily');
-  assert.deepEqual(partial.modules, { orgData: true, m365Activity: true, agent365: true, productFeedback: false, consumption: false, agentEvaluator: false, defender: false });
+  assert.deepEqual(partial.modules, { orgData: true, m365Activity: true, agent365: true, productFeedback: false, defender: false });
   assert.deepEqual(partial.fabric.notebooks, {});
 
   const leaky = /** @type {any} */ (emptyConfig());
@@ -422,7 +422,6 @@ test('messages name the exe when it started the installer', () => {
   assert.equal(installerWindow({}), 'your terminal');
   assert.equal(installerWindow(exe), 'the installer window');
   assert.match(help(), /Usage: (valuelens-install|AnalyticsHubInstaller\.exe) \[command\] \[options\]/);
-  assert.match(help(), /deploy-app\s+Deploy the Analytics Hub app again/);
 });
 
 test('messages name the PowerShell command when install.ps1 started the installer', () => {

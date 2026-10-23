@@ -51,16 +51,10 @@ const COMMANDS = {
     desc: 'Run again only the loads that failed in the latest pipeline run, and the steps that waited for them, one at a time.',
     off: 'There is no pipeline yet.',
   },
-  'load-cowork': {
-    title: 'Load Cowork now', short: 'Load Cowork', icon: 'database', section: 'Cowork credits',
-    row: 'Load Cowork now', button: 'Load Cowork',
-    desc: 'Once the Cowork Dataflow is signed in and published: refresh it, load the Viva credits and refresh the consumption model.',
-    off: 'There is no Cowork credits Dataflow.',
-  },
   refresh: {
-    title: 'Refresh the models', short: 'Refresh', icon: 'refresh', section: 'Model refresh',
-    row: 'Refresh the models', button: 'Refresh',
-    desc: 'Refresh the semantic models from the Lakehouse now.',
+    title: 'Refresh the model', short: 'Refresh', icon: 'refresh', section: 'Model refresh',
+    row: 'Refresh the model', button: 'Refresh',
+    desc: 'Refresh the semantic model from the Lakehouse now.',
     off: 'No semantic model is deployed.',
   },
   status: {
@@ -77,14 +71,8 @@ const COMMANDS = {
   update: {
     title: 'Update Analytics Hub', short: 'Update', icon: 'upload', section: 'Update', adopt: true,
     row: 'Update', button: 'Update',
-    desc: 'Push the notebooks, pipeline and semantic model from this checkout to Fabric, then refresh the models. If Fabric can\'t update a model and keep its data, the page asks before the data is cleared and reloaded.',
+    desc: 'Push the notebooks, pipeline and semantic model from this checkout to Fabric, then refresh the model. If Fabric can\'t update the model and keep its data, the page asks before the data is cleared and reloaded.',
     off: 'Nothing is installed yet.',
-  },
-  'deploy-app': {
-    title: 'Redeploy the app', short: 'Redeploy', icon: 'app', section: 'App deployment', adopt: true,
-    row: 'Redeploy the app', button: 'Redeploy',
-    desc: 'Rebuild Analytics Hub from this checkout and deploy it to the workspace.',
-    off: 'The app needs the semantic model.',
   },
   'rotate-secret': {
     title: 'Create new secrets', short: 'New secrets', icon: 'key', section: 'New secrets', adopt: true,
@@ -95,7 +83,7 @@ const COMMANDS = {
   access: {
     title: 'Manage access', short: 'Access', icon: 'shield', section: 'Viewer access',
     row: 'Manage access', button: 'Manage access',
-    desc: 'Choose the viewer group, add viewers or owners, and give the group Build on the models again. To share Analytics Hub, add people to the group.',
+    desc: 'Choose the viewer group, add viewers or owners, and give the group Build on the model again. To share Analytics Hub, add people to the group.',
     off: 'Viewers need the semantic model first.',
   },
   upload: {
@@ -107,7 +95,7 @@ const COMMANDS = {
   uninstall: {
     title: 'Uninstall Analytics Hub', short: 'Uninstall', icon: 'x', section: 'Uninstall', adopt: true,
     row: 'Uninstall', button: 'Uninstall',
-    desc: 'Azure: delete the resource group the installer created, or only tagged resources in an existing group, and the Power BI workspace if it created one. Fabric: delete the workspace, after its managed private endpoints.',
+    desc: 'Delete the Fabric workspace, after its managed private endpoints.',
     off: 'Nothing is installed yet.',
   },
   prereqs: {
@@ -116,20 +104,17 @@ const COMMANDS = {
     desc: 'See which roles, licences, capacities and Azure access you have and which are missing. Changes nothing.',
   },
 };
-const ROW_ORDER = ['run', 'rerun-failed', 'load-cowork', 'refresh', 'status', 'upload', 'check', 'update', 'deploy-app', 'access', 'rotate-secret', 'uninstall', 'install'];
-/** The id of the Cowork Dataflow card in steps/next-steps.js. */
-const COWORK_STEP_ID = 'cowork-dataflow';
+const ROW_ORDER = ['run', 'rerun-failed', 'refresh', 'status', 'upload', 'check', 'update', 'access', 'rotate-secret', 'uninstall', 'install'];
 
 // The install's stages in the order the installer prints them. Other headings (the target question,
 // Advanced settings, Who can view, Schedule...) slot in as they come.
 const INSTALL_STAGES = [
-  'Sign in', 'Checking your tenant', 'Data sources', 'What to collect', 'Azure', 'Power BI', 'Fabric', 'App registration',
-  'Key Vault for the app secret', 'Checking Azure', 'Ready to set up', 'Setting up', 'Done',
+  'Sign in', 'Checking your tenant', 'Data sources', 'Power BI', 'Fabric', 'App registration',
+  'Key Vault for the app secret', 'Ready to set up', 'Setting up', 'Done',
 ];
 // Stages only one target has. The rail shows the chosen target's; the record's target, else Fabric, until one is entered.
 const TARGET_STAGES = {
   fabric: new Set(['Data sources', 'Fabric', 'App registration', 'Key Vault for the app secret']),
-  azure: new Set(['What to collect', 'Azure', 'Checking Azure']),
 };
 const stageTarget = (title) => Object.keys(TARGET_STAGES).find((k) => TARGET_STAGES[k].has(title));
 const applies = (run, s) => !s.only || s.only === run.platform;
@@ -151,11 +136,7 @@ const NEEDS = [
   'Permission to register apps in Entra, or an app registration you already have. If you have neither, you get an admin pack to send an admin.',
   'A Global Administrator or Privileged Role Administrator to grant admin consent. If that isn\'t you, you get a link to send them.',
 ];
-// The exe and the PowerShell launcher carry their own Node.js and a ready-built app.
-const NODE_NEED = 'Node.js 22.13 or later on this computer to build the Analytics Hub app.';
-const bundled = () => !!app.state?.exe;
 const launcher = () => app.state?.launcher ?? {};
-const needs = () => (bundled() ? NEEDS : [...NEEDS, NODE_NEED]);
 const installerName = () => launcher().command ?? 'valuelens-install';
 const installerWindow = () => launcher().window ?? 'your terminal';
 const GLYPH = { ok: 'check', warn: 'warn', fail: 'x' };
@@ -446,7 +427,7 @@ function createRun(e) {
   const run = {
     command: cmd, title, startedAt: e.at, endedAt: 0, state: 'running', error: '', phase: 'signin',
     stages: cmd === 'install' ? INSTALL_STAGES.map((t) => newStage(t, { only: stageTarget(t) })) : [newStage('Sign in'), newStage(COMMANDS[cmd].section)],
-    platform: app.state?.record?.target === 'azure' ? 'azure' : 'fabric',
+    platform: app.state?.record?.target ?? 'fabric',
     cur: null, child: null, doneTitle: '', signedIn: false, user: null, prompts: new Map(), progress: new Map(), adopted: false,
     events: [e],
   };
@@ -629,9 +610,6 @@ function apply(e) {
       // Shown in the outcome at the end; kept as an item for the saved record.
       add(run, { t: 'next-steps', title: run.nextSteps.title, steps: run.nextSteps.steps });
       markExpected(run);
-      return;
-    case 'todo':
-      run.todo = e.step;
       return;
     case 'prereqs':
       ensureRoot(run, e.at);
@@ -974,8 +952,8 @@ function renderPrereqs(items) {
         it.status !== 'met' ? h('p', { class: 'prereq-how' }, h('strong', null, 'How to get it: '), linkify(it.howTo ?? '')) : null))));
 }
 
-const LOAD_GLYPH = { ok: 'check', warning: 'warn', failed: 'x', skipped: 'minus', running: 'clock', todo: 'warn' };
-const LOAD_STATE = { ok: 'loaded', warning: 'loaded with a warning', failed: 'failed', skipped: 'didn\'t run', running: 'still running', todo: 'to do' };
+const LOAD_GLYPH = { ok: 'check', warning: 'warn', failed: 'x', skipped: 'minus', running: 'clock' };
+const LOAD_STATE = { ok: 'loaded', warning: 'loaded with a warning', failed: 'failed', skipped: 'didn\'t run', running: 'still running' };
 
 /** One card per source: whether it loaded, why not and what to do. */
 function renderLoads(cards) {
@@ -1005,16 +983,11 @@ function copyButton(text, labelText) {
   }, icon('copy'), label);
 }
 
-/**
- * What's left once it finishes: a card per step, with who does it, the link, and for a hand-off the message to send.
- * The Cowork to-do from the last load (renderTodo) folds into its card here, adding the Dataflow link and Load Cowork now.
- */
-function renderNextSteps(next, todo) {
+/** What's left once it finishes: a card per step, with who does it, the link, and for a hand-off the message to send. */
+function renderNextSteps(next) {
   return h('section', { class: 'next', 'aria-labelledby': 'next-title' },
     h('h3', { id: 'next-title' }, next.title),
     h('ol', { class: 'next-list' }, next.steps.map((s) => {
-      const extra = todo && s.id === COWORK_STEP_ID ? todo : null;
-      const can = extra?.action && app.state?.record?.can?.[extra.action];
       return h('li', { class: `next-card${s.optional ? ' optional' : ''}` },
         h('div', { class: 'next-head' },
           h('span', { class: 'next-name' }, s.title),
@@ -1022,12 +995,10 @@ function renderNextSteps(next, todo) {
         h('p', null, s.why),
         (s.steps ?? []).length ? h('ol', { class: 'next-how' }, s.steps.map((x) => h('li', null, x))) : null,
         s.message ? h('details', { class: 'next-message' }, h('summary', null, 'The message to send'), h('pre', null, s.message)) : null,
-        s.link || s.message || extra
+        s.link || s.message
           ? h('div', { class: 'actions' },
             s.message ? copyButton(s.message, 'Copy message') : null,
-            extra?.url ? h('a', { class: 'btn', href: extra.url, target: '_blank', rel: 'noopener' }, icon('link'), 'Open the Dataflow') : null,
-            s.link && !extra?.url ? h('a', { class: 'btn', href: s.link, target: '_blank', rel: 'noreferrer' }, icon('link'), s.linkText ?? 'Open') : null,
-            can ? h('button', { type: 'button', class: 'btn primary', onclick: () => start(extra.action) }, icon(COMMANDS[extra.action]?.icon ?? 'play'), COMMANDS[extra.action]?.title ?? extra.action) : null)
+            s.link ? h('a', { class: 'btn', href: s.link, target: '_blank', rel: 'noreferrer' }, icon('link'), s.linkText ?? 'Open') : null)
           : null);
     })));
 }
@@ -1387,13 +1358,11 @@ function renderOutcome(run) {
       : ['', 'Stopped', [install && !built ? 'Nothing was created.' : 'Nothing after this point ran.']],
   }[r] ?? ['', 'Finished', []];
   const rerun = run.failedLoads && app.state?.record?.can?.['rerun-failed'];
-  const todoInSteps = !!run.todo && !!run.nextSteps?.steps.some((s) => s.id === COWORK_STEP_ID);
   return h('section', { class: `outcome ${copy[0]}`.trim(), 'aria-labelledby': 'outcome-title' },
     h('h2', { id: 'outcome-title' }, copy[1]),
-    run.nextSteps?.steps.length ? renderNextSteps(run.nextSteps, run.todo) : null,
+    run.nextSteps?.steps.length ? renderNextSteps(run.nextSteps) : null,
     copy[2].filter(Boolean).map((p) => h('p', null, p)),
     r === 'failed' && run.error ? h('details', { class: 'settings-changes' }, h('summary', null, 'Technical details'), h('pre', null, run.error)) : null,
-    run.todo && !todoInSteps ? renderTodo(run.todo) : null,
     rerun ? h('p', null, 'Some loads failed. Rerun failed runs just those again, and the steps that waited for them.') : null,
     h('div', { class: 'actions' },
       install && r === 'failed' && run.recovery?.section ? h('button', { type: 'button', class: 'btn primary', onclick: () => start('install', { section: run.recovery.section }) }, run.recovery.label) : null,
@@ -1404,21 +1373,6 @@ function renderOutcome(run) {
       rerun ? h('button', { type: 'button', class: 'btn primary', onclick: () => start('rerun-failed') }, icon('refresh'), 'Rerun failed') : null,
       h('button', { type: 'button', class: rerun ? 'btn' : 'btn primary', onclick: () => saveRecord(run) }, icon('download'), 'Save a record'),
       h('button', { type: 'button', class: 'btn', onclick: () => show('home') }, 'Back to home')));
-}
-
-/**
- * Something left to finish, such as signing in to the Cowork Dataflow (coworkNextStep in
- * steps/consumption.js): the steps, a link to the item and, when it can run here, its action.
- */
-function renderTodo(step) {
-  const can = step.action && app.state?.record?.can?.[step.action];
-  return h('div', { class: 'todo', role: 'note' },
-    h('h3', null, icon('warn'), step.title),
-    h('ol', null, step.steps.map((s) => h('li', null, s))),
-    step.note ? h('p', { class: 'todo-note' }, step.note) : null,
-    h('div', { class: 'actions' },
-      step.url ? h('a', { class: 'btn', href: step.url, target: '_blank', rel: 'noopener' }, icon('link'), 'Open the Dataflow') : null,
-      can ? h('button', { type: 'button', class: 'btn primary', onclick: () => start(step.action) }, icon(COMMANDS[step.action]?.icon ?? 'play'), COMMANDS[step.action]?.title ?? step.action) : null));
 }
 
 /* ---------- Rendering: home ---------- */
@@ -1569,7 +1523,6 @@ function renderHome() {
     ['Lakehouse', rec.lakehouse],
     ['Collects', rec.data.join(', ')],
     ['Semantic model', rec.model ?? 'Not deployed'],
-    ['App', rec.app ? link(rec.app.name, rec.app.url) : 'Not deployed'],
     ['Schedule', rec.schedule ?? 'Not set'],
     ['Client secret expires', rec.secretExpires ? h('span', { class: soon ? 'soon' : null }, `${rec.secretExpires} (${days < 0 ? 'expired' : `in ${days} days`})`) : 'Unknown'],
     ['First load', firstRun],
@@ -1655,7 +1608,7 @@ function prereqsPanel(busy) {
   } else {
     body = [
       h('p', { class: 'hint' }, 'Sign in to check which of these you have. The check only reads; it changes nothing.'),
-      h('ul', { class: 'needs' }, needs().map((n) => h('li', null, n))),
+      h('ul', { class: 'needs' }, NEEDS.map((n) => h('li', null, n))),
     ];
   }
   return h('section', { class: 'panel' },
@@ -1904,7 +1857,7 @@ function itemMarkdown(it, depth) {
       return ['', ...reviewMarkdown(it.plan), ''];
     case 'loads':
       return it.cards.flatMap((card) => [
-        `- ${card.expected ? '…' : { ok: '✓', warning: '⚠', failed: '✗', skipped: '⚠', running: '…', todo: '⚠' }[card.state] ?? ''} ${card.name}: ${card.expected ? `waiting for "${card.expected}"` : LOAD_STATE[card.state] ?? card.state}${card.attempts ? ` (${card.attempts} attempts)` : ''}`,
+        `- ${card.expected ? '…' : { ok: '✓', warning: '⚠', failed: '✗', skipped: '⚠', running: '…' }[card.state] ?? ''} ${card.name}: ${card.expected ? `waiting for "${card.expected}"` : LOAD_STATE[card.state] ?? card.state}${card.attempts ? ` (${card.attempts} attempts)` : ''}`,
         ...(card.reason ? [`  - ${card.reason}`] : []),
         ...(card.fix ?? []).map((f) => `  - ${f.trim()}`),
       ]);
@@ -1965,7 +1918,6 @@ function runFacts(run) {
 function saveRecord(run) {
   const L = [`# ${headTitle(run)}`, '', ...runFacts(run)];
   if (run.error) L.push('', `**Error:** ${run.error}`);
-  if (run.todo) L.push('', `**${run.todo.title}**`, '', ...run.todo.steps.map((s, i) => `${i + 1}. ${s}`), '', `_${run.todo.note}_`);
   for (const s of run.stages) if (applies(run, s)) L.push(...stageMarkdown(s, 2));
   L.push('', '---', '', '_Written by the Analytics Hub installer. Secrets are masked and sign-in codes left out._');
   download(`valuelens-${run.command}-${stamp(run.startedAt)}.md`, L);

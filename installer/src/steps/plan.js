@@ -7,24 +7,19 @@ import { randomBytes } from 'node:crypto';
 import { rlsOn } from '../transform/access.js';
 import { collectedLabels, ESSENTIAL_MODULES, MODULES, notebooksFor, OPTIONAL_MODULES, permissionsFor } from '../catalog.js';
 import { allowsAction, armLocation, validateVaultName } from '../clients/azure.js';
-import { TRANSCRIPT_ROLE } from '../clients/dataverse.js';
 import { APP_ROLES, CONSENT_ROLES } from '../clients/graph.js';
 import { HttpError } from '../http.js';
-import { commandLine, inCloudShell } from '../launch.js';
+import { inCloudShell } from '../launch.js';
 import { c } from '../ui.js';
-import { CURRENCIES, DEFAULT_CURRENCY, describeReporting, parseRate } from '../currency.js';
-import { AGENT_EVALUATOR_MODEL_NAME, CONSUMPTION_MODEL_NAME, DATA_AGENT_NAME, flowIdentity, MODEL_NAME, secretMode } from '../config.js';
-import { MIN_NODE, nodeVersionOk } from './app.js';
-import { agentEvaluatorModelWanted, fabricReadRoleReview, planAgentEvaluator } from './agent-evaluator.js';
-import { AZURE_AI_ROLES, consumptionModelWanted, COWORK_DATAFLOW_NAME, planConsumption, planCowork } from './consumption.js';
+import { CURRENCIES, DEFAULT_CURRENCY, describeReporting } from '../currency.js';
+import { flowIdentity, MODEL_NAME, secretMode } from '../config.js';
 import { FLOW_NAMES, flowsSkipped, flowsWanted, planFlows } from './flows.js';
 import { adminPack, canWriteSecrets, checkExistingApp, MAX_SECRET_DAYS, NOTEBOOK_SECRET_DAYS, notebookSecretDays, reportAppCheck, ResumeLater, writeAdminPack } from './identity.js';
 import { planResourceGraph, resourceGraphGrants, resourceGraphKinds, resourceGraphOn, scopeName } from './resource-graph.js';
 import { askAdvanced, asksAdvanced } from './advanced.js';
-import { describeSchedule, displayNames, freeName, modelKey, PIPELINE_NAME, stoppedRunItem } from './fabric.js';
+import { describeSchedule, displayNames, freeName, PIPELINE_NAME, stoppedRunItem } from './fabric.js';
 import { connectionName, MODEL_UPDATE_NOTE } from './model.js';
 import { reportsWanted } from './report.js';
-import { DATA_AGENT_TYPE, dataAgentWanted, planDataAgent } from './data-agent.js';
 import { planDataSources } from './data-sources.js';
 import { accessReview, planAccess } from './access.js';
 import { DATA_SOURCES, modulesFromSources, routerWanted, UPLOAD_DIR } from '../uploads.js';
@@ -145,26 +140,14 @@ export function sizingWarnings({ seats, capacity, scale }) {
 }
 
 /**
- * Tenant settings the semantic model, the reports and the app rely on, and what breaks without them.
- * @type {{ name: string, title: string, effect: string, app?: boolean, reports?: boolean }[]}
+ * Tenant settings the semantic model and the report rely on, and what breaks without them.
+ * @type {{ name: string, title: string, effect: string, reports?: boolean }[]}
  */
 export const POWER_BI_SETTINGS = [
   {
     name: 'ServicePrincipalAccessPermissionAPIs',
     title: 'Service principals can call Fabric public APIs',
     effect: 'The model\'s connection signs in as the app registration, so the model can\'t refresh without it.',
-  },
-  {
-    name: 'DatasetExecuteQueries',
-    title: 'Semantic Model Execute Queries REST API',
-    effect: 'The Analytics Hub app queries the model through it.',
-    app: true,
-  },
-  {
-    name: 'AppBackendTenant',
-    title: 'Fabric App items',
-    effect: 'The Analytics Hub app is a Fabric App item.',
-    app: true,
   },
   {
     name: 'CustomVisualsTenant',
@@ -177,12 +160,12 @@ export const POWER_BI_SETTINGS = [
 /**
  * Settings that look switched off. A setting delegated to capacity admins may still be on there.
  * @param {Preflight['tenantSettings']} settings
- * @param {{ app: boolean, reports?: boolean }} opts
+ * @param {{ reports?: boolean }} opts
  */
 export function blockedSettings(settings, opts) {
   if (!settings) return [];
   return POWER_BI_SETTINGS.filter(
-    (s) => (opts.app || !s.app) && (opts.reports || !s.reports) && settings[s.name]?.enabled === false && !settings[s.name]?.delegateToCapacity,
+    (s) => (opts.reports || !s.reports) && settings[s.name]?.enabled === false && !settings[s.name]?.delegateToCapacity,
   );
 }
 
@@ -209,14 +192,12 @@ export async function preflight(ctx) {
     ui.warn('Users in this tenant can\'t register apps and you have no app admin role. Choose "Use an app registration I already have", or get an admin pack for an admin to register it.');
   }
 
-  const capacities = ctx.config.target === 'azure' ? [] : (await api.fabric.listCapacities()).filter((cap) => cap.state === 'Active' && runsFabric(cap));
-  if (ctx.config.target !== 'azure') {
-    if (!capacities.length) {
-      ui.fail('No active Fabric capacity you can use.');
-      throw new Error('Start a Fabric trial, or ask a capacity admin to make you a contributor on an F2 or larger capacity, then run the installer again.');
-    }
-    ui.ok(`${capacities.length} active Fabric ${capacities.length === 1 ? 'capacity' : 'capacities'}`);
+  const capacities = (await api.fabric.listCapacities()).filter((cap) => cap.state === 'Active' && runsFabric(cap));
+  if (!capacities.length) {
+    ui.fail('No active Fabric capacity you can use.');
+    throw new Error('Start a Fabric trial, or ask a capacity admin to make you a contributor on an F2 or larger capacity, then run the installer again.');
   }
+  ui.ok(`${capacities.length} active Fabric ${capacities.length === 1 ? 'capacity' : 'capacities'}`);
 
   /** @type {any[]} */
   let subscriptions = [];
@@ -226,10 +207,6 @@ export async function preflight(ctx) {
     if (!(err instanceof HttpError)) throw err;
   }
   if (!subscriptions.length && !ctx.config.keyVault.uri && secretMode(ctx.config) !== 'notebook') {
-    if (ctx.config.target === 'azure') {
-      ui.fail('No Azure subscription you can use.');
-      throw new Error('Analytics Hub on Azure needs an Azure subscription in this tenant. Ask for Contributor on one, then run the installer again.');
-    }
     if (ctx.useKeyVault) {
       ui.fail('No Azure subscription you can use, so no Key Vault.');
       throw new Error('--key-vault needs an Azure subscription in this tenant. Ask for Contributor on one, or leave out --key-vault to keep the client secret in the notebooks.');
@@ -259,17 +236,14 @@ export async function preflight(ctx) {
 }
 
 /**
- * The Power BI choice to offer first. The reports and the app are on unless switched off, so
- * re-running an older install offers the reports too.
+ * The Power BI choice to offer first. The report is on unless switched off, so re-running an
+ * install that has only the model offers the report too.
  * @param {import('../config.js').InstallConfig} config
- * @param {boolean} canApp
- * @returns {'all' | 'reports' | 'both' | 'model' | 'none'}
+ * @returns {'reports' | 'model' | 'none'}
  */
-export function powerBiChoice(config, canApp) {
+export function powerBiChoice(config) {
   if (config.semanticModel.enabled === false) return 'none';
-  const reports = config.semanticModel.reports !== false;
-  if (canApp && config.fabricApp.enabled !== false) return reports ? 'all' : 'both';
-  return reports ? 'reports' : 'model';
+  return config.semanticModel.reports !== false ? 'reports' : 'model';
 }
 
 /**
@@ -278,48 +252,37 @@ export function powerBiChoice(config, canApp) {
  */
 export function applyPowerBiChoice(config, choice) {
   config.semanticModel.enabled = choice !== 'none';
-  config.semanticModel.reports = choice === 'all' || choice === 'reports';
-  config.fabricApp.enabled = choice === 'all' || choice === 'both';
+  config.semanticModel.reports = choice === 'reports';
 }
 
 /**
- * The semantic model, and the app on top of it.
+ * The semantic model, and the report on it.
  * @param {Ctx} ctx
  * @param {Preflight} pre
  */
 async function planPowerBi(ctx, pre) {
   const { ui, config, sources } = ctx;
   const sm = config.semanticModel;
-  const fa = config.fabricApp;
   ui.heading('Power BI');
   if (!sources.modelFile) {
     sm.enabled = false;
-    fa.enabled = false;
     ui.note('This checkout has no "ValueLens - Fabric.pbit", so the installer won\'t deploy a semantic model.');
     return;
   }
-  const canApp = !!sources.appDir;
   const choice = !asksAdvanced(ctx)
-    ? powerBiChoice(config, canApp)
+    ? powerBiChoice(config)
     : await ui.select(
     'Deploy the semantic model?',
     [
-      ...(canApp ? [{ name: 'Semantic model, Power BI reports and the Analytics Hub app (recommended)', value: 'all', description: 'The ValueLens reports and a web app in the workspace, built on the model.' }] : []),
-      { name: `Semantic model and Power BI reports${canApp ? '' : ' (recommended)'}`, value: 'reports', description: 'The ValueLens reports, published to the workspace and ready to share.' },
-      ...(canApp ? [{ name: 'Semantic model and the Analytics Hub app', value: 'both', description: 'A web app in the workspace, built on the model, without the reports.' }] : []),
+      { name: 'Semantic model and Power BI report (recommended)', value: 'reports', description: 'The ValueLens report, published to the workspace and ready to share.' },
       { name: 'Semantic model only', value: 'model', description: 'Build your own reports on it in Power BI.' },
       { name: 'Neither', value: 'none', description: 'You publish "ValueLens - Fabric.pbit" yourself.' },
     ],
-    powerBiChoice(config, canApp),
+    powerBiChoice(config),
   );
   applyPowerBiChoice(config, choice);
-  if (fa.enabled && !nodeVersionOk()) {
-    fa.enabled = false;
-    ui.warn(`Building the app needs Node.js ${MIN_NODE.join('.')} or later; this is ${process.versions.node}. Deploying the semantic model only.`);
-    ui.note(`Install a newer Node.js, then run "${commandLine('deploy-app')}".`);
-  }
   if (!sm.enabled) return;
-  for (const s of blockedSettings(pre.tenantSettings, { app: !!fa.enabled, reports: !!sm.reports })) {
+  for (const s of blockedSettings(pre.tenantSettings, { reports: !!sm.reports })) {
     ui.warn(`The tenant setting "${s.title}" is off. ${s.effect}`);
     ui.note('A Fabric administrator can switch it on in the admin portal, under Tenant settings.');
   }
@@ -398,7 +361,7 @@ export async function plan(ctx, pre, section) {
     await planDataSources(ctx);
     if (!section) await askAdvanced(
       ctx,
-      'the model and app, who can view, audit history, tenant size, the Lakehouse name, the new Key Vault\'s details, the schedule, the first load, the Value page currency and where Resource Graph reads',
+      'the model and report, who can view, audit history, tenant size, the Lakehouse name, the new Key Vault\'s details, the schedule, the first load, the Value page currency and where Resource Graph reads',
     );
   }
   if (editing('governance')) {
@@ -413,12 +376,7 @@ export async function plan(ctx, pre, section) {
     if (config.semanticModel.enabled) await planAccess(ctx);
   }
   if (editing('sources')) {
-    if (config.modules.consumption) {
-      await planConsumption(ctx, pre);
-      await planCowork(ctx);
-    }
     config.modules = modulesFromSources(config.dataSources);
-    if (config.modules.agentEvaluator) await planAgentEvaluator(ctx);
   }
 
   if (editing('schedule')) {
@@ -441,7 +399,6 @@ export async function plan(ctx, pre, section) {
       pre.capacities.some((cap) => cap.id === config.fabric.capacityId) ? config.fabric.capacityId : pre.capacities[0].id,
     );
     const capacity = pre.capacities.find((cap) => cap.id === config.fabric.capacityId);
-    await planDataAgent(ctx, pre, capacity, advanced());
     const scale = config.scale ?? defaultScale(capacity, pre.seats);
     config.scale = !advanced()
       ? scale
@@ -601,37 +558,24 @@ export async function plan(ctx, pre, section) {
 }
 
 /**
- * The currency the Value page reports value and cost in, and optionally its rate to the US
- * dollar. It is the app's default until someone saves another under Prices in the app. Only asked
- * under the advanced settings; otherwise the saved choice, --currency, or US dollars.
+ * The currency the report shows money in. Only its symbol reaches the model; the amounts are the
+ * report's own assumptions. Only asked under the advanced settings; otherwise the saved choice,
+ * --currency, or US dollars.
  * @param {Ctx} ctx
  */
 export async function askReportingCurrency(ctx) {
   const { ui, config } = ctx;
-  ui.heading('Value page');
-  const saved = config.reporting;
+  ui.heading('Estimated Value page');
   const currency = await ui.select(
-    'Which currency should the Value page report in?',
+    'Which currency should the report show money in?',
     CURRENCIES.map((cur) => ({
       name: `${cur.code} · ${cur.name}`,
       value: cur.code,
-      ...(cur.code === DEFAULT_CURRENCY ? { description: 'Licences and credits are billed in US dollars, so no exchange rate is needed.' } : {}),
+      ...(cur.code === DEFAULT_CURRENCY ? { description: 'Licences and credits are billed in US dollars.' } : {}),
     })),
-    saved?.currency ?? DEFAULT_CURRENCY,
+    config.reporting?.currency ?? DEFAULT_CURRENCY,
   );
-  if (currency === 'USD') {
-    config.reporting = { currency };
-    return;
-  }
-  const typed = await ui.input(`How many ${currency} to 1 US dollar? Leave blank to set it later under Prices in the app.`, {
-    default: saved?.currency === currency && saved.exchangeRate ? String(saved.exchangeRate) : '',
-    validate: (v) => {
-      const rate = parseRate(v);
-      return typeof rate === 'string' ? rate : true;
-    },
-  });
-  const rate = parseRate(typed);
-  config.reporting = typeof rate === 'number' ? { currency, exchangeRate: rate } : { currency };
+  config.reporting = { currency };
 }
 
 /**
@@ -753,7 +697,7 @@ const NO_VAULT_DESCRIPTION = 'Nothing in Azure. Anyone with a role in the worksp
 export function defaultsToNoVault(ctx) {
   const { config } = ctx;
   const kv = config.keyVault;
-  if (config.target === 'azure' || ctx.useKeyVault || flowIdentity(config) === 'app') return false;
+  if (ctx.useKeyVault || flowIdentity(config) === 'app') return false;
   return !kv.uri && !kv.mode && !kv.name && !kv.id && !kv.subscriptionId;
 }
 
@@ -942,18 +886,10 @@ export async function reserveNames(ctx) {
   const { ui, config, api } = ctx;
   const f = config.fabric;
   const sm = config.semanticModel;
-  const cc = config.consumption;
-  const ae = config.agentEvaluator;
   const ws = f.workspaceId;
   const list = async (/** @type {string} */ type) => (ws ? /** @type {any[]} */ (await api.fabric.listItems(ws, type)) : []);
-  const [notebookItems, pipelineItems, modelItems, reportItems, agentItems] = await Promise.all([
-    list('Notebook'),
-    list('DataPipeline'),
-    list('SemanticModel'),
-    list('Report'),
-    dataAgentWanted(ctx) ? list(DATA_AGENT_TYPE) : [],
-  ]);
-  const [notebookNames, pipelineNames, modelNames, reportNames, agentNames] = [notebookItems, pipelineItems, modelItems, reportItems, agentItems].map(displayNames);
+  const [notebookItems, pipelineItems, modelItems, reportItems] = await Promise.all([list('Notebook'), list('DataPipeline'), list('SemanticModel'), list('Report')]);
+  const [notebookNames, pipelineNames, modelNames, reportNames] = [notebookItems, pipelineItems, modelItems, reportItems].map(displayNames);
   /** @type {string[]} */
   const renamed = [];
   /**
@@ -971,8 +907,6 @@ export async function reserveNames(ctx) {
 
   const notebooks = notebooksFor(config.modules, {
     semanticModel: !!sm.enabled,
-    azureAi: !!config.modules.consumption && !!cc.azureSubscriptionId,
-    dataverse: !!config.modules.agentEvaluator && ae.environments.length > 0,
     access: rlsOn(config),
     dataSources: config.dataSources,
   });
@@ -981,16 +915,10 @@ export async function reserveNames(ctx) {
     if (!f.notebooks[nb.key]) f.notebookNames[nb.key] = pick(`Notebook:${nb.key}`, notebookItems, startFrom(f.notebookNames[nb.key], nb.displayName), notebookNames);
   }
   if (!f.pipelineId) f.pipelineName = pick('DataPipeline', pipelineItems, startFrom(f.pipelineName, PIPELINE_NAME), pipelineNames);
-  /** @param {import('../config.js').ModelConfig} m @param {string} base */
-  const model = (m, base) => pick(`SemanticModel:${modelKey(config, m)}`, modelItems, startFrom(m.name, base), modelNames);
-  if (sm.enabled && !sm.id) sm.name = model(sm, MODEL_NAME);
-  if (sm.enabled && consumptionModelWanted(ctx) && !cc.model.id) cc.model.name = model(cc.model, CONSUMPTION_MODEL_NAME);
-  if (sm.enabled && agentEvaluatorModelWanted(ctx) && !ae.model.id) ae.model.name = model(ae.model, AGENT_EVALUATOR_MODEL_NAME);
+  if (sm.enabled && !sm.id) sm.name = pick('SemanticModel:main', modelItems, startFrom(sm.name, MODEL_NAME), modelNames);
   for (const w of reportsWanted(ctx)) {
-    if (!w.model.report?.id) w.model.report = { ...w.model.report, name: pick(`Report:${modelKey(config, w.model)}`, reportItems, startFrom(w.model.report?.name, w.name), reportNames) };
+    if (!w.model.report?.id) w.model.report = { ...w.model.report, name: pick('Report:main', reportItems, startFrom(w.model.report?.name, w.name), reportNames) };
   }
-  const da = config.dataAgent;
-  if (dataAgentWanted(ctx) && !da.id) da.name = pick('DataAgent', agentItems, startFrom(da.name, DATA_AGENT_NAME), agentNames);
 
   if (renamed.length) {
     ui.note(
@@ -1011,7 +939,6 @@ export const PRICING = {
   fabric: 'https://azure.microsoft.com/pricing/details/microsoft-fabric/',
   powerAutomate: 'https://www.microsoft.com/power-platform/products/power-automate/pricing',
   keyVault: 'https://azure.microsoft.com/pricing/details/key-vault/',
-  azure: 'https://azure.microsoft.com/pricing/calculator/',
 };
 
 /**
@@ -1021,13 +948,11 @@ export const PRICING = {
  * @returns {ReviewCost[]}
  */
 export function planCosts(config) {
-  const azure = config.target === 'azure';
   /** @type {ReviewCost[]} */
   const costs = [];
-  if (!azure) costs.push({ what: 'Fabric capacity', detail: 'Runs the notebooks, pipeline and reports. Billed by capacity size; a trial capacity is free while it lasts.', url: PRICING.fabric });
+  costs.push({ what: 'Fabric capacity', detail: 'Runs the notebooks, pipeline and report. Billed by capacity size; a trial capacity is free while it lasts.', url: PRICING.fabric });
   if (flowsWanted(config).length) costs.push({ what: 'Power Automate Premium', detail: 'A licence for whoever signs in to the flows.', url: PRICING.powerAutomate });
-  if (azure) costs.push({ what: 'Azure resources', detail: 'Azure SQL, the Container Apps jobs, the web app and storage, billed to your Azure subscription.', url: PRICING.azure });
-  else if (secretMode(config) !== 'notebook') costs.push({ what: 'Azure Key Vault', detail: 'Holds the app\'s client secret. Billed to your Azure subscription.', url: PRICING.keyVault });
+  if (secretMode(config) !== 'notebook') costs.push({ what: 'Azure Key Vault', detail: 'Holds the app\'s client secret. Billed to your Azure subscription.', url: PRICING.keyVault });
   return costs;
 }
 
@@ -1043,13 +968,8 @@ export function planReview(ctx, pre) {
   const f = config.fabric;
   const kv = config.keyVault;
   const sm = config.semanticModel;
-  const fa = config.fabricApp;
-  const cc = config.consumption;
-  const ae = config.agentEvaluator;
   const appName = config.app.appId ? config.app.displayName ?? config.app.appId : APP_NAME;
-  const withAzureAi = !!config.modules.consumption && !!cc.azureSubscriptionId;
-  const withTranscripts = !!config.modules.agentEvaluator && ae.environments.length > 0;
-  const notebooks = notebooksFor(config.modules, { semanticModel: !!sm.enabled, azureAi: withAzureAi, dataverse: withTranscripts, access: rlsOn(config), dataSources: config.dataSources });
+  const notebooks = notebooksFor(config.modules, { semanticModel: !!sm.enabled, access: rlsOn(config), dataSources: config.dataSources });
 
   const mode = secretMode(config);
   /** @type {ReviewItem[]} */
@@ -1110,9 +1030,6 @@ export function planReview(ctx, pre) {
       detail: `Drop exports here; each run loads them.${n ? ` ${n} file${n === 1 ? '' : 's'} uploaded now.` : ''}`,
     });
   }
-  if (config.modules.consumption && config.dataSources.coworkCredits === 'api') {
-    creates.push({ kind: 'Dataflow Gen2', name: cc.dataflowName ?? COWORK_DATAFLOW_NAME, isNew: !cc.dataflowId, detail: 'Reads Cowork credits from your Viva Insights query before each Viva load.' });
-  }
   const env = config.uploads.flowEnvironment;
   for (const kind of flowsWanted(config)) {
     creates.push({
@@ -1123,31 +1040,18 @@ export function planReview(ctx, pre) {
     });
   }
   if (sm.enabled) {
-    const modelItem = (/** @type {{ name: string, id?: string }} */ m) => ({ kind: 'Semantic model', name: m.name, isNew: !m.id, ...(m.id ? { detail: MODEL_UPDATE_NOTE } : {}) });
-    creates.push(modelItem(sm));
-    if (consumptionModelWanted(ctx)) creates.push(modelItem(cc.model));
-    if (agentEvaluatorModelWanted(ctx)) creates.push(modelItem(ae.model));
+    creates.push({ kind: 'Semantic model', name: sm.name, isNew: !sm.id, ...(sm.id ? { detail: MODEL_UPDATE_NOTE } : {}) });
     creates.push({
       kind: 'Connection',
-      name: sm.connectionName ?? (f.workspaceId ? connectionName(f.workspaceId) : 'Analytics Hub SQL connection'),
+      name: sm.connectionName ?? (f.workspaceId ? connectionName(f.workspaceId) : 'ValueLens SQL connection'),
       isNew: !sm.connectionId,
-      detail: 'Lets the models read the Lakehouse, with a second client secret that only the connection holds.',
+      detail: 'Lets the model read the Lakehouse, with a second client secret that only the connection holds.',
     });
-    if (fa.enabled) creates.push({ kind: 'Fabric app', name: fa.name ?? 'Analytics Hub', isNew: !fa.itemId, detail: `A web app in the workspace, built on the semantic model. ${describeReporting(config.reporting)}` });
     for (const w of reportsWanted(ctx)) {
-      creates.push({ kind: 'Report', name: w.model.report?.name ?? w.name, isNew: !w.model.report?.id, detail: `From its Power BI template, reading ${w.model.name}.` });
-    }
-    if (dataAgentWanted(ctx)) {
-      creates.push({
-        kind: 'Data agent',
-        name: config.dataAgent.name,
-        isNew: !config.dataAgent.id,
-        detail: 'Answers questions in plain language from the semantic models, for the app\'s Ask page. Published to Microsoft 365 Copilot by hand.',
-      });
+      creates.push({ kind: 'Report', name: w.model.report?.name ?? w.name, isNew: !w.model.report?.id, detail: `From its Power BI template, reading ${w.model.name}. ${describeReporting(config.reporting)}` });
     }
   }
-  const access = sm.enabled ? accessReview(config, `Semantic models in workspace ${f.workspaceName ?? f.workspaceId}`) : { creates: [], grants: [] };
-  creates.push(...fabricReadRoleReview(config));
+  const access = sm.enabled ? accessReview(config, `Semantic model in workspace ${f.workspaceName ?? f.workspaceId}`) : { creates: [], grants: [] };
   creates.push(...access.creates);
 
   const appWho = `${appName} (app)`;
@@ -1179,7 +1083,7 @@ export function planReview(ctx, pre) {
       detail: kv.existing ? 'Only when you don\'t have it already.' : undefined,
     });
   }
-  if (sm.enabled) grants.push({ who: appWho, what: 'Viewer', where: `Workspace ${f.workspaceName ?? f.workspaceId}`, detail: 'So the semantic models can read the Lakehouse.' });
+  if (sm.enabled) grants.push({ who: appWho, what: 'Viewer', where: `Workspace ${f.workspaceName ?? f.workspaceId}`, detail: 'So the semantic model can read the Lakehouse.' });
   grants.push(...access.grants);
   const flows = flowsWanted(config);
   if (flows.length && flowIdentity(config) === 'app') {
@@ -1192,33 +1096,21 @@ export function planReview(ctx, pre) {
       detail: 'Not granted by the installer. You have it already; give it to anyone else who signs in.',
     });
   }
-  if (withAzureAi && !cc.azureAccess) {
-    grants.push({ who: appWho, what: AZURE_AI_ROLES.map((r) => r.name).join(', '), where: `Azure subscription ${cc.azureSubscriptionName ?? cc.azureSubscriptionId}`, detail: 'So the notebook can read Azure AI usage and cost.' });
-  }
-  grants.push(...resourceGraphGrants(config, user.tenantId, appWho, 'access', { canAssign: pre?.canConsent }));
-  const waiting = ae.environments.filter((e) => !e.access || !e.readAll);
-  if (config.modules.agentEvaluator && waiting.length) {
-    grants.push({
-      who: appWho,
-      what: `Application user with the ${TRANSCRIPT_ROLE} role and a role that reads every transcript`,
-      where: waiting.map((e) => e.name ?? new URL(e.url).host).join(', '),
-      detail: 'So the notebook can read every Copilot Studio transcript from Dataverse.',
-    });
-  }
+  grants.push(...resourceGraphGrants(config, user.tenantId, appWho, { canAssign: pre?.canConsent }));
 
   const capacity = pre?.capacities.find((cap) => cap.id === f.capacityId);
   const subscription = pre?.subscriptions.find((s) => s.subscriptionId === kv.subscriptionId);
   /** @type {ReviewRun[]} */
   const runsOn = [
     {
-      what: sm.enabled ? `Notebooks, pipeline, semantic models${reportsWanted(ctx).length ? ', reports' : ''}${fa.enabled ? ' and the app' : ''}` : 'Notebooks and pipeline',
+      what: sm.enabled ? `Notebooks, pipeline, semantic model${reportsWanted(ctx).length ? ' and report' : ''}` : 'Notebooks and pipeline',
       where: capacity ? `Fabric capacity ${capacity.displayName} (${capacity.sku}, ${capacity.region})` : `Fabric capacity ${f.capacityId ?? 'not chosen'}`,
     },
     ...(mode === 'notebook' ? [] : [{ what: 'Key Vault', where: `Azure subscription ${subscription?.displayName ?? kv.subscriptionId ?? 'already chosen'}`, detail: 'Standard tier.' }]),
     {
       what: 'Scheduled runs',
       where: `${describeSchedule(config.schedule)}, as ${user.upn}`,
-      detail: mode === 'notebook' ? 'The schedule\'s owner refreshes the models; the secret is in the notebooks.' : 'The schedule\'s owner reads the secret and refreshes the models.',
+      detail: mode === 'notebook' ? 'The schedule\'s owner refreshes the model; the secret is in the notebooks.' : 'The schedule\'s owner reads the secret and refreshes the model.',
     },
   ];
   if (ctx.runFirstLoad) runsOn.push({ what: 'First load', where: `${config.history.days} days of audit history, straight after setup` });
@@ -1263,25 +1155,9 @@ export async function confirmPlan(ctx, pre) {
   const capacity = pre?.capacities.find((cap) => cap.id === config.fabric.capacityId);
   for (const w of sizingWarnings({ seats: pre?.seats, capacity, scale: config.scale })) ui.warn(w);
   if (config.semanticModel.enabled) {
-    const cm = config.consumption.model;
-    const consumption = consumptionModelWanted(ctx) ? `, ${cm.name} ${cm.id ? '' : c.dim('(new)')}`.trimEnd() : '';
-    const am = config.agentEvaluator.model;
-    const evaluator = agentEvaluatorModelWanted(ctx) ? `, ${am.name} ${am.id ? '' : c.dim('(new)')}`.trimEnd() : '';
-    const app = config.fabricApp.enabled ? `, and the Analytics Hub app ${config.fabricApp.itemId ? '' : c.dim('(new)')}` : '';
-    ui.info(`Power BI:    ${config.semanticModel.name} ${config.semanticModel.id ? '' : c.dim('(new)')}`.trimEnd() + consumption + evaluator + app.trimEnd());
+    ui.info(`Power BI:    ${config.semanticModel.name} ${config.semanticModel.id ? '' : c.dim('(new)')}`.trimEnd());
     const reports = reportsWanted(ctx).map((w) => `${w.model.report?.name ?? w.name} ${w.model.report?.id ? '' : c.dim('(new)')}`.trimEnd());
     if (reports.length) ui.info(`Reports:     ${reports.join(', ')}`);
-    if (dataAgentWanted(ctx)) ui.info(`Ask:         ${config.dataAgent.name} ${config.dataAgent.id ? '' : c.dim('(new data agent)')}`.trimEnd());
-  }
-  if (config.modules.consumption) {
-    const cc = config.consumption;
-    ui.info(`Azure AI:    ${cc.azureSubscriptionId ? `${cc.azureSubscriptionName ?? cc.azureSubscriptionId}${cc.azureAccess ? '' : c.dim(' (the app gets Reader, Cost Management Reader and Monitoring Reader)')}` : c.dim('left out')}`);
-  }
-  if (config.modules.agentEvaluator) {
-    const envs = config.agentEvaluator.environments;
-    const names = envs.map((e) => e.name ?? new URL(e.url).host).join(', ');
-    const waiting = envs.some((e) => !e.access || !e.readAll) ? c.dim(' (the app is added to each with the Bot Transcript Viewer role and a role that reads every transcript)') : '';
-    ui.info(`Agents:      ${envs.length ? `${names}${waiting}` : c.dim('no environments chosen')}`);
   }
   if (resourceGraphOn(config)) ui.info(`Governance:  ${resourceGraphKinds(config)} from Azure Resource Graph, in ${scopeName(config)}`);
   if (ctx.runFirstLoad) ui.info(`First load:  ${config.history.days} days of history, straight after setup`);

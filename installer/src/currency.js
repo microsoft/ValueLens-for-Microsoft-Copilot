@@ -1,13 +1,10 @@
 // @ts-check
 /**
- * The reporting currency: the one currency the Value page shows value and cost in.
- * Licences and credits are billed in US dollars, so another currency needs a rate.
- * Keep CURRENCIES in step with `app/src/lib/currency.ts`.
+ * The reporting currency: the currency symbol the report's Estimated Value page shows money with.
+ * The amounts themselves are the report's assumptions, which people set in the report.
  */
 
 export const DEFAULT_CURRENCY = 'USD';
-/** The largest rate accepted, in units of the reporting currency per US dollar. */
-export const MAX_RATE = 100000;
 
 /** @typedef {{ code: string, name: string, symbol: string }} Currency */
 
@@ -32,10 +29,9 @@ export const CURRENCIES = [
 ];
 
 /**
- * The installer's choice, kept in the install record and passed to the app as its default.
+ * The installer's choice, kept in the install record.
  * @typedef {object} ReportingConfig
  * @property {string} currency  ISO 4217 code.
- * @property {number} [exchangeRate]  Units of the currency per US dollar. Never set for USD.
  */
 
 /** @param {unknown} value @returns {string | undefined} */
@@ -49,41 +45,21 @@ export function toCurrencyCode(value) {
 export const currencySymbol = (code) => CURRENCIES.find((c) => c.code === code)?.symbol ?? code;
 
 /**
- * A typed rate: undefined when blank, otherwise a positive number up to MAX_RATE.
- * @param {string} text
- * @returns {number | undefined | string}  The rate, undefined for blank, or why it was refused.
- */
-export function parseRate(text) {
-  const trimmed = String(text ?? '').trim();
-  if (!trimmed) return undefined;
-  const rate = Number(trimmed);
-  if (!Number.isFinite(rate) || rate <= 0) return 'Type a number above 0, or leave it blank.';
-  if (rate > MAX_RATE) return `Type a number up to ${MAX_RATE}.`;
-  return rate;
-}
-
-/**
- * The saved choice, cleaned: a known currency and, for anything but USD, a valid rate.
+ * The saved choice, cleaned: a known currency.
  * @param {unknown} raw
  * @returns {ReportingConfig | undefined}
  */
 export function normaliseReporting(raw) {
   if (!raw || typeof raw !== 'object') return undefined;
   const currency = toCurrencyCode(/** @type {any} */ (raw).currency);
-  if (!currency) return undefined;
-  const rate = /** @type {any} */ (raw).exchangeRate;
-  const exchangeRate = currency !== 'USD' && typeof rate === 'number' && rate > 0 && rate <= MAX_RATE ? rate : undefined;
-  return exchangeRate === undefined ? { currency } : { currency, exchangeRate };
+  return currency ? { currency } : undefined;
 }
 
 /**
- * The plan review's words for the Value page currency.
+ * The plan review's words for the report's currency.
  * @param {ReportingConfig | undefined} reporting
  */
 export function describeReporting(reporting) {
-  const currency = reporting?.currency ?? DEFAULT_CURRENCY;
-  if (currency === DEFAULT_CURRENCY) return 'The Value page reports in US dollars.';
-  return reporting?.exchangeRate
-    ? `The Value page reports in ${currency}, at ${reporting.exchangeRate} to $1.`
-    : `The Value page reports in ${currency}; set its rate under Prices in the app.`;
+  const code = reporting?.currency ?? DEFAULT_CURRENCY;
+  return `The Estimated Value page shows money in ${code} (${currencySymbol(code)}).`;
 }

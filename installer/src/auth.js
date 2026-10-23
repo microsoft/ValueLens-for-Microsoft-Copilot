@@ -12,7 +12,6 @@ export const SCOPES = {
   storage: 'https://storage.azure.com/.default',
   powerbi: 'https://analysis.windows.net/powerbi/api/.default',
   discovery: 'https://globaldisco.crm.dynamics.com/.default',
-  powerPlatform: 'https://api.powerplatform.com/.default',
   flow: 'https://service.flow.microsoft.com/.default',
   powerApps: 'https://service.powerapps.com/.default',
   /** Asked for only when giving the app an Entra role, and only if the usual Graph sign-in can't. */
@@ -28,19 +27,9 @@ export const API_NAMES = /** @type {Record<keyof typeof SCOPES, string>} */ ({
   storage: 'Azure Storage and OneLake',
   powerbi: 'Power BI',
   discovery: 'Dataverse',
-  powerPlatform: 'Power Platform',
   flow: 'Power Automate',
   powerApps: 'Power Apps',
 });
-
-/**
- * Microsoft Graph Command Line Tools, Microsoft's public client app for Graph scripts. The
- * installer signs in with it a second time only to publish the Teams app, because the app it
- * usually signs in with can't ask for the app catalog scope.
- */
-export const GRAPH_CLI_APP_ID = '14d82eec-204b-4c2f-b7e8-296a70dab67e';
-/** Publishing the Teams app to the org's app catalog. Not in SCOPES, so checkTokens never asks for it. */
-export const APP_CATALOG_SCOPE = 'https://graph.microsoft.com/AppCatalog.ReadWrite.All';
 
 /** Azure Cloud Shell's own sign-in, which the Azure CLI uses until you run az login, covers only some APIs. */
 const MSI_AUDIENCE = /not a supported MSI token audience/i;
@@ -56,8 +45,8 @@ export const isMsiAudienceError = (err) => MSI_AUDIENCE.test(String(/** @type {a
 export const msiAudienceMessage = (apis) => `The Azure CLI is on Cloud Shell's own sign-in, which can't get tokens for ${apis.join(', ')}. Run ${AZ_LOGIN} to sign the Azure CLI in as you, then run the installer again. Or leave out --use-az to sign in with a code.`;
 
 /**
- * A named API, the app catalog scope, or the scope of one found at run time, such as a Dataverse environment.
- * @typedef {keyof typeof SCOPES | typeof APP_CATALOG_SCOPE | `https://${string}/.default`} Resource
+ * A named API, or the scope of one found at run time, such as a Dataverse environment.
+ * @typedef {keyof typeof SCOPES | `https://${string}/.default`} Resource
  */
 
 /**

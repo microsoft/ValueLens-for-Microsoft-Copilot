@@ -9,11 +9,6 @@ import {
   AGENT365_FALLBACK,
   AGENT365_LANDER,
   AGENT365_REGISTRY,
-  AGENT_EVALUATOR_ACTIVITY,
-  AGENT_EVALUATOR_REFRESH_ACTIVITY,
-  CONSUMPTION_REFRESH_ACTIVITY,
-  COWORK_DATAFLOW_ACTIVITY,
-  COWORK_WRAPPER_ACTIVITY,
   REFRESH_ACTIVITY,
   RESOURCE_GRAPH_ACTIVITY,
   STATUS_ACTIVITY,
@@ -36,13 +31,6 @@ export const LOAD_LABELS = /** @type {Record<string, string>} */ ({
   [ACCESS_ACTIVITY]: 'Who sees which orgs (org-scoped access)',
   Run_M365_Activity_Ingester: 'Microsoft 365 activity',
   Run_ProductFeedback_Ingester: 'Product feedback',
-  Run_Consumption_Azure_AI: 'Azure AI spend',
-  Run_Consumption_Studio: 'Copilot Studio credits',
-  [COWORK_DATAFLOW_ACTIVITY]: 'Cowork credits (Viva Insights)',
-  Run_Consumption_Viva: 'Cowork credits (load)',
-  [CONSUMPTION_REFRESH_ACTIVITY]: 'Consumption model refresh',
-  [AGENT_EVALUATOR_ACTIVITY]: 'Agent transcripts',
-  [AGENT_EVALUATOR_REFRESH_ACTIVITY]: 'Agent Evaluator model refresh',
   [RESOURCE_GRAPH_ACTIVITY]: 'Agent configuration and Foundry (Resource Graph)',
   Run_Defender_Ingester: 'Shadow AI and agent risk (Defender)',
   [STATUS_ACTIVITY]: 'Load status record',
@@ -55,18 +43,17 @@ export const loadLabel = (name) => LOAD_LABELS[name] ?? name.replace(/^Run_/, ''
 export const RERUN = '{rerun}';
 
 /**
+ * A reason a load failed. `activity` ties it to one step: it then matches only that step's failures.
+ * @typedef {{ kind: string, pattern: string, text: string, fix: string, activity?: string }} Reason
+ */
+
+/**
  * Why a load failed, tested in order against "errorCode=<code> <message>". The patterns use only
- * syntax JavaScript and Python share, matched case-insensitively.
+ * syntax JavaScript and Python share, matched case-insensitively. The Record_Load_Status notebook
+ * ships with these and more (for loads Analytics Hub has and ValueLens doesn't), in the same order.
+ * @type {Reason[]}
  */
 export const REASONS = [
-  {
-    // Fabric's whole error when a Dataflow's connections have no sign-in, or it is still publishing.
-    kind: 'signIn',
-    activity: COWORK_DATAFLOW_ACTIVITY,
-    pattern: 'Job instance failed without detail error',
-    text: 'Needs sign-in: the Cowork Dataflow\'s connections aren\'t signed in (or it hadn\'t finished publishing).',
-    fix: 'Sign in to the Cowork Dataflow\'s two connections, save it and wait until it has finished publishing, then choose Load Cowork now.',
-  },
   {
     kind: 'capacity',
     pattern: 'TooManyRequestsForCapacity|(?:code|status)[\\s:\'"=-]{0,6}430\\b',
@@ -107,7 +94,6 @@ export const REASONS = [
 export const STATUS_TABLES = [
   { activity: RESOURCE_GRAPH_ACTIVITY, table: 'arg_status', item: 'Probe', status: 'Status' },
   { activity: 'Run_Defender_Ingester', table: 'defender_status', item: 'Probe', status: 'Status' },
-  { activity: AGENT_EVALUATOR_ACTIVITY, table: 'evaluator_status', item: 'Environment', status: 'Status' },
 ];
 
 /**
@@ -138,7 +124,7 @@ export const WARNINGS = [
     statuses: ['empty'],
     all: true,
     text: 'It ran, but found nothing to load in {items}.',
-    fix: 'Check the source has data for the period it reads. For Agent transcripts, choose the environments that hold your Copilot Studio agents with Repair or change in the installer.',
+    fix: 'Check the source has data for the period it reads.',
   },
 ];
 
@@ -197,18 +183,13 @@ export function loadWarnings(statusRun) {
  * @typedef {object} LoadCard
  * @property {string} activity
  * @property {string} name  Plain name of the source.
- * @property {'ok' | 'warning' | 'failed' | 'skipped' | 'running' | 'todo'} state  A warning loaded, but not all of its source. todo: left for you to finish, such as a sign-in.
+ * @property {'ok' | 'warning' | 'failed' | 'skipped' | 'running'} state  A warning loaded, but not all of its source.
  * @property {string} [reason]
  * @property {ReasonKind} [kind]
  * @property {string[]} fix  What to do, with {@link RERUN} still in it.
  * @property {number} [attempts]
- * @property {boolean} [counted]  Failed in a way that leaves an install partly set up. The Cowork Dataflow failing
- *   while signing it in is still to do isn't: that's a next step.
+ * @property {boolean} [counted]  Failed in a way that leaves an install partly set up.
  */
-
-/** The Viva load, which reads what the Cowork Dataflow wrote. */
-export const VIVA_ACTIVITY = 'Run_Consumption_Viva';
-const COWORK_TODO_FIX = 'Sign in to the Cowork Dataflow, then choose Load Cowork now.';
 
 const RUN_STATES = /** @type {Record<string, LoadCard['state']>} */ ({
   Succeeded: 'ok',
@@ -266,11 +247,6 @@ export function loadCards(runs, activities) {
     const name = load.name;
     if (name === STATUS_ACTIVITY) continue;
     const run = runs.get(name);
-    if (!run && parent?.name === COWORK_WRAPPER_ACTIVITY && runs.get(parent.name)?.status === 'Succeeded') {
-      // The run was told to leave the Dataflow out (SkipCowork) because it wasn't signed in yet.
-      cards.push({ activity: name, name: loadLabel(name), state: 'todo', reason: 'Not loaded yet: the Cowork Dataflow needs signing in first.', fix: [COWORK_TODO_FIX] });
-      continue;
-    }
     if (!run && parent && runs.get(parent.name)?.status === 'Succeeded') continue;
     if (name === AGENT365_REGISTRY && fallbackWorked) continue;
     if (name === AGENT365_FALLBACK && registryWorked) continue;
@@ -298,14 +274,6 @@ export function loadCards(runs, activities) {
       card.fix = [`It runs again once those succeed: ${RERUN}.`];
     }
     cards.push(card);
-  }
-  // The Viva load "succeeds" on nothing new when the Dataflow didn't refresh first: not green.
-  const cowork = cards.find((c) => c.activity === COWORK_DATAFLOW_ACTIVITY);
-  const viva = cards.find((c) => c.activity === VIVA_ACTIVITY);
-  if (viva?.state === 'ok' && (cowork?.state === 'todo' || cowork?.state === 'failed')) {
-    viva.state = 'todo';
-    viva.reason = 'It ran, but nothing new came from the Cowork Dataflow: the Dataflow didn\'t refresh first.';
-    viva.fix = cowork.state === 'todo' ? [COWORK_TODO_FIX] : cowork.fix;
   }
   return cards;
 }

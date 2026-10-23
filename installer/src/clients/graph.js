@@ -1,6 +1,5 @@
 // @ts-check
 /** Microsoft Graph calls for the app registration and the signed-in user's roles. */
-import crypto from 'node:crypto';
 import { GRAPH_APP_ID } from '../catalog.js';
 import { HttpError } from '../http.js';
 
@@ -16,18 +15,10 @@ export const APP_ROLES = {
   '158c047a-c907-4556-b7ef-446551a6b5f7': 'Cloud Application Administrator',
 };
 
-/** Directory roles that can publish a custom app to the org's Teams app catalog. */
-export const TEAMS_PUBLISH_ROLES = {
-  '69091246-20e8-4a56-aa4d-066075b2a7a8': 'Teams Administrator',
-  '62e90394-69f5-4237-9190-012177145e10': 'Global Administrator',
-};
-
 export const FABRIC_ADMIN_ROLE = 'a9ea8996-122f-4c74-9520-8edcd192826c';
 export const GLOBAL_READER_ROLE = 'f2ef992c-3afb-46b9-b7cf-a126ee74c451';
 export const AI_ADMIN_ROLE = 'd2562ede-74db-457e-a7b6-544e236ebb61';
 export const POWER_PLATFORM_ADMIN_ROLE = '11648597-926c-4cf3-9c36-bcebb0ba8dcc';
-
-export const POWER_BI_APP_ID = '00000009-0000-0000-c000-000000000000';
 
 /**
  * Maps permission names to Graph app role IDs. A missing required permission is an
@@ -63,43 +54,6 @@ export function adminConsentUrl(tenantId, appId) {
 export function apiPermissionsUrl(appId) {
   return `https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/CallAnAPI/appId/${appId}`;
 }
-
-/**
- * The web app's pre-authorised clients with `scopeId` added for each of `clientIds`. Every other client and
- * permission an admin added stays. Nothing is listed twice, a permission the app no longer has goes because
- * Graph refuses it, and so does a client left with none.
- * @param {{ appId: string, delegatedPermissionIds?: string[] }[] | undefined} current
- * @param {string[]} clientIds
- * @param {string} scopeId
- * @param {{ id: string }[]} scopes  The app's oauth2PermissionScopes as they will be saved.
- */
-export function mergePreAuthorizedApplications(current, clientIds, scopeId, scopes) {
-  const known = new Set(scopes.map((s) => s.id.toLowerCase()));
-  /** @type {Map<string, { appId: string, delegatedPermissionIds: string[] }>} */
-  const clients = new Map();
-  /** @param {string} appId @param {string[]} ids */
-  const add = (appId, ids) => {
-    const client = clients.get(appId.toLowerCase()) ?? { appId, delegatedPermissionIds: [] };
-    clients.set(appId.toLowerCase(), client);
-    for (const id of ids) {
-      const have = client.delegatedPermissionIds.some((d) => d.toLowerCase() === id.toLowerCase());
-      if (!have && known.has(id.toLowerCase())) client.delegatedPermissionIds.push(id);
-    }
-  };
-  for (const client of current ?? []) if (client?.appId) add(client.appId, client.delegatedPermissionIds ?? []);
-  for (const appId of clientIds) add(appId, [scopeId]);
-  return [...clients.values()].filter((c) => c.delegatedPermissionIds.length);
-}
-
-/**
- * The web app's delegated Graph permissions: User.Read, and with the viewer group GroupMember.ReadWrite.All and
- * User.ReadBasic.All, so that Share can change the group and find people by email.
- * @param {{ graphUserReadScopeId: string, graphGroupScopeId?: string, graphPeopleScopeId?: string }} o
- */
-const webAppGraphAccess = (o) => ({
-  resourceAppId: GRAPH_APP_ID,
-  resourceAccess: [o.graphUserReadScopeId, o.graphGroupScopeId, o.graphPeopleScopeId].flatMap((id) => (id ? [{ id, type: 'Scope' }] : [])),
-});
 
 /**
  * Entra takes a little while to replicate a new app and service principal, so
@@ -206,91 +160,6 @@ export function graphApi(http) {
         requiredResourceAccess: appRoles.length ? [{ resourceAppId: GRAPH_APP_ID, resourceAccess: appRoles.map((r) => ({ id: r.id, type: 'Role' })) }] : [],
       }),
     /**
-     * Creates the Azure-hosted web application registration.
-     * @param {{ displayName: string, fqdn: string, pbiScopeId: string, graphUserReadScopeId: string, graphGroupScopeId?: string, graphPeopleScopeId?: string, groupClaims?: boolean, teamsClientIds: string[] }} o
-     */
-    createAzureWebApplication(o) {
-      const scopeId = crypto.randomUUID();
-      // No identifierUris here: tenant policy needs the URI to contain the app ID, so
-      // updateAzureWebApplication sets api://<fqdn>/<appId> once the app ID exists.
-      return http.post('/applications', {
-        displayName: o.displayName,
-        signInAudience: 'AzureADMyOrg',
-        spa: { redirectUris: [`https://${o.fqdn}/`, `https://${o.fqdn}/?host=teams&auth=popup`] },
-        api: {
-          oauth2PermissionScopes: [
-            {
-              id: scopeId,
-              adminConsentDescription: 'Allow users to access Analytics Hub.',
-              adminConsentDisplayName: 'Access Analytics Hub',
-              isEnabled: true,
-              type: 'User',
-              userConsentDescription: 'Allow you to access Analytics Hub.',
-              userConsentDisplayName: 'Access Analytics Hub',
-              value: 'access_as_user',
-            },
-          ],
-          preAuthorizedApplications: o.teamsClientIds.map((appId) => ({ appId, delegatedPermissionIds: [scopeId] })),
-        },
-        appRoles: [
-          { id: crypto.randomUUID(), allowedMemberTypes: ['User'], displayName: 'Analytics Hub User', value: 'AnalyticsHub.User', description: 'Can use Analytics Hub.', isEnabled: true },
-          { id: crypto.randomUUID(), allowedMemberTypes: ['User'], displayName: 'Analytics Hub Admin', value: 'AnalyticsHub.Admin', description: 'Can administer Analytics Hub.', isEnabled: true },
-        ],
-        requiredResourceAccess: [
-          { resourceAppId: POWER_BI_APP_ID, resourceAccess: [{ id: o.pbiScopeId, type: 'Scope' }] },
-          webAppGraphAccess(o),
-        ],
-        ...(o.groupClaims ? { groupMembershipClaims: 'SecurityGroup' } : {}),
-        notes: 'Created by the Analytics Hub installer for the Azure-hosted web app.',
-      });
-    },
-
-    /**
-     * Brings the web app registration up to date on every install, upgrade and Repair. Other scopes and
-     * pre-authorised clients on it stay.
-     * @param {any} application
-     * @param {{ fqdn: string, clientId: string, pbiScopeId: string, graphUserReadScopeId: string, graphGroupScopeId?: string, graphPeopleScopeId?: string, groupClaims?: boolean, teamsClientIds: string[] }} o
-     */
-    async updateAzureWebApplication(application, o) {
-      /** @type {any[]} */
-      const scopes = application.api?.oauth2PermissionScopes ?? [];
-      const scope = scopes.find((s) => s.value === 'access_as_user') ?? { id: crypto.randomUUID() };
-      const accessAsUser = {
-        ...scope,
-        adminConsentDescription: scope.adminConsentDescription ?? 'Allow users to access Analytics Hub.',
-        adminConsentDisplayName: scope.adminConsentDisplayName ?? 'Access Analytics Hub',
-        isEnabled: true,
-        type: 'User',
-        userConsentDescription: scope.userConsentDescription ?? 'Allow you to access Analytics Hub.',
-        userConsentDisplayName: scope.userConsentDisplayName ?? 'Access Analytics Hub',
-        value: 'access_as_user',
-      };
-      // Graph won't drop an enabled scope, and another pre-authorised client may use one.
-      const oauth2PermissionScopes = scopes.includes(scope) ? scopes.map((s) => (s === scope ? accessAsUser : s)) : [...scopes, accessAsUser];
-      await http.patch(`/applications/${application.id}`, {
-        spa: { redirectUris: [`https://${o.fqdn}/`, `https://${o.fqdn}/?host=teams&auth=popup`] },
-        identifierUris: [`api://${o.fqdn}/${o.clientId}`],
-        // The web app lets the viewer group in by the groups claim.
-        groupMembershipClaims: o.groupClaims ? 'SecurityGroup' : application.groupMembershipClaims ?? null,
-        api: {
-          ...(application.api ?? {}),
-          oauth2PermissionScopes,
-          preAuthorizedApplications: mergePreAuthorizedApplications(application.api?.preAuthorizedApplications, o.teamsClientIds, scope.id, oauth2PermissionScopes),
-        },
-        appRoles: application.appRoles?.length
-          ? application.appRoles
-          : [
-              { id: crypto.randomUUID(), allowedMemberTypes: ['User'], displayName: 'Analytics Hub User', value: 'AnalyticsHub.User', description: 'Can use Analytics Hub.', isEnabled: true },
-              { id: crypto.randomUUID(), allowedMemberTypes: ['User'], displayName: 'Analytics Hub Admin', value: 'AnalyticsHub.Admin', description: 'Can administer Analytics Hub.', isEnabled: true },
-            ],
-        requiredResourceAccess: [
-          { resourceAppId: POWER_BI_APP_ID, resourceAccess: [{ id: o.pbiScopeId, type: 'Scope' }] },
-          webAppGraphAccess(o),
-        ],
-      });
-      return scope.id;
-    },
-    /**
      * Adds Graph app roles to the app's required permissions, keeping what is there.
      * @param {any} application
      * @param {{ id: string }[]} appRoles
@@ -312,13 +181,6 @@ export function graphApi(http) {
 
     /** @param {string} applicationObjectId */
     deleteApplication: (applicationObjectId) => http.del(`/applications/${applicationObjectId}`),
-
-    /**
-     * @param {string} applicationObjectId
-     * @param {{ name: string, issuer: string, subject: string, audiences: string[] }} credential
-     */
-    addFederatedIdentityCredential: (applicationObjectId, credential) =>
-      http.post(`/applications/${applicationObjectId}/federatedIdentityCredentials`, credential, replicationRetry),
 
     /**
      * @param {string} applicationObjectId
@@ -453,48 +315,3 @@ export function graphApi(http) {
 }
 
 /** @typedef {ReturnType<typeof graphApi>} GraphApi */
-
-/**
- * An app in the org's Teams app catalog, with its versions when asked for.
- * @typedef {object} TeamsCatalogApp
- * @property {string} id  The app's ID in the catalog, not the manifest's.
- * @property {string} [externalId]  The manifest's `id`.
- * @property {string} [displayName]
- * @property {string} [distributionMethod]  `organization` for an app your org published.
- * @property {{ id?: string, version?: string, publishingState?: string }[]} [appDefinitions]  `publishingState` is `published`, or `submitted` while it waits for an admin.
- */
-
-/**
- * The org's Teams app catalog. Every call needs the delegated AppCatalog.ReadWrite.All scope, and
- * publishing straight to the catalog, not for review, needs a Teams Administrator or Global Administrator.
- * https://learn.microsoft.com/graph/api/teamsapp-publish
- * @param {import('../http.js').HttpClient} http
- * @param {(o?: { abortSignal?: AbortSignal }) => Promise<unknown>} [signIn]  Gets the scope's token, so the sign-in can come before any call.
- */
-export function appCatalogApi(http, signIn = async () => {}) {
-  /** Not retried after a network error: a second upload could add a second app. @type {import('../http.js').RequestOptions} */
-  const zipped = { headers: { 'Content-Type': 'application/zip' }, once: true };
-  return {
-    /** @param {{ abortSignal?: AbortSignal }} [o]  abortSignal: stop waiting for the sign-in. */
-    signIn: async (o) => {
-      await signIn(o);
-    },
-    /**
-     * The org's own apps with this manifest ID, with their versions. Store apps are left out.
-     * @param {string} externalId
-     * @returns {Promise<TeamsCatalogApp[]>}
-     */
-    find: async (externalId) => {
-      const apps = await http.list('/appCatalogs/teamsApps', { query: { $filter: `distributionMethod eq 'organization' and externalId eq '${externalId.replace(/'/g, "''")}'`, $expand: 'appDefinitions' } });
-      return apps.filter((a) => a.distributionMethod === 'organization');
-    },
-    /** Adds a new app to the org's catalog. @param {Uint8Array} zip @returns {Promise<TeamsCatalogApp>} */
-    publish: (zip) => http.post('/appCatalogs/teamsApps', zip, zipped),
-    /** Uploads a new version of an app already in the catalog. @param {string} id @param {Uint8Array} zip */
-    update: (id, zip) => http.post(`/appCatalogs/teamsApps/${encodeURIComponent(id)}/appDefinitions`, zip, zipped),
-    /** @param {string} id */
-    remove: (id) => http.del(`/appCatalogs/teamsApps/${encodeURIComponent(id)}`),
-  };
-}
-
-/** @typedef {ReturnType<typeof appCatalogApi>} AppCatalogApi */

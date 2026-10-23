@@ -1,9 +1,8 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { BACKFILL_ENV, jobTemplateWith } from '../src/steps/azure/index.js';
 import { askMoreHistory, HISTORY_CHOICES, reloadDetail, reloadLine } from '../src/steps/plan.js';
-import { fakeArm, fakeCtx, fakeUi } from './fakes.js';
+import { fakeCtx, fakeUi } from './fakes.js';
 
 /** A ui that records each select's choices and answers with `answer`, or the default. @param {any} [answer] */
 function selectUi(answer) {
@@ -49,17 +48,4 @@ test('reloadLine and reloadDetail describe the reload for the plan summary', () 
   assert.deepEqual(HISTORY_CHOICES.map((c) => c.value), [30, 90, 180]);
   assert.match(reloadLine(90), /90 days/);
   assert.ok(reloadDetail(180).length > 0);
-});
-
-test('jobTemplateWith: one execution with the backfill setting, replacing any old one and keeping the rest', async () => {
-  const arm = fakeArm();
-  const job = await arm.api.getContainerAppJob('sub-1', 'rg', 'vlens-run');
-  const template = jobTemplateWith(job, [{ name: BACKFILL_ENV, value: '90' }]);
-  assert.ok(template);
-  const [ct] = template.containers;
-  assert.equal(ct.image, 'img:1');
-  assert.deepEqual(ct.command, ['python']);
-  assert.deepEqual(ct.env, [{ name: 'VALUELENS_AUDIT_HISTORY_DAYS', value: '30' }, { name: BACKFILL_ENV, value: '90' }]);
-  assert.equal(jobTemplateWith({ properties: { template: { containers: [] } } }, []), undefined);
-  assert.equal(BACKFILL_ENV, 'VALUELENS_AUDIT_BACKFILL_DAYS');
 });

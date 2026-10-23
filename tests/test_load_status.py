@@ -196,9 +196,19 @@ class LoadStatusTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("node"), "node is not installed")
     def test_labels_and_reasons_match_the_installer(self):
+        # The installer fills STATUS_JSON with its own lists when it deploys the notebook. The notebook
+        # keeps Analytics Hub's fuller lists (for loads ValueLens doesn't have), so each of the
+        # installer's entries must be in the notebook word for word, and in the same order.
         script = "import('./src/loads.js').then(m => process.stdout.write(m.statusConfigJson()))"
         out = subprocess.run(["node", "--input-type=module", "-e", script], cwd=INSTALLER, capture_output=True, text=True, check=True, encoding="utf-8").stdout
-        self.assertEqual(status(namespace()), json.loads(out))
+        installer, notebook = json.loads(out), status(namespace())
+        self.assertEqual(set(installer), set(notebook))
+        for name, label in installer["labels"].items():
+            self.assertEqual(notebook["labels"].get(name), label, name)
+        for key in ("reasons", "statusTables", "warnings"):
+            with self.subTest(key=key):
+                rest = iter(notebook[key])
+                self.assertTrue(all(entry in rest for entry in installer[key]), f"the installer's {key} are in the notebook, in order")
 
 
 if __name__ == "__main__":

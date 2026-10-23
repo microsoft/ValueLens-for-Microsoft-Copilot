@@ -10,9 +10,8 @@ import { test } from 'node:test';
 import { graphApi } from '../src/clients/graph.js';
 import { createClient, HttpError } from '../src/http.js';
 import { accessCommand, accessReview, ensureViewerGroup, VIEWER_GROUP_NAME } from '../src/steps/access.js';
-import { installAzure } from '../src/steps/azure/index.js';
 import { orgAccessCommand } from '../src/steps/org-access.js';
-import { fakeArm, fakeAzureGraph, fakeCtx, fakeFabric, fakePowerBi, fakeUi } from './fakes.js';
+import { fakeCtx, fakeFabric, fakePowerBi, fakeUi } from './fakes.js';
 
 /** The signed-in user, as fakeCtx has them. */
 const ME = { id: 'user-1', upn: 'admin@contoso.com' };
@@ -151,52 +150,7 @@ test('a create that fails without an answer from Graph still stops', async () =>
   await assert.rejects(ensureViewerGroup(ctx), /fetch failed/);
 });
 
-/**
- * An Azure setup against fakes, as azure.test.js's webAppInstall runs one, with the viewer group still to create:
- * the user kept "A new group".
- * @param {{ admin: boolean }} o
- */
-async function azureSetup(o) {
-  const t = tenant(o);
-  const arm = fakeArm();
-  const graph = fakeAzureGraph();
-  const { getGroup, findGroupByName, createSecurityGroup, groupMembers, groupOwners, groupUsers } = t.graph;
-  Object.assign(graph.api, { getGroup, findGroupByName, createSecurityGroup, groupMembers, groupOwners, groupUsers });
-  const powerBi = fakePowerBi();
-  powerBi.setDatasources([{ datasourceType: 'Sql', gatewayId: 'gw', datasourceId: 'ds', connectionDetails: { server: 'vlens-sql.database.windows.net', database: 'valuelens' } }]);
-  /** @type {string[]} */
-  const grants = [];
-  Object.assign(powerBi.api, {
-    datasetUsers: async () => [],
-    addDatasetUser: async (/** @type {string} */ _ws, /** @type {string} */ ds, /** @type {any} */ body) => {
-      grants.push(`${ds} ${body.identifier}`);
-      return null;
-    },
-  });
-  const ui = fakeUi();
-  const { ctx, config } = fakeCtx({ arm: arm.api, graph: graph.api, fabric: fakeFabric().api, powerBi: powerBi.api, ui: ui.ui });
-  Object.assign(config, {
-    target: 'azure',
-    azure: { subscriptionId: 'sub-1', resourceGroup: 'rg', location: 'uksouth', namePrefix: 'vlens', installId: 'install-1', tags: {}, deployments: [], outputs: {}, graphRoles: { assigned: [], pending: [] }, publicNetworkAccess: true, workspaceName: 'Analytics Hub' },
-    access: { groupName: VIEWER_GROUP_NAME, contact: ME.upn },
-  });
-  ctx.runFirstLoad = false;
-  const ok = await installAzure(ctx, { wait: true });
-  return { ok, t, config, grants, text: ui.text };
-}
-
 for (const admin of [true, false]) {
-  test(`Azure setup, as ${who(admin)}: the viewer group is created with them as owner, and setup carries on`, async () => {
-    const s = await azureSetup({ admin });
-    assert.equal(s.ok, true);
-    assert.equal(s.t.creates.length, admin ? 1 : 2);
-    assert.deepEqual([...s.t.groups.values()].map((g) => g.owners), [[ME.id]]);
-    assert.equal(s.config.access?.groupId, 'g-1');
-    assert.equal(s.config.access?.createdGroup, true);
-    assert.ok(s.grants.length && s.grants.every((g) => g.endsWith(' g-1')), 'the group gets Build on the models');
-    assert.match(s.text(), /Created the group "Analytics Hub Viewers", with you as owner/);
-  });
-
   test(`access, as ${who(admin)}: keeping "A new group" creates it with them as owner, then shows it`, async () => {
     const t = tenant({ admin });
     const { ui, text, asked } = fakeUi();

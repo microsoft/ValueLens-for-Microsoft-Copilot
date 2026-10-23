@@ -3,13 +3,11 @@
  * The Power BI reports from the templates, published to the workspace and bound to the
  * installer's semantic models, so nobody has to open Power BI Desktop.
  */
-import { AGENT_EVALUATOR_REPORT_NAME, CONSUMPTION_REPORT_NAME, REPORT_NAME } from '../config.js';
+import { REPORT_NAME } from '../config.js';
 import { commandLine } from '../launch.js';
 import { loadTemplateReport, reportDefinition, reportSignature } from '../transform/report.js';
 import { c } from '../ui.js';
-import { agentEvaluatorModelWanted } from './agent-evaluator.js';
-import { consumptionModelWanted } from './consumption.js';
-import { createItem, modelKey } from './fabric.js';
+import { createItem } from './fabric.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 /** @typedef {import('../config.js').ModelConfig} ModelConfig */
@@ -31,20 +29,14 @@ export const reportsOn = (config) => !!(config.semanticModel.enabled && config.s
  */
 
 /**
- * The reports to publish: ValueLens, and the credit consumption and Agent Evaluator ones with their models.
+ * The report to publish: ValueLens, on its model.
  * @param {Ctx} ctx
  * @returns {WantedReport[]}
  */
 export function reportsWanted(ctx) {
   const { config, sources } = ctx;
-  if (!reportsOn(config)) return [];
-  /** @type {{ model: ModelConfig, file?: string, name: string }[]} */
-  const all = [
-    { model: config.semanticModel, file: sources.modelFile, name: REPORT_NAME },
-    ...(consumptionModelWanted(ctx) ? [{ model: config.consumption.model, file: sources.consumptionModelFile, name: CONSUMPTION_REPORT_NAME }] : []),
-    ...(agentEvaluatorModelWanted(ctx) ? [{ model: config.agentEvaluator.model, file: sources.agentEvaluatorModelFile, name: AGENT_EVALUATOR_REPORT_NAME }] : []),
-  ];
-  return /** @type {WantedReport[]} */ (all.filter((r) => r.file));
+  if (!reportsOn(config) || !sources.modelFile) return [];
+  return [{ model: config.semanticModel, file: sources.modelFile, name: REPORT_NAME }];
 }
 
 /**
@@ -72,7 +64,7 @@ export async function deployReport(ctx, w) {
   }
   if (!r.id) {
     const definition = reportDefinition(parts, m.id);
-    const made = await createItem(ctx, `Report:${modelKey(ctx.config, m)}`, 'Report', r.name, items, (name, ref) => api.fabric.createReport(ws, name, definition, ref));
+    const made = await createItem(ctx, 'Report:main', 'Report', r.name, items, (name, ref) => api.fabric.createReport(ws, name, definition, ref));
     r.id = made.id;
     r.name = made.name;
     if (made.resumed) await api.fabric.updateReport(ws, made.id, definition);

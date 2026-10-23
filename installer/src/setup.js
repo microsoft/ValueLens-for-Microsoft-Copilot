@@ -5,9 +5,6 @@ import { createHash } from 'node:crypto';
 import { archiveConfig, loadConfig, removeFile, saveConfig } from './config.js';
 import { armErrors } from './clients/azure.js';
 import { plan, preflight, confirmPlan } from './steps/plan.js';
-import { askTarget, azurePreflight, azureResourceGraphOn, confirmAzurePlan, deploymentPinned, planAzure, resourcesIn, supportsVnetGateway } from './steps/azure/index.js';
-import { checkRegions, regionProblems, sqlProblem, allowedFor, ASK_TYPE } from './steps/azure/regions.js';
-import { askModelIn } from './steps/azure/ask.js';
 import { isResumeLater } from './steps/identity.js';
 import { resourceGraphOn } from './steps/resource-graph.js';
 import { checkStaged } from './staging.js';
@@ -15,33 +12,26 @@ import { checkStaged } from './staging.js';
 /** @typedef {import('./install.js').Ctx} Ctx */
 /** @typedef {import('./config.js').InstallConfig} InstallConfig */
 
-export const SETUP_SECTIONS = ['data', 'placement', 'networking', 'powerbi', 'access', 'identity', 'sources', 'governance', 'ask', 'schedule'];
+export const SETUP_SECTIONS = ['data', 'placement', 'powerbi', 'access', 'identity', 'sources', 'governance', 'schedule'];
 const draftFile = (/** @type {string} */ file) => `${file}.draft.json`;
 const recordRevision = (/** @type {string} */ file) => existsSync(file) ? createHash('sha256').update(readFileSync(file)).digest('hex') : 'new';
 
 /** @param {InstallConfig} config */
 export function setupCategories(config) {
-  const az = config.azure;
-  const azure = config.target === 'azure';
   const done = new Set(config.setup?.completed ?? []);
   const entry = (/** @type {string} */ id, /** @type {string} */ title, /** @type {string} */ summary) => ({ id, title, summary, complete: done.has(id) });
   const rg = config.resourceGraph;
-  const resourceGraph = (azure ? azureResourceGraphOn(config) : resourceGraphOn(config))
+  const resourceGraph = resourceGraphOn(config)
     ? `agents ${rg.agents ? 'on' : 'off'}, Foundry ${rg.foundry ? 'on' : 'off'}`
     : 'off';
   return [
-    entry('data', 'Data collection', `${azure && az?.sampleData ? 'Demo data; ' : ''}${Object.entries(config.modules).filter(([, on]) => on).map(([name]) => name).join(', ')}`),
-    entry('placement', azure ? 'Azure placement' : 'Fabric placement', azure
-      ? `${az?.subscriptionName ?? az?.subscriptionId ?? 'Choose subscription'} / ${az?.resourceGroup ?? 'Choose resource group'}; Azure: ${az?.location ?? 'not set'}; SQL: ${az?.sqlLocation || az?.location || 'not set'}`
-      : `${config.fabric.workspaceName ?? 'Choose workspace'}; capacity: ${config.fabric.capacityId ?? 'not set'}`),
-    ...(azure ? [entry('networking', 'Networking', `${az?.publicNetworkAccess === false ? 'Private networking' : 'Public endpoints'}; DNS: ${az?.privateDns?.mode ?? 'create'}`)] : []),
-    entry('powerbi', 'Power BI', azure ? `Workspace: ${az?.powerBi?.workspaceId ?? az?.workspaceName ?? 'not set'}; capacity: ${az?.powerBi?.capacityId ?? 'shared'}`
-      : `Semantic model: ${config.semanticModel.enabled === false ? 'off' : 'on'}; reports: ${config.semanticModel.reports === false ? 'off' : 'on'}; app: ${config.fabricApp.enabled === false ? 'off' : 'on'}`),
+    entry('data', 'Data collection', Object.entries(config.modules).filter(([, on]) => on).map(([name]) => name).join(', ')),
+    entry('placement', 'Fabric placement', `${config.fabric.workspaceName ?? 'Choose workspace'}; capacity: ${config.fabric.capacityId ?? 'not set'}`),
+    entry('powerbi', 'Power BI', `Semantic model: ${config.semanticModel.enabled === false ? 'off' : 'on'}; reports: ${config.semanticModel.reports === false ? 'off' : 'on'}`),
     entry('access', 'Viewer access', config.access?.groupName ?? config.access?.groupId ?? 'Choose who can view'),
-    ...(!azure ? [entry('identity', 'Identity and secrets', `${config.app.displayName ?? config.app.appId ?? 'App registration'}; ${config.keyVault.mode === 'notebook' ? 'secret in notebooks' : config.keyVault.name ?? 'Key Vault'}`)] : []),
-    entry('sources', 'Module connections', 'Credit consumption, data sources and module-specific connections'),
+    entry('identity', 'Identity and secrets', `${config.app.displayName ?? config.app.appId ?? 'App registration'}; ${config.keyVault.mode === 'notebook' ? 'secret in notebooks' : config.keyVault.name ?? 'Key Vault'}`),
+    entry('sources', 'Module connections', 'Data sources and module-specific connections'),
     entry('governance', 'Governance and flows', `Resource Graph: ${resourceGraph}`),
-    ...(azure ? [entry('ask', 'Ask / AI', `${az?.ask?.mode ?? 'off'}${az?.ask?.location ? `; ${az.ask.location}` : ''}`)] : []),
     entry('schedule', 'Schedule and loading', `${config.schedule.frequency}, ${config.schedule.time} ${config.schedule.timeZone}; ${config.history.days} days; ${config.reporting?.currency ?? 'USD'}`),
   ];
 }
@@ -49,9 +39,9 @@ export function setupCategories(config) {
 /**
  * Retain error codes through explanatory wrappers; never require the browser to parse error prose.
  * @param {unknown} err
- * @param {InstallConfig} config
+ * @param {InstallConfig} _config
  */
-export function setupRecovery(err, config) {
+export function setupRecovery(err, _config) {
   const e = /** @type {{ body?: unknown, cause?: unknown, message?: string, operations?: unknown }} */ (err ?? {});
   const source = e.cause ?? e;
   const cause = /** @type {{ body?: unknown, message?: string, operations?: unknown }} */ (source);
@@ -60,15 +50,13 @@ export function setupRecovery(err, config) {
   const text = `${codes} ${e.message ?? ''} ${cause.message ?? ''} ${JSON.stringify(cause.operations ?? [])}`;
   let section;
   let label;
-  if (/InsufficientQuota|DeploymentModelNotSupported|ModelNotSupported|ServiceModelDeprecated|SkuNotSupported/i.test(text) && /model|CognitiveServices/i.test(text)) {
-    section = config.target === 'azure' ? 'ask' : 'placement';
-    label = 'Change Ask / AI settings';
-  } else if (/RequestDisallowedByPolicy|DenyPublicEndpointEnabled|public network|private.?dns|networking/i.test(text)) {
-    section = config.target === 'azure' ? 'networking' : 'identity';
+  // Key Vault is the only Azure resource the Fabric route creates, under Identity and secrets.
+  if (/RequestDisallowedByPolicy|DenyPublicEndpointEnabled|public network|private.?dns|networking/i.test(text)) {
+    section = 'identity';
     label = 'Review policy and networking';
   } else if (/region|location|capacity|quota|SkuNotAvailable|NotAvailableForSubscription|SubscriptionIsOverQuota/i.test(text)) {
     section = 'placement';
-    label = /SQL/i.test(text) ? 'Change SQL region' : 'Change region or capacity';
+    label = 'Change region or capacity';
   }
   return { section, label, code: codes || undefined };
 }
@@ -107,55 +95,17 @@ function oneOff(setup) {
   return setup;
 }
 
-/**
- * Detect partial ARM success even when the deployment returned no outputs.
- * No resources are moved, replaced or deleted by editing settings.
- * @param {Ctx} ctx
- * @param {InstallConfig} before
- */
-export async function checkSetupChanges(ctx, before) {
-  const az = ctx.config.azure;
-  const old = before.azure;
-  if (ctx.config.target !== 'azure' || !az || !old) return;
-  const baseline = old.deploymentConfig;
-  if (!baseline && !old.outputs?.sqlServerFqdn && !old.deployments?.length) return;
-  const deployed = baseline ?? old;
-  const resources = await resourcesIn(ctx.api.arm, deployed.subscriptionId, deployed.resourceGroup);
-  const has = (/** @type {RegExp} */ type) => resources.some((r) => r.tags?.['valuelens-install-id'] === old.installId && type.test(r.type ?? ''));
-  if (deploymentPinned(old, resources) && (az.subscriptionId !== deployed.subscriptionId || az.resourceGroup !== deployed.resourceGroup || az.namePrefix !== deployed.namePrefix)) {
-    throw new Error('Deployment has already been attempted here. Keep the subscription, resource group and name prefix to reuse its resources. Use a separate install record for a new deployment; existing resources are not deleted.');
-  }
-  if (az.location !== deployed.location && (old.outputs?.storageAccountName || old.outputs?.environmentName || old.outputs?.webName || has(/Microsoft\.(App|Storage|OperationalInsights|ManagedIdentity)\//i))) {
-    throw new Error('Resources already exist in the Azure region. They cannot be moved by retrying setup. Keep that region; change only the SQL region if its server has not been created. A new regional deployment needs a separate install record and explicit cleanup of the old resources.');
-  }
-  if ((az.sqlLocation || az.location) !== (deployed.sqlLocation || deployed.location) && (old.outputs?.sqlServerFqdn || has(/^Microsoft\.Sql\/servers$/i))) {
-    throw new Error('The SQL server already exists. Its region cannot change in place. Keep its region or plan a separate deployment and data migration; this installer will not delete it.');
-  }
-  if (az.publicNetworkAccess !== deployed.publicNetworkAccess && (old.outputs?.environmentName || has(/^Microsoft\.App\/managedEnvironments$/i))) {
-    throw new Error('The Container Apps environment already exists. Networking cannot change in place. Keep its networking or use a separate install record; existing resources are not deleted.');
-  }
-  if (az.ask?.mode === 'create' && (az.ask.location || az.location) !== (old.ask?.location || deployed.location) && has(/^Microsoft\.CognitiveServices\/accounts$/i)) {
-    throw new Error('An AI account already exists. Keep its region, use an existing deployment, or turn Ask off. Turning Ask off does not delete the account or stop its other charges.');
-  }
-  if (old.ask?.mode === 'create' && az.ask?.mode !== 'create' && has(/^Microsoft\.CognitiveServices\/accounts$/i)) {
-    ctx.ui.warn('The existing AI account is not deleted when you change Ask. Review its remaining charges in Azure.');
-  }
-  if (old.powerBi?.workspaceId && az.powerBi?.workspaceId !== old.powerBi.workspaceId) throw new Error('Keep the existing Power BI workspace for this install. A different workspace needs a separate install record.');
-}
-
 /** @param {InstallConfig} before @param {InstallConfig} after */
 function changedCategories(before, after) {
   const old = setupCategories(before);
   const values = (/** @type {InstallConfig} */ config) => ({
-    data: [config.modules, config.dataSources, config.azure?.sampleData],
-    placement: [config.azure?.subscriptionId, config.azure?.resourceGroup, config.azure?.location, config.azure?.sqlLocation, config.azure?.namePrefix, config.azure?.tags, config.azure?.sqlScaleUp, config.azure?.webAlwaysOn, config.fabric.capacityId, config.fabric.workspaceName, config.fabric.lakehouseName, config.scale],
-    networking: [config.azure?.publicNetworkAccess, config.azure?.privateDns],
-    powerbi: [config.azure?.powerBi, config.azure?.workspaceName, config.semanticModel.enabled, config.semanticModel.reports, config.fabricApp.enabled],
+    data: [config.modules, config.dataSources],
+    placement: [config.fabric.capacityId, config.fabric.workspaceName, config.fabric.lakehouseName, config.scale],
+    powerbi: [config.semanticModel.enabled, config.semanticModel.reports],
     access: config.access,
     identity: [config.app, config.keyVault],
-    sources: [config.dataSources, config.consumption, config.agentEvaluator],
+    sources: [config.dataSources],
     governance: [config.resourceGraph, config.uploads],
-    ask: config.azure?.ask,
     schedule: [config.schedule, config.history, config.reporting, config.setup?.runFirstLoad, config.setup?.reloadHistoryDays],
   });
   const previousValues = values(before);
@@ -166,19 +116,6 @@ function changedCategories(before, after) {
     return [previous?.summary !== cat.summary
       ? `${cat.title}: ${previous?.summary ?? 'not set'} -> ${cat.summary}`
       : `${cat.title}: settings updated; review the deployment plan before approving.`];
-  });
-}
-
-/** @param {Ctx} ctx */
-async function refreshRegions(ctx) {
-  const az = ctx.config.azure;
-  if (ctx.config.target !== 'azure' || !az?.subscriptionId || !az.resourceGroup) return;
-  const locations = await ctx.api.arm.listLocations(az.subscriptionId);
-  const rg = await ctx.api.arm.getResourceGroup(az.subscriptionId, az.resourceGroup);
-  ctx.azureRegions = await checkRegions(ctx.api.arm, {
-    subscriptionId: az.subscriptionId,
-    scope: `/subscriptions/${az.subscriptionId}${rg ? `/resourceGroups/${az.resourceGroup}` : ''}`,
-    newResourceGroup: !rg, locations,
   });
 }
 
@@ -202,19 +139,18 @@ export async function reviewSetup(ctx) {
       ctx.ui.warn(`Couldn't archive the older draft (${/** @type {Error} */ (err).message}). It will be replaced by a draft of the latest install record.`);
     }
   }
-  await askTarget(ctx);
   const baseRevision = recordRevision(ctx.file);
   const baseline = structuredClone(ctx.config);
-  const deployed = ctx.config.target === 'azure' ? !!ctx.config.azure?.deploymentConfig || !!ctx.config.azure?.outputs?.sqlServerFqdn : !!ctx.config.fabric.lakehouseId;
+  const deployed = !!ctx.config.fabric.lakehouseId;
   ctx.config.setup ??= { completed: deployed ? setupCategories(ctx.config).map((cat) => cat.id) : [] };
   // One-off answers: a restored draft carries them for this session; the install record never does.
   oneOff(ctx.config.setup);
-  ctx.runFirstLoad ??= ctx.config.target === 'azure' ? !ctx.reloadHistoryDays : ctx.config.firstRun?.status !== 'Completed';
+  ctx.runFirstLoad ??= ctx.config.firstRun?.status !== 'Completed';
   baseline.setup = { ...(baseline.setup ?? { completed: [] }), runFirstLoad: ctx.runFirstLoad, reloadHistoryDays: ctx.reloadHistoryDays };
-  if (ctx.config.app.existing && !ctx.config.keyVault.secretSetAt && !ctx.pendingSecret && ctx.config.target !== 'azure') {
+  if (ctx.config.app.existing && !ctx.config.keyVault.secretSetAt && !ctx.pendingSecret) {
     ctx.config.setup.completed = ctx.config.setup.completed.filter((id) => id !== 'identity');
   }
-  let notice = deployed ? 'Existing resources are reused where safe. Placement and networking changes are checked against live resources; editing never deletes them.' : '';
+  let notice = deployed ? 'Existing resources are reused where safe. Editing settings never deletes them.' : '';
   if (!ctx.pendingUploads?.length && ctx.config.setup.uploads?.length) {
     const missing = [];
     ctx.pendingUploads = [];
@@ -276,57 +212,26 @@ export async function reviewSetup(ctx) {
         if (choice !== 'deploy') {
           ctx.advanced = true;
           ctx.ui.beginSection();
-          if (['networking', 'ask'].includes(choice)) await refreshRegions(ctx);
-          if (ctx.config.target === 'azure') await planAzure(ctx, pre, choice);
-          else await plan(ctx, pre, choice);
+          await plan(ctx, pre, choice);
           planned = true;
-          await checkSetupChanges(ctx, baseline);
           const completed = new Set(ctx.config.setup?.completed);
           completed.add(choice);
-          // Data and networking affect connections and access requirements.
-          if ((choice === 'data' && (JSON.stringify(before.modules) !== JSON.stringify(ctx.config.modules) || before.azure?.sampleData !== ctx.config.azure?.sampleData)) ||
-              (choice === 'networking' && before.azure?.publicNetworkAccess !== ctx.config.azure?.publicNetworkAccess)) {
-            for (const dependent of ['sources', 'access', ...(choice === 'networking' ? ['powerbi'] : ['governance'])]) completed.delete(dependent);
+          // Data affects connections and access requirements.
+          if (choice === 'data' && JSON.stringify(before.modules) !== JSON.stringify(ctx.config.modules)) {
+            for (const dependent of ['sources', 'access', 'governance']) completed.delete(dependent);
           }
           if (choice === 'powerbi' && before.semanticModel.enabled !== ctx.config.semanticModel.enabled) completed.delete('access');
-          if (choice === 'placement' && before.azure?.subscriptionId !== ctx.config.azure?.subscriptionId) {
-            for (const dependent of ['networking', 'sources', 'governance', 'ask']) completed.delete(dependent);
-          }
           ctx.config.setup = { completed: [...completed] };
           checkpoint();
           continue;
         }
         const missing = categories.filter((cat) => !cat.complete);
         if (missing.length) throw new Error(`Review these categories first: ${missing.map((cat) => cat.title).join(', ')}.`);
-        await checkSetupChanges(ctx, baseline);
-        if (ctx.config.target === 'azure') {
-          await refreshRegions(ctx);
-          const az = ctx.config.azure;
-          if (az?.powerBi?.capacityId) {
-            const capacities = await ctx.api.fabric.listCapacities();
-            if (!capacities.some((cap) => cap.id === az.powerBi?.capacityId && cap.state === 'Active' && (az.publicNetworkAccess !== false || supportsVnetGateway(cap)))) {
-              throw new Error('Review Power BI: the selected capacity is no longer active, accessible, or suitable for private networking.');
-            }
-          }
-          if (az?.location && ctx.azureRegions) {
-            const problems = [...regionProblems(ctx.azureRegions, az.location, { sql: false }), sqlProblem(ctx.azureRegions, az.sqlLocation || az.location)].filter(Boolean);
-            if (problems.length) throw new Error(`Review Azure placement: ${problems.join('; ')}.`);
-            if (az.ask?.mode === 'create') {
-              const region = az.ask.location || az.location;
-              const allowed = allowedFor(ctx.azureRegions, ASK_TYPE);
-              if (allowed && !allowed.includes(region)) throw new Error(`Review Ask / AI: Azure Policy does not allow the model in ${region}.`);
-              const model = await askModelIn(ctx, region, az.ask.sku ?? 'GlobalStandard');
-              if (!model.ok) throw new Error(`Review Ask / AI: ${model.reason}.`);
-              if (model.unchecked) ctx.ui.warn('Ask model availability could not be checked. Azure will check it during deployment.');
-              else if (model.capacity < (az.ask.capacity ?? 50)) throw new Error(`Review Ask / AI: only ${model.capacity}K tokens/min is currently available; reduce the model capacity before retrying.`);
-            }
-          }
-          await azurePreflight(ctx);
-        } else if (!pre.capacities.some((cap) => cap.id === ctx.config.fabric.capacityId)) {
+        if (!pre.capacities.some((cap) => cap.id === ctx.config.fabric.capacityId)) {
           throw new Error('Review Fabric placement: the selected capacity is no longer active or accessible.');
         }
         checkpoint();
-        const go = ctx.config.target === 'azure' ? await confirmAzurePlan(ctx) : await confirmPlan(ctx, pre);
+        const go = await confirmPlan(ctx, pre);
         if (!go) continue;
         if (recordRevision(ctx.file) !== baseRevision) throw new Error('The install record changed while you edited this draft. Save and close, then reopen setup to keep the latest deployed IDs and resolve the draft conflict.');
         // Marked first so a draft a synced folder keeps locked is cleaned up next run, not treated as a conflict.

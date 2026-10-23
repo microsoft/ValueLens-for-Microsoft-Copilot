@@ -10,12 +10,12 @@ import { connect as realConnect, createCtx, runCommand, showPrereqs } from './in
 import { bundled, commandLine, installerWindow, launcher, reopenHint, updateHint } from './launch.js';
 import { checkPrereqs } from './prereqs.js';
 import { loadSources } from './sources.js';
-import { coworkDataflowOn, describeSchedule, modelDeployed, recordWorkspaceGone, staleRecordMessage } from './steps/fabric.js';
+import { describeSchedule, recordWorkspaceGone, staleRecordMessage } from './steps/fabric.js';
 import { isResumeLater } from './steps/identity.js';
 import { routerWanted } from './uploads.js';
 import { SETUP_SECTIONS, setupRecovery } from './setup.js';
 
-export const WEB_COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'load-cowork', 'check', 'refresh', 'deploy-app', 'status', 'rotate-secret', 'access', 'upload', 'uninstall', 'prereqs'];
+export const WEB_COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'status', 'rotate-secret', 'access', 'upload', 'uninstall', 'prereqs'];
 /** Commands that work before anything is installed. */
 const NO_RECORD = ['install', 'prereqs'];
 const METHODS = ['browser', 'device-code', 'azure-cli'];
@@ -29,39 +29,33 @@ const METHODS = ['browser', 'device-code', 'azure-cli'];
  */
 export function describeRecord(config) {
   const f = config.fabric;
-  const az = config.azure;
   const sm = config.semanticModel;
-  const fa = config.fabricApp;
-  const azure = config.target === 'azure';
-  const installed = azure ? !!(az?.subscriptionId && az.resourceGroup) : !!(f.workspaceId && f.lakehouseId);
+  const installed = !!(f.workspaceId && f.lakehouseId);
   return {
     tenantId: config.tenantId,
     target: config.target,
     installed,
-    workspace: azure ? az?.resourceGroup : f.workspaceName ?? f.workspaceId,
-    workspaceUrl: azure ? az?.outputs?.webUrl : f.workspaceId ? `https://app.fabric.microsoft.com/groups/${f.workspaceId}` : undefined,
-    lakehouse: azure ? az?.outputs?.sqlDatabaseName : f.lakehouseName,
+    workspace: f.workspaceName ?? f.workspaceId,
+    workspaceUrl: f.workspaceId ? `https://app.fabric.microsoft.com/groups/${f.workspaceId}` : undefined,
+    lakehouse: f.lakehouseName,
     schedule: f.scheduleId ? describeSchedule(config.schedule) : undefined,
     data: collectedLabels(config.modules),
     model: sm.id ? sm.name : undefined,
-    app: azure && az?.outputs?.webUrl ? { name: 'Analytics Hub', url: az.outputs.webUrl } : fa.itemId ? { name: fa.name ?? 'Analytics Hub', url: fa.url } : undefined,
-    secretExpires: (azure ? az?.sqlReader?.secretExpiry : config.app.secretExpires)?.slice(0, 10),
+    secretExpires: config.app.secretExpires?.slice(0, 10),
     firstRun: config.firstRun?.status,
     historyDays: config.history?.days,
     viewers: config.access?.groupId ? config.access.groupName : undefined,
     can: {
       update: installed,
-      run: installed && (azure || !!f.pipelineId),
-      'rerun-failed': !azure && installed && !!f.pipelineId,
-      'load-cowork': !azure && installed && !!f.pipelineId && coworkDataflowOn(config),
-      check: !azure && installed && !!f.notebooks.dataCheck,
-      refresh: azure ? !!az?.powerBi?.datasetId : !!sm.id,
-      'deploy-app': !azure && modelDeployed(config),
+      run: installed && !!f.pipelineId,
+      'rerun-failed': installed && !!f.pipelineId,
+      check: installed && !!f.notebooks.dataCheck,
+      refresh: !!sm.id,
       status: true,
-      'rotate-secret': azure ? !!az?.sqlReader?.clientId : !!(config.app.appId && (secretMode(config) === 'notebook' ? installed : config.keyVault.uri)),
-      access: azure ? !!az?.powerBi?.datasetId : !!sm.id,
-      upload: !azure && installed && !!f.notebooks.uploadRouter && routerWanted(config.dataSources),
-      uninstall: azure ? installed : !!f.workspaceId,
+      'rotate-secret': !!(config.app.appId && (secretMode(config) === 'notebook' ? installed : config.keyVault.uri)),
+      access: !!sm.id,
+      upload: installed && !!f.notebooks.uploadRouter && routerWanted(config.dataSources),
+      uninstall: !!f.workspaceId,
     },
   };
 }

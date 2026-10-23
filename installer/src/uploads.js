@@ -19,7 +19,7 @@ export const UPLOAD_FOLDERS = [UPLOAD_DIR, FEEDBACK_DIR, AGENT365_DIR, WORKDAY_D
 export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 
 /** @typedef {'api' | 'csv' | 'skip'} SourceMode */
-/** @typedef {'core' | 'orgData' | 'workday' | 'm365Activity' | 'agent365' | 'productFeedback' | 'studioCredits' | 'coworkCredits' | 'azureAi' | 'agentEvaluator' | 'defender' | 'resourceGraph'} DataSourceId */
+/** @typedef {'core' | 'orgData' | 'workday' | 'm365Activity' | 'agent365' | 'productFeedback' | 'defender' | 'resourceGraph'} DataSourceId */
 /** @typedef {Record<DataSourceId, SourceMode>} DataSourceModes */
 
 /**
@@ -35,11 +35,8 @@ export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
  * @property {string} [page]  The dashboard page that stays dormant when it is skipped.
  * @property {Partial<Record<SourceMode, string>>} [modeLabels]  Overrides MODE_LABELS, e.g. "Connected (Dataflow)".
  * @property {Partial<Record<SourceMode, string>>} [hints]  What the mode does, shown under the card.
- * @property {string} [group]  A heading the card sits under with the others that share it, e.g. "Credit consumption".
+ * @property {string} [group]  A heading the card sits under with the others that share it.
  */
-
-/** The heading over the cards for Copilot Studio, Cowork and Azure AI credits. */
-export const CREDIT_GROUP = 'Credit consumption';
 
 /** @type {DataSourceInfo[]} */
 export const DATA_SOURCES = [
@@ -110,60 +107,6 @@ export const DATA_SOURCES = [
             url: 'https://admin.microsoft.com/Adminportal/Home#/tenantfeedback',
       files: 'One CSV per export. Uploads add up; duplicates are removed by Feedback Id.',
     },
-  },
-  {
-    id: 'studioCredits',
-    label: 'Copilot Studio credits',
-    description: 'Copilot Studio credits by day, environment, agent and user, from the Power Platform licensing API.',
-    modes: ['api', 'csv', 'skip'],
-    defaultMode: 'skip',
-    page: 'Consumption Central',
-    group: CREDIT_GROUP,
-    modeLabels: { api: 'Connected (Power Automate flow)', csv: 'Upload CSV only' },
-    hints: {
-      api: 'A daily Power Automate flow reads the licensing API. Needs Power Automate Premium for whoever signs in to the flow; you sign in to its connections once. Exports are optional and win for the months they cover.',
-      csv: 'Upload the exports each month. No flow.',
-    },
-    export: {
-      where: 'Power Platform admin center > Licensing > Products > Copilot Studio. Download the Summary, Environments and Agents exports (EntitlementConsumption*_MCSMessages*.csv).',
-      url: 'https://admin.powerplatform.microsoft.com/',
-      files: 'Up to three CSVs a month. A new file replaces the last one of the same kind.',
-    },
-  },
-  {
-    id: 'coworkCredits',
-    label: 'Copilot Cowork credits',
-    description: 'Cowork credits by person, from Viva Insights.',
-    modes: ['api', 'csv', 'skip'],
-    defaultMode: 'skip',
-    page: 'Consumption Central',
-    group: CREDIT_GROUP,
-    modeLabels: { api: 'Connected (Dataflow)' },
-    hints: {
-      api: 'A Viva Insights analyst (Insights Analyst role) creates the Copilot consumption query and gives you its partition and query IDs. The installer creates a Dataflow Gen2 that reads it on every run; you sign in to the Dataflow once. No query yet? Upload the CSV export until there is one.',
-    },
-    export: {
-      where: 'Viva Insights > Copilot Consumption Dashboard > Export (PersonServiceCreditsMetrics and SpendingPolicyMetadata CSVs).',
-      url: 'https://learn.microsoft.com/viva/insights/advanced/analyst/export-query-data-microsoft-fabric',
-      files: 'Credits add up and are de-duplicated; a new policy file replaces the last.',
-    },
-  },
-  {
-    id: 'azureAi',
-    label: 'Azure AI costs',
-    description: 'Azure OpenAI and AI Foundry costs, and Copilot pay-as-you-go billed to Azure.',
-    modes: ['api', 'skip'],
-    defaultMode: 'skip',
-    page: 'Consumption Central',
-    group: CREDIT_GROUP,
-  },
-  {
-    id: 'agentEvaluator',
-    label: 'Agent Evaluator',
-    description: 'Copilot Studio conversation transcripts from Dataverse: how conversations end and where agents fall short.',
-    modes: ['api', 'skip'],
-    defaultMode: 'skip',
-    page: 'Agent Evaluator',
   },
   {
     id: 'defender',
@@ -239,72 +182,6 @@ export const UPLOAD_KINDS = [
     dir: AGENT365_DIR,
     name: 'agents.csv',
     policy: 'replace',
-  },
-  {
-    kind: 'studioTenant',
-    source: 'studioCredits',
-    groups: [['billingplanid'], ['environmentid'], ['capacitytype'], ['prepaidconsumedquantity'], ['usagedate']],
-    dir: 'Files/landing/studio',
-    name: 'EntitlementConsumptionTenantDetailsReport_MCSMessages_{stamp}.csv',
-    policy: 'replaceKind',
-  },
-  {
-    kind: 'studioAgent',
-    source: 'studioCredits',
-    groups: [['agentid'], ['agentname'], ['billedcredit'], ['nonbilledcredit'], ['channel']],
-    dir: 'Files/landing/studio',
-    name: 'EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_{stamp}.csv',
-    policy: 'replaceKind',
-  },
-  {
-    kind: 'studioUser',
-    source: 'studioCredits',
-    groups: [['userid'], ['useremail'], ['creditsused'], ['billablecreditused']],
-    dir: 'Files/landing/studio',
-    name: 'EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_{stamp}.csv',
-    policy: 'replaceKind',
-  },
-  // Written each day by the Analytics Hub Copilot Studio credits flow from the licensing API. Each
-  // file restates the last ten days, so only the newest is kept; the notebook merges by day.
-  {
-    kind: 'studioAgentDaily',
-    source: 'studioCredits',
-    groups: [['usagedate'], ['agentid'], ['agentname'], ['billedcredit'], ['nonbilledcredit'], ['channel']],
-    dir: 'Files/landing/studio',
-    name: 'StudioApiAgentDaily_{stamp}.csv',
-    policy: 'replaceKind',
-  },
-  {
-    kind: 'studioUserDaily',
-    source: 'studioCredits',
-    groups: [['usagedate'], ['userid'], ['billedcredit'], ['nonbilledcredit'], ['unit']],
-    dir: 'Files/landing/studio',
-    name: 'StudioApiUserDaily_{stamp}.csv',
-    policy: 'replaceKind',
-  },
-  {
-    kind: 'studioEntitlement',
-    source: 'studioCredits',
-    groups: [['snapshotdate'], ['environmentid'], ['environmentallocated'], ['tenantprepaidconsumed'], ['tenantpaygconsumed']],
-    dir: 'Files/landing/studio',
-    name: 'StudioApiEntitlement_{stamp}.csv',
-    policy: 'replaceKind',
-  },
-  {
-    kind: 'vivaCredits',
-    source: 'coworkCredits',
-    groups: [['serviceid'], ['servicename'], ['spendingpolicyid'], ['metricdate'], ['totalcopilotcreditsused']],
-    dir: 'Files/landing/viva',
-    name: 'PersonServiceCreditsMetrics_{stamp}.csv',
-    policy: 'append',
-  },
-  {
-    kind: 'vivaPolicy',
-    source: 'coworkCredits',
-    groups: [['spendingpolicyid'], ['name'], ['planlimit'], ['userlimit'], ['includedservices']],
-    dir: 'Files/landing/viva',
-    name: 'SpendingPolicyMetadata_{stamp}.csv',
-    policy: 'replaceKind',
   },
   {
     kind: 'workday',
@@ -400,7 +277,7 @@ export function detectSource(headers, enabled) {
 }
 
 function expectedHint() {
-  return 'Expected one of: product feedback, Agent 365 agents, Copilot Studio credits (including the Analytics Hub flow\'s files), Cowork credits or a Workday report.';
+  return 'Expected one of: product feedback, Agent 365 agents or a Workday report.';
 }
 
 /**
@@ -421,11 +298,10 @@ export function defaultDataSources() {
  * Fills the gaps in a saved choice. A record from before the Data sources screen is read from its modules.
  * @param {Partial<Record<string, string>> | undefined} saved
  * @param {import('./catalog.js').ModuleChoice} modules
- * @param {{ azureSubscriptionId?: string }} [consumption]
- * @param {{ studioFlow?: boolean, feedbackFlow?: boolean }} [uploads]  A saved CSV choice with its flow is now the api mode.
+ * @param {{ feedbackFlow?: boolean }} [uploads]  A saved CSV choice with its flow is now the api mode.
  * @returns {DataSourceModes}
  */
-export function normaliseDataSources(saved, modules, consumption = {}, uploads = {}) {
+export function normaliseDataSources(saved, modules, uploads = {}) {
   /** @type {Partial<DataSourceModes>} */
   const legacy = saved
     ? {}
@@ -433,10 +309,6 @@ export function normaliseDataSources(saved, modules, consumption = {}, uploads =
         m365Activity: modules.m365Activity ? 'api' : 'skip',
         agent365: modules.agent365 ? 'api' : 'skip',
         productFeedback: modules.productFeedback ? 'csv' : 'skip',
-        studioCredits: modules.consumption ? 'csv' : 'skip',
-        coworkCredits: modules.consumption ? 'csv' : 'skip',
-        azureAi: modules.consumption && consumption.azureSubscriptionId ? 'api' : 'skip',
-        agentEvaluator: modules.agentEvaluator ? 'api' : 'skip',
         defender: modules.defender ? 'api' : 'skip',
       };
   const out = { ...defaultDataSources(), ...legacy };
@@ -445,7 +317,6 @@ export function normaliseDataSources(saved, modules, consumption = {}, uploads =
     if (v && s.modes.includes(v)) out[s.id] = v;
     if (s.locked) out[s.id] = s.modes[0];
   }
-  if (saved && out.studioCredits === 'csv' && uploads.studioFlow) out.studioCredits = 'api';
   if (saved && out.productFeedback === 'csv' && uploads.feedbackFlow) out.productFeedback = 'api';
   return out;
 }
@@ -462,8 +333,6 @@ export function modulesFromSources(ds) {
     m365Activity: on('m365Activity'),
     agent365: on('agent365'),
     productFeedback: on('productFeedback'),
-    consumption: on('studioCredits') || on('coworkCredits') || on('azureAi'),
-    agentEvaluator: on('agentEvaluator'),
     defender: on('defender'),
   };
 }
@@ -573,7 +442,6 @@ export function uploadName(original, now = new Date()) {
 /** Other names `--data` accepts for a mode, e.g. productFeedback=flow for its Power Automate flow. */
 export const MODE_ALIASES = /** @type {Partial<Record<DataSourceId, Record<string, SourceMode>>>} */ ({
   productFeedback: { flow: 'api' },
-  studioCredits: { flow: 'api' },
 });
 
 /**

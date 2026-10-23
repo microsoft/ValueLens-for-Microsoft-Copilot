@@ -9,17 +9,16 @@ import { armApi, ROLES } from '../src/clients/azure.js';
 import { emptyConfig, normaliseResourceGraph } from '../src/config.js';
 import { HttpError } from '../src/http.js';
 import { LOAD_LABELS, statusConfigJson } from '../src/loads.js';
-import { argParameters, armParameterNames, azureDeployment, installAzure, parseDropFolder, REQUIRED_ARM_PARAMETERS } from '../src/steps/azure/index.js';
 import { notebookSettings } from '../src/steps/fabric.js';
 import { flowDefinitions, flowsWanted } from '../src/steps/flows.js';
 import { AGENT_ROLE, directoryRoleHandoff, ENTRA_ROLES_URL, ensureAgentDirectoryRole, ensureAppResourceGraphAccess, managementGroupId, resourceGraphGrants, resourceGraphScope } from '../src/steps/resource-graph.js';
 import { CONSENT_ROLES, GLOBAL_READER_ROLE, POWER_PLATFORM_ADMIN_ROLE } from '../src/clients/graph.js';
 import { AGENT_INVENTORY_DIR, AGENT_INVENTORY_FLOW_NAME, CONNECTORS, connectorsUsed, PPAPI } from '../src/transform/flows.js';
-import { buildConsumptionModel, buildModel, loadTemplateModel } from '../src/transform/model.js';
+import { buildModel, loadTemplateModel } from '../src/transform/model.js';
 import { buildPipeline, findActivity, LANE_ORDER, REFRESH_ACTIVITY, RESOURCE_GRAPH_ACTIVITY } from '../src/transform/pipeline.js';
-import { AGENT_CONFIG_TABLE, ARG_TABLES, ENVIRONMENTS_TABLE, FOUNDRY_TABLE } from '../src/transform/resource-graph.js';
+import { AGENT_CONFIG_TABLE, ARG_TABLES, ENVIRONMENTS_TABLE } from '../src/transform/resource-graph.js';
 import { DATA_SOURCES, dataSource, defaultDataSources, normaliseDataSources, parseDataFlags, routedSources, routerWanted, UPLOADABLE_SOURCES } from '../src/uploads.js';
-import { fakeArm, fakeAzureGraph, fakeCtx, fakeFabric, fakePowerBi, fakeUi, realSources } from './fakes.js';
+import { fakeArm, fakeCtx, fakeUi, realSources } from './fakes.js';
 
 const MG_ROOT = '/providers/Microsoft.Management/managementGroups/tenant-1';
 
@@ -88,7 +87,7 @@ test('catalog and notebook: deployed only when on, with the management group and
 test('pipeline: the Resource Graph step runs in lane 2 after Agent 365, and the model refresh waits for it', () => {
   const sources = realSources();
   const ids = { auditIngester: 'nb-a', licensedUsers: 'nb-b', processor: 'nb-c', orgData: 'nb-d', refreshModel: 'nb-r', resourceGraph: 'nb-rg' };
-  const modules = { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false };
+  const modules = { orgData: true, m365Activity: false, agent365: false, productFeedback: false };
   const doc = buildPipeline(sources.pipeline, { workspaceId: 'ws', notebookIds: ids, modules, semanticModelId: 'model-1', resourceGraph: true });
   const step = findActivity(doc.properties.activities, RESOURCE_GRAPH_ACTIVITY);
   assert.equal(step.typeProperties.notebookId, 'nb-rg');
@@ -142,8 +141,8 @@ test('Fabric access: Reader for the app on the tenant root group, or the chosen 
   turnOn(o.config).resourceGraph = { managementGroup: '', agents: true, foundry: false };
   await ensureAppResourceGraphAccess(o.ctx);
   assert.ok(!off.calls.length, 'no Reader without Foundry');
-  assert.deepEqual(resourceGraphGrants(o.config, 'tenant-1', 'App', 'access').map((g) => g.what), ['Global Reader (Entra)']);
-  assert.equal(resourceGraphGrants(emptyConfig(), 'tenant-1', 'App', 'access').length, 0);
+  assert.deepEqual(resourceGraphGrants(o.config, 'tenant-1', 'App').map((g) => g.what), ['Global Reader (Entra)']);
+  assert.equal(resourceGraphGrants(emptyConfig(), 'tenant-1', 'App').length, 0);
   assert.equal(resourceGraphScope(emptyConfig(), 'tenant-1'), MG_ROOT);
 });
 
@@ -193,90 +192,10 @@ test('agent inventory flow: pages the Power Platform inventory as the signed-in 
   assert.match(text, /_agent_inventory\.json/);
   assert.match(text, /"Content-Type":"application\/json"/);
   assert.deepEqual(connectorsUsed(d), [CONNECTORS.entra.name, CONNECTORS.storage.name].sort());
-  assert.doesNotMatch(JSON.stringify(flowDefinitions(config, 'tenant-1').studio.definition), /application\/json/, 'the CSV flows are unchanged');
+  assert.doesNotMatch(JSON.stringify(flowDefinitions(config, 'tenant-1').feedback.definition), /application\/json/, 'the CSV flow is unchanged');
 });
 
-test('agent inventory flow on Azure: the landing container, or the SharePoint drop folder; none when unreachable', () => {
-  const { config } = fakeCtx();
-  turnOn(config);
-  config.target = 'azure';
-  config.azure = { subscriptionId: 'sub-1', resourceGroup: 'rg', location: 'uksouth', namePrefix: 'vlens', installId: 'i', tags: {}, deployments: [], outputs: { storageAccountName: 'vlensst' }, graphRoles: { assigned: [], pending: [] }, publicNetworkAccess: true };
-  config.uploads.flowEnvironment = { url: 'https://org1.crm.dynamics.com', id: 'env-1', name: 'Default' };
-  assert.deepEqual(flowsWanted(config), ['agents']);
-  const pub = flowDefinitions(config, 'tenant-1').agents;
-  assert.match(JSON.stringify(pub.definition), /https:\/\/vlensst\.dfs\.core\.windows\.net\/landing\/arg_inventory\//);
-  assert.match(pub.description, /landing\/arg_inventory/);
-
-  config.azure = { ...config.azure, publicNetworkAccess: false };
-  assert.deepEqual(flowsWanted(config), [], 'private networking without a drop folder');
-  config.azure.drop = parseDropFolder('https://contoso.sharepoint.com/sites/Analytics/Shared Documents/ValueLens');
-  assert.deepEqual(flowsWanted(config), ['agents']);
-  const priv = flowDefinitions(config, 'tenant-1').agents.definition;
-  assert.deepEqual(connectorsUsed(priv), [CONNECTORS.entra.name, CONNECTORS.sharePoint.name].sort());
-  assert.match(JSON.stringify(priv), /"folderPath":"\/Shared Documents\/ValueLens\/arg_inventory"/);
-
-  config.azure.sampleData = true;
-  assert.deepEqual(flowsWanted(config), [], 'demo mode reads nothing from the tenant');
-});
-
-test('Azure deployment: Resource Graph joins the modules with its management group and what to read', async () => {
-  for (const p of ['argManagementGroup', 'argAgents', 'argFoundry']) {
-    assert.ok(REQUIRED_ARM_PARAMETERS.includes(p));
-    assert.ok(armParameterNames().includes(p));
-  }
-  const { ctx, config } = fakeCtx();
-  config.target = 'azure';
-  config.azure = { subscriptionId: 'sub', resourceGroup: 'rg', location: 'uksouth', namePrefix: 'vlens', installId: 'id', tags: {}, deployments: [], outputs: {}, graphRoles: { assigned: [], pending: [] } };
-  const value = async () => Object.fromEntries(Object.entries((await azureDeployment(ctx, { pass: 1 })).properties.parameters).map(([k, v]) => [k, /** @type {any} */ (v).value]));
-  const off = await value();
-  assert.ok(!off.modules.split(',').includes('resourceGraph'));
-  assert.deepEqual([off.argManagementGroup, off.argAgents, off.argFoundry], ['', true, true]);
-
-  turnOn(config).resourceGraph = { managementGroup: 'mg-1', agents: false, foundry: true };
-  const on = await value();
-  assert.ok(on.modules.split(',').includes('resourceGraph'));
-  assert.deepEqual([on.argManagementGroup, on.argAgents, on.argFoundry], ['mg-1', false, true]);
-  assert.deepEqual(Object.keys(argParameters(config)), ['argManagementGroup', 'argAgents', 'argFoundry']);
-
-  /** @type {any} */ (config.azure).sampleData = true;
-  assert.ok(!(await value()).modules.split(',').includes('resourceGraph'), 'demo mode reads nothing from the tenant');
-});
-
-test('Azure install with Resource Graph: Reader for the jobs on the tenant root group, landing write for you, and the inventory flow', async () => {
-  const arm = fakeArm();
-  const powerBi = fakePowerBi();
-  powerBi.setDatasources([{ datasourceType: 'Sql', gatewayId: 'gw', datasourceId: 'ds' }]);
-  /** @type {Map<string, any>} */
-  const flows = new Map();
-  const env = {
-    createFlow: async (/** @type {any} */ f) => {
-      flows.set(`flow-${flows.size + 1}`, { workflowid: `flow-${flows.size + 1}`, name: f.name, statecode: 0, clientdata: f.clientdata });
-      return `flow-${flows.size}`;
-    },
-    getFlow: async (/** @type {string} */ id) => flows.get(id),
-    updateFlow: async () => {},
-    turnOffFlow: async () => {},
-    deleteFlow: async () => {},
-  };
-  const ui = fakeUi();
-  const { ctx, config } = fakeCtx({ arm: arm.api, graph: fakeAzureGraph().api, fabric: fakeFabric().api, powerBi: powerBi.api, ui: ui.ui, dataverse: () => env });
-  config.target = 'azure';
-  config.azure = { subscriptionId: 'sub-1', resourceGroup: 'rg', location: 'uksouth', namePrefix: 'vlens', installId: 'install-1', tags: {}, deployments: [], outputs: {}, graphRoles: { assigned: [], pending: [] }, publicNetworkAccess: true, workspaceName: 'Analytics Hub' };
-  turnOn(config);
-  config.uploads = { flowEnvironment: { url: 'https://org1.crm.dynamics.com', id: 'env-1', name: 'Default' } };
-  ctx.runFirstLoad = false;
-
-  await installAzure(ctx, { wait: true });
-  assert.ok(arm.calls.includes(`assignRole ${MG_ROOT} ${ROLES.reader} mi-sp ServicePrincipal`));
-  assert.equal(config.resourceGraph?.azureAccess, true);
-  assert.ok(arm.calls.some((c) => c.startsWith('assignRole') && c.includes(`${ROLES.storageBlobDataContributor} user-1 User`)));
-  assert.equal(flows.size, 1);
-  assert.equal([...flows.values()][0].name, AGENT_INVENTORY_FLOW_NAME);
-  assert.match([...flows.values()][0].clientdata, /landing\/arg_inventory/);
-  assert.match(ui.text(), /The jobs' managed identity needs the Global Reader Entra role/);
-});
-
-test('models: the Resource Graph tables are always there, read from the Lakehouse only when on', () => {
+test('model: the Resource Graph tables are always there, read from the Lakehouse only when on', () => {
   const sources = realSources();
   const template = loadTemplateModel(/** @type {string} */ (sources.modelFile));
   const settings = { server: 'abc.datawarehouse.fabric.microsoft.com', database: 'ValueLens', modules: { ...defaultModules(), agent365: true } };
@@ -299,14 +218,6 @@ test('models: the Resource Graph tables are always there, read from the Lakehous
   assert.doesNotMatch(offTable.partitions[0].source.expression.join('\n'), /FabricTable/);
   assert.match(offTable.partitions[0].source.expression.join('\n'), /#table\(Columns, \{\}\)/);
   assert.equal(JSON.stringify(buildModel(template, { ...settings, resourceGraph: true }).model.tables.map((t) => t.lineageTag)), JSON.stringify(on.tables.map((t) => t.lineageTag)), 'stable lineage');
-
-  const cc = loadTemplateModel(/** @type {string} */ (sources.consumptionModelFile));
-  const ccOn = buildConsumptionModel(cc, { server: 's', database: 'd', resourceGraph: true }).model;
-  const foundry = ccOn.tables.find((x) => x.name === FOUNDRY_TABLE);
-  assert.match(foundry.partitions[0].source.expression.join('\n'), /GetTable\("arg_foundry_resources"\)/);
-  assert.ok(!ccOn.relationships?.some((/** @type {any} */ r) => r.fromTable === FOUNDRY_TABLE || r.toTable === FOUNDRY_TABLE));
-  const ccOff = buildConsumptionModel(cc, { server: 's', database: 'd' }).model;
-  assert.doesNotMatch(ccOff.tables.find((x) => x.name === FOUNDRY_TABLE).partitions[0].source.expression.join('\n'), /GetTable/);
 });
 
 /**
@@ -345,34 +256,34 @@ test('Entra role: a Global Administrator gives the app Global Reader once, and t
   const ui = fakeUi();
   const { ctx, config } = fakeCtx({ graph: graph.api, ui: ui.ui });
   turnOn(config);
-  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'Analytics Hub Data Collector', appId: 'app-1' }, 'access'), 'assigned');
+  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'Analytics Hub Data Collector', appId: 'app-1' }), 'assigned');
   assert.deepEqual(graph.calls, ['list sp-1', 'mine', `assign sp-1 ${GLOBAL_READER_ROLE}`]);
   assert.equal(config.resourceGraph.roleAssigned, AGENT_ROLE);
   assert.match(ui.text(), /Gave Analytics Hub Data Collector the Global Reader Entra role/);
 
   graph.calls.length = 0;
-  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'Analytics Hub Data Collector' }, 'access'), 'has');
+  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'Analytics Hub Data Collector' }), 'has');
   assert.deepEqual(graph.calls, [], 'a repair trusts the record');
-  assert.deepEqual(resourceGraphGrants(config, 'tenant-1', 'App', 'access', { canAssign: true }).filter((g) => /Entra/.test(g.what)), [], 'nothing left to give');
+  assert.deepEqual(resourceGraphGrants(config, 'tenant-1', 'App', { canAssign: true }).filter((g) => /Entra/.test(g.what)), [], 'nothing left to give');
 });
 
 test('Entra role: an app that already has a role that covers agents is left alone', async () => {
   const graph = roleGraph({ mine: [GA], existing: [{ roleDefinitionId: POWER_PLATFORM_ADMIN_ROLE, directoryScopeId: '/' }] });
   const { ctx, config } = fakeCtx({ graph: graph.api });
   turnOn(config);
-  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'App' }, 'access'), 'has');
+  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'App' }), 'has');
   assert.ok(!graph.calls.some((c) => c.startsWith('assign')));
   assert.equal(config.resourceGraph.roleAssigned, 'Power Platform Administrator');
 
   const scoped = roleGraph({ mine: [GA], existing: [{ roleDefinitionId: GLOBAL_READER_ROLE, directoryScopeId: '/administrativeUnits/au-1' }] });
   const s = fakeCtx({ graph: scoped.api });
   turnOn(s.config);
-  assert.equal(await ensureAgentDirectoryRole(s.ctx, { id: 'sp-1', name: 'App' }, 'access'), 'assigned', 'an administrative unit role doesn\'t count');
+  assert.equal(await ensureAgentDirectoryRole(s.ctx, { id: 'sp-1', name: 'App' }), 'assigned', 'an administrative unit role doesn\'t count');
 
   const raced = roleGraph({ mine: [GA], assign: [new HttpError('400 Bad Request', { method: 'POST', url: 'x', status: 400, body: { error: { message: 'A conflicting object with one or more of the specified property values is present in the directory.' } } })] });
   const r = fakeCtx({ graph: raced.api });
   turnOn(r.config);
-  assert.equal(await ensureAgentDirectoryRole(r.ctx, { id: 'sp-1', name: 'App' }, 'access'), 'assigned', 'already there counts as done');
+  assert.equal(await ensureAgentDirectoryRole(r.ctx, { id: 'sp-1', name: 'App' }), 'assigned', 'already there counts as done');
 });
 
 test('Entra role: without the rights, the steps for an admin, with the app\'s object ID and an Entra link', async () => {
@@ -381,7 +292,7 @@ test('Entra role: without the rights, the steps for an admin, with the app\'s ob
   const { ctx, config } = fakeCtx({ graph: graph.api, ui: ui.ui });
   turnOn(config);
   const who = { id: 'sp-1', name: 'Analytics Hub Data Collector', appId: 'app-1' };
-  assert.equal(await ensureAgentDirectoryRole(ctx, who, 'access'), 'handoff');
+  assert.equal(await ensureAgentDirectoryRole(ctx, who), 'handoff');
   assert.ok(!graph.calls.some((c) => c.startsWith('assign')), 'not tried without the rights');
   assert.equal(config.resourceGraph.roleAssigned, undefined);
   const text = ui.text();
@@ -390,7 +301,7 @@ test('Entra role: without the rights, the steps for an admin, with the app\'s ob
   assert.ok(text.includes(ENTRA_ROLES_URL));
   assert.ok(text.includes(`"roleDefinitionId":"${GLOBAL_READER_ROLE}"`));
   assert.match(text, /Not collected: permission missing/);
-  const grant = resourceGraphGrants(config, 'tenant-1', 'App', 'access', { canAssign: false }).find((g) => /Entra/.test(g.what));
+  const grant = resourceGraphGrants(config, 'tenant-1', 'App', { canAssign: false }).find((g) => /Entra/.test(g.what));
   assert.match(grant?.detail ?? '', /You can't give it yourself/);
 });
 
@@ -401,7 +312,7 @@ test('Entra role: a refused assignment tries the role management sign-in, then f
   const { ctx, config } = fakeCtx({ graph: graph.api });
   /** @type {any} */ (ctx.api).graphRoles = roles.api;
   turnOn(config);
-  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'App' }, 'access'), 'assigned');
+  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'App' }), 'assigned');
   assert.deepEqual(roles.calls, [`assign sp-1 ${GLOBAL_READER_ROLE}`]);
 
   const both = roleGraph({ mine: [GA], assign: [forbidden()] });
@@ -409,17 +320,17 @@ test('Entra role: a refused assignment tries the role management sign-in, then f
   const b = fakeCtx({ graph: both.api, ui: ui.ui });
   /** @type {any} */ (b.ctx.api).graphRoles = roleGraph({ assign: [new Error('consent declined')] }).api;
   turnOn(b.config);
-  assert.equal(await ensureAgentDirectoryRole(b.ctx, { id: 'sp-1', name: 'App' }, 'access'), 'handoff');
+  assert.equal(await ensureAgentDirectoryRole(b.ctx, { id: 'sp-1', name: 'App' }), 'handoff');
   assert.match(ui.text(), /Couldn't give App the Global Reader Entra role \(consent declined\)/);
 });
 
 test('Entra role: never given when Resource Graph or its agents aren\'t read', async () => {
   const graph = roleGraph({ mine: [GA] });
   const { ctx, config } = fakeCtx({ graph: graph.api });
-  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'App' }, 'access'), 'off');
+  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'App' }), 'off');
   turnOn(config).resourceGraph = { managementGroup: '', agents: false, foundry: true };
-  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'App' }, 'access'), 'off');
+  assert.equal(await ensureAgentDirectoryRole(ctx, { id: 'sp-1', name: 'App' }), 'off');
   assert.deepEqual(graph.calls, []);
-  assert.ok(!resourceGraphGrants(config, 'tenant-1', 'App', 'access', { canAssign: true }).some((g) => /Entra/.test(g.what)));
-  assert.deepEqual(resourceGraphGrants(emptyConfig(), 'tenant-1', 'App', 'access', { canAssign: true }), []);
+  assert.ok(!resourceGraphGrants(config, 'tenant-1', 'App', { canAssign: true }).some((g) => /Entra/.test(g.what)));
+  assert.deepEqual(resourceGraphGrants(emptyConfig(), 'tenant-1', 'App', { canAssign: true }), []);
 });

@@ -1,8 +1,8 @@
 // @ts-check
 /**
- * The Power Automate flows: product feedback exports emailed to the admin, and Copilot Studio
- * credits from the Power Platform licensing API. The installer creates each flow, turned off, in a
- * Power Platform environment the user picks. It makes the HTTP with Microsoft Entra ID connections
+ * The Power Automate flows: product feedback exports emailed to the admin, and the Power Platform
+ * inventory of Copilot Studio agents. The installer creates each flow, turned off, in a Power
+ * Platform environment the user picks. It makes the HTTP with Microsoft Entra ID connections
  * the flows need, gives a sign-in link for each, and once they're signed in to, points the flows at
  * them and turns them on. Anything else (e.g. Outlook) the user signs in to in Power Automate.
  * When a flow can't be created, it is written to a file to import instead.
@@ -18,7 +18,6 @@ import {
   AGENT_INVENTORY_DIR,
   AGENT_INVENTORY_FLOW_NAME,
   agentInventoryFlowDefinition,
-  BACKFILL_MARKER,
   connectionReferencesOf,
   connectorByName,
   connectorsUsed,
@@ -27,7 +26,6 @@ import {
   FEEDBACK_SUBJECT,
   feedbackFlowDefinition,
   flowClientData,
-  FLOW_STATE_DIR,
   flowFile,
   isBound,
   nameByConnection,
@@ -36,75 +34,28 @@ import {
   oneLakeEndpoint,
   PPAPI,
   STORAGE_RESOURCE,
-  STUDIO_FLOW_NAME,
-  studioFlowDefinition,
 } from '../transform/flows.js';
 import { c } from '../ui.js';
 import { UPLOAD_DIR } from '../uploads.js';
 import { ensureWorkspaceRole } from './model.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
-/** @typedef {'feedback' | 'studio' | 'agents'} FlowKind */
+/** @typedef {'feedback' | 'agents'} FlowKind */
 
 const MAKER = 'https://make.powerautomate.com/';
 export const FLOW_FILES = /** @type {Record<FlowKind, string>} */ ({
   feedback: 'analytics-hub-feedback-flow.json',
-  studio: 'analytics-hub-studio-credits-flow.json',
   agents: 'analytics-hub-agent-inventory-flow.json',
 });
 
 /** @type {Record<FlowKind, string>} */
-export const FLOW_NAMES = { feedback: FEEDBACK_FLOW_NAME, studio: STUDIO_FLOW_NAME, agents: AGENT_INVENTORY_FLOW_NAME };
+export const FLOW_NAMES = { feedback: FEEDBACK_FLOW_NAME, agents: AGENT_INVENTORY_FLOW_NAME };
 
 /** @param {import('../config.js').InstallConfig} config @returns {FlowKind[]} */
-const flowsChosen = (config) => {
-  const azure = config.target === 'azure';
-  const sample = azure && config.azure?.sampleData === true;
-  // On Azure with private networking, Power Automate can only write to the SharePoint drop folder.
-  const unreachable = azure && config.azure?.publicNetworkAccess === false && !azureDropsToSharePoint(config.azure);
-  return [
-    ...(!azure && config.dataSources.productFeedback === 'api' ? /** @type {const} */ (['feedback']) : []),
-    ...(config.dataSources.studioCredits === 'api' && (!azure || (!!config.modules.consumption && !sample)) ? /** @type {const} */ (['studio']) : []),
-    ...(config.dataSources.resourceGraph === 'api' && config.resourceGraph?.agents !== false && !sample && !unreachable ? /** @type {const} */ (['agents']) : []),
-  ];
-};
-
-/** The ADLS container an Azure install's flows and uploads land in. */
-export const AZURE_LANDING = 'landing';
-/** Folders under the Azure landing place: what the jobs read, and the flow's own state, which they don't. */
-export const AZURE_LANDING_DIRS = /** @type {const} */ ({ studio: 'studio', viva: 'viva', agent365: 'agent365', productFeedback: 'product_feedback', workday: 'workday', flows: 'flows', argInventory: 'arg_inventory' });
-
-/**
- * The credit files and the CSV exports (Agent 365, product feedback, Workday) go to a SharePoint folder rather than the
- * landing container. The plan sets the folder only with private networking, where Power Automate can't reach
- * the storage account.
- * @param {import('../config.js').AzureConfig | undefined} az
- */
-export const azureDropsToSharePoint = (az) => !!az?.drop?.siteId;
-
-/**
- * Where an Azure install's flows write: the landing container through a signed-in storage connection,
- * or, when storage takes no public traffic, the SharePoint drop folder.
- * @param {import('../config.js').AzureConfig | undefined} az
- * @returns {import('../transform/flows.js').FlowTarget}
- */
-export function azureFlowTarget(az) {
-  const dirs = { dropDir: AZURE_LANDING_DIRS.studio, stateDir: AZURE_LANDING_DIRS.flows };
-  if (azureDropsToSharePoint(az)) {
-    return { identity: 'user', endpoint: '', sharePoint: { siteUrl: az?.drop?.siteUrl ?? '', folder: az?.drop?.sitePath ?? '' }, ...dirs };
-  }
-  return { identity: 'user', endpoint: `https://${az?.outputs?.storageAccountName ?? 'storage'}.dfs.core.windows.net/${AZURE_LANDING}`, ...dirs };
-}
-
-/**
- * Where an Azure install's flow saves, for people: the Studio folder unless `dir` says otherwise.
- * @param {import('../config.js').AzureConfig | undefined} az
- * @param {string} [dir]
- */
-export function azureDropLabel(az, dir = AZURE_LANDING_DIRS.studio) {
-  if (azureDropsToSharePoint(az)) return az?.drop?.folderUrl ? `${az.drop.folderUrl.replace(/\/+$/, '')}/${dir}` : 'the SharePoint drop folder';
-  return `${az?.outputs?.storageAccountName ?? 'the storage account'} > ${AZURE_LANDING}/${dir}`;
-}
+const flowsChosen = (config) => [
+  ...(config.dataSources.productFeedback === 'api' ? /** @type {const} */ (['feedback']) : []),
+  ...(config.dataSources.resourceGraph === 'api' && config.resourceGraph?.agents !== false ? /** @type {const} */ (['agents']) : []),
+];
 
 /** The app identity reads its secret from Key Vault, which notebook mode doesn't use. @param {import('../config.js').InstallConfig} config */
 const appWithoutVault = (config) => flowIdentity(config) === 'app' && secretMode(config) === 'notebook';
@@ -130,7 +81,7 @@ function validateUrl(v) {
 
 /**
  * Asks where to create the flows. Each comes with its source's api mode: product feedback's
- * "Power Automate (emailed export)" and Studio credits' "Connected (Power Automate flow)".
+ * "Power Automate (emailed export)" and the agent inventory under Azure Resource Graph.
  * @param {Ctx} ctx
  */
 export async function planFlows(ctx) {
@@ -202,34 +153,25 @@ async function pickFlowEnvironment(ctx) {
  */
 export function flowDefinitions(config, tenantId) {
   const identity = flowIdentity(config);
-  const azure = config.target === 'azure';
   /** @type {import('../transform/flows.js').FlowTarget} */
-  const t = azure
-    ? azureFlowTarget(config.azure)
-    : {
-        identity,
-        endpoint: oneLakeEndpoint(config.fabric.workspaceId ?? '', config.fabric.lakehouseId ?? ''),
-        ...(identity === 'app' ? { tenantId, clientId: config.app.appId ?? '', secretName: config.keyVault.secretName } : {}),
-      };
-  const where = azure ? azureDropLabel(config.azure) : `${config.fabric.lakehouseName ?? 'the Lakehouse'} > ${UPLOAD_DIR}`;
+  const t = {
+    identity,
+    endpoint: oneLakeEndpoint(config.fabric.workspaceId ?? '', config.fabric.lakehouseId ?? ''),
+    ...(identity === 'app' ? { tenantId, clientId: config.app.appId ?? '', secretName: config.keyVault.secretName } : {}),
+  };
+  const where = `${config.fabric.lakehouseName ?? 'the Lakehouse'} > ${UPLOAD_DIR}`;
   const schedule = { time: config.schedule.time, timeZone: config.schedule.timeZone };
-  const inventoryDir = azure ? AZURE_LANDING_DIRS.argInventory : AGENT_INVENTORY_DIR;
-  const inventoryWhere = azure ? azureDropLabel(config.azure, AZURE_LANDING_DIRS.argInventory) : `${config.fabric.lakehouseName ?? 'the Lakehouse'} > ${AGENT_INVENTORY_DIR}`;
+  const inventoryWhere = `${config.fabric.lakehouseName ?? 'the Lakehouse'} > ${AGENT_INVENTORY_DIR}`;
   return {
     feedback: {
       name: FEEDBACK_FLOW_NAME,
       description: `Saves product feedback exports emailed with the subject "${FEEDBACK_SUBJECT}" to ${where}. Created by the Analytics Hub installer.`,
       definition: nameByConnection(feedbackFlowDefinition(t), t),
     },
-    studio: {
-      name: STUDIO_FLOW_NAME,
-      description: `Saves Copilot Studio credits from the Power Platform licensing API to ${where} each day. Created by the Analytics Hub installer.`,
-      definition: nameByConnection(studioFlowDefinition(t, schedule), t),
-    },
     agents: {
       name: AGENT_INVENTORY_FLOW_NAME,
       description: `Saves the Power Platform inventory of Copilot Studio agents, environments and agent flows to ${inventoryWhere} each day, for when Azure Resource Graph won't return agents. The inventory API takes delegated sign-ins only, so its connection signs in as a Power Platform or Global Reader-type administrator. Created by the Analytics Hub installer.`,
-      definition: nameByConnection(agentInventoryFlowDefinition(t, schedule, inventoryDir), t),
+      definition: nameByConnection(agentInventoryFlowDefinition(t, schedule, AGENT_INVENTORY_DIR), t),
     },
   };
 }
@@ -237,14 +179,11 @@ export function flowDefinitions(config, tenantId) {
 /** @param {any} definition */
 const signatureOf = (definition) => createHash('sha256').update(JSON.stringify(definition)).digest('hex').slice(0, 16);
 
-/** @param {string[]} names @param {import('../config.js').InstallConfig} [config] */
-const labels = (names, config) => names.map((n) => connectorLabel(n, config)).join('; ');
+/** @param {string[]} names */
+const labels = (names) => names.map((n) => connectorLabel(n)).join('; ');
 
-/** @param {string} name @param {import('../config.js').InstallConfig} [config] */
-const connectorLabel = (name, config) => {
-  const label = connectorByName(name)?.label ?? name;
-  return config?.target === 'azure' && name === CONNECTORS.storage.name ? label.replace('for OneLake', 'for Azure Storage') : label;
-};
+/** @param {string} name */
+const connectorLabel = (name) => connectorByName(name)?.label ?? name;
 
 /**
  * Creates the flows chosen, or brings them up to date. An update keeps the connections already
@@ -318,7 +257,7 @@ export async function ensureFlows(ctx) {
  * @param {{ name: string, description: string, definition: any }} def
  */
 async function updateFlow(ctx, dv, existing, { name, description, definition }) {
-  const { ui, config } = ctx;
+  const { ui } = ctx;
   const current = connectionReferencesOf(existing.clientdata);
   const fresh = newConnections(definition, current);
   const wasOn = existing.statecode === 1;
@@ -340,13 +279,13 @@ async function updateFlow(ctx, dv, existing, { name, description, definition }) 
   if (wasOn) await dv.turnOffFlow(existing.workflowid);
   try {
     await dv.updateFlow(existing.workflowid, flowClientData(definition, current));
-    ui.warn(`Updated the flow ${existing.name}${wasOn ? ' and turned it off' : ''}. Sign in to: ${labels(fresh, config)}. Then turn it on.`);
+    ui.warn(`Updated the flow ${existing.name}${wasOn ? ' and turned it off' : ''}. Sign in to: ${labels(fresh)}. Then turn it on.`);
     return existing.workflowid;
   } catch (err) {
     if (!missingConnection(err)) throw err;
   }
   const id = await dv.deleteFlow(existing.workflowid).then(() => dv.createFlow({ name, description, clientdata: flowClientData(definition) }));
-  ui.warn(`Dataverse won't update a flow with a connection still to sign in to, so ${name} was replaced. Sign in to all its connections again (your existing connections are still there to pick): ${labels(connectorsUsed(definition), config)}. Then turn it on.`);
+  ui.warn(`Dataverse won't update a flow with a connection still to sign in to, so ${name} was replaced. Sign in to all its connections again (your existing connections are still there to pick): ${labels(connectorsUsed(definition))}. Then turn it on.`);
   return id;
 }
 
@@ -365,7 +304,7 @@ function missingConnection(err) {
 function writeFlowFile(ctx, kind, name, definition) {
   const { ui, config } = ctx;
   const file = join(ctx.configFile ? dirname(ctx.configFile) : process.cwd(), FLOW_FILES[kind]);
-  const note = `Written by the Analytics Hub installer because the flow couldn't be created. In Power Automate, create an automated or scheduled cloud flow, open it in the code view (or use the Power Automate Management connector) and paste "definition". Then sign in to its connections: ${labels(connectorsUsed(definition), config)}.`;
+  const note = `Written by the Analytics Hub installer because the flow couldn't be created. In Power Automate, create an automated or scheduled cloud flow, open it in the code view (or use the Power Automate Management connector) and paste "definition". Then sign in to its connections: ${labels(connectorsUsed(definition))}.`;
   try {
     writeFileSync(file, `${JSON.stringify(flowFile(name, definition, note), null, 2)}\n`);
     config.uploads.flowFiles = { ...config.uploads.flowFiles, [kind]: file };
@@ -382,23 +321,20 @@ function writeFlowFile(ctx, kind, name, definition) {
 export const CONNECTION_NAMES = {
   ppApi: 'Analytics Hub - Power Platform API',
   oneLake: 'Analytics Hub - OneLake',
-  azureStorage: 'Analytics Hub - Azure Storage',
 };
-const OWNED_NAME = /^Analytics Hub - (Power Platform API|OneLake|Azure Storage( \(.+\))?)$/;
+const OWNED_NAME = /^Analytics Hub - (Power Platform API|OneLake)$/;
 /** Whether a connection's display name is one the installer gives. @param {string | undefined} name */
 export const isOwnedConnectionName = (name) => OWNED_NAME.test(name ?? '');
 
 /**
  * The name of the connection the installer makes for a connection reference, if it makes one.
- * @param {import('../config.js').InstallConfig} config
+ * @param {import('../config.js').InstallConfig} _config
  * @param {string} ref
  */
-export function ownedConnectionName(config, ref) {
+export function ownedConnectionName(_config, ref) {
   if (ref === CONNECTORS.entra.name) return CONNECTION_NAMES.ppApi;
-  if (ref !== CONNECTORS.storage.name) return undefined;
-  if (config.target !== 'azure') return CONNECTION_NAMES.oneLake;
-  const account = config.azure?.outputs?.storageAccountName;
-  return account ? `${CONNECTION_NAMES.azureStorage} (${account})` : undefined;
+  if (ref === CONNECTORS.storage.name) return CONNECTION_NAMES.oneLake;
+  return undefined;
 }
 
 /** The connector both HTTP with Microsoft Entra ID references use. */
@@ -433,27 +369,17 @@ export function ownedConnections(ctx, kinds) {
       ref: CONNECTORS.entra.name,
       displayName: CONNECTION_NAMES.ppApi,
       parameters: { baseResourceUrl: PPAPI, 'token:ResourceUri': PPAPI },
-      who: kinds.includes('agents') ? 'a Power Platform administrator' : 'a Power Platform, Billing or Global administrator',
+      who: 'a Power Platform administrator',
     });
   }
   const storageName = ownedConnectionName(config, CONNECTORS.storage.name);
   if (used.has(CONNECTORS.storage.name) && storageName) {
-    const account = config.azure?.outputs?.storageAccountName;
-    out.push(
-      config.target === 'azure'
-        ? {
-            ref: CONNECTORS.storage.name,
-            displayName: storageName,
-            parameters: { baseResourceUrl: `https://${account}.dfs.core.windows.net`, 'token:ResourceUri': STORAGE_RESOURCE },
-            who: `someone with Storage Blob Data Contributor on ${account}`,
-          }
-        : {
-            ref: CONNECTORS.storage.name,
-            displayName: storageName,
-            parameters: { baseResourceUrl: ONELAKE_DFS, 'token:ResourceUri': STORAGE_RESOURCE },
-            who: `someone with Contributor or higher on ${config.fabric.workspaceName ?? 'the workspace'}`,
-          },
-    );
+    out.push({
+      ref: CONNECTORS.storage.name,
+      displayName: storageName,
+      parameters: { baseResourceUrl: ONELAKE_DFS, 'token:ResourceUri': STORAGE_RESOURCE },
+      who: `someone with Contributor or higher on ${config.fabric.workspaceName ?? 'the workspace'}`,
+    });
   }
   return out;
 }
@@ -470,7 +396,7 @@ const sameTarget = (c, want) => {
 /**
  * Signs the flows in for the user. Makes each HTTP with Microsoft Entra ID connection a flow needs,
  * with its URLs filled in and a name the installer owns, and gives one sign-in link for each. Once
- * they're signed in to, points each flow at them and turns it on, so the Studio flow can run before
+ * they're signed in to, points each flow at them and turns it on, so the flows can run before
  * the first load. Connections the installer made before and nobody signed in to are deleted.
  * Never throws: whatever it can't do is left to the steps.
  * @param {Ctx} ctx
@@ -560,7 +486,7 @@ export async function connectFlows(ctx) {
       }
       if (missing.length) {
         const others = missing.filter((ref) => !owned.has(ref));
-        if (others.length) ui.info(`${FLOW_NAMES[kind]} also needs ${labels(others, config)}, which only Power Automate can sign in to. Its steps below say how.`);
+        if (others.length) ui.info(`${FLOW_NAMES[kind]} also needs ${labels(others)}, which only Power Automate can sign in to. Its steps below say how.`);
         else waiting = true;
         continue;
       }
@@ -576,7 +502,6 @@ export async function connectFlows(ctx) {
       }
     }
     if (waiting) ui.note(`When the connections are signed in to, run "${commandLine('update')}" to point the flows at them and turn them on. Or follow the steps below.`);
-    if (pending.includes('studio') && !on.has('studio')) ui.warn('Copilot Studio data arrives after the flow runs and the next daily load.');
     await tidyConnections(ctx, env, new Set([...chosen.values()].map((conn) => conn.name).concat(boundTo(Object.values(details)))), page);
   } catch (err) {
     ui.warn(`Couldn't set up the flow connections (${/** @type {Error} */ (err).message}). Sign in to them in Power Automate instead; the steps below say how.`);
@@ -704,31 +629,14 @@ export function connectionSteps(config, kind) {
     return made[ref] && name ? ` Or pick the connection "${name}" the installer made, once it's signed in to.` : '';
   };
   const storage =
-    (config.target === 'azure'
-      ? azureStorageStep(config.azure)
-      : flowIdentity(config) === 'app'
-        ? `${CONNECTORS.keyVault.label}: vault ${config.keyVault.name ?? 'your Key Vault'}.`
-        : `${CONNECTORS.storage.label}: Base Resource URL ${ONELAKE_DFS}, Resource URI ${STORAGE_RESOURCE}. Sign in as someone with Contributor or higher on ${workspace}. Its actions end in "via OneLake".`) +
-    (flowIdentity(config) === 'app' || azureDropsToSharePoint(config.azure) ? '' : orPick(CONNECTORS.storage.name));
+    (flowIdentity(config) === 'app'
+      ? `${CONNECTORS.keyVault.label}: vault ${config.keyVault.name ?? 'your Key Vault'}.`
+      : `${CONNECTORS.storage.label}: Base Resource URL ${ONELAKE_DFS}, Resource URI ${STORAGE_RESOURCE}. Sign in as someone with Contributor or higher on ${workspace}. Its actions end in "via OneLake".`) +
+    (flowIdentity(config) === 'app' ? '' : orPick(CONNECTORS.storage.name));
   if (kind === 'feedback') return [`${CONNECTORS.outlook.label}: sign in as the mailbox the export is emailed to.`, storage];
   const ppApi = `${CONNECTORS.entra.label}: Base Resource URL and Resource URI ${PPAPI}.`;
   const ppActions = `Its actions end in "via Power Platform API".${orPick(CONNECTORS.entra.name)}`;
-  if (kind === 'agents') {
-    return [`${ppApi} Sign in as a Power Platform administrator, or an admin with Global Reader: the inventory API takes delegated sign-ins only. ${ppActions}`, storage];
-  }
-  return [`${ppApi} Sign in as a Power Platform, Billing or Global administrator. ${ppActions}`, storage];
-}
-
-/**
- * The storage sign-in for an Azure install's flow.
- * @param {import('../config.js').AzureConfig | undefined} az
- */
-function azureStorageStep(az) {
-  if (azureDropsToSharePoint(az)) {
-    return `${CONNECTORS.sharePoint.label}: sign in as someone who can add files to ${az?.drop?.folderUrl ?? 'the drop folder'}.`;
-  }
-  const account = az?.outputs?.storageAccountName ?? '<storage account>';
-  return `${connectorLabel(CONNECTORS.storage.name, /** @type {any} */ ({ target: 'azure' }))}: Base Resource URL https://${account}.dfs.core.windows.net, Resource URI ${STORAGE_RESOURCE}. Sign in as someone with Storage Blob Data Contributor on ${account} (the installer gave it to you). Its actions end in "via Azure Storage".`;
+  return [`${ppApi} Sign in as a Power Platform administrator, or an admin with Global Reader: the inventory API takes delegated sign-ins only. ${ppActions}`, storage];
 }
 
 /** The Microsoft 365 admin center page for product feedback (Health > Product feedback), where the export is scheduled. */
@@ -756,11 +664,7 @@ function flowSteps(ctx, kind, link) {
   for (const step of connectionSteps(config, kind)) ui.info(`  ${n++}. ${step}`);
   ui.info(`  ${n++}. Save, then turn it on.`);
   if (kind === 'feedback') ui.info(`  ${n++}. ${feedbackExportStep}`);
-  else if (kind === 'agents') ui.note('     It runs daily, an hour before the pipeline. The collector reads its newest file only when Azure Resource Graph returns no agents.');
-  else {
-    ui.info(`  ${n++}. To load about six months now rather than at its first daily run, click Run. Or use "${commandLine('run')}", which offers to run it before the pipeline.`);
-    ui.note('     After that it runs daily, an hour before the pipeline.');
-  }
+  else ui.note('     It runs daily, an hour before the pipeline. The collector reads its newest file only when Azure Resource Graph returns no agents.');
 }
 
 /**
@@ -794,81 +698,6 @@ export function flowsSummary(ctx) {
   }
 }
 
-/** How often, and how many times, to check on a Studio flow run before carrying on without it. */
-export const STUDIO_RUN_POLL_MS = 30_000;
-export const STUDIO_RUN_POLLS = 120;
-const RUN_ACTIVE = new Set(['Running', 'Waiting']);
-
-/**
- * The Studio credits flow loads about six months on its first run, which is otherwise the next
- * daily one. When the flow is on and hasn't done that yet, offers to run it now as the signed-in
- * user, and to wait so the pipeline that follows picks up its files. When it's off, says how to.
- * Never throws: anything that goes wrong ends in the steps to do it by hand.
- * @param {Ctx} ctx
- * @param {{ pipelineNext?: boolean, quietWhenOff?: boolean }} [opts]
- *   pipelineNext: the pipeline runs straight after, so waiting is the default.
- *   quietWhenOff: say nothing when the flow is off (the flows summary covers it).
- * @returns {Promise<'ran' | 'started' | 'off' | 'done' | 'skipped' | 'failed'>}
- */
-export async function offerStudioRun(ctx, opts = {}) {
-  const { ui, config } = ctx;
-  const up = config.uploads;
-  const id = up.flowIds?.studio;
-  if (!flowsWanted(config).includes('studio') || !id || up.flowFiles?.studio || !up.flowEnvironment) return 'skipped';
-  const steps = (/** @type {string} */ why) => {
-    const link = up.flowEnvironment?.id ? `${MAKER}environments/${up.flowEnvironment.id}/flows` : MAKER;
-    ui.info(`${why ? `${why} ` : ''}To load about six months of Copilot Studio credits now:`);
-    ui.info(`  1. Open ${link} and open ${STUDIO_FLOW_NAME}.`);
-    ui.info('  2. If it is off, sign in to its connections, save, and turn it on.');
-    ui.info('  3. Click Run. Otherwise it loads them at its next daily run, an hour before the pipeline.');
-  };
-  try {
-    const env = await flowEnvironmentId(ctx);
-    if (!env) {
-      steps("Couldn't find the Power Platform environment's ID.");
-      return 'failed';
-    }
-    const flow = await ctx.api.flow.getFlow(env, id);
-    const state = flow?.properties?.state;
-    if (state && state !== 'Started') {
-      if (!opts.quietWhenOff) steps(`${STUDIO_FLOW_NAME} is ${state === 'Suspended' ? 'suspended' : 'off'}.`);
-      return 'off';
-    }
-    if (await backfillDone(ctx, env, id)) return 'done';
-    const running = (await ctx.api.flow.listRuns(env, id)).find((r) => RUN_ACTIVE.has(r.properties?.status ?? ''));
-    if (running) {
-      if (!opts.pipelineNext || ui.yes || !(await ui.confirm(`${STUDIO_FLOW_NAME} is running now. Wait for it before starting the pipeline?`, true))) return 'started';
-      return await waitForStudioRun(ctx, env, id, running.name);
-    }
-    if (ui.yes) {
-      ui.note(`${STUDIO_FLOW_NAME} hasn't loaded its first six months yet. Run it in Power Automate, or run this without --yes to be offered it.`);
-      return 'skipped';
-    }
-    const choice = await ui.select(
-      `${STUDIO_FLOW_NAME} hasn't loaded its first six months of Copilot Studio credits yet. Run it now?`,
-      [
-        { name: `Run it now and wait${opts.pipelineNext ? ', so the pipeline picks up its files (recommended)' : ''}`, value: 'wait' },
-        { name: "Run it now, don't wait", value: 'start' },
-        { name: 'Not now (it runs at its next daily run)', value: 'no' },
-      ],
-      opts.pipelineNext ? 'wait' : 'start',
-    );
-    if (choice === 'no') return 'skipped';
-    const before = new Set((await ctx.api.flow.listRuns(env, id)).map((r) => r.name));
-    await ctx.api.flow.runTrigger(env, id, 'Daily');
-    ui.ok(`Started ${STUDIO_FLOW_NAME}`);
-    if (choice !== 'wait') return 'started';
-    return await waitForStudioRun(ctx, env, id, undefined, before);
-  } catch (err) {
-    const e = /** @type {any} */ (err);
-    ui.warn(/CannotRunUnpublishedSolutionFlow/i.test(`${e?.code ?? ''} ${e?.message ?? ''}`)
-      ? `${STUDIO_FLOW_NAME} can't run until it is turned on.`
-      : `Couldn't run ${STUDIO_FLOW_NAME} (${e?.message ?? err}).`);
-    steps('');
-    return 'failed';
-  }
-}
-
 /**
  * The flow environment's ID, which Power Automate uses rather than the org URL. Looked up and saved
  * when an older record only has the URL.
@@ -883,62 +712,4 @@ async function flowEnvironmentId(ctx) {
   env.id = found.EnvironmentId;
   ctx.save();
   return env.id;
-}
-
-/**
- * Whether the flow has loaded its six months. On Fabric its marker file says so; on Azure, or if
- * OneLake can't be read, any run that succeeded.
- * @param {Ctx} ctx
- * @param {string} env
- * @param {string} id
- */
-async function backfillDone(ctx, env, id) {
-  const { config, api } = ctx;
-  if (config.target !== 'azure' && config.fabric.workspaceId && config.fabric.lakehouseId) {
-    try {
-      return await api.oneLake.exists(config.fabric.workspaceId, config.fabric.lakehouseId, `${FLOW_STATE_DIR}/${BACKFILL_MARKER}`);
-    } catch {
-      // Fall back to the run history.
-    }
-  }
-  return (await api.flow.listRuns(env, id)).some((r) => r.properties?.status === 'Succeeded');
-}
-
-/**
- * Waits for a Studio flow run: the named one, or the first not in `before`.
- * @param {Ctx} ctx
- * @param {string} env
- * @param {string} id
- * @param {string} [name]
- * @param {Set<string>} [before]
- * @returns {Promise<'ran' | 'started' | 'failed'>}
- */
-async function waitForStudioRun(ctx, env, id, name, before) {
-  const { ui } = ctx;
-  const progress = ui.progress(STUDIO_FLOW_NAME);
-  /** @type {import('../clients/flow.js').FlowRun | undefined} */
-  let found;
-  try {
-    for (let i = 0; i < STUDIO_RUN_POLLS; i++) {
-      const runs = await ctx.api.flow.listRuns(env, id);
-      found = runs.find((r) => (name ? r.name === name : !before?.has(r.name))) ?? found;
-      const status = found?.properties?.status;
-      progress.update(status ?? 'Starting');
-      if (status && !RUN_ACTIVE.has(status)) break;
-      await ctx.sleep(STUDIO_RUN_POLL_MS);
-    }
-  } finally {
-    progress.done();
-  }
-  const status = found?.properties?.status;
-  if (status === 'Succeeded') {
-    ui.ok(`${STUDIO_FLOW_NAME} loaded its first six months`);
-    return 'ran';
-  }
-  if (!status || RUN_ACTIVE.has(status)) {
-    ui.warn(`${STUDIO_FLOW_NAME} is still running. Carrying on; the next pipeline run picks up whatever it hasn't saved yet.`);
-    return 'started';
-  }
-  ui.warn(`${STUDIO_FLOW_NAME} ${status.toLowerCase()}${found?.properties?.error?.message ? `: ${found.properties.error.message}` : ''}. Open its run history in Power Automate to see why.`);
-  return 'failed';
 }

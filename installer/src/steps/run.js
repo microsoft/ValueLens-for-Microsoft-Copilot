@@ -5,12 +5,11 @@
  */
 import { isTransientNetworkError } from '../auth.js';
 import { commandLine } from '../launch.js';
-import { failedCards, fillRerun, loadCards, VIVA_ACTIVITY } from '../loads.js';
+import { failedCards, fillRerun, loadCards } from '../loads.js';
 import { DATA_CHECK_FILE } from '../transform/notebook.js';
-import { AGENT_EVALUATOR_ACTIVITY, COWORK_DATAFLOW_ACTIVITY, COWORK_WRAPPER_ACTIVITY, firstRunParameters, REFRESH_ACTIVITY, SKIP_COWORK_PARAMETER } from '../transform/pipeline.js';
-import { c, formatDuration } from '../ui.js';
-import { coworkConnections, coworkNextStep, coworkSignInSteps, VIVA_LOAD_FILE } from './consumption.js';
-import { agentEvaluatorOn, coworkDataflowOn, modelDeployed } from './fabric.js';
+import { firstRunParameters, REFRESH_ACTIVITY } from '../transform/pipeline.js';
+import { formatDuration } from '../ui.js';
+import { modelDeployed } from './fabric.js';
 import { modelRefreshes } from './model.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
@@ -155,8 +154,7 @@ const STUCK_MS = 24 * 3_600_000;
  * Starts the pipeline. With `backfillDays` it reloads that much audit history and rebuilds the curated table.
  * It doesn't start a run while another is going: two at once overload a small capacity.
  * @param {Ctx} ctx
- * @param {{ backfillDays?: number, wait?: boolean, first?: boolean, skipCowork?: boolean }} opts  skipCowork: leave the Cowork
- *   Dataflow out of this run only (SkipCowork), because its connections aren't signed in yet.
+ * @param {{ backfillDays?: number, wait?: boolean, first?: boolean }} opts
  * @returns {Promise<RunResult>}
  */
 export async function runPipeline(ctx, opts) {
@@ -173,14 +171,12 @@ export async function runPipeline(ctx, opts) {
     return { jobId: running.id, status: running.status, ok: false, started: false };
   }
   const days = opts.backfillDays;
-  /** @type {Record<string, any> | undefined} */
-  let parameters = days ? firstRunParameters(days) : undefined;
-  if (opts.skipCowork) parameters = { ...parameters, [SKIP_COWORK_PARAMETER]: true };
+  const parameters = days ? firstRunParameters(days) : undefined;
   const startedAt = ctx.now().toISOString();
   const url = await api.fabric.runJob(f.workspaceId, f.pipelineId, 'Pipeline', parameters ? { parameters } : undefined);
   const jobId = jobIdFrom(url);
   if (opts.first) {
-    config.firstRun = { jobId, status: 'NotStarted', startedAt, ...(opts.skipCowork ? { coworkSkipped: true } : {}) };
+    config.firstRun = { jobId, status: 'NotStarted', startedAt };
     ctx.save();
   }
   if (!days) ui.ok('Started the pipeline');
@@ -236,67 +232,22 @@ export async function pipelineActivities(ctx) {
 export async function reportLoads(ctx, runs, activities) {
   if (!runs) return [];
   const cards = loadCards(runs, activities ?? (await pipelineActivities(ctx)));
-  await checkVivaRows(ctx, cards);
-  const todo = coworkNextStep(ctx.config, cards);
   const rerun = `run "${commandLine('rerun-failed')}"`;
-  for (const card of cards) {
-    if (card.activity === COWORK_DATAFLOW_ACTIVITY && card.state === 'failed' && card.kind !== 'capacity') {
-      card.fix = todo
-        ? [`The Cowork credits Dataflow fails until its connections are signed in: see "${todo.title}".`]
-        : ['The Cowork credits Dataflow usually fails until it has its sign-ins:', ...coworkSignInSteps(ctx.config).map((step, i) => `  ${i + 1}. ${step}`)];
-    }
-    card.fix = card.fix.map((t) => fillRerun(t, rerun));
-  }
-  // So the web page shows what the install counts as failed, rather than as waiting on a next step.
+  for (const card of cards) card.fix = card.fix.map((t) => fillRerun(t, rerun));
+  // So the web page shows what the install counts as failed.
   for (const card of countedFailures(ctx.config, cards)) card.counted = true;
   if (cards.length) ctx.ui.loads(cards);
-  if (todo) ctx.ui.todo(todo);
   return cards;
 }
 
 /**
- * The failed loads that leave an install partly set up: all of them except the Cowork credits Dataflow while signing it
- * in is still to do, which is a next step. Failing for another reason, such as a busy capacity, counts.
- * @param {import('../config.js').InstallConfig} config
+ * The failed loads that leave an install partly set up. In ValueLens that's every failed load: none
+ * waits on a next step that's yours to do.
+ * @param {import('../config.js').InstallConfig} _config
  * @param {LoadCard[]} cards
  */
-export function countedFailures(config, cards) {
-  const signInToDo = !!coworkNextStep(config, cards);
-  return failedCards(cards).filter((c) => !(signInToDo && c.activity === COWORK_DATAFLOW_ACTIVITY));
-}
-
-/**
- * The Viva load succeeds whether or not the Dataflow gave it any rows, so it reads back the counts
- * the notebook wrote and isn't green when none came. Without the file it leaves the card as it is.
- * @param {Ctx} ctx
- * @param {LoadCard[]} cards
- */
-async function checkVivaRows(ctx, cards) {
-  const viva = cards.find((c) => c.activity === VIVA_ACTIVITY);
-  const f = ctx.config.fabric;
-  if (viva?.state !== 'ok' || !coworkDataflowOn(ctx.config) || !ctx.api.oneLake || !f.workspaceId || !f.lakehouseId) return;
-  /** @type {any} */
-  const summary = await ctx.api.oneLake.readJson(f.workspaceId, f.lakehouseId, VIVA_LOAD_FILE).catch(() => null);
-  if (summary && Number(summary.dataflowRows) === 0) {
-    viva.state = 'todo';
-    viva.reason = 'It ran, but no rows came from the Cowork Dataflow.';
-    viva.fix = ['Check the Viva Insights query has Auto-refresh on and covers recent weeks, then choose Load Cowork now.'];
-  }
-}
-
-/**
- * Whether the installer's first load should leave the Cowork Dataflow out: only when Fabric says its
- * connections aren't signed in and the pipeline has the SkipCowork switch. When unsure, it runs it.
- * @param {Ctx} ctx
- */
-export async function coworkSkipForFirstLoad(ctx) {
-  if (!coworkDataflowOn(ctx.config)) return false;
-  const activities = await pipelineActivities(ctx);
-  if (!activities?.some((a) => a.name === COWORK_WRAPPER_ACTIVITY)) return false;
-  if ((await coworkConnections(ctx)) !== 'unbound') return false;
-  ctx.ui.warn('Cowork credits are left out of this first load: the Cowork Dataflow isn\'t signed in yet.');
-  ctx.ui.note('Everything else loads now. The steps to sign in and load Cowork follow once the load has finished.');
-  return true;
+export function countedFailures(_config, cards) {
+  return failedCards(cards);
 }
 
 /**
@@ -331,14 +282,13 @@ export async function activityRuns(ctx, jobId, job) {
 
 /**
  * Whether a run loaded the history: the audit log and its processor succeeded, and so did the model
- * refresh and the transcripts when they are installed.
+ * refresh when the model is deployed.
  * @param {import('../config.js').InstallConfig} config
  * @param {Map<string, any>} runs
  */
 export function loadedBy(config, runs) {
   const needed = ['Run_Audit_Log_Ingester', 'Run_Audit_Log_Processor'];
   if (modelDeployed(config)) needed.push(REFRESH_ACTIVITY);
-  if (agentEvaluatorOn(config)) needed.push(AGENT_EVALUATOR_ACTIVITY);
   return needed.every((name) => runs.get(name)?.status === 'Succeeded');
 }
 
@@ -527,7 +477,7 @@ function printAuditExcluded(ctx, excluded) {
 }
 
 /**
- * Says whether licences match Copilot activity. With no match the app shows 0 licensed users.
+ * Says whether licences match Copilot activity. With no match the report shows 0 licensed users.
  * @param {Ctx} ctx
  * @param {{ licensed?: number, audit?: number, matched?: number, masked?: number } | null | undefined} identity
  */
@@ -567,20 +517,7 @@ export async function status(ctx) {
   ui.info(`Lakehouse: ${f.lakehouseName ?? f.lakehouseId}`);
   ui.info(`Pipeline:  ${f.pipelineName ?? f.pipelineId}`);
   const sm = config.semanticModel;
-  const cm = config.consumption?.model;
-  const am = config.agentEvaluator?.model;
   if (sm?.id) ui.info(`Model:     ${sm.name}${sm.bound ? '' : ' (not connected to the Lakehouse yet)'}`);
-  if (cm?.id) ui.info(`Model:     ${cm.name}${cm.bound ? '' : ' (not connected to the Lakehouse yet)'}`);
-  if (am?.id) ui.info(`Model:     ${am.name}${am.bound ? '' : ' (not connected to the Lakehouse yet)'}`);
-  if (config.modules.agentEvaluator && config.agentEvaluator.environments.length) {
-    const envs = config.agentEvaluator.environments;
-    const waiting = envs.filter((e) => !e.access || !e.readAll).length;
-    ui.info(
-      `Agents:    ${envs.length - waiting} of ${envs.length} environment(s) readable` +
-        `${waiting ? c.dim(' (the rest are waiting for an admin to add the app, or give it the role that reads every transcript)') : ''}`,
-    );
-  }
-  if (config.fabricApp?.itemId) ui.info(`App:       ${config.fabricApp.name}  ${c.dim(config.fabricApp.url ?? '')}`);
   expiry(ctx, 'Client secret', config.app.secretExpires);
   if (sm?.connectionId) expiry(ctx, 'Model connection secret', sm.secretExpires);
 
@@ -620,25 +557,22 @@ export async function status(ctx) {
     }
   }
 
-  for (const m of [sm, cm, am]) {
-    if (!m?.id) continue;
-    const refreshes = await modelRefreshes(ctx, m).catch(() => null);
-    if (refreshes) {
-      ui.heading(m === sm ? 'Model refreshes' : `${m.name} refreshes`);
-      if (!refreshes.length) ui.note('No refreshes yet.');
-      for (const r of refreshes) {
-        const start = utc(r.startTime);
-        const end = utc(r.endTime);
-        const when = start ? start.toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : 'not started';
-        const took = start && end ? `, ${formatDuration(end.getTime() - start.getTime())}` : '';
-        const state = r.extendedStatus ?? r.status ?? 'Unknown';
-        const line = `${when}  ${state}${took}  ${r.refreshType ?? ''}`.trimEnd();
-        if (state === 'Completed') ui.ok(line);
-        else if (state === 'Failed') {
-          ui.fail(line);
-          if (r.serviceExceptionJson) ui.note(String(r.serviceExceptionJson).slice(0, 400));
-        } else ui.info(line);
-      }
+  const refreshes = sm?.id ? await modelRefreshes(ctx, sm).catch(() => null) : null;
+  if (refreshes) {
+    ui.heading('Model refreshes');
+    if (!refreshes.length) ui.note('No refreshes yet.');
+    for (const r of refreshes) {
+      const start = utc(r.startTime);
+      const end = utc(r.endTime);
+      const when = start ? start.toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : 'not started';
+      const took = start && end ? `, ${formatDuration(end.getTime() - start.getTime())}` : '';
+      const state = r.extendedStatus ?? r.status ?? 'Unknown';
+      const line = `${when}  ${state}${took}  ${r.refreshType ?? ''}`.trimEnd();
+      if (state === 'Completed') ui.ok(line);
+      else if (state === 'Failed') {
+        ui.fail(line);
+        if (r.serviceExceptionJson) ui.note(String(r.serviceExceptionJson).slice(0, 400));
+      } else ui.info(line);
     }
   }
 

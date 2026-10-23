@@ -10,7 +10,7 @@ import { loadConfig, saveConfig } from '../src/config.js';
 import { createClient, HttpError } from '../src/http.js';
 import { powerBiApi } from '../src/clients/powerbi.js';
 import { finishUpdate, loadState, runCommand } from '../src/install.js';
-import { confirmReloaded, deployModel, MODEL_UPDATE_NOTE, needsDataReset, pendingReloads, refreshModel, settleReloads } from '../src/steps/model.js';
+import { confirmReloaded, deployModel, MODEL_UPDATE_NOTE, needsDataReset, refreshModel, settleReloads } from '../src/steps/model.js';
 import { planReview } from '../src/steps/plan.js';
 import { createWebUi } from '../src/web-ui.js';
 import { fakeCtx, fakeFabric, fakeGraph, fakePowerBi, fakeUi, httpError } from './fakes.js';
@@ -175,7 +175,7 @@ test('update: a failed refresh is reported, not "Up to date", and the model stay
   const text = t.ui.text();
   assert.doesNotMatch(text, /Up to date/);
   assert.match(text, /Analytics Hub Model has no data until a refresh finishes/);
-  assert.match(text, /The update isn't finished: the models weren't reloaded/);
+  assert.match(text, /The update isn't finished: the model wasn't reloaded/);
   assert.equal(t.sm.reload?.cleared, true);
 });
 
@@ -210,7 +210,7 @@ test('update on the page says the same: still reloading, or not finished, never 
     const lines = web.history().filter((/** @type {any} */ e) => e.type === 'line').map((/** @type {any} */ e) => `${e.kind}: ${e.text}`);
     assert.ok(!lines.some((l) => /Up to date/.test(l)), lines.join('\n'));
     if (outcome === 'reloading') assert.ok(lines.some((l) => /^ok: Updated\. Analytics Hub Model is still reloading/.test(l)), lines.join('\n'));
-    else assert.ok(lines.some((l) => /^fail: The update isn't finished: the models weren't reloaded/.test(l)), lines.join('\n'));
+    else assert.ok(lines.some((l) => /^fail: The update isn't finished: the model wasn't reloaded/.test(l)), lines.join('\n'));
   }
 });
 
@@ -625,7 +625,7 @@ test('scope: following a busy table refresh never retires the reload; its own wh
       svc.ran('table-only', { objects: ['FactAlpha'] });
       svc.setBusy(2);
       assert.equal(await finishUpdate(busy.ctx), false);
-      assert.match(busy.ui.text(), /The update isn't finished: the models weren't reloaded/);
+      assert.match(busy.ui.text(), /The update isn't finished: the model wasn't reloaded/);
       assert.doesNotMatch(busy.ui.text(), /Up to date/);
       assert.deepEqual(svc.tables, { FactAlpha: true, FactBeta: false });
       assert.deepEqual(loadConfig(saved.file).config.semanticModel.reload, { since: '2026-06-01T12:00:00.000Z', cleared: true });
@@ -695,24 +695,6 @@ test('a change that may not have finished is applied again before anything count
   t.sm.bound = true;
   assert.deepEqual(await settleReloads(t.ctx, { wait: true, load: 'none', reachable: () => true }), { ok: true, pending: [] });
   assert.equal(t.sm.reload, undefined);
-});
-
-test('a Consumption model kept while credit consumption is off, or in Azure demo mode, is owed no reload until it is used again', () => {
-  const { config } = fakeCtx();
-  const reload = { since: '2026-06-01T12:00:00.000Z', unsettled: true };
-  Object.assign(config.semanticModel, { id: 'vl-1', reload: { ...reload } });
-  Object.assign(config.consumption.model, { id: 'cc-1', reload: { ...reload } });
-  const owed = () => pendingReloads(config).map((m) => m.id);
-  for (const target of /** @type {const} */ (['fabric', 'azure'])) {
-    config.target = target;
-    config.modules.consumption = true;
-    assert.deepEqual(owed(), ['vl-1', 'cc-1'], target);
-    config.modules.consumption = false;
-    assert.deepEqual(owed(), ['vl-1'], `${target}, unticked`);
-  }
-  config.modules.consumption = true;
-  /** @type {any} */ (config.azure).sampleData = true;
-  assert.deepEqual(owed(), ['vl-1'], 'demo mode publishes no credit tables');
 });
 
 test('--allow-model-reset: only with install, update or access, and not with --ui', () => {

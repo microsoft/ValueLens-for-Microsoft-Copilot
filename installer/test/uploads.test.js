@@ -6,15 +6,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { notebooksFor } from '../src/catalog.js';
-import { applyDataFlags, main, parseCli } from '../src/cli.js';
+import { applyDataFlags, parseCli } from '../src/cli.js';
 import { emptyConfig } from '../src/config.js';
-import { install } from '../src/install.js';
 import { startServer } from '../src/server.js';
 import { checkStaged, clearStaged, inspectFile, sizeOk, stageUpload } from '../src/staging.js';
 import { checkCsvFiles, ensureUploads, planDataSources, uploadCommand, uploadFiles } from '../src/steps/data-sources.js';
 import { buildPipeline, UPLOAD_ROUTER_ACTIVITY } from '../src/transform/pipeline.js';
 import {
-  CREDIT_GROUP,
   DATA_SOURCES,
   decodeStart,
   defaultDataSources,
@@ -41,14 +39,6 @@ import { fakeCtx, fakeUi } from './fakes.js';
 const HEADERS = {
   productFeedback: 'Feedback Id,Date submitted (UTC),Feedback type,App,Feedback,Email',
   agent365: 'Agent name,Title ID,Publisher type,Availability,Created by',
-  studioTenant: 'Billing plan id,Environment id,Capacity type,Prepaid consumed quantity,Usage date',
-  studioAgent: 'Agent id,Agent name,Billed credit,Non billed credit,Channel',
-  studioUser: 'User id,User email,Credits used,Billable credit used',
-  studioAgentDaily: 'Usage date,Agent id,Agent name,Billed credit,Non billed credit,Channel,Environment id',
-  studioUserDaily: 'Usage date,User id,Environment id,Agent id,Billed credit,Non billed credit,Unit',
-  studioEntitlement: 'Snapshot date,Environment id,Environment allocated,Tenant prepaid consumed,Tenant PAYG consumed',
-  vivaCredits: 'ServiceId,ServiceName,SpendingPolicyId,MetricDate,TotalCopilotCreditsUsed',
-  vivaPolicy: 'SpendingPolicyId,Name,PlanLimit,UserLimit,IncludedServices',
   workday: 'Primary Work Email,Cost Center,Level',
 };
 
@@ -81,7 +71,7 @@ test('detectSource: each export is recognised by its headers', () => {
   assert.equal(UPLOAD_KINDS.length, Object.keys(HEADERS).length, 'every kind has a sample here');
 });
 
-test('detectSource: no header, an unknown file, a tie and a skipped source are refused', () => {
+test('detectSource: no header, an unknown file and a skipped source are refused', () => {
   const none = detectSource([]);
   assert.ok(!none.ok && /no header/.test(none.reason));
   const other = detectSource(['Name', 'Colour']);
@@ -89,8 +79,6 @@ test('detectSource: no header, an unknown file, a tie and a skipped source are r
   const both = detectSource(parseCsvHeader(`${HEADERS.productFeedback},Primary Work Email`));
   assert.ok(both.ok, 'the kind matching more groups wins');
   assert.equal(both.source, 'productFeedback');
-  const tie = detectSource(parseCsvHeader(`${HEADERS.vivaPolicy},ServiceId,ServiceName,MetricDate,TotalCopilotCreditsUsed`));
-  assert.ok(!tie.ok && /more than one export/.test(tie.reason));
   const skipped = detectSource(parseCsvHeader(HEADERS.productFeedback), ['workday']);
   assert.ok(!skipped.ok && /Product feedback export, but that source is set to Skip/.test(skipped.reason));
 });
@@ -121,7 +109,8 @@ test('uploadName: stamped, cleaned and kept a .csv', () => {
 test('parseDataFlags: comma-separated or repeated; unknown sources and modes are errors', () => {
   assert.deepEqual(parseDataFlags(['productFeedback=csv,agent365=api', 'workday=CSV']), { productFeedback: 'csv', agent365: 'api', workday: 'csv' });
   assert.throws(() => parseDataFlags(['nope=csv']), /unknown source "nope"/);
-  assert.deepEqual(parseDataFlags(['productFeedback=flow', 'studioCredits=FLOW']), { productFeedback: 'api', studioCredits: 'api' });
+  assert.deepEqual(parseDataFlags(['productFeedback=flow']), { productFeedback: 'api' });
+  assert.deepEqual(parseDataFlags(['productFeedback=FLOW']), { productFeedback: 'api' });
   assert.throws(() => parseDataFlags(['agent365=flow']), /agent365 can be api or csv or skip, not "flow"/);
   assert.throws(() => parseDataFlags(['productFeedback=email']), /productFeedback can be api or csv or skip or flow, not "email"/);
   assert.throws(() => parseDataFlags(['workday=api']), /workday can be csv or skip, not "api"/);
@@ -129,63 +118,38 @@ test('parseDataFlags: comma-separated or repeated; unknown sources and modes are
 });
 
 test('normaliseDataSources: an old record is read from its modules; locked sources stay on', () => {
-  const legacy = normaliseDataSources(undefined, { orgData: true, m365Activity: true, agent365: false, productFeedback: true, consumption: true, agentEvaluator: false }, {});
+  const legacy = normaliseDataSources(undefined, { orgData: true, m365Activity: true, agent365: false, productFeedback: true });
   assert.equal(legacy.m365Activity, 'api');
   assert.equal(legacy.agent365, 'skip');
   assert.equal(legacy.productFeedback, 'csv');
-  assert.equal(legacy.studioCredits, 'csv');
-  assert.equal(legacy.azureAi, 'skip', 'no subscription, so no Azure costs');
-  const none = { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false };
-  assert.equal(normaliseDataSources(undefined, { ...none, consumption: true }, { azureSubscriptionId: 'sub' }).azureAi, 'api');
+  const none = { orgData: true, m365Activity: false, agent365: false, productFeedback: false };
 
   const saved = normaliseDataSources({ core: 'skip', workday: 'api' }, none);
   assert.equal(saved.core, 'api');
   assert.equal(saved.workday, DATA_SOURCES.find((s) => s.id === 'workday')?.defaultMode, 'a mode the source lacks falls back to its default');
 });
 
-test('normaliseDataSources: a record with the Studio flow on reads as the api mode; exports alone stay csv', () => {
-  const none = { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: true, agentEvaluator: false };
-  assert.equal(normaliseDataSources({ studioCredits: 'csv' }, none, {}, { studioFlow: true }).studioCredits, 'api');
-  assert.equal(normaliseDataSources({ studioCredits: 'csv' }, none, {}, {}).studioCredits, 'csv');
-  assert.equal(normaliseDataSources({ studioCredits: 'skip' }, none, {}, { studioFlow: true }).studioCredits, 'skip');
-  const card = DATA_SOURCES.find((s) => s.id === 'studioCredits');
-  assert.deepEqual(card?.modes, ['api', 'csv', 'skip'], 'Connected first');
-});
-
 test('product feedback: the Power Automate route is its own mode; a record with the email flow on reads as it', () => {
-  const none = { orgData: true, m365Activity: false, agent365: false, productFeedback: true, consumption: false, agentEvaluator: false };
-  assert.equal(normaliseDataSources({ productFeedback: 'csv' }, none, {}, { feedbackFlow: true }).productFeedback, 'api');
-  assert.equal(normaliseDataSources({ productFeedback: 'csv' }, none, {}, {}).productFeedback, 'csv');
-  assert.equal(normaliseDataSources({ productFeedback: 'skip' }, none, {}, { feedbackFlow: true }).productFeedback, 'skip');
+  const none = { orgData: true, m365Activity: false, agent365: false, productFeedback: true };
+  assert.equal(normaliseDataSources({ productFeedback: 'csv' }, none, { feedbackFlow: true }).productFeedback, 'api');
+  assert.equal(normaliseDataSources({ productFeedback: 'csv' }, none, {}).productFeedback, 'csv');
+  assert.equal(normaliseDataSources({ productFeedback: 'skip' }, none, { feedbackFlow: true }).productFeedback, 'skip');
   const card = sourceCards(defaultDataSources()).find((c) => c.id === 'productFeedback');
   assert.deepEqual(card?.modes.map((m) => m.label), ['Power Automate (emailed export)', 'Upload CSV', 'Skip']);
   assert.deepEqual(card?.exportModes, ['api', 'csv'], 'the flow saves the same export, so its location still shows');
   assert.match(card?.modes[0].hint ?? '', /Power Automate Premium/);
 });
 
-test('credit sources: grouped under Credit consumption, next to each other, with what each needs', () => {
-  const cards = sourceCards(defaultDataSources());
-  const grouped = cards.filter((c) => c.group === CREDIT_GROUP).map((c) => c.id);
-  assert.equal(CREDIT_GROUP, 'Credit consumption');
-  assert.deepEqual(grouped, ['studioCredits', 'coworkCredits', 'azureAi']);
-  const at = cards.findIndex((c) => c.id === 'studioCredits');
-  assert.deepEqual(cards.slice(at, at + 3).map((c) => c.id), grouped, 'one run of cards, so one heading');
-  assert.equal(cards.find((c) => c.id === 'core')?.group, undefined);
-  const hint = (/** @type {string} */ id) => cards.find((c) => c.id === id)?.modes.find((m) => m.value === 'api')?.hint ?? '';
-  assert.match(hint('studioCredits'), /Power Automate Premium/);
-  assert.match(hint('coworkCredits'), /Viva Insights analyst/);
-});
-
 test('modulesFromSources, routedSources and routerWanted', () => {
   const ds = defaultDataSources();
   assert.equal(routerWanted(ds), false, 'nothing arrives as a CSV by default');
-  assert.deepEqual(modulesFromSources(ds), { orgData: true, m365Activity: true, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false, defender: false });
+  assert.deepEqual(modulesFromSources(ds), { orgData: true, m365Activity: true, agent365: false, productFeedback: false, defender: false });
   ds.productFeedback = 'csv';
   ds.agent365 = 'api';
   assert.deepEqual(routedSources(ds), ['productFeedback', 'agent365'], 'Agent 365 on the API still takes its export');
   assert.equal(routerWanted(ds), true);
-  ds.azureAi = 'api';
-  assert.equal(modulesFromSources(ds).consumption, true);
+  ds.defender = 'api';
+  assert.equal(modulesFromSources(ds).defender, true);
   assert.deepEqual(JSON.parse(routerSignaturesJson(ds)).map((/** @type {any} */ k) => k.kind), ['productFeedback', 'agent365']);
   assert.equal(JSON.parse(routerSignaturesJson()).length, UPLOAD_KINDS.length);
 });
@@ -268,14 +232,14 @@ test('uploadFiles: each export goes to the drop folder; one that fails is report
 
 test('planDataSources sets the modules and keeps the exports; ensureUploads makes the folders and uploads them', async () => {
   const oneLake = fakeOneLake();
-  const modes = { ...defaultDataSources(), productFeedback: 'csv', agentEvaluator: 'api' };
+  const modes = { ...defaultDataSources(), productFeedback: 'csv', defender: 'api' };
   const { ui, asked } = fakeUi({ answers: [{ modes, files: [] }] });
   const { ctx, config } = fakeCtx({ ui, oneLake });
   ctx.csvFiles = [csvFile('fb.csv', HEADERS.productFeedback)];
   await planDataSources(ctx);
   assert.equal(config.dataSources.productFeedback, 'csv');
   assert.equal(config.modules.productFeedback, true);
-  assert.equal(config.modules.agentEvaluator, true);
+  assert.equal(config.modules.defender, true);
   assert.equal(config.modules.agent365, false);
   assert.ok(!asked.some((q) => /Power Automate/.test(q)), 'no follow-up about the email flow: it is its own mode');
   assert.equal(ctx.pendingUploads?.length, 1);
@@ -333,13 +297,6 @@ test('uploadCommand: needs an install that loads exports; uploads, then runs whe
   const bare = fakeCtx();
   bare.config.fabric.workspaceId = undefined;
   await assert.rejects(uploadCommand(bare.ctx, { files: [] }, runNow), /Nothing is installed/);
-
-  // On Azure, exports go in the landing folders by hand: say where, not "Nothing is installed".
-  bare.config.target = 'azure';
-  bare.config.azure = /** @type {any} */ ({ outputs: { storageAccountName: 'stah' } });
-  await assert.rejects(uploadCommand(bare.ctx, { files: [] }, runNow), /^Error: The upload command is for the Fabric target only.*stah > landing\/studio.*stah > landing\/viva/);
-  bare.config.azure = /** @type {any} */ ({ drop: { siteId: 's1', folderUrl: 'https://contoso.sharepoint.com/sites/ah/Shared Documents/AnalyticsHub/' } });
-  await assert.rejects(uploadCommand(bare.ctx, { files: [] }, runNow), /AnalyticsHub\/studio and Cowork credit exports in https:\/\/contoso\.sharepoint\.com\/.*AnalyticsHub\/viva;/);
 });
 
 test('cli: upload takes files; --run, --data and --csv go where they belong', () => {
@@ -361,51 +318,6 @@ test('cli: upload takes files; --run, --data and --csv go where they belong', ()
   const skipped = emptyConfig();
   applyDataFlags(skipped, { dataSources: { productFeedback: 'skip' }, feedbackFlow: true });
   assert.equal(skipped.dataSources.productFeedback, 'skip');
-});
-
-test('cli: install --csv on an Azure install stops before signing in and says where exports go', async () => {
-  const file = join(tmp, 'azure-record.json');
-  writeFileSync(file, JSON.stringify({ version: 1, target: 'azure', azure: { outputs: { storageAccountName: 'stah' } } }));
-  const write = process.stderr.write;
-  let err = '';
-  process.stderr.write = /** @type {any} */ ((/** @type {string} */ s) => {
-    err += s;
-    return true;
-  });
-  try {
-    assert.equal(await main(['install', '--config', file, '--csv', 'credits.csv']), 1);
-  } finally {
-    process.stderr.write = write;
-  }
-  assert.match(err, /--csv is for the Fabric target only.*stah > landing\/studio.*stah > landing\/viva/);
-});
-
-test('install: --csv on a new install stops as soon as Azure is chosen, before the tenant checks', async () => {
-  /** @type {string[]} */
-  const calls = [];
-  const graph = new Proxy({}, { get: (_target, name) => async () => (calls.push(String(name)), []) });
-  const t = fakeUi({ answers: ['azure'] });
-  const { ctx, config } = fakeCtx({ ui: t.ui, graph });
-  delete config.fabric.workspaceId;
-  ctx.csvFiles = ['credits.csv'];
-  await assert.rejects(
-    install(ctx, { wait: false }),
-    /--csv is for the Fabric target only.*run it again and choose Microsoft Fabric.*without --csv, then put Copilot Studio credit exports in the storage account > landing\/studio and Cowork credit exports in the storage account > landing\/viva, or with private networking in the studio and viva folders of the SharePoint drop folder/,
-  );
-  assert.equal(config.target, 'azure');
-  assert.deepEqual(t.asked, ['Where should Analytics Hub run?']);
-  assert.deepEqual(calls, [], 'preflight never ran');
-  assert.doesNotMatch(t.text(), /Checking your tenant/);
-
-  // A record already on Azure (the CLI stops it before signing in): its landing folders, and no new choice to offer.
-  const known = fakeUi();
-  const azure = fakeCtx({ ui: known.ui, graph });
-  Object.assign(azure.config, { target: 'azure', azure: { outputs: { storageAccountName: 'stah' } } });
-  azure.ctx.csvFiles = ['credits.csv'];
-  await assert.rejects(install(azure.ctx, { wait: false }), (/** @type {Error} */ e) =>
-    /On Azure, put Copilot Studio credit exports in stah > landing\/studio and Cowork credit exports in stah > landing\/viva/.test(e.message) && !/choose Microsoft Fabric/.test(e.message));
-  assert.deepEqual(known.asked, []);
-  assert.deepEqual(calls, []);
 });
 
 test('web ui: the Data sources answer checks its modes and staged files', async () => {
@@ -448,7 +360,7 @@ test('web session: Upload exports is offered once an install loads exports', () 
 });
 
 test('catalog and pipeline: the router is deployed and runs first in lane 2 only when a source takes a CSV', async () => {
-  const modules = { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false };
+  const modules = { orgData: true, m365Activity: false, agent365: false, productFeedback: false };
   const ds = defaultDataSources();
   assert.ok(!notebooksFor(modules, { dataSources: ds }).some((nb) => nb.key === 'uploadRouter'));
   ds.workday = 'csv';

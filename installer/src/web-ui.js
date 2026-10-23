@@ -232,10 +232,6 @@ export function createWebUi(opts = {}) {
       emit({ type: 'review', plan });
     },
     /** @param {import('./loads.js').LoadCard[]} cards */
-    /** @param {import('./steps/consumption.js').CoworkNextStep} step */
-    todo: (step) => {
-      emit({ type: 'todo', step });
-    },
     loads: (cards) => {
       emit({ type: 'loads', cards });
     },

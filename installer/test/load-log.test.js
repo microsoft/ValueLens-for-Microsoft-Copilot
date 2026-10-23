@@ -5,13 +5,14 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { realSources } from './fakes.js';
-import { EVALUATOR_STATUS, EVALUATOR_STATUS_TABLE, LOAD_LOG, LOAD_LOG_TABLE } from '../src/transform/load-log.js';
-import { buildAgentEvaluatorModel, buildModel, loadTemplateModel } from '../src/transform/model.js';
+import { NOTEBOOKS_DIR } from '../src/catalog.js';
+import { LOAD_LOG, LOAD_LOG_TABLE } from '../src/transform/load-log.js';
+import { buildModel, loadTemplateModel } from '../src/transform/model.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sources = realSources();
 const lake = { server: 'abc.datawarehouse.fabric.microsoft.com', database: 'ValueLens' };
-const modules = { orgData: true, m365Activity: false, agent365: false, productFeedback: false, consumption: false, agentEvaluator: false };
+const modules = { orgData: true, m365Activity: false, agent365: false, productFeedback: false };
 
 /** @param {any} table */
 const partition = (table) => [table.partitions[0].source.expression].flat().join('\n');
@@ -27,19 +28,9 @@ test('the ValueLens model reads dbo.load_log, falling back to an empty table', (
 });
 
 test('the Load Log columns are ones the Record_Load_Status notebook writes', () => {
-  const nb = JSON.parse(readFileSync(join(here, '..', '..', 'fabric', 'notebooks', 'AnalyticsHub_Load_Status.ipynb'), 'utf8'));
+  const nb = JSON.parse(readFileSync(join(here, '..', '..', NOTEBOOKS_DIR, 'AnalyticsHub_Load_Status.ipynb'), 'utf8'));
   const code = nb.cells.map((/** @type {any} */ c) => [c.source].flat().join('')).join('\n');
   for (const c of LOAD_LOG.columns) assert.match(code, new RegExp(`StructField\\('${c.name}'`), c.name);
-});
-
-test('the Agent Evaluator model reads dbo.evaluator_status, and the parser writes its columns', () => {
-  const model = buildAgentEvaluatorModel(loadTemplateModel(/** @type {string} */ (sources.agentEvaluatorModelFile)), lake).model;
-  const table = model.tables.find((t) => t.name === EVALUATOR_STATUS_TABLE);
-  assert.ok(table);
-  assert.match(partition(table), /try FabricTable\("evaluator_status"\) otherwise EmptyTable\(Columns\)/);
-  const nb = JSON.parse(readFileSync(join(here, '..', '..', 'fabric', 'notebooks', 'agent-evaluator', 'Copilot_Agent_Transcript_Parser.ipynb'), 'utf8'));
-  const code = nb.cells.map((/** @type {any} */ c) => [c.source].flat().join('')).join('\n');
-  for (const c of EVALUATOR_STATUS.columns) assert.ok(code.includes(`'${c.name}'`), c.name);
 });
 
 test('a template that already has the table is left alone', () => {

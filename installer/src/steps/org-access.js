@@ -1,23 +1,16 @@
 // @ts-check
 /**
- * Org-scoped access: opt-in row-level security on the semantic models. Who sees what lives in a
- * scope list (a CSV the installer writes: in the Lakehouse on Fabric, in the landing container on
- * Azure), never in the models, so it survives redeploys. Each model gets two roles when it's on;
- * their members are applied over XMLA by the Access Scope notebook after every deploy, because a
- * definition deploy drops role members.
+ * Org-scoped access: opt-in row-level security on the semantic model. Who sees what lives in a
+ * scope list (a CSV the installer writes in the Lakehouse), never in the model, so it survives
+ * redeploys. The model gets two roles when it's on; their members are applied over XMLA by the
+ * Access Scope notebook after every deploy, because a definition deploy drops role members.
  */
-import { NOTEBOOKS } from '../catalog.js';
 import { notebookJobParameters } from '../clients/fabric.js';
-import { HttpError } from '../http.js';
 import { commandLine } from '../launch.js';
 import { ACCESS_INVENTORY, ACCESS_PEOPLE_TABLE, ORG_ATTRIBUTES, rlsOn, roleDefinitions } from '../transform/access.js';
-import { prepareNotebook, serialiseNotebook } from '../transform/notebook.js';
 import { ensureViewerGroup } from './access.js';
-import { azureConsumptionModelDeployed, grantLandingWrite, isPrivate, onceRunFinished, startAndWaitJob } from './azure/index.js';
-import { createdId } from './fabric.js';
 import { deployedRoles, refreshModel } from './model.js';
 import { BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, waitForJob } from './run.js';
-import { azureAgentEvaluatorModelDeployed } from './azure/agent-evaluator.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 /** @typedef {import('../transform/access.js').AccessModelKind} AccessModelKind */
@@ -46,16 +39,9 @@ const SCOPE_TYPES = ['all', 'hierarchy', 'org'];
 const MANAGED_VIA = ['seed', 'installer'];
 const STATUSES = ['active', 'pending_group'];
 
-/** Where the files go: in the Lakehouse (Fabric) and the landing container (Azure). */
+/** Where the files go, in the Lakehouse. */
 export const FABRIC_SCOPE_FILE = 'Files/analytics_hub_access/access_scope.csv';
 export const FABRIC_ROLES_FILE = 'Files/analytics_hub_access/roles.json';
-export const AZURE_CONTAINER = 'landing';
-export const AZURE_SCOPE_FILE = 'access/access_scope.csv';
-export const AZURE_ROLES_FILE = 'access/roles.json';
-
-/** A new role assignment takes a few minutes to reach storage. */
-export const STORAGE_ATTEMPTS = 8;
-export const STORAGE_RETRY_MS = 30_000;
 
 /** Below this share of people with a manager, "below a person" scopes miss most people. */
 export const LOW_MANAGER_COVERAGE = 0.5;
@@ -242,30 +228,15 @@ export function describeScope(r, attribute = 'department') {
 }
 
 /**
- * The models org-scoped access covers on this install.
+ * The models org-scoped access covers on this install: the ValueLens model, once it's deployed.
  * @param {import('../config.js').InstallConfig} config
  * @returns {RlsModel[]}
  */
 export function rlsModels(config) {
-  if (config.target === 'azure') {
-    const pbi = config.azure?.powerBi ?? {};
-    if (!pbi.workspaceId) return [];
-    const ws = pbi.workspaceId;
-    return [
-      ...(pbi.datasetId ? [{ kind: /** @type {const} */ ('valuelens'), workspaceId: ws, datasetId: pbi.datasetId, name: config.semanticModel.name, model: config.semanticModel }] : []),
-      ...(azureConsumptionModelDeployed(config) ? [{ kind: /** @type {const} */ ('consumption'), workspaceId: ws, datasetId: /** @type {string} */ (pbi.consumptionDatasetId), name: config.consumption.model.name, model: config.consumption.model }] : []),
-      ...(azureAgentEvaluatorModelDeployed(config) ? [{ kind: /** @type {const} */ ('agentEvaluator'), workspaceId: ws, datasetId: /** @type {string} */ (pbi.agentEvaluatorDatasetId), name: config.agentEvaluator.model.name, model: config.agentEvaluator.model }] : []),
-    ];
-  }
   const ws = config.fabric.workspaceId;
-  if (!ws || !config.semanticModel.enabled) return [];
-  /** @type {[AccessModelKind, import('../config.js').ModelConfig | false][]} */
-  const all = [
-    ['valuelens', config.semanticModel],
-    ['consumption', !!config.modules.consumption && config.consumption.model],
-    ['agentEvaluator', !!config.modules.agentEvaluator && config.agentEvaluator.model],
-  ];
-  return all.flatMap(([kind, m]) => (m && m.id ? [{ kind, workspaceId: ws, datasetId: m.id, name: m.name, model: m }] : []));
+  const m = config.semanticModel;
+  if (!ws || !m.enabled || !m.id) return [];
+  return [{ kind: 'valuelens', workspaceId: ws, datasetId: m.id, name: m.name, model: m }];
 }
 
 /**
@@ -275,24 +246,6 @@ export function rlsModels(config) {
 function store(ctx) {
   const { config, api } = ctx;
   const encode = (/** @type {string} */ s) => new TextEncoder().encode(s);
-  if (config.target === 'azure') {
-    const account = config.azure?.outputs?.storageAccountName;
-    if (!account) throw new Error(`The storage account isn't deployed yet. Run "${commandLine('install')}" first.`);
-    if (isPrivate(config.azure)) {
-      // Private networking: the account takes no public traffic, so calls from this machine would only get 403s.
-      const blocked = () => Promise.reject(new Error(`The storage account ${account} only accepts traffic from its private endpoints, so the installer can't read or write it from this machine.`));
-      return { where: `${account}/${AZURE_CONTAINER}/${AZURE_SCOPE_FILE}`, readScope: blocked, readRoles: blocked, writeScope: blocked, writeRoles: blocked, rolesPath: `abfss://${AZURE_CONTAINER}@${account}.dfs.core.windows.net/${AZURE_ROLES_FILE}` };
-    }
-    const lake = api.dataLake(account);
-    return {
-      where: `${account}/${AZURE_CONTAINER}/${AZURE_SCOPE_FILE}`,
-      readScope: () => lake.readText(AZURE_CONTAINER, AZURE_SCOPE_FILE),
-      readRoles: () => lake.readText(AZURE_CONTAINER, AZURE_ROLES_FILE),
-      writeScope: (/** @type {string} */ text) => lake.writeFile(AZURE_CONTAINER, AZURE_SCOPE_FILE, encode(text)),
-      writeRoles: (/** @type {string} */ text) => lake.writeFile(AZURE_CONTAINER, AZURE_ROLES_FILE, encode(text)),
-      rolesPath: `abfss://${AZURE_CONTAINER}@${account}.dfs.core.windows.net/${AZURE_ROLES_FILE}`,
-    };
-  }
   const ws = /** @type {string} */ (config.fabric.workspaceId);
   const lh = config.fabric.lakehouseId;
   if (!ws || !lh) throw new Error(`Nothing is installed yet. Run "${commandLine('install')}" first.`);
@@ -311,79 +264,7 @@ function store(ctx) {
  * @param {Ctx} ctx
  */
 export async function readScopes(ctx) {
-  return parseScopeCsv(await withStorageRole(ctx, () => store(ctx).readScope()));
-}
-
-/**
- * Retries a storage call while a new role assignment reaches the account.
- * @template T
- * @param {Ctx} ctx
- * @param {() => Promise<T>} fn
- * @returns {Promise<T>}
- */
-async function whileRoleArrives(ctx, fn) {
-  if (ctx.config.target !== 'azure') return fn();
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      if (!(err instanceof HttpError) || err.status !== 403 || attempt >= STORAGE_ATTEMPTS) throw err;
-      if (attempt === 1) ctx.ui.info('Waiting for your storage role to take effect. A new one takes a few minutes.');
-      await ctx.sleep(STORAGE_RETRY_MS);
-    }
-  }
-}
-
-/** Org-scoped access can't read or write its files on the storage account: you don't have the role it needs yet. */
-class NoStorageRole extends Error {}
-
-/** Whether this run could give you Storage Blob Data Contributor on the storage account, or found you have it: asked once a run. @type {WeakMap<Ctx, boolean>} */
-const storageRoles = new WeakMap();
-
-/**
- * Runs a read or write of the scope list or the roles file. On Azure it first gives you Storage Blob
- * Data Contributor on the storage account, every run, as the install may have given it to someone
- * else; then retries while a new role takes effect. With private networking every call is refused
- * anyway, so it asks for nothing.
- * @template T
- * @param {Ctx} ctx
- * @param {() => Promise<T>} fn
- * @returns {Promise<T>}
- */
-async function withStorageRole(ctx, fn) {
-  const { config } = ctx;
-  if (config.target !== 'azure' || isPrivate(config.azure)) return fn();
-  let granted = storageRoles.get(ctx);
-  if (granted === undefined) {
-    granted = await grantLandingWrite(ctx, 'for org-scoped access', { always: true });
-    storageRoles.set(ctx, granted);
-  }
-  try {
-    // Without the right to assign it, you may still have it, given by hand.
-    return await (granted ? whileRoleArrives(ctx, fn) : fn());
-  } catch (err) {
-    if (!(err instanceof HttpError) || err.status !== 403) throw err;
-    const account = config.azure?.outputs?.storageAccountName;
-    const again = `then try again from "${commandLine('access')}".`;
-    throw new NoStorageRole(
-      granted
-        ? `Your Storage Blob Data Contributor role on the storage account ${account} hasn't taken effect yet. Wait about 5 minutes, ${again}`
-        : `You need Storage Blob Data Contributor on the storage account ${account} for org-scoped access, and you can't assign roles on it. Ask an Owner or User Access Administrator to give it to you (Azure portal > the storage account > Access control (IAM)), wait about 5 minutes, ${again}`,
-      { cause: err },
-    );
-  }
-}
-
-/**
- * Says what to do when org-scoped access lacks its storage role, and gives null. Anything else is rethrown.
- * @param {Ctx} ctx
- * @param {unknown} err
- * @returns {null}
- */
-function storageRoleFailed(ctx, err) {
-  if (!(err instanceof NoStorageRole)) throw err;
-  ctx.ui.fail(err.message);
-  return null;
+  return parseScopeCsv(await store(ctx).readScope());
 }
 
 /**
@@ -392,7 +273,7 @@ function storageRoleFailed(ctx, err) {
  * @param {ScopeRow[]} rows
  */
 export async function writeScopes(ctx, rows) {
-  await withStorageRole(ctx, () => store(ctx).writeScope(scopeCsv(rows)));
+  await store(ctx).writeScope(scopeCsv(rows));
 }
 
 /**
@@ -400,15 +281,9 @@ export async function writeScopes(ctx, rows) {
  * @param {Ctx} ctx
  */
 export function rlsBlockers(ctx) {
-  const { config } = ctx;
   /** @type {string[]} */
   const out = [];
-  if (!rlsModels(config).length) out.push(`No semantic model is deployed yet. Run "${commandLine('install')}" with the semantic model first.`);
-  if (config.target === 'azure') {
-    const az = config.azure;
-    if (isPrivate(az)) out.push('This install uses private networking. The notebook that applies the roles can\'t reach the storage account, so org-scoped access isn\'t supported here yet.');
-    if (!az?.powerBi?.capacityId) out.push('The Power BI workspace is on a Pro licence. Roles with members are applied through the XMLA endpoint, which needs a Fabric, Premium or Premium Per User capacity.');
-  }
+  if (!rlsModels(ctx.config).length) out.push(`No semantic model is deployed yet. Run "${commandLine('install')}" with the semantic model first.`);
   return out;
 }
 
@@ -502,43 +377,13 @@ async function runAccessNotebook(ctx, workspaceId, notebookId, params) {
 }
 
 /**
- * The Access Scope notebook in the Azure Power BI workspace, which applies role members there.
- * @param {Ctx} ctx
- */
-async function ensureAzureAccessNotebook(ctx) {
-  const { config, api, ui, sources } = ctx;
-  const pbi = /** @type {NonNullable<import('../config.js').AzureConfig['powerBi']>} */ (config.azure?.powerBi);
-  const ws = /** @type {string} */ (pbi.workspaceId);
-  const nb = /** @type {import('../catalog.js').NotebookInfo} */ (NOTEBOOKS.find((n) => n.key === 'accessScope'));
-  const content = serialiseNotebook(
-    prepareNotebook(sources.notebooks.accessScope, { parameters: nb.parameters, values: { MODE: 'membership', ROLES_B64: '', ROLES_FILE: '', WORKSPACE_ID: ws } }),
-  );
-  const items = await api.fabric.listItems(ws, 'Notebook').catch(() => []);
-  if (pbi.accessNotebookId && items.some((i) => i.id === pbi.accessNotebookId)) {
-    await api.fabric.updateNotebook(ws, pbi.accessNotebookId, content);
-    return pbi.accessNotebookId;
-  }
-  const existing = items.find((i) => i.displayName === nb.displayName);
-  if (existing) {
-    await api.fabric.updateNotebook(ws, existing.id, content);
-    pbi.accessNotebookId = existing.id;
-  } else {
-    const created = await api.fabric.createNotebook(ws, nb.displayName, content);
-    pbi.accessNotebookId = await createdId(ctx, created, 'Notebook', nb.displayName);
-    ui.ok(`Created ${nb.displayName} in the Power BI workspace`);
-  }
-  ctx.save();
-  return /** @type {string} */ (pbi.accessNotebookId);
-}
-
-/**
- * Lands the scope list, applies each model's role members and, when asked, refreshes the models.
- * The install carries on whatever happens, and the models stay closed to scoped viewers until it's
+ * Lands the scope list, applies the model's role members and, when asked, refreshes the model.
+ * The install carries on whatever happens, and the model stays closed to scoped viewers until it's
  * applied.
  * @param {Ctx} ctx
  * @param {{ refresh?: boolean }} [opts]
  * @returns {Promise<boolean | null>} true when applied; false when it failed, saying how to try again; null when it only
- *   warned: no model can take its roles yet, or on Azure a run was already going, or the job that loads them couldn't be followed.
+ *   warned: no model can take its roles yet.
  */
 export async function applyOrgAccess(ctx, opts = {}) {
   const { ui, config } = ctx;
@@ -549,49 +394,24 @@ export async function applyOrgAccess(ctx, opts = {}) {
     ui.info(`Fix ${blockers.length === 1 ? 'that' : 'those'}, or turn org-scoped access off from "${commandLine('access')}".`);
     return false;
   }
-  const rows = await readScopes(ctx).catch((err) => storageRoleFailed(ctx, err));
-  if (!rows) return false;
+  const rows = await readScopes(ctx);
   const { items, missing } = await roleItems(ctx, rows);
   for (const m of missing) ui.warn(`${m.name} wasn't deployed with org-scoped access by this installer. Run "${commandLine('update')}" to redeploy it.`);
   if (!items.length) return null;
 
   const s = store(ctx);
-  const written = await withStorageRole(ctx, async () => {
-    await s.writeScope(scopeCsv(rows));
-    await s.writeRoles(JSON.stringify(items, null, 2));
-    return true;
-  }).catch((err) => storageRoleFailed(ctx, err));
-  if (!written) return false;
+  await s.writeScope(scopeCsv(rows));
+  await s.writeRoles(JSON.stringify(items, null, 2));
 
-  let ok;
-  if (config.target === 'azure') {
-    const ws = /** @type {string} */ (config.azure?.powerBi?.workspaceId);
-    const id = await ensureAzureAccessNotebook(ctx);
-    ok = await runAccessNotebook(ctx, ws, id, { MODE: 'membership', ROLES_B64: '', ROLES_FILE: s.rolesPath, WORKSPACE_ID: ws });
-    // The jobs load the list into SQL, then refresh the models so it takes effect.
-    if (ok && opts.refresh !== false) {
-      const job = await startAndWaitJob(ctx, 'run', { wait: true, steps: 'access,refresh', timeoutMs: 30 * 60_000 });
-      // A run was already going. Scheduled runs load the list and refresh the models too, so the next one applies it.
-      if (!job.started) {
-        ui.note(onceRunFinished(`apply org-scoped access again from "${commandLine('access')}", or the next scheduled run does`));
-        return null;
-      }
-      // Started, but it couldn't be followed: that warns and says how to check it.
-      if (job.unfollowed) return null;
-      ok = job.ok;
-      if (!ok) ui.info(`Then try again from "${commandLine('access')}".`);
-    }
-  } else {
-    const ws = /** @type {string} */ (config.fabric.workspaceId);
-    const id = config.fabric.notebooks.accessScope;
-    if (!id) {
-      ui.fail(`The Access Scope notebook isn't deployed. Run "${commandLine('update')}".`);
-      return false;
-    }
-    ok = await runAccessNotebook(ctx, ws, id, { MODE: 'all', ROLES_B64: '', ROLES_FILE: s.rolesPath, WORKSPACE_ID: ws });
-    if (ok && opts.refresh !== false) {
-      for (const m of rlsModels(config)) if (m.model) await refreshModel(ctx, { model: m.model, wait: false });
-    }
+  const ws = /** @type {string} */ (config.fabric.workspaceId);
+  const id = config.fabric.notebooks.accessScope;
+  if (!id) {
+    ui.fail(`The Access Scope notebook isn't deployed. Run "${commandLine('update')}".`);
+    return false;
+  }
+  const ok = await runAccessNotebook(ctx, ws, id, { MODE: 'all', ROLES_B64: '', ROLES_FILE: s.rolesPath, WORKSPACE_ID: ws });
+  if (ok && opts.refresh !== false) {
+    for (const m of rlsModels(config)) if (m.model) await refreshModel(ctx, { model: m.model, wait: false });
   }
   if (!ok) return false;
   rls.applied = [...new Set(items.map((i) => i.datasetId))];
@@ -729,17 +549,13 @@ async function addFlow(ctx, rows) {
   } else if (type === 'org') {
     value = (await ui.input(`Which ${ATTRIBUTE_LABELS[attribute]}? (as it appears in the org data)`, { validate: (v) => (v.trim() ? true : 'Enter a value') })).trim();
   }
-  const canDelegate =
-    config.target === 'azure' && person.upn !== '*' && type !== 'all'
-      ? await ui.confirm('Can they share what they see with people below them, from the app\'s Share panel?', false)
-      : false;
-  const row = newRow({ upn: person.upn, type, value, canDelegate }, { grantedBy: user.upn, now: ctx.now() });
+  const row = newRow({ upn: person.upn, type, value }, { grantedBy: user.upn, now: ctx.now() });
   const groupId = config.access?.groupId;
   if (person.id && groupId) {
-    // A scope is no use without the group: it's what lets them open the app and query the models.
+    // A scope is no use without the group: it's what lets them open the report and query the model.
     const added = await api.graph.addGroupMember(groupId, person.id).catch(() => null);
     if (added) ui.ok(`Added ${person.upn} to ${config.access?.groupName ?? 'the viewer group'}`);
-    else if (added === null) ui.warn(`Couldn't add ${person.upn} to ${config.access?.groupName ?? 'the viewer group'}. Add them, or they can't open the app.`);
+    else if (added === null) ui.warn(`Couldn't add ${person.upn} to ${config.access?.groupName ?? 'the viewer group'}. Add them, or they can't open the report.`);
   }
   ui.ok(describeScope(row, attribute));
   return addScope(rows, row);

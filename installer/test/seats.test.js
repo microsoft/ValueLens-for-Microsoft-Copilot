@@ -1,9 +1,8 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { azureSizingWarnings } from '../src/steps/azure/index.js';
 import { defaultScale, plan, sizingWarnings } from '../src/steps/plan.js';
-import { AZURE_LARGE_TENANT_SKU, AZURE_LARGE_TENANT_SQL_VCORES, BIG_CAPACITY_SEATS, COPILOT_PLAN, copilotLicences, copilotSeats, LARGE_TENANT_SEATS, seatCount } from '../src/seats.js';
+import { BIG_CAPACITY_SEATS, COPILOT_PLAN, copilotLicences, copilotSeats, LARGE_TENANT_SEATS, seatCount } from '../src/seats.js';
 import { fakeCtx, fakeFabric, fakeUi } from './fakes.js';
 
 /** @param {string} skuPartNumber @param {number} consumedUnits @param {string} [servicePlanName] */
@@ -91,23 +90,4 @@ test('plan: an existing install keeps the size it saved, and is told to change i
   await plan(ctx, pre);
   assert.equal(config.scale, 'standard', 'never changed behind the admin\'s back');
   assert.match(t.text(), /12,000 Copilot seats are assigned, but the tenant size is "Up to 10,000"/);
-});
-
-test('azure sizing: a large tenant is warned about the SQL free limit, vCores, job size and shared Power BI', () => {
-  const base = { seats: 40_000, sqlFreeLimit: true, sqlMaxVcores: 2, powerBiCapacityId: undefined };
-  const all = azureSizingWarnings(base);
-  assert.equal(all.length, 4);
-  assert.match(all[0], /free offer.*Azure placement, choose to carry on past the free allowance \(about \$30-80 a month\).*Compute \+ storage.*continue using it for additional charges.*policy keeps the free limit/);
-  const vcores = AZURE_LARGE_TENANT_SQL_VCORES;
-  assert.match(all[1], new RegExp(`scales up to 2 vCores.*Azure placement, choose to scale it up to ${vcores} vCores.*max vCores to ${vcores} or more`));
-  assert.match(all[2], /4 vCPU and 8 GiB and up to 4 hours.*the next run carries on reading the audit log from where it stopped.*Schedule and loading, start with 30 days/);
-  assert.match(all[3], new RegExp(`shared capacity.*1 GB.*In Power BI, choose a Fabric capacity of ${AZURE_LARGE_TENANT_SKU} or larger \\(or its Premium equivalent\\)`));
-
-  assert.deepEqual(azureSizingWarnings({ ...base, sqlFreeLimit: false, sqlMaxVcores: 8, powerBiCapacityId: 'cap-1', seats: 20_000 }), []);
-  assert.equal(azureSizingWarnings({ ...base, seats: 20_000 }).length, 2, 'from 10,000 seats: the free limit and shared capacity only');
-  assert.deepEqual(azureSizingWarnings({ ...base, seats: 9_000 }), []);
-  assert.deepEqual(azureSizingWarnings({ ...base, sampleData: true }), [], 'demo data is small');
-  assert.deepEqual(azureSizingWarnings({ ...base, seats: undefined }), []);
-  assert.equal(azureSizingWarnings({ ...base, seats: 20_000, sharedCapacity: false }).length, 1, 'an existing workspace on its own capacity is not shared');
-  assert.equal(azureSizingWarnings({ ...base, seats: 20_000, powerBiCapacityId: 'cap-1', sharedCapacity: true }).length, 2);
 });

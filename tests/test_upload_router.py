@@ -88,9 +88,16 @@ class UploadRouterTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("node"), "node is not installed")
     def test_signatures_match_the_installer(self):
+        # The notebook is shared with Analytics Hub, so it also knows exports this installer doesn't route.
+        # The installer writes its own SIGNATURES_JSON at deploy; each of its signatures must match the notebook's.
         script = "import('./src/uploads.js').then(m => process.stdout.write(m.routerSignaturesJson()))"
         out = subprocess.run(["node", "--input-type=module", "-e", script], cwd=INSTALLER, capture_output=True, text=True, check=True).stdout
-        self.assertEqual(json.loads(namespace()["SIGNATURES_JSON"]), json.loads(out))
+        notebook = {sig["kind"]: sig for sig in json.loads(namespace()["SIGNATURES_JSON"])}
+        installer = json.loads(out)
+        self.assertTrue(installer)
+        for sig in installer:
+            with self.subTest(kind=sig["kind"]):
+                self.assertEqual(notebook.get(sig["kind"]), sig)
 
 
 if __name__ == "__main__":

@@ -1,9 +1,7 @@
 // @ts-check
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { accessCommand, accessReview, ensureViewerGroup, grantModelAccess, myGroupsUrl, NEW_GROUP_ATTEMPTS, NEW_GROUP_RETRY_MS, planAccess, publicAccess, VIEWER_GROUP_NAME } from '../src/steps/access.js';
-import { fabricConfigFile } from '../src/steps/app.js';
-import { azureViewerModels, webAccess } from '../src/steps/azure/index.js';
+import { accessCommand, accessReview, ensureViewerGroup, grantModelAccess, myGroupsUrl, NEW_GROUP_ATTEMPTS, NEW_GROUP_RETRY_MS, planAccess, VIEWER_GROUP_NAME } from '../src/steps/access.js';
 import { fabricViewerModels } from '../src/install.js';
 import { HttpError } from '../src/http.js';
 import { fakeCtx, fakeUi } from './fakes.js';
@@ -242,33 +240,10 @@ test('access: the command adds viewers and owners, and skips names it cannot fin
   assert.match(text(), new RegExp(myGroupsUrl('g-1').replace(/[/.]/g, '\\$&')));
 });
 
-test('access: the app is told the group and who to ask, and nothing without a group', () => {
-  const { ctx: ctx } = fakeCtx();
-  assert.equal(publicAccess(ctx.config), undefined);
-  assert.equal(webAccess(ctx.config), '');
-  assert.equal(fabricConfigFile(ctx.config, 'ws', ['vl']).access, undefined);
-
-  ctx.config.access = { groupId: 'g-1', groupName: VIEWER_GROUP_NAME, contact: 'admin@contoso.com', createdGroup: true, grantedModels: ['ds-vl'] };
-  const expected = { groupId: 'g-1', groupName: VIEWER_GROUP_NAME, contact: 'admin@contoso.com' };
-  assert.deepEqual(fabricConfigFile(ctx.config, 'ws', ['vl']).access, expected);
-  assert.deepEqual(JSON.parse(webAccess(ctx.config)), expected);
-
-  ctx.config.access.rls = { enabled: true, orgAttribute: 'country', applied: [] };
-  assert.deepEqual(JSON.parse(webAccess(ctx.config)), { ...expected, rlsOrgAttribute: 'country' }, 'org-scoped access turns on delegation');
-  ctx.config.access.rls = { enabled: false, applied: [] };
-  assert.deepEqual(JSON.parse(webAccess(ctx.config)), expected);
-});
-
-test('access: each target grants Build on the models its app queries', () => {
+test('access: the viewer group gets Build on the deployed ValueLens model', () => {
   const { ctx: ctx } = fakeCtx();
   const config = ctx.config;
   config.semanticModel.enabled = true;
   config.semanticModel.id = 'ds-vl';
-  config.modules.consumption = true;
-  config.modules.agentEvaluator = true;
-  config.azure = { powerBi: { workspaceId: 'pbi-ws', datasetId: 'az-vl', consumptionDatasetId: 'az-cc', agentEvaluatorDatasetId: 'az-ae' } };
-  assert.deepEqual(azureViewerModels(config).map((m) => `${m.workspaceId}/${m.datasetId}`), ['pbi-ws/az-vl', 'pbi-ws/az-cc', 'pbi-ws/az-ae']);
   assert.deepEqual(fabricViewerModels(config).map((m) => `${m.workspaceId}/${m.datasetId}`), ['ws-1/ds-vl']);
-  config.modules.consumption = false;
-  assert.deepEqual(azureViewerModels(config).map((m) => m.datasetId), ['az-vl', 'az-ae'], 'a Consumption model kept after an untick gets no new grants');
 });

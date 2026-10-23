@@ -7,7 +7,7 @@ import { runCommand } from '../src/install.js';
 import { ensureLakehouse, ensureNotebooks, ensurePipeline, ensureSchedule, freeName, pipelineSignature, usesSecret } from '../src/steps/fabric.js';
 import { ensureConsent } from '../src/steps/identity.js';
 import { connectionName } from '../src/steps/model.js';
-import { APP_NAME, lakehouseNameFrom, largeCapacity, planCosts, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
+import { APP_NAME, lakehouseNameFrom, largeCapacity, planReview, reserveNames, validateNewLakehouseName } from '../src/steps/plan.js';
 import { BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, chooseLoad, firstLoadEstimate, firstRunStatus, historyLoaded, NETWORK_LOSSES, printDataCheck, ranSince, runDataCheck, runPipeline, status, waitForJob } from '../src/steps/run.js';
 import { DATA_CHECK_FILE } from '../src/transform/notebook.js';
 import { PIPELINE_CHANGE, PIPELINE_VERSION, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
@@ -182,10 +182,6 @@ test('planReview: lists what adds to the bill with pricing links and no prices',
   const t = fakeUi();
   t.ui.review(planReview(ctx));
   assert.match(t.text(), /Costs: +Fabric capacity https:\/\/azure\.microsoft\.com\/pricing\/details\/microsoft-fabric\/\n +Power Automate Premium https:\/\/www\.microsoft\.com\/power-platform\/products\/power-automate\/pricing/);
-
-  config.target = 'azure';
-  const azure = planCosts(config).map((x) => x.what);
-  assert.ok(azure.includes('Azure resources') && !azure.includes('Fabric capacity') && !azure.includes('Azure Key Vault'));
 });
 
 test('lakehouse: never writes to one it did not create', async () => {
@@ -219,8 +215,6 @@ test('pipeline: one with the same name that is not ours is left alone', async ()
 test('names: new installs use Analytics Hub names; an older install keeps the names its items have', async () => {
   const config = emptyConfig();
   assert.equal(config.semanticModel.name, 'Analytics Hub Model');
-  assert.equal(config.consumption.model.name, 'Analytics Hub Consumption Model');
-  assert.equal(config.agentEvaluator.model.name, 'Analytics Hub Agent Evaluator Model');
   assert.equal(APP_NAME, 'Analytics Hub Data Collector');
   assert.equal(connectionName('12345678-aaaa'), 'Analytics Hub SQL 12345678');
 
@@ -603,16 +597,13 @@ test('run loads the history until a run has loaded it, then runs as usual', asyn
   assert.deepEqual(await chooseLoad(ctx, wait), { wait: true });
   assert.equal(config.firstRun?.status, 'Completed', 'and is marked so');
 
-  // It must also have refreshed the model and read the transcripts, when they are installed.
+  // It must also have refreshed the model, when the model is deployed.
   config.firstRun = { jobId: 'job-9', status: 'Failed' };
   Object.assign(config.semanticModel, { enabled: true, id: 'model-1', bound: true });
   assert.equal(await historyLoaded(ctx), false);
-  fabric.activityRuns['job-9'].push(activity(REFRESH_ACTIVITY, 'Succeeded'));
-  config.modules.agentEvaluator = true;
-  config.agentEvaluator.environments = [{ url: 'https://org.crm.dynamics.com', access: true }];
-  assert.deepEqual(await chooseLoad(ctx, wait), { wait: true, backfillDays: 30, first: true }, 'the transcripts are missing');
+  assert.deepEqual(await chooseLoad(ctx, wait), { wait: true, backfillDays: 30, first: true }, 'the model refresh is missing');
   assert.deepEqual(await chooseLoad(ctx, { wait: true, backfillDays: 60 }), { wait: true, backfillDays: 60, first: true });
-  fabric.activityRuns['job-9'].push(activity('Run_Agent_Evaluator_Transcripts', 'Succeeded'));
+  fabric.activityRuns['job-9'].push(activity(REFRESH_ACTIVITY, 'Succeeded'));
   assert.equal(await historyLoaded(ctx), true);
 
   // Installs from before the installer tracked the first load count any completed run.

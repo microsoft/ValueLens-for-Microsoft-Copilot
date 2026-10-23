@@ -8,18 +8,13 @@ import { SETUP_DIR } from '../catalog.js';
 import { currencySymbol } from '../currency.js';
 import { addAccessScope } from './access.js';
 import { addDefender } from './defender.js';
-import { addEvaluatorStatus, addLoadLog } from './load-log.js';
+import { addLoadLog } from './load-log.js';
 import { addM365Activity } from './m365.js';
-import { addCopilotPaygSpend } from './payg.js';
-import { addFoundryResources, addResourceGraph } from './resource-graph.js';
+import { addResourceGraph } from './resource-graph.js';
 import { readZipEntry } from './zip.js';
 
 /** The ValueLens report, relative to the source folder. */
 export const MODEL_TEMPLATE = `${SETUP_DIR}/ValueLens - Fabric.pbit`;
-/** The credit consumption report from Consumption Central, relative to the source folder. */
-export const CONSUMPTION_TEMPLATE = `${SETUP_DIR}/Add Credit Consumption/Consumption Central - Fabric.pbit`;
-/** The Agent Evaluator report, vendored from microsoft/AgentEvaluator-for-Copilot-Studio. */
-export const AGENT_EVALUATOR_TEMPLATE = `${SETUP_DIR}/Add Agent Evaluator/Agent Evaluator.pbit`;
 
 /** The table that has an incremental refresh policy. */
 export const AUDIT_TABLE = 'Chat + Agent Interactions (Audit Logs)';
@@ -149,102 +144,6 @@ export function buildModel(template, settings) {
   if (settings.currency) setCurrencySymbol(model, settings.currency);
   if (settings.access) addAccessScope(model, 'valuelens', settings.access);
   return { compatibilityLevel: template.compatibilityLevel, model };
-}
-
-/**
- * The credit consumption model. Every table in it is optional, so it deploys and
- * refreshes before any consumption data has landed.
- * @param {ModelBim} template
- * @param {{ server: string, database: string, resourceGraph?: boolean, access?: AccessSettings }} settings
- * @returns {ModelBim}
- */
-export function buildConsumptionModel(template, settings) {
-  const model = structuredClone(template.model);
-  setMParameter(model, 'FabricSQLEndpoint', settings.server);
-  setMParameter(model, 'LakehouseName', settings.database);
-  addCopilotPaygSpend(model);
-  addFoundryResources(model, !!settings.resourceGraph);
-  if (settings.access) addAccessScope(model, 'consumption', settings.access);
-  return { compatibilityLevel: template.compatibilityLevel, model };
-}
-
-/** Agent Evaluator functions that read Dataverse, SharePoint or local CSVs. Fabric mode never calls them. */
-export const AGENT_EVALUATOR_OFFLINE_FUNCTIONS = /** @type {const} */ (['CsvBinary', 'CsvFromPath', 'DataverseEntity']);
-/** The Agent Evaluator table that probes Dataverse directly. */
-export const AGENT_EVALUATOR_DIAGNOSTIC_TABLE = 'Dataverse Diagnostic';
-
-/**
- * The Agent Evaluator model, reading the parser's tables from the Lakehouse. The report also
- * reads Dataverse or CSV files directly; those paths are switched off and stubbed so the service
- * only ever sees the Lakehouse as a data source.
- * @param {ModelBim} template
- * @param {{ server: string, database: string, access?: AccessSettings }} settings
- * @returns {ModelBim}
- */
-export function buildAgentEvaluatorModel(template, settings) {
-  const model = structuredClone(template.model);
-  setMParameter(model, 'Fabric SQL Endpoint', settings.server);
-  setMParameter(model, 'Lakehouse Name', settings.database);
-  setMParameter(model, 'Source Mode', 'Fabric');
-  for (const name of AGENT_EVALUATOR_OFFLINE_FUNCTIONS) {
-    const expr = model.expressions?.find((e) => e.name === name);
-    if (!expr) throw new Error(`The transcripts model template has no "${name}" function.`);
-    const text = Array.isArray(expr.expression) ? expr.expression.join('\n') : String(expr.expression);
-    const at = text.indexOf('=>');
-    if (at < 0) throw new Error(`"${name}" is not a function.`);
-    expr.expression = `${text.slice(0, at)}=> error "Not used: the Analytics Hub installer reads Agent Evaluator data from the Lakehouse."`;
-    expr.description = 'Not used: the Analytics Hub installer reads Agent Evaluator data from the Lakehouse.';
-  }
-  // The service can't bind a Sql.Database whose arguments are worked out inside an if/error, so
-  // read the parameters directly, as the ValueLens model does.
-  const fabricTable = model.expressions?.find((e) => e.name === 'FabricTable');
-  const fabricText = fabricTable && (Array.isArray(fabricTable.expression) ? fabricTable.expression.join('\n') : String(fabricTable.expression));
-  const direct = fabricText?.replace(/^([ \t]*)FabEndpoint = [^\n]*\n[ \t]*FabLakehouse = [^\n]*\n[ \t]*Db = [^\n]*Sql\.Database\(FabEndpoint, FabLakehouse\),/m, '$1Db = Sql.Database(#"Fabric SQL Endpoint", #"Lakehouse Name"),');
-  if (!fabricTable || !direct || direct === fabricText) throw new Error('The transcripts model template\'s "FabricTable" function has changed shape.');
-  fabricTable.expression = direct;
-  completeAgentEvaluatorFallbacks(model);
-  const diagnostic = model.tables.find((t) => t.name === AGENT_EVALUATOR_DIAGNOSTIC_TABLE);
-  for (const p of diagnostic?.partitions ?? []) {
-    const text = Array.isArray(p.source.expression) ? p.source.expression.join('\n') : String(p.source.expression);
-    const empty = /Empty = (#table\(\{[^}]*\}, \{\}\))/.exec(text);
-    if (!empty) throw new Error(`The "${AGENT_EVALUATOR_DIAGNOSTIC_TABLE}" table has changed shape.`);
-    p.source.expression = empty[1];
-  }
-  addEvaluatorStatus(model);
-  if (settings.access) addAccessScope(model, 'agentEvaluator', settings.access);
-  return { compatibilityLevel: template.compatibilityLevel, model };
-}
-
-/** M steps that keep the Lakehouse table's columns as they are, apart from adding some or dropping unread ones. */
-const PASS_THROUGH_STEPS = new Set(['AddColumn', 'ColumnNames', 'HasColumns', 'RemoveColumns', 'TransformColumnTypes', 'TransformColumns']);
-
-/**
- * Until the parser first runs, a table falls back to an empty one. Some of those lack columns the
- * model declares, which fails the refresh, so add them. Tables that select, rename or build their
- * columns are left alone: their declared columns don't come straight from the Lakehouse.
- * @param {ModelBim['model']} model
- */
-function completeAgentEvaluatorFallbacks(model) {
-  for (const table of model.tables) {
-    for (const p of table.partitions ?? []) {
-      if (p.source?.type !== 'm') continue;
-      const text = Array.isArray(p.source.expression) ? p.source.expression.join('\n') : String(p.source.expression);
-      const fallback = /(FabricTable\("[^"]+"\)\s*otherwise\s*EmptyTable\(\{)([^}]*)(\}\))/g;
-      const hits = [...text.matchAll(fallback)];
-      if (hits.length !== 1) continue;
-      const steps = [...text.matchAll(/Table\.(\w+)\(/g)].map((m) => m[1]);
-      if (steps.some((s) => !PASS_THROUGH_STEPS.has(s))) continue;
-      const listed = new Set([...hits[0][2].matchAll(/"([^"]+)"/g)].map((m) => m[1]));
-      const added = new Set([...text.matchAll(/Table\.AddColumn\([^,]+,\s*"([^"]+)"/g)].map((m) => m[1]));
-      const missing = table.columns
-        .filter((c) => c.type !== 'calculated' && c.type !== 'rowNumber')
-        .map((c) => c.sourceColumn ?? c.name)
-        .filter((c) => !listed.has(c) && !added.has(c));
-      if (!missing.length) continue;
-      const extra = missing.map((c) => `"${c.replace(/"/g, '""')}"`).join(', ');
-      p.source.expression = text.replace(fallback, (_, open, cols, close) => `${open}${cols.trim() ? `${cols}, ` : ''}${extra}${close}`);
-    }
-  }
 }
 
 /**

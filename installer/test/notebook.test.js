@@ -125,72 +125,10 @@ test('credentials must be given together', () => {
   assert.throws(() => prepareNotebook(load('Copilot_Org_Data_Direct_Ingester.ipynb'), { tenantId: TENANT }), /together/);
 });
 
-const consumption = (/** @type {string} */ key) => /** @type {import('../src/catalog.js').NotebookInfo} */ (NOTEBOOKS.find((n) => n.key === key));
-
-test('Viva consumption: reads the Dataflow table and CSVs, and ends quietly with neither', () => {
-  const info = consumption('vivaConsumption');
-  assert.equal(info.patches, undefined);
-  const nb = prepareNotebook(load(info.file, info.dir), { lakehouse: LAKEHOUSE });
-  const all = nb.cells.map(cellText).join('\n');
-  assert.match(all, /DATAFLOW_TABLE = "viva_credits_dataflow"/);
-  assert.match(all, /spark\.catalog\.tableExists\(DATAFLOW_TABLE\)/);
-  assert.match(all, /if not notebookutils\.fs\.exists\(LANDING\):\n\s+return \[\]/);
-  assert.match(all, /notebookutils\.notebook\.exit\(f'No Viva consumption in \{LANDING\} or \{DATAFLOW_TABLE\}/);
-  assert.match(all, /pol_files = landed\('spendingpolicymetadata'\)\nif pol_files:/);
-  assert.doesNotMatch(all, /raise ValueError\(f'No PersonServiceCreditsMetrics/);
-  assert.equal(nb.metadata.dependencies.lakehouse.default_lakehouse, LAKEHOUSE.id);
-});
-
-test('Studio consumption: licensing API files fill studio_agent_daily and never replace an export', () => {
-  const info = consumption('studioConsumption');
-  const nb = prepareNotebook(load(info.file, info.dir), { lakehouse: LAKEHOUSE });
-  const all = nb.cells.map(cellText).join('\n');
-  assert.match(all, /PAT_API_AGENT = \("StudioApiAgentDaily\*\.csv",\)/);
-  assert.match(all, /PAT_API_ENTITLEMENT = \("StudioApiEntitlement\*\.csv",\)/);
-  assert.match(all, /TBL_AGENT_DAILY = "studio_agent_daily"/);
-  assert.match(all, /api_raw = read\(\*PAT_API_AGENT, api=True\)\nif api_raw is None:\n\s+print\("no licensing API files - skipping"\)/);
-  // Environment names come from the entitlement snapshot when the resources call has none.
-  assert.match(all, /rows\.join\(names, "environment_id", "left"\)/);
-  // Months and days an export covers keep the export's figures.
-  assert.match(all, /an export covers this month, so the API figures aren't used/);
-  assert.match(all, /tenant_api\.join\(exported, \["usage_date", "environment_id"\], "left_anti"\)/);
-  assert.match(all, /no entitlement snapshot - treating every credit as prepaid/);
-});
-
-test('Studio consumption: per-user API files fill studio_user_daily, look up UPNs without failing, and roll up only months no export covers', () => {
-  const info = consumption('studioConsumption');
-  assert.equal(info.credentials, true, 'the installer fills in the app, for the Graph lookup');
-  const nb = prepareNotebook(load(info.file, info.dir), { lakehouse: LAKEHOUSE, tenantId: TENANT, clientId: CLIENT, secret: SECRET });
-  const all = nb.cells.map(cellText).join('\n');
-  assert.match(all, new RegExp(`^TENANT_ID = '${TENANT}'`, 'm'));
-  assert.match(all, /^CLIENT_SECRET = notebookutils\.credentials\.getSecret\('https:\/\/vl-kv-test\.vault\.azure\.net\/', 'valuelens-client-secret'\)/m);
-  assert.match(all, /PAT_API_USER = \("StudioApiUserDaily\*\.csv",\)/);
-  assert.match(all, /TBL_USER_DAILY = "studio_user_daily"/);
-  assert.match(all, /user_raw = read\(\*PAT_API_USER, api=True\)\nif user_raw is None:\n\s+print\("no licensing API user files - skipping"\)/);
-  assert.match(all, /graph\.microsoft\.com\/v1\.0\/\$batch/);
-  assert.match(all, /except Exception as e:\n\s+print\(f" {2}UPN lookup skipped: \{e\}"\)/, 'a failed lookup never fails the run');
-  assert.match(all, /an export covers this month, so the API user figures aren't used/);
-  assert.match(all, /merge\(umonthly, TBL_USER, \["snapshot_month", "user_id", "agent_id"\]\)/);
-  assert.match(all, /merge\(user, TBL_USER, \["snapshot_month", "user_id", "agent_id"\]\)\n\s+drop_api_rows\(TBL_USER, user, \["snapshot_month"\]\)/, 'an export replaces the API rollup for its month');
-  // The per-user cell runs after the per-agent one, which it takes agent names from.
-  assert.ok(all.indexOf('user_raw = read(') > all.indexOf('api_raw = read('));
-});
+const byKey = (/** @type {string} */ key) => /** @type {import('../src/catalog.js').NotebookInfo} */ (NOTEBOOKS.find((n) => n.key === key));
 
 test('a patch that no longer matches exactly once is an error', () => {
-  const info = consumption('vivaConsumption');
+  const info = byKey('agent365Lander');
   assert.throws(() => prepareNotebook(load(info.file, info.dir), { patches: [{ find: 'no such text', replace: '' }] }), /found it 0 times/);
-  assert.throws(() => prepareNotebook(load(info.file, info.dir), { patches: [{ find: 'LANDING', replace: '' }] }), /LANDING/);
-});
-
-test('Azure AI: the subscription, app and Key Vault secret are filled in', () => {
-  const info = consumption('azureAi');
-  const nb = prepareNotebook(load(info.file, info.dir), {
-    values: { SUBSCRIPTION_ID: TENANT, TENANT_ID: TENANT, CLIENT_ID: CLIENT, KEY_VAULT_URL: SECRET.vaultUri, CLIENT_SECRET_NAME: SECRET.secretName },
-  });
-  const all = nb.cells.map(cellText).join('\n');
-  assert.match(all, new RegExp(`^SUBSCRIPTION_ID = '${TENANT}'`, 'm'));
-  assert.match(all, new RegExp(`^CLIENT_ID = '${CLIENT}'`, 'm'));
-  assert.match(all, /^KEY_VAULT_URL = 'https:\/\/vl-kv-test\.vault\.azure\.net\/'/m);
-  assert.match(all, /^CLIENT_SECRET_NAME = 'valuelens-client-secret'/m);
-  assert.match(all, /notebookutils\.credentials\.getSecret\(KEY_VAULT_URL, CLIENT_SECRET_NAME\)/);
+  assert.throws(() => prepareNotebook(load(info.file, info.dir), { patches: [{ find: 'OUTPUT_TABLE', replace: '' }] }), /OUTPUT_TABLE/);
 });

@@ -55,7 +55,6 @@ const BINDINGS = {
  * agent's detail, and on a large tenant its weekly refresh outgrew the template's 2 hours. `registry`
  * sets that load's TIME_BUDGET_MIN, after which it leaves scheduled refreshes to the next run and writes
  * what it has, and its retry count (the CSV fallback covers a failure, so it keeps its own).
- * `transcripts` is the Copilot Studio transcript load's timeout.
  * @type {Record<TenantScale, ScaleProfile>}
  */
 export const SCALE_PROFILES = {
@@ -66,7 +65,6 @@ export const SCALE_PROFILES = {
       Run_Defender_Ingester: '0.01:00:00',
     },
     registry: { budget: 120, retry: 1 },
-    transcripts: '0.03:00:00',
     refresh: { timeout: '0.03:00:00', minutes: 170 },
   },
   large: {
@@ -81,7 +79,6 @@ export const SCALE_PROFILES = {
       Run_Defender_Ingester: '0.02:00:00',
     },
     registry: { budget: 270, retry: 2 },
-    transcripts: '0.06:00:00',
     refresh: { timeout: '0.05:00:00', minutes: 290 },
   },
 };
@@ -91,7 +88,6 @@ export const SCALE_PROFILES = {
  * @property {Record<string, number>} audit  The audit load's window size, retries and time budget.
  * @property {Record<string, string>} timeouts  Activity timeouts that replace the template's.
  * @property {{ budget: number, retry: number }} [registry]  The Agent 365 registry load's TIME_BUDGET_MIN and retry count.
- * @property {string} transcripts  The Copilot Studio transcript load's timeout.
  * @property {{ timeout: string, minutes: number }} refresh
  */
 
@@ -102,7 +98,7 @@ export const SCALE_PROFILES = {
  * notebook's own budget, which fits the template's 2 hours.
  * @type {ScaleProfile}
  */
-export const UNSIZED_PROFILE = { audit: { TIME_BUDGET_MIN: 90 }, timeouts: {}, transcripts: '0.02:00:00', refresh: SCALE_PROFILES.standard.refresh };
+export const UNSIZED_PROFILE = { audit: { TIME_BUDGET_MIN: 90 }, timeouts: {}, refresh: SCALE_PROFILES.standard.refresh };
 
 /** @param {TenantScale | undefined} scale */
 export const scaleProfile = (scale) => (scale === 'large' || scale === 'standard' ? SCALE_PROFILES[scale] : UNSIZED_PROFILE);
@@ -115,54 +111,16 @@ export const scaleProfile = (scale) => (scale === 'large' || scale === 'standard
  * @property {import('../catalog.js').ModuleChoice} modules
  * @property {number} [backfillDays]  Default for BackfillDays.
  * @property {string} [semanticModelId]  Adds a last step that refreshes this model.
- * @property {boolean} [azureAi]  Runs the Azure AI notebook (credit consumption).
- * @property {string} [consumptionModelId]  Adds a step that refreshes the consumption model.
- * @property {boolean} [agentTranscripts]  Runs the Agent Evaluator transcript parser.
- * @property {string} [agentEvaluatorModelId]  Adds a step that refreshes the Agent Evaluator model.
  * @property {boolean} [uploadRouter]  Runs the upload router first in lane 2, so uploaded CSVs reach their loads.
  * @property {boolean} [workday]  Enriches org data from the uploaded Workday export after the Entra ID load.
  * @property {boolean} [agent365Csv]  Agent 365 comes from its admin center export: the lander replaces the registry load.
- * @property {string} [coworkDataflowId]  Refreshes this Dataflow, which pulls Cowork credits from Viva Insights, before the Viva load.
  * @property {boolean} [resourceGraph]  Reads agent configuration and Foundry from Azure Resource Graph, after Agent 365.
- * @property {boolean} [access]  Org-scoped access is on: loads the access tables after org data, before the models refresh.
+ * @property {boolean} [access]  Org-scoped access is on: loads the access tables after org data, before the model refreshes.
  */
 
 export const REFRESH_ACTIVITY = 'Refresh_Semantic_Model';
 /** Loads access_scope and rebuilds access_people. Only with org-scoped access on. */
 export const ACCESS_ACTIVITY = 'Run_Access_Scope';
-export const CONSUMPTION_REFRESH_ACTIVITY = 'Refresh_Consumption_Model';
-export const AGENT_EVALUATOR_ACTIVITY = 'Run_Agent_Evaluator_Transcripts';
-export const AGENT_EVALUATOR_REFRESH_ACTIVITY = 'Refresh_Agent_Evaluator_Model';
-
-/** Days of transcripts each scheduled run re-reads. Merge keeps the overlap from duplicating. */
-export const TRANSCRIPT_LOOKBACK_DAYS = 14;
-/**
- * Days of transcripts a backfill, such as the first run, reads at least. Dataverse keeps transcripts
- * for 30 days unless an admin changed the clean-up job, so this reads all an environment still has.
- */
-export const TRANSCRIPT_BACKFILL_DAYS = 180;
-
-/** The credit consumption notebooks, as pipeline activities. */
-export const CONSUMPTION_ACTIVITIES = /** @type {const} */ ([
-  {
-    key: 'azureAi',
-    name: 'Run_Consumption_Azure_AI',
-    description: 'Azure AI spend from Cost Management and token use from Azure Monitor for one subscription, plus Copilot pay-as-you-go from each billing policy\'s subscription. Writes azure_ai_spend, azure_ai_tokens and copilot_payg_spend, then best-effort azure_deployment_health, azure_solution_spend and azure_billing_reconciliation.',
-    timeout: '0.01:00:00',
-  },
-  {
-    key: 'studioConsumption',
-    name: 'Run_Consumption_Studio',
-    description: 'Loads the Copilot Studio exports from Files/landing/studio. Writes studio_tenant_daily, studio_agent and studio_user. Does nothing when the folder is empty.',
-    timeout: '0.00:30:00',
-  },
-  {
-    key: 'vivaConsumption',
-    name: 'Run_Consumption_Viva',
-    description: 'Loads Viva Insights Copilot credit CSVs from Files/landing/viva. Writes viva_credits_weekly and viva_spending_policy. Does nothing when the folder is empty.',
-    timeout: '0.00:30:00',
-  },
-]);
 
 /** The template's Agent 365 load. Without an Agent 365 licence it fails every time, and the fallback stands in. */
 export const AGENT365_REGISTRY = 'Run_Agent365_Registry_Ingester';
@@ -173,15 +131,6 @@ export const AGENT365_FALLBACK = 'Run_Agent365_CSV_Fallback';
 export const AGENT365_LANDER = 'Run_Agent365_Lander';
 export const UPLOAD_ROUTER_ACTIVITY = 'Run_Upload_Router';
 export const WORKDAY_ACTIVITY = 'Run_Org_Data_Workday';
-export const COWORK_DATAFLOW_ACTIVITY = 'Refresh_Cowork_Credits';
-/** Runs the Cowork Dataflow refresh unless the run sets SkipCowork. */
-export const COWORK_WRAPPER_ACTIVITY = 'Conditionally_Refresh_Cowork_Credits';
-/**
- * Leaves the Cowork Dataflow out of one run. Defaults to false, so scheduled runs always refresh it
- * and fail loudly until someone signs in; only the installer's first load sets it, when the
- * Dataflow's connections aren't signed in yet.
- */
-export const SKIP_COWORK_PARAMETER = 'SkipCowork';
 /** Agent configuration and Foundry from Azure Resource Graph. It never fails for want of access: the notebook records that in arg_status. */
 export const RESOURCE_GRAPH_ACTIVITY = 'Run_Resource_Graph_Ingester';
 
@@ -189,7 +138,7 @@ export const RESOURCE_GRAPH_ACTIVITY = 'Run_Resource_Graph_Ingester';
 export const PIPELINE_VERSION = 7;
 /** What this version changed, for people whose pipeline an older version built. */
 export const PIPELINE_CHANGE =
-  'This version gives the Agent 365 registry, Defender and Copilot Studio transcript loads more time, sized by tenant size, and gives the registry load a time budget so a long weekly refresh finishes on the next run instead of timing out. Your data and settings are kept.';
+  'This version gives the Agent 365 registry and Defender loads more time, sized by tenant size, and gives the registry load a time budget so a long weekly refresh finishes on the next run instead of timing out. Your data and settings are kept.';
 
 /** Notebooks with the same tag share one high-concurrency Spark session (letters, digits and underscores only). */
 export const SESSION_TAG = 'analytics_hub';
@@ -214,21 +163,15 @@ export const LANE_ORDER = [
   'Conditionally_Run_Product_Feedback',
   'Conditionally_Run_Defender',
   ...ARCHIVED_ACTIVITIES,
-  ...CONSUMPTION_ACTIVITIES.slice(0, 2).map((a) => a.name),
-  COWORK_WRAPPER_ACTIVITY,
-  ...CONSUMPTION_ACTIVITIES.slice(2).map((a) => a.name),
-  CONSUMPTION_REFRESH_ACTIVITY,
-  AGENT_EVALUATOR_ACTIVITY,
-  AGENT_EVALUATOR_REFRESH_ACTIVITY,
 ];
 
 /** Lane 2 steps that keep their own conditions. Each already waits for the step before it. */
-const OWN_CONDITIONS = new Set([AGENT365_FALLBACK, CONSUMPTION_REFRESH_ACTIVITY, AGENT_EVALUATOR_REFRESH_ACTIVITY]);
+const OWN_CONDITIONS = new Set([AGENT365_FALLBACK]);
 
 /**
  * Chains the lane 2 steps that are present. Each waits for the one before it to finish, whether it
- * succeeded or failed. The fallback and the two model refreshes keep their own conditions, and the
- * next step also runs when one of them is skipped.
+ * succeeded or failed. The fallback keeps its own conditions, and the next step also runs when it
+ * is skipped.
  * @param {any[]} activities  Top-level activities.
  */
 export function chainLanes(activities) {
@@ -362,137 +305,6 @@ function refreshActivity(activities, settings) {
     dependsOn,
     writeMode: { value: '@pipeline().parameters.ProcessorWriteMode', type: 'Expression' },
   });
-}
-
-/**
- * One activity per consumption notebook. `chainLanes` puts them in lane 2.
- * @param {PipelineSettings} settings
- */
-function consumptionActivities(settings) {
-  return CONSUMPTION_ACTIVITIES.filter((a) => a.key !== 'azureAi' || settings.azureAi).map((/** @type {{ key: 'azureAi' | 'studioConsumption' | 'vivaConsumption', name: string, description: string, timeout: string }} */ a) => {
-    const notebookId = settings.notebookIds[a.key];
-    if (!notebookId) throw new Error(`The ${a.name.replace(/^Run_/, '').replace(/_/g, ' ')} notebook has not been deployed.`);
-    return {
-      name: a.name,
-      description: a.description,
-      type: 'TridentNotebook',
-      dependsOn: [],
-      policy: { timeout: a.timeout, ...retryPolicy(a.timeout), secureOutput: false, secureInput: false },
-      typeProperties: { notebookId, workspaceId: settings.workspaceId, parameters: {} },
-    };
-  });
-}
-
-/**
- * Refreshes the Cowork credits Dataflow just before the Viva load reads its table. It doesn't
- * retry: a refresh that fails, such as when the Viva Insights sign-in has lapsed, leaves the last
- * table in place, and the Viva load still runs because lane 2 waits on Completed. It sits inside an
- * If Condition on SkipCowork, so the installer's first load can leave it out while its connections
- * aren't signed in; scheduled runs keep the default, false, and always refresh it.
- * @param {PipelineSettings} settings
- */
-function coworkDataflowActivity(settings) {
-  const refresh = {
-    name: COWORK_DATAFLOW_ACTIVITY,
-    description: 'Refreshes the Dataflow that reads Cowork credits from the Viva Insights query into viva_credits_dataflow.',
-    type: 'RefreshDataflow',
-    dependsOn: [],
-    policy: { timeout: '0.02:00:00', retry: 0, retryIntervalInSeconds: 30, secureOutput: false, secureInput: false },
-    typeProperties: {
-      workspaceId: settings.workspaceId,
-      dataflowId: settings.coworkDataflowId,
-      notifyOption: 'NoNotification',
-      dataflowType: 'DataflowFabric',
-    },
-  };
-  return {
-    name: COWORK_WRAPPER_ACTIVITY,
-    description: `Refreshes the Cowork credits Dataflow unless ${SKIP_COWORK_PARAMETER} is true. Scheduled runs keep the default, false.`,
-    type: 'IfCondition',
-    dependsOn: [],
-    typeProperties: {
-      expression: { value: `@not(pipeline().parameters.${SKIP_COWORK_PARAMETER})`, type: 'Expression' },
-      ifTrueActivities: [refresh],
-      ifFalseActivities: [],
-    },
-  };
-}
-
-/**
- * Refreshes the consumption model only when every consumption load succeeded, so a
- * failed collection never shows up as an empty page.
- * @param {any[]} activities
- * @param {PipelineSettings} settings
- */
-function consumptionRefreshActivity(activities, settings) {
-  const dependsOn = activities
-    .filter((a) => CONSUMPTION_ACTIVITIES.some((c) => c.name === a.name))
-    .map((a) => ({ activity: a.name, dependencyConditions: ['Succeeded'] }));
-  dependsOn.push(...orgDataDependencies(activities));
-  return refreshStep(settings, {
-    name: CONSUMPTION_REFRESH_ACTIVITY,
-    description: 'Refreshes the consumption model once every consumption load has succeeded.',
-    modelId: /** @type {string} */ (settings.consumptionModelId),
-    dependsOn,
-    writeMode: 'merge',
-  });
-}
-
-/**
- * Reads Copilot Studio transcripts from Dataverse. A backfill reads as far back as the audit load, and
- * at least {@link TRANSCRIPT_BACKFILL_DAYS}, as the transcripts don't add to the audit load's time.
- * @param {PipelineSettings} settings
- */
-function agentTranscriptsActivity(settings) {
-  const notebookId = settings.notebookIds.agentTranscripts;
-  if (!notebookId) throw new Error('The Copilot Studio transcript notebook has not been deployed.');
-  const timeout = scaleProfile(settings.scale).transcripts;
-  return {
-    name: AGENT_EVALUATOR_ACTIVITY,
-    description: 'Reads Copilot Studio conversation transcripts from each chosen Dataverse environment and merges them into agent_sessions, agent_turns and the other agent tables.',
-    type: 'TridentNotebook',
-    dependsOn: [],
-    policy: { timeout, ...retryPolicy(timeout), secureOutput: false, secureInput: false },
-    typeProperties: {
-      notebookId,
-      workspaceId: settings.workspaceId,
-      parameters: {
-        LOOKBACK_DAYS: {
-          value: {
-            value: `@if(equals(pipeline().parameters.AuditMode, 'backfill'), max(pipeline().parameters.BackfillDays, ${TRANSCRIPT_BACKFILL_DAYS}), ${TRANSCRIPT_LOOKBACK_DAYS})`,
-            type: 'Expression',
-          },
-          type: 'int',
-        },
-      },
-    },
-  };
-}
-
-/**
- * Refreshes the Agent Evaluator model once the transcripts have loaded and the org data has had its turn.
- * @param {any[]} activities
- * @param {PipelineSettings} settings
- */
-function agentEvaluatorRefreshActivity(activities, settings) {
-  const dependsOn = [{ activity: AGENT_EVALUATOR_ACTIVITY, dependencyConditions: ['Succeeded'] }, ...orgDataDependencies(activities)];
-  return refreshStep(settings, {
-    name: AGENT_EVALUATOR_REFRESH_ACTIVITY,
-    description: 'Refreshes the Agent Evaluator model once the transcripts have loaded.',
-    modelId: /** @type {string} */ (settings.agentEvaluatorModelId),
-    dependsOn,
-    writeMode: 'merge',
-  });
-}
-
-/**
- * A model refresh waits for the org data loads that are present, whether they succeeded or not.
- * @param {any[]} activities
- */
-function orgDataDependencies(activities) {
-  return ['Conditionally_Run_Org_Data', WORKDAY_ACTIVITY]
-    .filter((name) => activities.some((a) => a.name === name))
-    .map((name) => ({ activity: name, dependencyConditions: ['Completed'] }));
 }
 
 /**
@@ -631,19 +443,6 @@ export function buildPipeline(template, settings) {
     );
   }
   if (settings.semanticModelId) filled.properties.activities.push(refreshActivity(filled.properties.activities, settings));
-  if (settings.modules.consumption) {
-    filled.properties.activities.push(...consumptionActivities(settings));
-    if (settings.coworkDataflowId) {
-      filled.properties.activities.push(coworkDataflowActivity(settings));
-      filled.properties.parameters[SKIP_COWORK_PARAMETER] = { type: 'Boolean', defaultValue: false };
-    }
-    if (settings.consumptionModelId) filled.properties.activities.push(consumptionRefreshActivity(filled.properties.activities, settings));
-  }
-  const transcripts = !!(settings.modules.agentEvaluator && settings.agentTranscripts);
-  if (transcripts) {
-    filled.properties.activities.push(agentTranscriptsActivity(settings));
-    if (settings.agentEvaluatorModelId) filled.properties.activities.push(agentEvaluatorRefreshActivity(filled.properties.activities, settings));
-  }
   chainLanes(filled.properties.activities);
   const status = !!settings.notebookIds.loadStatus;
   if (status) filled.properties.activities.push(statusActivity(filled.properties.activities, settings));
@@ -655,13 +454,10 @@ export function buildPipeline(template, settings) {
     `Lane 1 loads the audit log, then runs the Audit Log Processor${settings.semanticModelId ? ', then refreshes the semantic model' : ''}. ` +
     'Lane 2 runs the other loads one after another; a load that fails doesn\'t stop the next. ' +
     `${settings.uploadRouter ? 'Lane 2 starts by routing any CSV exports dropped in Files/analytics_hub_uploads to the loads that read them. ' : ''}` +
-    `${settings.modules.consumption ? `The credit consumption loads run in lane 2${settings.consumptionModelId ? ' and refresh the consumption model when they all succeed' : ''}. ` : ''}` +
-    `${transcripts ? `The Agent Evaluator reads Copilot Studio transcripts at the end of lane 2${settings.agentEvaluatorModelId ? ', then refreshes its model' : ''}. ` : ''}` +
     `${status ? `${STATUS_ACTIVITY} runs last: it writes each load's outcome to dbo.load_log and fails the run if any load failed. ` : ''}` +
     `Each load retries up to 3 times, ${RETRY_INTERVAL_SECONDS / 60} minutes apart. ` +
     'Scheduled runs use the parameter defaults (incremental audit load, merge into the curated table). ' +
     'The first run overrides them with AuditMode=backfill and ProcessorWriteMode=overwrite. ' +
-    `${settings.modules.consumption && settings.coworkDataflowId ? `The installer's first load sets ${SKIP_COWORK_PARAMETER}=true only when the Cowork Dataflow isn't signed in yet; scheduled runs keep it false and refresh the Dataflow. ` : ''}` +
     'Re-run the installer with "update" to pick up new notebook and pipeline versions.';
   return filled;
 }

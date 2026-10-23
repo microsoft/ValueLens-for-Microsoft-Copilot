@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { runCommand } from '../src/install.js';
 import { ENDPOINT_POLL_MS, fabricUninstall } from '../src/steps/fabric-uninstall.js';
 import { describeRecord } from '../src/web-session.js';
-import { fakeCtx, fakeTranscriptEnvironment, fakeUi, httpError } from './fakes.js';
+import { fakeCtx, fakeUi, httpError } from './fakes.js';
 
 /**
  * A workspace with managed private endpoints that take a poll or two to go after they're deleted.
@@ -135,63 +135,6 @@ test('uninstall on Fabric: the model\'s SQL connection goes after the workspace;
   delete nc.config.semanticModel.connectionId;
   await fabricUninstall(nc.ctx);
   assert.ok(!none.calls.some((c) => c.startsWith('deleteConnection')));
-});
-
-test('uninstall on Fabric: the transcript read role the installer created is taken back and deleted; the app\'s user and Bot Transcript Viewer stay', async () => {
-  const ENV = 'https://contoso.crm.dynamics.com';
-  const role = 'Analytics Hub transcript reader ws-1';
-  /** @param {import('../src/config.js').InstallConfig} config */
-  const installed = (config) => {
-    config.fabric.createdWorkspace = true;
-    config.app.displayName = 'ValueLens Data Collector';
-    config.modules.agentEvaluator = true;
-    config.agentEvaluator.environments = [{ url: ENV, name: 'Contoso', access: true, readAll: true }];
-    config.fabric.transcriptAccess = [{ url: ENV, appId: 'app-1', name: 'Contoso', userId: 'user-1', readRoleId: 'read-1', readRoleName: role, createdReadRole: true, assignedReadRoleId: 'read-1' }];
-  };
-  const environment = () =>
-    fakeTranscriptEnvironment({
-      users: [{ systemuserid: 'user-1', applicationid: 'app-1', _businessunitid_value: 'bu-root' }],
-      userRoles: { 'user-1': ['role-btv', 'read-1'] },
-      roles: [
-        { roleid: 'read-1', name: role, bu: 'bu-root', privileges: new Map([['priv-transcript', 'Global']]) },
-        { roleid: 'admin-role', name: 'Transcripts, made by an admin', bu: 'bu-root', privileges: new Map([['priv-transcript', 'Global']]) },
-      ],
-    });
-
-  const dv = environment();
-  const ui = fakeUi();
-  const { ctx, config } = fakeCtx({ fabric: fakeWorkspace().api, ui: ui.ui, dataverse: () => dv.api });
-  installed(config);
-  assert.equal(await fabricUninstall(ctx), true);
-  assert.deepEqual(dv.calls, ['removeRole user-1 read-1', 'deleteRole read-1']);
-  assert.deepEqual(dv.userRoles['user-1'], ['role-btv']);
-  assert.deepEqual(dv.roles.map((r) => r.roleid), ['admin-role'], 'a role the installer didn\'t create is left');
-  assert.equal(config.fabric.transcriptAccess, undefined);
-  assert.match(ui.text(), /Deleted the "Analytics Hub transcript reader ws-1" role in Contoso/);
-  assert.match(ui.text(), /Left alone: the app registration ValueLens Data Collector, .*the app's application users in Dataverse environments with their Bot Transcript Viewer role/);
-
-  // Dataverse won't take the role back: the uninstall carries on, and says what an admin does.
-  const denied = environment();
-  denied.failures.removeRole = [httpError(403, 'Forbidden')];
-  const d = fakeUi();
-  const dc = fakeCtx({ fabric: fakeWorkspace().api, ui: d.ui, dataverse: () => denied.api });
-  installed(dc.config);
-  assert.equal(await fabricUninstall(dc.ctx), true);
-  assert.deepEqual(denied.calls, ['removeRole user-1 read-1']);
-  assert.deepEqual(denied.roles.map((r) => r.roleid), ['read-1', 'admin-role']);
-  assert.ok(
-    d.text().includes(
-      'Couldn\'t take the "Analytics Hub transcript reader ws-1" role away from the app registration ValueLens Data Collector (client ID app-1) in Contoso (Forbidden), so it can still read every transcript there.',
-    ),
-  );
-  assert.ok(
-    d.text().includes(
-      'A System Administrator can: Power Platform admin center > Manage > Environments > Contoso > Settings > Users + permissions > Application users > ValueLens Data Collector (app-1) > ' +
-        'Edit security roles, clear "Analytics Hub transcript reader ws-1", and Save. Then delete the role: Power Platform admin center > Manage > Environments > Contoso > Settings > ' +
-        'Users + permissions > Security roles > "Analytics Hub transcript reader ws-1" > Delete.',
-    ),
-  );
-  assert.equal(dc.config.fabric.transcriptAccess, undefined, 'said once, then dropped with the workspace');
 });
 
 test('web: uninstall is offered for a Fabric install too', () => {

@@ -23,7 +23,6 @@ import {
   UPLOAD_FOLDERS,
   uploadName,
 } from '../uploads.js';
-import { AZURE_LANDING_DIRS, azureDropLabel } from './flows.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 /** @typedef {import('../staging.js').PendingUpload} PendingUpload */
@@ -160,20 +159,6 @@ export function dataSourcesSummary(ctx) {
 }
 
 /**
- * The installer uploads exports to the Lakehouse only. On Azure, people put them in the folders the
- * run job reads, and its next run loads them.
- * @param {import('../config.js').InstallConfig} config
- * @param {string} what  The command or flag, e.g. "--csv".
- * @param {boolean} [chosen]  A new install has just chosen Azure: nothing is deployed, and Fabric is still open.
- */
-export function azureUploadError(config, what, chosen = false) {
-  const studio = azureDropLabel(config.azure, AZURE_LANDING_DIRS.studio);
-  const viva = azureDropLabel(config.azure, AZURE_LANDING_DIRS.viva);
-  if (!chosen) return new Error(`${what} is for the Fabric target only for now. On Azure, put Copilot Studio credit exports in ${studio} and Cowork credit exports in ${viva}; the next run loads them.`);
-  return new Error(`${what} is for the Fabric target only for now. To upload these exports with the installer, run it again and choose Microsoft Fabric. To install on Azure, run it again without ${what}, then put Copilot Studio credit exports in ${studio} and Cowork credit exports in ${viva}, or with private networking in the ${AZURE_LANDING_DIRS.studio} and ${AZURE_LANDING_DIRS.viva} folders of the SharePoint drop folder; the next run loads them.`);
-}
-
-/**
  * Uploads exports to an existing install, then runs the pipeline if asked.
  * @param {Ctx} ctx
  * @param {{ files: string[], run?: boolean, wait?: boolean }} opts
@@ -182,7 +167,6 @@ export function azureUploadError(config, what, chosen = false) {
  */
 export async function uploadCommand(ctx, opts, runNow) {
   const { ui, config } = ctx;
-  if (config.target === 'azure') throw azureUploadError(config, 'The upload command');
   const f = config.fabric;
   if (!f.workspaceId || !f.lakehouseId) throw new Error('Nothing is installed yet. Run the installer first.');
   const modes = config.dataSources;

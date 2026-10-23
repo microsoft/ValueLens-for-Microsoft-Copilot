@@ -2,46 +2,33 @@
 /**
  * `rerun-failed`: runs again only the loads that failed in the latest pipeline run, and the steps
  * that were skipped because of them, one at a time in the pipeline's order. Fabric can't rerun a
- * pipeline from its failed step, so each notebook or Dataflow is started on its own. `load-cowork`
- * uses the same machinery to refresh the Cowork Dataflow and run what reads it.
+ * pipeline from its failed step, so each notebook is started on its own.
  */
 import { commandLine } from '../launch.js';
-import { conditionMet, failedCards, loadLabel, VIVA_ACTIVITY } from '../loads.js';
+import { conditionMet, failedCards, loadLabel } from '../loads.js';
 import {
   AGENT365_FALLBACK,
   AGENT365_REGISTRY,
-  AGENT_EVALUATOR_REFRESH_ACTIVITY,
-  CONSUMPTION_REFRESH_ACTIVITY,
-  COWORK_DATAFLOW_ACTIVITY,
   firstRunParameters,
   REFRESH_ACTIVITY,
-  SKIP_COWORK_PARAMETER,
   STATUS_ACTIVITY,
   buildPipeline,
 } from '../transform/pipeline.js';
-import { coworkConnections, coworkSignInSteps, VIVA_LOAD_FILE } from './consumption.js';
-import { coworkDataflowOn, pipelineSettings } from './fabric.js';
-import { AZURE_LANDING_DIRS, azureDropLabel } from './flows.js';
+import { pipelineSettings } from './fabric.js';
 import { activityRuns, BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, jobIdFrom, loadedBy, reportLoads, TERMINAL, utc, waitForJob } from './run.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 
 /** Steps that only reread what others loaded, so they run again when one of those reruns. */
-const REFRESHES = new Set([REFRESH_ACTIVITY, CONSUMPTION_REFRESH_ACTIVITY, AGENT_EVALUATOR_REFRESH_ACTIVITY]);
-/**
- * Loads that read what another step wrote, where the pipeline only orders them (lane 2 waits on
- * Completed, so ordering alone says nothing about input). Each reruns, even after succeeding, when a
- * step it reads freshly reran: the Viva load reads the table the Cowork Dataflow refreshes.
- * @type {Record<string, string[]>}
- */
-export const DOWNSTREAM_READERS = { [VIVA_ACTIVITY]: [COWORK_DATAFLOW_ACTIVITY] };
+const REFRESHES = new Set([REFRESH_ACTIVITY]);
 
 /**
- * The steps whose output an activity reads.
+ * The steps whose output an activity reads: a model refresh reads every step it waits for. Other
+ * loads only wait on order (lane 2 waits on Completed), which says nothing about their input.
  * @param {any} a
  * @returns {string[]}
  */
-const readsFrom = (a) => (REFRESHES.has(a.name) ? (a.dependsOn ?? []).map((/** @type {any} */ d) => d.activity) : DOWNSTREAM_READERS[a.name] ?? []);
+const readsFrom = (a) => (REFRESHES.has(a.name) ? (a.dependsOn ?? []).map((/** @type {any} */ d) => d.activity) : []);
 /** Times a step turned away by a busy capacity is tried again, and how long to wait first. */
 export { BUSY_RETRIES, BUSY_WAIT_MS };
 const STUCK_MS = 24 * 3_600_000;
@@ -179,9 +166,7 @@ const branch = (a, /** @type {boolean} */ which) => (which ? a.typeProperties?.i
 /**
  * Works out what to run again and runs it, step by step. A step reruns when it didn't succeed and
  * what it waits for now holds. A step that succeeded reruns when something it reads freshly reran:
- * a model refresh reads every step it waits for, and the loads in {@link DOWNSTREAM_READERS} read
- * the steps listed there. So a rerun Dataflow reruns the Viva load, and that the consumption model
- * refresh. A step whose dependencies still fail is marked skipped.
+ * a model refresh reads every step it waits for. A step whose dependencies still fail is marked skipped.
  * @param {any[]} activities  Top-level activities of the pipeline.
  * @param {Map<string, any>} runs  The last attempt of each activity in the run being repaired.
  * @param {Record<string, any>} params  The run's pipeline parameters.
@@ -306,31 +291,23 @@ export async function rerunFailed(ctx) {
 }
 
 /**
- * Runs one notebook or Dataflow as its own job and waits for it, trying again while Fabric's
+ * Runs one notebook as its own job and waits for it, trying again while Fabric's
  * capacity is too busy to start it.
  * @param {Ctx} ctx
- * @param {{ beforeDataflow?: (label: string) => Promise<StepResult | undefined>, retryUnpublished?: boolean }} [opts]
- *   beforeDataflow: runs first, and a result from it stands instead of the refresh. retryUnpublished:
- *   a Dataflow refresh that fails the way an unpublished one does is tried once more a minute later.
  * @returns {Execute}
  */
-export function makeExecutor(ctx, opts = {}) {
+export function makeExecutor(ctx) {
   const { ui, api } = ctx;
   const ws = /** @type {string} */ (ctx.config.fabric.workspaceId);
   return async (a, parameters) => {
     const label = loadLabel(a.name);
-    /** @type {[string, 'RunNotebook' | 'Refresh', any]} */
+    /** @type {[string, 'RunNotebook', any]} */
     let job;
     if (a.type === 'TridentNotebook') job = [a.typeProperties.notebookId, 'RunNotebook', parameters ? { parameters } : undefined];
-    else if (a.type === 'RefreshDataflow') {
-      const early = await opts.beforeDataflow?.(label);
-      if (early) return early;
-      job = [a.typeProperties.dataflowId, 'Refresh', undefined];
-    } else {
+    else {
       ui.warn(`${label}: the installer can't rerun a ${a.type} step. Run the pipeline again instead.`);
       return { status: 'Failed', error: { message: `Can't rerun a ${a.type} step on its own.` } };
     }
-    let unpublishedRetried = false;
     for (let attempt = 0; ; attempt++) {
       const url = await api.fabric.runJob(ws, job[0], job[1], job[2]);
       const done = await waitForJob(ctx, url, label);
@@ -344,121 +321,8 @@ export function makeExecutor(ctx, opts = {}) {
         await ctx.sleep(BUSY_WAIT_MS);
         continue;
       }
-      if (opts.retryUnpublished && a.type === 'RefreshDataflow' && !unpublishedRetried && UNPUBLISHED.test(String(error.message ?? ''))) {
-        unpublishedRetried = true;
-        ui.warn(`${label}: the refresh failed straight after the save. The Dataflow may not have finished publishing, so trying again in ${PUBLISH_RETRY_MS / 60_000} minute.`);
-        await ctx.sleep(PUBLISH_RETRY_MS);
-        continue;
-      }
       ui.fail(`${label}: failed`);
       return { status: 'Failed', error };
     }
   };
-}
-
-/** Fabric's whole error for a Dataflow refresh without signed-in connections, or one still publishing. */
-const UNPUBLISHED = /without detail error/i;
-/** How often, and how many times, Load Cowork now checks the Dataflow has published its connections. */
-export const PUBLISH_POLL_MS = 30_000;
-export const PUBLISH_POLLS = 10;
-/** How long Load Cowork now waits before trying a refresh that failed straight after the save again. */
-export const PUBLISH_RETRY_MS = 60_000;
-
-/**
- * The `load-cowork` command, and the web page's Load Cowork now: once someone has signed in to the
- * Cowork Dataflow, it waits until the Dataflow has published, refreshes it, then runs the Viva load
- * and the consumption model refresh, as the pipeline would. It uses the rerun's machinery, starting
- * from a run where only the Dataflow failed, so the Viva load and the refresh rerun because they read it.
- * @param {Ctx} ctx
- * @returns {Promise<{ reran: string[], failed: string[] }>}
- */
-export async function loadCoworkNow(ctx) {
-  const { ui, config, api } = ctx;
-  if (config.target === 'azure') {
-    throw new Error(`load-cowork is for the Fabric target's Cowork Dataflow. On Azure, Cowork credits come from the Consumption Dashboard's CSV export: put it in ${azureDropLabel(config.azure, AZURE_LANDING_DIRS.viva)}, and the next run loads it.`);
-  }
-  const f = config.fabric;
-  if (!f.workspaceId || !f.pipelineId) throw new Error('There is no pipeline yet. Run the installer first.');
-  if (!coworkDataflowOn(config)) {
-    throw new Error('There is no Cowork credits Dataflow. Choose the Viva Insights query for Cowork credits on the Data sources screen, then run the installer.');
-  }
-  if (await pipelineRunning(ctx)) {
-    ui.warn('The pipeline is running, so this didn\'t load Cowork. The run refreshes the Cowork Dataflow itself.');
-    ui.note(`Once it has finished, run "${commandLine('status')}" to see how it went.`);
-    return { reran: [], failed: [] };
-  }
-  /** @type {any} */
-  let definition = await api.fabric.getPipelineDefinition(f.workspaceId, f.pipelineId).catch(() => null);
-  if (!Array.isArray(definition?.properties?.activities)) definition = buildPipeline(ctx.sources.pipeline, pipelineSettings(config));
-  const activities = definition.properties.activities;
-  const holds = (/** @type {any} */ a) => a.name === COWORK_DATAFLOW_ACTIVITY || [...branch(a, true), ...branch(a, false)].some((x) => x.name === COWORK_DATAFLOW_ACTIVITY);
-  if (!activities.some(holds)) {
-    throw new Error(`The pipeline doesn't refresh the Cowork Dataflow yet. Run "${commandLine('update')}" first.`);
-  }
-
-  // A run where everything worked but the Dataflow, so only it and what reads it run.
-  /** @type {Map<string, any>} */
-  const runs = new Map();
-  const mark = (/** @type {any} */ a, /** @type {string} */ status) => runs.set(a.name, { activityName: a.name, activityType: a.type, status, attempts: 1 });
-  for (const a of activities) {
-    mark(a, holds(a) ? 'Failed' : 'Succeeded');
-    for (const inner of [...branch(a, true), ...branch(a, false)]) mark(inner, inner.name === COWORK_DATAFLOW_ACTIVITY ? 'Failed' : 'Succeeded');
-  }
-  const params = { ...runParameters(definition, config, ''), [SKIP_COWORK_PARAMETER]: false };
-
-  ui.heading('Loading Cowork credits now');
-  /** @param {string} label @returns {Promise<StepResult | undefined>} */
-  const waitForPublish = async (label) => {
-    for (let poll = 0; ; poll++) {
-      const state = await coworkConnections(ctx);
-      if (state !== 'unbound') return undefined;
-      if (poll >= PUBLISH_POLLS) break;
-      if (!poll) ui.info(`${label}: waiting for the Dataflow to finish publishing its sign-ins.`);
-      await ctx.sleep(PUBLISH_POLL_MS);
-    }
-    ui.fail(`${label}: its connections still aren't signed in`);
-    coworkSignInSteps(config).slice(0, 4).forEach((step, i) => ui.info(`  ${i + 1}. ${step}`));
-    return { status: 'Failed', error: { message: 'Job instance failed without detail error: the Cowork Dataflow\'s connections aren\'t signed in.' } };
-  };
-  const result = await rerunSteps(activities, runs, params, makeExecutor(ctx, { beforeDataflow: waitForPublish, retryUnpublished: true }));
-
-  ui.heading('Cowork credits');
-  const ran = new Map([...result.runs].filter(([name]) => result.reran.includes(name)));
-  const cards = await reportLoads(ctx, ran, activities.filter((/** @type {any} */ a) => ran.has(a.name)));
-  const failed = cards.filter((c) => c.state !== 'ok');
-  if (!failed.length) {
-    await reportVivaRows(ctx);
-    if (config.firstRun?.coworkSkipped) {
-      config.firstRun = { ...config.firstRun, coworkSkipped: false };
-      ctx.save();
-    }
-  }
-  ui.note('This load isn\'t added to dbo.load_log: that table records the scheduled pipeline runs. They refresh the Cowork Dataflow every day from now on.');
-  return { reran: result.reran, failed: failed.map((c) => c.activity) };
-}
-
-/**
- * Says how many Cowork rows the Viva load read, from the counts its notebook wrote.
- * @param {Ctx} ctx
- */
-async function reportVivaRows(ctx) {
-  const f = ctx.config.fabric;
-  if (!ctx.api.oneLake || !f.workspaceId || !f.lakehouseId) return;
-  /** @type {any} */
-  const summary = await ctx.api.oneLake.readJson(f.workspaceId, f.lakehouseId, VIVA_LOAD_FILE).catch(() => null);
-  const rows = Number(summary?.dataflowRows);
-  if (Number.isFinite(rows) && rows > 0) ctx.ui.ok(`Loaded ${rows.toLocaleString('en-GB')} rows of Cowork credits from the Dataflow`);
-}
-
-/**
- * Whether a pipeline run is going. One that started over a day ago is stuck, not running.
- * @param {Ctx} ctx
- */
-async function pipelineRunning(ctx) {
-  const f = ctx.config.fabric;
-  const jobs = await ctx.api.fabric.listJobs(/** @type {string} */ (f.workspaceId), /** @type {string} */ (f.pipelineId)).catch(() => []);
-  return jobs.some((j) => {
-    const started = utc(j.startTimeUtc);
-    return (j.status === 'InProgress' || j.status === 'NotStarted') && !(started && ctx.now().getTime() - started.getTime() > STUCK_MS);
-  });
 }

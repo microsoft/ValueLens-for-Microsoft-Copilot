@@ -27,20 +27,6 @@ export function flowApi(http) {
      */
     getFlow: (env, id) => http.get(`${path(env, id)}?${VERSION}`),
     /**
-     * The latest runs, newest first.
-     * @param {string} env
-     * @param {string} id
-     * @returns {Promise<FlowRun[]>}
-     */
-    listRuns: async (env, id) => (await http.get(`${path(env, id)}/runs?${VERSION}`))?.value ?? [],
-    /**
-     * Runs a trigger now, as the Run button in Power Automate does. Recurrence triggers included.
-     * @param {string} env
-     * @param {string} id
-     * @param {string} trigger  The trigger's name in the definition.
-     */
-    runTrigger: (env, id, trigger) => http.post(`${path(env, id)}/triggers/${encodeURIComponent(trigger)}/run?${VERSION}`, {}),
-    /**
      * The flow with its definition and connection references, as Power Automate holds them: each
      * signed-in reference has a `connectionName`.
      * @param {string} env

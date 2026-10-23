@@ -12,7 +12,7 @@ import { scheduleBody } from '../clients/fabric.js';
 import { normaliseResourceGraph, secretMode } from '../config.js';
 import { HttpError } from '../http.js';
 import { rlsOn } from '../transform/access.js';
-import { INLINE_SECRET_NOTE, MARKER, prepareNotebook, pyString, serialiseNotebook } from '../transform/notebook.js';
+import { prepareNotebook, serialiseNotebook } from '../transform/notebook.js';
 import { buildPipeline, PIPELINE_CHANGE, PIPELINE_VERSION } from '../transform/pipeline.js';
 import { addDays, notebookSecretDays } from './identity.js';
 import { dropAttempt, findAttempts, refused, removeRetired, SECRET_SETTLE_MS, withSecretRef } from './secrets.js';
@@ -181,13 +181,6 @@ const stillCreating = (name) => `Fabric is still creating ${name}. Run the insta
 export const itemRef = (ref) => `(ref ${ref})`;
 
 /**
- * Which of the install's models `m` is, for keys that stay the same when the model's name changes.
- * @param {import('../config.js').InstallConfig} config
- * @param {import('../config.js').ModelConfig} m
- */
-export const modelKey = (config, m) => (m === config.consumption?.model ? 'consumption' : m === config.agentEvaluator?.model ? 'agentEvaluator' : 'main');
-
-/**
  * Creates a workspace item so that a run stopped part-way through doesn't leave a stray copy. The
  * name and a random ref are saved as pending before the create, and the ref goes in the item's
  * description. If the run stops before the ID is saved, the next run finds the item by both and
@@ -261,7 +254,7 @@ export function clearPending(f, key) {
  */
 export async function recordWorkspaceGone({ config, fabric, tenantId }) {
   const f = config.fabric;
-  if (config.target === 'azure' || !f?.workspaceId) return null;
+  if (!f?.workspaceId) return null;
   const workspace = f.workspaceName ?? f.workspaceId;
   if (config.tenantId && tenantId && config.tenantId.toLowerCase() !== tenantId.toLowerCase()) return { workspace, reason: 'other-tenant' };
   try {
@@ -493,14 +486,11 @@ export async function ensureVaultEndpoint(ctx) {
 /** Stands in for the client secret when there is no value to write, e.g. in a preview. */
 export const SECRET_PLACEHOLDER = '<client secret>';
 
-/** The Azure AI notebook's Key Vault read, as it ships. */
-export const AZURE_AI_SECRET_FIND = 'secret = notebookutils.credentials.getSecret(KEY_VAULT_URL, CLIENT_SECRET_NAME)';
-
 /**
  * Notebooks that hold or read the app's client secret.
  * @param {import('../catalog.js').NotebookInfo} nb
  */
-export const usesSecret = (nb) => nb.credentials || nb.key === 'azureAi';
+export const usesSecret = (nb) => !!nb.credentials;
 
 /**
  * What the installer changes in one notebook.
@@ -516,17 +506,6 @@ export function notebookSettings(ctx, nb) {
   /** @type {Record<string, string> | undefined} */
   let values = nb.values;
   if (nb.key === 'refreshModel') values = { WORKSPACE_ID: /** @type {string} */ (f.workspaceId), SEMANTIC_MODEL_ID: /** @type {string} */ (config.semanticModel.id) };
-  if (nb.key === 'azureAi') {
-    values = {
-      SUBSCRIPTION_ID: /** @type {string} */ (config.consumption.azureSubscriptionId),
-      TENANT_ID: user.tenantId,
-      CLIENT_ID: /** @type {string} */ (config.app.appId),
-      KEY_VAULT_URL: inline ? '' : /** @type {string} */ (config.keyVault.uri),
-      CLIENT_SECRET_NAME: inline ? '' : config.keyVault.secretName,
-    };
-  }
-  // Merge upserts each run's window, so environments and days accumulate without duplicates.
-  if (nb.key === 'agentTranscripts') values = { SOURCE_MODE: 'dataverse', WRITE_MODE: 'merge', RAW_TABLE: '' };
   if (nb.key === 'uploadRouter') values = routerValues(config);
   if (nb.key === 'loadStatus') values = { STATUS_JSON: statusConfigJson() };
   // The pipeline loads the tables only; the installer passes roles when it applies membership.
@@ -538,12 +517,6 @@ export function notebookSettings(ctx, nb) {
     values = { MANAGEMENT_GROUP: rg.managementGroup ?? '' };
     expressions = { INCLUDE_AGENTS: rg.agents ? 'True' : 'False', INCLUDE_FOUNDRY: rg.foundry ? 'True' : 'False' };
   }
-  /** @type {import('../catalog.js').NotebookPatch[]} */
-  const extra = [
-    ...(nb.key === 'agentTranscripts' ? [environmentsPatch(config.agentEvaluator.environments)] : []),
-    ...(nb.key === 'azureAi' && paygReadable(config).length ? [paygPatch(paygReadable(config))] : []),
-    ...(nb.key === 'azureAi' && inline ? [{ find: AZURE_AI_SECRET_FIND, replace: `secret = ${pyString(value)}  # ${INLINE_SECRET_NOTE}` }] : []),
-  ];
   return {
     ...(nb.credentials
       ? {
@@ -555,7 +528,7 @@ export function notebookSettings(ctx, nb) {
     parameters: nb.parameters,
     ...(values ? { values } : {}),
     ...(expressions ? { expressions } : {}),
-    patches: extra.length ? [...(nb.patches ?? []), ...extra] : nb.patches,
+    patches: nb.patches,
     lakehouse: {
       id: /** @type {string} */ (f.lakehouseId),
       name: /** @type {string} */ (f.lakehouseName),
@@ -564,9 +537,6 @@ export function notebookSettings(ctx, nb) {
     dataCheckSummary: nb.key === 'dataCheck',
   };
 }
-
-/** The transcript parser's environment list, as it ships. */
-export const ENVIRONMENTS_FIND = "DATAVERSE_URLS = [\n    # 'https://org1.crm.dynamics.com',\n    # 'https://org2.crm.dynamics.com',\n]";
 
 /**
  * What the upload router accepts: the sources that aren't skipped, and their header signatures.
@@ -589,48 +559,9 @@ export const routerSignature = (config) => createHash('sha256').update(routerSig
  */
 export const notebookOptions = (config) => ({
   semanticModel: modelDeployed(config),
-  azureAi: azureAiOn(config),
-  dataverse: agentEvaluatorOn(config),
   access: rlsOn(config),
   dataSources: config.dataSources,
 });
-
-/** The Azure AI notebook's extra pay-as-you-go subscriptions, as it ships. */
-export const PAYG_FIND = 'PAYG_SUBSCRIPTION_IDS = []';
-
-/**
- * The other subscriptions whose Copilot pay-as-you-go the app can read.
- * @param {import('../config.js').InstallConfig} config
- */
-export const paygReadable = (config) => (config.consumption?.paygSubscriptions ?? []).filter((p) => p.access);
-
-/**
- * The pay-as-you-go subscriptions in the Azure AI notebook, as stored with the deployed notebook.
- * @param {import('../config.js').InstallConfig} config
- */
-export const paygIds = (config) => paygReadable(config).map((p) => p.subscriptionId).join(',');
-
-/**
- * @param {import('../config.js').PaygSubscription[]} subs
- * @returns {import('../catalog.js').NotebookPatch}
- */
-export function paygPatch(subs) {
-  const lines = subs.map((s) => `    ${pyString(s.subscriptionId)},${s.name ? `  # ${s.name.replace(/[\r\n]+/g, ' ')}` : ''}`);
-  return { find: PAYG_FIND, replace: ['PAYG_SUBSCRIPTION_IDS = [  # ' + MARKER, ...lines, ']'].join('\n') };
-}
-
-/**
- * Lists every chosen environment, including those still waiting for access: the parser skips
- * those, then reads them once an admin adds the app. Their names go in too, for evaluator_status.
- * @param {import('../config.js').AgentEnvironment[]} environments
- * @returns {import('../catalog.js').NotebookPatch}
- */
-export function environmentsPatch(environments) {
-  const lines = environments.map((e) => `    ${pyString(e.url)},${e.name ? `  # ${e.name.replace(/[\r\n]+/g, ' ')}` : ''}`);
-  const names = environments.flatMap((e) => (e.name ? [`${pyString(e.url.replace(/\/+$/, ''))}: ${pyString(e.name.replace(/[\r\n]+/g, ' '))}`] : []));
-  // The names come after the list, so they replace the empty default above it; evaluator_status uses them.
-  return { find: ENVIRONMENTS_FIND, replace: ['DATAVERSE_URLS = [  # ' + MARKER, ...lines, ']', `DATAVERSE_ENV_NAMES = {${names.join(', ')}}`].join('\n') };
-}
 
 /**
  * @param {Ctx} ctx
@@ -659,8 +590,6 @@ export async function ensureNotebooks(ctx, opts = {}) {
       !!opts.force ||
       (switched && usesSecret(nb)) ||
       (rotate && usesSecret(nb)) ||
-      (nb.key === 'agentTranscripts' && environmentUrls(config) !== config.agentEvaluator.deployedUrls) ||
-      (nb.key === 'azureAi' && paygIds(config) !== (config.consumption.deployedPayg ?? '')) ||
       (nb.key === 'uploadRouter' && routerSignature(config) !== f.deployedRouter)
     );
   };
@@ -673,8 +602,6 @@ export async function ensureNotebooks(ctx, opts = {}) {
   try {
     for (const nb of wanted) {
       const content = serialiseNotebook(prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb)));
-      const urls = nb.key === 'agentTranscripts' ? environmentUrls(config) : undefined;
-      const payg = nb.key === 'azureAi' ? paygIds(config) : undefined;
       const routed = nb.key === 'uploadRouter' ? routerSignature(config) : undefined;
       // Notebooks are updated when this checkout's version differs, so running the installer again
       // from a newer release pushes their fixes. Not those holding an inline secret: their content
@@ -706,8 +633,6 @@ export async function ensureNotebooks(ctx, opts = {}) {
         opts.force ||
         (inline && usesSecret(nb)) ||
         (switched && usesSecret(nb)) ||
-        (urls !== undefined && urls !== config.agentEvaluator.deployedUrls) ||
-        (payg !== undefined && payg !== (config.consumption.deployedPayg ?? '')) ||
         (routed !== undefined && routed !== f.deployedRouter) ||
         (hash !== undefined && hash !== f.notebookHashes[nb.key])
       ) {
@@ -718,8 +643,6 @@ export async function ensureNotebooks(ctx, opts = {}) {
         ui.ok(`${label} is in place`);
       }
       f.notebooks[nb.key] = id;
-      if (urls !== undefined) config.agentEvaluator.deployedUrls = urls;
-      if (payg !== undefined) config.consumption.deployedPayg = payg;
       if (routed !== undefined) f.deployedRouter = routed;
       if (hash !== undefined) f.notebookHashes[nb.key] = hash;
       ctx.save();
@@ -935,26 +858,15 @@ function dropPending(app, keyIds) {
 }
 
 /**
- * The environments the transcript notebook reads, as stored with the deployed notebook.
- * @param {import('../config.js').InstallConfig} config
- */
-export const environmentUrls = (config) => config.agentEvaluator.environments.map((e) => e.url).join(',');
-
-/**
  * What the pipeline definition is built from. A change means the deployed pipeline is out of date.
  * @param {import('../config.js').InstallConfig} config
  */
 export function pipelineSignature(config) {
   const parts = [enabledModules(config.modules).join(',')];
   if (modelDeployed(config)) parts.push(`model=${config.semanticModel.id}`);
-  if (azureAiOn(config)) parts.push('azureAi');
-  if (consumptionModelDeployed(config)) parts.push(`consumption=${config.consumption.model.id}`);
-  if (agentEvaluatorOn(config)) parts.push('agentEvaluator');
-  if (agentEvaluatorModelDeployed(config)) parts.push(`ae=${config.agentEvaluator.model.id}`);
   if (routerWanted(config.dataSources)) parts.push('router');
   if (workdayOn(config)) parts.push('workday');
   if (agent365Csv(config)) parts.push('agent365=csv');
-  if (coworkDataflowOn(config)) parts.push(`cowork=${config.consumption.dataflowId}`);
   if (resourceGraphNotebookOn(config)) parts.push('resourceGraph');
   if (rlsOn(config)) parts.push('access');
   if (config.scale) parts.push(`scale=${config.scale}`);
@@ -966,12 +878,6 @@ export function pipelineSignature(config) {
  * @param {import('../config.js').InstallConfig} config
  */
 export const resourceGraphNotebookOn = (config) => config.dataSources?.resourceGraph === 'api';
-
-/**
- * Cowork credits come from the Viva Insights Dataflow, so the pipeline refreshes it before the Viva load.
- * @param {import('../config.js').InstallConfig} config
- */
-export const coworkDataflowOn = (config) => !!(config.modules.consumption && config.dataSources?.coworkCredits === 'api' && config.consumption?.dataflowId);
 
 /**
  * Workday org data is uploaded, so its lander runs after the Entra ID load.
@@ -992,32 +898,6 @@ export const agent365Csv = (config) => !!(config.modules.agent365 && config.data
 export const modelDeployed = (config) => !!(config.semanticModel?.enabled && config.semanticModel.id && config.semanticModel.bound);
 
 /**
- * Credit consumption is on, and the app can read Azure AI costs in the chosen subscription.
- * @param {import('../config.js').InstallConfig} config
- */
-export const azureAiOn = (config) => !!(config.modules.consumption && config.consumption?.azureSubscriptionId && config.consumption.azureAccess);
-
-/**
- * The consumption model exists and reads the Lakehouse. It is refreshed by the same notebook as the ValueLens model.
- * @param {import('../config.js').InstallConfig} config
- */
-export const consumptionModelDeployed = (config) => !!(config.modules.consumption && modelDeployed(config) && config.consumption?.model?.id && config.consumption.model.bound);
-
-/**
- * The transcript notebook is deployed: the Agent Evaluator is on and the app can read at least one
- * environment. The parser stops when it can reach none of them.
- * @param {import('../config.js').InstallConfig} config
- */
-export const agentEvaluatorOn = (config) => !!(config.modules.agentEvaluator && config.agentEvaluator?.environments.some((e) => e.access));
-
-/**
- * The Agent Evaluator model exists and reads the Lakehouse. The pipeline refreshes it after the transcripts load.
- * @param {import('../config.js').InstallConfig} config
- */
-export const agentEvaluatorModelDeployed = (config) =>
-  !!(config.modules.agentEvaluator && modelDeployed(config) && config.agentEvaluator?.model?.id && config.agentEvaluator.model.bound);
-
-/**
  * What the pipeline is built from, for this install.
  * @param {import('../config.js').InstallConfig} config
  * @returns {import('../transform/pipeline.js').PipelineSettings}
@@ -1031,14 +911,9 @@ export function pipelineSettings(config) {
     modules: config.modules,
     backfillDays: config.history.days,
     semanticModelId: modelDeployed(config) ? config.semanticModel.id : undefined,
-    azureAi: azureAiOn(config),
-    consumptionModelId: consumptionModelDeployed(config) ? config.consumption.model.id : undefined,
-    agentTranscripts: agentEvaluatorOn(config),
-    agentEvaluatorModelId: agentEvaluatorOn(config) && agentEvaluatorModelDeployed(config) ? config.agentEvaluator.model.id : undefined,
     uploadRouter: routerWanted(config.dataSources),
     workday: workdayOn(config),
     agent365Csv: agent365Csv(config),
-    coworkDataflowId: coworkDataflowOn(config) ? config.consumption.dataflowId : undefined,
     resourceGraph: resourceGraphNotebookOn(config),
     access: rlsOn(config),
   };

@@ -14,19 +14,17 @@ import {
   SCOPED_ROLE,
   scopedFilter,
 } from '../src/transform/access.js';
-import { buildAgentEvaluatorModel, buildConsumptionModel, buildModel, loadTemplateModel } from '../src/transform/model.js';
+import { buildModel, loadTemplateModel } from '../src/transform/model.js';
 import { realSources } from './fakes.js';
 
 const sources = realSources();
 const lake = { server: 'abc.datawarehouse.fabric.microsoft.com', database: 'ValueLens' };
-const allModules = { orgData: true, m365Activity: true, agent365: true, productFeedback: true, defender: true, consumption: true, agentEvaluator: true };
+const allModules = { orgData: true, m365Activity: true, agent365: true, productFeedback: true, defender: true };
 
 /** @type {Record<keyof typeof ACCESS_INVENTORY, (access?: { orgAttribute?: string }) => import('../src/transform/model.js').ModelBim>} */
 const build = {
   valuelens: (access) =>
     buildModel(loadTemplateModel(/** @type {string} */ (sources.modelFile)), { ...lake, modules: /** @type {any} */ (allModules), resourceGraph: true, access }),
-  consumption: (access) => buildConsumptionModel(loadTemplateModel(/** @type {string} */ (sources.consumptionModelFile)), { ...lake, resourceGraph: true, access }),
-  agentEvaluator: (access) => buildAgentEvaluatorModel(loadTemplateModel(/** @type {string} */ (sources.agentEvaluatorModelFile)), { ...lake, access }),
 };
 const kinds = /** @type {(keyof typeof ACCESS_INVENTORY)[]} */ (Object.keys(ACCESS_INVENTORY));
 
@@ -179,7 +177,7 @@ test('the lookup columns read the access tables by lower-case UPN', () => {
 });
 
 test('roleDefinitions: Viewers in the scoped role; everyone-scope people (and Viewers, when that is the default) in Everyone', () => {
-  const on = build.consumption({});
+  const on = build.valuelens({});
   const roles = roleDefinitions(on.model, { groupId: 'g1', tenantId: 't1', everyone: ['B@x.com', 'a@x.com', 'a@x.com', '*', ''] });
   assert.deepEqual(
     roles.map((r) => [r.name, r.members]),
@@ -197,5 +195,5 @@ test('roleDefinitions: Viewers in the scoped role; everyone-scope people (and Vi
   const open = roleDefinitions(on.model, { groupId: 'g1', tenantId: 't1', everyone: [], defaultAll: true });
   assert.deepEqual(open[0].members, [{ memberName: 'obj:g1@t1', identityProvider: 'AzureAD', memberType: 'group' }]);
   assert.ok(open[1].tablePermissions.length > 1, 'the scoped role keeps its filters');
-  assert.throws(() => roleDefinitions(build.consumption().model, { groupId: 'g', tenantId: 't', everyone: [] }), /without org-scoped access/);
+  assert.throws(() => roleDefinitions(build.valuelens().model, { groupId: 'g', tenantId: 't', everyone: [] }), /without org-scoped access/);
 });

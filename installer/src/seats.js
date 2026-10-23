@@ -14,15 +14,6 @@ export const LARGE_TENANT_SEATS = 10_000;
 export const BIG_CAPACITY_SEATS = 30_000;
 
 /**
- * The capacity the Azure path recommends for the Power BI workspace of a large tenant. Provisional: the 20,000-seat
- * Fabric speed tests ran on F64, and the Azure speed test sets the final size, which changes only this line.
- */
-export const AZURE_LARGE_TENANT_SKU = 'F64';
-
-/** The max vCores Azure SQL scales to when a large tenant agrees to pay for more than the free offer. */
-export const AZURE_LARGE_TENANT_SQL_VCORES = 4;
-
-/**
  * The Copilot SKUs in a `subscribedSkus` list, and how many of their seats are assigned.
  * @param {any[]} skus
  */

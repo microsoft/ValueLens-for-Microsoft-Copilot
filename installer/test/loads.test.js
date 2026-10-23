@@ -40,7 +40,7 @@ const ids = {
   refreshModel: id(9),
   loadStatus: id(10),
 };
-const modules = { orgData: true, m365Activity: true, agent365: true, productFeedback: false, consumption: false, agentEvaluator: false };
+const modules = { orgData: true, m365Activity: true, agent365: true, productFeedback: false };
 /** @param {Partial<import('../src/transform/pipeline.js').PipelineSettings>} [more] */
 const build = (more = {}) => buildPipeline(template, { workspaceId: WS, notebookIds: ids, modules, semanticModelId: 'model-1', ...more });
 
@@ -380,5 +380,4 @@ test('status tables and warnings: every kind has a plain text, and the notebook 
   assert.deepEqual(json.statusTables, STATUS_TABLES);
   assert.deepEqual(json.warnings.map((/** @type {any} */ w) => w.kind), ['forbidden', 'unlicensed', 'other', 'empty']);
   for (const w of WARNINGS) assert.ok(w.text.includes('{items}') && w.fix, w.kind);
-  assert.ok(STATUS_TABLES.some((t) => t.table === 'evaluator_status'));
 });
