@@ -41,19 +41,19 @@ Use [`scripts/README.md`](scripts/README.md) for the full parameter reference. R
    cmdkey /generic:PAX-AIBV-<tenant-id> /user:app /pass:<client-secret>
    ```
 
-4. Seed the interactions file once.
+4. Seed the interactions file once, in the work folder the scheduled task uses (`C:\AIBV` by default).
 
    ```powershell
-   .\Run-PAX-AIBV.ps1 -TenantId <tenant-id> -ClientId <client-id> -Days 30
+   .\Run-PAX-AIBV.ps1 -TenantId <tenant-id> -ClientId <client-id> -Days 30 -WorkRoot 'C:\AIBV'
    ```
 
-   Add `-UserInfoFile <path|SharePoint-URL|OneLake-path>` if you use your own org file; start from [`../5. Local CSV/scripts/OrgData-Template.csv`](../5.%20Local%20CSV/scripts/OrgData-Template.csv). Add `-IncludeAgent365Info` or `-Agents365Csv <admin-centre-agents-export.csv>` for Agent 365. The script writes `.\processed\rollup-manifest.json`.
+   Add `-UserInfoFile <path|SharePoint-URL|OneLake-path>` if you use your own org file; start from [`../5. Local CSV/scripts/OrgData-Template.csv`](../5.%20Local%20CSV/scripts/OrgData-Template.csv). Add `-IncludeAgent365Info` or `-Agents365Csv <admin-centre-agents-export.csv>` for Agent 365. The script writes `C:\AIBV\processed\rollup-manifest.json`.
 
 5. Upload the seeded files to SharePoint.
 
    ```powershell
    .\Upload-Rollups-SharePoint.ps1 `
-       -Manifest .\processed\rollup-manifest.json `
+       -Manifest 'C:\AIBV\processed\rollup-manifest.json' `
        -TenantId <tenant-id> -ClientId <client-id> `
        -SiteId '<host>,<siteguid>,<webguid>' `
        -DriveId 'b!...' `
@@ -78,7 +78,14 @@ Use [`scripts/README.md`](scripts/README.md) for the full parameter reference. R
 
 ## Schedule refresh
 
-1. Register the daily Windows Scheduled Task from an elevated PowerShell 7 window.
+1. Give the seeded interactions file a stable name, so the daily runs can append to it.
+
+   ```powershell
+   Get-ChildItem 'C:\AIBV\processed\*_Interactions_*.csv' | Sort-Object LastWriteTime |
+       Select-Object -Last 1 | Rename-Item -NewName 'cumulative_Interactions.csv'
+   ```
+
+2. Register the daily Windows Scheduled Task from an elevated PowerShell 7 window.
 
    ```powershell
    .\Register-TaskScheduler.ps1 `
@@ -87,15 +94,15 @@ Use [`scripts/README.md`](scripts/README.md) for the full parameter reference. R
        -DriveId 'b!...' `
        -FolderPath '/AIBV' `
        -Days 2 `
-       -AppendFile Purview_CopilotInteraction_Rollup.csv `
+       -AppendFile cumulative_Interactions.csv `
        -RunAt '02:00'
    ```
 
    Add `-IncludeAgent365Info`, `-Agents365Csv <admin-centre-agents-export.csv>`, or `-RunAsUser DOMAIN\svc_aibv` if needed. The task name is `AIBV-Rollup-Refresh`; it runs `Run-PAX-AIBV.ps1` and then `Upload-Rollups-SharePoint.ps1`.
 
-2. In Power BI Service, open the semantic model **Settings**. Under **Data source credentials**, sign in to SharePoint (**OAuth2**) for each listed source and set **Privacy level** to **None**. If the tenant-root site URL fails the connection test, tick **Skip test connection** for it. Under **Scheduled refresh**, turn it on and schedule it after the extract, for example extract at `02:00` and refresh at `04:00`.
+3. In Power BI Service, open the semantic model **Settings**. Under **Data source credentials**, sign in to SharePoint (**OAuth2**) for each listed source and set **Privacy level** to **None**. If the tenant-root site URL fails the connection test, tick **Skip test connection** for it. Under **Scheduled refresh**, turn it on and schedule it after the extract, for example extract at `02:00` and refresh at `04:00`.
 
-3. Check or run the scheduled task when needed.
+4. Check or run the scheduled task when needed.
 
    ```powershell
    Get-ScheduledTaskInfo -TaskName 'AIBV-Rollup-Refresh'

@@ -16,6 +16,8 @@
   upload OVERWRITES the previous file. No folder iteration, no privacy-firewall
   fights at refresh time.
 
+  With -File it uploads that one file instead, under its own name or -RemoteName.
+
   Auth: uses the same Entra app reg as Run-PAX-AIBV.ps1. The app must have
   the Sites.Selected Graph permission AND a per-site write grant — set up once
   via .\ProvisionSiteAccess-SP-AppReg.ps1.
@@ -34,6 +36,14 @@
   Optional. Agent 365 registry CSV (Get-Agents365Registry.ps1 output or the admin
   centre export). Defaults to the manifest's agents365_csv, written by
   Run-PAX-AIBV.ps1 -IncludeAgent365Info and/or its -Agents365Csv fallback.
+
+.PARAMETER File
+  Uploads this one file instead of the rollups. Use it instead of -Manifest or
+  the CSV pair. An existing file with the same name is overwritten.
+
+.PARAMETER RemoteName
+  Name for -File in the folder. Default: the file's own name. A file name only:
+  to use a subfolder, put it in -FolderPath.
 
 .PARAMETER TenantId
 .PARAMETER ClientId
@@ -62,6 +72,11 @@
       -DriveId  'b!...' `
       -FolderPath '/AIBV'
 
+.EXAMPLE
+  .\Upload-Rollups-SharePoint.ps1 -File .\notes.csv -RemoteName 'notes.csv' `
+      -TenantId <guid> -ClientId <guid> -SiteId '<host>,<siteguid>,<webguid>' `
+      -DriveId 'b!...' -FolderPath '/AIBV'
+
 .NOTES
   Files are uploaded with Graph's simple PUT (supports up to 250 MB), so the two
   rollup CSVs always take the single-request path. A resumable upload session is
@@ -72,7 +87,10 @@ param(
   [Parameter(ParameterSetName='Manifest', Mandatory=$true)] [string]$Manifest,
   [Parameter(ParameterSetName='Files',    Mandatory=$true)] [string]$InteractionsCsv,
   [Parameter(ParameterSetName='Files',    Mandatory=$true)] [string]$UsersCsv,
+  [Parameter(ParameterSetName='Manifest')] [Parameter(ParameterSetName='Files')]
                                  [string]$Agents365Csv,
+  [Parameter(ParameterSetName='File',     Mandatory=$true)] [string]$File,
+  [Parameter(ParameterSetName='File')]                      [string]$RemoteName,
   [Parameter(Mandatory=$true)] [string]$TenantId,
   [Parameter(Mandatory=$true)] [string]$ClientId,
                                  [string]$ClientSecret,
@@ -128,7 +146,8 @@ function Get-GraphToken {
 }
 
 function Invoke-GraphPutCsv {
-  param([string]$Token, [string]$DriveId, [string]$FolderPath, [string]$RemoteName, [string]$LocalPath)
+  param([string]$Token, [string]$DriveId, [string]$FolderPath, [string]$RemoteName, [string]$LocalPath,
+        [string]$ContentType = 'text/csv')
   $size = (Get-Item -LiteralPath $LocalPath).Length
   $folder = $FolderPath.Trim('/')
   $itemPath = if ($folder) { "$folder/$RemoteName" } else { $RemoteName }
@@ -145,7 +164,7 @@ function Invoke-GraphPutCsv {
     Write-Host ("  PUT  {0} ({1:N0} bytes)" -f $RemoteName, $size)
     $uri = "https://graph.microsoft.com/v1.0/drives/$DriveId/root:/$itemPathEnc`:/content"
     Invoke-RestMethod -Method PUT -Uri $uri -Headers $headers `
-      -ContentType 'text/csv' -InFile $LocalPath | Out-Null
+      -ContentType $ContentType -InFile $LocalPath | Out-Null
     return
   }
 
@@ -178,6 +197,31 @@ function Invoke-GraphPutCsv {
       $offset += $read
     }
   } finally { $fs.Dispose() }
+}
+
+# ---- One file ----
+if ($PSCmdlet.ParameterSetName -eq 'File') {
+  if (-not (Test-Path -LiteralPath $File -PathType Leaf)) { throw "File not found: $File" }
+  if (-not $RemoteName) { $RemoteName = Split-Path -Leaf $File }
+  if ($RemoteName -match '[\\/:*?"<>|]' -or $RemoteName -ne $RemoteName.Trim() -or $RemoteName -in @('.', '..')) {
+    throw "-RemoteName must be a file name, without folders or any of \ / : * ? `" < > |"
+  }
+  $secret = Resolve-Secret -Provided $ClientSecret -TenantId $TenantId
+
+  Write-Host "==== Upload to SharePoint ====" -ForegroundColor Cyan
+  Write-Host ("Site   : {0}" -f $SiteId)
+  Write-Host ("Drive  : {0}" -f $DriveId)
+  Write-Host ("Folder : {0}" -f $FolderPath)
+  Write-Host ("File   : {0} -> {1}" -f $File, $RemoteName)
+  Write-Host ""
+
+  $token = Get-GraphToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $secret
+  $type = if ([System.IO.Path]::GetExtension($RemoteName) -eq '.csv') { 'text/csv' } else { 'application/octet-stream' }
+  Invoke-GraphPutCsv -Token $token -DriveId $DriveId -FolderPath $FolderPath `
+    -RemoteName $RemoteName -LocalPath $File -ContentType $type
+  Write-Host ""
+  Write-Host "==> Upload complete." -ForegroundColor Green
+  return
 }
 
 # ---- Resolve sources ----
