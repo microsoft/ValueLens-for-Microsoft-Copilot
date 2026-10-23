@@ -186,15 +186,25 @@ export const REPORT_NAME = PRODUCT.fabric.report;
 /**
  * The PAX route's SharePoint folder. The refresh writes its files there and the report reads them.
  * @typedef {object} SharePointConfig
- * @property {string} folderUrl  The folder's address, e.g. https://contoso.sharepoint.com/sites/Analytics/Shared Documents/ValueLens.
+ * @property {string} folderUrl  The folder's address, each part encoded, e.g. https://contoso.sharepoint.com/sites/Analytics/Shared%20Documents/ValueLens.
  * @property {string} siteUrl  The site's address, e.g. https://contoso.sharepoint.com/sites/Analytics.
- * @property {string} sitePath  Graph's path form of the site, e.g. contoso.sharepoint.com:/sites/Analytics.
+ * @property {string} sitePath  Graph's path form of the site, e.g. contoso.sharepoint.com:/sites/Analytics, or the host for the root site.
  * @property {string} library  The document library's name in the address, e.g. Shared Documents.
  * @property {string} folderPath  The folder in the library, e.g. /ValueLens, or / for the library itself.
  * @property {string} [siteId]  Graph's ID for the site, once the installer could read it.
  * @property {boolean} [granted]  The PAX app can write to the site.
  * @property {string} [grantId]  The site permission the installer added, which uninstall removes.
  * @property {boolean} [pendingAdminGrant]  A SharePoint or Global Administrator still has to give the app write access to the site.
+ * @property {RetiredGrant[]} [retiredGrants]  Sites the folder moved away from, where the app may still have access, until it's taken back.
+ */
+
+/**
+ * A site the app had access to before the folder moved.
+ * @typedef {object} RetiredGrant
+ * @property {string} siteUrl
+ * @property {string} sitePath
+ * @property {string} [siteId]
+ * @property {string} [grantId]
  */
 
 /**

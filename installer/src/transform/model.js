@@ -45,6 +45,19 @@ export function decodeText(raw) {
 }
 
 /**
+ * Encodes text the way `raw` was, the reverse of decodeText: UTF-16 or UTF-8, with a byte-order
+ * mark only when `raw` had one.
+ * @param {string} text
+ * @param {Buffer} raw
+ */
+export function encodeTextLike(text, raw) {
+  if (raw[0] === 0xff && raw[1] === 0xfe) return Buffer.concat([raw.subarray(0, 2), Buffer.from(text, 'utf16le')]);
+  if (raw[0] === 0xef && raw[1] === 0xbb && raw[2] === 0xbf) return Buffer.concat([raw.subarray(0, 3), Buffer.from(text, 'utf8')]);
+  if (raw.length > 1 && raw[0] !== 0 && raw[1] === 0) return Buffer.from(text, 'utf16le');
+  return Buffer.from(text, 'utf8');
+}
+
+/**
  * Reads the model from a Power BI template.
  * @param {Buffer} pbit
  * @returns {ModelBim}

@@ -321,10 +321,19 @@ export function graphApi(http) {
      * @param {'read' | 'write'} role
      */
     grantSitePermission: (siteId, appId, displayName, role) =>
-      http.post(`/sites/${siteId}/permissions`, { roles: [role], grantedToIdentities: [{ application: { id: appId, displayName } }] }),
+      http.post(`/sites/${siteId}/permissions`, { roles: [role], grantedToIdentities: [{ application: { id: appId, displayName } }] }, { once: true }),
 
-    /** The apps granted access to one site. Needs a SharePoint admin. @param {string} siteId @returns {Promise<any[]>} */
+    /** The apps granted access to one site, without their roles. Needs a SharePoint admin. @param {string} siteId @returns {Promise<any[]>} */
     sitePermissions: (siteId) => http.list(`/sites/${siteId}/permissions`),
+
+    /** One app's access to a site, with its roles. @param {string} siteId @param {string} permissionId */
+    sitePermission: (siteId, permissionId) => http.get(`/sites/${siteId}/permissions/${permissionId}`),
+
+    /**
+     * Changes one app's role on a site.
+     * @param {string} siteId @param {string} permissionId @param {'read' | 'write'} role
+     */
+    updateSitePermission: (siteId, permissionId, role) => http.patch(`/sites/${siteId}/permissions/${permissionId}`, { roles: [role] }),
 
     /** Takes back one app's access to a site. @param {string} siteId @param {string} permissionId */
     deleteSitePermission: (siteId, permissionId) => http.del(`/sites/${siteId}/permissions/${permissionId}`),
