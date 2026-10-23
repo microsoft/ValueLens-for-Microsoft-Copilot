@@ -1,0 +1,57 @@
+EVALUATE
+// How much of the user snapshot's credits the busiest users account for,
+// from the same user rows as the top-users table, so it holds for every user
+// rather than the top of that list. A user under more than one group counts
+// once, with their rows summed.
+VAR __Rows =
+    SUMMARIZECOLUMNS(
+        'Group By'[Group],
+        'Credit Consumption (User)'[User Name],
+        "@Credits", [Studio Total Credits Used]
+    )
+VAR __Values =
+    FILTER(
+        GROUPBY(
+            SELECTCOLUMNS(
+                __Rows,
+                "@Person", COALESCE('Credit Consumption (User)'[User Name], ""),
+                "@Credits", [@Credits]
+            ),
+            [@Person],
+            "@Value", SUMX(CURRENTGROUP(), [@Credits])
+        ),
+        [@Value] > 0
+    )
+// The cuts lib/concentration.ts reads: every top slice's size, rounded up,
+// and both roundings of each point on the thinned curve. Each cut's sum
+// takes the busiest people, less any tied past the cut.
+VAR __Total = SUMX(__Values, [@Value])
+VAR __Count = COUNTROWS(__Values) + 0
+VAR __Steps = MAX(1, MIN(__Count, 100))
+VAR __Cuts =
+    ADDCOLUMNS(
+        FILTER(
+            DISTINCT(
+                UNION(
+                    SELECTCOLUMNS({ 1, 5, 25 }, "@Count", QUOTIENT(__Count * [Value] + 99, 100)),
+                    SELECTCOLUMNS(GENERATESERIES(1, __Steps), "@Count", QUOTIENT([Value] * __Count, __Steps)),
+                    SELECTCOLUMNS(GENERATESERIES(1, __Steps), "@Count", QUOTIENT([Value] * __Count + __Steps - 1, __Steps))
+                )
+            ),
+            [@Count] >= 1
+        ),
+        "@Cumulative",
+            VAR __Top = TOPN([@Count], __Values, [@Value], DESC)
+            VAR __Boundary = MINX(__Top, [@Value])
+            VAR __Higher = FILTER(__Top, [@Value] > __Boundary)
+            RETURN SUMX(__Higher, [@Value]) + ([@Count] - COUNTROWS(__Higher)) * __Boundary
+    )
+RETURN
+    SELECTCOLUMNS(
+        __Cuts,
+        "Count", [@Count],
+        "Cumulative", [@Cumulative],
+        "People", __Count,
+        "Total", __Total
+    )
+ORDER BY [Count]

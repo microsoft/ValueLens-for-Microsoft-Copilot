@@ -1,0 +1,8 @@
+[
+  { "[Scope Order]": 1, "[Sharing Scope]": "Whole organisation", "[Access Order]": 1, "[Data Access]": "Organisation content", "[Agents]": 14, "[Unused Agents]": 5 },
+  { "[Scope Order]": 1, "[Sharing Scope]": "Whole organisation", "[Access Order]": 3, "[Data Access]": "None declared", "[Agents]": 22, "[Unused Agents]": 9 },
+  { "[Scope Order]": 2, "[Sharing Scope]": "Specific people or groups", "[Access Order]": 1, "[Data Access]": "Organisation content", "[Agents]": 31, "[Unused Agents]": 12 },
+  { "[Scope Order]": 2, "[Sharing Scope]": "Specific people or groups", "[Access Order]": 2, "[Data Access]": "Uploaded files only", "[Agents]": 8, "[Unused Agents]": 2 },
+  { "[Scope Order]": 3, "[Sharing Scope]": "Not shared", "[Access Order]": 1, "[Data Access]": "Organisation content", "[Agents]": 57, "[Unused Agents]": 40 },
+  { "[Scope Order]": 3, "[Sharing Scope]": "Not shared", "[Access Order]": 4, "[Data Access]": "Not reported", "[Agents]": 3, "[Unused Agents]": 3 }
+]

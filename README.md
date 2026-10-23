@@ -192,6 +192,15 @@ stay in the repo as alternatives to the app.
   model live, as the person viewing it, so row-level security applies. The
   [installer](1.%20Fabric/installer/README.md) deploys it. It also needs the **Semantic Model
   Execute Queries REST API** tenant setting.
+- **[`fabric-app/`](fabric-app/)**: the app's design, reading your published ValueLens and
+  Consumption Central semantic models live, as the person viewing it, so row-level security
+  applies. It keeps no copy of your data. Deploy ValueLens alone (`npm run deploy:vl`),
+  Consumption Central alone (`npm run deploy:cc`), or both behind a product switcher
+  (`npm run deploy:both`); the joined app hides the tab of a product that isn't installed. Add
+  `--dry-run` first to see which models it found. It also needs the **Semantic Model Execute
+  Queries REST API** tenant setting. The folder is kept identical in the
+  [Consumption Central](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot)
+  repo. **[Fabric App details →](fabric-app/README.md)**
 - **The app, in Fabric**: the same `app/` code, reading the same CSV files, hosted in your
   workspace. See [As a Fabric App](app/README.md#as-a-fabric-app-in-a-fabric-workspace).
 

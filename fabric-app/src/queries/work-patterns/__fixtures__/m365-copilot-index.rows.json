@@ -1,0 +1,38 @@
+[
+  {
+    "[Metric]": "Chat messages",
+    "[Copilot Users]": 96.4,
+    "[Others]": 58.1,
+    "[Index]": 1.6592082616179002
+  },
+  {
+    "[Metric]": "Meetings",
+    "[Copilot Users]": 11.2,
+    "[Others]": 8.3,
+    "[Index]": 1.3493975903614457
+  },
+  {
+    "[Metric]": "Files viewed or edited",
+    "[Copilot Users]": 24.7,
+    "[Others]": 19.5,
+    "[Index]": 1.2666666666666666
+  },
+  {
+    "[Metric]": "Active days",
+    "[Copilot Users]": 4.6,
+    "[Others]": 4.1,
+    "[Index]": 1.1219512195121952
+  },
+  {
+    "[Metric]": "Emails sent",
+    "[Copilot Users]": 31.8,
+    "[Others]": 33.9,
+    "[Index]": 0.9380530973451328
+  },
+  {
+    "[Metric]": "Call and meeting hours",
+    "[Copilot Users]": 5.9,
+    "[Others]": 7.4,
+    "[Index]": 0.7972972972972973
+  }
+]

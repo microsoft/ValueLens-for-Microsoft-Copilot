@@ -1,0 +1,8 @@
+EVALUATE
+ROW(
+    "Overall SPUW", [Observed Sessions per User per Week],
+    "Licensed SPUW", [Observed Licensed Sessions per User per Week],
+    "Unlicensed SPUW", [Observed Unlicensed Sessions per User per Week],
+    "Agent SPUW", [Observed Agent Sessions per User per Week],
+    "Cowork SPUW", [Observed Cowork Sessions per User per Week]
+)

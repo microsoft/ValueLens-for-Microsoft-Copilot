@@ -1,0 +1,73 @@
+// Groups first, largest first, then the people inside them, so the tree
+// keeps both orders.
+DEFINE
+    // The released Consumption Central templates have no policy name yet, so
+    // the query brings its own. SUMMARIZE walks the relationship to
+    // SpendingPolicy, so a group row covers everyone in it. The all-zero GUID
+    // is usage outside any policy window, not a policy.
+    MEASURE 'CoworkBilling'[ValueLens Cowork Policy Name] =
+        VAR Assigned =
+            FILTER(
+                SUMMARIZE(
+                    'CoworkBilling',
+                    'CoworkBilling'[SpendingPolicyId],
+                    'SpendingPolicy'[Policy Name]
+                ),
+                'CoworkBilling'[SpendingPolicyId] <> ""
+                    && 'CoworkBilling'[SpendingPolicyId] <> "00000000-0000-0000-0000-000000000000"
+            )
+        VAR N = COUNTROWS(DISTINCT(SELECTCOLUMNS(Assigned, "PolicyId", 'CoworkBilling'[SpendingPolicyId])))
+        VAR PolicyName = MAXX(Assigned, 'SpendingPolicy'[Policy Name])
+        VAR PolicyId = MAXX(Assigned, 'CoworkBilling'[SpendingPolicyId])
+        RETURN
+            SWITCH(
+                TRUE(),
+                N = 1, IF(PolicyName <> "", PolicyName, "Policy " & LEFT(PolicyId, 8)),
+                N > 1, FORMAT(N, "#,0") & " policies",
+                NOT ISEMPTY('CoworkBilling'), "(Unassigned)"
+            )
+EVALUATE
+// Every group row is kept, so the totals stay whole; the people under them
+// stop at the top 1,000, and "Total" counts them all.
+VAR _all =
+    SUMMARIZECOLUMNS(
+        ROLLUPADDISSUBTOTAL(
+            'Group By'[Group], "Is Grand Total",
+            // The sign-in name keeps people apart, so a blank or shared display
+            // name cannot fold several people into one row.
+            ROLLUPGROUP('Org'[DisplayName], 'Org'[UserPrincipalName]), "Is Group Total"
+        ),
+        "Users", [User Count],
+        "Credits Used", [Cowork Total Credits Used],
+        "Allowance Used", [Person Allowance Used %],
+        "Prepaid Cost", [Cowork Prepaid Cost],
+        "PAYG Cost", [Cowork PAYG Cost],
+        "Total Cost", [Cowork Total Cost],
+        "Policy", [ValueLens Cowork Policy Name],
+        // The billing export's own name, for people the org data has no name for.
+        "Billing Name", MAX('CoworkBilling'[DisplayName])
+    )
+VAR _people = FILTER(_all, NOT [Is Group Total])
+VAR _total = COUNTROWS(_people) + 0
+RETURN
+ADDCOLUMNS(
+    UNION(
+        FILTER(_all, [Is Group Total]),
+        TOPN(
+            1000,
+            _people,
+            [Credits Used], DESC,
+            'Org'[UserPrincipalName], ASC,
+            'Org'[DisplayName], ASC,
+            'Group By'[Group], ASC
+        )
+    ),
+    "Total", _total
+)
+ORDER BY
+    [Is Grand Total] DESC,
+    [Is Group Total] DESC,
+    [Credits Used] DESC,
+    'Org'[UserPrincipalName] ASC,
+    'Org'[DisplayName] ASC,
+    'Group By'[Group] ASC

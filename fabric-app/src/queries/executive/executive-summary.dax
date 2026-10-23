@@ -1,0 +1,136 @@
+DEFINE
+    // The catalogue: every behaviour ValueLens recognises, and every Cowork
+    // task category seen. General chat and general assistance say nothing
+    // about what Copilot was used for, so they never count (EXCLUDED_KINDS in
+    // executive/skills.ts lists the same names).
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Skills Available] =
+        VAR _kinds =
+            DISTINCT(
+                UNION(
+                    SELECTCOLUMNS(ALL('Behavior Value Map'[Behavior]), "Kind", 'Behavior Value Map'[Behavior]),
+                    SELECTCOLUMNS(
+                        CALCULATETABLE(VALUES('Chat + Agent Interactions (Audit Logs)'[Cowork Task Category]), REMOVEFILTERS()),
+                        "Kind", 'Chat + Agent Interactions (Audit Logs)'[Cowork Task Category]
+                    )
+                )
+            )
+        RETURN
+            COUNTROWS(
+                FILTER(
+                    _kinds,
+                    LEN(TRIM([Kind])) > 0
+                        && NOT [Kind] IN { "General Chat", "General Assistance", "General assistance / Other" }
+                )
+            )
+
+EVALUATE
+// As on the Leaderboards, Security Copilot's automated sessions are left out of the agent figures.
+VAR _noSecurityCopilot =
+    FILTER(
+        ALL('Chat + Agent Interactions (Audit Logs)'[AppHost]),
+        NOT CONTAINSSTRING('Chat + Agent Interactions (Audit Logs)'[AppHost], "SecurityCopilot")
+    )
+VAR _seats = [Licensed Users (Filter-Aware)]
+// [Active Licensed Users] now tests each user ID with LEN(TRIM()) only when
+// Audit_UserId is filtered directly, but models deployed from older templates
+// still test every ID, which takes seconds on a large tenant. Counting the
+// licensed users with a usage row, less the blank IDs, gives the same number
+// on any model, so this inline count stays (as in executive-months.dax).
+VAR _blankIds =
+    FILTER(
+        ALL('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+        LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Audit_UserId])) = 0
+    )
+VAR _licensedUsers =
+    CALCULATE(
+        DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+        KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Is Usage Row] = TRUE()),
+        KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[License Status] = "M365 Copilot Licensed")
+    )
+        - CALCULATE(
+            DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+            KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Is Usage Row] = TRUE()),
+            KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[License Status] = "M365 Copilot Licensed"),
+            KEEPFILTERS(_blankIds)
+        )
+// Blank rather than 0 when nobody is counted, as COUNTROWS gives.
+VAR _seatsInUse = IF(_licensedUsers > 0, _licensedUsers)
+// Agents In Use asked [Active Agent Users] about each agent. That measure now
+// tests each user ID with LEN(TRIM()) only when Audit_UserId is filtered
+// directly, but models deployed from older templates still test every ID, so
+// this inline count stays. As in the measure, an agent is in use when its
+// prompts in the agent audience come from more user IDs than blank ones.
+VAR _agents =
+    CALCULATETABLE(
+        ADDCOLUMNS(
+            FILTER(
+                VALUES('Chat + Agent Interactions (Audit Logs)'[AgentName]),
+                LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[AgentName])) > 0
+            ),
+            "@Ids", CALCULATE(DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[Audit_UserId])),
+            "@BlankIds",
+                CALCULATE(
+                    DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                    KEEPFILTERS(_blankIds)
+                )
+        ),
+        KEEPFILTERS(_noSecurityCopilot),
+        KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)] = "Agents"),
+        KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Is Prompt Row] = TRUE())
+    )
+// Same people as [All Active Users]: a prompt or a Cowork scheduled run.
+VAR _promptOrCowork =
+    FILTER(
+        ALL(
+            'Chat + Agent Interactions (Audit Logs)'[Is Prompt Row],
+            'Chat + Agent Interactions (Audit Logs)'[Is_Cowork]
+        ),
+        'Chat + Agent Interactions (Audit Logs)'[Is Prompt Row]
+            || 'Chat + Agent Interactions (Audit Logs)'[Is_Cowork]
+    )
+VAR _activeIds =
+    CALCULATE(
+        DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+        KEEPFILTERS(_promptOrCowork)
+    )
+        - CALCULATE(
+            DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+            KEEPFILTERS(_promptOrCowork),
+            KEEPFILTERS(_blankIds)
+        )
+RETURN
+    ROW(
+        "Hours", CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Typical"),
+        "Tasks", [AI Tasks],
+        "People", [All Active Users],
+        "Weeks",
+            CALCULATE(
+                DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[WeekStart]),
+                ALLEXCEPT('Chat + Agent Interactions (Audit Logs)', 'Chat + Agent Interactions (Audit Logs)'[WeekStart]),
+                VALUES('Calendar'[Date])
+            ),
+        "Skills Available", [ValueLens Skills Available],
+        "Licensed Seats", _seats,
+        "Seats In Use", _seatsInUse,
+        // [% Active Licensed Users].
+        "Seats In Use Pct", IF(_seats > 0 && _seatsInUse <= _seats, DIVIDE(_seatsInUse, _seats)),
+        "Unlicensed Users", [Active Unlicensed Users],
+        "Habit Month", [Last Full Month Start],
+        "Habitual Pct", [Habitual Users %, Last Month],
+        "Power Pct", [Power Users %, Last Month],
+        "Agent Users", CALCULATE([Active Agent Users], KEEPFILTERS(_noSecurityCopilot)),
+        "Agent Hours",
+            CALCULATE(
+                [Expert Equivalent Hours],
+                'Effort Scenario'[Scenario] = "Typical",
+                KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)] = "Agents")
+            ),
+        "Agents In Use", COUNTROWS(FILTER(_agents, [@Ids] > [@BlankIds])),
+        "Satisfaction", 'ProductFeedback'[Satisfaction Rate],
+        "Feedback", 'ProductFeedback'[Total Feedback],
+        // This asked each person for their organization, but the audit log never
+        // filters the org table, so everyone got the same answer. Asking once,
+        // and counting the active people less the blank IDs, gives the same number.
+        "People With Organization",
+            IF(_activeIds > 0 && LEN(TRIM(MAX('Chat + Agent Org Data'[Organization]))) > 0, _activeIds)
+    )

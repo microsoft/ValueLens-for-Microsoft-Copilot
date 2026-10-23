@@ -1,0 +1,18 @@
+EVALUATE
+VAR _days =
+    SUMMARIZECOLUMNS(
+        'AzureSolutionSpend'[UsageDate],
+        "@Model", [Azure Model Cost],
+        "@Service", [Azure AI Service Cost],
+        "@Supporting", [Azure Supporting Cost]
+    )
+RETURN
+    FILTER(
+        UNION(
+            SELECTCOLUMNS(_days, "Usage Date", 'AzureSolutionSpend'[UsageDate], "Component", "Models", "Component Sort", 1, "Cost", [@Model]),
+            SELECTCOLUMNS(_days, "Usage Date", 'AzureSolutionSpend'[UsageDate], "Component", "AI services", "Component Sort", 2, "Cost", [@Service]),
+            SELECTCOLUMNS(_days, "Usage Date", 'AzureSolutionSpend'[UsageDate], "Component", "Supporting", "Component Sort", 3, "Cost", [@Supporting])
+        ),
+        NOT ISBLANK([Cost])
+    )
+ORDER BY [Usage Date] ASC, [Component Sort] ASC

@@ -1,0 +1,19 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'AzureSolutionSpend'[ResourceName],
+            'AzureSolutionSpend'[Application],
+            'AzureSolutionSpend'[ServiceName],
+            'AzureSolutionSpend'[DepartmentTag],
+            "@Cost", [Azure Selected Cost]
+        ),
+        NOT ISBLANK([@Cost])
+    ),
+    "Resource", 'AzureSolutionSpend'[ResourceName],
+    "Application", 'AzureSolutionSpend'[Application],
+    "Service", 'AzureSolutionSpend'[ServiceName],
+    "Department Tag", 'AzureSolutionSpend'[DepartmentTag],
+    "Cost", [@Cost]
+)
+ORDER BY [Cost] DESC

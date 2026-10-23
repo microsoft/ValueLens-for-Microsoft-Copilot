@@ -1,0 +1,41 @@
+EVALUATE
+UNION(
+    SELECTCOLUMNS(
+        FILTER(
+            VALUES('Agents 365'[Agent Type Label]),
+            LEN(TRIM('Agents 365'[Agent Type Label])) > 0
+        ),
+        "Kind", "agentType",
+        "Value", 'Agents 365'[Agent Type Label]
+    ),
+    SELECTCOLUMNS(
+        FILTER(
+            VALUES('Chat + Agent Interactions (Audit Logs)'[AgentName]),
+            LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[AgentName])) > 0
+        ),
+        "Kind", "agentName",
+        "Value", 'Chat + Agent Interactions (Audit Logs)'[AgentName]
+    ),
+    SELECTCOLUMNS(
+        FILTER(
+            VALUES('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)]),
+            LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)])) > 0
+        ),
+        "Kind", "activity",
+        "Value", 'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)]
+    ),
+    ROW(
+        "Kind", "firstDate",
+        "Value", FORMAT(MIN('Chat + Agent Interactions (Audit Logs)'[ActivityDate]), "yyyy-MM-dd")
+    ),
+    ROW(
+        "Kind", "lastDate",
+        "Value", FORMAT(MAX('Chat + Agent Interactions (Audit Logs)'[ActivityDate]), "yyyy-MM-dd")
+    ),
+    // The people with activity, as each query counts them to decide the tenant's default date window.
+    ROW(
+        "Kind", "people",
+        "Value", FORMAT(CALCULATE(DISTINCTCOUNTNOBLANK('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]), REMOVEFILTERS()), "0")
+    )
+)
+ORDER BY [Kind], [Value]

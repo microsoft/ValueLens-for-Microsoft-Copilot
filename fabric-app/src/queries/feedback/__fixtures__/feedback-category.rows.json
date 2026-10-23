@@ -1,0 +1,44 @@
+[
+  {
+    "[Category]": "Apps & Productivity",
+    "[Feedback Type]": "Thumbs Up",
+    "[Count]": 83,
+    "[Total Feedback]": 118,
+    "[Satisfaction]": 0.7033898305084746
+  },
+  {
+    "[Category]": "Apps & Productivity",
+    "[Feedback Type]": "Thumbs Down",
+    "[Count]": 35,
+    "[Total Feedback]": 118,
+    "[Satisfaction]": 0.7033898305084746
+  },
+  {
+    "[Category]": "Outlook & Email",
+    "[Feedback Type]": "Thumbs Up",
+    "[Count]": 60,
+    "[Total Feedback]": 101,
+    "[Satisfaction]": 0.594059405940594
+  },
+  {
+    "[Category]": "Outlook & Email",
+    "[Feedback Type]": "Thumbs Down",
+    "[Count]": 41,
+    "[Total Feedback]": 101,
+    "[Satisfaction]": 0.594059405940594
+  },
+  {
+    "[Category]": "Teams & Remote Work",
+    "[Feedback Type]": "Thumbs Up",
+    "[Count]": 36,
+    "[Total Feedback]": 69,
+    "[Satisfaction]": 0.5217391304347826
+  },
+  {
+    "[Category]": "Teams & Remote Work",
+    "[Feedback Type]": "Thumbs Down",
+    "[Count]": 33,
+    "[Total Feedback]": 69,
+    "[Satisfaction]": 0.5217391304347826
+  }
+]

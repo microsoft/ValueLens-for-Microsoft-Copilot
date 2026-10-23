@@ -1,0 +1,59 @@
+EVALUATE
+-- The model's `Cowork Readiness Rank (Dynamic)` builds this scored table again
+-- for every person it ranks, so its cost grows with the square of the user
+-- count. It is built once here, as the measure builds it for one person with
+-- no organization in scope. Inside the measure, ALLSELECTED brings back the
+-- filters this query runs under, which are the users VALUES sees here.
+VAR __Scope =
+    FILTER(
+        ADDCOLUMNS(
+            VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+            "@b", [Cowork Readiness: Surfaces Per Day],
+            "@d", CALCULATE([Prompts per Observed Session], KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Is_Cowork] = FALSE())),
+            "@a", IF(COALESCE(CALCULATE([Observed Agent Sessions]), 0) > 0, 1, 0),
+            "@cw", COALESCE(CALCULATE([Observed Sessions], KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Is_Cowork] = TRUE())), 0)
+        ),
+        [@cw] = 0 && NOT ISBLANK([@b]) && NOT ISBLANK([@d])
+    )
+VAR __MaxB = MAXX(__Scope, [@b])
+VAR __MaxD = MAXX(__Scope, [@d])
+VAR __Scored =
+    ADDCOLUMNS(
+        __Scope,
+        "@s",
+            ROUND(
+                45 * MIN(DIVIDE([@b], __MaxB, 0), 1)
+                    + 35 * MIN(DIVIDE([@d], __MaxD, 0), 1)
+                    + 20 * [@a],
+                0
+            )
+    )
+-- A dense rank is one more than the number of distinct higher scores.
+VAR __Scores = DISTINCT(SELECTCOLUMNS(__Scored, "@Value", [@s]))
+VAR __Depths = COUNTROWS(DISTINCT(SELECTCOLUMNS(__Scope, "@Depth", [@d])))
+VAR __Total = COUNTROWS(__Scope)
+RETURN
+SELECTCOLUMNS(
+    TOPN(
+        1000,
+        __Scored,
+        [@s], DESC,
+        [@b], DESC,
+        'Chat + Agent Interactions (Audit Logs)'[Audit_UserId], ASC
+    ),
+    "Rank",
+        VAR __Score = [@s]
+        RETURN COUNTROWS(FILTER(__Scores, [@Value] > __Score)) + 1,
+    "User", 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId],
+    "Organization",
+        LOOKUPVALUE(
+            'Chat + Agent Org Data'[Organization],
+            'Chat + Agent Org Data'[PersonId], 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId]
+        ),
+    "Surfaces Per Day", [@b],
+    "Prompts Per Session", [@d],
+    "Uses Agents", IF(COALESCE([Cowork Fit: Agent User Share], 0) > 0, "Yes", "No"),
+    "Depths", __Depths,
+    "Total", __Total
+)
+ORDER BY [Rank], [Surfaces Per Day] DESC, [User]

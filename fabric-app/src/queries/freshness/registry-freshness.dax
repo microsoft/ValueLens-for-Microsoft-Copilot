@@ -1,0 +1,4 @@
+EVALUATE
+// When the Agent 365 registry was last updated, by the model's own measure,
+// as the Agent registry stage reports it.
+ROW("Last Date", [Agent Registry Freshness])

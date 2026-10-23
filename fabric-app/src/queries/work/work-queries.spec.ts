@@ -1,0 +1,314 @@
+//-----------------------------------------------------------------------
+// <copyright company="Microsoft Corporation">
+//        Copyright (c) Microsoft Corporation.  All rights reserved.
+//        Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// </copyright>
+//-----------------------------------------------------------------------
+
+import { describe, expect, it } from "vitest";
+import { describeOrgAttribute } from "@/lib/org-attribute";
+import {
+    cohortTaskField,
+    leaderboardCohorts,
+    leaderboardConcentration,
+    leaderboardMeasures,
+    leaderboardPeople,
+    leaderboardSummary,
+    leaderboardSummaryColumns,
+    leaderboardTasks,
+    surfaceUsage,
+    taskBreakdown,
+    taskDimensions,
+    topOutcome,
+    workCohorts,
+    workSummary,
+    type WorkCohort,
+} from "./index";
+import { liveColumns } from "./live-columns.fixture";
+
+const modules = [
+    { name: "workSummary", factory: () => workSummary(), columns: liveColumns.workSummary },
+    { name: "topOutcome", factory: () => topOutcome(), columns: liveColumns.topOutcome },
+    { name: "taskBreakdown", factory: () => taskBreakdown(), columns: liveColumns.taskBreakdown },
+    {
+        name: "surfaceUsage",
+        factory: () => surfaceUsage({ lens: "surface" }),
+        columns: liveColumns.surfaceUsage,
+    },
+    ...leaderboardCohorts.map(({ id }) => ({
+        name: `leaderboardSummary (${id})`,
+        factory: () => leaderboardSummary(id),
+        columns: liveColumns.leaderboardSummary[id],
+    })),
+    ...leaderboardCohorts.map(({ id }) => ({
+        name: `leaderboardPeople (${id})`,
+        factory: () => leaderboardPeople(id),
+        columns: liveColumns.leaderboardPeople,
+    })),
+    ...leaderboardCohorts.map(({ id }) => ({
+        name: `leaderboardConcentration (${id})`,
+        factory: () => leaderboardConcentration(id),
+        columns: liveColumns.leaderboardConcentration,
+    })),
+    ...leaderboardCohorts.map(({ id }) => ({
+        name: `leaderboardTasks (${id})`,
+        factory: () => leaderboardTasks(id),
+        columns: id === "cowork" ? liveColumns.leaderboardCoworkTasks : liveColumns.leaderboardTasks,
+    })),
+];
+
+/** Characters `ColumnDef.name` strips from the original DAX column name. */
+function cleanColumnName(original: string): string {
+    return original.replace(/[.[\]\\"']/g, "");
+}
+
+/** Every `field` reference anywhere in a Vega-Lite spec. */
+function collectFields(node: unknown, found: Set<string> = new Set()): Set<string> {
+    if (Array.isArray(node)) {
+        node.forEach((item) => collectFields(item, found));
+    } else if (node && typeof node === "object") {
+        for (const [key, value] of Object.entries(node)) {
+            if (key === "field" && typeof value === "string") {
+                found.add(value);
+            } else if (key === "fold" && Array.isArray(value)) {
+                value.forEach((item) => typeof item === "string" && found.add(item));
+            } else {
+                collectFields(value, found);
+            }
+        }
+    }
+    return found;
+}
+
+describe("work query contract", () => {
+    it.each(modules)("$name covers exactly the columns the model returns", ({ factory, columns }) => {
+        const { columnMetadata } = factory();
+        expect(Object.keys(columnMetadata).sort()).toEqual([...columns].sort());
+    });
+
+    it.each(modules)("$name derives ColumnDef names by the documented rule", ({ factory }) => {
+        const { columnMetadata } = factory();
+        for (const [original, def] of Object.entries(columnMetadata)) {
+            expect(def.name).toBe(cleanColumnName(original));
+        }
+    });
+
+    it.each(modules)("$name targets the bound connection", ({ factory }) => {
+        expect(factory().connection).toBe("vl");
+    });
+
+    it.each(modules)("$name ships a non-empty DAX query", ({ factory }) => {
+        const raw = factory().query;
+        // `trim()` treats U+FEFF as whitespace, so the BOM has to be checked on
+        // the raw string — it survives Vite's ?raw import and would otherwise be
+        // sent to the query service as part of the statement.
+        expect(raw.charCodeAt(0)).not.toBe(0xfeff);
+        expect(raw.trim()).toMatch(/^(EVALUATE|DEFINE)\b/);
+    });
+
+    // Every measure below was confirmed to exist in the published model. The
+    // report also binds to measures that do not exist there at all; naming one
+    // of those in a query returns an error rather than a blank, so the list is
+    // repeated here to make an accidental reintroduction fail the build.
+    it("never names a measure the published model does not define", () => {
+        const absent = [
+            "Licensed Utilisation %",
+            "NoOfActiveChatUsers (Licensed)",
+            "NoOfActiveChatUsers (Unlicensed)",
+            "Copilot AI Tasks Per User Per Week",
+            "AI Tasks per Active User per Week",
+            "UsersInteractingWithAgents",
+            "Agent AI Tasks Per User Per Week",
+        ];
+
+        for (const { name, factory } of modules) {
+            for (const measure of absent) {
+                expect(factory().query, `${name} references [${measure}]`).not.toContain(`[${measure}]`);
+            }
+        }
+    });
+});
+
+describe("work cohorts", () => {
+    it("names a task column for every cohort the toggles offer", () => {
+        const available = new Set(Object.values(surfaceUsage({ lens: "surface" }).columnMetadata).map((d) => d.name));
+        for (const { id } of workCohorts) {
+            expect(available, `cohort "${id}"`).toContain(cohortTaskField(id));
+        }
+    });
+
+    it("binds the selected cohort's column to the value axis", () => {
+        for (const { id } of workCohorts) {
+            const serialized = JSON.stringify(surfaceUsage({ lens: "model", cohort: id }).vegaLiteSpec);
+            expect(serialized).toContain(`"field":"${cohortTaskField(id)}"`);
+        }
+    });
+});
+
+describe("work spec field references", () => {
+    const specModules = [
+        ...taskDimensions.map(({ id }) => ({
+            name: `taskBreakdown (${id})`,
+            factory: () => taskBreakdown({ dimension: id }),
+        })),
+        ...(["surface", "model"] as const).flatMap((lens) =>
+            workCohorts.map(({ id }) => ({
+                name: `surfaceUsage (${lens}, ${id})`,
+                factory: () => surfaceUsage({ lens, cohort: id as WorkCohort }),
+            })),
+        ),
+    ];
+
+    it.each(specModules)("$name only references columns the query returns", ({ factory }) => {
+        const { columnMetadata, vegaLiteSpec } = factory();
+        const available = new Set(Object.values(columnMetadata).map((def) => def.name));
+
+        for (const field of collectFields(vegaLiteSpec)) {
+            expect(available, `unknown field "${field}"`).toContain(field);
+        }
+    });
+
+    it.each(specModules)("$name leaves no unsubstituted placeholders", ({ factory }) => {
+        expect(JSON.stringify(factory().vegaLiteSpec)).not.toMatch(/__[A-Z]+__/);
+    });
+
+    // DAX returns dates as ISO strings and Vega-Lite's `timeUnit` does not
+    // parse them, collapsing every point onto one x position. No Work spec
+    // plots a date today; this keeps it that way by accident-proofing.
+    it.each(specModules)("$name never relies on timeUnit to parse dates", ({ factory }) => {
+        expect(JSON.stringify(factory().vegaLiteSpec)).not.toMatch(/"timeUnit"/);
+    });
+
+    it("filters each lens to its own rows so the shared result never double-counts", () => {
+        for (const { id } of taskDimensions) {
+            const { vegaLiteSpec } = taskBreakdown({ dimension: id });
+            const serialized = JSON.stringify(vegaLiteSpec);
+            expect(serialized).toMatch(/"filter":"datum\.Dimension === '[^']+'"/);
+        }
+
+        for (const lens of ["surface", "model"] as const) {
+            const serialized = JSON.stringify(surfaceUsage({ lens }).vegaLiteSpec);
+            expect(serialized).toMatch(/"filter":"datum\.Lens === '[^']+'"/);
+        }
+    });
+
+    it("plots a dimension value the query actually emits", () => {
+        const { query } = taskBreakdown();
+        for (const { id } of taskDimensions) {
+            const spec = JSON.stringify(taskBreakdown({ dimension: id }).vegaLiteSpec);
+            const [, value] = spec.match(/"filter":"datum\.Dimension === '([^']+)'"/) ?? [];
+            expect(query, `dimension "${value}" is never produced`).toContain(`"Dimension", "${value}"`);
+        }
+    });
+
+    it("names the detailed-task lens Task Breakdown", () => {
+        expect(taskDimensions.map(({ label }) => label)).toEqual(["Task Breakdown", "Workflow action", "Value outcome"]);
+        expect(taskBreakdown().title).toBe("Tasks by Task Breakdown");
+    });
+
+    it("does not let one variant's spec changes leak into the next", () => {
+        surfaceUsage({ lens: "model", cohort: "agents" });
+        const followUp = JSON.stringify(surfaceUsage({ lens: "surface" }).vegaLiteSpec);
+        expect(followUp).toContain(`"filter":"datum.Lens === 'Surface'"`);
+        expect(followUp).toContain(`"field":"All Tasks"`);
+    });
+});
+
+describe("leaderboard queries", () => {
+    const cohortQueries = leaderboardCohorts.flatMap(({ id }) => [
+        { name: `people (${id})`, cohort: id, query: leaderboardPeople(id).query },
+        { name: `tasks (${id})`, cohort: id, query: leaderboardTasks(id).query },
+        { name: `summary (${id})`, cohort: id, query: leaderboardSummary(id).query },
+    ]);
+    const concentrationQueries = leaderboardCohorts.map(({ id }) => ({
+        name: `concentration (${id})`,
+        cohort: id,
+        query: leaderboardConcentration(id).query,
+    }));
+    const everyQuery = [...cohortQueries, ...concentrationQueries];
+
+    it.each([...cohortQueries, ...concentrationQueries])("$name leaves no unsubstituted placeholders", ({ query }) => {
+        expect(query).not.toMatch(/__[A-Z_]+__/);
+    });
+
+    // The top slices sum the sessions the people list sorts by, for the same people.
+    it.each(concentrationQueries)("$name sums its own cohort's sessions per person", ({ cohort, query }) => {
+        expect(query).toContain(`"@Sessions", [${leaderboardMeasures(cohort).sessions}]`);
+        expect(query).toContain(`'Chat + Agent Interactions (Audit Logs)'[Audit_UserId]`);
+        expect(leaderboardConcentration(cohort, describeOrgAttribute("Department")).query).toContain(
+            "'Chat + Agent Org Data'[Department]",
+        );
+    });
+
+    // Leaderboards shows the top 1%, 5% and 25% without a curve, so its query
+    // asks for those three cuts alone, still over the org-and-person rows.
+    it.each(concentrationQueries)("$name works out only the top slices", ({ query }) => {
+        expect(query).toContain(`SELECTCOLUMNS({ 1, 5, 25 }, "@Count", QUOTIENT(__Count * [Value] + 99, 100))`);
+        expect(query).toContain("'Chat + Agent Org Data'[Organization]");
+        expect(query).not.toMatch(/GENERATESERIES|UNION|__Steps/);
+    });
+
+    // The report's bookmarks each bind their own cohort's measures, so a
+    // template filled with the wrong ones would rank the wrong sessions.
+    it.each(cohortQueries)("$name binds its own cohort's measures", ({ cohort, query }) => {
+        const measures = leaderboardMeasures(cohort);
+        expect(query).toContain(`[${measures.users}]`);
+        expect(query).toContain(`[${measures.sessions}]`);
+        expect(query).toContain(`[${measures.perWeek}]`);
+    });
+
+    it.each(everyQuery)("$name leaves Security Copilot out, as the report's page filter does", ({ query }) => {
+        expect(query).toContain(
+            `NOT CONTAINSSTRING('Chat + Agent Interactions (Audit Logs)'[AppHost], "SecurityCopilot")`,
+        );
+    });
+
+    it("breaks Cowork down by what the work was, and every other cohort by app and Task Breakdown", () => {
+        for (const { id } of leaderboardCohorts) {
+            const levels =
+                id === "cowork" ? ["Task Breakdown Group", "Task Breakdown Category"] : ["AppHost", "Behavior_Enriched_Full"];
+            const rollup = new RegExp(
+                `ROLLUPADDISSUBTOTAL\\(\\s*'Chat \\+ Agent Interactions \\(Audit Logs\\)'\\[${levels[0]}\\], "Is Grand Total",\\s*` +
+                    `'Chat \\+ Agent Interactions \\(Audit Logs\\)'\\[${levels[1]}\\], "Is Group Total"`,
+            );
+            expect(leaderboardTasks(id).query, `cohort "${id}"`).toMatch(rollup);
+        }
+    });
+
+    it("names Cowork's levels Task Category then Task Breakdown, and every cohort's leaves Task Breakdown", () => {
+        for (const { id } of leaderboardCohorts) {
+            expect(leaderboardTasks(id).levels.leafNoun, `cohort "${id}"`).toBe("Task Breakdown");
+        }
+        expect(leaderboardTasks("cowork").levels.groupNoun).toBe("Task Category");
+    });
+
+    it("names every cohort's cards in its summary", () => {
+        for (const { id } of leaderboardCohorts) {
+            const available = new Set<string>(liveColumns.leaderboardSummary[id]);
+            for (const column of Object.values(leaderboardSummaryColumns(id))) {
+                expect(available, `cohort "${id}"`).toContain(column);
+            }
+        }
+    });
+
+    // All five cohorts' cards in one row took about twice as long as one at 20,000 people.
+    it("asks the summary for the chosen cohort's cards only", () => {
+        for (const { id } of leaderboardCohorts) {
+            const query = leaderboardSummary(id).query;
+            for (const { id: other } of leaderboardCohorts) {
+                if (other === id) continue;
+                expect(query, `cohort "${id}" asks for "${other}"`).not.toContain(`[${leaderboardMeasures(other).sessions}]`);
+            }
+        }
+    });
+
+    it("groups people by whichever org column is chosen", () => {
+        const { query, columnMetadata } = leaderboardPeople("licensed", describeOrgAttribute("Department"));
+        expect(query).toContain("'Chat + Agent Org Data'[Department]");
+        expect(query).not.toContain("[Organization]");
+        expect(columnMetadata["Chat + Agent Org Data[Department]"]).toMatchObject({
+            name: "Chat + Agent Org DataOrganization",
+            displayName: "Department",
+        });
+    });
+});

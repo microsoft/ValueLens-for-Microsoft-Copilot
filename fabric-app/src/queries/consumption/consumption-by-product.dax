@@ -1,0 +1,14 @@
+// GitHub Copilot is left out: this page covers Cowork / Work IQ, Copilot
+// Studio and Azure. The sort keeps the report's product order.
+EVALUATE
+SELECTCOLUMNS(
+    FILTER('Reporting Product', 'Reporting Product'[Product] <> "GitHub Copilot"),
+    "Product", 'Reporting Product'[Product],
+    "Product Sort",
+        SWITCH('Reporting Product'[Product], "Cowork / Work IQ", 1, "Copilot Studio", 2, "Azure AI Foundry", 3, 9),
+    "Credits", [Reporting Product Credits],
+    "Cost", [Reporting Product Cost],
+    "Cost Basis", [Reporting Cost Basis],
+    "Coverage", [Reporting Coverage]
+)
+ORDER BY [Product Sort] ASC
