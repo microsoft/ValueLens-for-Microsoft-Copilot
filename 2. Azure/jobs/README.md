@@ -54,6 +54,14 @@ model reads `dbo.<table>` in Azure SQL. Each collector fails on its own, and the
     - `azure_deployment_health`
     - `azure_solution_spend`
     - `azure_billing_reconciliation`
+  - Each run replaces those 90 days in every table and keeps the older rows, so the history grows
+    past 90 days. A result with no rows still replaces its days, and rows with no date are always
+    replaced. `azure_deployment_health` and `azure_billing_reconciliation` replace whole months: when
+    the window starts after the 1st, that month's stored rows are kept only if they were written
+    after the month ended.
+  - A stored table that can't be read (a failed download or a corrupt file) isn't counted as empty:
+    its write fails and the table is left as it was. For the strict tables, none of the three is
+    replaced.
   - Without that subscription, pay-as-you-go isn't read either, as in Fabric.
   - The managed identity needs Cost Management Reader and Monitoring Reader (or Reader) on each
     subscription.
@@ -100,7 +108,7 @@ state is ignored. Where the folder lives depends on the networking mode:
 | `studio_agent`, `studio_user` | studio | snapshot |
 | `viva_credits_weekly` | viva | by `metric_date` |
 | `viva_spending_policy` | viva | snapshot |
-| `azure_ai_spend`, `azure_ai_tokens`, `copilot_payg_spend`, `azure_deployment_health`, `azure_solution_spend`, `azure_billing_reconciliation` | azure_ai | snapshot |
+| `azure_ai_spend`, `azure_ai_tokens`, `copilot_payg_spend`, `azure_deployment_health`, `azure_solution_spend`, `azure_billing_reconciliation` | azure_ai | snapshot of the lake table, which keeps older days |
 | `arg_agent_config`, `arg_environments`, `arg_agent_flows`, `arg_foundry_resources`, `arg_status` | resource_graph | snapshot |
 
 `2. Azure/sql/migrations/V002__consumption.sql` and `V004__resource_graph.sql` create every table up front, so a refresh before
@@ -163,7 +171,7 @@ The job reads its settings from environment variables. Bicep sets them.
 | `raw/copilot_licensed_users/`, `raw/copilot_org_data/`, `raw/m365_activity_daily/` | Collector snapshots |
 | `curated/copilot_interactions_curated/part-0.parquet` | The curated fact. It is written atomically. |
 | `curated/studio_*/`, `curated/viva_*/` | consumption: the merged Studio and Viva tables, rewritten atomically each run |
-| `raw/azure_ai_*/`, `raw/copilot_payg_spend/`, `raw/azure_deployment_health/`, `raw/azure_solution_spend/`, `raw/azure_billing_reconciliation/` | consumption: Azure AI snapshots |
+| `raw/azure_ai_*/`, `raw/copilot_payg_spend/`, `raw/azure_deployment_health/`, `raw/azure_solution_spend/`, `raw/azure_billing_reconciliation/` | consumption: the Azure AI tables, one file each. Each run replaces its 90 days and keeps older rows. |
 | `landing/studio/`, `landing/viva/` | consumption: the drop folder in public networking. It is read only. |
 | `raw/defender_*/` | defender: one parquet file per day for the two daily tables, a snapshot for the rest |
 | `landing/defender/ai_watchlist.csv` | defender: the AI watchlist. The first run writes it; after that it is only read |

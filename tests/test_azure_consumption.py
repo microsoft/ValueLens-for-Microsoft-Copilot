@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import duckdb
@@ -451,23 +451,26 @@ def _cost_page(columns, rows):
     return Resp(200, {"properties": {"columns": [{"name": c} for c in columns], "rows": rows, "nextLink": None}})
 
 
-def _arm_handler(rid, calls):
+def _arm_handler(rid, calls, windowed=False):
+    """Fake ARM. Cost rows are on 1 and 2 Aug, or with `windowed` on the query's first two days."""
     def handler(method, url, kw):
         calls.append((method, url, kw))
         assert url.startswith("https://management.azure.com/")
         if method == "POST" and url.endswith("/query?api-version=2025-03-01"):
             body = kw["json"]
+            first = date.fromisoformat(body["timePeriod"]["from"][:10]) if windowed else date(2026, 8, 1)
+            spend_day, payg_day = (int(f"{d:%Y%m%d}") for d in (first, first + timedelta(days=1)))
             grouping = [g["name"] for g in body["dataset"]["grouping"]]
             if grouping == ["ServiceName", "MeterCategory"]:
                 return _cost_page(["Cost", "UsageQuantity", "UsageDate", "ServiceName", "MeterCategory", "Currency"],
-                                  [[1.5, 3, 20260801, "Foundry Models", "Foundry Models", "USD"]])
+                                  [[1.5, 3, spend_day, "Foundry Models", "Foundry Models", "USD"]])
             if grouping == ["Meter", "ResourceId"]:
                 return _cost_page(["Cost", "UsageQuantity", "UsageDate", "Meter", "ResourceId", "Currency"],
-                                  [[1.5, 3, 20260801, "gpt 1M input tokens", rid, "USD"]])
+                                  [[1.5, 3, spend_day, "gpt 1M input tokens", rid, "USD"]])
             if grouping == ["Meter", "serviceName"]:
                 tagged = PAYG_SUB in url
                 return _cost_page(["PreTaxCost", "UsageQuantity", "UsageDate", "Meter", "TagKey", "TagValue", "Currency"],
-                                  [[2.0, 200, 20260802, "Pay As You Go Copilot Credit",
+                                  [[2.0, 200, payg_day, "Pay As You Go Copilot Credit",
                                     "serviceName" if tagged else "", "cowork" if tagged else "", "USD"]])
             return Resp(204)  # solution spend / reconciliation detail: no rows
         if url.endswith("/resources"):
@@ -515,6 +518,166 @@ def test_collect_azure_ai_strict_failure_writes_nothing(tmp_path):
     assert not (tmp_path / "raw").exists()
     with pytest.raises(ValueError):
         azure_ai.collect_azure_ai(api, LocalStore(tmp_path), Settings(azure_ai_subscription="not-a-guid"))
+
+
+AI_RID = f"/subscriptions/{SUB}/resourceGroups/rg-ai/providers/Microsoft.CognitiveServices/accounts/demo-ai"
+
+
+def _run_azure_ai(store, today, handler=None):
+    api, _ = make_api(handler or _arm_handler(AI_RID, [], windowed=True))
+    s = Settings(modules=frozenset({"consumption"}), azure_ai_subscription=SUB, payg_subscriptions=(PAYG_SUB,))
+    return azure_ai.collect_azure_ai(api, store, s, today=today)
+
+
+def _raw(store, name, columns):
+    path = (store.root / "raw" / name).as_posix()
+    rows = duckdb.sql(f"SELECT {columns} FROM read_parquet('{path}/*.parquet') ORDER BY ALL").fetchall()
+    return [r[0] if len(r) == 1 else r for r in rows]
+
+
+def _health_row(metric_date, snapshot_date, name):
+    return {"MetricDate": metric_date, "SnapshotDate": snapshot_date, "DeploymentName": name}
+
+
+def _recon_row(first, last, pool):
+    return {"Period": f"{first:%Y-%m}", "PeriodStart": first, "PeriodEnd": last, "PoolName": pool}
+
+
+def test_azure_ai_reload_keeps_older_rows(tmp_path):
+    store = LocalStore(tmp_path)
+    assert _run_azure_ai(store, TODAY)["azure_ai_spend"] == 1  # window from 12 June
+    for _ in range(2):  # window from 17 June; a rerun replaces it again rather than adding to it
+        out = _run_azure_ai(store, TODAY + timedelta(days=5))
+        assert out["azure_ai_spend"] == 2 and out["copilot_payg_spend"] == 4
+    assert _raw(store, "azure_ai_spend", "UsageDate") == [date(2026, 6, 12), date(2026, 6, 17)]
+    assert _raw(store, "copilot_payg_spend", "UsageDate") == [date(2026, 6, 13)] * 2 + [date(2026, 6, 18)] * 2
+    assert store.list("raw/azure_ai_spend") == ["raw/azure_ai_spend/part-0.parquet"]
+
+
+def test_azure_ai_empty_strict_result_replaces_its_window(tmp_path):
+    store = LocalStore(tmp_path)
+    _run_azure_ai(store, TODAY)
+    _run_azure_ai(store, TODAY + timedelta(days=5))
+    inner = _arm_handler(AI_RID, [], windowed=True)
+
+    def no_costs(method, url, kw):
+        return Resp(204) if method == "POST" else inner(method, url, kw)
+
+    out = _run_azure_ai(store, TODAY + timedelta(days=3), no_costs)  # window from 15 June
+    assert out["azure_ai_spend"] == 1 and out["copilot_payg_spend"] == 2
+    assert _raw(store, "azure_ai_spend", "UsageDate") == [date(2026, 6, 12)]
+    assert _raw(store, "copilot_payg_spend", "UsageDate") == [date(2026, 6, 13)] * 2
+
+
+def test_azure_ai_best_effort_step_that_fails_leaves_its_table(tmp_path, monkeypatch):
+    store = LocalStore(tmp_path)
+    azure_ai.write_tables(store, date(2026, 5, 1), {"azure_deployment_health": [
+        _health_row(date(2026, 5, 31), date(2026, 5, 31), "may"), _health_row(date(2026, 6, 30), date(2026, 6, 30), "june"),
+        _health_row(date(2026, 7, 31), date(2026, 7, 20), "july"), _health_row(None, None, "undated")]})
+    stored = tmp_path / "raw" / "azure_deployment_health" / "part-0.parquet"
+    before = stored.read_bytes()
+
+    def boom(*a, **k):
+        raise RuntimeError("Monitor is unavailable")
+
+    for step, warnings in ((boom, 1), (lambda *a, **k: None, None)):
+        monkeypatch.setattr(azure_ai, "collect_health", step)
+        out = _run_azure_ai(store, TODAY)
+        assert "azure_deployment_health" not in out and out.get("warnings") == warnings
+        assert out["azure_ai_spend"] == 1 and out["azure_solution_spend"] == 0
+        assert stored.read_bytes() == before
+    # A step that succeeds with no rows replaces its window. The window starts on 12 June, and
+    # June's rows were stored after it ended, so June is kept; July and the undated row go.
+    monkeypatch.setattr(azure_ai, "collect_health", lambda *a, **k: [])
+    assert _run_azure_ai(store, TODAY)["azure_deployment_health"] == 2
+    assert _raw(store, "azure_deployment_health", "DeploymentName") == ["june", "may"]
+
+
+@pytest.mark.parametrize("start, june_covered, kept", [
+    (date(2026, 6, 12), date(2026, 6, 30), True),  # June was stored after it ended
+    (date(2026, 6, 12), date(2026, 6, 20), False),  # stored while June was in progress
+    (date(2026, 6, 1), date(2026, 6, 30), False),  # the window covers all of June
+])
+def test_azure_ai_monthly_tables_replace_whole_months(tmp_path, start, june_covered, kept):
+    store = LocalStore(tmp_path)
+    azure_ai.write_tables(store, date(2026, 4, 1), {
+        "azure_deployment_health": [_health_row(date(2026, 5, 31), date(2026, 5, 31), "old"),
+                                    _health_row(date(2026, 6, 30), june_covered, "old")],
+        "azure_billing_reconciliation": [_recon_row(date(2026, 5, 1), date(2026, 5, 31), "old"),
+                                         _recon_row(date(2026, 6, 1), june_covered, "old")]})
+    out = azure_ai.write_tables(store, start, {
+        "azure_deployment_health": [_health_row(date(2026, 6, 30), date(2026, 6, 30), "new"),
+                                    _health_row(date(2026, 7, 31), date(2026, 7, 31), "new")],
+        "azure_billing_reconciliation": [_recon_row(start, date(2026, 6, 30), "new"),
+                                         _recon_row(date(2026, 7, 1), date(2026, 7, 31), "new")]})
+    assert out == {"azure_deployment_health": 3, "azure_billing_reconciliation": 3}
+    june = "old" if kept else "new"
+    assert _raw(store, "azure_deployment_health", "MetricDate, DeploymentName") == [
+        (date(2026, 5, 31), "old"), (date(2026, 6, 30), june), (date(2026, 7, 31), "new")]
+    assert _raw(store, "azure_billing_reconciliation", "PeriodStart, PoolName") == [
+        (date(2026, 5, 1), "old"), (date(2026, 6, 1) if kept else start, june), (date(2026, 7, 1), "new")]
+
+
+class _FailingPull(LocalStore):
+    def pull(self, prefix):
+        if prefix == "raw/azure_ai_tokens":
+            raise OSError("download failed")
+        return super().pull(prefix)
+
+
+def test_azure_ai_unreadable_stored_table_fails_and_replaces_nothing(tmp_path):
+    store = LocalStore(tmp_path)
+    _run_azure_ai(store, TODAY)
+    files = [tmp_path / "raw" / t / "part-0.parquet" for t in ("azure_ai_spend", "azure_ai_tokens", "copilot_payg_spend")]
+    before = [p.read_bytes() for p in files]
+    later = TODAY + timedelta(days=5)
+    with pytest.raises(RuntimeError, match="can't be read, so nothing was replaced .*download failed"):
+        _run_azure_ai(_FailingPull(tmp_path), later)
+    assert [p.read_bytes() for p in files] == before
+    files[2].write_bytes(b"not parquet")
+    with pytest.raises(RuntimeError, match="can't be read, so nothing was replaced"):
+        _run_azure_ai(store, later)
+    assert [p.read_bytes() for p in files] == before[:2] + [b"not parquet"]
+
+
+def test_azure_ai_unreadable_best_effort_table_is_left_with_a_warning(tmp_path, caplog):
+    store = LocalStore(tmp_path)
+    _run_azure_ai(store, TODAY)
+    health = tmp_path / "raw" / "azure_deployment_health" / "part-0.parquet"
+    health.write_bytes(b"not parquet")
+    out = _run_azure_ai(store, TODAY + timedelta(days=5))
+    assert out["warnings"] == 1 and "azure_deployment_health" not in out
+    assert out["azure_ai_spend"] == 2 and out["azure_solution_spend"] == 0
+    assert health.read_bytes() == b"not parquet"
+    assert "azure_deployment_health failed; left unchanged" in caplog.text
+
+
+def test_azure_ai_rows_with_no_date_are_replaced(tmp_path):
+    store = LocalStore(tmp_path)
+    azure_ai.write_tables(store, date(2026, 5, 1), {"azure_ai_spend": [
+        {"UsageDate": None, "Meter": "undated"}, {"UsageDate": date(2026, 5, 2), "Meter": "older"}]})
+    assert _raw(store, "azure_ai_spend", "Meter") == ["older", "undated"]
+    out = azure_ai.write_tables(store, date(2026, 6, 12), {"azure_ai_spend": [
+        {"UsageDate": date(2026, 6, 12), "Meter": "new"}, {"UsageDate": date(2026, 6, 1), "Meter": "before the window"}]})
+    assert out == {"azure_ai_spend": 2}
+    assert _raw(store, "azure_ai_spend", "UsageDate, Meter") == [(date(2026, 5, 2), "older"), (date(2026, 6, 12), "new")]
+
+
+def test_azure_ai_reads_stored_files_by_the_current_columns(tmp_path):
+    store = LocalStore(tmp_path)
+    folder = tmp_path / "raw" / "azure_ai_spend"
+    folder.mkdir(parents=True)
+    duckdb.sql(f"COPY (SELECT DATE '2026-05-02' AS UsageDate, 'm' AS Meter, 1.5 AS Cost, 'x' AS Retired) "
+               f"TO '{(folder / 'part-0.parquet').as_posix()}' (FORMAT PARQUET)")
+    duckdb.sql(f"COPY (SELECT DATE '2026-05-03' AS UsageDate, 'n' AS Meter, 'Ops' AS DepartmentTag) "
+               f"TO '{(folder / 'part-3.parquet').as_posix()}' (FORMAT PARQUET)")
+    assert azure_ai.write_tables(store, date(2026, 6, 12), {"azure_ai_spend": []}) == {"azure_ai_spend": 2}
+    assert store.list("raw/azure_ai_spend") == ["raw/azure_ai_spend/part-0.parquet"]
+    rel = duckdb.sql(f"SELECT * FROM read_parquet('{(folder / 'part-0.parquet').as_posix()}') ORDER BY ALL")
+    assert rel.columns == [c for c, _ in azure_ai.SCHEMAS["azure_ai_spend"]]
+    rows = [dict(zip(rel.columns, r)) for r in rel.fetchall()]
+    assert [(r["UsageDate"], r["Meter"], r["Cost"], r["DepartmentTag"]) for r in rows] == [
+        (date(2026, 5, 2), "m", 1.5, None), (date(2026, 5, 3), "n", None, "Ops")]
 
 
 def test_arm_client_refuses_foreign_continuation_urls():
