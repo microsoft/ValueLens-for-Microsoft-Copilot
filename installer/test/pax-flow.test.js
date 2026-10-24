@@ -1031,6 +1031,26 @@ test('pax flow: a reload that stops part way says so, and status shows how far t
   assert.doesNotMatch(await status(), /History:/, 'a one-window load finishes in one run');
 });
 
+test('pax flow: status warns while a history load reads its days without the day before', { timeout: 10_000 }, async () => {
+  const s = await installed({ by: { [Q.signIn]: 'set' } });
+  const status = async () => {
+    s.ui.out.length = 0;
+    assert.equal(await paxStatus(s.ctx), true, plain(s.ui.text()));
+    return plain(s.ui.text());
+  };
+  s.pax.setRun('partial');
+  assert.equal(await paxCommand(s.ctx, 'run', { backfillDays: 120 }), true, plain(s.ui.text()));
+  assert.doesNotMatch(await status(), /without the day before/);
+  const state = /** @type {any} */ (readState(s.pax.host));
+  state.progress.noOverlap = true;
+  s.pax.writeState(state);
+  const text = await status();
+  assert.ok(text.includes(
+    "! The history load reads its days without the day before, because a run that read one day with the day before didn't finish inside the task's time limit. So each day can miss the activity between midnight UTC and midnight in this PC's time zone.",
+  ), text);
+  assert.match(text, /^ +History: +loading 120 days of activity/m, 'the load still shows how far it has got');
+});
+
 test('pax flow: a run that stops part way through a long load says the next run carries on', { timeout: 10_000 }, async () => {
   const s = await installed({ by: { [Q.signIn]: 'set' } });
   rmSync(paxPaths(s.pax.host).state);

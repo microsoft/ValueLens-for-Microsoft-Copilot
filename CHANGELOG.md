@@ -53,9 +53,12 @@ a second route that needs no Fabric.
   and Repair asks again.
 - **Long loads on the PAX route.** The task reads history a week at a time, oldest first, and saves
   its progress after each week. It stops before the task's 12-hour limit, and the next run carries
-  on. A file copied down from SharePoint is used only when its size matches SharePoint's. PAX
-  1.11.15 can exit 0 when its rollup step fails, so the run reads PAX's log too, and fails when the
-  rollup failed or PAX didn't write a file.
+  on. PAX reads days in the PC's time zone but keeps whole UTC days, so each week after the first
+  starts a day early, and PAX drops the rows it already has. If even one day read with the day
+  before can't finish inside the limit, the load reads on without the day before, and **Check
+  status** warns that each day can miss a few hours. A file copied down from SharePoint is used
+  only when its size matches SharePoint's. PAX 1.11.15 can exit 0 when its rollup step fails, so
+  the run reads PAX's log too, and fails when the rollup failed or PAX didn't write a file.
 - **The Power BI model.** When Power BI turns the model's refresh schedule off, the installer turns
   it back on after the next refresh it waits for works. The installer never replaces or deletes a
   model or report it didn't publish: its own get a free name, such as `ValueLens_2`. A model

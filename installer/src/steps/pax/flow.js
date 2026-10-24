@@ -593,6 +593,10 @@ export async function paxStatus(ctx) {
       const read = load.throughUtc ? `read up to ${when(load.throughUtc)} so far` : 'none read yet';
       ui.info(`History:      loading ${load.days} days of activity, ${read}. Each run carries on where the last one stopped.`);
     }
+    // The task stopped a one-day window that read the day before too, so the load reads without it.
+    if (load?.noOverlap) {
+      ui.warn("The history load reads its days without the day before, because a run that read one day with the day before didn't finish inside the task's time limit. So each day can miss the activity between midnight UTC and midnight in this PC's time zone.");
+    }
     if (state.gapWarning) ui.warn(String(state.gapWarning));
     if (state.lastResult === 'failed') {
       ok = false;

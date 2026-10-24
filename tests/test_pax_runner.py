@@ -199,6 +199,19 @@ def day_before(iso_day):
     return (date.fromisoformat(iso_day) - timedelta(days=1)).isoformat()
 
 
+def early(spans, first=False):
+    """The (StartDate, EndDate) refresh.ps1 passes for those windows. PAX reads days in the PC's time zone but keeps
+    whole UTC days, so each window after the first starts a day early, and so does the first when first is True."""
+    return [(day_before(start) if k or first else start, end) for k, (start, end) in enumerate(spans)]
+
+
+EARLY = ("a day early, because PAX reads days in this PC's time zone but keeps whole UTC days. PAX drops the rows it "
+         "already has.")
+NO_OVERLAP = ("This load reads its days without the day before, because a run that read one day with the day before "
+              "didn't finish inside the task's time limit. So each day can miss the activity between midnight UTC and "
+              "midnight in this PC's time zone.")
+
+
 ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
 
@@ -700,6 +713,30 @@ def _window_resume_small(c):
     c.config(windowDays=7, runHours=1e-05).state(5, progress=progress).local().run()
 
 
+@refresh_case("window-no-overlap")
+def _window_no_overlap(c):
+    # The last run was stopped inside a one-day window that read the day before too. The limit
+    # stops the first run after one window, and the second run has the default limit.
+    progress = {"fromUtc": local_midnight_utc(10), "days": 10, "seed": True, "windowDays": 1,
+                "throughUtc": local_midnight_utc(5),
+                "pending": {"from": local_midnight_utc(5), "to": local_midnight_utc(4), "days": 1, "first": True,
+                            "early": True}}
+    full = c.install / "refresh-full.json"
+    c.config(windowDays=7, runHours=1e-05).config(path=full, windowDays=7)
+    c.state(5, progress=progress).local().run().run(Config=full)
+
+
+@refresh_case("window-join-daily")
+def _window_join_daily(c):
+    # With no days of overlap, a daily run starts at the day the cumulative files stop.
+    c.config(overlapDays=0, minDays=1).state(1).local().run()
+
+
+@refresh_case("window-join-180")
+def _window_join_180(c):
+    c.config().state(180).local().run(Days=180)
+
+
 # Files left by earlier runs: their age in days, and whether the refresh keeps them.
 PRUNE_FILES = {
     "data/old.log": (40, False),
@@ -835,9 +872,9 @@ class RefreshTests(unittest.TestCase):
         return [(entry["params"].get("StartDate"), entry["params"].get("EndDate")) for entry in case.log("pax", n)]
 
     @staticmethod
-    def progress(from_days_ago, days, through_days_ago, window_days=7):
+    def progress(from_days_ago, days, through_days_ago, window_days=7, no_overlap=False):
         return {"fromUtc": local_midnight_utc(from_days_ago), "days": days, "seed": True, "windowDays": window_days,
-                "throughUtc": local_midnight_utc(through_days_ago), "pending": None}
+                "noOverlap": no_overlap, "throughUtc": local_midnight_utc(through_days_ago), "pending": None}
 
     def assertRolledUp(self, case, interactions, users, folder="Reports"):
         self.assertEqual(case.remote_lines(f"{folder}/{INTERACTIONS}"), interactions)
@@ -1149,7 +1186,9 @@ class RefreshTests(unittest.TestCase):
 
     def test_a_long_load_reads_its_days_in_windows_oldest_first(self):
         c = self.case("windowed-seed")
-        expected = windows(30, 5)
+        nominal = windows(30, 5)
+        # Each window after the first starts a day early, so no hours fall between two windows.
+        expected = early(nominal)
         self.assertEqual(c.exit(1), 0, c.output(1))
         self.assertEqual(self.spans(c, 1), expected)
         pax = c.log("pax", 1)
@@ -1158,9 +1197,10 @@ class RefreshTests(unittest.TestCase):
         # The Agent 365 registry is a snapshot, so only the first window reads it.
         self.assertEqual(["IncludeAgent365Info" in run["params"] for run in pax], [True, False, False, False, False])
         output = c.output(1)
-        self.assertIn(f"PAX looks back 30 days, from {expected[0][0]}.", output)
+        self.assertIn(f"PAX looks back 30 days, from {nominal[0][0]}.", output)
         self.assertIn("It reads them in 5 windows of up to 6 days, oldest first.", output)
-        self.assertIn(f"==> Window 2 of 5: {expected[1][0]} to {day_before(expected[1][1])}", output)
+        self.assertIn(f"Each window after the first starts {EARLY}", output)
+        self.assertIn(f"==> Window 2 of 5: {nominal[1][0]} to {day_before(nominal[1][1])}", output)
         self.assertEqual(len(c.tokens(1)), 2)
         rows = [f"row-from-run-1-{start}" for start, _ in expected]
         self.assertRolledUp(c, ["Message_Id_Raw", *rows], ["Id", *rows])
@@ -1172,19 +1212,21 @@ class RefreshTests(unittest.TestCase):
         c = self.case("window-fail-resume")
         first = windows(30, 5)
         self.assertEqual(c.exit(1), 1, c.output(1))
-        self.assertEqual(self.spans(c, 1), first[:2])
+        self.assertEqual(self.spans(c, 1), early(first[:2]))
         self.assertEqual(c.log("upload", 1), [])
         state = self.assertState(c, 1, lastResult="failed", coveredThroughUtc=local_midnight_utc(24),
                                  progress=self.progress(30, 30, 24))
         self.assertEqual(state["lastError"],
                          f"The PAX run failed (exit code 1). PAX stopped on an error. PAX failed. The log is {state['lastLog']}.")
-        # The next run carries on at the day the last window it read stopped.
-        second = windows(24, 4)
+        # The next run carries on at the day the last window it read stopped. Its first window
+        # starts there, so it starts a day early too.
+        second = early(windows(24, 4), first=True)
         self.assertEqual(c.exit(2), 0, c.output(2))
         self.assertEqual(self.spans(c, 2), second)
         self.assertIn(f"The last run stopped part way through a load, so this run carries on from {first[0][1]}.",
                       c.output(2))
         self.assertIn("It reads them in 4 windows of up to 6 days, oldest first.", c.output(2))
+        self.assertIn(f"Each window starts {EARLY}", c.output(2))
         self.assertState(c, 2, lastResult="success", days=24, coveredThroughUtc=local_midnight_utc(0), progress=None)
         rows = [f"row-from-run-1-{first[0][0]}"] + [f"row-from-run-2-{start}" for start, _ in second]
         self.assertRolledUp(c, ["Message_Id_Raw", *rows], ["Id", *rows])
@@ -1194,15 +1236,16 @@ class RefreshTests(unittest.TestCase):
         self.assertEqual(c.exit(1), 0, c.output(1))
         self.assertIn("The last run never finished its first window, of 6 days, so this run reads windows of up to "
                       "3 days.", c.output(1))
-        self.assertEqual(self.spans(c, 1), windows(12, 4))
+        self.assertEqual(self.spans(c, 1), early(windows(12, 4)))
         self.assertState(c, 1, lastResult="success", days=12, coveredThroughUtc=local_midnight_utc(0), progress=None)
 
     def test_a_first_window_with_no_activity_leaves_the_files_to_a_later_window(self):
         c = self.case("window-zero-first")
-        expected = windows(30, 5)
+        nominal = windows(30, 5)
+        expected = early(nominal)
         self.assertEqual(c.exit(1), 0, c.output(1))
         self.assertEqual(self.spans(c, 1), expected)
-        self.assertIn(f"PAX found no Copilot activity from {expected[0][0]} to {day_before(expected[0][1])}, "
+        self.assertIn(f"PAX found no Copilot activity from {nominal[0][0]} to {day_before(nominal[0][1])}, "
                       "so a later window starts the files.", c.output(1))
         self.assertEqual(["AppendFile" in run["params"] for run in c.log("pax", 1)], [False, False, True, True, True])
         rows = [f"row-from-run-1-{start}" for start, _ in expected[1:]]
@@ -1221,7 +1264,7 @@ class RefreshTests(unittest.TestCase):
                              "the task's time limit. SharePoint has everything loaded so far, and the next scheduled "
                              "run carries on from there."))
         self.assertEqual(self.remote_names(c, 1), [INTERACTIONS, USERS])
-        second = windows(24, 4)
+        second = early(windows(24, 4), first=True)
         self.assertEqual(c.exit(2), 0, c.output(2))
         self.assertEqual(self.spans(c, 2), second)
         self.assertState(c, 2, lastResult="success", lastMessage="SharePoint's files are up to date.", days=24,
@@ -1232,11 +1275,50 @@ class RefreshTests(unittest.TestCase):
     def test_a_resumed_load_moves_on_with_every_window_however_small(self):
         c = self.case("window-resume-small")
         self.assertEqual(c.exit(1), 0, c.output(1))
-        # Starting with the usual overlap would read only days the load already has.
-        self.assertEqual(self.spans(c, 1), windows(5, 5)[:1])
+        # Starting with the usual overlap would read only days the load already has. Its windows
+        # start a day early instead.
+        self.assertEqual(self.spans(c, 1), early(windows(5, 5)[:1], first=True))
+        self.assertIn(f"Each window starts {EARLY}", c.output(1))
         self.assertIn("The run stops here.", c.output(1))
         self.assertState(c, 1, lastResult="success", days=5, coveredThroughUtc=local_midnight_utc(4),
                          progress=self.progress(10, 10, 4, window_days=1))
+
+    def test_a_one_day_window_stopped_with_the_day_before_reads_on_without_it_and_warns(self):
+        c = self.case("window-no-overlap")
+        first = windows(5, 5)
+        self.assertEqual(c.exit(1), 0, c.output(1))
+        # A one-day window can't be halved, so the load gives up the day before instead.
+        self.assertIn("The last run never finished its first window, of one day read with the day before, so this run "
+                      "reads its days without the day before.", c.output(1))
+        self.assertEqual(self.spans(c, 1), first[:1])
+        self.assertNotIn("a day early", c.output(1))
+        self.assertIn(NO_OVERLAP, c.output(1))
+        self.assertState(c, 1, lastResult="success", coveredThroughUtc=local_midnight_utc(4),
+                         progress=self.progress(10, 10, 4, window_days=1, no_overlap=True), lastMessage=(
+                             f"This run loaded activity up to {day_before(first[0][1])}, then stopped to stay inside "
+                             "the task's time limit. SharePoint has everything loaded so far, and the next scheduled "
+                             f"run carries on from there. {NO_OVERLAP}"))
+        # The rest of the load reads without the day before too, and the run that finishes it says so.
+        self.assertEqual(c.exit(2), 0, c.output(2))
+        self.assertEqual(self.spans(c, 2), windows(4, 4))
+        self.assertNotIn("a day early", c.output(2))
+        self.assertState(c, 2, lastResult="success", days=4, coveredThroughUtc=local_midnight_utc(0), progress=None,
+                         lastMessage=f"SharePoint's files are up to date. {NO_OVERLAP}")
+
+    def test_a_daily_run_that_starts_where_the_files_stop_starts_a_day_early(self):
+        c = self.case("window-join-daily")
+        self.assertEqual(c.exit(1), 0, c.output(1))
+        self.assertEqual(self.spans(c, 1), early(windows(1, 1), first=True))
+        self.assertNotIn("Days", c.log("pax", 1)[0]["params"])
+        self.assertIn(f"It starts {EARLY}", c.output(1))
+        self.assertState(c, 1, lastResult="success", days=1, coveredThroughUtc=local_midnight_utc(0), progress=None)
+
+    def test_a_load_of_180_days_never_reaches_back_a_day_further(self):
+        c = self.case("window-join-180")
+        self.assertEqual(c.exit(1), 0, c.output(1))
+        self.assertEqual(self.days(c, 1), "180")
+        self.assertNotIn("a day early", c.output(1))
+        self.assertState(c, 1, lastResult="success", days=180, coveredThroughUtc=local_midnight_utc(0))
 
     def test_old_run_files_and_logs_are_pruned(self):
         c = self.case("prune")

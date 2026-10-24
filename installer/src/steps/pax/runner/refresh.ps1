@@ -20,6 +20,13 @@
   from the last finished window. So does the next run after one that failed part way. When
   Task Scheduler stops a run inside its first window, the next run reads windows half that size.
 
+  PAX reads whole days in this PC's time zone but keeps only rows on whole UTC days, so two
+  windows that just meet would miss the hours between them. Each window after the first starts
+  a day early, and so does the first when it starts where the cumulative files stop. PAX drops
+  the rows it already has. When Task Scheduler stops a run inside a one-day window that started
+  early, the rest of that load reads its days without the day before, and its runs warn that
+  each day can miss the activity between midnight UTC and midnight in this PC's time zone.
+
   The folder holds:
     data\         the cumulative files, PAX's logs, and any files set aside
     work\         Run-PAX-AIBV.ps1's working folder: the PAX download and processed\
@@ -319,6 +326,7 @@ function ConvertTo-Progress {
       to    = Format-UtcDate $window.to
       days  = [int]$window.days
       first = ($window.first -eq $true)
+      early = ($window.early -eq $true)
     }
   }
   return [ordered]@{
@@ -326,6 +334,7 @@ function ConvertTo-Progress {
     days       = [int]$Value.days
     seed       = ($Value.seed -eq $true)
     windowDays = [int]$Value.windowDays
+    noOverlap  = ($Value.noOverlap -eq $true)
     throughUtc = Format-UtcDate $Value.throughUtc
     pending    = $pending
   }
@@ -760,24 +769,43 @@ function Set-RunWindow {
   if ($reachFrom -and $script:WindowStart -gt $reachFrom -and $script:RunDays -lt 180) { $script:NewGapFrom = $reachFrom }
 
   $size = $cfg.windowDays
+  $noOverlap = $false
   if ($progress) {
     $size = [math]::Min($size, $progress.windowDays)
+    $noOverlap = $progress.noOverlap
     $pending = $progress.pending
     if ($pending -and $pending.first) {
       # The last run ended inside its first window without saving a result, which is what
       # happens when Task Scheduler stops a run at its time limit.
       $size = [math]::Min($size, [math]::Max(1, [math]::Floor($pending.days / 2)))
-      Write-Host ('The last run never finished its first window, of {0} days, so this run reads windows of up to {1} days.' -f $pending.days, $size)
+      if ($pending.days -le 1 -and $pending.early) {
+        # A one-day window can't be halved, so it gives up the day before instead.
+        $noOverlap = $true
+        Write-Host 'The last run never finished its first window, of one day read with the day before, so this run reads its days without the day before.'
+      } else {
+        Write-Host ('The last run never finished its first window, of {0} days, so this run reads windows of up to {1} days.' -f $pending.days, $size)
+      }
     }
   }
+  $script:NoOverlap = [bool]$noOverlap
   $size = [int]$size
   $count = [int][math]::Ceiling($script:RunDays / $size)
   $total = $script:RunDays
+  # PAX reads whole days in this PC's time zone but keeps only rows on whole UTC days, so a
+  # window that starts where earlier rows stop would miss the hours between them. It starts a
+  # day early instead, and PAX drops the rows it already has. The first window starts where
+  # the files stop when it carries on a load, or when the run reads no days of overlap. It
+  # never reaches back past 180 days.
+  $joinAt = if ($resume -and $progress.throughUtc) { $reachFrom } elseif ($interactions.mode -eq 'append') { $script:Covered }
+  $firstEarly = [bool]($joinAt -and $script:RunDays -lt 180 -and $start -eq $joinAt.ToLocalTime().Date)
   $script:Windows = @(for ($k = 0; $k -lt $count; $k++) {
       $first = [int][math]::Floor($k * $total / $count)
       $next = [int][math]::Floor(($k + 1) * $total / $count)
       $to = $start.AddDays($next)
-      [pscustomobject]@{ Index = $k + 1; From = $start.AddDays($first); To = $to; Days = $next - $first; Through = $to.ToUniversalTime() }
+      [pscustomobject]@{
+        Index = $k + 1; From = $start.AddDays($first); To = $to; Days = $next - $first; Through = $to.ToUniversalTime()
+        Early = -not $script:NoOverlap -and ($k -gt 0 -or $firstEarly)
+      }
     })
 
   if ($resume) {
@@ -793,11 +821,22 @@ function Set-RunWindow {
     days       = $script:Load.days
     seed       = $script:Load.seed
     windowDays = $size
+    noOverlap  = $script:NoOverlap
     throughUtc = $through
     pending    = $null
   }
   Write-Host ('PAX looks back {0} days, from {1:yyyy-MM-dd}.' -f $script:RunDays, $start)
   if ($count -gt 1) { Write-Host ('It reads them in {0} windows of up to {1} days, oldest first.' -f $count, [int][math]::Ceiling($total / $count)) }
+  $early = @($script:Windows | Where-Object Early).Count
+  if ($early) {
+    $which = if ($early -lt $count) { 'Each window after the first starts' } elseif ($count -gt 1) { 'Each window starts' } else { 'It starts' }
+    Write-Host "$which a day early, because PAX reads days in this PC's time zone but keeps whole UTC days. PAX drops the rows it already has."
+  }
+  if ($script:NoOverlap) { Write-Host (Get-NoOverlapWarning) }
+}
+
+function Get-NoOverlapWarning {
+  "This load reads its days without the day before, because a run that read one day with the day before didn't finish inside the task's time limit. So each day can miss the activity between midnight UTC and midnight in this PC's time zone."
 }
 
 function Invoke-PaxChild {
@@ -809,10 +848,11 @@ function Invoke-PaxChild {
   $arguments.AddRange([string[]]@(
       '-NoProfile', '-NonInteractive', '-File', (Join-Path $PSScriptRoot 'Run-PAX-AIBV.ps1'),
       '-TenantId', $cfg.tenantId, '-ClientId', $cfg.clientId))
-  if (@($script:Windows).Count -gt 1) {
+  if (@($script:Windows).Count -gt 1 -or $Window.Early) {
     # PAX reads from the start date up to, but not including, the end date.
+    $from = if ($Window.Early) { $Window.From.AddDays(-1) } else { $Window.From }
     $arguments.AddRange([string[]]@(
-        '-StartDate', $Window.From.ToString('yyyy-MM-dd', [cultureinfo]::InvariantCulture),
+        '-StartDate', $from.ToString('yyyy-MM-dd', [cultureinfo]::InvariantCulture),
         '-EndDate', $Window.To.ToString('yyyy-MM-dd', [cultureinfo]::InvariantCulture)))
   } else {
     $arguments.AddRange([string[]]@('-Days', [string]$script:RunDays))
@@ -1109,6 +1149,7 @@ function Invoke-Refresh {
       to    = Format-UtcDate $window.To
       days  = $window.Days
       first = ($window.Index -eq 1)
+      early = $window.Early
     }
     Save-Progress
     $started = [datetime]::UtcNow
@@ -1153,6 +1194,7 @@ function Invoke-Refresh {
     "SharePoint's files are up to date."
   }
   if ($agents.warning) { $state.lastMessage += ' ' + $agents.warning }
+  if ($script:NoOverlap) { $state.lastMessage += ' ' + (Get-NoOverlapWarning) }
   Write-Host $state.lastMessage
   $script:ExitCode = 0
 }

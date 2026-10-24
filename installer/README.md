@@ -215,6 +215,13 @@ the history a week at a time, oldest first, and saves its progress after each we
 - If a run stops part way, for example because the PC was turned off, the next run carries on
   from the last week it finished. If Task Scheduler stopped it inside its first week, the next
   run reads half as many days at a time.
+- PAX reads days in this PC's time zone but keeps whole UTC days. So each week after the first
+  starts a day early, and so does a run that carries on where the files stop. PAX drops the rows
+  it already has.
+- If Task Scheduler stops a run that reads one day with the day before, later runs read their
+  days without the day before until the load finishes. The run's log and **Check status** warn
+  that each day can then miss the activity between midnight UTC and midnight in this PC's time
+  zone.
 - **Check status** shows how far a load of more than a week has got.
 
 #### The SharePoint folder
