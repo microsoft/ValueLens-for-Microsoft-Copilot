@@ -1,24 +1,47 @@
-# ValueLens for Microsoft Copilot
+<div align="center">
 
-Shows how your organisation uses Microsoft 365 Copilot and agents, and the hours and value they
-deliver. Use it as an app (preview) or as a Power BI report.
+<br>
+
+# 🔍 ValueLens for Microsoft Copilot
+
+**The hours and value Microsoft 365 Copilot and agents deliver, as an app or a Power BI report.**
+
+<br>
+
+All reports and guides can be found on the [Analytics Hub](https://microsoft.github.io/Analytics-Hub/).
 
 **Also see [Analytics Hub for Microsoft Copilot](https://github.com/microsoft/AnalyticsHub-Dashboard):**
 one installer sets up an app on Microsoft Fabric or Azure that shows Copilot and agent adoption,
 value, consumption and governance in one place. It includes the ValueLens report.
+
+<br>
+
+**Found this useful? ⭐ Star this repo to help others discover it!**
+
+<br>
+
+**[Start here ↓](#start-here-the-app-preview)** &nbsp;·&nbsp; **[Your data ↓](#where-your-data-comes-from)** &nbsp;·&nbsp; **[Power BI report ↓](#the-power-bi-report)** &nbsp;·&nbsp; **[Fabric App ↓](#the-fabric-app-alternative)** &nbsp;·&nbsp; **[Archived ↓](#archived)** &nbsp;·&nbsp; **[Watch the demo ↗](https://youtu.be/P0uHJb13ZR0)**
+
+<br>
+
+</div>
 
 ![ValueLens preview](Images/ValueLens-Preview.gif)
 
 > **This isn't the official Copilot report, and you're responsible for the data it extracts.**
 > Read the [disclaimer](#disclaimer) first.
 
+<details>
+<summary><strong>📊 What it shows</strong> <em>(click to expand)</em></summary>
+
+<br>
+
+ValueLens shows how your organisation uses Microsoft 365 Copilot and agents, and the hours and
+value they deliver. Use it as an app (preview) or as a Power BI report.
+
 **▶ [Watch the demo](https://youtu.be/P0uHJb13ZR0)**: what the dashboard measures, page by page (2m 4s).
 
-1. [Start here: the app](#start-here-the-app-preview)
-2. [Where your data comes from](#where-your-data-comes-from)
-3. [The Power BI report](#the-power-bi-report)
-4. [The Fabric App (alternative)](#the-fabric-app-alternative)
-5. [Archived](#archived)
+</details>
 
 <a id="app-edition-preview"></a>
 
