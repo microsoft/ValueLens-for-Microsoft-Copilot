@@ -10,6 +10,11 @@ Fabric-specific. Three kinds of permission are involved:
 
 > Optional sources are opt-in. Skip any you don't use — the dashboard still works (those pages load empty).
 
+**Using the ValueLens installer?** What the installer in [`installer/`](../installer/README.md)
+creates and grants, including both its app registrations' permissions, is in
+[The ValueLens installer](#the-valuelens-installer). The rest of this page describes the manual
+setups and the older Analytics Hub installer in `1. Fabric/installer`.
+
 ---
 
 ## Core sources (required)
@@ -189,6 +194,124 @@ Caveats:
 - Scopes other than `all` change at the next scheduled load. **Apply now** in `access` reloads and refreshes straight away; a new `all` scope needs it, since it changes role members.
 - Totals on a scoped viewer's pages, licence counts included, are for the people they can see.
 - Hiding names from scoped viewers isn't part of this. The app's minimum-group-size rules still apply.
+
+---
+
+## The ValueLens installer
+
+What the [ValueLens installer](../installer/README.md) creates and grants. Each route has its own
+app registration. Their Microsoft Graph permissions are application permissions, and need admin
+consent from a Global Administrator or Privileged Role Administrator. All are read-only except
+`Sites.Selected`. Who does what, by person:
+[PREREQUISITES.md](PREREQUISITES.md#the-valuelens-installer).
+
+### Fabric route: `ValueLens (Fabric)`
+
+The notebooks and the model's connection sign in as this app registration, with a client secret.
+It gets only the permissions your data sources need:
+
+| Data source | Microsoft Graph application permissions |
+|---|---|
+| Copilot usage and licences (always) | `AuditLogsQuery.Read.All`, `Reports.Read.All` |
+| Org data, from Microsoft Entra ID (always) | `User.Read.All` |
+| Microsoft 365 activity | `Reports.Read.All` |
+| Agent 365 registry, from the registry | `CopilotPackages.Read.All`, `Application.Read.All`, `User.Read.All` |
+| Defender (shadow AI and agent risk) | `ThreatHunting.Read.All`, `CloudApp-Discovery.Read.All` |
+| Agent configuration and Foundry, from Azure Resource Graph | None: it uses the Azure and Entra roles below |
+| Workday org data, product feedback, and anything you upload as CSV, such as the Agent 365 export | None |
+
+Some tenants can't grant every permission yet. The install carries on without these:
+
+- `CopilotPackages.Read.All`: Agent 365 uses its CSV export instead.
+- `ThreatHunting.Read.All`: Defender's device and agent probes are skipped.
+- `CloudApp-Discovery.Read.All`: Defender's Cloud Discovery probe is skipped.
+
+Other access the app registration gets:
+
+| Where | Role | What for |
+|---|---|---|
+| The Fabric workspace | Viewer | So the model can read the Lakehouse |
+| The Fabric workspace | Contributor | Only when the flows sign in as the app (`--flow-identity app`), so they can write to the upload folder |
+| A management group, or the tenant root group | Azure Reader | Foundry, through Azure Resource Graph. The installer gives it if you're an Owner or User Access Administrator there. Otherwise it shows the command to send |
+| Microsoft Entra ID | Global Reader, Power Platform Administrator or AI Administrator | Copilot Studio agents, for agent configuration, through Azure Resource Graph. The installer can't give Entra roles, so the Done page has **Ask for Global Reader** |
+
+What you need:
+
+- Contributor on an F2 or larger Fabric capacity, or a trial, so the installer can put a new
+  workspace on it. Or Admin or Member of an existing workspace on one.
+- Power BI Pro or Premium Per User.
+- With Azure Key Vault: Key Vault Secrets Officer, or an access policy with secret get, list and
+  set, to write the secret. The scheduled runs read it as you, so you also need Key Vault Secrets
+  User, or an access policy with secret get and list. The installer gives you these when it can.
+  Otherwise a vault admin can.
+
+### No Fabric: PAX + SharePoint route: `ValueLens (PAX)`
+
+PAX signs in as this app registration on your PC, with a client secret kept in Windows Credential
+Manager as `PAX-ValueLens-<tenant ID>`.
+
+| Microsoft Graph application permission | What for |
+|---|---|
+| `AuditLogsQuery.Read.All` | The audit log query |
+| `User.Read.All`, `Organization.Read.All` | The users and licences that PAX's rollup joins to the activity |
+| `Sites.Selected` | Write access to the one SharePoint site an administrator grants, and to no other |
+| `Application.Read.All`, `CopilotPackages.Read.All` | Optional: only if you collect the Agent 365 file (advanced setting **Also collect the Agent 365 file?**). A tenant without `CopilotPackages.Read.All` yet only loses the registry |
+
+**The site grant.** `Sites.Selected` gives no access until an administrator grants the app a
+site. The installer asks for write access to the site that holds your folder. That needs a
+sign-in with `Sites.FullControl.All`: a SharePoint Administrator or Global Administrator. If that
+isn't you, the installer shows the commands to send them (Microsoft Graph PowerShell, or PnP
+PowerShell), and waits. The admin pack has them too. If you move the folder to another site, the
+Done page lists the old site's grant to take back.
+
+**Publishing the report.** You publish it through the Power BI API, as you. You need Power BI Pro
+or Premium Per User, and either the tenant setting *Create workspaces* for a new workspace, or
+Admin or Member of an existing one.
+
+**The model's sign-in.** The model reads the SharePoint folder as you, not as the app. Once, after
+publishing, you sign it in to SharePoint: **OAuth2**, privacy level **None**. So you need read
+access to the folder.
+
+### Viewer access, both routes
+
+- The installer creates a security group, `ValueLens Viewers`, with you as owner, or uses one you
+  choose. If you can't create groups, ask an Entra admin for a security group, then run `access`
+  to use it.
+- The group gets **Build** (ReadExplore) on the semantic model, through the Power BI API.
+- The group gets no workspace role. Workspace viewers can read the notebooks' code, and a default
+  Fabric install keeps the app's client secret in the notebooks.
+- You share the report with the group once, by hand, as Power BI has no API for it: in the
+  workspace, choose **…** next to the report, then **Manage permissions** > **Add user**. Enter
+  the group and choose **Grant**.
+- Each viewer needs Power BI Pro or Premium Per User, unless the workspace is on a paid F64 or
+  larger Fabric capacity, or a Power BI Premium capacity.
+
+### The app (PAX route)
+
+The installer deploys the app with the bundled managed apps CLI (`ms`), which signs in as you
+separately.
+
+- **Power Platform settings**, for the environment: **Allow app creation with the Copilot Managed
+  Runtime CLI**, and **External artifacts in managed apps**. A Power Platform administrator turns
+  them on in the Power Platform admin center, under **Copilot** > **Settings** > **Managed apps**.
+  If the environment's group has a published rule, they change it on the group's **Rules**.
+  Without these settings, setup finishes at the report.
+- **You** can create apps in the environment: your developer environment, or the one you pass
+  with `--environment-id`.
+- **Conditional Access** allows the CLI's sign-in, app ID `9cee029c-6210-4654-90bb-17e6e9d36617`.
+- **Sharing.** The app is shared with the viewer group, unless a policy blocks sharing apps in the
+  environment.
+- **Viewers** need Power Apps Premium or Copilot Credits (the Power Apps rights in Microsoft 365
+  don't count). For credits, turn on usage-based billing and add viewers to a spending policy for
+  managed apps. Viewers also need read access to the SharePoint folder. The installer doesn't
+  give folder access.
+
+### If you can't register apps
+
+The installer writes an admin pack, `valuelens-admin-pack.md`, for someone who can register apps
+and grant admin consent. It has the permissions above for your route and, on the PAX route, the
+commands for the site grant. See
+[If you can't register apps](../installer/README.md#if-you-cant-register-apps).
 
 ---
 

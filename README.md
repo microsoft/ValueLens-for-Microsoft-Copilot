@@ -132,7 +132,7 @@ BI Desktop are only needed for the report.
 
 | Path | You need | Setup |
 |---|---|---|
-| **[1. Fabric](1.%20Fabric/)** (recommended) | Fabric capacity (F2 or larger, or a [free trial](https://learn.microsoft.com/fabric/fundamentals/fabric-trial#method-1-start-a-new-trial-capacity-from-the-account-manager)) | Import the notebooks, schedule the pipeline and publish the report. **[🎥 Watch the setup](1.%20Fabric/README.md#set-it-up)**. The [installer](1.%20Fabric/README.md#analytics-hub-installer-work-in-progress) that automates it is a work in progress. |
+| **[1. Fabric](1.%20Fabric/)** (recommended) | Fabric capacity (F2 or larger, or a [free trial](https://learn.microsoft.com/fabric/fundamentals/fabric-trial#method-1-start-a-new-trial-capacity-from-the-account-manager)) | Import the notebooks, schedule the pipeline and publish the report. **[🎥 Watch the setup](1.%20Fabric/README.md#set-it-up)**. The [installer](1.%20Fabric/README.md#valuelens-installer) that automates it is a work in progress. |
 | **[2. Azure](2.%20Azure/)** (work in progress) | An Azure subscription (Contributor plus User Access Administrator) and Power BI Pro | Open the installer and pick **Your Azure subscription**. It runs the data collection in your Azure subscription (scheduled jobs in Azure Container Apps, with Azure SQL and the web app) and publishes to a Power BI workspace, with no Fabric. See [Azure target](1.%20Fabric/installer/README.md#azure-target). |
 | **[4. SharePoint](4.%20SharePoint/)** | Power BI Pro | App registration, a SharePoint library and a scheduled export. |
 | **[5. Local CSV](5.%20Local%20CSV/)** | Power BI Desktop, June 2024 or later | Open the template. Sample data is included. |
@@ -141,8 +141,9 @@ Path 3, Power Automate + Dataverse, is [archived](#archived).
 
 **Have Fabric?** Follow the [manual setup](1.%20Fabric/README.md#set-it-up): import the notebooks,
 schedule the pipeline and publish the report. **[🎥 Watch the setup](1.%20Fabric/README.md#set-it-up)**.
-The [Analytics Hub installer](https://github.com/microsoft/AnalyticsHub-Dashboard)
-automates it, but it's a work in progress: try it in a test tenant first.
+The [ValueLens installer](1.%20Fabric/README.md#valuelens-installer) automates it, but it's a work
+in progress: try it in a test tenant first. Analytics Hub has
+[its own installer](https://github.com/microsoft/AnalyticsHub-Dashboard).
 
 **Before you start**, see [what you need](1.%20Fabric/README.md#before-you-start). No Fabric capacity?
 [Start a free trial](https://learn.microsoft.com/fabric/fundamentals/fabric-trial#method-1-start-a-new-trial-capacity-from-the-account-manager).

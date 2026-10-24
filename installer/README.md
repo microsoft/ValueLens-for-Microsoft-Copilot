@@ -1,9 +1,13 @@
-# Analytics Hub installer
+# ValueLens installer
 
-Sets up Analytics Hub in your tenant, on [Fabric](../fabric/README.md) or [Azure](../azure/README.md),
-loads the first data and checks it. This page is the reference. To get going, follow the
-[Getting started](../README.md#getting-started) steps:
-[Prerequisites](../docs/PREREQUISITES.md) → [Install](../docs/INSTALL.md) → [Check it worked](../docs/INSTALL.md#check-it-worked).
+Sets up [ValueLens](../README.md) in your tenant, loads the first data and checks it. You answer
+its questions in your browser, or in the terminal. This page is the reference. To get going:
+[Prerequisites](../docs/PREREQUISITES.md#the-valuelens-installer) →
+[Install](../docs/INSTALL.md) → [Check it worked](../docs/INSTALL.md#check-it-worked).
+
+It covers ValueLens only. [Analytics Hub](https://github.com/microsoft/AnalyticsHub-Dashboard),
+which covers ValueLens plus Consumption Central, Agent Evaluator and an Azure route, has its own
+installer.
 
 ## Install
 
@@ -20,1059 +24,630 @@ and run it. Other versions are on the
 [installer releases](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases?q=valuelens-installer-v).
 The repo's "Latest" release is usually a dashboard release, not the installer.
 
-## Editing setup and recovering from failures
+## Run it
 
-The browser installer opens **Review and fix setup**, with a summary card for each category.
-Choose **Edit settings** on just the category you need: placement, networking, Power BI, data
-collection, viewer access, module connections, governance, Ask / AI, identity (Fabric), or schedule
-and loading. There is no Advanced settings switch in this view. Azure placement, networking and
-schedules group related fields on one screen. **Back to settings** cancels the open category
-without changing its saved choices; **Save and close** keeps your draft for next time.
+[docs/INSTALL.md](../docs/INSTALL.md) has the steps:
 
-After a failed deployment, use **Edit all settings**, the suggested category (for recognised
-region, capacity, model or policy errors), or **Retry saved configuration** directly from the
-error screen. You do not need to return Home or repeat unrelated questions. Previous attempts
-remain available under **Previous attempts in this session**. **Review and deploy** refreshes checks and shows the plan,
-access grants and costs before you approve another attempt. Availability and quota checks are
-best effort, not a reservation of Azure capacity.
+- [Run it](../docs/INSTALL.md#run-it): the one-liner or the exe, the questions and the install
+  record.
+- [Check it worked](../docs/INSTALL.md#check-it-worked): the Done page, status and the data check.
+- [Check the download](../docs/INSTALL.md#check-the-download): the exe's SHA-256.
+- [From PowerShell](../docs/INSTALL.md#from-powershell): later commands, `-ZipPath`, `-Proxy`
+  and `-Uninstall`.
+- [IT-approved Node.js](../docs/INSTALL.md#it-approved-nodejs): `-UseInstalledNode`.
+- [Locked-down tenant / Azure Cloud Shell](../docs/INSTALL.md#locked-down-tenant--azure-cloud-shell):
+  the Fabric route only.
+- [Without the exe](../docs/INSTALL.md#without-the-exe): from a clone of this repo.
 
-Unapproved answers are checkpointed beside the install record as
-`valuelens-install.json.draft.json` (or `<your-record-path>.draft.json`). The deployed-resource
-record is kept separately until you approve the plan. Neither file contains secrets. A pasted
-secret stays in memory only, so you may need to paste it again after closing the installer.
-Staged CSV selections survive commands in the same installer session. If the installer restarts
-or a staged file is removed, Data collection explicitly requires you to select that file again.
-If another command has updated the install record since the draft was saved, setup asks you to
-keep the latest deployed IDs and archive the older draft, or stop without changing either file.
-**Start fresh** archives both the record and its draft; it does not delete cloud resources.
+The installer has two routes. Choose one in the browser, or with `--target fabric` or
+`--target pax`. An install stays on the route it started on.
 
-Retries reuse resources where safe. Before changing Azure placement or networking, the installer
-checks live resources, including resources left by a failed deployment that returned no outputs.
-You can change the SQL region independently while its server has not been created. Existing SQL
-servers cannot move regions, and existing Container Apps environments cannot switch networking
-in place. Such changes require a separate deployment and, where applicable, a data migration;
-the installer will not silently replace or delete resources. Turning Ask off leaves any existing
-AI account in place, so review its remaining charges.
+| Route | Each day | The data | Needs |
+|---|---|---|---|
+| **Fabric** | Notebooks and a pipeline in a Fabric workspace load the data | A Lakehouse | A Fabric capacity (F2 or larger, or a trial) |
+| **No Fabric: PAX + SharePoint** | A scheduled task on a Windows PC runs PAX | CSV files in a SharePoint folder | Power BI Pro, PowerShell 7.2 or later and Python 3.10 or later |
 
-Terminal setup and `--yes` keep their existing sequential/default-answer behaviour.
-References to **Advanced settings** below apply to terminal setup; in the browser, open the
-corresponding settings category directly.
+To set it up by hand instead, follow [1. Fabric](../1.%20Fabric/README.md) or
+[4. SharePoint](../4.%20SharePoint/README.md).
 
-## Before you start
+## What it sets up
 
-Moved to [Prerequisites](../docs/PREREQUISITES.md). Once you sign in, the **Prerequisites** panel
-(`prereqs` in the terminal) checks most of it, and changes nothing.
+### Fabric route
+
+It sets up what [1. Fabric](../1.%20Fabric/README.md) describes, from
+`1. Fabric/Manual setup`:
+
+| What | Default name |
+|---|---|
+| Fabric workspace | `ValueLens`, or one you choose, on your Fabric capacity |
+| Lakehouse | `ValueLens` |
+| Notebooks | `ValueLens_…`. The `Copilot_…` loads keep their names |
+| Pipeline | `ValueLens_Pipeline`, which runs the loads each day |
+| Semantic model | `ValueLens Model` |
+| Report | `ValueLens` |
+| Connection | `ValueLens SQL` and the first 8 characters of the workspace ID: the model's connection to the Lakehouse's SQL analytics endpoint, signed in as the app registration |
+| App registration | `ValueLens (Fabric)`, with the Microsoft Graph permissions your data sources need. See [Permissions](../docs/PERMISSIONS.md#the-valuelens-installer) |
+| Viewer group | `ValueLens Viewers`, with Build on the model. See [Viewer access](#viewer-access) |
+| Power Automate flows | Only for the sources that use them: `ValueLens - Product feedback` and `ValueLens - Agent inventory` |
+| Azure Key Vault | Only if you choose it. See [Where the secret goes](#where-the-secret-goes) |
+
+The Fabric route deploys the report only. Deploying the app from it comes in a later version.
+
+The installer never changes anything it didn't create. If one of its names is taken in the
+workspace, its own item gets the next free name, such as `ValueLens Model 2` or `ValueLens_Pipeline_2`.
+The plan shows the names before you approve it.
+
+**Data sources.** Each source has a card, with how its data arrives: **Connected (API)**,
+**Upload CSV** or **Skip**. On the command line, use `--data <id>=<mode>`, with `api`, `csv` or
+`skip`.
+
+| Card | `--data` id | Choices | Default | Needs |
+|---|---|---|---|---|
+| Copilot usage and licences | `core` | Connected (API) | Always on | Graph: AuditLogsQuery.Read.All, Reports.Read.All |
+| Org data (Microsoft Entra ID) | `orgData` | Connected (API) | Always on | Graph: User.Read.All |
+| Workday org data | `workday` | Upload CSV, Skip | Skip | A Workday export |
+| Microsoft 365 activity | `m365Activity` | Connected (API), Skip | Connected (API) | Graph: Reports.Read.All |
+| Agent 365 registry | `agent365` | Connected (API), Upload CSV, Skip | Skip | The API needs an Agent 365 licence. Graph: CopilotPackages.Read.All, Application.Read.All, User.Read.All |
+| Product feedback | `productFeedback` | Power Automate (emailed export), Upload CSV, Skip | Skip | The flow needs Power Automate Premium |
+| Defender (shadow AI and agent risk) | `defender` | Connected (API), Skip | Skip | Defender for Endpoint P2 or Defender for Cloud Apps. Graph: ThreatHunting.Read.All, CloudApp-Discovery.Read.All |
+| Agent configuration and Foundry (Azure Resource Graph) | `resourceGraph` | Connected (API), Skip | Skip | Foundry needs Reader on a management group. Agents need an Entra role such as Global Reader |
+
+- **Upload CSV.** Upload the export with **Upload exports** in the browser, or `upload <files>`.
+  It goes to the Lakehouse folder `Files/analytics_hub_uploads`, and the next run loads it.
+  `install --csv <file>` uploads one during the install, and `upload --run` runs the pipeline
+  straight after.
+- **Product feedback** by flow: `--data productFeedback=flow`, or `--feedback-flow`. The flow
+  saves the product feedback exports emailed to you. The Done page then has
+  **Ask for the product feedback export**.
+- **Agent configuration and Foundry** reads Copilot Studio agents and Foundry resources through
+  Azure Resource Graph, from the whole tenant or one management group
+  (`--arg-management-group`). `--no-arg-agents` or `--no-arg-foundry` leaves one out. With agents
+  on, the installer also makes the `ValueLens - Agent inventory` flow. What can't be read is
+  reported, not failed. The Done page has **Ask for Global Reader** when the app registration
+  needs it.
+- **The flows** go in a Power Platform environment you choose (`--flow-environment`). People with
+  access to it can see them. Its data policy (DLP) must allow the
+  "HTTP with Microsoft Entra ID (preauthorized)" connector, and whoever signs in to the flows
+  needs a Power Automate Premium licence. By default a person signs in to the flows' connection
+  (`--flow-identity user`). `--flow-identity app` uses the app registration, with its secret from
+  Key Vault; the vault must allow public network access. With the secret in the notebooks, flows
+  that would use the app aren't made.
+- **Currency.** The report shows money in USD unless you choose another (`--currency`).
 
 ### Where the secret goes
 
-The notebooks sign in as the app registration with its client secret. Fabric notebooks can't get
-Microsoft Graph tokens from a workspace identity, so they need that secret. The installer offers
-three places for it. For a new Fabric install, the default is no Key Vault:
+The notebooks sign in as the app registration with a client secret. A new install asks
+**Where should the app's client secret go?**
 
-| Option | You need | Use it when |
-|---|---|---|
-| **No Key Vault: keep the secret in the notebooks** (the default) | Nothing in Azure: no subscription and no vault | You want the quickest set-up, have no Azure subscription, or can't create or write to a vault. Anyone with a role in the workspace can read the secret. |
-| **Key Vault, written by the installer** | Contributor to create a vault, or write access to an existing one | You want workspace roles not to expose the secret. Choose **Azure Key Vault**, or run `install --key-vault`. |
-| **A vault admin will add the secret for me** | Read access to the vault: Key Vault Secrets User, or secret Get and List on an access policy | You want Key Vault but can't write to the vault and can't create one. Offered when the installer finds you can't write. |
+- **No Key Vault: keep the secret in the notebooks** (the default). Nothing in Azure. Anyone with
+  a role in the workspace can read the secret. It lasts 90 days unless you change it (in the
+  advanced settings, or `--secret-days`, 1 to 730), and each install, repair or update replaces
+  it.
+- **Azure Key Vault.** Needs an Azure subscription where you can create or use a vault.
+  Workspace roles don't expose the secret.
 
-Installs that already keep the secret in Key Vault carry on using it. `--flow-identity app` reads
-the secret from Key Vault, so it goes to the Key Vault questions.
+Repair offers **Keep it in the notebooks** or **Use Key Vault instead**. With `--yes`, a new
+install keeps the secret in the notebooks unless you add `--key-vault`. Either way, viewers get
+no workspace role: see [Viewer access](#viewer-access).
 
-**A vault admin adds the secret.** The installer shows the vault, the secret name and one
-Azure Cloud Shell command for the admin. The command creates a new client secret on the app and
-stores it in the vault in one step, so nobody, including the installer, sees its value. If you
-don't have read access yet and can't give it to yourself, the command gives it to you as well.
-The installer can make the admin an owner of the app, so they can create its secret: enter their
-email when asked. Then answer **Has the admin added it?** with **Yes, carry on**, or choose
-**Stop and resume later** and run the installer again once it's there. Your answers are kept.
-Read access is all the notebooks need: they read the secret with `notebookutils` as the person
-the run uses. The choice is recorded in the install record as `keyVault.mode: "keyvault-admin"`.
+### No Fabric: PAX + SharePoint route
 
-**No Key Vault: keep the secret in the notebooks.** The default for a new Fabric install: take it
-at the **Where should the app's client secret go?** question, or run `install --no-key-vault`
-(`--secret-in-notebook` still works). It's also recommended when you pick Key Vault but can't
-create a vault or write to the one you picked. The installer states the trade-off and asks you to
-confirm (with `--yes`, the default is taken):
+[PAX](https://github.com/microsoft/PAX) (Portable Audit eXporter) exports Copilot audit records.
+This route automates [4. SharePoint](../4.%20SharePoint/README.md):
 
-- **Anyone with a role in the workspace can read the secret**, Viewer included, and so can anyone
-  a notebook is shared with. They could use it to read your tenant's data through Microsoft Graph
-  until it expires. Key Vault avoids that: the notebooks read the secret from the vault at run
-  time, so a workspace role doesn't expose it.
-- It is copied into notebook run snapshots, exports and deployment pipelines.
-- There's no vault audit log of who read it, and no vault network rules.
-
-To limit that, the installer:
-
-- Gives the secret a short life: **90 days** by default. Change it with `--secret-days <n>` (1 to
-  730), or under **Advanced settings**.
-- Replaces it on every install, **Repair or change** and `update`: it writes a new secret into
-  the notebooks, then removes the old one from the app. If the rewrite stops part-way, the old
-  secret is kept until the next run finishes.
-- Won't write it into a workspace connected to Git, so it never reaches source control. Disconnect
-  Git under **Workspace settings** > **Git integration**, or choose Key Vault.
-- Never writes it to the install record or the logs. `valuelens-install.json` holds only the
-  secret's ID and expiry date.
-
-The installer records `keyVault.mode: "notebook"`. Power Automate flows still work in this mode,
-because they sign in to OneLake rather than read the secret (unless you choose
-`--flow-identity app`). If you brought your own app, the installer can't make its secrets, so it
-doesn't replace yours: paste a new one with **Create new secrets** (`rotate-secret`). To move to
-Key Vault later, run the installer again and choose **Use Key Vault instead**. It rewrites the
-notebooks to read the secret from the vault and removes the secret they held from the app.
-
-### If you can't register apps
-
-Choose **An admin will register the app for me** in the app registration question. Before
-anything is created, the installer writes `analytics-hub-admin-pack.md` next to the install record.
-It holds an Azure Cloud Shell script and the same steps for the portal. An admin uses it to:
-
-1. Register the app, with every Graph application permission the modules you picked need.
-2. Grant admin consent.
-3. Create a client secret. If you chose **A vault admin will add the secret for me**, the
-   secret goes straight into the vault. Otherwise the admin sends it to you through a secure
-   channel.
-
-They send you back the client ID. Run the installer again, enter it, and paste the secret if
-you're asked. The installer then checks the app as below.
-
-**Using an app you already have?** The installer checks it before anything is created: that the
-app and its service principal exist, and that every Graph application permission you need is on
-it with admin consent. It lists anything missing with the link to the app's API permissions page.
-Once an admin has fixed it, choose **Check again**. Or choose **Carry on anyway**: data the missing
-permissions cover won't load until they're fixed.
-
-## Azure target
-
-The installer can also set up Analytics Hub in **your Azure subscription**. Start it with
-`--target azure`, or pick **Your Azure subscription** as the first wizard answer.
-
-You need:
-
-- Contributor plus User Access Administrator (or Owner) on the subscription or resource group. Or,
-  for least privilege, Contributor and a limited Role Based Access Control Administrator on just a
-  resource group your Azure admin creates: see
-  [Least-privilege Azure install](../docs/AZURE-LEAST-PRIVILEGE.md).
-- Permission to register Entra apps, or an Application Administrator.
-- A Global Administrator or Privileged Role Administrator to grant the managed identity's Graph app
-  roles, or to use the admin links the installer prints.
-- Power BI Pro or PPU, and permission to create or use the chosen Power BI workspace.
-- To publish the Teams app for you: the Teams Administrator or Global Administrator role, and consent
-  to `AppCatalog.ReadWrite.All` for Microsoft Graph Command Line Tools at a second sign-in. Without
-  them, a Teams admin uploads the generated package: see
-  [Give it to everyone](../azure/teams/README.md#give-it-to-everyone).
-- The tenant settings *Service principals can call Fabric public APIs* (enabled for a group that holds
-  the managed identity, so the jobs can refresh the model) and *Semantic Model Execute Queries REST
-  API* (for the app's queries).
-- For Agent Evaluator: System Administrator in each Power Platform environment you pick, so the
-  installer can add the jobs' managed identity there. Otherwise an admin adds it: see
-  [Agent Evaluator](#agent-evaluator).
-
-It creates or reuses a resource group and deploys a managed identity, Storage, Log Analytics,
-Azure SQL Database serverless, Container Apps jobs, and the web app from the ARM template in
-`src/azure/main.arm.json`. It also creates the Azure web app registration, an SQL reader app
-registration, a Power BI workspace and model, and an `AnalyticsHub-Teams.zip` package (the app as a
-Teams tab, built by `src/azure/teams/build-package.mjs`) next to the install record. It publishes the
-package to your org's Teams app catalog, and later runs update that app rather than add another. If
-it can't, if you say no when the plan asks, or if the sign-in isn't finished within 5 minutes, it
-prints the steps to upload it by hand and carries on.
-
-Every module is supported on Azure: `core`, `orgData`, `m365Activity`, `agent365`, `productFeedback`,
-`consumption`, `agentEvaluator` and `defender`. Credit consumption deploys the Consumption Central model,
-gives the jobs' managed identity Cost Management and Azure AI roles, and creates the Copilot Studio flow,
-signed in as you (`--flow-identity app` is Fabric only). With public endpoints the flow writes to the
-storage account's `landing` container and you get **Storage Blob Data Contributor** on it. With private
-networking it writes to a SharePoint folder you name, and the managed identity gets **Sites.Selected** read
-on that site (a SharePoint or Global administrator grants it). See
-[Azure](../azure/README.md#credit-consumption).
-The Agent 365 registry comes from its CSV export, which you drop in the same place, under
-`agent365`; the Agent 365 API is Fabric only for now. See
-[Agent 365 registry](../azure/README.md#agent-365-registry).
-Product feedback comes from its CSV exports, which you drop there too, under `product_feedback`; the
-emailed export flow is Fabric only for now. See [Product feedback](../azure/README.md#product-feedback).
-Workday org data, under the advanced settings, comes from its CSV export, which you drop there too,
-under `workday`. See [Workday org data](../azure/README.md#workday-org-data).
-Agent Evaluator deploys the Agent Evaluator model and adds the jobs' managed identity to the Power
-Platform environments you pick, so the jobs can read their Copilot Studio transcripts: see
-[Agent Evaluator](#agent-evaluator).
-Agent configuration and Foundry from Azure
-Resource Graph also works on Azure: see [Agent configuration and Foundry](#agent-configuration-and-foundry).
-The app's Ask page answers with an Azure OpenAI model, an AI Services account the installer creates
-by default or a deployment you already have: see [Ask](#ask).
-Re-runs are incremental and use the same
-`valuelens-install.json`, with `target: "azure"` and an `azure` block. The installer tags every Azure
-resource with `valuelens-install-id` and stops rather than modifying untagged resources with colliding
-names.
-
-### A large tenant on Azure
-
-On a tenant with more than 10,000 Copilot seats, setup sizes Azure for the tenant and asks before
-anything costs more:
-
-- **Power BI capacity.** Setup recommends F64 or larger and suggests the first active capacity that
-  size. It warns when the semantic model would sit on shared capacity, where a model is limited to
-  1 GB.
-- **Azure SQL.** **Azure placement** offers to let the database scale up to 4 vCores and carry on
-  past the free offer's monthly allowance, for about $30-80 a month. Otherwise, when the allowance
-  runs out, Azure pauses the database until next month and the jobs stop until then.
-- **Web app.** **Azure placement** offers to keep one replica running, for about $10-20 a month, so
-  the first visit after a quiet spell doesn't wait while the app starts.
-
-The prices are indicative: check the [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/).
-Neither paid option is on unless you choose it: `--yes` never turns one on, and **Repair or change**
-keeps what you chose. The plan also warns when the sizing looks small and says where to change it:
-the free offer, fewer than 4 max vCores from 30,000 seats, the run job's time limit, and shared
-capacity. If your organisation's policy rules a change out, setup still works and the loads are
-slower. Tenants with 10,000 seats or fewer aren't asked or warned, and deploy as before.
-
-Each run of the collector job has 4 vCPU, 8 GiB and up to 4 hours, which Azure enforces. The run
-loads the data and then refreshes the semantic models, waiting up to 2 hours for each refresh. On a
-large tenant the first load may not fit in one run. The audit collector records each time window as
-it finishes, so the next run (the next scheduled one, or **Run** on the home page) queries only the
-windows still to do, and then loads them all. The dashboard fills in once that's done. A reload of
-more history carries over the same way: when a run stops at 4 hours, the next runs carry on with it,
-and the dashboard gets the extra history once a run has loaded all of it. At 20,000
-seats, start with 30 days of history and [load more](#load-more-audit-history) once the first load
-has finished. In an offline test at 20,000 seats, with the audit service simulated, the run stayed
-within the job's memory and disk. Collecting the audit records took about 3 minutes for the first
-30 days and 18 minutes for 180 days, plus the time each audit query waits in Microsoft's queue,
-which the test couldn't measure. Processing them took about 3 minutes for the first 30 days, 5
-minutes for a nightly run and 25 to 35 minutes for 180 days. How long the refresh takes depends on
-the capacity and the history loaded.
-
-### Demo mode
-
-Under [Advanced settings](#advanced-settings), the wizard asks which data the dashboard shows. **Demo mode (sample data)**
-deploys everything as usual but sets `VALUELENS_SAMPLE_DATA=true` on the run job, so each run publishes
-the synthetic sample bundled in the jobs image (dates moved forward to end last week) instead of calling
-the tenant's APIs. It's recorded as `azure.sampleData`. Demo mode leaves
-[credit consumption](../azure/README.md#credit-consumption) out for now: the installer deploys the
-Consumption Central model once you switch. To switch to tenant data, run the installer again,
-choose **Yes** for the advanced settings and pick **Your tenant's data**; the next run replaces the sample.
-There's no Agent Evaluator sample, so demo mode reads no transcripts and hides those pages. It leaves
-the jobs' managed identity in its environments for when you switch to your tenant's data.
-
-### Networking
-
-Under [Advanced settings](#advanced-settings), the wizard asks how the app, jobs and Power BI reach Azure SQL and Storage:
-
-- **Public endpoints** (default). SQL allows Azure services and Power BI connects to it directly.
-- **Private networking**. Choose this where Azure Policy keeps public network access off (common on
-  managed and MCAPS subscriptions; the installer says so when what-if hits `DenyPublicEndpointEnabled`).
-  On a first install, when an Azure Policy assignment denies Azure SQL public access or modifies it
-  to `Disabled`, the installer names it and uses Private networking: SQL with public access off can't
-  take the firewall rule that public endpoints need. Your machine never connects to SQL either way:
-  the migrate job creates the schema and reader user over the private endpoint, and Power BI goes
-  through the VNet data gateway. Policy exemptions aren't read.
-  It adds a VNet whose subnets share a network security group, private endpoints and private DNS
-  zones for SQL, Storage (blob, dfs, table) and the Ask AI Services account when the installer
-  creates it, a VNet-integrated Container Apps environment, and a Power BI **VNet data gateway** that
-  the model's SQL connection runs through. SQL uses the Proxy connection policy, so everything stays
-  on port 1433. Storage, AI Services and Log Analytics turn public network access off too. The web
-  app keeps public ingress, so people can open it.
-  - **Private DNS zones.** Landing zones often deny private DNS zones outside a hub subscription, or
-    let a policy add the DNS records. The wizard then asks how to handle the `privatelink.*` zones:
-    - **Create them in this resource group** (default). If the resource group already has one of
-      them that this install didn't create, yours or another Analytics Hub install's, the preflight
-      names it and stops before deploying: the install would tag the zone as its own, so its
-      uninstall would try to delete it. To use the zones there, choose **Use existing zones in
-      another resource group** and give this resource group's ID, after creating any of the zones
-      that aren't there yet. Or install into another resource group.
-    - **Use existing zones in another resource group.** Give the resource ID of the hub resource group that holds them. Every
-      zone must already exist there, including the three AI zones when Ask is created. The installer
-      links the VNet to them, which needs **Private DNS Zone Contributor** on that group.
-    - **Leave DNS to Azure Policy or the network team.** No zones and no DNS records. The jobs can't reach SQL or Storage
-      until a policy or your network team adds them, so the first migrate may fail.
-  - The setting is saved as `azure.privateDns`: `{ "mode": "existing", "resourceGroupId": "/subscriptions/<id>/resourceGroups/<name>" }`.
-  - Container Apps logs go to Log Analytics through a diagnostic setting, in the
-    `ContainerAppConsoleLogs` and `ContainerAppSystemLogs` tables. Querying them from a public network
-    needs an Azure Monitor Private Link Scope.
-  - When Azure Policy blocks the deployment, the installer names each policy, its assignment and the
-    resource it blocked, and prints the command that shows the full error. When any deployment
-    fails, it reads the deployment operations and shows each failing resource's own error code and
-    message, not just `DeploymentFailed`.
-  - It needs an active Fabric (F or trial) or Power BI Premium capacity to host the gateway. The
-    Power BI workspace is assigned to it.
-  - The preflight registers the `Microsoft.Network/AllowBringYourOwnPublicIpAddress` subscription
-    feature, which VNet-integrated Container Apps environments need. It's approved automatically.
-  - It adds about $30–40 a month (four or five private endpoints and DNS zones). The gateway uses capacity units
-    while refreshing.
-  - Networking can't be changed in place. Uninstall and install again to switch.
-
-### Regions and images
-
-- **Region preflight.** On a first install, the region list shows only the regions where every
-  resource can go. A region is left out if any of these are true:
-  - Azure Policy denies it. The installer reads the built-in **Allowed locations** and **Allowed
-    locations for resource groups** policies, either assigned directly or inside an initiative,
-    and simple custom deny rules on `location`.
-  - The subscription isn't offered one of the resource types there.
-  - Standard_LRS storage is restricted there.
-  - Azure SQL is restricted there.
-
-  The installer says why each region was dropped. If no region passes, it stops before deploying
-  anything. It still deploys if it can't read a policy, says so, and leaves that check to Azure.
-  The Ask model's account only moves to regions that policy allows. A re-run keeps its region.
-- `azure.sqlLocation` puts Azure SQL in a different region from everything else. Some subscriptions
-  can't create SQL in busy regions (for example uksouth, northeurope or westeurope on MCAPS). The
-  preflight checks SQL capability and points at this setting. With **Yes** to advanced settings, the
-  region list keeps regions where only SQL is blocked, and the Azure SQL list offers only regions
-  where SQL can go. The private endpoint can be in another region from the server.
-- `azure.images` overrides where the jobs and web images come from, for air-gapped tenants or testing
-  an unreleased build: `{ "registry": "myacr.azurecr.io/valuelens", "registryResourceId": "<ACR
-  resource ID>", "tag": "dev-abc123" }`. With `registryResourceId` set, the managed identity is granted
-  AcrPull. Build into your registry from the repo root with
-  `az acr build -r myacr -t valuelens/valuelens-jobs:<tag> -f "azure/jobs/Dockerfile" .` (and the
-  same for `valuelens-web` with `azure/web/Dockerfile`). If the upload fails on long `node_modules`
-  paths, build from a folder that holds only the paths the Dockerfile copies.
-
-If the database migration job fails, setup stops before the first load and prints the
-`az containerapp job logs show` command for its logs. Fix the cause and run install again; finished
-steps are skipped.
-
-Azure commands:
-
-- `run` starts the Container Apps run job, unless a run of it is already going. Then it says which
-  one, and to run `run` again once it has finished.
-- `status` shows job executions, the web URL, pending admin actions, and SQL reader secret expiry.
-  With Agent Evaluator it also shows which environments the jobs' managed identity can read, and
-  what the jobs' last read found in each.
-- `refresh` starts a Power BI model refresh. It refreshes the Agent Evaluator model only once the
-  jobs' managed identity can read one of its environments.
-- `update` re-runs preflight/what-if and redeploys with the current installer image tag.
-- `rotate-secret` creates a new SQL reader secret and rebinds the Power BI credential.
-- `uninstall` deletes the created resource group, or only tagged resources if you used an existing group.
-  Before that it removes what it added in each Agent Evaluator environment: see
-  [Agent Evaluator](#agent-evaluator).
-  It waits up to 45 minutes for Azure to finish deleting the group (`--no-wait` doesn't). In an existing
-  group it deletes each tagged resource before what it depends on, and waits for each to go. If any are
-  left, it lists them and fails: run `uninstall` again to finish. It also deletes
-  the Power BI workspace if the installer created it, after asking.
-
-## Run it
-
-Moved to [Run it](../docs/INSTALL.md#run-it).
-
-### Advanced settings
-
-After the data sources, the installer asks **Change the advanced settings?** With **No** (the
-default, and what `--yes` answers) it uses what you chose last time, or else the defaults below.
-With **Yes** it asks about each one as it comes. To change one later, choose **Repair or change**,
-then **Yes**.
-
-| Setting | Default |
+| What | Name or place |
 |---|---|
-| [Power BI](#power-bi-reports) | The semantic model, the Power BI reports and the app. Or the model and reports, the model and app, the model only, or neither. |
-| Who can view | A new **Analytics Hub Viewers** group. You're who people ask for access. **Manage access** changes it later. |
-| [Audit history](#load-more-audit-history) for the first load | 30 days. Or 90 or 180. |
-| [How many people are in the tenant](#a-large-tenant) | More than 10,000 on an F64 or larger capacity or with more than 10,000 Copilot seats assigned, otherwise up to 10,000. An existing install keeps its size. |
-| Lakehouse name | `Analytics_Hub`, or the next free name (`ValueLens` on earlier installs, which keep it). Spaces and hyphens become underscores. |
-| A new Key Vault's resource group, region and name, and the secret's name | `rg-valuelens`, the capacity's region, `valuelens-` and six random characters, and the default secret name. If you can't use `rg-valuelens`, it asks. |
-| Schedule | Daily, at the default time. Or weekly, and the time (UTC). |
-| Run the first load as soon as setup finishes | Yes. |
-| Value page currency | US dollars. See below. |
-| [Agent configuration and Foundry](#agent-configuration-and-foundry) | The whole tenant, agents and Foundry. |
-| [Ask data agent](#ask) | Yes, on a paid F2 or larger, or Premium, capacity. |
+| App registration | `ValueLens (PAX)`. Its client secret is kept in Windows Credential Manager on this PC. See [Permissions](../docs/PERMISSIONS.md#the-valuelens-installer) |
+| Access to one SharePoint site | Write access to the site that holds the folder, and to no other site (Sites.Selected) |
+| Scheduled task | `ValueLens - PAX refresh`, on this PC, each day at 02:00 by default |
+| Local folder | `%LOCALAPPDATA%\ValueLens\pax\`: the scripts, settings, logs and working files |
+| SharePoint folder | The CSV files the report and the app read |
+| Power BI workspace | A new one, `ValueLens` by default, or one you're in |
+| Semantic model and report | Both `ValueLens`, from the template in [4. SharePoint](../4.%20SharePoint/README.md) |
+| Refresh schedule | Twice a day, after the task |
+| Viewer group | `ValueLens Viewers`, with Build on the model. See [Viewer access](#viewer-access) |
+| The app | `ValueLens`, a Copilot Managed App, unless you turn it off. See [The app](#the-app) |
 
-**Currency for the Value page.** Licences and credits are billed in US dollars, so it reports in
-dollars unless you choose another, such as euros or pounds. For another currency you can type how
-many of it make $1, or leave it blank and set it under **Prices** in the app. It also sets the
-Power BI model's currency symbol. Nothing is looked up online. To choose it without the question,
-use `install --currency GBP --exchange-rate 0.79`. The installer keeps your choice for next time.
+#### Checks before it changes anything
 
-The [Azure target](#azure-target) asks the same question. Its advanced settings also cover
-[demo mode](#demo-mode), the Azure SQL region, the name prefix, extra tags,
-[networking](#networking), where credits come from,
-[Workday org data](../azure/README.md#workday-org-data), agent configuration and Foundry, and
-[which model Ask uses](#ask).
+First the installer checks this PC. It stops, and says what to do, if:
 
-## After it finishes
+- It's Azure Cloud Shell, or not Windows. Run the installer on the Windows PC that will run the
+  task.
+- PowerShell is older than 7.2: `winget install --id Microsoft.PowerShell --source winget`.
+- The execution policy is **AllSigned** or **Restricted**. The scripts aren't signed, and the
+  installer doesn't change or bypass the policy. Run
+  `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, or ask your IT admin if Group Policy
+  sets it.
+- An application control policy, such as App Control for Business or AppLocker, limits
+  PowerShell, so the refresh can't keep its secret in Credential Manager. Ask your IT admin to
+  allow the scripts.
+- Python 3.10 or later is missing. PAX's `-Rollup` needs it to build the files. Without it, PAX
+  tries to install Python itself, which a scheduled task can't finish:
+  `winget install --id Python.Python.3.13 --scope user`.
 
-Moved to [After it finishes](../docs/INSTALL.md#after-it-finishes).
+#### The daily refresh
 
-### When an update has to clear a model's data
+The task, `ValueLens - PAX refresh`:
 
-`update`, and `install` or **Repair or change** run from a newer version, update each semantic
-model in place and keep its data. Some changes, such as new columns, can't keep it: Fabric then
-turns the update down and changes nothing. The installer names the model, says reports on it show
-no data until it's reloaded from the Lakehouse or Azure SQL (which isn't changed), and asks before
-clearing it. Answer no, and the run stops with that model unchanged.
+- Runs as you, each day at 02:00 by default, in this PC's time. The advanced settings change it:
+  **When should the refresh run each day?**
+- Runs at run level **Limited**: not elevated.
+- Runs only while you're signed in to this PC (logon type **Interactive**). A missed run starts
+  when it can. To run it when you're signed out too, change it in Task Scheduler to
+  **Run whether user is logged on or not**, which may need the "Log on as a batch job" right. The
+  installer keeps that change. The Done page card **Keep the refresh running while you're signed
+  out** has the steps.
+- Runs only with a network connection, never twice at once, and stops after 12 hours.
+- Runs `pwsh.exe -NoProfile -NonInteractive -WindowStyle Hidden -File "<refresh.ps1>" -Config "<refresh.json>"`.
+  There's no `-ExecutionPolicy Bypass`.
 
-`--yes` alone never clears a model's data: the run stops instead. For an unattended run that
-may clear it, add `--allow-model-reset`. In the browser setup, the page asks.
+Each run:
 
-After a model's definition changes, the installer reloads it, and only says it's done once a
-whole-model refresh that it requested after the change was applied has finished cleanly:
-Completed, with no warnings or errors in its details. A refresh it didn't request, such as the
-pipeline's or one already running that it had to wait behind, never counts, because it may cover
-only some tables; nor does one that reported problems, or one whose details can't be read. Until then
-the install record notes that the model is owed a reload, so if the run stops, fails or can't
-tell, the next `install`, `update` or **Repair or change** reloads it, even with nothing else to
-change. If the installer can't tell whether the change itself was applied, the next run applies
-it again before reloading. If that reload fails or can't run, `update` and `install` end as failed
-and say which models have no data. Run `refresh`, or run the same command again. If other
-refreshes keep running so the installer can't start its own, a waited `refresh` fails and says so
-rather than reporting the model refreshed. Run without
-waiting, the refresh is only started, so the run says the model is still reloading rather than
-"Up to date". On the Azure target, the model is reloaded before any first load or history reload
-starts, rather than assuming that load reloads it.
+1. Takes a lock, so only one run works at a time.
+2. Reads the client secret from Credential Manager.
+3. If this PC has no files yet, copies them from the SharePoint folder.
+4. Runs PAX in its own PowerShell process. PAX is pinned to release `purview-v1.11.15`, and the
+   script's SHA-256 is checked before it runs.
+5. Uploads the files to the SharePoint folder.
+6. Writes `state.json` and a log.
 
-## Power BI reports
+| Where | What |
+|---|---|
+| `%LOCALAPPDATA%\ValueLens\pax\scripts\` | `refresh.ps1`, and the scripts from `4. SharePoint/scripts` it runs: `Run-PAX-AIBV.ps1`, `Get-Agents365Registry.ps1` and `Upload-Rollups-SharePoint.ps1` |
+| `…\pax\refresh.json` | The task's settings |
+| `…\pax\state.json` | The last run |
+| `…\pax\logs\` | A log for each run, kept 30 days |
+| `…\pax\data\` | The cumulative files, PAX's logs and any set-aside files |
+| `…\pax\work\` | PAX's working files |
+| Windows Credential Manager, `PAX-ValueLens-<tenant ID>` | The client secret. It lasts 12 months |
 
-The installer publishes the reports from the Power BI templates to the workspace, already
-connected to its semantic models, so nobody has to open Power BI Desktop:
+The first load runs straight after setup and pulls 30 days of audit history by default. It can
+take hours on a large tenant. Leave the PC on, and stay signed in, until it finishes.
 
-| Report | Reads | Published when |
-|---|---|---|
-| `ValueLens` | `Analytics Hub Model` | Always, with the reports |
-| `Consumption Central` | `Analytics Hub Consumption Model` | Credit consumption is on |
-| `Agent Evaluator` | `Analytics Hub Agent Evaluator Model` | Agent Evaluator is on, with an environment |
+#### The SharePoint folder
 
-Pages for sources you skip stay empty rather than failing. To leave the reports out, choose
-**Semantic model and the Analytics Hub app** or **Semantic model only** for Power BI. An install
-from an earlier version gets the reports offered the next time you choose **Repair or change**;
-**Update** on its own doesn't add them.
+- Use a folder in a document library on a SharePoint site. A OneDrive folder is refused, so the
+  refresh doesn't depend on one person's OneDrive. Subsites aren't supported. A folder name with
+  spaces at the start or end, or a full stop at the end, is refused.
+- The refresh writes `copilot_interactions_rollup.csv` and `copilot_users_rollup.csv`, and
+  `agents_365.csv` if you chose the Agent 365 file. The report reads only these.
+- If the folder has a file this PC didn't upload or copy down, the refresh doesn't overwrite it.
+  It moves this PC's copy to `data\set-aside-<date and time>-<name>`, and the next run carries on
+  from SharePoint's copy.
+- `upload <files> --folder <path>` uploads other files to a subfolder, such as `Exports/2026`.
+  Missing folders are created, and names can include `#` and `%`. The report doesn't read them.
+- Uninstalling leaves the files in SharePoint.
 
-On the [Azure target](#azure-target) the installer publishes no reports: the web app's pages read
-the models. It deploys the Agent Evaluator model when Agent Evaluator is on with an environment,
-outside [demo mode](#demo-mode).
+**The site grant.** Giving the app write access to the site needs a sign-in with
+Sites.FullControl.All, which the installer's sign-in usually doesn't have. The installer then
+shows the commands for a SharePoint Administrator or Global Administrator (Microsoft Graph
+PowerShell, or PnP PowerShell), and asks: **Check again**, or
+**Carry on without it (the refresh can't save its files until it's done)**. If you carry on, the
+Done page has **Ask for the app's access to the SharePoint site**, with a message to send.
 
-The Analytics Hub app reads a small `fabric.config.json` deployed beside it. It contains the
-semantic model IDs the app should query and, for newer installs, the optional modules the admin
-turned on:
+#### The report
 
-```json
-{
-  "semanticModels": {
-    "vl": { "workspaceId": "<workspace>", "itemId": "<Analytics Hub Model>" }
-  },
-  "modules": {
-    "m365Activity": true,
-    "agent365": false,
-    "productFeedback": false,
-    "consumption": false,
-    "agentEvaluator": false,
-    "defender": false
-  }
-}
-```
+- The installer publishes the report through the Power BI API, to a new workspace
+  (**Create a new workspace**) or one you're in. Creating one needs the tenant setting
+  **Create workspaces**. In an existing workspace you need Admin or Member.
+- If Power BI won't take the report through the API, for example in a workspace without a
+  capacity or with the API turned off for the tenant, the installer falls back to Power BI
+  Desktop. It writes `ValueLens.pbit` beside the install record and shows the steps:
+  1. Open it in Power BI Desktop, which is free from the Microsoft Store.
+  2. Keep the parameters and select **Load**.
+  3. When it asks how to connect to SharePoint, choose **Microsoft account** (or
+     **Organizational account**), sign in with your work account and select **Connect**.
+  4. Save it as `ValueLens.pbix`.
+  5. Select **Publish**, choose the workspace, and select **Replace** if it asks.
 
-Older installs may not have `modules`; the app then probes the model as before.
+  Then choose **I've published it**, **Keep the version that's there for now** or
+  **Stop and resume later**. Once you've used Desktop, later updates go through Desktop too. If
+  you stop, the Done page has **Publish the report from Power BI Desktop**.
 
-On Azure the web app serves the same `modules` in its `/app.config.json`, from the list the
-installer gives the jobs (`VALUELENS_MODULES`). An Azure install gets it at its next **Update** or
-**Repair or change**; until then the app probes as before.
+**Sign the model in to SharePoint.** Once, after publishing, the model needs your sign-in to
+read the folder. The installer shows the steps: in the workspace, open the model's settings, then
+**Data source credentials** > **Edit credentials**. Choose **OAuth2** and privacy level **None**,
+then **Sign in**. Do the same for each source. If a site fails the test, select
+**Skip test connection**. Then choose **I've signed it in**. **Later** leaves
+**Sign ValueLens in to SharePoint** on the Done page. Until it's done, the report has no data.
 
-**Editing a report.** A new installer version may bring a new version of a report. **Update** and
-**Repair or change** then ask before replacing it, because that replaces edits made in Power BI.
-To keep your edits, use **File** > **Save a copy** in Power BI first and edit the copy.
+**Refresh schedule.** Once the model is signed in, the installer schedules its refresh each day
+4 and 10 hours after the task, rounded up to the half hour: 06:00 and 12:00 for a 02:00 task, in
+this PC's time zone. Power BI emails if a refresh fails. Power BI Pro allows 8 refreshes a day.
 
-**Blank visuals.** The Tornado chart, Word cloud and Deneb visuals need the tenant setting
-*Allow visuals created using the Power BI SDK*. If you're a Fabric administrator, the installer
-checks it.
+### The app
 
-Without the reports, publish the templates yourself: open `ValueLens - Fabric.pbit` in Power BI
-Desktop (June 2024 or later) with the values the installer shows, and publish it to the workspace.
+On the PAX route, the installer asks **Deploy the ValueLens app?** Yes is the default.
+
+- The app is a Copilot Managed App named `ValueLens`. The installer deploys it with the bundled
+  `ms` CLI (`@microsoft/managed-apps-cli`), which signs in separately: a browser opens.
+- It goes in your Power Platform developer environment, unless you pass `--environment-id`.
+- It's shared with the viewer group. Each viewer needs Power Apps Premium or Copilot Credits. The
+  Power Apps rights in Microsoft 365 don't count. For Copilot Credits, turn on usage-based billing
+  and add the viewers to a spending policy for managed apps.
+- In the app, viewers choose **Change data** and pick the CSV files from the SharePoint folder. So
+  they need read access to the folder. The installer doesn't give it.
+- **Update** and **Deploy the app** (`deploy-app`) deploy it again only when the build has
+  changed.
+- The CLI needs Node.js 24.11 or later. The exe and the PowerShell command bring what it needs.
+  With `-UseInstalledNode`, or from a clone, see
+  [IT-approved Node.js](../docs/INSTALL.md#it-approved-nodejs) and
+  [Without the exe](../docs/INSTALL.md#without-the-exe).
+
+**If the tenant isn't ready.** If the Power Platform settings
+**Allow app creation with the Copilot Managed Runtime CLI** or
+**External artifacts in managed apps** are off, the installer says which. It finishes at the
+report instead of failing, and the Done page has **Ask for managed apps to be turned on**. A
+Power Platform administrator turns them on in the Power Platform admin center: **Copilot** >
+**Settings** > **Managed apps**, or, for an environment group, its rules. Then choose
+**Deploy the app** (`deploy-app`). **Repair or change** asks about the app again.
+
+If the app step stops for another reason, the Done page has **Finish the ValueLens app**, with
+what went wrong. For example:
+
+- **AADSTS53003.** Conditional Access blocked the CLI's sign-in. Ask for its app ID,
+  `9cee029c-6210-4654-90bb-17e6e9d36617`, to be allowed.
+- **No developer environment.** Pass `--environment-id` with the environment to use.
+- **An app with that name already exists.** Rename or delete it at
+  [managedapps.cloud.microsoft](https://managedapps.cloud.microsoft/).
+- **A policy blocks sharing apps in the environment.** Allow it, or deploy to another
+  environment.
+
+## Viewer access
+
+The installer creates a viewer group, **ValueLens Viewers** (or uses one you name), with you as
+owner.
+
+- **No workspace role.** Workspace viewers can read the notebooks' code, and a default Fabric
+  install keeps the app's client secret in the notebooks. So the group gets no workspace role on
+  either route.
+- **Build on the model.** The installer gives the group Build (ReadExplore) on the semantic model
+  through the Power BI API. If that fails, share the model with the group from its
+  **Manage permissions** page, with "Allow recipients to build content" ticked.
+- **Share the report, once.** Power BI has no API for it, so the installer asks you: in the
+  workspace, choose **…** next to the report, then **Manage permissions** > **Add user**. Enter
+  the group and choose **Grant**. Then choose **I've shared it**. **Later** leaves
+  **Share the report with ValueLens Viewers** on the Done page, and **Repair or change** asks
+  again.
+- **The app.** On the PAX route, the app is shared with the group too.
+
+To give someone access, add them to the group: choose **Manage access** (`access`), or use
+[My Groups](https://myaccount.microsoft.com/groups). They need no workspace role. Unless the
+workspace is on a paid F64 or larger Fabric capacity, or a Power BI Premium capacity, each of
+them needs Power BI Pro or Premium Per User.
+
+## Check it worked
+
+[Check it worked](../docs/INSTALL.md#check-it-worked) in docs/INSTALL.md has the steps. In
+short: read the Done page, choose **Check status** (`status`), which changes nothing, then
+**Check the data** (Fabric) or **Check the SharePoint folder** (PAX), both `check`.
 
 ## Load status and reruns
 
-**One Spark session.** The pipeline's notebooks share one Spark session, up to five at a time,
-instead of each starting its own. This keeps a small capacity from being too busy to start them
-(`TooManyRequestsForCapacity`). The installer turns on the workspace setting it needs: *High
-concurrency for pipeline running multiple notebooks*. That needs the workspace **Admin** role. If
-you're a Member, it warns you, and the notebooks start their own sessions as before. A workspace
-admin can turn it on under **Workspace settings** > **Data Engineering/Science** >
-**Spark settings** > **High concurrency**.
+**Fabric.** After a run, each source has a card: loaded, warning, failed, skipped or still
+running. The same is in the Lakehouse table `dbo.load_log`. A failed card says why:
 
-**What loaded.** After a run, the installer shows a card for each source: loaded, failed, skipped,
-or still running. A failed card says why in plain words, such as *Fabric's capacity was too busy
-to start it*, and what to do about it. The last pipeline step, `AnalyticsHub_Load_Status`, writes
-the same thing to the Lakehouse table `dbo.load_log`, one row per source per run. If any load
-failed, that step fails too, so the run shows as failed in Fabric and in its alert emails. A failed
-Agent 365 API load doesn't count when the Agent 365 export loaded instead.
+| Why it failed | What to do |
+|---|---|
+| The capacity was too busy (430) | Nothing is lost. Rerun later, or use a larger capacity |
+| The SQL analytics endpoint hadn't caught up | Wait a couple of minutes and rerun |
+| Sign-in failed (AADSTS, 401, 403 or consent) | Check admin consent, and that the client secret hasn't expired |
+| It timed out | Rerun. Load less history, or use a larger capacity |
+| The file isn't there | Upload it, or set the source to **Skip** |
 
-**Loaded, with a warning.** Some loads finish but couldn't read everything. When that happens, the
-card is amber, and in the terminal the line is too, with the reason:
+A warning means the load ran but something was missing: a role or permission
+([Permissions](../docs/PERMISSIONS.md#the-valuelens-installer) lists them), a licence, or any
+data. Azure Resource Graph and Defender also write what they couldn't read to the tables
+`arg_status` and `defender_status`.
 
-- Resource Graph was refused (`arg_status`).
-- Defender isn't licensed (`defender_status`).
-- Agent Evaluator found no transcripts (`evaluator_status`).
+- **Rerun failed loads** (`rerun-failed`) runs again only the loads that failed in the latest
+  pipeline run.
+- **Run now** (`run`) runs the pipeline, then the data check.
+- **Check the data** (`check`) runs the data check again, without the pipeline.
 
-`load_log` records these as `Warning`, with a `reason_kind` of `empty`, `forbidden` or
-`unlicensed`. A warning doesn't fail the run. The app's freshness line shows the latest status and
-reason for each source. It reads them after the next model refresh, because the status step runs
-after the refresh.
-
-**Rerun only what failed.** Choose **Rerun failed loads**, or run `rerun-failed`. It runs the
-failed loads again, then the steps that depend on them, and refreshes the model. Loads that worked
-aren't run again, unless they read what a rerun step writes: when the Cowork Dataflow reruns, so do
-the Viva load and the consumption model refresh, even if they succeeded on the empty input. A Viva
-load that got no rows from the Dataflow shows as **to do**, not loaded. If the capacity is still busy, it waits five minutes and tries again, twice. It
-won't start while a pipeline run is still going. The data check after a run does the same: the
-pipeline's Spark session can hold the capacity for a few minutes after the run ends.
-
-**The model sees new tables.** Before refreshing the model, `AnalyticsHub_Refresh_Model` asks the
-Lakehouse SQL endpoints to sync. Otherwise a refresh straight after a load can fail with
-*Table '…' is not in database*.
+**No Fabric: PAX + SharePoint.** **Check status** (`status`) shows the task and its last run, the
+client secret, the SharePoint folder and the model's last refresh. **Run now** (`run`) runs the
+refresh now. Each run's log is in `%LOCALAPPDATA%\ValueLens\pax\logs\`. If the first refresh
+fails, the Done page has **Fix the first refresh**.
 
 ## A large tenant
 
-Each audit query waits a few minutes in Microsoft's queue, however little it returns, so the first
-load's time grows with the days of history. With 30 days a tenant of up to 10,000 people usually
-loads in under an hour. Later runs load only what's new.
-
-On a tenant with tens of thousands of people, choose **More than 10,000** when asked how many
-people are in the tenant, under [Advanced settings](#advanced-settings). A new install chooses it
-for you on an F64 or larger capacity (a trial counts as the F size it matches, so FTL64 does), or
-when more than 10,000 Microsoft 365 Copilot seats are assigned. The installer reads the assigned seats in the prerequisite checks and shows them in the
-plan. An install that already has a tenant size keeps it, but the plan warns when the seats have
-outgrown it. Then:
-
-- The audit log is read in 2-hour windows instead of 24-hour ones. A long window can hold too many
-  records, and the audit service fails it after an hour or more. A window that fails is split after
-  one retry instead of three.
-- Each daily run reads the last 3 days again, not 7, which keeps the extra queries down. Records
-  that arrive more than 3 days late are missed.
-- The loads and the model refresh get longer time limits: up to 6 hours for the audit log.
-- If a run can't finish the history in time, it stops before writing anything and the retry carries
-  on from where it stopped. Windows already read aren't read again. `run` does the same.
-
-The slow Graph loads get longer time limits for both sizes than the pipeline template's:
-
-| Load | Template | Up to 10,000 | More than 10,000 |
-|---|---|---|---|
-| Agent 365 registry | 2 hours | 3 hours | 6 hours, retried twice |
-| Copilot Studio transcripts | 2 hours | 3 hours | 6 hours |
-| Defender | 30 minutes | 1 hour | 2 hours |
-
-The Agent 365 registry re-reads each agent's detail once a week, spread across the week: each agent
-has its own day, so a daily run refreshes about a seventh of them. New and changed agents are read
-first. Within a time budget set below the time limit (2 hours, or 4.5 hours for more than 10,000),
-the registry leaves any refreshes still to do to the next run and writes what it has; nothing is
-older than 7 days for long.
-
-With 30,000 or more seats on a capacity smaller than F64, the plan warns and says to choose an F64
-or larger capacity in **Fabric placement**. If your organisation's policy keeps you on the smaller
-capacity, setup still works, but the loads take longer and may hit their time limits.
-
-Expect the first load to take several hours. Start with 30 days, use an F64 or larger capacity,
-and [load more history](#load-more-audit-history) later. Don't run audit searches in the
-Purview portal while it loads. To change the tenant size, choose **Repair or change**, then **Yes**
-for the advanced settings. An install from an earlier version keeps its audit windows and time
-limits until you do. An install that has a tenant size gets the new time limits on its next
-**Update** or **Repair or change**, and keeps its data and settings.
-
-On the Azure target, the Power BI capacity, Azure SQL and web app sizing and the run job's time
-limit are under [A large tenant on Azure](#a-large-tenant-on-azure).
+- **Fabric.** The advanced settings ask **How many people are in the tenant?** **More than
+  10,000** uses smaller audit windows and longer time limits, and is best on F64 or larger. The
+  installer picks a default from your capacity and licences.
+- **No Fabric: PAX + SharePoint.** The first load pulls 30 days of audit history by default. The
+  advanced settings offer 30, 90 or 180 days. On a large tenant the first load can take hours:
+  leave the PC on, and stay signed in, until it finishes.
 
 ### Load more audit history
 
-The first load reads the history you chose: 30, 90 or 180 days. To load more later, any of these
-work:
-
-- **Repair or change** asks *Load more audit history?* once the first load has finished, offering
-  only more than you have. Keep is the default. The plan shows the reload, and it runs once,
-  straight after the repair. Later runs load only what's new. If a run is already going, the reload
-  doesn't start: use `run --backfill-days <n>` once that run has finished.
-- On the home page, the **Run** row has an **Audit history** picker: the usual run, or 30, 90 or
-  180 days.
-- In the terminal: `run --backfill-days <n>`, with `<n>` from 1 to 180.
-
-The record keeps the most history loaded, once the reload has started. On Fabric, windows already
-read are reused, so a reload only queries what's missing. On a large tenant, 90 or 180 days can
-take many hours.
-
-On the [Azure target](#azure-target), the reload starts the run job once with
-`VALUELENS_AUDIT_BACKFILL_DAYS` set, and leaves its usual settings alone. Job images older than
-this installer ignore it and run as usual: run `update` first if yours is.
-
-The run records the reload before it reads anything. If it stops short, at the run job's 4-hour
-limit or on a query that fails, the next runs carry the reload on and query only what's missing.
-The audit history and Agent Evaluator both carry it over until they've finished it: the audit
-history until a run has loaded every window, and Agent Evaluator until it has read each environment.
-The dashboard gets the extra history once a run has loaded all of it.
-
-## Data sources and exports
-
-| Source | Connected (API) | Upload CSV: where to export it | Fills |
-|---|---|---|---|
-| Copilot usage and licences | Always | | Every page |
-| Org data (Entra ID) | Always | | Organisation filters |
-| Workday org data | | Workday: a report of active workers with **Primary Work Email** | Organisation filters |
-| Microsoft 365 activity | Yes | | M365 activity |
-| Agent 365 registry | Needs an Agent 365 licence. Fabric only for now: on Azure, use the export | Microsoft 365 admin center > **Agents** > **All agents** > **Export** | Agents |
-| Product feedback | No API. **Power Automate (emailed export)**: a flow saves exports emailed to you. Fabric only for now: on Azure, use the export | Microsoft 365 admin center > **Health** > **Product feedback** > **Export** | User Feedback |
-| Copilot Studio credits | **Connected (Power Automate flow)**, the default: a daily flow reads the licensing API (tenant, environment, agent and per-user figures) | Power Platform admin center > **Licensing** > **Products** > **Copilot Studio** (Summary, Environments, Agents and Users) | Consumption Central |
-| Copilot Cowork credits | **Connected (Dataflow)**: a Dataflow Gen2 reads your Viva Insights query | Viva Insights > Copilot Consumption Dashboard > **Export** | Consumption Central |
-| Azure AI costs | Yes | | Consumption Central |
-| Agent Evaluator | Yes | | Agent Evaluator |
-| Defender (shadow AI and agent risk) | Yes, through Microsoft Graph. Needs Defender for Endpoint P2 or Defender for Cloud Apps | | Governance: Shadow AI and the *No sign-in required* flag |
-| Agent configuration and Foundry (Azure Resource Graph) | Off by default. See [Agent configuration and Foundry](#agent-configuration-and-foundry) | | Governance: agent configuration, Foundry estate and the *No sign-in required* flag (ahead of Defender) |
-
-A skipped source leaves its table empty and its page blank. Nothing fails. To turn one on later,
-choose **Repair or change**.
-
-**Adding exports.** Every export goes to one folder in the Lakehouse, `Files/analytics_hub_uploads`.
-Drop files there as downloaded: no renaming and no subfolders. Each pipeline run starts by
-recognising each file from its column headers, handing it to the notebook that loads it, and
-moving it to `_processed`. A file it doesn't recognise, or one for a skipped source, goes to
-`_unrecognised`; the reason is in the `analytics_hub_upload_log` table. Ways to add a file:
-
-- **In the installer.** Choose **Upload exports**, or pick files on the Data sources screen.
-- **In Fabric.** Open the Lakehouse, choose **…** next to the folder, then **Upload** > **Upload files**.
-- **[OneLake File Explorer](https://learn.microsoft.com/fabric/onelake/onelake-file-explorer)**,
-  which shows the folder in Windows Explorer.
-
-The installer uploads files up to 200 MB. Use Fabric or OneLake File Explorer for bigger ones.
-Your account needs Contributor or Member on the workspace to write there.
-
-**A SharePoint or OneDrive folder instead (optional).** In the Lakehouse, open
-`analytics_hub_uploads`, choose **New shortcut** > **OneDrive (SharePoint)**, pick your folder and
-name the shortcut `sharepoint`. Files there are read where they are, loaded once each, and left in
-place. Shortcuts need the Fabric tenant setting for OneDrive and SharePoint shortcuts. Without it,
-use the Lakehouse folder.
-
-**On Azure** there's no Lakehouse, and **Upload exports** is Fabric only. Drop the Agent 365 export
-in `agent365/` in the storage account's `landing` container or, with private networking, in the
-`agent365` folder under the SharePoint folder you gave the installer. Each run loads the newest
-one. Product feedback exports go in `product_feedback/` the same way, and each run loads them all.
-The Workday export goes in `workday/`, and each run adds the newest one to the org data. See
-[Agent 365 registry](../azure/README.md#agent-365-registry),
-[Product feedback](../azure/README.md#product-feedback) and
-[Workday org data](../azure/README.md#workday-org-data); credit files are in
-[Credit consumption](../azure/README.md#credit-consumption).
-
-### Power Automate flows
-
-The installer creates these flows in the Power Platform environment you pick, **turned off**, then
-helps you sign in to them and turns them on. It preselects the tenant's default environment. The
-environment's DLP policy must allow *HTTP with Microsoft Entra ID (preauthorized)*, and people with
-access to the environment can see the flows.
-
-| Flow | When | What it does | Sign in to |
-|---|---|---|---|
-| `Analytics Hub - Copilot Studio credits` | Copilot Studio credits set to **Connected** (the default) | Each day, an hour before the pipeline, reads credits by agent, by user and the tenant's entitlement from the Power Platform licensing API. The first run loads about six months; later runs restate the last ten days | Power Platform API and OneLake |
-| `Analytics Hub - Product feedback` | Product feedback set to **Power Automate (emailed export)**, on Fabric only for now | Saves product feedback exports emailed with the subject `Copilot Product Feedback` | Office 365 Outlook and OneLake |
-| `Analytics Hub - Agent inventory` | Agent configuration and Foundry set to **Connected**, with agents | Each day, an hour before the pipeline, saves the Power Platform inventory of Copilot Studio agents, environments and agent flows to `Files/arg_inventory`, for when Resource Graph won't give the app the agents | Power Platform API and OneLake |
-
-They need Power Automate Premium: whoever signs in to the HTTP with Microsoft Entra ID
-connections, and you as the flows' owner. See the
-[Power Platform admin checklist](../docs/PREREQUISITES.md#power-platform-admin-for-the-copilot-studio-credits-flow).
-
-**The installer signs them in with you.** Straight after it creates the flows, it:
-
-1. Makes the HTTP with Microsoft Entra ID connections the flows need, with their URLs filled in,
-   named `Analytics Hub - Power Platform API` and `Analytics Hub - OneLake` (on Azure,
-   `Analytics Hub - Azure Storage (<account>)`). It reuses ones of the same name that are signed in
-   to already.
-2. Gives one sign-in link for each, and says who signs in. If a link opens nothing, your browser
-   blocked the pop-up: allow pop-ups for `make.powerautomate.com` and `login.microsoftonline.com`.
-   If there's no link, it names the connection to find on the environment's Connections page and
-   click **Fix connection**.
-3. Waits while you sign in. Choose **I've signed in, check now**, or **Do this later**. `--yes`
-   doesn't wait.
-4. Once they're signed in to, points each flow at them and turns it on, so the Studio flow can run
-   before the first pipeline load. Run `update` to finish this later.
-5. Deletes the connections it made before that nobody signed in to and no flow uses. It lists your
-   other HTTP with Microsoft Entra ID connections that aren't signed in to, but never deletes them.
-
-The feedback flow's Outlook connection, and the Key Vault one with `--flow-identity app`, are still
-yours to sign in to in Power Automate. If the installer can't do any of this, it shows the steps
-below as soon as it creates the flows, and again at the end. If you leave the sign-ins for later,
-Copilot Studio data arrives after the flow runs and the next daily load.
-
-To finish a flow by hand:
-
-1. Open it in Power Automate. Allow pop-ups for `make.powerautomate.com`: each sign-in opens one.
-2. Sign in to its connections, or pick the ones the installer made. Each action's name ends in the
-   connection it uses: "via Power Platform API", "via OneLake" or "via Azure Storage".
-   - **HTTP with Microsoft Entra ID (preauthorized), for the Power Platform API** (Studio flow):
-     Base Resource URL and Resource URI `https://api.powerplatform.com`. Sign in as a Power
-     Platform, Billing or Global administrator. For the agent inventory flow, sign in as a Power
-     Platform administrator or Global Reader: the inventory API takes delegated sign-ins only.
-   - **Office 365 Outlook** (feedback flow): sign in as the mailbox the export is emailed to.
-   - **HTTP with Microsoft Entra ID (preauthorized), for OneLake**: Base Resource URL
-     `https://onelake.dfs.fabric.microsoft.com`, Resource URI `https://storage.azure.com`. Sign in
-     as someone with Contributor or higher on the workspace.
-3. Save, then turn it on.
-4. For product feedback, schedule the export to be emailed to that mailbox with the subject
-   `Copilot Product Feedback`, in the
-   [Microsoft 365 admin center > Health > Product feedback](https://admin.microsoft.com/Adminportal/Home#/tenantfeedback).
-
-**Load the Studio credits now.** The Studio flow loads its first six months on its first run,
-which is otherwise the next day, an hour before the pipeline. Once it's on, click **Run** in
-Power Automate to load them now. Or use `run`, or **Repair or change**: when the flow is on and
-hasn't loaded them yet (there's no `Files/analytics_hub_flows/studio_backfill_done` in the
-Lakehouse, or on Azure no successful run), the installer offers to run it as you, and to wait for it
-so the pipeline that follows picks up its files. `--yes` never runs it. If the flow is off, or
-Power Automate turns the run down, the installer shows these steps instead.
-
-The flows write to the drop folder as the person who signed in to the OneLake connection, so
-there's no secret and no Key Vault connection. That works when your Key Vault only takes private
-connections. The Fabric tenant setting **Users can access data stored in OneLake with apps
-external to Fabric** must be on (it is by default). Workspaces that block public inbound access
-can't take writes from Power Automate.
-
-**Keep them running.** A flow runs as the people who signed in to its connections. Sign in with a
-dedicated admin account rather than your own, and add a co-owner. Sign in again if the account's
-password is reset, the account is disabled, or the flow hasn't run for about 90 days.
-
-**Write as the app instead (optional).** `install --flow-identity app` makes the flows write as
-the app registration, with its secret read from Key Vault through an **Azure Key Vault**
-connection, and gives the app **Contributor** on the workspace. The Key Vault connector needs the
-vault to allow public network access, so use this only where it does. It needs the secret in Key
-Vault, not in the notebooks.
-
-If a flow can't be created (no environment, or no maker rights), the installer writes it to a file
-beside your answers in `Documents\Analytics Hub`. Create a cloud flow and paste the file's
-`definition` in. The [Manual setup flows](../fabric/flows/README.md) describe the feedback
-flow by hand. **Repair or change** updates existing flows and keeps the connections you signed in
-to. If an update adds a connection, the installer turns the flow off and tells you which one to
-sign in to. Dataverse won't update a flow that still has a connection to sign in to, so a flow
-whose connections were never signed in to is replaced with the new version instead, and so is one
-Dataverse refuses to update. Its connections are still there to pick when you sign in again.
-
-The Studio flow only sees environments that have Copilot Studio credits allocated, and its
-per-user figures come from an undocumented API route, so they're best effort. Exports are still
-accepted: for a month an export covers, its figures are used, and they add users' email
-addresses, the M365 Copilot licence flag and the exact prepaid split.
-
-### Commands
-
-| To | Run |
-|---|---|
-| Choose sources without the questions | `install --data productFeedback=csv,agent365=api --yes` |
-| Upload exports during the install | `install --data productFeedback=csv --csv feedback.csv` |
-| Create the product feedback email flow | `install --data productFeedback=flow --flow-environment https://contoso.crm.dynamics.com` |
-| Read Copilot Studio credits with the flow | `install --data studioCredits=api --flow-environment https://contoso.crm.dynamics.com` |
-| Have the flows write as the app, with its secret in Key Vault | `install --flow-identity app` |
-| Read Cowork credits with a Dataflow | `install --data coworkCredits=api --viva-partition <id> --viva-query <id>` |
-| Read agent configuration and Foundry from Resource Graph | `install --data resourceGraph=api --arg-management-group <id>` |
-| Report the Value page in another currency | `install --currency GBP --exchange-rate 0.79` |
-| Upload exports later, then load them now | `upload feedback.csv agents.csv --run` |
-| Run only the loads that failed last time | `rerun-failed` |
-| Delete the Fabric workspace and everything in it | `uninstall` |
-| After signing in to the Cowork Dataflow, refresh it and load Cowork credits | `load-cowork` |
-| Add viewers or owners to the viewer group, or choose another group | `access` |
-| Show each viewer only the orgs they're given (opt-in) | `access`, then **Turn on org-scoped access**. See [Org-scoped access](../docs/PERMISSIONS.md#org-scoped-access-row-level-security) |
-
-Source IDs for `--data`: `workday`, `m365Activity`, `agent365`, `productFeedback`,
-`studioCredits`, `coworkCredits`, `azureAi`, `agentEvaluator`, `defender`, `resourceGraph`. Modes:
-`api`, `csv` or `skip` (`defender` and `resourceGraph` take `api` or `skip`, and `workday` takes
-`csv` or `skip`).
-For `productFeedback` and `studioCredits`, `flow` is the same as `api`. `--feedback-flow` still
-works: it's the same as `productFeedback=flow`.
-On Azure, `agent365` and `productFeedback` are `csv` or `skip`. `api` warns and uses the exports, as
-do `productFeedback=flow` and `--feedback-flow`. `workday=csv` works there too, with org data.
-`agentEvaluator=api` ticks Agent Evaluator on Azure as well as on Fabric.
-Without `--flow-environment`, the installer asks which environment to use.
-With `resourceGraph=api`, `--arg-management-group <id>` reads one management group rather than the
-whole tenant, and `--no-arg-agents` or `--no-arg-foundry` leaves agents or Foundry out.
-`--currency <code>` sets the Value page currency (US dollars by default), and `--exchange-rate <n>`
-how many of it make $1. Without the rate, set it under **Prices** in the app. In the browser, choose
-the currency under [Advanced settings](#advanced-settings) instead.
-
-On the Azure target, `upload`, `--csv`, `load-cowork`, `--flow-identity app` and
-`coworkCredits=api` are Fabric only for now. `upload`, `--csv` and `load-cowork` stop and name the
-folder to put exports in. The other two warn, then the Copilot Studio credits flow signs in as you
-and Cowork credits come from the CSV export. See
-[Parity with Fabric](../azure/README.md#parity-with-fabric).
-
-`uninstall` on Fabric asks before it deletes the workspace. If the installer didn't create the
-workspace, the answer defaults to no. It deletes the workspace's managed private endpoints first,
-because Fabric won't delete a workspace that still has them, and waits up to ten minutes for them
-to go. It leaves the following alone: the app registration, the Key Vault, the flows, Dataverse
-access and the roles it gave.
-
-## Microsoft 365 activity
-
-On by default. It fills the app's **Work patterns** page.
-
-**Turn off concealed names**, or the organisation filters won't work on that page. In the
-Microsoft 365 admin center, go to **Settings** > **Org settings** > **Services** > **Reports** and clear
-**Display concealed user, group, and site names in all reports**. Then choose **Run now**.
-
-The `M365 Activity` table refreshes incrementally, like the audit table. The model keeps 12 months
-of it, and each refresh reloads only the last 35 days. That covers every day the notebook can
-rewrite: Microsoft keeps 28 days of reports. The first refresh after installing, or after
-**Repair or change** adds the policy to an existing install, still loads all of it once. If you set the
-notebook's `RETAIN_DAYS`, make it 0 or at least 400: days it deletes within the last 12 months stay
-in the model until they're older than that.
-
-## Credit consumption
-
-Optional. It fills the app's Consumption pages. See [Consumption Central](../fabric/Add%20Credit%20Consumption/).
-On the Azure target, see [Credit consumption](../azure/README.md#credit-consumption) instead.
-On the **Data sources** screen it's three cards, grouped as **Credit consumption**: **Copilot
-Studio credits**, **Copilot Cowork credits** and **Azure AI costs**. Choose any of them.
-
-- **Azure AI costs.** The installer reads Azure AI and Copilot pay-as-you-go costs for you.
-  `Ingest_Azure_AI` also fills the Azure capacity and health, billing reconciliation and Foundry
-  solution spend pages from ARM, Azure Monitor, Cost Management and the public Retail Prices API.
-  It needs no extra roles. Installs from 0.3.5 or earlier get it with **Repair or change**.
-- **Copilot Studio credits.** Leave it on **Connected** and finish the
-  [Copilot Studio credits flow](#power-automate-flows). To add exports as well, or instead, in the
-  Power Platform admin center go to **Licensing** > **Products** > **Copilot Studio**. Download the
-  `EntitlementConsumption…_MCSMessages…csv` files from the Summary, Environments, Agents and Users
-  tabs, and add them as [exports](#data-sources-and-exports). A new file replaces the last one of
-  the same kind, and an export's figures win for the month it covers.
-- **Copilot Cowork credits.** Choose **Connected (Dataflow)** where you can. Your Viva Insights
-  analyst creates the query first: send them the
-  [note in the checklist](../docs/PREREQUISITES.md#send-this-to-your-viva-insights-analyst-first).
-  In Viva Insights > **Create analysis** > **Create custom query** > **Consumption query**, they
-  keep the preselected credit metrics, turn on **Auto-refresh** and run it. In **Analysis
-  results**, the link icon copies its partition and query IDs. Step by step:
-  [Running the Viva Insights query](../docs/VIVA-QUERY.md). The
-  installer fills in the partition ID with your tenant ID, which is usually right. If you don't
-  have the query ID yet, choose **Not yet** to add the query later: Cowork credits use the CSV
-  export until then, and you add the IDs with **Repair or change**. With the IDs, the installer
-  creates the Dataflow Gen2 `AnalyticsHub_Cowork_Credits`, which loads the query into
-  `viva_credits_dataflow`, and the pipeline refreshes it before each Viva load. Its connections
-  need signing in once, and the installer can't do that for you:
-  1. Open the Dataflow from the link on the **Done** page or at the end of the install.
-  2. It shows **Configure connection** twice, once for each thing it connects to: the Viva Insights
-     source (the VivaInsights query) and the Lakehouse destination.
-  3. On each one, choose **Configure connection**, sign in, then **Connect**.
-  4. Choose **Save**, then wait until the Dataflow shows it has finished publishing.
-  5. Choose **Load Cowork now**, or run `load-cowork`. It waits for publishing to finish, refreshes
-     the Dataflow (trying once more a minute later if the refresh fails straight after the save),
-     then runs the Viva load and the consumption model refresh and says how many rows it loaded.
-
-  If the Dataflow isn't signed in yet when the first load starts, the installer leaves it out of
-  that run (the pipeline's `SkipCowork` parameter), so the other loads aren't marked as failed,
-  and the **Done** page shows an amber **To do: sign in to the Cowork Dataflow** card with these
-  steps. Scheduled runs never skip it: until someone signs in, they fail on
-  `Refresh_Cowork_Credits` with *Needs sign-in*. Rows in the editor's preview use your own sign-in,
-  so they show even while every refresh still fails for want of saved connections. See the
-  [Viva Insights guide](https://learn.microsoft.com/viva/insights/advanced/analyst/export-query-data-microsoft-fabric).
-  You need the Viva Insights **Insights Analyst** role. Without the IDs, or if the Dataflow can't be
-  created, Cowork credits fall back to the Consumption Dashboard's CSV
-  [export](#data-sources-and-exports). Exports can still fill weeks before the query; the
-  Dataflow wins for weeks both cover. Fabric also adds **DataflowsStagingLakehouse** and
-  **DataflowsStagingWarehouse** items to the workspace for the Dataflow. They're expected: leave
-  them. See [staging items](https://learn.microsoft.com/fabric/data-factory/dataflows-gen2-overview#staging-items-in-your-workspace).
-
-If you can't assign Azure roles, ask an Owner or User Access Administrator to give the app
-registration Reader, Cost Management Reader and Monitoring Reader on the subscription. Then
-choose **Repair or change**.
-
-## Defender (shadow AI and agent risk)
-
-Optional and off by default, on the Fabric and the Azure target. It fills the **Shadow AI** section of
-the app's **Governance** page, and gives the Agent 365 registry a *No sign-in required* flag.
-
-- **What it reads.** Microsoft Defender advanced hunting, through Microsoft Graph
-  `POST /security/runHuntingQuery` (`ThreatHunting.Read.All`), and Cloud Discovery in Defender for
-  Cloud Apps (`CloudApp-Discovery.Read.All`). The installer asks for both permissions; a tenant that
-  doesn't offer one yet gets a warning and that part is skipped.
-- **Four probes, each on its own.** Devices that ran or reached a watched AI tool, devices with one
-  installed, AI agents and whether they need sign-in, and generative AI apps in Cloud Discovery. A
-  probe the tenant isn't licensed for, or can't read, is recorded in `defender_status` and skipped.
-  The rest of the load carries on, and the page says what didn't load.
-- **Licences.** The device and agent probes need Defender for Endpoint P2 (or Microsoft Defender
-  XDR); Cloud Discovery needs Defender for Cloud Apps. The prerequisite check looks for them.
-- **The watchlist.** The first run writes a starting list of AI tools to
-  `Files/defender/ai_watchlist.csv` (Fabric) or the `landing` container's
-  `defender/ai_watchlist.csv` (Azure). Edit it to add tools, and set each tool's `Posture` to
-  `Sanctioned`, `Unsanctioned` or `Not reviewed` (the default). Sanctioned tools aren't shadow AI, so
-  the page leaves them out.
-- **It's a floor, not a census.** Defender sees only onboarded devices and the tools on the
-  watchlist. See [Methodology](../docs/METHODOLOGY.md#shadow-ai-what-other-ai-tools-are-in-use).
-
-## Agent configuration and Foundry
-
-Optional and off by default. On the Data sources screen set **Agent configuration and Foundry
-(Azure Resource Graph)** to **Connected**, or use `--data resourceGraph=api`. Each day
-`Copilot_Resource_Graph_Ingester` reads Copilot Studio agents (authentication, connectors, sharing,
-model and channels), Power Platform environments, agent flows, and Foundry resources and projects,
-into `arg_agent_config`, `arg_environments`, `arg_agent_flows`, `arg_foundry_resources` and
-`arg_status`. An agent's authentication setting feeds the Agent 365 registry's *Sign-in Required*
-column, ahead of Defender when both are on. It reads the tenant root group, or under
-[Advanced settings](#advanced-settings) one management group you name. On Azure, turn it on under
-Advanced settings. It
-never fails for want of a role: what it couldn't read is in `arg_status`, in plain words.
-
-Whoever runs the load (the app registration, or on Azure the jobs' managed identity) needs:
-
-- **Foundry:** Azure **Reader** on the management group, or on the tenant root group. The installer
-  gives it when you can assign roles there. If you can't, it prints the command for an Owner or
-  User Access Administrator:
-  `az role assignment create --assignee <app or identity client ID> --role Reader --scope /providers/Microsoft.Management/managementGroups/<group or tenant ID>`.
-- **Agents:** one of the Entra roles **Global Reader**, **Power Platform Administrator** or **AI
-  Administrator**. If you're a Global Administrator or Privileged Role Administrator, the
-  installer gives it **Global Reader** itself, and *Ready to set up* says so. It checks first,
-  so a repeat install doesn't add it again. If you aren't, it shows a message to copy to someone
-  who is. The message names the role, the app and its object ID, with a link to **Roles and
-  administrators** in the Entra admin center. Without the role, Resource Graph returns no agents,
-  and the Governance page says *Not collected: permission missing*. See
-  [PERMISSIONS](../docs/PERMISSIONS.md#azure-resource-graph).
-
-When Resource Graph won't return the agents, the load reads the newest file the
-`Analytics Hub - Agent inventory` [flow](#power-automate-flows) saved instead. The Power Platform
-inventory API it calls takes delegated sign-ins only, so the flow reads as the admin who signed in
-to its connection. It writes to `Files/arg_inventory` in the Lakehouse, or on Azure to
-`landing/arg_inventory`, or with private networking the `arg_inventory` subfolder of the
-SharePoint drop folder. Agent Title IDs are matched from the Agent 365 registry, so the load runs
-after it. They're matched on its `Bot Id` and `Entra Agent ID` columns, which the admin center's
-export doesn't have, so with only the export (on Azure, for now) they stay blank.
-
-On Azure the installer adds `resourceGraph` to the jobs' modules and passes the management group
-and what to read (`argManagementGroup`, `argAgents`, `argFoundry`). Demo mode leaves it out.
-
-## Agent Evaluator
-
-Optional. It fills the app's Agent Evaluation pages from your Copilot Studio conversations. See
-[Agent Evaluator](../fabric/Add%20Agent%20Evaluator/).
-
-**Which environments.** When you have more than one, the installer always asks which to read.
-Read the environments that hold your Copilot Studio agents. It checks each environment for agents,
-four at a time, and ticks the ones that have some. If it can't tell, it ticks the default
-environment and says so. It lists only environments you're a member of, so ask for access to any
-that are missing.
-
-**How far back.** An environment's first run reads up to 180 days of transcripts, including an
-environment you add later. After that, each run reads the last 14 days. Copilot Studio keeps
-transcripts for 30 days by default, so a first run usually finds about a month's worth.
-
-**When it finds none.** The parser records what it read in each environment in
-`evaluator_status`: how many transcripts, over how many days, and why any are missing. When there
-are none, the Agent Evaluation page says where it looked and how far back. To add environments,
-choose **Repair or change**, then **Agent Evaluator**. If an environment has transcripts but none
-are found, the reader likely has only Bot Transcript Viewer there, as on installs from before 0.6.8:
-choose **Update**, or **Repair or change**, as a System Administrator of the environment, so the
-installer adds the role that reads every transcript. Then
-[load more audit history](#load-more-audit-history) once, for example with
-`run --backfill-days 30`: later runs read only the last 14 days of transcripts, and a reload reads
-up to 180 days, so it picks up the older ones the environment still keeps.
-
-**Who reads them.** On Fabric, the transcript notebook signs in as the app registration. In each
-environment you pick, the installer adds it as an application user with the **Bot Transcript
-Viewer** role, and gives it a role the installer creates for the install in the root business unit:
-*Analytics Hub transcript reader* followed by the first 8 characters of the workspace's ID. That
-role holds exactly one privilege, read on the ConversationTranscript table at Organization depth, so
-the app reads every transcript in the environment, whoever owns it, and nothing else through it.
-Bot Transcript Viewer on its own reads only the transcripts the application user owns, or that are
-shared with it. A new role comes with 9 platform privileges of its own, so the installer takes those
-off, and reads the role's privileges back before it gives it. It never changes a role it didn't
-create. It adds transcript read to its own role only while no user or team other than the app has
-the role; otherwise it leaves the role as it is, and prints the steps for a System Administrator.
-Installs from before 0.6.8 get the role on **Update**, or **Repair or change**.
-
-If you aren't a System Administrator in an environment you pick, ask one to:
-
-1. Open the [Power Platform admin center](https://admin.powerplatform.microsoft.com) and go to
-   **Manage** > **Environments** > the environment > **Settings** > **Users + permissions**.
-2. **Security roles** > **+ New role**. Name it, for example *Analytics Hub transcript reader*, keep
-   the root business unit, turn off **Include App Opener privileges for running Model-Driven apps**,
-   and **Save**. Then set the **ConversationTranscript** table's **Read** to **Organization**, and
-   **Save**.
-3. **Application users** > **New app user**. Pick the app registration, the root business unit, and
-   the **Bot Transcript Viewer** role and the new role. If the app is an application user there
-   already, open it, choose **Edit security roles**, tick the new role, and **Save**.
-
-Then choose **Repair or change**, and when it asks, say the app already has access, or already
-reads every transcript.
-
-When you untick an environment or the module, or uninstall, the installer takes the transcript
-reader role away from the app, and deletes the role if it created it. On Fabric it leaves the app's
-application user and its Bot Transcript Viewer role, as before.
-
-**On Azure.** Tick **Agent Evaluator** under **Data collection**, then pick its environments under
-**Module connections**, from the same list. The jobs read the transcripts as their managed identity,
-the one they already run as, so it's the managed identity that needs to be an application user with
-the **Bot Transcript Viewer** role and the transcript reader role in each environment. The role is
-named for the install's ID. The web app's registration gets no Dataverse access. The **Transcript
-access** step adds both when you're a System Administrator of the environment. When it can't, it
-prints the steps above with the managed identity's name and client ID, then asks whether to **Leave
-it out for now** or whether **It already has access**. When the managed identity has Bot Transcript
-Viewer already, it asks whether to **Carry on for now**, reading only the transcripts shared with
-it, or whether **It already reads every transcript**. In step 3 the admin chooses **+ Add an app**
-and searches for the client ID, not the name. `--yes` leaves it out, or carries on.
-
-The Agent Evaluator pages show while the module is on and its model is deployed, outside
-[demo mode](#demo-mode), even before the managed identity can read an environment. They stay empty
-until the jobs first read transcripts. The installer refreshes the model, turns on its scheduled
-refresh and gives the jobs the environments to read only once the managed identity can read one of
-them. The jobs' modules include `agentEvaluator` whenever the module is ticked, as on Fabric.
-
-When you untick an environment or the module, or uninstall, the installer removes only what it
-added there: the transcript reader role it gave, and the role itself if it created it, then the Bot
-Transcript Viewer role it gave, and the application user if it created it. Unticking the module
-keeps the model, hides its pages and turns off its scheduled refresh; ticking it again reuses the
-model. Demo mode reads no transcripts and adds no access. Switching to it removes nothing, so the
-managed identity keeps its access for when you switch back. See
-[Agent Evaluator on Azure](../azure/README.md#agent-evaluator).
-
-## Ask
-
-The app's **Ask** page answers questions about the dashboard in plain language. It lists suggested
-questions for each page the install shows, from `app/src/ask/catalogue.json`. How it answers depends
-on the target.
-
-**Fabric.** The installer creates a data agent, **Analytics Hub Ask**, in the workspace and publishes
-it. It reads `Analytics Hub Model`, and Consumption Central and Agent Evaluator when they're on. Its
-instructions come from the same catalogue: what the measures mean, how to filter by date and
-organization, to compare rather than explain why, never to estimate, and to leave out groups under
-5 people. A data agent built on semantic models can't take example queries, so these all go into its
-instructions. On a re-run the installer updates and republishes it only when the models or the
-catalogue changed, and a failure here never stops the install. The app's Ask page links to the agent
-in Fabric (**Open the data agent in Fabric**) and copies questions to ask it. To use it in Teams or
-Microsoft 365 Copilot, publish it there from Fabric by hand: there's no API for that yet.
-
-It needs:
-
-- A paid Fabric capacity, **F2 or larger**, or Premium (P1 or larger). On a trial capacity the
-  installer skips the agent and the Ask page lists the questions only.
-- The tenant settings **Users can create and share data agent items**, **Users can use Copilot and
-  other features powered by Azure OpenAI** and, if your capacity isn't in the US or EU, **Data sent
-  to Azure OpenAI can be processed outside your capacity's geographic region**. The installer
-  checks them when it can read tenant settings and warns about any that look off.
-- For the people who ask it: access to the agent (share it, or a workspace role) and **Build** or
-  **Read** on the models it reads. The viewer group already has Build.
-
-To leave it out, choose **Yes** for the advanced settings and **No** when asked to create the data
-agent. It's recorded as `dataAgent` in `valuelens-install.json`.
-
-**Azure.** The web app answers on the page itself through `POST /api/ask`, with an Azure OpenAI model.
-The model can only run the named queries the pages run, as the person asking, so it sees only what
-they can see. Under [Advanced settings](#advanced-settings) the wizard asks which model to use:
-
-- **Create one for Ask** (the default): an Azure AI Services account in the resource group with a
-  `gpt-5-mini` deployment, billed per token. Choose whether prompts may be processed in any region
-  (Global Standard) or only in your data zone (Data Zone Standard). The installer checks the region
-  offers the model and has quota, and moves a global deployment to another region if it doesn't,
-  but only to a region that Azure Policy allows.
-  The web app's managed identity gets **Cognitive Services OpenAI User** on it.
-- **Use an Azure OpenAI deployment you already have**: pick the account and a chat deployment that
-  supports tool calling. The installer gives the managed identity Cognitive Services OpenAI User on
-  that account if you can assign roles there, or prints the `az role assignment create` command.
-- **Leave Ask off**: the page lists suggested questions without answers. An account the installer
-  created earlier stays until you delete it.
-
-It's recorded as `azure.ask`. See [Ask](../azure/README.md#ask) for the limits and what's logged.
-
-## Private Key Vaults
-
-If your vault blocks public access, the installer connects the workspace to it with a managed
-private endpoint. You need to be a workspace Admin, on an F or trial capacity. If you can't approve
-the endpoint, someone who manages the vault approves it under **Networking** >
-**Private endpoint connections**. Then choose **Repair or change**.
+`run --backfill-days <n>` reloads `n` days of audit history, 1 to 180. On the Fabric route it
+rebuilds the curated table. On the PAX route it adds the days to the SharePoint folder's files.
+
+## Already set up by hand
+
+- **Fabric.** The installer leaves alone anything it didn't create. In a workspace that already
+  has ValueLens items, its own items get the next free names, so you have two copies. Use a new
+  workspace, or delete the hand-made items first.
+- **No Fabric: PAX + SharePoint.** The installer's task, secret and local folder have their own
+  names, so a hand set-up from [4. SharePoint](../4.%20SharePoint/README.md) keeps running. If
+  both write to the same SharePoint folder, the installer's refresh won't overwrite files it
+  didn't write: it sets its own copy aside (see [The SharePoint folder](#the-sharepoint-folder)).
+  Give it its own folder.
+- **Analytics Hub.** The installer won't use a workspace that holds an Analytics Hub install, or
+  an Analytics Hub install record (`valuelens-install.json`). Manage those with the
+  [Analytics Hub installer](https://github.com/microsoft/AnalyticsHub-Dashboard).
+
+## Update, repair or change
+
+**Updates.** When the browser page starts, the installer checks for a newer installer. It lists
+this repo's releases and takes the newest published `valuelens-installer-v*` release, skipping
+drafts and prereleases. It never uses GitHub's **Latest** release, which is usually a dashboard
+release. If there's a newer one,
+the page says **Installer x.y.z is available.**, and **Get it** opens that release. If you
+started the installer from PowerShell, it also gives the command for that version, pinned to its
+release. Close the installer, run the newer one, then choose **Repair or change**. The check gives
+up quietly if GitHub doesn't answer within 5 seconds. Set `VALUELENS_NO_UPDATE_CHECK=1` to turn
+it off.
+
+**Update** (`update`) pushes the version you're running to your install: on the Fabric route,
+the notebooks, pipeline and semantic model; on the PAX route, the scripts on this PC, the report
+and the app.
+
+**Repair or change.** Start the installer again the same way and choose **Repair or change**
+(`install`). It goes through the set-up again from the install record and puts back what's
+missing. It also asks again about what you put off, such as sharing the report, Key Vault and the
+app.
+
+**The install record.** The installer keeps your answers in `valuelens-setup.json`, in
+`Documents\ValueLens` when you start it with the exe or the PowerShell command. It holds no
+secrets, and its `product` is `valuelens`. Choices you haven't approved yet are kept beside it in
+`valuelens-setup.json.draft.json`. Use `--config <file>` for another record.
+
+**Changing route.** An install stays on its route. Uninstall it first, or pass `--config` with a
+new file name to set up a second copy.
+
+## Secrets expire
+
+| Route | Where the client secret is | How long it lasts |
+|---|---|---|
+| Fabric, no Key Vault | In the notebooks | 90 days by default (`--secret-days`, 1 to 730). Each install, repair or update replaces it |
+| Fabric, Key Vault | In Key Vault | **Check status** shows when it expires |
+| No Fabric: PAX + SharePoint | Credential Manager on this PC | 12 months. When the installer runs with 30 days or fewer left, it makes a new one |
+
+**Check status** (`status`) shows when each secret expires. On the Fabric route, it warns when
+fewer than 30 days are left. To replace it, choose **Create new secrets** (Fabric) or
+**Create a new client secret** (PAX), or run `rotate-secret`:
+
+- **Fabric, no Key Vault.** A new secret is written into the notebooks, then the old one is
+  removed from the app registration, so copies of it in run snapshots, exports or Git stop
+  working. If you brought your own app registration, you paste the new secret, then delete the
+  old one from its **Certificates & secrets** page.
+- **Fabric, Key Vault.** New secrets go into Key Vault and the model's connection. The old secret
+  keeps working until it expires: delete it from the app's **Certificates & secrets** page once a
+  run has succeeded.
+- **No Fabric: PAX + SharePoint.** A new secret goes into Credential Manager on this PC. If the
+  installer didn't create the app registration, it can't make one: make a secret in Entra ID
+  (**App registrations** > the app > **Certificates & secrets**), then run `rotate-secret`.
+
+## Uninstall
+
+Choose **Uninstall** (`uninstall`).
+
+**Fabric:**
+
+- It asks before it deletes the workspace and everything in it, including the Lakehouse data. Yes
+  is the default only if the installer created the workspace.
+- It deletes the workspace's managed private endpoints, the workspace and the model's
+  connection.
+- It leaves alone the app registration, the Key Vault and its secret, any Power Automate flows,
+  the viewer group, and the other roles the app registration was given.
+- The install record still names the deleted workspace. Move it aside before you install again.
+
+**No Fabric: PAX + SharePoint:**
+
+- It asks first, then removes the scheduled task.
+- If the installer created the Power BI workspace, it asks before it deletes it and everything in
+  it (yes by default). Otherwise it deletes the report, and asks before it deletes the model (yes
+  by default).
+- It deletes the app. If it can't, it says to delete it at
+  [managedapps.cloud.microsoft](https://managedapps.cloud.microsoft/).
+- It removes the app registration's access to the SharePoint site.
+- If the installer created the app registration, it asks before it deletes it (no by default). If
+  the app registration stays, it removes the client secret the installer made.
+- It removes the secret from Credential Manager, and the `%LOCALAPPDATA%\ValueLens\pax` folder.
+- It leaves the files in SharePoint, the viewer group, PowerShell 7 and Python.
+- Move the install record aside before you install again, or the installer picks up the old
+  set-up.
+
+## Remove the installer
+
+Uninstall removes what's in your tenant and the scheduled refresh, not the installer itself. To
+remove that:
+
+- **The exe or the PowerShell command.** Run `.\install.ps1 -Uninstall` (see
+  [From PowerShell](../docs/INSTALL.md#from-powershell)), or run the one-liner from
+  [Install](#install) as `& ([scriptblock]::Create((irm <its install.ps1 link>))) -Uninstall`. It
+  removes the installer folders unpacked under `%LOCALAPPDATA%\ValueLens`, and the `valuelens.cmd`
+  command. Your install record in `Documents\ValueLens` stays, and so does the `pax` folder a
+  scheduled PAX refresh runs from. Then delete the exe, if you downloaded it.
+- **Azure Cloud Shell.** Delete `~/.valuelens`. Your install record in `~/valuelens` stays.
+- **A clone.** Delete the clone.
+
+## If you can't register apps
+
+When the installer asks about the app registration, you can choose:
+
+- **Use an app registration I already have.** Enter its client ID and, when asked, a client
+  secret's value.
+- **An admin will register the app for me.** The installer writes an admin pack,
+  `valuelens-admin-pack.md`, beside the install record. It has an Azure Cloud Shell (Bash) script
+  and the same steps in the portal, for someone who can register apps and grant admin consent,
+  such as a Privileged Role Administrator or Global Administrator. On the PAX route it adds the
+  PowerShell that gives the app the SharePoint site, for a SharePoint Administrator or Global
+  Administrator. The admin sends you the client ID, and the client secret through a secure
+  channel, unless the secret goes straight into Key Vault.
+
+[Permissions](../docs/PERMISSIONS.md#the-valuelens-installer) lists what each app registration
+needs.
+
+## Prerequisites
+
+[Prerequisites](../docs/PREREQUISITES.md#the-valuelens-installer) lists what each route needs, by
+person. [Permissions](../docs/PERMISSIONS.md#the-valuelens-installer) lists what the installer
+creates and grants. To check your own account, choose **Check prerequisites** in the browser, or
+run `prereqs` (add `--target pax` for the PAX route). It's read-only and works before anything is
+installed.
 
 ## Troubleshooting
 
-Moved to [Troubleshooting](../docs/TROUBLESHOOTING.md#troubleshooting).
+- **"Release valuelens-installer-v… is no longer available".** That `install.ps1` is pinned to a
+  release whose zip has gone. Get the current release's command from the
+  [installer releases](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases?q=valuelens-installer-v).
+- **A proxy blocks the download.** Use `-Proxy` or `VALUELENS_PROXY`, or download the zip in a
+  browser and use `-ZipPath`. See [From PowerShell](../docs/INSTALL.md#from-powershell).
+- **AppLocker or App Control blocks `node.exe`.** Use
+  [IT-approved Node.js](../docs/INSTALL.md#it-approved-nodejs), or
+  [Azure Cloud Shell](../docs/INSTALL.md#locked-down-tenant--azure-cloud-shell) for the Fabric
+  route.
+- **`valuelens.cmd` says this copy has been removed or replaced.** Run the command it prints.
+- **The installer won't use a workspace or an install record.** It holds an Analytics Hub
+  install. Use the [Analytics Hub installer](https://github.com/microsoft/AnalyticsHub-Dashboard).
+- **"This install record is for the … route".** See [Changing route](#update-repair-or-change).
+- **The first load was skipped.** Admin consent wasn't granted. Once it is, run the command the
+  installer printed: `run --backfill-days <days>` (Fabric) or `run` (PAX).
+- **A Fabric load failed.** See [Load status and reruns](#load-status-and-reruns).
+- **The PAX checks stop the install.** See
+  [Checks before it changes anything](#checks-before-it-changes-anything).
+- **The SharePoint folder's address is refused.** Use a folder on a SharePoint site, not OneDrive
+  or a subsite, with no spaces at the start or end of a name and no full stop at the end.
+- **The refresh can't save its files.** The app doesn't have the site yet. See
+  [The SharePoint folder](#the-sharepoint-folder).
+- **The task didn't run.** It runs only while you're signed in. See
+  [The daily refresh](#the-daily-refresh). Its logs are in `%LOCALAPPDATA%\ValueLens\pax\logs\`.
+- **The refresh found no Copilot audit records.** If Copilot is in use, check that auditing is
+  on: in the Microsoft Purview portal, open **Audit**. If it offers to start recording user and
+  admin activity, auditing is off: turn it on. Activity is audited from then on.
+- **Files called `set-aside-…`.** SharePoint had a file this PC didn't write. See
+  [The SharePoint folder](#the-sharepoint-folder).
+- **The workspace can't be created.** Ask a Fabric administrator for the tenant setting
+  **Create workspaces**, or ask someone to create one and add you as Admin or Member. If the name
+  is taken, choose another, or ask its admin to add you.
+- **Power BI wouldn't schedule the model's refresh.** It usually means the model isn't signed in
+  to SharePoint. Sign it in, then run the installer again.
+- **The app wasn't deployed.** See [The app](#the-app).
+- **Something else.** Run the command again with `--verbose` to print each API call, and
+  [open an issue](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues).
 
-## Check the download
+## Commands and options
 
-Moved to [Check the download](../docs/INSTALL.md#check-the-download).
+In the browser, choose a command on the home page. In the terminal, add it to the command you
+started with: `& $env:LOCALAPPDATA\ValueLens\valuelens.cmd status`,
+`ValueLensInstaller.exe status`, `~/.valuelens/valuelens status` in Cloud Shell, or
+`npm start -- status` from a clone. `--help` lists them all.
 
-## From PowerShell
+| Command | Browser | What it does |
+|---|---|---|
+| `install` | **Repair or change** | Set up ValueLens, or repair it from the install record (the default) |
+| `update` | **Update** | Push this version to the install: Fabric's notebooks, pipeline and semantic model, or PAX's scripts on this PC, the report and the app |
+| `run` | **Run now** | Fabric: run the pipeline now, then the data check. PAX: run the refresh now |
+| `rerun-failed` | **Rerun failed loads** | Fabric: run again only the loads that failed in the latest pipeline run |
+| `check` | **Check the data**, **Check the SharePoint folder** | Fabric: run the data check again, without the pipeline. PAX: check the app can still write to the SharePoint folder |
+| `refresh` | **Refresh the model** | Refresh the semantic model now |
+| `status` | **Check status** | Show recent runs and refreshes, the last data check and when secrets expire |
+| `rotate-secret` | **Create new secrets**, **Create a new client secret** | Create new client secrets: Fabric's and the model's connection's, or PAX's in Credential Manager on this PC |
+| `access` | **Manage access** | Who can view: the viewer group, its members and owners, and its Build on the model |
+| `upload [files]` | **Upload exports** (Fabric) | Fabric: upload CSV exports to the drop folder, which the next run loads. PAX: upload any files to the SharePoint folder |
+| `deploy-app` | **Deploy the app** | PAX: deploy the app, or deploy it again from this version's build |
+| `uninstall` | **Uninstall** | See [Uninstall](#uninstall) |
+| `prereqs` | **Check prerequisites** | Check the roles, licences, capacities and Azure access you have and lack. Read-only. `--target pax` checks the PAX route's |
+| `preview` | | Write what would be deployed to a folder, without signing in |
 
-Moved to [From PowerShell](../docs/INSTALL.md#from-powershell).
+**Options:**
 
-## Locked-down tenant / Azure Cloud Shell
+| Option | What it does |
+|---|---|
+| `--ui` | Run the installer in your browser instead of the terminal. Only this computer can reach the page |
+| `--no-open` | With `--ui`: print the link instead of opening the browser |
+| `--config <file>` | The install record (default `./valuelens-setup.json`) |
+| `--source <dir>` | The repo folder to deploy from (default: this checkout) |
+| `--tenant <id>` | Tenant ID or domain to sign in to |
+| `--target <fabric\|pax>` | The route. `install` asks when it's left out, and an install record keeps its route |
+| `--device-code` | Sign in with a code on another device instead of a browser. The default in Azure Cloud Shell |
+| `--use-az` | Use the account you're signed in to with the Azure CLI. In Cloud Shell, run `az login --use-device-code` first |
+| `--backfill-days <n>` | With `run`: reload `n` days of audit history, 1 to 180 |
+| `--out <dir>` | With `preview`: where to write (default `./valuelens-preview`) |
+| `--yes` | Take saved answers and defaults without asking. It never lets Fabric clear a model's data: add `--allow-model-reset` for that |
+| `--no-wait` | Don't wait for the first load or a refresh to finish |
+| `--verbose` | Print each API call |
+| `-h`, `--help` | Show the help |
+| `-v`, `--version` | Show the version |
 
-Moved to [Locked-down tenant / Azure Cloud Shell](../docs/INSTALL.md#locked-down-tenant--azure-cloud-shell).
+**Fabric route options.** Without `--target` or an install record, they choose this route.
 
-## Without the exe
+| Option | What it does |
+|---|---|
+| `--data <id=mode>` | With `install`: how a source arrives, `api`, `csv` or `skip`. Repeat it or use commas, such as `--data productFeedback=flow,agent365=api`. `flow` is product feedback's Power Automate flow. Ids: `core`, `orgData`, `workday`, `m365Activity`, `agent365`, `productFeedback`, `defender`, `resourceGraph` |
+| `--csv <file>` | With `install`: an export to upload during the install. Repeat for more |
+| `--feedback-flow` | With `install`: the same as `--data productFeedback=flow` |
+| `--flow-environment <url>` | With `install`: the Power Platform environment to create the flows in |
+| `--flow-identity <user\|app>` | With `install`: who the flows write to OneLake as. `user` (default): a person signs in to an HTTP with Microsoft Entra ID connection. `app`: the app registration, with its secret from Key Vault, which must allow public network access |
+| `--arg-management-group <id>` | With `install`: the management group Resource Graph reads from (default: the whole tenant) |
+| `--no-arg-agents` | With `install`: leave Copilot Studio agents out of Resource Graph |
+| `--no-arg-foundry` | With `install`: leave Foundry resources out of Resource Graph |
+| `--currency <code>` | With `install`: the currency the report shows money in, such as GBP (default USD) |
+| `--run` | With `upload`: run the pipeline straight after |
+| `--no-key-vault` | With `install`: keep the client secret in the notebooks, the default for a new install. Same as `--secret-in-notebook` |
+| `--key-vault` | With `install`: keep the client secret in Azure Key Vault. Needed with `--yes` to choose Key Vault for a new install |
+| `--secret-days <n>` | With `install` or `rotate-secret`, and no Key Vault: how many days the secret in the notebooks lasts, 1 to 730 (default 90) |
+| `--allow-model-reset` | With `install`, `update` or `access`: when Fabric can't update a model and keep its data, clear the data and reload it without asking. Reports on that model show no data until the reload finishes |
 
-Moved to [Without the exe](../docs/INSTALL.md#without-the-exe).
+**No Fabric: PAX + SharePoint route options.** Without `--target` or an install record, they
+choose this route.
+
+| Option | What it does |
+|---|---|
+| `--environment-id <id>` | With `install` or `deploy-app`: the Power Platform environment for a new app |
+| `--folder <path>` | With `upload`: a subfolder of the SharePoint folder, such as `Exports/2026`. Missing folders are created. Names can include `#` and `%` |
+
+## For maintainers
+
+- **Layout.** `bin/valuelens-installer.js` starts the installer. `src/` has the commands and
+  steps, with the browser page in `src/web/`, the PAX route in `src/steps/pax/` (the PowerShell
+  the task runs is in `src/steps/pax/runner/`) and the app step in `src/managed-app/`. The names
+  are in `src/product.js`. `packaging/` builds the exe and `install.ps1`.
+- **npm scripts** (in `installer/`):
+  - `npm start` runs `node bin/valuelens-installer.js`.
+  - `npm test` runs `node --test`.
+  - `npm run typecheck` runs `tsc -p jsconfig.json`.
+  - `npm run build:exe` builds the exe, the zip and `install.ps1`. It needs Windows, Node.js
+    24.11 or later (the exe ships the Node.js that builds it), the .NET Framework C# compiler that
+    comes with Windows, and `npm ci` run first in `installer/` and `app/`. Without the app's
+    dependencies the exe has no app, and its app step stops. Options: `--out <dir>` (default
+    `./dist-exe`), `--keep` (keep the working folder), `--release` (fail rather than warn when
+    something a published download needs is missing) and `--repo <owner/name>`.
+- **Node.js.** The installer needs Node.js 22.13 or later (`engines` in `package.json`), because
+  its Azure and prompt packages do. The app step and the exe build need 24.11 or later.
+- **The workflow.** `.github/workflows/valuelens-installer-exe.yml` runs on
+  `valuelens-installer-v*` tags, pull requests that touch the installer or what it carries,
+  manual runs and published releases. It checks the tag matches the version in `package.json`,
+  runs `npm ci` in `app/` and `installer/`, `npm test`, `npm run typecheck` and
+  `npm run build:exe -- --release`, then smoke-tests the exe and `install.ps1`. On a tag it drafts
+  a release with `--draft --latest=false`. A `-rc.N` tag makes a prerelease, which the update
+  check skips. It never publishes a release: you publish it by hand. `--latest=false` keeps the
+  repo's **Latest** release the dashboard's, so every installer link names its version.
+- **Signing.** The exe is Authenticode-signed with ESRP outside the workflow
+  (`packaging/sign-installer.azure-pipelines.yml`), which replaces the draft's exe, `.sha256` and
+  notes. With the repo variable `REQUIRE_SIGNED_INSTALLER` set to `true`, publishing an unsigned
+  release turns it back into a draft.
+- **A new version.** Change `version` in `package.json`, and the pinned links in this README's
+  [Install](#install) section and in [docs/INSTALL.md](../docs/INSTALL.md). `test/script.test.js`
+  checks they match. Then push a `valuelens-installer-v<version>` tag.
+- **The older installer.** `1. Fabric/installer` is the older Analytics Hub installer. It's built
+  by `installer-exe.yml` on `installer-v*` tags.
+
+Ported from the Analytics Hub installer at
+[microsoft/AnalyticsHub-Dashboard@1af87db](https://github.com/microsoft/AnalyticsHub-Dashboard/commit/1af87db)
+(installer 0.6.8-rc.2). Removed in the port: the Azure route, Credit consumption (Consumption
+Central), Agent Evaluator, Ask, and the Analytics Hub app step.

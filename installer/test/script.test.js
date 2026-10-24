@@ -89,6 +89,18 @@ test("script: the installer README shows this version's install command and link
   assert.doesNotMatch(readme, /releases\/latest/, "GitHub's Latest is often a dashboard release");
 });
 
+test("script: docs/INSTALL.md shows this version's install command and links the installer releases", () => {
+  const doc = readFileSync(fileURLToPath(new URL('../../docs/INSTALL.md', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
+  const { version } = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'));
+  assert.ok(doc.includes(`\n${scriptCommand(version)}\n`), `docs/INSTALL.md shows: ${scriptCommand(version)}`);
+  assert.ok(doc.includes(`(${scriptUrl(version).replace(/install\.ps1$/, PRODUCT.exe)})`), 'links this version of the exe');
+  const tags = [...doc.matchAll(/releases\/download\/([^/\s)]+)\//g)].map((m) => m[1]);
+  assert.ok(tags.length > 0, 'links a release download');
+  assert.deepEqual([...new Set(tags)], [`${PRODUCT.tagPrefix}${version}`], 'no other version');
+  assert.ok(doc.includes(`(${RELEASES_PAGE})`), RELEASES_PAGE);
+  assert.doesNotMatch(doc, /releases\/latest/, "GitHub's Latest is often a dashboard release");
+});
+
 test('script: in Azure Cloud Shell, gets the pinned commit and runs the installer in the terminal', () => {
   const cloud = TEMPLATE.slice(TEMPLATE.indexOf('if ($CloudShell) {'), TEMPLATE.indexOf("if ($env:OS -ne 'Windows_NT')"));
   assert.ok(cloud.length > 1000, 'the Cloud Shell branch comes before the Windows-only check');

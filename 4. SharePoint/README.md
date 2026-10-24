@@ -2,6 +2,24 @@
 
 Use this path when you want ValueLens in Power BI Pro with scheduled refresh from SharePoint CSVs, and you do not use Fabric.
 
+## Let the installer set it up
+
+The [ValueLens installer](../installer/README.md) can do this page for you. Its
+**No Fabric: PAX + SharePoint** route runs on the Windows PC that will run the daily refresh. It:
+
+- Creates an app registration, `ValueLens (PAX)`, with the Microsoft Graph permissions PAX needs.
+  It can write to your SharePoint site and no other (`Sites.Selected`), once a SharePoint
+  Administrator or Global Administrator grants that. The installer shows the commands to send.
+- Adds a daily scheduled task on the PC, `ValueLens - PAX refresh`. It runs a pinned PAX release
+  and keeps the CSVs in your SharePoint folder.
+- Publishes the SharePoint report to a Power BI Pro workspace. You sign the model in to
+  SharePoint once, then it refreshes each day.
+- Deploys the app, if your tenant is ready for it.
+
+To start, see [Install](../installer/README.md#install). What it sets up, in detail:
+[No Fabric: PAX + SharePoint route](../installer/README.md#no-fabric-pax--sharepoint-route). The
+manual steps below still work.
+
 ## You need
 
 - Power BI Pro, PPU, or Premium, plus a workspace where you can publish and schedule refresh.
