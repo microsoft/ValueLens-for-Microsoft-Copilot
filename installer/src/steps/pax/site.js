@@ -35,14 +35,31 @@ const SIGN_IN_FAILED = /^Couldn't sign in to Microsoft Graph as the app/;
 const SETTLE_TRIES = 9;
 const SETTLE_MS = 15_000;
 
-/** @param {string} s */
+/**
+ * Decodes one part of a pasted address. A typed % that isn't an escape, as in "100% Done", stays
+ * as it is: the browser escapes the space after it but not the %.
+ * @param {string} s
+ */
 const decode = (s) => {
   try {
     return decodeURIComponent(s);
   } catch {
-    return s;
+    return s.replace(/(?:%[0-9a-f]{2})+/gi, (run) => {
+      try {
+        return decodeURIComponent(run);
+      } catch {
+        return run;
+      }
+    });
   }
 };
+
+/**
+ * A folder name the scheduled refresh accepts (refresh.ps1's Test-FileName): no leading or
+ * trailing spaces, and no full stop at the end.
+ * @param {string} s
+ */
+export const tidyFolderName = (s) => s === s.trim() && !s.endsWith('.');
 
 /** @param {string} why */
 const notAFolder = (why) =>
@@ -99,6 +116,8 @@ export function parseSharePointFolder(text) {
   if (FILE_NAME.test(rest[rest.length - 1])) throw new Error("That's a file. Paste the address of the folder it's in.");
   const bad = [...site, ...rest].find((s) => BAD_NAME.test(s) || s === '.' || s === '..');
   if (bad !== undefined) throw new Error(`"${bad}" can't be part of a SharePoint folder's address. Check the address.`);
+  const untidy = rest.slice(1).find((s) => !tidyFolderName(s));
+  if (untidy !== undefined) throw new Error(`"${untidy}" can't be a folder's name: SharePoint doesn't allow spaces at the start or end, or a full stop at the end. Check the address.`);
 
   const enc = (/** @type {string[]} */ parts) => parts.map(encodeURIComponent).join('/');
   const siteUrl = site.length ? `https://${host}/${enc(site)}` : `https://${host}`;
@@ -126,7 +145,7 @@ export function folderValidator(text) {
 }
 
 /**
- * "Shared Documents/ValueLens on https://contoso.sharepoint.com/sites/Analytics".
+ * "Shared Documents/Reports on https://contoso.sharepoint.com/sites/Analytics".
  * @param {Pick<SharePointConfig, 'library' | 'folderPath' | 'siteUrl'>} sp
  */
 export const describeFolder = (sp) => `${sp.library}${sp.folderPath === '/' ? '' : sp.folderPath} on ${sp.siteUrl}`;

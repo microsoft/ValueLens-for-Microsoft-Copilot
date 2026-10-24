@@ -15,8 +15,8 @@ import { describeFolder } from './site.js';
 /** @typedef {import('../../install.js').Ctx} Ctx */
 
 /**
- * A subfolder's path, checked: forward slashes, no empty, `.` or `..` parts, and none of the
- * characters SharePoint refuses in names.
+ * A subfolder's path, checked the way refresh.ps1 checks it: forward slashes, no empty, `.` or
+ * `..` parts, none of the characters SharePoint refuses in names, and no name ending in a full stop.
  * @param {string} text
  * @returns {string}  The tidied path, or '' for the folder itself.
  */
@@ -24,7 +24,7 @@ export function remoteFolderPath(text) {
   const parts = text.replace(/\\/g, '/').split('/').map((p) => p.trim()).filter(Boolean);
   for (const p of parts) {
     if (p === '.' || p === '..') throw new Error(`"${text}" isn't a subfolder of the SharePoint folder.`);
-    if (/["*:<>?|#%]/.test(p) || /[. ]$/.test(p)) throw new Error(`"${p}" isn't a name SharePoint allows for a folder.`);
+    if (/["*:<>?|\u0000-\u001f]/.test(p) || p.endsWith('.')) throw new Error(`"${p}" isn't a name SharePoint allows for a folder.`);
   }
   return parts.join('/');
 }
@@ -47,15 +47,15 @@ export async function paxUpload(ctx, o) {
   const { ui, config } = ctx;
   const sp = config.sharePoint;
   if (!sp || !config.app.appId) throw new Error(`${PRODUCT.name} isn't set up on this PC yet, so there's no SharePoint folder to upload to. Run install first.`);
+  const sub = o.remoteFolder ? remoteFolderPath(o.remoteFolder) : '';
   let files = o.files;
   if (!files.length) {
     if (ui.yes) throw new Error('Name the files to upload.');
     ui.heading('Upload files');
-    files = splitPaths(await ui.input(`Which files go in ${describeFolder(sp)}? Give the full path of each on this PC, separated by semicolons.`, {
+    files = splitPaths(await ui.input(`Which files go in ${describeFolder(sp)}${sub ? `, in ${sub}` : ''}? Give the full path of each on this PC, separated by semicolons.`, {
       validate: (v) => (splitPaths(v).length ? true : 'Give at least one file.'),
     }));
   }
-  const sub = o.remoteFolder ? remoteFolderPath(o.remoteFolder) : '';
 
   const host = paxHostOf(ctx);
   // The upload reads the folder and the secret's name from refresh.json. A record copied from

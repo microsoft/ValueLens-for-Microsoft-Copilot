@@ -218,16 +218,27 @@ export function lastJson(text) {
 }
 
 /**
- * The message in what a script printed when it failed: the runner's `ERROR:` line, or pwsh's
- * message under the ~~~ line of an unhandled error, else the last line.
+ * The runner's last `ERROR:` line, without the prefix, or ''.
  * @param {string} text
  */
-export function errorText(text) {
+const runnerError = (text) => {
   const lines = stripBom(stripAnsi(String(text ?? ''))).split(/\r?\n/);
   for (let i = lines.length - 1; i >= 0; i--) {
     const m = /^ERROR:\s*(.*)$/.exec(lines[i].trim());
     if (m?.[1]) return m[1].trim();
   }
+  return '';
+};
+
+/**
+ * The message in what a script printed when it failed: the runner's `ERROR:` line, or pwsh's
+ * message under the ~~~ line of an unhandled error, else the last line.
+ * @param {string} text
+ */
+export function errorText(text) {
+  const runner = runnerError(text);
+  if (runner) return runner;
+  const lines = stripBom(stripAnsi(String(text ?? ''))).split(/\r?\n/);
   for (let i = lines.length - 1; i >= 0; i--) {
     if (!/^\s*\|\s*~+\s*$/.test(lines[i])) continue;
     /** @type {string[]} */
@@ -244,14 +255,15 @@ export function errorText(text) {
 }
 
 /**
- * An error for a script or program that failed, with what it said.
+ * An error for a script or program that failed, with what it said. The runner's own `ERROR:` line
+ * comes first, from either stream, ahead of anything else on stderr.
  * @param {RunResult} r
  * @param {string} what  What the installer was doing, e.g. "Registering the scheduled task".
  */
 export function scriptFailed(r, what) {
   if (r.missing) return new Error(`${what} failed: PowerShell 7 (pwsh) isn't installed. Install it with: ${PWSH_INSTALL}`);
   if (r.timedOut) return new Error(`${what} didn't finish in time, so the installer stopped it.`);
-  const detail = errorText(r.stderr) || errorText(r.stdout);
+  const detail = runnerError(r.stdout) || runnerError(r.stderr) || errorText(r.stderr) || errorText(r.stdout);
   return new Error(`${what} failed${r.code === null ? '' : ` (exit code ${r.code})`}${detail ? `: ${detail}` : '.'}`);
 }
 
@@ -271,30 +283,36 @@ export const PWSH_PROBE = [
 ].join(' ');
 
 /**
- * Finds PowerShell 7: the first candidate that answers the probe.
+ * Finds PowerShell 7: the first candidate that answers the probe and is new enough, else the
+ * first that answers, which checkHost reports as too old.
  * @param {PaxHost} host
  * @returns {Promise<{ pwsh?: PwshInfo, error?: string }>}
  */
 export async function findPwsh(host) {
   /** @type {string | undefined} */
   let error;
+  /** @type {PwshInfo | undefined} */
+  let older;
   for (const candidate of host.pwshCandidates) {
     const r = await host.run(candidate, ['-NoProfile', '-NonInteractive', '-Command', PWSH_PROBE], { timeoutMs: 60_000 });
     if (r.missing) continue;
     const info = lastJson(r.stdout);
     if (r.code === 0 && typeof info?.version === 'string') {
-      return {
-        pwsh: {
-          path: String(info.path || candidate),
-          version: info.version,
-          policy: String(info.policy ?? ''),
-          languageMode: String(info.languageMode ?? ''),
-          ...(info.timeZone ? { timeZone: String(info.timeZone) } : {}),
-        },
+      /** @type {PwshInfo} */
+      const pwsh = {
+        path: String(info.path || candidate),
+        version: info.version,
+        policy: String(info.policy ?? ''),
+        languageMode: String(info.languageMode ?? ''),
+        ...(info.timeZone ? { timeZone: String(info.timeZone) } : {}),
       };
+      if (atLeast(pwsh.version, MIN_PWSH)) return { pwsh };
+      older ??= pwsh;
+      continue;
     }
     error ??= scriptFailed(r, `Checking ${candidate}`).message;
   }
+  if (older) return { pwsh: older };
   return error ? { error } : {};
 }
 
@@ -698,7 +716,11 @@ export async function uploadToFolder(host, file, o = {}) {
  */
 export function runRefresh(host, o = {}) {
   const args = ['-Config', paxPaths(host).config];
-  if (o.days) args.push('-Days', String(o.days));
+  if (o.days !== undefined) {
+    // refresh.ps1 takes -Days from 1 to 180, as far back as Purview's records go.
+    if (!Number.isInteger(o.days) || o.days < 1 || o.days > 180) return Promise.reject(new RangeError(`A refresh reads from 1 to 180 days, not ${o.days}.`));
+    args.push('-Days', String(o.days));
+  }
   return runScript(host, 'refresh.ps1', args, { timeoutMs: o.timeoutMs ?? RUN_LIMIT_MS });
 }
 
