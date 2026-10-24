@@ -2,9 +2,11 @@
 /**
  * What goes into ValueLensInstaller.exe, kept apart from the build so it can be tested.
  * The payload unpacks to:
- *   node/node.exe            Node.js, which runs everything below
- *   f/installer/             the installer, with its production dependencies
- *   f/<templates>            the notebooks, pipeline and semantic model templates it deploys
+ *   node/node.exe              Node.js, which runs everything below
+ *   f/installer/               the installer, with its production dependencies
+ *   f/installer/managed-cli/   the Copilot managed apps CLI that deploys the app, with its dependencies
+ *   f/app/dist/                the app, built
+ *   f/<templates>              the notebooks, pipeline and semantic model templates it deploys
  * `f` stands in for the repo root, which keeps paths short when unpacked under the user's profile.
  */
 import { posix } from 'node:path';
@@ -29,6 +31,15 @@ export const MAX_PAYLOAD_PATH = 200;
  * paths under 260 characters, so these must fit even under a long user name.
  */
 export const MAX_NATIVE_PATH = 120;
+/** The folder under the installer that pins the managed apps CLI. The build installs its dependencies. */
+export const MANAGED_CLI_DIR = 'managed-cli';
+/**
+ * The sample data the app opens with isn't committed: `app/scripts/prepare-sample.mjs` builds it
+ * into the app's public folder from this one, which it finds two folders above itself.
+ */
+export const APP_SAMPLE_DATA = '5. Local CSV/sample-data';
+/** The sample files the built app fetches when it opens (app/src/data/load.ts). */
+export const APP_SAMPLE_FILES = Object.freeze(['interactions', 'users', 'agents', 'feedback'].map((f) => `sample/${f}.csv`));
 export { MIRROR_REGISTRY, PUBLIC_REGISTRY, publicRegistry } from './registry.js';
 
 /** @param {string} p */
@@ -53,7 +64,9 @@ export function sourceFiles() {
  * @param {string} rel
  */
 export function installerFile(rel) {
-  return /^(bin|src)\//.test(rel) || ['package.json', 'package-lock.json', 'README.md'].includes(rel);
+  return /^(bin|src)\//.test(rel)
+    || ['package.json', 'package-lock.json', 'README.md'].includes(rel)
+    || [`${MANAGED_CLI_DIR}/package.json`, `${MANAGED_CLI_DIR}/package-lock.json`].includes(rel);
 }
 
 /**
@@ -75,13 +88,29 @@ export function fileVersion(version) {
   return `${parts.join('.')}.0`;
 }
 
+/** The folder under @azure/msal-node-runtime's dist/windows for each Node.js architecture. */
+const MSAL_ARCH = /** @type {Record<string, string>} */ ({ x64: 'x64', arm64: 'arm64', ia32: 'x86' });
+const MSAL_RUNTIME = /(?:^|\/)node_modules\/@azure\/msal-node-runtime\/dist\/(windows|macos|linux)\/(.+)$/i;
+
+/**
+ * The folder of the sign-in broker's Windows binaries that a Node.js architecture loads.
+ * @param {string} [arch]
+ */
+export const msalRuntimeArch = (arch = process.arch) => MSAL_ARCH[arch] ?? arch;
+
 /**
  * Whether an installed package's file can be left out of the payload: source maps, which nothing
- * reads when the installer runs.
+ * reads when the installer runs, and the sign-in broker's binaries for other platforms. The managed
+ * apps CLI's @azure/msal-node-runtime ships every platform's (about 36 MB), where npm installs the
+ * other native packages for the building PC's platform only.
  * @param {string} rel  Relative to the payload root.
+ * @param {string} [arch]  The Node.js architecture the payload runs on: the one that builds it.
  */
-export function prunable(rel) {
-  return /(^|\/)node_modules\/.+\.map$/i.test(rel);
+export function prunable(rel, arch = process.arch) {
+  if (/(^|\/)node_modules\/.+\.map$/i.test(rel)) return true;
+  const msal = MSAL_RUNTIME.exec(rel);
+  if (!msal) return false;
+  return msal[1].toLowerCase() !== 'windows' || !msal[2].startsWith(`${msalRuntimeArch(arch)}/`);
 }
 
 /**

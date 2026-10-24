@@ -18,7 +18,8 @@ export const PAX_SCRIPTS = Object.freeze(['Run-PAX-AIBV.ps1', 'Get-Agents365Regi
 
 /**
  * The app's build, which the PAX route deploys as a Copilot Managed App. The exe ships it; in a
- * checkout, `npm ci` then `npm run build` in `app` makes it.
+ * checkout, `npm ci`, `node scripts/prepare-sample.mjs` (the sample it opens with isn't committed)
+ * then `npm run build` in `app` makes it.
  */
 export const APP_DIST = 'app/dist';
 

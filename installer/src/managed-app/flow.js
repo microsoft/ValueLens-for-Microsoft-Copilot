@@ -208,7 +208,7 @@ export function whyNot({ distDir, cliDir, nodeVersion, needBuild = true }) {
   if (needBuild && !(distDir && existsSync(join(distDir, 'index.html')))) {
     return {
       why: 'This copy of the installer has no build of the app.',
-      steps: [`Use ${PRODUCT.exe}, which carries it. Or build it from a clone: in app, run npm ci, then npm run build.`, then],
+      steps: [`Use ${PRODUCT.exe}, which carries it. Or build it from a clone: in app, run npm ci, node scripts/prepare-sample.mjs, then npm run build.`, then],
     };
   }
   if (!nodeOk(nodeVersion)) {

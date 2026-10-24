@@ -5,9 +5,10 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { DEFAULT_SOURCE_DIR } from '../src/sources.js';
 import {
-  MAX_NATIVE_PATH, MAX_PAYLOAD_PATH, MIRROR_REGISTRY, PUBLIC_REGISTRY, fileVersion, installerFile, leakedIds, localIds, payloadId, prunable, publicRegistry,
-  sourceFiles, tooLong,
+  APP_SAMPLE_DATA, APP_SAMPLE_FILES, MANAGED_CLI_DIR, MAX_NATIVE_PATH, MAX_PAYLOAD_PATH, MIRROR_REGISTRY, PUBLIC_REGISTRY, fileVersion, installerFile, leakedIds,
+  localIds, msalRuntimeArch, payloadId, prunable, publicRegistry, sourceFiles, tooLong,
 } from '../packaging/payload.js';
+import { CLI_PACKAGE, CLI_PACKAGE_DIR, pinnedVersion } from '../src/managed-app/cli.js';
 
 test('packaging: ships every template the installer reads, and they exist', () => {
   const files = sourceFiles();
@@ -21,6 +22,30 @@ test('packaging: ships every template the installer reads, and they exist', () =
 test('packaging: ships the installer code, not its tests or tooling', () => {
   for (const f of ['bin/valuelens-installer.js', 'src/cli.js', 'src/web/index.html', 'package.json', 'package-lock.json', 'README.md']) assert.ok(installerFile(f), f);
   for (const f of ['test/cli.test.js', 'packaging/build-exe.js', 'jsconfig.json', '.gitignore', 'valuelens-setup.json', 'valuelens-install.json']) assert.ok(!installerFile(f), f);
+});
+
+test('packaging: ships the pin for the managed apps CLI, which the build installs', () => {
+  for (const f of ['package.json', 'package-lock.json']) assert.ok(installerFile(`${MANAGED_CLI_DIR}/${f}`), f);
+  for (const f of ['node_modules/@microsoft/managed-apps-cli/package.json', 'README.md']) assert.ok(!installerFile(`${MANAGED_CLI_DIR}/${f}`), f);
+  // The installer runs the CLI from there, so the payload's folder and the installer's must agree.
+  assert.equal(join(DEFAULT_SOURCE_DIR, 'installer', MANAGED_CLI_DIR), CLI_PACKAGE_DIR);
+  const lock = JSON.parse(readFileSync(join(CLI_PACKAGE_DIR, 'package-lock.json'), 'utf8'));
+  assert.equal(lock.packages[`node_modules/${CLI_PACKAGE}`]?.version, pinnedVersion(), 'package-lock.json installs the CLI that package.json pins');
+  assert.equal(lock.packages['']?.dependencies?.[CLI_PACKAGE], pinnedVersion(), 'package-lock.json is up to date with package.json');
+});
+
+test('packaging: the app\'s sample is built from data the repo holds', () => {
+  for (const f of ['copilot_interactions_sample.csv', 'copilot_users_sample.csv', 'agents_365_sample.csv', 'product_feedback_sample.csv']) {
+    assert.ok(existsSync(join(DEFAULT_SOURCE_DIR, APP_SAMPLE_DATA, f)), `${f} is missing`);
+  }
+  // prepare-sample.mjs finds it two folders above itself, which the build copies it under.
+  const script = readFileSync(join(DEFAULT_SOURCE_DIR, 'app', 'scripts', 'prepare-sample.mjs'), 'utf8');
+  assert.match(script, /path\.resolve\(here, '\.\.', '\.\.'\)/);
+  assert.ok(script.includes(`path.join(root, ${APP_SAMPLE_DATA.split('/').map((p) => `'${p}'`).join(', ')})`), 'prepare-sample.mjs reads APP_SAMPLE_DATA');
+  // The app fetches each sample file by name when it opens.
+  const load = readFileSync(join(DEFAULT_SOURCE_DIR, 'app', 'src', 'data', 'load.ts'), 'utf8');
+  assert.ok(load.includes('`${import.meta.env.BASE_URL}sample/${f}.csv`'));
+  for (const f of APP_SAMPLE_FILES) assert.ok(load.includes(`get('${f.replace(/^sample\/|\.csv$/g, '')}')`), f);
 });
 
 test('packaging: payload IDs change with the content', () => {
@@ -51,6 +76,26 @@ test('packaging: source maps in installed packages are left out', () => {
   for (const f of ['f/installer/src/web/index.js.map', 'f/installer/node_modules/a/index.js', 'f/installer/node_modules/a/map.js', 'f/x.map']) {
     assert.ok(!prunable(f), f);
   }
+});
+
+test('packaging: the sign-in broker keeps only the Windows binaries for the build\'s architecture', () => {
+  const runtime = 'f/installer/managed-cli/node_modules/@azure/msal-node-runtime';
+  const other = [
+    'dist/macos/arm64/msal-node-runtime.node', 'dist/macos/x64/libmsalruntime.dylib', 'dist/linux/ubuntu/x64/msal-node-runtime.node',
+    'dist/linux/rhel10/x64/libmsalruntime.so', 'dist/windows/x86/msalruntime_x86.dll', 'dist/windows/arm64/msal-node-runtime.node',
+  ];
+  for (const f of other) assert.ok(prunable(`${runtime}/${f}`, 'x64'), f);
+  const kept = ['dist/windows/x64/msal-node-runtime.node', 'dist/windows/x64/msalruntime.dll', 'dist/index.cjs', 'dist/index.d.ts', 'package.json', 'LICENSE'];
+  for (const f of kept) assert.ok(!prunable(`${runtime}/${f}`, 'x64'), f);
+  assert.ok(!prunable(`${runtime}/dist/windows/arm64/msal-node-runtime.node`, 'arm64'));
+  assert.ok(prunable(`${runtime}/dist/windows/x64/msal-node-runtime.node`, 'arm64'));
+  assert.ok(!prunable(`${runtime}/dist/windows/x86/msalruntime_x86.dll`, 'ia32'));
+  assert.equal(msalRuntimeArch('ia32'), 'x86');
+  // Only that package: other packages' platform folders stay. A nested copy of it is pruned too.
+  for (const f of ['f/installer/node_modules/foo/dist/linux/x.so', 'f/installer/managed-cli/node_modules/@azure/msal-node/dist/macos/x.js']) {
+    assert.ok(!prunable(f, 'x64'), f);
+  }
+  assert.ok(prunable(`f/installer/managed-cli/node_modules/@microsoft/managed-apps-cli/node_modules/@azure/msal-node-runtime/${other[0]}`, 'x64'));
 });
 
 test('packaging: IDs from local settings are caught, public ones are not', () => {
