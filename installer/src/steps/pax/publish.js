@@ -162,7 +162,9 @@ async function refuseForeignWorkspace(ctx) {
 
 /**
  * The Power BI workspace the report goes to: the one chosen in the plan, or a new one. It needs
- * no capacity, so Power BI Pro is enough. A saved one that's gone is made again.
+ * no capacity, so Power BI Pro is enough. A saved one that's gone is made again. When a new one's
+ * name is taken by a workspace the user is in, that one is used, unless an Analytics Hub install
+ * is in it.
  * @param {Ctx} ctx
  */
 export async function ensurePaxWorkspace(ctx) {
@@ -197,7 +199,18 @@ export async function ensurePaxWorkspace(ctx) {
       );
     }
     if (/AlreadyExists|already exists|duplicate/i.test(errorText(err))) {
-      throw new Error(`There's already a workspace called "${name}" that you aren't in. Run the installer again and choose another name, or ask its admin to add you and then choose it.`);
+      // Such as one a run made but stopped before recording.
+      const mine = (await api.powerBi.groups()).find((g) => lower(g.name) === lower(name));
+      if (!mine) {
+        throw new Error(`There's already a workspace called "${name}" that you aren't in. Run the installer again and choose another name, or ask its admin to add you and then choose it.`);
+      }
+      if (foreignInstall(await workspaceItems(ctx, String(mine.id)))) throw new Error(foreignWorkspaceMessage(String(mine.name ?? name)));
+      f.workspaceId = String(mine.id);
+      f.workspaceName = String(mine.name ?? name);
+      delete f.createdWorkspace;
+      ctx.save();
+      ui.ok(`Workspace ${f.workspaceName} already exists, and you're in it, so using it`);
+      return;
     }
     throw err;
   }
@@ -251,7 +264,8 @@ async function publishByApi(ctx, entry) {
 
 /**
  * What's published under the template's names: the model, found by its recorded ID or by name,
- * and the report on it.
+ * and the report on it. A model with a report comes before one without, such as one the item API
+ * made before it turned the report down.
  * @param {Ctx} ctx
  * @param {string} ws
  * @returns {Promise<{ dataset: any, report?: any } | undefined>}
@@ -260,11 +274,18 @@ async function findPublished(ctx, ws) {
   const { api, config } = ctx;
   const datasets = await api.powerBi.datasets(ws);
   const sm = config.semanticModel;
-  const dataset = (sm.id && datasets.find((d) => d.id === sm.id)) || datasets.find((d) => lower(d.name) === lower(PRODUCT.pax.model));
-  if (!dataset) return undefined;
-  const reports = (await api.powerBi.reports(ws)).filter((r) => r.datasetId === dataset.id);
-  const report = (sm.report?.id && reports.find((r) => r.id === sm.report?.id)) || reports.find((r) => lower(r.name) === lower(PRODUCT.pax.report)) || reports[0];
-  return { dataset, ...(report ? { report } : {}) };
+  const models = [
+    ...datasets.filter((d) => sm.id && d.id === sm.id),
+    ...datasets.filter((d) => d.id !== sm.id && lower(d.name) === lower(PRODUCT.pax.model)),
+  ];
+  if (!models.length) return undefined;
+  const reports = await api.powerBi.reports(ws);
+  for (const dataset of models) {
+    const own = reports.filter((r) => r.datasetId === dataset.id);
+    const report = (sm.report?.id && own.find((r) => r.id === sm.report?.id)) || own.find((r) => lower(r.name) === lower(PRODUCT.pax.report)) || own[0];
+    if (report) return { dataset, report };
+  }
+  return { dataset: models[0] };
 }
 
 /**
@@ -329,17 +350,18 @@ export async function publishWithDesktop(ctx, entry, o = {}) {
   const signature = `desktop;${desktopHash(entry)}`;
 
   let found = await findPublished(ctx, ws);
-  // Published since a run that stopped to wait for it.
-  if (found && pbi.desktopPending && found.dataset.id !== sm.id) {
+  // Published since a run that stopped to wait for it: a new model, or a report the record lacks.
+  if (found?.report && pbi.desktopPending && (found.dataset.id !== sm.id || found.report.id !== sm.report?.id)) {
     adoptPublished(ctx, found, pbi.desktopPending);
-    ui.ok(`Found the ${found.report?.name ?? PRODUCT.pax.report} report you published from Power BI Desktop`);
+    ui.ok(`Found the ${found.report.name ?? PRODUCT.pax.report} report you published from Power BI Desktop`);
   }
-  if (found && sm.id === found.dataset.id && sm.signature === signature) {
-    if (!sm.report?.id && found.report) adoptPublished(ctx, found, signature);
+  if (found?.report && sm.id === found.dataset.id && sm.signature === signature) {
+    if (sm.report?.id !== found.report.id) adoptPublished(ctx, found, signature);
     ui.ok(`The ${sm.report?.name ?? PRODUCT.pax.report} report is in place`);
     return;
   }
-  const current = !!(found && sm.id === found.dataset.id);
+  // Not a model without its report, such as one the item API made before turning the report down.
+  const current = !!(found?.report && sm.id === found.dataset.id);
 
   await o.beforeDesktop?.();
   const file = join(outDir(ctx), `${PRODUCT.pax.report}.pbit`);
@@ -377,12 +399,16 @@ export async function publishWithDesktop(ctx, entry, o = {}) {
     }
     if (next === 'stop') throw new ResumeLater(`Stopped until the report is published. ${later}`);
     found = await findPublished(ctx, ws);
-    if (found) {
+    if (found?.report) {
       adoptPublished(ctx, found, signature);
       ui.ok(`Found ${sm.name} and its report in ${workspace}`);
       return;
     }
-    ui.warn(`There's no model called ${PRODUCT.pax.model} in ${workspace} yet. Save the file as ${PRODUCT.pax.report}.pbix before publishing, so Power BI gives it that name.`);
+    ui.warn(
+      found
+        ? `${PRODUCT.pax.model} in ${workspace} has no report on it yet. Publish the file from Power BI Desktop, which publishes the report with its model.`
+        : `There's no model called ${PRODUCT.pax.model} in ${workspace} yet. Save the file as ${PRODUCT.pax.report}.pbix before publishing, so Power BI gives it that name.`,
+    );
   }
 }
 
@@ -615,14 +641,21 @@ export async function refreshPaxModel(ctx, opts = {}) {
 
 /**
  * Refreshes the model and checks it answers queries. A refresh that fails to sign in to
- * SharePoint asks for the sign-in again, once.
+ * SharePoint asks for the sign-in again, once. Once it's signed in, it schedules the daily
+ * refresh: again after a new sign-in, as Power BI can turn the schedule off while refreshes fail.
  * @param {Ctx} ctx
  * @param {{ wait?: boolean }} [opts]
  * @returns {Promise<PaxRefreshResult>}
  */
 export async function loadPaxModel(ctx, opts = {}) {
+  const pbi = powerBiOf(ctx.config);
   let r = await refreshPaxModel(ctx, opts);
-  if (r.credentials && !ctx.ui.yes && (await askCredentials(ctx))) r = await refreshPaxModel(ctx, opts);
+  let signedIn = false;
+  if (r.credentials && !ctx.ui.yes) {
+    signedIn = await askCredentials(ctx);
+    if (signedIn) r = await refreshPaxModel(ctx, opts);
+  }
+  if (!r.credentials && (signedIn || !pbi.refreshAt)) await setPaxSchedule(ctx);
   if (r.ok && r.status === 'Completed') {
     const check = await verifyModel(ctx);
     if (!check.ok) return { ...r, ok: false };
