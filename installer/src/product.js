@@ -112,9 +112,11 @@ export const PRODUCT = deepFreeze({
       users: 'copilot_users_rollup.csv',
       agents365: 'agents_365.csv',
     },
+    /** Files the refresh writes only while the install record's `pax` switch of this name is on. */
+    optionalFiles: { agents365: 'agent365' },
     /**
-     * The SharePoint template's parameters. Each file parameter takes the file's full address in
-     * the folder, and an optional one left blank loads an empty table.
+     * The SharePoint template's parameters. `site` takes the site's address. Each file parameter
+     * takes the file's full address in the folder, and one left blank loads an empty table.
      */
     parameters: {
       interactions: 'Copilot Interactions File',
@@ -123,6 +125,14 @@ export const PRODUCT = deepFreeze({
       agents365: 'Agent 365',
       feedback: 'Feedback File',
     },
+  },
+  /** The app, deployed with the `ms` CLI as a Copilot Managed App. */
+  managedApp: {
+    /** What people see in the Managed Apps portal. */
+    name: 'ValueLens',
+    description: 'Microsoft 365 Copilot adoption, habits, agents and value.',
+    /** The folder under `home` (%LOCALAPPDATA%\ValueLens) that holds the build the installer deploys, and its ms.config.json. */
+    folder: 'app',
   },
   flows: {
     feedback: 'ValueLens - Product feedback',

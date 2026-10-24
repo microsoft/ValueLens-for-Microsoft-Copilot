@@ -1,8 +1,8 @@
 // @ts-check
 /**
- * The installer's two routes: Fabric, where notebooks and a pipeline load a Lakehouse, and no
- * Fabric, where a scheduled task on this PC runs PAX and writes to a SharePoint folder that the
- * report reads.
+ * The installer's two routes: Fabric, where notebooks and a pipeline load a Lakehouse for the
+ * report, and no Fabric, where a scheduled task on this PC runs PAX and writes to a SharePoint
+ * folder that the report and the app read.
  */
 import { permissionsFor } from './catalog.js';
 import { PRODUCT } from './product.js';
@@ -92,12 +92,12 @@ export async function askTarget(ctx) {
         {
           name: ROUTE_NAMES.fabric,
           value: 'fabric',
-          description: 'Notebooks and a pipeline in a Fabric workspace load the data into a Lakehouse each day. Needs a Fabric capacity (F2 or larger, or a trial).',
+          description: 'Notebooks and a pipeline in a Fabric workspace load the data into a Lakehouse each day, for the report. Needs a Fabric capacity (F2 or larger, or a trial).',
         },
         {
           name: ROUTE_NAMES.pax,
           value: 'pax',
-          description: 'A daily task on this Windows PC runs PAX and writes the data to a SharePoint folder, which the report reads. Needs Power BI Pro, PowerShell 7 and Python 3.10 or later.',
+          description: 'A daily task on this Windows PC runs PAX and writes the data to a SharePoint folder, which the report and the app read. Needs Power BI Pro, PowerShell 7 and Python 3.10 or later.',
         },
       ],
       /** @type {Target} */ (config.target ?? 'fabric'),

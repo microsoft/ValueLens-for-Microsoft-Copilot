@@ -96,6 +96,8 @@ import { reviewSetup } from './setup.js';
  * @property {boolean} [setupRetry] Revalidate saved choices without reopening every question.
  * @property {boolean} [targetChosen]  --target was given, so the route isn't asked about.
  * @property {import('./steps/pax/local.js').PaxHost} [paxHost]  This machine, for the PAX route's local steps.
+ * @property {import('./managed-app/flow.js').AppDeps} [appDeps]  What the app step runs the `ms` CLI with, and where. Tests pass fakes.
+ * @property {string} [environmentId]  --environment-id: the Power Platform environment for the app.
  */
 
 /**

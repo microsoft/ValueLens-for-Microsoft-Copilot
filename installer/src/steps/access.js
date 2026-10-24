@@ -2,11 +2,12 @@
 /**
  * Who can view ValueLens: one Entra security group, whose members get Build on the semantic
  * model the report reads, and the report shared with it once. Sharing is then adding people to the
- * group, from the installer or My Groups. The group never gets a workspace role: that would let its
- * members read the notebooks, and the client secret when the notebooks hold it.
+ * group, from the installer or My Groups. The group never gets a workspace role: on the Fabric route
+ * that would let its members read the notebooks, and the client secret when the notebooks hold it.
  */
 import { HttpError } from '../http.js';
 import { PRODUCT } from '../product.js';
+import { isPax } from '../target.js';
 import { rlsOn } from '../transform/access.js';
 import { asksAdvanced } from './advanced.js';
 import { orgAccessCommand } from './org-access.js';
@@ -16,6 +17,8 @@ import { reportsOn } from './report.js';
 /** @typedef {{ workspaceId: string, datasetId: string, name: string }} ModelRef */
 
 export const VIEWER_GROUP_NAME = PRODUCT.viewerGroup;
+/** On the PAX route the report is in a workspace with no capacity, where Power BI asks each viewer for a licence. */
+export const PRO_VIEWERS = 'Unless the workspace is on a Fabric or Premium capacity, each of them needs Power BI Pro or Premium Per User.';
 const GROUP_DESCRIPTION = `People who can view ${PRODUCT.name}. Add members to share it.`;
 
 /** Where a group's owners add and remove members themselves. @param {string} groupId */
@@ -238,7 +241,7 @@ export function shareReportSteps(config, tenantId) {
   const r = viewerReport(config);
   const ws = config.fabric?.workspaceName;
   return [
-    `Open ${ws ? `the ${ws} workspace` : 'the workspace'}${r ? ` (${workspaceUrl(r.workspaceId, tenantId)})` : ''} and choose … (More options) next to the ${r?.name ?? config.semanticModel?.report?.name ?? PRODUCT.fabric.report} report.`,
+    `Open ${ws ? `the ${ws} workspace` : 'the workspace'}${r ? ` (${workspaceUrl(r.workspaceId, tenantId)})` : ''} and choose … (More options) next to the ${r?.name ?? config.semanticModel?.report?.name ?? (isPax(config) ? PRODUCT.pax.report : PRODUCT.fabric.report)} report.`,
     'Choose Manage permissions, then Add user.',
     `Enter "${group}" and choose Grant.`,
   ];
@@ -270,7 +273,11 @@ export async function shareReport(ctx) {
   const group = a?.groupName ?? VIEWER_GROUP_NAME;
   ui.info(`Members of "${group}" can open the report once it's shared with the group. Power BI has no API for this, so it's a few clicks:`);
   shareReportSteps(config, user.tenantId).forEach((s, i) => ui.info(`  ${i + 1}. ${s}`));
-  ui.note('After that, give people access by adding them to the group. Keep them off workspace roles: a role lets them read the notebooks.');
+  ui.note(
+    isPax(config)
+      ? `After that, give people access by adding them to the group. They need no workspace role. ${PRO_VIEWERS}`
+      : 'After that, give people access by adding them to the group. Keep them off workspace roles: a role lets them read the notebooks.',
+  );
   const done = await ui.select(
     'Have you shared the report?',
     [

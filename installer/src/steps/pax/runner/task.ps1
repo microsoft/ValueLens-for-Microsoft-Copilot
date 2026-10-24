@@ -7,7 +7,8 @@
   The task runs as the current user, only while that user is signed in, with limited rights.
   It needs no administrator rights to register. It never bypasses PowerShell's execution
   policy: Register stops when the policy is AllSigned or Restricted, because the refresh
-  scripts aren't signed.
+  scripts aren't signed. A run may take up to 12 hours, because the first one on a large
+  tenant reads a month of activity; a run that starts at 02:00 still ends before the next.
 
   To keep the refresh running while nobody is signed in, an administrator can switch the task
   to "Run whether user is logged on or not" in Task Scheduler. The client secret is in the
@@ -125,7 +126,7 @@ switch ($Action) {
     $trigger = New-ScheduledTaskTrigger -Daily -At $startTime
     $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-      -RunOnlyIfNetworkAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 4) -MultipleInstances IgnoreNew
+      -RunOnlyIfNetworkAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 12) -MultipleInstances IgnoreNew
     $register = @{
       TaskName  = $TaskName
       TaskPath  = $TaskFolder

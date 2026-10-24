@@ -1,0 +1,631 @@
+// @ts-check
+/**
+ * The PAX route's report in the Power BI service. The SharePoint template's model and report go
+ * to a Power BI workspace through the item API or, where the service turns that down, through
+ * Power BI Desktop. The model is then signed in to SharePoint once, by hand, and refreshes daily
+ * after the PAX refresh has written the files.
+ *
+ * Nothing here names a product: every name comes from product.js, so another installer can copy it.
+ */
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { semanticModelDefinition } from '../../clients/fabric.js';
+import { MODEL_NAME } from '../../config.js';
+import { HttpError } from '../../http.js';
+import { commandLine } from '../../launch.js';
+import { PRODUCT } from '../../product.js';
+import { loadTemplateModel, PBISM } from '../../transform/model.js';
+import { buildEntryModel, fillTemplate } from '../../transform/template.js';
+import { formatDuration } from '../../ui.js';
+import { foreignInstall, foreignWorkspaceMessage } from '../fabric.js';
+import { ResumeLater } from '../identity.js';
+import { TASK_AT } from './local.js';
+import { deployModel, modelSettingsUrl, REFRESH_FINAL, REFRESH_POLL_MS, verifyModel } from '../model.js';
+import { deployReport } from '../report.js';
+
+/** @typedef {import('../../install.js').Ctx} Ctx */
+/** @typedef {import('../../config.js').InstallConfig} InstallConfig */
+/** @typedef {import('../../config.js').PowerBiConfig} PowerBiConfig */
+/** @typedef {import('../../transform/template.js').ModelEntry} ModelEntry */
+
+/**
+ * How many hours after the PAX refresh starts Power BI refreshes the model: once when a daily run
+ * has usually finished, and again later in case a long one hadn't.
+ */
+export const REFRESH_AFTER_HOURS = Object.freeze([4, 10]);
+const EVERY_DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+/** How long a refresh the installer waits for may take. */
+export const REFRESH_WAIT_MS = 2 * 3_600_000;
+
+/** @param {unknown} err @param {number} status */
+const isStatus = (err, status) => err instanceof HttpError && err.status === status;
+/** @param {unknown} err */
+const errorText = (err) => `${err instanceof HttpError ? (err.code ?? '') : ''} ${/** @type {Error} */ (err)?.message ?? err}`.trim();
+/** @param {unknown} s */
+const lower = (s) => String(s ?? '').toLowerCase();
+
+/** @param {InstallConfig} config */
+const powerBiOf = (config) => /** @type {PowerBiConfig} */ ((config.powerBi ??= {}));
+
+/** Where files for the user go: beside the install record. @param {Ctx} ctx */
+const outDir = (ctx) => (ctx.configFile ? dirname(ctx.configFile) : process.cwd());
+
+/**
+ * Whether the refresh writes one of the files in PRODUCT.pax.files. It writes each of them,
+ * except one in PRODUCT.pax.optionalFiles while its switch in the record's `pax` is off.
+ * @param {InstallConfig} config
+ * @param {string} key
+ */
+export function paxWrites(config, key) {
+  const flag = /** @type {Record<string, string>} */ (PRODUCT.pax.optionalFiles)[key];
+  return !flag || !!(/** @type {Record<string, unknown>} */ (config.pax ?? {}))[flag];
+}
+
+/**
+ * A file's address in the SharePoint folder.
+ * @param {import('../../config.js').SharePointConfig} sp
+ * @param {string} name
+ */
+export const folderFileUrl = (sp, name) => `${sp.folderUrl.replace(/\/+$/, '')}/${encodeURIComponent(name)}`;
+
+/**
+ * The template's values for this install: `site` takes the site's address, and each file
+ * parameter the file's full address in the folder. A file the refresh doesn't write is left
+ * blank, so its table loads empty. PRODUCT.pax.expressions, when a product has it, replaces
+ * whole queries.
+ * @param {InstallConfig} config
+ * @param {string} template  The .pbit's path.
+ * @returns {ModelEntry}
+ */
+export function paxEntry(config, template) {
+  const sp = config.sharePoint;
+  if (!sp?.folderUrl || !sp.siteUrl) throw new Error('The install record has no SharePoint folder yet. Run the installer to choose one.');
+  const files = /** @type {Record<string, string>} */ (PRODUCT.pax.files);
+  /** @type {Record<string, string>} */
+  const parameters = {};
+  for (const [key, name] of Object.entries(PRODUCT.pax.parameters)) {
+    if (key === 'site') parameters[name] = sp.siteUrl;
+    else parameters[name] = files[key] && paxWrites(config, key) ? folderFileUrl(sp, files[key]) : '';
+  }
+  const expressions = /** @type {{ expressions?: Record<string, string> }} */ (/** @type {unknown} */ (PRODUCT.pax)).expressions;
+  return { template, parameters, ...(expressions && Object.keys(expressions).length ? { expressions: { ...expressions } } : {}) };
+}
+
+/** What the deployed model was built from, besides its definition. @param {InstallConfig} config */
+export const paxSignature = (config) => `pax;${lower(config.sharePoint?.folderUrl)}`;
+
+/**
+ * A short hash of what goes to Power BI Desktop: the template and this install's values in it.
+ * @param {ModelEntry} entry
+ */
+export function desktopHash(entry) {
+  return createHash('sha256')
+    .update(readFileSync(entry.template))
+    .update('\0')
+    .update(JSON.stringify({ parameters: entry.parameters, expressions: entry.expressions ?? {} }))
+    .digest('hex')
+    .slice(0, 16);
+}
+
+/**
+ * Forgets a workspace that's gone, and everything that was in it.
+ * @param {InstallConfig} config
+ */
+function forgetWorkspace(config) {
+  const f = config.fabric;
+  delete f.workspaceId;
+  delete f.createdWorkspace;
+  delete f.pendingItems;
+  const sm = config.semanticModel;
+  delete sm.id;
+  delete sm.signature;
+  delete sm.report;
+  delete sm.reload;
+  sm.bound = false;
+  const pbi = powerBiOf(config);
+  delete pbi.credentials;
+  delete pbi.refreshAt;
+  delete pbi.publishedBy;
+  delete pbi.desktopPending;
+  delete pbi.desktopFile;
+  if (config.access) delete config.access.reportShared;
+}
+
+/**
+ * A workspace's items, by display name. Not every Pro workspace answers the Fabric item API, so
+ * this falls back to its Power BI datasets and reports.
+ * @param {Ctx} ctx
+ * @param {string} workspaceId
+ * @returns {Promise<{ displayName: string }[]>}
+ */
+export async function workspaceItems(ctx, workspaceId) {
+  const { api } = ctx;
+  try {
+    return await api.fabric.listItems(workspaceId);
+  } catch {
+    return [...(await api.powerBi.datasets(workspaceId).catch(() => [])), ...(await api.powerBi.reports(workspaceId).catch(() => []))].map((i) => ({ displayName: i.name }));
+  }
+}
+
+/**
+ * Stops before the report goes into a workspace that holds an Analytics Hub install, which already
+ * has it. A workspace this install made, or already published to, is its own.
+ * @param {Ctx} ctx
+ */
+async function refuseForeignWorkspace(ctx) {
+  const { config } = ctx;
+  const f = config.fabric;
+  if (!f.workspaceId || f.createdWorkspace || config.semanticModel.id) return;
+  if (foreignInstall(await workspaceItems(ctx, f.workspaceId))) throw new Error(foreignWorkspaceMessage(f.workspaceName ?? f.workspaceId));
+}
+
+/**
+ * The Power BI workspace the report goes to: the one chosen in the plan, or a new one. It needs
+ * no capacity, so Power BI Pro is enough. A saved one that's gone is made again.
+ * @param {Ctx} ctx
+ */
+export async function ensurePaxWorkspace(ctx) {
+  const { ui, config, api } = ctx;
+  const f = config.fabric;
+  if (f.workspaceId) {
+    const id = lower(f.workspaceId);
+    const found = (await api.powerBi.groups()).find((g) => lower(g.id) === id);
+    if (found) {
+      if (found.name && found.name !== f.workspaceName) {
+        f.workspaceName = String(found.name);
+        ctx.save();
+      }
+      await refuseForeignWorkspace(ctx);
+      ui.ok(`Workspace ${f.workspaceName ?? f.workspaceId} is in place`);
+      return;
+    }
+    ui.warn(`The workspace ${f.workspaceName ?? f.workspaceId} is gone, or you're no longer in it, so making a new one.`);
+    forgetWorkspace(config);
+    ctx.save();
+  }
+  const name = f.workspaceName ?? PRODUCT.pax.workspace;
+  /** @type {any} */
+  let made;
+  try {
+    made = await api.powerBi.createGroup(name);
+  } catch (err) {
+    if (isStatus(err, 401) || isStatus(err, 403)) {
+      throw new Error(
+        'You can\'t create Power BI workspaces in this tenant. Ask a Fabric administrator to let you (the tenant setting "Create workspaces"), ' +
+          'or ask someone who can to create one and add you as Admin or Member. Then run the installer again and choose it.',
+      );
+    }
+    if (/AlreadyExists|already exists|duplicate/i.test(errorText(err))) {
+      throw new Error(`There's already a workspace called "${name}" that you aren't in. Run the installer again and choose another name, or ask its admin to add you and then choose it.`);
+    }
+    throw err;
+  }
+  f.workspaceId = String(made.id);
+  f.workspaceName = String(made.name ?? name);
+  f.createdWorkspace = true;
+  ctx.save();
+  ui.ok(`Created workspace ${f.workspaceName}`);
+}
+
+/**
+ * Why the service turned down publishing through the item API, when Power BI Desktop can still
+ * publish there: a workspace without a capacity, or the API turned off for the tenant. Undefined
+ * for anything else, which stops the install.
+ * @param {unknown} err
+ */
+export function apiRefusal(err) {
+  if (!(err instanceof HttpError)) return undefined;
+  const text = errorText(err);
+  if (/InsufficientPrivileges|PrincipalTypeNotSupported|TokenExpired/i.test(text)) return undefined;
+  if (err.status === 403 || /FeatureNotAvailable|capacity|Premium|licen[cs]e|not supported|Unsupported/i.test(text)) return text.slice(0, 200);
+  return undefined;
+}
+
+/**
+ * Publishes the model and report through the item API, or updates them when the template or the
+ * folder changed. A new model has no SharePoint sign-in yet; one updated in place is taken to keep
+ * the one it had, and its next refresh shows otherwise.
+ * @param {Ctx} ctx
+ * @param {ModelEntry} entry
+ */
+async function publishByApi(ctx, entry) {
+  const { config } = ctx;
+  const sm = config.semanticModel;
+  const pbi = powerBiOf(config);
+  const before = sm.id;
+  await deployModel(ctx, sm, {
+    signature: paxSignature(config),
+    definition: () => semanticModelDefinition(buildEntryModel(loadTemplateModel(entry.template), entry), PBISM),
+  });
+  if (sm.id !== before) {
+    delete pbi.credentials;
+    delete pbi.refreshAt;
+  }
+  sm.bound = pbi.credentials === 'set';
+  pbi.publishedBy = 'api';
+  ctx.save();
+  // The report from the same template, not reportsWanted's, which is the Fabric route's.
+  await deployReport(ctx, { model: sm, file: entry.template, name: PRODUCT.pax.report });
+}
+
+/**
+ * What's published under the template's names: the model, found by its recorded ID or by name,
+ * and the report on it.
+ * @param {Ctx} ctx
+ * @param {string} ws
+ * @returns {Promise<{ dataset: any, report?: any } | undefined>}
+ */
+async function findPublished(ctx, ws) {
+  const { api, config } = ctx;
+  const datasets = await api.powerBi.datasets(ws);
+  const sm = config.semanticModel;
+  const dataset = (sm.id && datasets.find((d) => d.id === sm.id)) || datasets.find((d) => lower(d.name) === lower(PRODUCT.pax.model));
+  if (!dataset) return undefined;
+  const reports = (await api.powerBi.reports(ws)).filter((r) => r.datasetId === dataset.id);
+  const report = (sm.report?.id && reports.find((r) => r.id === sm.report?.id)) || reports.find((r) => lower(r.name) === lower(PRODUCT.pax.report)) || reports[0];
+  return { dataset, ...(report ? { report } : {}) };
+}
+
+/**
+ * Records what Power BI Desktop published.
+ * @param {Ctx} ctx
+ * @param {{ dataset: any, report?: any }} found
+ * @param {string} signature
+ */
+function adoptPublished(ctx, found, signature) {
+  const { config } = ctx;
+  const sm = config.semanticModel;
+  const pbi = powerBiOf(config);
+  if (sm.id !== found.dataset.id) {
+    delete pbi.credentials;
+    delete pbi.refreshAt;
+  }
+  sm.id = String(found.dataset.id);
+  sm.name = String(found.dataset.name ?? sm.name);
+  sm.signature = signature;
+  sm.bound = pbi.credentials === 'set';
+  if (found.report) {
+    if (sm.report?.id !== found.report.id && config.access) delete config.access.reportShared;
+    sm.report = { id: String(found.report.id), name: String(found.report.name ?? PRODUCT.pax.report), signature: 'desktop', modelId: sm.id };
+  }
+  pbi.publishedBy = 'desktop';
+  delete pbi.desktopPending;
+  delete pbi.desktopFile;
+  ctx.save();
+}
+
+/**
+ * The steps to publish the filled-in template from Power BI Desktop.
+ * @param {string} file
+ * @param {string} workspace
+ */
+export function desktopSteps(file, workspace) {
+  return [
+    `Open ${file} in Power BI Desktop, which is free from the Microsoft Store.`,
+    'If it shows the parameters, keep the values in them and select Load.',
+    'When it asks how to connect to SharePoint, choose Microsoft account (or Organizational account), sign in with your work account, then select Connect.',
+    `Once the data has loaded, save it as ${PRODUCT.pax.report}.pbix. Power BI names the report and its model after the file.`,
+    `Select Publish, choose the workspace "${workspace}", and select Replace if it asks.`,
+  ];
+}
+
+/**
+ * Hands the template, filled in for this install, to Power BI Desktop, then finds what the user
+ * published by name. An install published that way stays with Desktop: when the template or the
+ * folder changes, it's published again the same way, and until then the version already there
+ * can stay.
+ * @param {Ctx} ctx
+ * @param {ModelEntry} entry
+ * @param {{ beforeDesktop?: () => Promise<void> }} [o]  Runs before the steps are shown, such as waiting for the files Desktop loads.
+ */
+export async function publishWithDesktop(ctx, entry, o = {}) {
+  const { ui, config } = ctx;
+  const f = config.fabric;
+  const sm = config.semanticModel;
+  const pbi = powerBiOf(config);
+  const ws = /** @type {string} */ (f.workspaceId);
+  const workspace = f.workspaceName ?? ws;
+  const signature = `desktop;${desktopHash(entry)}`;
+
+  let found = await findPublished(ctx, ws);
+  // Published since a run that stopped to wait for it.
+  if (found && pbi.desktopPending && found.dataset.id !== sm.id) {
+    adoptPublished(ctx, found, pbi.desktopPending);
+    ui.ok(`Found the ${found.report?.name ?? PRODUCT.pax.report} report you published from Power BI Desktop`);
+  }
+  if (found && sm.id === found.dataset.id && sm.signature === signature) {
+    if (!sm.report?.id && found.report) adoptPublished(ctx, found, signature);
+    ui.ok(`The ${sm.report?.name ?? PRODUCT.pax.report} report is in place`);
+    return;
+  }
+  const current = !!(found && sm.id === found.dataset.id);
+
+  await o.beforeDesktop?.();
+  const file = join(outDir(ctx), `${PRODUCT.pax.report}.pbit`);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, fillTemplate(readFileSync(entry.template), entry));
+  pbi.publishedBy = 'desktop';
+  pbi.desktopPending = signature;
+  pbi.desktopFile = file;
+  ctx.save();
+
+  ui.heading('Publish from Power BI Desktop');
+  ui.info(current ? `There's a new version of the ${PRODUCT.pax.report} report for you to publish.` : `Publish the ${PRODUCT.pax.report} report from Power BI Desktop. It takes a few minutes.`);
+  desktopSteps(file, workspace).forEach((s, i) => ui.info(`  ${i + 1}. ${s}`));
+  const later = `Publish ${file} from Power BI Desktop to "${workspace}", then run the installer again.`;
+  if (ui.yes) {
+    if (current) {
+      ui.warn(`Kept the version of ${PRODUCT.pax.report} that's there. ${later}`);
+      return;
+    }
+    throw new ResumeLater(`Stopped until the report is published. ${later}`);
+  }
+  for (;;) {
+    const next = await ui.select(
+      'Published it?',
+      [
+        { name: 'I\'ve published it', value: 'check' },
+        ...(current ? [{ name: 'Keep the version that\'s there for now', value: 'keep', description: 'Run the installer again to publish the new one.' }] : []),
+        { name: 'Stop and resume later', value: 'stop', description: 'Your answers are saved. Run the installer again once it\'s published.' },
+      ],
+      'check',
+    );
+    if (next === 'keep') {
+      ui.note(later);
+      return;
+    }
+    if (next === 'stop') throw new ResumeLater(`Stopped until the report is published. ${later}`);
+    found = await findPublished(ctx, ws);
+    if (found) {
+      adoptPublished(ctx, found, signature);
+      ui.ok(`Found ${sm.name} and its report in ${workspace}`);
+      return;
+    }
+    ui.warn(`There's no model called ${PRODUCT.pax.model} in ${workspace} yet. Save the file as ${PRODUCT.pax.report}.pbix before publishing, so Power BI gives it that name.`);
+  }
+}
+
+/**
+ * Publishes the SharePoint template's model and report, or updates them when the template or the
+ * folder changed. Where the service turns the item API down, the template goes to Power BI
+ * Desktop instead, and an install published that way stays with Desktop.
+ * @param {Ctx} ctx
+ * @param {{ beforeDesktop?: () => Promise<void> }} [o]
+ */
+export async function publishPax(ctx, o = {}) {
+  const { ui, config, sources } = ctx;
+  const template = sources.paxModelFile;
+  if (!template) throw new Error(`This checkout has no SharePoint template for the ${PRODUCT.pax.report} report.`);
+  const sm = config.semanticModel;
+  const pbi = powerBiOf(config);
+  const entry = paxEntry(config, template);
+  sm.enabled = true;
+  sm.reports = true;
+  if (!sm.id && (!sm.name || sm.name === MODEL_NAME)) sm.name = PRODUCT.pax.model;
+  ctx.save();
+  if (pbi.publishedBy === 'desktop') return publishWithDesktop(ctx, entry, o);
+  try {
+    await publishByApi(ctx, entry);
+  } catch (err) {
+    const why = apiRefusal(err);
+    if (!why) throw err;
+    ui.warn(`Power BI didn't take the ${PRODUCT.pax.report} report through its API (${why}).`);
+    await publishWithDesktop(ctx, entry, o);
+  }
+}
+
+/**
+ * How to sign the model in to SharePoint, on its settings page.
+ * @param {string} url
+ */
+export function credentialSteps(url) {
+  return [
+    `Open the model's settings: ${url}`,
+    'Expand Data source credentials, and select Edit credentials beside a source.',
+    'Choose OAuth2 and the privacy level None, then select Sign in and sign in with your work account.',
+    'Do the same for each source it lists. If a site\'s address fails the connection test, edit it again and tick Skip test connection.',
+  ];
+}
+
+/**
+ * Asks the user to sign the model in to SharePoint, which Power BI has no API for. Until then it
+ * can't refresh. Later, or an unattended run, leaves it for the Done page.
+ * @param {Ctx} ctx
+ * @returns {Promise<boolean>}  Whether it's signed in.
+ */
+export async function askCredentials(ctx) {
+  const { ui, config } = ctx;
+  const sm = config.semanticModel;
+  const pbi = powerBiOf(config);
+  const ws = config.fabric.workspaceId;
+  if (!sm.id || !ws) return false;
+  if (pbi.credentials === 'set' && sm.bound) {
+    ui.ok(`${sm.name} is signed in to SharePoint`);
+    return true;
+  }
+  ui.heading('Sign the report in to SharePoint');
+  ui.info(`${sm.name} reads the files in the SharePoint folder as you. Power BI has no way for the installer to sign it in, so do it once:`);
+  credentialSteps(modelSettingsUrl(ws, sm.id)).forEach((s, i) => ui.info(`  ${i + 1}. ${s}`));
+  if (ui.yes) {
+    pbi.credentials = 'later';
+    sm.bound = false;
+    ctx.save();
+    ui.note(`Until it's signed in, the report has no data. Then run "${commandLine('refresh')}".`);
+    return false;
+  }
+  const answer = await ui.select(
+    'Signed it in?',
+    [
+      { name: 'I\'ve signed it in', value: 'set' },
+      { name: 'Later', value: 'later', description: 'The report has no data until it\'s signed in. The steps are on the Done page.' },
+    ],
+    'set',
+  );
+  pbi.credentials = answer === 'set' ? 'set' : 'later';
+  sm.bound = answer === 'set';
+  ctx.save();
+  return sm.bound;
+}
+
+/**
+ * When Power BI refreshes the model each day, in this PC's time zone: some hours after the PAX
+ * refresh starts, on the hour or half hour as Power BI requires.
+ * @param {string} [taskAt]  When the PAX refresh starts, HH:mm.
+ * @returns {string[]}  HH:mm, earliest first.
+ */
+export function refreshTimes(taskAt = TASK_AT) {
+  const [h, m] = String(taskAt).split(':').map(Number);
+  const start = (Number.isInteger(h) ? h : 2) * 60 + (Number.isInteger(m) ? m : 0);
+  const times = REFRESH_AFTER_HOURS.map((after) => {
+    const at = (Math.ceil((start + after * 60) / 30) * 30) % (24 * 60);
+    return `${String(Math.floor(at / 60)).padStart(2, '0')}:${String(at % 60).padStart(2, '0')}`;
+  });
+  return [...new Set(times)].sort();
+}
+
+/**
+ * Schedules the model's daily refreshes, after the PAX refresh. It needs the SharePoint sign-in
+ * first, so without it this leaves the schedule for a later run.
+ * @param {Ctx} ctx
+ * @returns {Promise<boolean>}
+ */
+export async function setPaxSchedule(ctx) {
+  const { ui, config, api } = ctx;
+  const sm = config.semanticModel;
+  const pbi = powerBiOf(config);
+  const ws = config.fabric.workspaceId;
+  if (!sm.id || !ws || pbi.credentials !== 'set') return false;
+  const times = refreshTimes(config.pax?.task?.at);
+  const timeZone = pbi.timeZone ?? 'UTC';
+  try {
+    await api.powerBi.setRefreshSchedule(ws, sm.id, { value: { enabled: true, days: EVERY_DAY, times, localTimeZoneId: timeZone, notifyOption: 'MailOnFailure' } });
+  } catch (err) {
+    if (!isStatus(err, 400)) throw err;
+    ui.warn(`Power BI wouldn't schedule ${sm.name}'s daily refresh: ${errorText(err).slice(0, 300)}`);
+    ui.info('It usually means the model isn\'t signed in to SharePoint. Sign it in, then run the installer again.');
+    delete pbi.refreshAt;
+    ctx.save();
+    return false;
+  }
+  pbi.refreshAt = times[0];
+  pbi.timeZone = timeZone;
+  ctx.save();
+  ui.ok(`${sm.name} refreshes daily at ${times.join(' and ')} (${timeZone}), after the PAX refresh`);
+  return true;
+}
+
+/**
+ * A refresh's state from Power BI's history: `Unknown` while it runs, so its extended status then.
+ * @param {any} r
+ */
+export const historyState = (r) => (r?.status === 'Unknown' ? (r?.extendedStatus ?? 'Unknown') : r?.status);
+
+/** @param {any} r */
+const refreshError = (r) => String(r?.serviceExceptionJson ?? '').slice(0, 600);
+
+/**
+ * @typedef {object} PaxRefreshResult
+ * @property {boolean} ok
+ * @property {string} [status]  `Unknown` when it didn't wait.
+ * @property {boolean} [credentials]  It needs signing in to SharePoint again.
+ * @property {boolean} [limited]  Power BI won't start another refresh today.
+ */
+
+/**
+ * Refreshes the model now, or follows a refresh already running, and waits for it unless `wait`
+ * is false. A Pro workspace allows 8 refreshes a day, scheduled ones included. A failure to sign
+ * in to SharePoint marks the model as needing its sign-in again.
+ * @param {Ctx} ctx
+ * @param {{ wait?: boolean, timeoutMs?: number }} [opts]
+ * @returns {Promise<PaxRefreshResult>}
+ */
+export async function refreshPaxModel(ctx, opts = {}) {
+  const { ui, config, api } = ctx;
+  const sm = config.semanticModel;
+  const pbi = powerBiOf(config);
+  const ws = /** @type {string} */ (config.fabric.workspaceId);
+  if (!sm.id || !ws) throw new Error('There is no report yet. Run the installer first.');
+  if (!sm.bound) {
+    ui.warn(`${sm.name} isn't signed in to SharePoint yet, so it can't refresh. Run the installer again to sign it in.`);
+    return { ok: false, credentials: true };
+  }
+  const asked = ctx.now().getTime();
+  /** @type {string | undefined} */
+  let requestId;
+  let following = false;
+  try {
+    requestId = await api.powerBi.refreshNow(ws, sm.id);
+    ui.ok(`Started a refresh of ${sm.name}`);
+  } catch (err) {
+    const text = errorText(err);
+    if (isStatus(err, 429) || /maximum number|limit|exceeded/i.test(text)) {
+      ui.warn(`Power BI won't start another refresh of ${sm.name} today: a Pro workspace allows 8 a day. Its daily refresh still runs.`);
+      return { ok: false, limited: true };
+    }
+    if (!(isStatus(err, 409) || /in progress|already running/i.test(text))) throw err;
+    following = true;
+    ui.note('A refresh is already running, so following that one.');
+  }
+  if (opts.wait === false) return { ok: true, status: 'Unknown' };
+
+  const progress = ui.progress('Refresh');
+  const tries = Math.ceil((opts.timeoutMs ?? REFRESH_WAIT_MS) / REFRESH_POLL_MS);
+  /** @type {any} */
+  let r;
+  let took = 0;
+  try {
+    for (let i = 0; i <= tries; i++) {
+      const history = await api.powerBi.refreshes(ws, /** @type {string} */ (sm.id), 5);
+      r =
+        (requestId && history.find((h) => h.requestId === requestId)) ||
+        history.find((h) => Date.parse(h.startTime) >= asked - 60_000) ||
+        (following ? history[0] : undefined);
+      const state = r ? historyState(r) : 'NotStarted';
+      progress.update(state);
+      if (REFRESH_FINAL.has(state) || i === tries) break;
+      await ctx.sleep(REFRESH_POLL_MS);
+    }
+  } finally {
+    took = progress.done();
+  }
+  const state = r ? historyState(r) : 'NotStarted';
+  if (state === 'Completed') {
+    delete sm.reload;
+    ctx.save();
+    ui.ok(`${sm.name} refreshed in ${formatDuration(took)}`);
+    return { ok: true, status: state };
+  }
+  if (!REFRESH_FINAL.has(state)) {
+    ui.warn(`The refresh is still running. Check later with "${commandLine('status')}".`);
+    return { ok: false, status: state };
+  }
+  const error = refreshError(r);
+  if (/credential/i.test(error)) {
+    sm.bound = false;
+    delete pbi.credentials;
+    ctx.save();
+    ui.fail(`${sm.name} couldn't sign in to SharePoint, so it didn't refresh.`);
+    return { ok: false, status: state, credentials: true };
+  }
+  ui.fail(`The refresh ended as ${state}`);
+  if (error) ui.info(error);
+  return { ok: false, status: state };
+}
+
+/**
+ * Refreshes the model and checks it answers queries. A refresh that fails to sign in to
+ * SharePoint asks for the sign-in again, once.
+ * @param {Ctx} ctx
+ * @param {{ wait?: boolean }} [opts]
+ * @returns {Promise<PaxRefreshResult>}
+ */
+export async function loadPaxModel(ctx, opts = {}) {
+  let r = await refreshPaxModel(ctx, opts);
+  if (r.credentials && !ctx.ui.yes && (await askCredentials(ctx))) r = await refreshPaxModel(ctx, opts);
+  if (r.ok && r.status === 'Completed') {
+    const check = await verifyModel(ctx);
+    if (!check.ok) return { ...r, ok: false };
+  }
+  return r;
+}

@@ -18,6 +18,10 @@ export function powerBiApi(http) {
     datasets: async (workspaceId) => (await http.get(`/groups/${workspaceId}/datasets`))?.value ?? [],
     /** The workspace's reports, with id, name and datasetId. @param {string} workspaceId @returns {Promise<any[]>} */
     reports: async (workspaceId) => (await http.get(`/groups/${workspaceId}/reports`))?.value ?? [],
+    /** Deletes a semantic model. @param {string} workspaceId @param {string} datasetId */
+    deleteDataset: (workspaceId, datasetId) => http.del(`/groups/${workspaceId}/datasets/${datasetId}`),
+    /** Deletes a report. @param {string} workspaceId @param {string} reportId */
+    deleteReport: (workspaceId, reportId) => http.del(`/groups/${workspaceId}/reports/${reportId}`),
     /**
      * Starts a standard refresh, the kind a Pro workspace has, and returns its request ID when Power BI gives one.
      * @param {string} workspaceId @param {string} datasetId

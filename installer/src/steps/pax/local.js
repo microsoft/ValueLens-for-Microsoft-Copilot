@@ -35,6 +35,8 @@ export const MIN_PYTHON = Object.freeze([3, 10]);
 export const TASK_AT = '02:00';
 /** How many days of activity the first refresh asks PAX for. */
 export const SEED_DAYS = 30;
+/** The longest a refresh may run, as task.ps1 sets it: the first on a large tenant reads a month of activity. */
+export const RUN_LIMIT_MS = 12 * 60 * 60_000;
 
 export const PWSH_INSTALL = 'winget install --id Microsoft.PowerShell --source winget';
 export const PYTHON_INSTALL = 'winget install --id Python.Python.3.13 --scope user';
@@ -81,7 +83,7 @@ export const PYTHON_CANDIDATES = Object.freeze([['python'], ['py', '-3.13'], ['p
  * @property {string} command  How PAX will run it, e.g. `py -3.12`.
  * @property {string} version
  *
- * @typedef {{ title: string, fix: string }} HostProblem
+ * @typedef {{ part: 'pwsh' | 'python', title: string, fix: string }} HostProblem
  *
  * @typedef {object} HostCheck
  * @property {PwshInfo} [pwsh]
@@ -330,21 +332,24 @@ export async function checkHost(host) {
   const { pwsh, error } = await findPwsh(host);
   if (!pwsh) {
     problems.push({
+      part: 'pwsh',
       title: "PowerShell 7 isn't installed",
       fix: `PAX and the refresh need PowerShell 7.2 or later. Install it with: ${PWSH_INSTALL}${error ? `. (${error})` : ''}`,
     });
   } else if (!atLeast(pwsh.version, MIN_PWSH)) {
-    problems.push({ title: `PowerShell ${pwsh.version} is too old`, fix: `PAX needs PowerShell 7.2 or later. Update it with: ${PWSH_INSTALL}` });
+    problems.push({ part: 'pwsh', title: `PowerShell ${pwsh.version} is too old`, fix: `PAX needs PowerShell 7.2 or later. Update it with: ${PWSH_INSTALL}` });
   } else {
     host.pwsh = pwsh.path;
     if (/^(AllSigned|Restricted)$/i.test(pwsh.policy)) {
       problems.push({
+        part: 'pwsh',
         title: `PowerShell's execution policy is ${pwsh.policy}, so the refresh scripts can't run`,
         fix: "The scripts aren't signed, and the installer doesn't change or bypass the policy. To let your account run local scripts, run this in PowerShell 7: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned. If Group Policy sets the policy, ask your IT admin.",
       });
     }
     if (pwsh.languageMode && pwsh.languageMode !== 'FullLanguage') {
       problems.push({
+        part: 'pwsh',
         title: `PowerShell runs in ${pwsh.languageMode} mode on this PC`,
         fix: `An application control policy (such as App Control for Business or AppLocker) limits PowerShell here, so the refresh can't keep its secret in Credential Manager. Ask your IT admin to allow the scripts in ${paxPaths(host).scripts}, or set up the refresh on another PC.`,
       });
@@ -353,6 +358,7 @@ export async function checkHost(host) {
   const { python, older } = await findPython(host);
   if (!python) {
     problems.push({
+      part: 'python',
       title: older ? `Python ${older.version} is too old` : "Python isn't installed",
       fix: `PAX needs Python 3.10 or later to build its files. Without it PAX tries to install Python itself, which a scheduled task can't finish. Install it for your account with: ${PYTHON_INSTALL}`,
     });
@@ -559,9 +565,11 @@ export async function removeSecret(host, target) {
  * @property {boolean} [neverRan]
  * @property {string | null} [nextRunTime]
  * @property {string} [userId]
+ * @property {string} [logonType]  Interactive, Password or S4U.
  * @property {string} [runLevel]
  * @property {string} [execute]
  * @property {string} [arguments]
+ * @property {string | null} [workingDirectory]
  */
 
 /**
@@ -593,6 +601,25 @@ export async function registerTask(host, task) {
  */
 export async function taskInfo(host, name) {
   return /** @type {TaskReport} */ (await scriptJson(host, 'task.ps1', ['-Action', 'Info', '-TaskName', name], 'Reading the scheduled task'));
+}
+
+/**
+ * Whether the registered task already does what this install wants: it's enabled, starts at the
+ * time recorded, and runs this PC's refresh.ps1 with its refresh.json, from that file's folder,
+ * with a pwsh.exe that's still there. Repair keeps a task that does, so a change the user made in
+ * Task Scheduler, such as running it while signed out, stays.
+ * @param {TaskReport} info
+ * @param {PaxHost} host
+ * @param {import('../../config.js').PaxTask | undefined} recorded
+ * @param {string} at  When it should start, HH:mm.
+ */
+export function taskCurrent(info, host, recorded, at) {
+  if (!info.exists || info.state === 'Disabled' || recorded?.at !== at) return false;
+  const { scripts, config } = paxPaths(host);
+  const args = (info.arguments ?? '').toLowerCase();
+  if (![join(scripts, 'refresh.ps1'), config].every((path) => args.includes(`"${path.toLowerCase()}"`))) return false;
+  if ((info.workingDirectory ?? '').replace(/[\\/]+$/, '').toLowerCase() !== dirname(config).toLowerCase()) return false;
+  return !!info.execute && existsSync(info.execute);
 }
 
 /**
@@ -663,7 +690,8 @@ export async function uploadToFolder(host, file, o = {}) {
 }
 
 /**
- * Runs the refresh now in this window, rather than through the task.
+ * Runs the refresh now in this window, rather than through the task, such as to fill a gap with
+ * -Days. Like the task, it's stopped after 12 hours.
  * @param {PaxHost} host
  * @param {{ days?: number, timeoutMs?: number }} [o]
  * @returns {Promise<RunResult>}
@@ -671,7 +699,7 @@ export async function uploadToFolder(host, file, o = {}) {
 export function runRefresh(host, o = {}) {
   const args = ['-Config', paxPaths(host).config];
   if (o.days) args.push('-Days', String(o.days));
-  return runScript(host, 'refresh.ps1', args, { timeoutMs: o.timeoutMs ?? 4 * 60 * 60_000 });
+  return runScript(host, 'refresh.ps1', args, { timeoutMs: o.timeoutMs ?? RUN_LIMIT_MS });
 }
 
 /**

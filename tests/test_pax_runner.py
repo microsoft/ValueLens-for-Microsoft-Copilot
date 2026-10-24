@@ -1306,7 +1306,7 @@ class TaskTests(unittest.TestCase):
         self.assertEqual(task["Triggers"], [{"Daily": True, "At": "02:00"}])
         self.assertEqual(task["Settings"], {
             "StartWhenAvailable": True, "AllowStartIfOnBatteries": True, "DontStopIfGoingOnBatteries": True,
-            "RunOnlyIfNetworkAvailable": True, "ExecutionTimeLimit": "04:00:00", "MultipleInstances": "IgnoreNew"})
+            "RunOnlyIfNetworkAvailable": True, "ExecutionTimeLimit": "12:00:00", "MultipleInstances": "IgnoreNew"})
 
     def test_info_reports_whether_the_task_has_run(self):
         r = self.result

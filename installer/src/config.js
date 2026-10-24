@@ -216,12 +216,33 @@ export const REPORT_NAME = PRODUCT.fabric.report;
  * @property {string} [credentialTarget]  The Windows Credential Manager entry that holds the app's client secret.
  * @property {string} [secretSetAt]  When the installer last wrote the secret there.
  * @property {string} [secretExpires]
- * @property {{ name: string, at: string, registeredAt?: string }} [task]  The scheduled task.
+ * @property {PaxTask} [task]  The scheduled task.
  * @property {boolean} [agent365]  Also export the Agent 365 registry.
  * @property {number} [seedDays]  How many days the first refresh asks PAX for.
  * @property {string} [scriptsHash]  What the installed scripts were copied from.
- * @property {string} [firstRunAt]  When the installer started the first refresh.
+ * @property {FirstRun} [firstRun]  The first refresh, from when the installer starts it until a refresh succeeds.
+ * @property {boolean} [deployApp]  Deploy the app. On when absent.
  * @typedef {PaxConfigFields & import('./steps/secrets.js').SecretSlot} PaxConfig
+ */
+
+/**
+ * The scheduled task that runs the refresh.
+ * @typedef {object} PaxTask
+ * @property {string} name
+ * @property {string} at  When it starts each day, HH:mm on this PC's clock.
+ * @property {string} [registeredAt]
+ * @property {string} [logonType]  As Task Scheduler last reported it. Interactive: it runs only while the user is signed in.
+ */
+
+/**
+ * The first refresh, which fills the folder with the last `seedDays` of activity. On a large
+ * tenant it takes hours, so the installer starts it and checks on it rather than waiting.
+ * @typedef {object} FirstRun
+ * @property {string} startedAt
+ * @property {string} [finishedAt]
+ * @property {'no-data' | 'failed'} [result]  How it ended, when it didn't succeed.
+ * @property {string} [error]
+ * @property {string} [log]  Its log file on this PC.
  */
 
 /**
@@ -229,23 +250,24 @@ export const REPORT_NAME = PRODUCT.fabric.report;
  * report in `semanticModel`.
  * @typedef {object} PowerBiConfig
  * @property {'api' | 'desktop'} [publishedBy]  The installer published it, or handed the template to Power BI Desktop.
+ * @property {string} [desktopPending]  The template handed to Power BI Desktop and not yet found published, by its hash.
+ * @property {string} [desktopFile]  Where that template is on this PC.
  * @property {'set' | 'later'} [credentials]  The model has been signed in to SharePoint, or the user chose to do it later.
- * @property {string} [refreshAt]  The model's daily refresh time, HH:mm. Set once the refresh is scheduled.
+ * @property {string} [refreshAt]  The model's first daily refresh, HH:mm. Set once the refreshes are scheduled.
  * @property {string} [timeZone]  The schedule's Windows time zone ID.
  */
 
 /**
- * The app, deployed with the `ms` CLI as a Copilot Managed App.
+ * The app, deployed with the `ms` CLI as a Copilot Managed App and shared with the viewer group.
  * @typedef {object} ManagedAppConfig
- * @property {boolean} [enabled]  The user wants it. On by default on the PAX route.
- * @property {string} [name]  Its name in the Copilot Managed Apps portal.
- * @property {string} [appId]  The managed app's ID, once deployed.
- * @property {string} [environmentId]  The Power Platform environment it's deployed to.
+ * @property {string} [appId]
  * @property {string} [url]  Where people open it.
+ * @property {string} [environmentId]  The Power Platform environment it's deployed to, or the one chosen for it.
  * @property {string} [deployedAt]
- * @property {string} [sourceHash]  What was deployed, so `update` deploys again only when the app changed.
- * @property {string} [sharedWith]  The group or person it's shared with.
- * @property {string[]} [notReady]  The tenant settings that stopped the last deploy, until one succeeds.
+ * @property {string} [buildHash]  A hash of the build that was deployed.
+ * @property {string[]} [sharedWith]  The groups it's shared with.
+ * @property {('createApps' | 'externalArtifacts')[]} [missing]  The tenant settings the last attempt found turned off.
+ * @property {{ why: string, steps: string[] }} [skipped]  Why the last attempt didn't deploy it, and what to do.
  */
 
 /** @returns {InstallConfig} */
@@ -349,7 +371,7 @@ function normaliseConfig(raw, file) {
     ...(raw.sharePoint ? { sharePoint: { ...raw.sharePoint } } : {}),
     ...(raw.pax ? { pax: { ...raw.pax, ...(raw.pax.task ? { task: { ...raw.pax.task } } : {}) } } : {}),
     ...(raw.powerBi ? { powerBi: { ...raw.powerBi } } : {}),
-    ...(raw.managedApp ? { managedApp: { ...raw.managedApp, ...(raw.managedApp.notReady ? { notReady: [...raw.managedApp.notReady] } : {}) } } : {}),
+    ...(raw.managedApp ? { managedApp: { ...raw.managedApp } } : {}),
   };
   if (!config.reporting) delete config.reporting;
   assertNoSecrets(config);

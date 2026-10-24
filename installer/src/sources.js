@@ -17,6 +17,12 @@ export const PAX_SCRIPTS_DIR = '4. SharePoint/scripts';
 export const PAX_SCRIPTS = Object.freeze(['Run-PAX-AIBV.ps1', 'Get-Agents365Registry.ps1', 'Upload-Rollups-SharePoint.ps1']);
 
 /**
+ * The app's build, which the PAX route deploys as a Copilot Managed App. The exe ships it; in a
+ * checkout, `npm ci` then `npm run build` in `app` makes it.
+ */
+export const APP_DIST = 'app/dist';
+
+/**
  * @typedef {object} Sources
  * @property {string} dir
  * @property {Record<import('./catalog.js').NotebookKey, import('./transform/notebook.js').Notebook>} notebooks
@@ -24,6 +30,7 @@ export const PAX_SCRIPTS = Object.freeze(['Run-PAX-AIBV.ps1', 'Get-Agents365Regi
  * @property {string} [modelFile]  `ValueLens - Fabric.pbit`, read only when the semantic model is deployed.
  * @property {string} [paxModelFile]  `ValueLens - SharePoint.pbit`, the PAX route's report.
  * @property {string[]} [paxScripts]  The PAX scripts' paths, when the checkout has all of them.
+ * @property {string} [appDist]  The app's build, when there is one.
  */
 
 /**
@@ -46,6 +53,7 @@ export function loadSources(dir = DEFAULT_SOURCE_DIR) {
   const modelFile = join(root, MODEL_TEMPLATE);
   const paxModelFile = join(root, PAX_MODEL_TEMPLATE);
   const paxScripts = PAX_SCRIPTS.map((s) => join(root, PAX_SCRIPTS_DIR, s));
+  const appDist = join(root, APP_DIST);
   return {
     dir: root,
     notebooks,
@@ -53,6 +61,7 @@ export function loadSources(dir = DEFAULT_SOURCE_DIR) {
     modelFile: existsSync(modelFile) ? modelFile : undefined,
     ...(existsSync(paxModelFile) ? { paxModelFile } : {}),
     ...(paxScripts.every((s) => existsSync(s)) ? { paxScripts } : {}),
+    ...(existsSync(join(appDist, 'index.html')) ? { appDist } : {}),
   };
 }
 

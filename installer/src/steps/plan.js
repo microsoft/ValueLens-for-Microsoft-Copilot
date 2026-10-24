@@ -953,6 +953,7 @@ export const PRICING = {
   fabric: 'https://azure.microsoft.com/pricing/details/microsoft-fabric/',
   powerAutomate: 'https://www.microsoft.com/power-platform/products/power-automate/pricing',
   keyVault: 'https://azure.microsoft.com/pricing/details/key-vault/',
+  powerBiPro: 'https://www.microsoft.com/power-platform/products/power-bi/pricing',
 };
 
 /**
