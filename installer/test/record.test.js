@@ -174,6 +174,16 @@ test('record: when two commands change the same field the later save wins; a fie
     }
   }));
 
+test('record: the groups that were the viewer group, and the models they still have Build on, read back as saved', () =>
+  inDir((dir) => {
+    const file = join(dir, 'valuelens-setup.json');
+    const config = record();
+    const retiredGroups = [{ groupId: 'g-2', groupName: 'Old viewers', datasets: ['ds-1', 'ds-2'] }, { groupId: 'g-3', datasets: ['ds-1'] }];
+    config.access = { groupId: 'g-1', grantedModels: ['ds-1'], retiredGroups: structuredClone(retiredGroups) };
+    saveConfig(file, config);
+    assert.deepEqual(loadConfig(file).config.access?.retiredGroups, retiredGroups);
+  }));
+
 test('record: a record saved to another file, such as the setup draft, is written as it is', () =>
   inDir((dir) => {
     const file = join(dir, 'valuelens-setup.json');

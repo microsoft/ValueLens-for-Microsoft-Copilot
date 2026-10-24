@@ -18,7 +18,7 @@ import { PRODUCT } from '../../product.js';
 import { loadTemplateModel, PBISM } from '../../transform/model.js';
 import { buildEntryModel, fillTemplate } from '../../transform/template.js';
 import { formatDuration } from '../../ui.js';
-import { foreignInstall, foreignWorkspaceMessage } from '../fabric.js';
+import { foreignInstall, foreignWorkspaceMessage, freeName, noteRenamed } from '../fabric.js';
 import { ResumeLater } from '../identity.js';
 import { TASK_AT } from './local.js';
 import { deployModel, modelSettingsUrl, REFRESH_FINAL, REFRESH_POLL_MS, verifyModel } from '../model.js';
@@ -130,15 +130,14 @@ export function desktopHash(entry) {
 }
 
 /**
- * Forgets a workspace that's gone, and everything that was in it.
+ * Forgets the model and its report, such as ones deleted outside the installer, and what was set
+ * up on them: the SharePoint sign-in, the schedule, the share with the viewer group and its Build.
+ * The next install publishes them again.
  * @param {InstallConfig} config
  */
-function forgetWorkspace(config) {
-  const f = config.fabric;
-  delete f.workspaceId;
-  delete f.createdWorkspace;
-  delete f.pendingItems;
+export function forgetModel(config) {
   const sm = config.semanticModel;
+  const id = sm.id;
   delete sm.id;
   delete sm.signature;
   delete sm.report;
@@ -147,10 +146,48 @@ function forgetWorkspace(config) {
   const pbi = powerBiOf(config);
   delete pbi.credentials;
   delete pbi.refreshAt;
-  delete pbi.publishedBy;
   delete pbi.desktopPending;
   delete pbi.desktopFile;
-  if (config.access) delete config.access.reportShared;
+  delete pbi.desktopName;
+  const access = config.access;
+  if (!access) return;
+  delete access.reportShared;
+  if (!id) return;
+  if (access.grantedModels) access.grantedModels = access.grantedModels.filter((m) => m !== id);
+  if (access.retiredGroups) {
+    access.retiredGroups = access.retiredGroups.map((g) => ({ ...g, datasets: g.datasets.filter((m) => m !== id) })).filter((g) => g.datasets.length);
+    if (!access.retiredGroups.length) delete access.retiredGroups;
+  }
+}
+
+/**
+ * Forgets a workspace that's gone, and everything that was in it.
+ * @param {InstallConfig} config
+ */
+function forgetWorkspace(config) {
+  const f = config.fabric;
+  delete f.workspaceId;
+  delete f.createdWorkspace;
+  delete f.pendingItems;
+  forgetModel(config);
+  delete powerBiOf(config).publishedBy;
+}
+
+/**
+ * Whether Power BI says the model isn't there: deleted outside the installer.
+ * @param {unknown} err
+ */
+const modelGone = (err) => isStatus(err, 404);
+
+/**
+ * Forgets a model Power BI says is gone, and says how to publish it again.
+ * @param {Ctx} ctx
+ * @param {string} name
+ */
+function forgetGoneModel(ctx, name) {
+  forgetModel(ctx.config);
+  ctx.save();
+  ctx.ui.warn(`${name} isn't in the workspace any more. To publish it again, run: ${commandLine('update')}`);
 }
 
 /**
@@ -284,29 +321,32 @@ async function publishByApi(ctx, entry) {
 }
 
 /**
- * What's published under the template's names: the model, found by its recorded ID or by name,
+ * The workspace's models and reports, and which of them are this install's: the model by its
+ * recorded ID or, while a template waits in Power BI Desktop, by the name the installer gave it,
  * and the report on it. A model with a report comes before one without, such as one the item API
- * made before it turned the report down.
+ * made before it turned the report down. A model the installer didn't publish is never taken
+ * over, even when it has the same name.
  * @param {Ctx} ctx
  * @param {string} ws
- * @returns {Promise<{ dataset: any, report?: any } | undefined>}
+ * @returns {Promise<{ found?: { dataset: any, report?: any }, datasets: any[], reports: any[] }>}
  */
 async function findPublished(ctx, ws) {
   const { api, config } = ctx;
-  const datasets = await api.powerBi.datasets(ws);
   const sm = config.semanticModel;
+  const pbi = powerBiOf(config);
+  const datasets = await api.powerBi.datasets(ws);
+  const reports = await api.powerBi.reports(ws);
+  const name = pbi.desktopPending ? pbi.desktopName : undefined;
   const models = [
     ...datasets.filter((d) => sm.id && d.id === sm.id),
-    ...datasets.filter((d) => d.id !== sm.id && lower(d.name) === lower(PRODUCT.pax.model)),
+    ...datasets.filter((d) => name && d.id !== sm.id && lower(d.name) === lower(name)),
   ];
-  if (!models.length) return undefined;
-  const reports = await api.powerBi.reports(ws);
   for (const dataset of models) {
     const own = reports.filter((r) => r.datasetId === dataset.id);
-    const report = (sm.report?.id && own.find((r) => r.id === sm.report?.id)) || own.find((r) => lower(r.name) === lower(PRODUCT.pax.report)) || own[0];
-    if (report) return { dataset, report };
+    const report = (sm.report?.id && own.find((r) => r.id === sm.report?.id)) || own.find((r) => lower(r.name) === lower(name ?? PRODUCT.pax.report)) || own[0];
+    if (report) return { found: { dataset, report }, datasets, reports };
   }
-  return { dataset: models[0] };
+  return { found: models.length ? { dataset: models[0] } : undefined, datasets, reports };
 }
 
 /**
@@ -334,6 +374,7 @@ function adoptPublished(ctx, found, signature) {
   pbi.publishedBy = 'desktop';
   delete pbi.desktopPending;
   delete pbi.desktopFile;
+  delete pbi.desktopName;
   ctx.save();
 }
 
@@ -341,22 +382,26 @@ function adoptPublished(ctx, found, signature) {
  * The steps to publish the filled-in template from Power BI Desktop.
  * @param {string} file
  * @param {string} workspace
+ * @param {string} [name]  What to save it as, which Power BI names the model and report after.
+ * @param {boolean} [replace]  It replaces the install's own model of that name.
  */
-export function desktopSteps(file, workspace) {
+export function desktopSteps(file, workspace, name = PRODUCT.pax.report, replace = false) {
   return [
     `Open ${file} in Power BI Desktop, which is free from the Microsoft Store.`,
     'If it shows the parameters, keep the values in them and select Load.',
     'When it asks how to connect to SharePoint, choose Microsoft account (or Organizational account), sign in with your work account, then select Connect.',
-    `Once the data has loaded, save it as ${PRODUCT.pax.report}.pbix. Power BI names the report and its model after the file.`,
-    `Select Publish, choose the workspace "${workspace}", and select Replace if it asks.`,
+    `Once the data has loaded, save it as ${name}.pbix. Power BI names the report and its model after the file.`,
+    replace ? `Select Publish, choose the workspace "${workspace}", and select Replace when it asks. That updates this install's ${name}.` : `Select Publish and choose the workspace "${workspace}".`,
   ];
 }
 
 /**
  * Hands the template, filled in for this install, to Power BI Desktop, then finds what the user
- * published by name. An install published that way stays with Desktop: when the template or the
- * folder changes, it's published again the same way, and until then the version already there
- * can stay.
+ * published. Desktop names the model after the file, so the file's name is the install's own
+ * model's, which Desktop replaces, or a name nothing in the workspace has: Desktop never replaces
+ * a model the installer didn't publish. An install published that way stays with Desktop: when
+ * the template or the folder changes, it's published again the same way, and until then the
+ * version already there can stay.
  * @param {Ctx} ctx
  * @param {ModelEntry} entry
  * @param {{ beforeDesktop?: () => Promise<void> }} [o]  Runs before the steps are shown, such as waiting for the files Desktop loads.
@@ -370,11 +415,17 @@ export async function publishWithDesktop(ctx, entry, o = {}) {
   const workspace = f.workspaceName ?? ws;
   const signature = `desktop;${desktopHash(entry)}`;
 
-  let found = await findPublished(ctx, ws);
+  let { found, datasets, reports } = await findPublished(ctx, ws);
   // Published since a run that stopped to wait for it: a new model, or a report the record lacks.
   if (found?.report && pbi.desktopPending && (found.dataset.id !== sm.id || found.report.id !== sm.report?.id)) {
     adoptPublished(ctx, found, pbi.desktopPending);
     ui.ok(`Found the ${found.report.name ?? PRODUCT.pax.report} report you published from Power BI Desktop`);
+  }
+  if (sm.id && !datasets.some((d) => d.id === sm.id)) {
+    ui.warn(`${sm.name} isn't in ${workspace} any more, so it's published again.`);
+    forgetModel(config);
+    ctx.save();
+    found = undefined;
   }
   if (found?.report && sm.id === found.dataset.id && sm.signature === signature) {
     if (sm.report?.id !== found.report.id) adoptPublished(ctx, found, signature);
@@ -383,6 +434,8 @@ export async function publishWithDesktop(ctx, entry, o = {}) {
   }
   // Not a model without its report, such as one the item API made before turning the report down.
   const current = !!(found?.report && sm.id === found.dataset.id);
+  const own = sm.id ? datasets.find((d) => d.id === sm.id) : undefined;
+  const name = own?.name ? String(own.name) : freeName(PRODUCT.pax.report, [...datasets, ...reports].map((i) => String(i.name ?? '')));
 
   await o.beforeDesktop?.();
   const file = join(outDir(ctx), `${PRODUCT.pax.report}.pbit`);
@@ -391,15 +444,17 @@ export async function publishWithDesktop(ctx, entry, o = {}) {
   pbi.publishedBy = 'desktop';
   pbi.desktopPending = signature;
   pbi.desktopFile = file;
+  pbi.desktopName = name;
   ctx.save();
 
   ui.heading('Publish from Power BI Desktop');
-  ui.info(current ? `There's a new version of the ${PRODUCT.pax.report} report for you to publish.` : `Publish the ${PRODUCT.pax.report} report from Power BI Desktop. It takes a few minutes.`);
-  desktopSteps(file, workspace).forEach((s, i) => ui.info(`  ${i + 1}. ${s}`));
-  const later = `Publish ${file} from Power BI Desktop to "${workspace}", then run the installer again.`;
+  ui.info(current ? `There's a new version of the ${name} report for you to publish.` : `Publish the ${name} report from Power BI Desktop. It takes a few minutes.`);
+  if (!own) noteRenamed(ctx, PRODUCT.pax.report, name);
+  desktopSteps(file, workspace, name, !!own).forEach((s, i) => ui.info(`  ${i + 1}. ${s}`));
+  const later = `Publish ${file} from Power BI Desktop to "${workspace}" as ${name}, then run the installer again.`;
   if (ui.yes) {
     if (current) {
-      ui.warn(`Kept the version of ${PRODUCT.pax.report} that's there. ${later}`);
+      ui.warn(`Kept the version of ${name} that's there. ${later}`);
       return;
     }
     throw new ResumeLater(`Stopped until the report is published. ${later}`);
@@ -419,7 +474,7 @@ export async function publishWithDesktop(ctx, entry, o = {}) {
       return;
     }
     if (next === 'stop') throw new ResumeLater(`Stopped until the report is published. ${later}`);
-    found = await findPublished(ctx, ws);
+    found = (await findPublished(ctx, ws)).found;
     if (found?.report) {
       adoptPublished(ctx, found, signature);
       ui.ok(`Found ${sm.name} and its report in ${workspace}`);
@@ -427,8 +482,8 @@ export async function publishWithDesktop(ctx, entry, o = {}) {
     }
     ui.warn(
       found
-        ? `${PRODUCT.pax.model} in ${workspace} has no report on it yet. Publish the file from Power BI Desktop, which publishes the report with its model.`
-        : `There's no model called ${PRODUCT.pax.model} in ${workspace} yet. Save the file as ${PRODUCT.pax.report}.pbix before publishing, so Power BI gives it that name.`,
+        ? `${name} in ${workspace} has no report on it yet. Publish the file from Power BI Desktop, which publishes the report with its model.`
+        : `There's no model called ${name} in ${workspace} yet. Save the file as ${name}.pbix before publishing, so Power BI gives it that name.`,
     );
   }
 }
@@ -549,6 +604,10 @@ export async function setPaxSchedule(ctx) {
   try {
     await api.powerBi.setRefreshSchedule(ws, sm.id, { value: { enabled: true, days: EVERY_DAY, times, localTimeZoneId: timeZone, notifyOption: 'MailOnFailure' } });
   } catch (err) {
+    if (modelGone(err)) {
+      forgetGoneModel(ctx, sm.name);
+      return false;
+    }
     if (!isStatus(err, 400)) throw err;
     ui.warn(`Power BI wouldn't schedule ${sm.name}'s daily refresh: ${errorText(err).slice(0, 300)}`);
     ui.info('It usually means the model isn\'t signed in to SharePoint. Sign it in, then run the installer again.');
@@ -584,6 +643,10 @@ export async function resumePaxSchedule(ctx) {
   try {
     schedule = await api.powerBi.refreshSchedule(ws, sm.id);
   } catch (err) {
+    if (modelGone(err)) {
+      forgetGoneModel(ctx, sm.name);
+      return false;
+    }
     if (!(err instanceof HttpError)) throw err;
     ui.warn(`Couldn't read ${sm.name}'s refresh schedule, so couldn't check it's on: ${errorText(err).slice(0, 300)}`);
     return false;
@@ -608,12 +671,14 @@ const refreshError = (r) => String(r?.serviceExceptionJson ?? '').slice(0, 600);
  * @property {string} [status]  `Unknown` when it didn't wait.
  * @property {boolean} [credentials]  It needs signing in to SharePoint again.
  * @property {boolean} [limited]  Power BI won't start another refresh today.
+ * @property {boolean} [gone]  The model was deleted outside the installer, so the record forgot it.
  */
 
 /**
  * Refreshes the model now, or follows a refresh already running, and waits for it unless `wait`
  * is false. A Pro workspace allows 8 refreshes a day, scheduled ones included. A failure to sign
- * in to SharePoint marks the model as needing its sign-in again.
+ * in to SharePoint marks the model as needing its sign-in again, and a model that's been deleted
+ * is forgotten, so the next update publishes it again.
  * @param {Ctx} ctx
  * @param {{ wait?: boolean, timeoutMs?: number }} [opts]
  * @returns {Promise<PaxRefreshResult>}
@@ -636,6 +701,10 @@ export async function refreshPaxModel(ctx, opts = {}) {
     requestId = await api.powerBi.refreshNow(ws, sm.id);
     ui.ok(`Started a refresh of ${sm.name}`);
   } catch (err) {
+    if (modelGone(err)) {
+      forgetGoneModel(ctx, sm.name);
+      return { ok: false, gone: true };
+    }
     const text = errorText(err);
     if (isStatus(err, 429) || /maximum number|limit|exceeded/i.test(text)) {
       ui.warn(`Power BI won't start another refresh of ${sm.name} today: a Pro workspace allows 8 a day. Its daily refresh still runs.`);
@@ -652,9 +721,18 @@ export async function refreshPaxModel(ctx, opts = {}) {
   /** @type {any} */
   let r;
   let took = 0;
+  let gone = false;
   try {
     for (let i = 0; i <= tries; i++) {
-      const history = await api.powerBi.refreshes(ws, /** @type {string} */ (sm.id), 5);
+      /** @type {any[]} */
+      let history;
+      try {
+        history = await api.powerBi.refreshes(ws, /** @type {string} */ (sm.id), 5);
+      } catch (err) {
+        if (!modelGone(err)) throw err;
+        gone = true;
+        break;
+      }
       r =
         (requestId && history.find((h) => h.requestId === requestId)) ||
         history.find((h) => Date.parse(h.startTime) >= asked - 60_000) ||
@@ -666,6 +744,10 @@ export async function refreshPaxModel(ctx, opts = {}) {
     }
   } finally {
     took = progress.done();
+  }
+  if (gone) {
+    forgetGoneModel(ctx, sm.name);
+    return { ok: false, gone: true };
   }
   const state = r ? historyState(r) : 'NotStarted';
   if (state === 'Completed') {
@@ -703,10 +785,12 @@ export async function refreshPaxModel(ctx, opts = {}) {
 export async function loadPaxModel(ctx, opts = {}) {
   const pbi = powerBiOf(ctx.config);
   let r = await refreshPaxModel(ctx, opts);
+  if (r.gone) return r;
   let signedIn = false;
   if (r.credentials && !ctx.ui.yes) {
     signedIn = await askCredentials(ctx);
     if (signedIn) r = await refreshPaxModel(ctx, opts);
+    if (r.gone) return r;
   }
   if (!r.credentials && (signedIn || !pbi.refreshAt)) await setPaxSchedule(ctx);
   else if (r.ok && r.status === 'Completed' && pbi.refreshAt) await resumePaxSchedule(ctx);

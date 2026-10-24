@@ -63,8 +63,17 @@ export const AH_RELEASES = 'https://github.com/microsoft/AnalyticsHub-Dashboard/
  * @property {string} [contact]  Who people ask for access. Defaults to the installer.
  * @property {string} [requestUrl]  Optional link for access requests, e.g. a My Access package or a form.
  * @property {string[]} [grantedModels]  Semantic model IDs the group has Build (ReadExplore) on.
+ * @property {RetiredGroup[]} [retiredGroups]  Groups that were the viewer group, until the installer has taken away the Build it gave them.
  * @property {boolean} [reportShared]  The user said the report is shared with the group. Power BI has no API to check.
  * @property {RlsConfig} [rls]  Org-scoped access (row-level security). Off when absent.
+ */
+
+/**
+ * A group that was the viewer group, and the models it still has the installer's Build on.
+ * @typedef {object} RetiredGroup
+ * @property {string} groupId
+ * @property {string} [groupName]
+ * @property {string[]} datasets  Semantic model IDs.
  */
 
 /**
@@ -252,6 +261,7 @@ export const REPORT_NAME = PRODUCT.fabric.report;
  * @property {'api' | 'desktop'} [publishedBy]  The installer published it, or handed the template to Power BI Desktop.
  * @property {string} [desktopPending]  The template handed to Power BI Desktop and not yet found published, by its hash.
  * @property {string} [desktopFile]  Where that template is on this PC.
+ * @property {string} [desktopName]  The name to publish that template under: the install's own model's, or one nothing in the workspace had, so Desktop never replaces a model the installer didn't publish.
  * @property {'set' | 'later'} [credentials]  The model has been signed in to SharePoint, or the user chose to do it later.
  * @property {string} [refreshAt]  The model's first daily refresh, HH:mm. Set once the refreshes are scheduled.
  * @property {string} [timeZone]  The schedule's Windows time zone ID.
@@ -363,6 +373,7 @@ function normaliseConfig(raw, file) {
           access: {
             ...raw.access,
             grantedModels: [...(raw.access.grantedModels ?? [])],
+            ...(raw.access.retiredGroups ? { retiredGroups: raw.access.retiredGroups.map((g) => ({ ...g, datasets: [...(g.datasets ?? [])] })) } : {}),
             ...(raw.access.rls ? { rls: { ...raw.access.rls, applied: Array.isArray(raw.access.rls.applied) ? [...raw.access.rls.applied] : [] } } : {}),
           },
         }

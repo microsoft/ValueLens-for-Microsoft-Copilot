@@ -7,12 +7,12 @@ import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { GRAPH_APP_ID } from '../catalog.js';
 import { allowsAction, isPrivateVault, networkBlocked, ROLES } from '../clients/azure.js';
-import { adminConsentUrl, apiPermissionsUrl, resolveAppRoles } from '../clients/graph.js';
+import { adminConsentUrl, apiPermissionsUrl, declaredGraphRoles, resolveAppRoles } from '../clients/graph.js';
 import { secretMode } from '../config.js';
 import { HttpError } from '../http.js';
 import { commandLine } from '../launch.js';
 import { PRODUCT } from '../product.js';
-import { appName, isPax, requiredPermissions } from '../target.js';
+import { appName, isPax, requiredPermissions, retiredPermissions } from '../target.js';
 import { c } from '../ui.js';
 import { APP_NAME } from './plan.js';
 import { pnpGrantCommand, siteGrantCommands, SITE_ADMIN } from './pax/site.js';
@@ -99,6 +99,21 @@ export async function graphRoles(ctx) {
   }
   return ctx.graphRoles;
 }
+
+/**
+ * Graph app roles that an app the installer made may have for a choice since switched off, such as
+ * a module or the Agent 365 file. None for an app the user brought, which keeps what it has.
+ * @param {import('../config.js').InstallConfig} config
+ * @param {{ appRoles: { id: string, value: string }[] }} graphSp
+ */
+function retiredRoles(config, graphSp) {
+  if (config.app.existing) return [];
+  const retired = retiredPermissions(config);
+  return resolveAppRoles(graphSp, retired, retired).roles;
+}
+
+/** @param {{ value: string }[]} roles */
+const roleNames = (roles) => roles.map((r) => r.value).join(', ');
 
 /**
  * Creates or adopts the vault and makes sure the signed-in user can write secrets to it.
@@ -420,13 +435,14 @@ async function addAdminOwner(ctx, email) {
 /**
  * Creates or adopts the app registration and its service principal. On the Fabric route it also puts a
  * client secret in Key Vault; the PAX route keeps its secret in Credential Manager on the PC instead.
+ * An app the installer made loses the API permissions it no longer uses.
  * @param {Ctx} ctx
  */
 export async function ensureApp(ctx) {
   const { ui, config, api } = ctx;
   const app = config.app;
   const name = appName(config);
-  const { roles } = await graphRoles(ctx);
+  const { sp: graphSp, roles } = await graphRoles(ctx);
 
   if (app.appId) {
     const application = await api.graph.findApplication(app.appId);
@@ -439,6 +455,18 @@ export async function ensureApp(ctx) {
     }
     app.objectId = application.id;
     app.displayName = application.displayName;
+    // Before the additions, which then see what's left.
+    const declared = declaredGraphRoles(application);
+    const unused = retiredRoles(config, graphSp).filter((r) => declared.has(r.id));
+    if (unused.length) {
+      try {
+        await api.graph.removeRequiredAccess(application, unused);
+        ui.ok(`Took ${roleNames(unused)} off its API permissions, as ${PRODUCT.name} no longer uses ${unused.length > 1 ? 'them' : 'it'}`);
+      } catch (err) {
+        if (!isStatus(err, 403)) throw err;
+        ui.warn(`You can't edit ${application.displayName}'s API permissions, so it still lists ${roleNames(unused)}, which ${PRODUCT.name} no longer uses. An admin can remove ${unused.length > 1 ? 'them' : 'it'}.`);
+      }
+    }
     try {
       if (await api.graph.ensureRequiredAccess(application, roles)) ui.ok(`Added the ${PRODUCT.name} permissions to its API permissions`);
     } catch (err) {
@@ -699,7 +727,50 @@ export async function newSecret(ctx) {
 }
 
 /**
+ * Takes back admin consent for the Graph permissions in `retired` that the app still has. Without
+ * the rights to, or when Graph refuses, it says which remain and where an admin removes them.
+ * @param {Ctx} ctx
+ * @param {{ canConsent: boolean }} who
+ * @param {string} graphSpId
+ * @param {{ id: string, value: string }[]} retired
+ * @param {{ id: string, appRoleId: string }[]} assigned  The app's Graph app role assignments.
+ */
+async function revokeRetiredRoles(ctx, who, graphSpId, retired, assigned) {
+  const { ui, config, api } = ctx;
+  const byId = new Map(retired.map((r) => [r.id, r]));
+  const stale = assigned.filter((a) => byId.has(a.appRoleId));
+  /** @type {{ id: string, value: string }[]} */
+  const done = [];
+  /** @type {{ id: string, value: string }[]} */
+  const left = [];
+  for (const a of stale) {
+    const role = /** @type {{ id: string, value: string }} */ (byId.get(a.appRoleId));
+    if (!who.canConsent) {
+      left.push(role);
+      continue;
+    }
+    try {
+      await api.graph.revokeAppRole(graphSpId, a.id);
+      done.push(role);
+    } catch (err) {
+      if (!(err instanceof HttpError)) throw err;
+      if (err.status === 404) done.push(role);
+      else left.push(role);
+    }
+  }
+  if (done.length) ui.ok(`Took back admin consent for ${roleNames(done)}, as ${PRODUCT.name} no longer uses ${done.length > 1 ? 'them' : 'it'}`);
+  if (left.length) {
+    ui.warn(
+      `${config.app.displayName ?? 'The app'} still has admin consent for ${roleNames(left)}, which ${PRODUCT.name} no longer uses. ` +
+        `A Global Administrator or Privileged Role Administrator can revoke ${left.length > 1 ? 'them' : 'it'} on its API permissions page:`,
+    );
+    ui.info(apiPermissionsUrl(/** @type {string} */ (config.app.appId)));
+  }
+}
+
+/**
  * Grants the Graph application permissions, or hands the user a link for an admin.
+ * For an app the installer made, it also takes back the consent for permissions it no longer uses.
  * Returns true when every permission is consented.
  * @param {Ctx} ctx
  * @param {{ canConsent: boolean }} who
@@ -710,14 +781,18 @@ export async function ensureConsent(ctx, who) {
   const spId = /** @type {string} */ (app.servicePrincipalId);
   const appId = /** @type {string} */ (app.appId);
   const { sp: graphSp, roles } = await graphRoles(ctx);
+  const retired = retiredRoles(config, graphSp);
 
+  /** @type {{ id: string, appRoleId: string }[]} */
+  let assigned = [];
   const missing = async () => {
-    const assigned = await api.graph.appRoleAssignments(spId);
-    const have = new Set(assigned.filter((a) => a.resourceId === graphSp.id).map((a) => a.appRoleId));
+    assigned = (await api.graph.appRoleAssignments(spId)).filter((a) => a.resourceId === graphSp.id);
+    const have = new Set(assigned.map((a) => a.appRoleId));
     return roles.filter((r) => !have.has(r.id));
   };
 
   let todo = await missing();
+  await revokeRetiredRoles(ctx, who, graphSp.id, retired, assigned);
   if (!todo.length) {
     ui.ok(`Admin consent is in place (${roles.map((r) => r.value).join(', ')})`);
     return true;

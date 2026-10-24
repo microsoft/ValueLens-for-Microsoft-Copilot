@@ -8,7 +8,7 @@ import { emptyConfig, MODEL_NAME } from '../src/config.js';
 import { HttpError } from '../src/http.js';
 import { commandLine } from '../src/launch.js';
 import { PRODUCT } from '../src/product.js';
-import { foreignWorkspaceMessage } from '../src/steps/fabric.js';
+import { foreignWorkspaceMessage, freeName } from '../src/steps/fabric.js';
 import { isResumeLater } from '../src/steps/identity.js';
 import { modelSettingsUrl, REFRESH_POLL_MS } from '../src/steps/model.js';
 import { TASK_AT } from '../src/steps/pax/local.js';
@@ -20,6 +20,7 @@ import {
   desktopSteps,
   ensurePaxWorkspace,
   folderFileUrl,
+  forgetModel,
   historyState,
   loadPaxModel,
   paxEntry,
@@ -162,6 +163,7 @@ function fakePbi(fabric) {
     },
     refreshes: async (/** @type {string} */ ws, /** @type {string} */ id, /** @type {number} */ top) => {
       base.calls.push(`refreshes ${ws} ${id} ${top}`);
+      fail('refreshes');
       return structuredClone(polls.length ? polls.shift() : base.history);
     },
   };
@@ -223,12 +225,13 @@ function watchSelects(t, before) {
 
 /**
  * What the user publishes from Power BI Desktop: a model, and its report unless report is null.
+ * Both are named after the file.
  * @param {Setup} t
  * @param {{ dataset?: string, report?: string | null, name?: string }} [o]
  */
 function publishFromDesktop(t, { dataset = 'ds-desktop', report = 'rp-desktop', name = P.model } = {}) {
   t.pbi.datasets.push({ id: dataset, name });
-  if (report) t.pbi.reports.push({ id: report, name: P.report, datasetId: dataset });
+  if (report) t.pbi.reports.push({ id: report, name, datasetId: dataset });
 }
 
 // ---- What the route writes, and the parameters ----
@@ -589,8 +592,15 @@ test('pax publish: desktopSteps walks through publishing the filled file', () =>
     'If it shows the parameters, keep the values in them and select Load.',
     'When it asks how to connect to SharePoint, choose Microsoft account (or Organizational account), sign in with your work account, then select Connect.',
     `Once the data has loaded, save it as ${P.report}.pbix. Power BI names the report and its model after the file.`,
-    `Select Publish, choose the workspace "${WORKSPACE}", and select Replace if it asks.`,
+    `Select Publish and choose the workspace "${WORKSPACE}".`,
   ]);
+  const renamed = desktopSteps(file, WORKSPACE, `${P.report}_2`);
+  assert.equal(renamed[3], `Once the data has loaded, save it as ${P.report}_2.pbix. Power BI names the report and its model after the file.`);
+  assert.equal(renamed[4], `Select Publish and choose the workspace "${WORKSPACE}".`, 'nothing of that name to replace');
+  assert.equal(
+    desktopSteps(file, WORKSPACE, P.report, true)[4],
+    `Select Publish, choose the workspace "${WORKSPACE}", and select Replace when it asks. That updates this install's ${P.report}.`,
+  );
 });
 
 test('pax publish: credentialSteps walks through signing the model in to SharePoint', () => {
@@ -606,8 +616,8 @@ test('pax publish: credentialSteps walks through signing the model in to SharePo
 
 /** The install record's powerBi section, or an empty one. @param {Setup} t @returns {any} */
 const pbiOf = (t) => /** @type {any} */ (t.config).powerBi ?? {};
-/** @param {Setup} t */
-const laterText = (t) => `Publish ${t.pbit} from Power BI Desktop to "${WORKSPACE}", then run the installer again.`;
+/** @param {Setup} t @param {string} [name] */
+const laterText = (t, name = P.report) => `Publish ${t.pbit} from Power BI Desktop to "${WORKSPACE}" as ${name}, then run the installer again.`;
 
 test('pax publish: publishWithDesktop with --yes writes the filled file and stops until it is published', async () => {
   const t = setup({ yes: true });
@@ -704,6 +714,7 @@ test('pax publish: publishWithDesktop can keep the version that is there for now
   await publishWithDesktop(t.ctx, entry);
   assert.deepEqual(offered, [['check', 'keep', 'stop']]);
   printed(t, `    ${laterText(t)}\n`);
+  printed(t, desktopSteps(t.pbit, WORKSPACE, P.report, true)[4]);
   assert.equal(pbiOf(t).desktopPending, `desktop;${desktopHash(entry)}`);
   assert.equal(pbiOf(t).credentials, 'set');
   assert.equal(t.config.semanticModel.signature, `desktop;${desktopHash(old)}`);
@@ -788,6 +799,8 @@ test('pax publish: publishWithDesktop takes up the report published onto a model
   const err = await rejection(publishWithDesktop(t.ctx, entry));
   assert.ok(isResumeLater(err), 'a model without its report is not in place');
   assert.doesNotMatch(t.out(), /new version|Kept the version/);
+  desktopSteps(t.pbit, WORKSPACE, P.model, true).forEach((s, i) => printed(t, `      ${i + 1}. ${s}\n`));
+  assert.doesNotMatch(t.out(), /isn't from this install/, 'its own model keeps its name');
   // Desktop's Replace keeps the model, and adds the report.
   t.pbi.reports.push({ id: 'rp-desktop', name: P.report, datasetId: 'ds-9' });
   await publishWithDesktop(t.ctx, entry);
@@ -814,6 +827,124 @@ test('pax publish: publishWithDesktop prefers a model with its report to the rec
   assert.equal(sm.id, 'ds-desktop');
   assert.equal(sm.report.id, 'rp-desktop');
   assert.equal(sm.report.modelId, 'ds-desktop');
+});
+
+test("pax publish: publishWithDesktop never takes over a model it didn't publish, and gives its own a free name", async () => {
+  const t = setup({ yes: true });
+  const entry = paxEntry(t.config, PAX_TEMPLATE);
+  // Someone else's report of the same name, already in the workspace.
+  publishFromDesktop(t, { dataset: 'ds-other', report: 'rp-other' });
+  const name = freeName(P.report, [P.report]);
+  assert.notEqual(name, P.report);
+  const err = await rejection(publishWithDesktop(t.ctx, entry));
+  assert.ok(isResumeLater(err), String(err));
+  assert.equal(err.message, `Stopped until the report is published. ${laterText(t, name)}`);
+  printed(t, `    Publish the ${name} report from Power BI Desktop. It takes a few minutes.\n`);
+  printed(t, `"${P.report}" is already in the workspace and isn't from this install, so it's left as it is. ${PRODUCT.name}'s is called "${name}".`);
+  desktopSteps(t.pbit, WORKSPACE, name).forEach((s, i) => printed(t, `      ${i + 1}. ${s}\n`));
+  assert.doesNotMatch(t.out(), /select Replace/);
+  assert.equal(t.config.semanticModel.id, undefined, 'not taken over');
+  assert.equal(pbiOf(t).desktopName, name);
+
+  // Published under the name it was given, it's the install's.
+  publishFromDesktop(t, { name });
+  await publishWithDesktop(t.ctx, entry);
+  printed(t, `✓ Found the ${name} report you published from Power BI Desktop`);
+  printed(t, `✓ The ${name} report is in place`);
+  const sm = /** @type {any} */ (t.config.semanticModel);
+  assert.equal(sm.id, 'ds-desktop');
+  assert.equal(sm.name, name);
+  assert.deepEqual(sm.report, { id: 'rp-desktop', name, signature: 'desktop', modelId: 'ds-desktop' });
+  assert.equal(pbiOf(t).desktopName, undefined);
+
+  // A new version replaces the install's own model, under its name.
+  t.config.sharePoint = folderConfig(/** @type {any} */ (parseSharePointFolder(MOVED)));
+  await publishWithDesktop(t.ctx, paxEntry(t.config, PAX_TEMPLATE));
+  printed(t, desktopSteps(t.pbit, WORKSPACE, name, true)[4]);
+  printed(t, `! Kept the version of ${name} that's there. ${laterText(t, name)}`);
+  assert.equal(pbiOf(t).desktopName, name);
+});
+
+test('pax publish: publishWithDesktop finds a pending publish only by the name it gave', async () => {
+  // A record that waits for Desktop but has no name for it, from before it kept one.
+  const t = setup({ yes: true });
+  const entry = paxEntry(t.config, PAX_TEMPLATE);
+  Object.assign((/** @type {any} */ (t.config).powerBi ??= {}), { publishedBy: 'desktop', desktopPending: `desktop;${desktopHash(entry)}` });
+  publishFromDesktop(t);
+  const err = await rejection(publishWithDesktop(t.ctx, entry));
+  assert.ok(isResumeLater(err), 'a model of the usual name is not taken as published');
+  assert.doesNotMatch(t.out(), /Found the/);
+  assert.equal(t.config.semanticModel.id, undefined);
+  assert.equal(pbiOf(t).desktopName, freeName(P.report, [P.report]));
+});
+
+test('pax publish: publishWithDesktop forgets a recorded model that was deleted, and hands the template over again', async () => {
+  const t = setup({ yes: true });
+  const entry = paxEntry(t.config, PAX_TEMPLATE);
+  Object.assign(t.config.semanticModel, {
+    id: 'ds-old',
+    name: P.model,
+    signature: `desktop;${desktopHash(entry)}`,
+    bound: true,
+    report: { id: 'rp-old', name: P.report, signature: 'desktop', modelId: 'ds-old' },
+  });
+  Object.assign((/** @type {any} */ (t.config).powerBi ??= {}), { publishedBy: 'desktop', credentials: 'set', refreshAt: '06:00' });
+  const access = Object.assign((/** @type {any} */ (t.config).access ??= {}), { groupId: 'g-1', grantedModels: ['ds-old'], reportShared: true });
+  const err = await rejection(publishWithDesktop(t.ctx, entry));
+  assert.ok(isResumeLater(err), String(err));
+  printed(t, `! ${P.model} isn't in ${WORKSPACE} any more, so it's published again.`);
+  desktopSteps(t.pbit, WORKSPACE).forEach((s, i) => printed(t, `      ${i + 1}. ${s}\n`));
+  const sm = /** @type {any} */ (t.config.semanticModel);
+  assert.equal(sm.id, undefined);
+  assert.equal(sm.report, undefined);
+  assert.equal(sm.bound, false);
+  assert.equal(pbiOf(t).credentials, undefined, 'a new model needs signing in');
+  assert.equal(pbiOf(t).refreshAt, undefined, 'and scheduling');
+  assert.equal(pbiOf(t).desktopName, P.report);
+  assert.deepEqual(access.grantedModels, []);
+  assert.equal(access.reportShared, undefined);
+});
+
+test('pax publish: forgetModel forgets the model, its report and what was set up on them', () => {
+  const config = paxConfig();
+  Object.assign(config.semanticModel, {
+    id: 'ds-9',
+    name: P.model,
+    signature: 'desktop;x',
+    bound: true,
+    report: { id: 'rp-9', name: P.report, signature: 'desktop', modelId: 'ds-9' },
+    reload: { since: '2026-06-01T00:00:00.000Z' },
+  });
+  const pbi = ((/** @type {any} */ (config).powerBi = {
+    publishedBy: 'desktop',
+    credentials: 'set',
+    refreshAt: '06:00',
+    timeZone: 'UTC',
+    desktopPending: 'desktop;y',
+    desktopFile: 'x.pbit',
+    desktopName: P.report,
+  }));
+  const access = ((/** @type {any} */ (config).access = {
+    groupId: 'g-3',
+    grantedModels: ['ds-9', 'ds-x'],
+    reportShared: true,
+    retiredGroups: [
+      { groupId: 'g-1', datasets: ['ds-9'] },
+      { groupId: 'g-2', groupName: 'Old viewers', datasets: ['ds-9', 'ds-x'] },
+    ],
+  }));
+  forgetModel(config);
+  const sm = /** @type {any} */ (config.semanticModel);
+  assert.deepEqual(
+    { id: sm.id, name: sm.name, signature: sm.signature, bound: sm.bound, report: sm.report, reload: sm.reload },
+    { id: undefined, name: P.model, signature: undefined, bound: false, report: undefined, reload: undefined },
+  );
+  assert.deepEqual(pbi, { publishedBy: 'desktop', timeZone: 'UTC' }, 'still published from Desktop, in the same time zone');
+  assert.deepEqual(access, { groupId: 'g-3', grantedModels: ['ds-x'], retiredGroups: [{ groupId: 'g-2', groupName: 'Old viewers', datasets: ['ds-x'] }] });
+
+  sm.id = 'ds-x';
+  forgetModel(config);
+  assert.deepEqual(access, { groupId: 'g-3', grantedModels: [] }, 'no old groups left to take Build from');
 });
 
 // ---- publishPax ----
@@ -1436,6 +1567,65 @@ test('pax publish: a schedule it cannot read only warns, and anything but an HTT
   const err = new Error('socket hang up');
   u.pbi.failures.refreshSchedule = [err];
   await assert.rejects(resumePaxSchedule(u.ctx), (e) => e === err);
+});
+
+test('pax publish: a model deleted outside the installer is forgotten, with how to publish it again', async () => {
+  const gone = () => httpError(404, 'Not found');
+  /** @param {Setup} s @param {string} label */
+  const forgotten = (s, label) => {
+    assert.equal(s.config.semanticModel.id, undefined, label);
+    assert.equal(s.config.semanticModel.bound, false, label);
+    assert.equal(pbiOf(s).credentials, undefined, label);
+    assert.equal(pbiOf(s).refreshAt, undefined, label);
+    assert.ok(s.saves() >= 1, `${label}: saved`);
+    printed(s, `! ${P.model} isn't in the workspace any more. To publish it again, run: ${commandLine('update')}`);
+  };
+
+  const a = setup();
+  withModel(a).refreshAt = '06:00';
+  a.pbi.failures.refreshNow = [gone()];
+  assert.deepEqual(await refreshPaxModel(a.ctx), { ok: false, gone: true });
+  forgotten(a, 'starting a refresh');
+
+  const b = setup();
+  withModel(b).refreshAt = '06:00';
+  b.pbi.failures.refreshes = [gone()];
+  assert.deepEqual(await refreshPaxModel(b.ctx), { ok: false, gone: true });
+  assert.equal(callCount(b, 'refreshes '), 1, 'stops following the refresh');
+  forgotten(b, 'following a refresh');
+
+  const c = setup();
+  withModel(c).refreshAt = '06:00';
+  c.pbi.failures.setRefreshSchedule = [gone()];
+  assert.equal(await setPaxSchedule(c.ctx), false);
+  assert.doesNotMatch(c.out(), /wouldn't schedule/);
+  forgotten(c, 'scheduling');
+
+  const d = setup();
+  withModel(d).refreshAt = '06:00';
+  d.pbi.failures.refreshSchedule = [gone()];
+  assert.equal(await resumePaxSchedule(d.ctx), false);
+  assert.doesNotMatch(d.out(), /Couldn't read/);
+  forgotten(d, 'reading the schedule');
+
+  const e = setup({ answers: ['set'] });
+  withModel(e).refreshAt = '06:00';
+  e.pbi.failures.refreshNow = [gone()];
+  assert.deepEqual(await loadPaxModel(e.ctx), { ok: false, gone: true });
+  assert.deepEqual(e.pbi.calls, ['refreshNow ws-1 ds-9'], 'no schedule or query check');
+  assert.deepEqual(e.ui.asked, [], 'no sign-in');
+  forgotten(e, 'loading');
+
+  // Gone after a refresh that couldn't sign in, by the time it's signed in again.
+  const f = setup({ answers: ['set'] });
+  withModel(f);
+  f.pbi.polls.push([run('Failed', { serviceExceptionJson: 'Credentials are missing' })]);
+  f.pbi.failures.refreshNow = [/** @type {any} */ (undefined), gone()]; // the first refresh starts
+  assert.deepEqual(await loadPaxModel(f.ctx), { ok: false, gone: true });
+  assert.deepEqual(f.ui.asked, ['Signed it in?']);
+  assert.equal(callCount(f, 'setRefreshSchedule '), 0);
+  assert.equal(callCount(f, 'executeQueries '), 0);
+  forgotten(f, 'loading after a sign-in');
 });
 
 // ---- End to end ----

@@ -12,7 +12,7 @@ import { BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, chooseLoad, firstLoadEstimate
 import { DATA_CHECK_FILE } from '../src/transform/notebook.js';
 import { PIPELINE_CHANGE, PIPELINE_VERSION, REFRESH_ACTIVITY } from '../src/transform/pipeline.js';
 import { PRODUCT } from '../src/product.js';
-import { fakeCtx, fakeFabric, fakeGraph as fakeGraphApi, fakePowerBi, fakeUi } from './fakes.js';
+import { fakeCtx, fakeFabric, fakeGraph as fakeGraphApi, fakePowerBi, fakeUi, httpError } from './fakes.js';
 
 const defaultNotebooks = notebooksFor(emptyConfig().modules);
 
@@ -401,27 +401,39 @@ test('schedule: created, unchanged on re-run, updated when the time changes, ado
 
 /**
  * @param {string[]} have  App role IDs already assigned.
+ * @param {{ revoke?: (assignmentId: string) => void }} [o]  Runs before an assignment is removed, and can throw.
  */
-function fakeGraph(have) {
+function fakeGraph(have, o = {}) {
   /** @type {string[]} */
   const granted = [];
+  /** @type {string[]} App role IDs whose assignment was removed. */
+  const revoked = [];
   const graphSp = {
     id: 'graph-sp',
     appRoles: [
       { id: 'r-audit', value: 'AuditLogsQuery.Read.All' },
       { id: 'r-reports', value: 'Reports.Read.All' },
       { id: 'r-users', value: 'User.Read.All' },
+      { id: 'r-hunting', value: 'ThreatHunting.Read.All' },
+      { id: 'r-packages', value: 'CopilotPackages.Read.All' },
     ],
   };
   const api = {
     graphServicePrincipal: async () => graphSp,
-    appRoleAssignments: async () => [...have, ...granted].map((appRoleId) => ({ resourceId: 'graph-sp', appRoleId })),
+    appRoleAssignments: async () =>
+      [...have, ...granted].filter((appRoleId) => !revoked.includes(appRoleId)).map((appRoleId) => ({ id: `a-${appRoleId}`, resourceId: 'graph-sp', appRoleId })),
     /** @param {string} _r @param {string} _p @param {string} role */
     grantAppRole: async (_r, _p, role) => {
       granted.push(role);
     },
+    /** @param {string} resourceId @param {string} assignmentId */
+    revokeAppRole: async (resourceId, assignmentId) => {
+      assert.equal(resourceId, 'graph-sp');
+      o.revoke?.(assignmentId);
+      revoked.push(assignmentId.replace(/^a-/, ''));
+    },
   };
-  return { api, granted };
+  return { api, granted, revoked };
 }
 
 test('consent: an admin grants only what is missing', async () => {
@@ -459,6 +471,64 @@ test('consent: without admin rights the user gets a link, and can check again', 
 
   const skip = fakeCtx({ graph: fakeGraph([]).api, ui: fakeUi({ answers: ['skip'] }).ui });
   assert.equal(await ensureConsent(skip.ctx, { canConsent: false }), false);
+});
+
+test('consent: an app the installer made loses the consent for permissions it no longer uses', async () => {
+  // ThreatHunting.Read.All and CopilotPackages.Read.All are for modules the default install leaves out.
+  const used = ['r-audit', 'r-reports', 'r-users'];
+  const tookBack = (/** @type {string} */ names, /** @type {string} */ them) => `Took back admin consent for ${names}, as ${PRODUCT.name} no longer uses ${them}`;
+
+  const graph = fakeGraph([...used, 'r-hunting', 'r-packages']);
+  const ui = fakeUi();
+  const { ctx } = fakeCtx({ graph: graph.api, ui: ui.ui });
+  assert.equal(await ensureConsent(ctx, { canConsent: true }), true);
+  assert.deepEqual(graph.revoked, ['r-hunting', 'r-packages']);
+  assert.deepEqual(graph.granted, []);
+  assert.ok(ui.text().includes(tookBack('ThreatHunting.Read.All, CopilotPackages.Read.All', 'them')), ui.text());
+  assert.match(ui.text(), /Admin consent is in place/);
+  assert.doesNotMatch(ui.text(), /still has admin consent/);
+
+  // Missing roles are still granted in the same run.
+  const both = fakeGraph(['r-audit', 'r-hunting']);
+  const mixed = fakeUi();
+  assert.equal(await ensureConsent(fakeCtx({ graph: both.api, ui: mixed.ui }).ctx, { canConsent: true }), true);
+  assert.deepEqual(both.revoked, ['r-hunting']);
+  assert.deepEqual(both.granted, ['r-reports', 'r-users']);
+  assert.ok(mixed.text().includes(tookBack('ThreatHunting.Read.All', 'it')), mixed.text());
+
+  // An app the user brought keeps what it has.
+  const theirs = fakeGraph([...used, 'r-hunting']);
+  const brought = fakeCtx({ graph: theirs.api, ui: fakeUi().ui });
+  brought.config.app.existing = true;
+  assert.equal(await ensureConsent(brought.ctx, { canConsent: true }), true);
+  assert.deepEqual(theirs.revoked, []);
+
+  // Without the rights to, it says what's left and where an admin removes it.
+  const stays = fakeGraph([...used, 'r-hunting']);
+  const told = fakeUi();
+  assert.equal(await ensureConsent(fakeCtx({ graph: stays.api, ui: told.ui }).ctx, { canConsent: false }), true);
+  assert.deepEqual(stays.revoked, []);
+  assert.ok(told.text().includes(`The app still has admin consent for ThreatHunting.Read.All, which ${PRODUCT.name} no longer uses.`), told.text());
+  assert.match(told.text(), /CallAnAPI\/appId\/app-1/);
+
+  // An assignment already gone counts as taken back; another refusal is left with the link.
+  const gone = fakeGraph([...used, 'r-hunting'], { revoke: () => { throw httpError(404); } });
+  const goneUi = fakeUi();
+  assert.equal(await ensureConsent(fakeCtx({ graph: gone.api, ui: goneUi.ui }).ctx, { canConsent: true }), true);
+  assert.ok(goneUi.text().includes(tookBack('ThreatHunting.Read.All', 'it')), goneUi.text());
+  assert.doesNotMatch(goneUi.text(), /still has admin consent/);
+
+  const refused = fakeGraph([...used, 'r-hunting', 'r-packages'], { revoke: (id) => { if (id === 'a-r-hunting') throw httpError(403, 'Forbidden'); } });
+  const refusedUi = fakeUi();
+  assert.equal(await ensureConsent(fakeCtx({ graph: refused.api, ui: refusedUi.ui }).ctx, { canConsent: true }), true);
+  assert.deepEqual(refused.revoked, ['r-packages']);
+  assert.ok(refusedUi.text().includes(tookBack('CopilotPackages.Read.All', 'it')), refusedUi.text());
+  assert.ok(refusedUi.text().includes(`The app still has admin consent for ThreatHunting.Read.All, which ${PRODUCT.name} no longer uses.`), refusedUi.text());
+  assert.match(refusedUi.text(), /CallAnAPI\/appId\/app-1/);
+
+  // Anything that isn't Graph refusing is a bug, and stops the run.
+  const broken = fakeGraph([...used, 'r-hunting'], { revoke: () => { throw new TypeError('boom'); } });
+  await assert.rejects(ensureConsent(fakeCtx({ graph: broken.api, ui: fakeUi().ui }).ctx, { canConsent: true }), /boom/);
 });
 
 test('waitForJob polls until the job ends', async () => {

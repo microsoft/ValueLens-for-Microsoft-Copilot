@@ -4,7 +4,7 @@
  * report, and no Fabric, where a scheduled task on this PC runs PAX and writes to a SharePoint
  * folder that the report and the app read.
  */
-import { permissionsFor } from './catalog.js';
+import { MODULES, permissionsFor } from './catalog.js';
 import { PRODUCT } from './product.js';
 import { paxHostOf } from './steps/pax/local.js';
 
@@ -37,6 +37,18 @@ export const isPax = (config) => config.target === 'pax';
 export function requiredPermissions(config) {
   if (!isPax(config)) return permissionsFor(config.modules, config.dataSources);
   return [...new Set([...PAX_PERMISSIONS, ...(config.pax?.agent365 ? PAX_AGENT365_PERMISSIONS : [])])].sort();
+}
+
+/**
+ * Graph application permissions the installer may have given the app on the record's route for a
+ * choice since switched off, such as a module or the Agent 365 file, sorted.
+ * @param {InstallConfig} config
+ * @returns {string[]}
+ */
+export function retiredPermissions(config) {
+  const need = new Set(requiredPermissions(config));
+  const any = isPax(config) ? [...PAX_PERMISSIONS, ...PAX_AGENT365_PERMISSIONS] : Object.values(MODULES).flatMap((m) => m.permissions);
+  return [...new Set(any)].filter((p) => !need.has(p)).sort();
 }
 
 /**

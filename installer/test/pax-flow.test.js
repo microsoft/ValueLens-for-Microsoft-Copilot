@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
+import { declaredGraphRoles } from '../src/clients/graph.js';
 import { commandLine } from '../src/launch.js';
 import { THE_APP } from '../src/managed-app/flow.js';
 import { PRODUCT } from '../src/product.js';
@@ -101,22 +102,34 @@ function graphFake() {
     oauth2PermissionScopes: [{ id: 's-user-read', value: 'User.Read' }],
   };
   const roleName = (/** @type {string} */ id) => graphSp.appRoles.find((r) => r.id === id)?.value ?? id;
-  /** @type {{ principalId: string, resourceId: string, appRoleId: string }[]} */
+  /** @type {{ id: string, principalId: string, resourceId: string, appRoleId: string }[]} */
   const assigned = [];
   /** @type {any[]} */
   const perms = [];
   /** @type {{ id: string, displayName: string, securityEnabled: boolean }[]} */
   const groups = [];
   let p = 0;
+  let n = 0;
   const byAppId = g.servicePrincipalByAppId;
+  const createApplication = g.createApplication;
   const assign = (/** @type {string} */ principalId, /** @type {string} */ resourceId, /** @type {string} */ appRoleId) => {
-    assigned.push({ principalId, resourceId, appRoleId });
-    return { id: `assignment-${assigned.length}`, principalId, resourceId, appRoleId };
+    const assignment = { id: `assignment-${++n}`, principalId, resourceId, appRoleId };
+    assigned.push(assignment);
+    return { ...assignment };
+  };
+  /** Sets the Graph app roles an app lists on its API permissions page, as Graph keeps them. @param {any} application @param {string[]} ids */
+  const declare = (application, ids) => {
+    application.requiredResourceAccess = ids.length ? [{ resourceAppId: GRAPH_APP_ID, resourceAccess: ids.map((id) => ({ id, type: 'Role' })) }] : [];
   };
   /** @type {Record<string, (...args: any[]) => any>} */
   const more = {
     graphServicePrincipal: async () => graphSp,
     servicePrincipalByAppId: async (appId) => (appId === GRAPH_APP_ID ? graphSp : byAppId(appId)),
+    createApplication: async (name, appRoles) => {
+      const application = await createApplication(name);
+      declare(application, appRoles.map((/** @type {{ id: string }} */ r) => r.id));
+      return application;
+    },
     grantAppRole: async (resourceId, principalId, appRoleId) => {
       calls.push(`grantAppRole ${roleName(appRoleId)}`);
       fail('grantAppRole');
@@ -126,10 +139,31 @@ function graphFake() {
       calls.push(`grantAppRole ${roleName(appRoleId)}`);
       return assign(principalId, resourceId, appRoleId);
     },
+    revokeAppRole: async (resourceId, assignmentId) => {
+      const at = assigned.findIndex((a) => a.id === assignmentId && a.resourceId === resourceId);
+      calls.push(`revokeAppRole ${at < 0 ? assignmentId : roleName(assigned[at].appRoleId)}`);
+      fail('revokeAppRole');
+      if (at < 0) throw httpError(404);
+      assigned.splice(at, 1);
+    },
     appRoleAssignments: async (spId) => assigned.filter((a) => a.principalId === spId).map((a) => ({ ...a })),
     appRoleAssignedTo: async (resourceId) => assigned.filter((a) => a.resourceId === resourceId).map((a) => ({ ...a })),
     usersCanRegisterApps: async () => true,
-    ensureRequiredAccess: async () => false,
+    ensureRequiredAccess: async (application, appRoles) => {
+      const have = declaredGraphRoles(application);
+      const add = appRoles.filter((/** @type {{ id: string }} */ r) => !have.has(r.id));
+      if (!add.length) return false;
+      calls.push(`ensureRequiredAccess ${add.map((/** @type {{ id: string }} */ r) => roleName(r.id)).join(', ')}`);
+      declare(application, [...have, ...add.map((/** @type {{ id: string }} */ r) => r.id)]);
+      return true;
+    },
+    removeRequiredAccess: async (application, appRoles) => {
+      calls.push(`removeRequiredAccess ${appRoles.map((/** @type {{ id: string }} */ r) => roleName(r.id)).join(', ')}`);
+      fail('removeRequiredAccess');
+      const drop = new Set(appRoles.map((/** @type {{ id: string }} */ r) => r.id));
+      declare(application, [...declaredGraphRoles(application)].filter((id) => !drop.has(id)));
+      return true;
+    },
     addOwner: async (appObjectId, userId) => {
       calls.push(`addOwner ${appObjectId} ${userId}`);
     },
@@ -647,6 +681,81 @@ test('pax flow: running the install again repairs it without making anything twi
   assert.ok(text.includes(`is up to date: ${APP_URL}`), text);
   assert.equal(config.managedApp.appId, APP_ID);
   assert.ok(text.includes(`${PRODUCT.name} is set up`), text);
+});
+
+test('pax flow: switching the Agent 365 file off takes back its permissions and their consent', { timeout: 10_000 }, async () => {
+  const s = await installed();
+  const ctx = /** @type {any} */ (s.ctx);
+  const { graph, config } = s;
+  const AGENT365 = 'Application.Read.All, CopilotPackages.Read.All';
+  const name = (/** @type {string} */ id) => graph.graphSp.appRoles.find((r) => r.id === id)?.value ?? id;
+  const consented = () => graph.assigned.filter((a) => a.principalId === config.app.servicePrincipalId).map((a) => name(a.appRoleId)).sort();
+  const declared = async () => [...declaredGraphRoles(await graph.api.findApplication(config.app.appId))].map(name).sort();
+  const base = ['AuditLogsQuery.Read.All', 'Organization.Read.All', 'Sites.Selected', 'User.Read.All'];
+  const all = [...base, 'Application.Read.All', 'CopilotPackages.Read.All'].sort();
+  assert.deepEqual(await declared(), base);
+  assert.deepEqual(consented(), base);
+
+  /** Runs the install again, as a new run of the installer would. @param {boolean} agent365 */
+  const rerun = async (agent365) => {
+    s.ui.out.length = 0;
+    s.ui.asked.length = 0;
+    graph.calls.length = 0;
+    delete ctx.runFirstLoad;
+    delete ctx.graphRoles;
+    config.pax.agent365 = agent365;
+    const pre = await paxPreflight(s.ctx);
+    await paxPlan(s.ctx, pre);
+    const ok = await paxInstall(s.ctx, pre);
+    const text = plain(s.ui.text());
+    assert.equal(ok, true, text);
+    return text;
+  };
+
+  let text = await rerun(true);
+  assert.ok(graph.calls.includes(`ensureRequiredAccess ${AGENT365}`), graph.calls.join('\n'));
+  assert.ok(graph.calls.includes('grantAppRole Application.Read.All') && graph.calls.includes('grantAppRole CopilotPackages.Read.All'), graph.calls.join('\n'));
+  assert.ok(!graph.calls.some((c) => c.startsWith('removeRequiredAccess') || c.startsWith('revokeAppRole')), graph.calls.join('\n'));
+  assert.deepEqual(await declared(), all);
+  assert.deepEqual(consented(), all);
+
+  // Off, signed in as someone who can't consent: the API permissions come off, and the consent stays with a link.
+  graph.directoryRoles.length = 0;
+  text = await rerun(false);
+  assert.ok(graph.calls.includes(`removeRequiredAccess ${AGENT365}`), graph.calls.join('\n'));
+  assert.ok(text.includes(`Took ${AGENT365} off its API permissions, as ${PRODUCT.name} no longer uses them`), text);
+  assert.ok(!graph.calls.some((c) => c.startsWith('revokeAppRole')), graph.calls.join('\n'));
+  assert.ok(text.includes(`${PRODUCT.pax.app} still has admin consent for ${AGENT365}, which ${PRODUCT.name} no longer uses.`), text);
+  assert.ok(text.includes(`CallAnAPI/appId/${config.app.appId}`), text);
+  assert.deepEqual(await declared(), base);
+  assert.deepEqual(consented(), all);
+
+  // Again, as someone who can: the consent is taken back, and nothing else changes.
+  graph.directoryRoles.push(GLOBAL_ADMIN);
+  text = await rerun(false);
+  assert.ok(!graph.calls.some((c) => c.startsWith('removeRequiredAccess') || c.startsWith('ensureRequiredAccess')), graph.calls.join('\n'));
+  assert.deepEqual(graph.calls.filter((c) => c.startsWith('revokeAppRole')), ['revokeAppRole Application.Read.All', 'revokeAppRole CopilotPackages.Read.All']);
+  assert.ok(text.includes(`Took back admin consent for ${AGENT365}, as ${PRODUCT.name} no longer uses them`), text);
+  assert.ok(!text.includes('still has admin consent'), text);
+  assert.deepEqual(await declared(), base);
+  assert.deepEqual(consented(), base);
+  assert.ok(!graph.calls.some((c) => c.startsWith('grantAppRole')), 'the roles it uses keep their consent');
+
+  // A run with nothing to take back says nothing about it.
+  text = await rerun(false);
+  assert.ok(!graph.calls.some((c) => c.startsWith('revokeAppRole') || c.startsWith('removeRequiredAccess')), graph.calls.join('\n'));
+  assert.ok(!text.includes('no longer uses'), text);
+
+  // On again, then off by someone who can consent but can't edit the app: the consent still goes.
+  await rerun(true);
+  assert.deepEqual(await declared(), all);
+  assert.deepEqual(consented(), all);
+  graph.failures.removeRequiredAccess = [httpError(403, 'Forbidden')];
+  text = await rerun(false);
+  assert.ok(text.includes(`You can't edit ${PRODUCT.pax.app}'s API permissions, so it still lists ${AGENT365}, which ${PRODUCT.name} no longer uses. An admin can remove them.`), text);
+  assert.ok(text.includes(`Took back admin consent for ${AGENT365}`), text);
+  assert.deepEqual(await declared(), all);
+  assert.deepEqual(consented(), base);
 });
 
 test('pax flow: sharing the report later leaves a card, and the next run asks again', { timeout: 10_000 }, async () => {

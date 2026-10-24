@@ -202,7 +202,7 @@ function desktopPublishStep(config) {
     who: 'You',
     link: DESKTOP_URL,
     linkText: 'Get Power BI Desktop',
-    steps: [...desktopSteps(pbi.desktopFile, workspace), 'Run the installer again. It finds the report you published and carries on.'],
+    steps: [...desktopSteps(pbi.desktopFile, workspace, pbi.desktopName, !!config.semanticModel?.id), 'Run the installer again. It finds the report you published and carries on.'],
   };
 }
 
