@@ -87,7 +87,8 @@ blocks either, use another route in the table above.
      the first load has started, you can close the page: the run carries on in Fabric.
    - **No Fabric: PAX + SharePoint.** The first load runs on this PC, in the background, straight
      after setup. It can take hours on a large tenant. Leave the PC on, and stay signed in, until
-     it finishes.
+     it finishes. A load too long for one run carries on in the next day's run, from the last week
+     it read. See [The daily refresh](../installer/README.md#the-daily-refresh).
 7. Read the Done page. See [Check it worked](#check-it-worked).
 
 **The install record.** The installer keeps your answers in `Documents\ValueLens`, in an install

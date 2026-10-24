@@ -51,15 +51,29 @@ a second route that needs no Fabric.
   role, because workspace viewers can read the notebooks and any secret written into them. The
   installer asks once to share the report with the group. "Later" leaves a card on the Done page,
   and Repair asks again.
+- **Long loads on the PAX route.** The task reads history a week at a time, oldest first, and saves
+  its progress after each week. It stops before the task's 12-hour limit, and the next run carries
+  on. A file copied down from SharePoint is used only when its size matches SharePoint's. PAX
+  1.11.15 can exit 0 when its rollup step fails, so the run reads PAX's log too, and fails when the
+  rollup failed or PAX didn't write a file.
+- **The Power BI model.** When Power BI turns the model's refresh schedule off, the installer turns
+  it back on after the next refresh it waits for works. The installer never replaces or deletes a
+  model or report it didn't publish: its own get a free name, such as `ValueLens_2`. A model
+  deleted in Power BI is reported and forgotten, and **Update** publishes it again.
+- **Taking access back.** Turning a choice off takes the Graph permissions it needed off an app
+  registration the installer created, and takes back their consent when the user can. Choosing
+  another viewer group takes away the old group's Build on the model.
 - **Also:** repair and uninstall, a browser page (`--ui`) as well as the terminal, an admin pack
   (`valuelens-admin-pack.md`) for the grants that need an admin, and a Windows exe,
   `ValueLensInstaller.exe`, with Node, the app and the managed apps CLI inside. The
   [exe workflow](.github/workflows/valuelens-installer-exe.yml) builds it. The install record is
   `valuelens-setup.json`, and the installer leaves Analytics Hub records and workspaces alone.
 - **Supporting changes.** The Fabric notebooks now match the Analytics Hub ones the installer
-  deploys. `Run-PAX-AIBV.ps1` gains `-PaxSha256`, `-AppendUserInfo` and `-SkipVersionCheck`, and its
-  append runs work on PAX 1.11.15. `Upload-Rollups-SharePoint.ps1` gains `-File` and `-RemoteName`.
-  A contract test checks that the notebooks write every Lakehouse column the Fabric template reads.
+  deploys. `Run-PAX-AIBV.ps1` gains `-PaxSha256`, `-AppendUserInfo`, `-SkipVersionCheck`,
+  `-StartDate` and `-EndDate`. Its append runs work on PAX 1.11.15, and a run whose rollup step
+  failed now fails, even when PAX exits 0. `Upload-Rollups-SharePoint.ps1` gains `-File` and
+  `-RemoteName`. A contract test checks that the notebooks write every Lakehouse column the Fabric
+  template reads.
 
 `1. Fabric/installer` stays as it is for now. A follow-up removes it and points its links here.
 Nothing is released yet. The first tag will be `valuelens-installer-v0.1.0`.

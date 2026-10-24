@@ -306,6 +306,26 @@ separately.
   managed apps. Viewers also need read access to the SharePoint folder. The installer doesn't
   give folder access.
 
+### Taking access back
+
+When you turn a choice off, or choose another viewer group, the installer takes back what it
+gave for it:
+
+- **Graph permissions.** When a choice that needed a Microsoft Graph permission is turned off,
+  such as a data source on the Fabric route or the Agent 365 file on the PAX route, the installer
+  takes the permission off the app registration, if the installer created it. Taking back the
+  admin consent needs a Global Administrator or Privileged Role Administrator, as granting it
+  does. Without one of those roles, the installer names the permissions that keep their consent
+  and links the app's API permissions page for an admin. An app registration you brought keeps
+  what it has.
+- **The old viewer group.** The installer takes away the old group's permissions on the semantic
+  model through the Power BI API, where it gave the group Build. Like giving Build, that needs
+  Admin or Member of the workspace. It doesn't change workspace roles, so it can't take away
+  access a workspace role gives. The app stays shared with the old group.
+- **The SharePoint site.** If you move the folder to another site, the installer takes back the
+  app's access to the old site. That needs a SharePoint Administrator or Global Administrator, as
+  giving it does. If you aren't one, the Done page has the commands for one.
+
 ### If you can't register apps
 
 The installer writes an admin pack, `valuelens-admin-pack.md`, for someone who can register apps

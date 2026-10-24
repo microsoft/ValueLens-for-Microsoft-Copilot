@@ -42,6 +42,7 @@ reference.
     -ClientId   <client-id> `
     [-ClientSecret <secret>] `
     [-Days 7] `
+    [-StartDate <yyyy-MM-dd> -EndDate <yyyy-MM-dd>] `
     [-WorkRoot .] `
     [-PaxReleaseTag latest] `
     [-PaxSha256 <sha256>] `
@@ -78,6 +79,16 @@ It reads that release's `-Dashboard` values without running it and passes `Value
 and later) or `AIBV` (v1.11.5 to v1.11.14), which build the same rollup. A release before v1.11.5
 stops with an error. The manifest records the value as `pax_dashboard`.
 Defaults are `-Auth AppRegistration`, `-Rollup`, and `-IncludeUserInfo`.
+
+**A date range** — `-StartDate` and `-EndDate`, both as `yyyy-MM-dd`, instead of `-Days`. PAX reads
+each date as midnight UTC, and reads up to, but not including, `-EndDate`. So windows that share a
+date, such as `2026-09-01` to `2026-09-08` and then `2026-09-08` to `2026-09-15`, meet with no gap
+and no overlap. Pass both or neither. The installer's refresh uses them to read a long history a
+week at a time.
+
+**A failed rollup fails the run.** PAX 1.11.15 can exit 0 when its rollup step fails. So the script
+also reads the logs PAX wrote this run, and stops with an error that names PAX's log if they show
+the rollup failed. Without `-AppendFile`, it also stops if PAX wrote no new rollup file this run.
 
 **Seed once, then append** — `-AppendFile` and `-AppendUserInfo`: the Purview interactions data is a
 growing time-series, so run the **first** extract as a **back-fill with no `-AppendFile`** (e.g.

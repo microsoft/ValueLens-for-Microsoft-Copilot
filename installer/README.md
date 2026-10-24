@@ -186,9 +186,13 @@ Each run:
 
 1. Takes a lock, so only one run works at a time.
 2. Reads the client secret from Credential Manager.
-3. If this PC has no files yet, copies them from the SharePoint folder.
-4. Runs PAX in its own PowerShell process. PAX is pinned to release `purview-v1.11.15`, and the
-   script's SHA-256 is checked before it runs.
+3. If this PC has no files yet, copies them from the SharePoint folder. Each one downloads under
+   a temporary name, and is used only if its size matches SharePoint's, so a broken download
+   can't become the history the run adds to and uploads.
+4. Runs PAX in its own PowerShell process, for up to a week of activity at a time. PAX is pinned
+   to release `purview-v1.11.15`, and the script's SHA-256 is checked before it runs. PAX
+   1.11.15 can end without an error when its rollup step fails, so the run also reads PAX's log.
+   It fails if the log shows the rollup failed, or if PAX found activity but didn't write a file.
 5. Uploads the files to the SharePoint folder.
 6. Writes `state.json` and a log.
 
@@ -203,7 +207,15 @@ Each run:
 | Windows Credential Manager, `PAX-ValueLens-<tenant ID>` | The client secret. It lasts 12 months |
 
 The first load runs straight after setup and pulls 30 days of audit history by default. It can
-take hours on a large tenant. Leave the PC on, and stay signed in, until it finishes.
+take hours on a large tenant. Leave the PC on, and stay signed in, until it finishes. It reads
+the history a week at a time, oldest first, and saves its progress after each week:
+
+- When the next week might take the run past 10 hours, the run uploads what it has and stops,
+  inside the task's 12-hour limit. The next run carries on from there.
+- If a run stops part way, for example because the PC was turned off, the next run carries on
+  from the last week it finished. If Task Scheduler stopped it inside its first week, the next
+  run reads half as many days at a time.
+- **Check status** shows how far a load of more than a week has got.
 
 #### The SharePoint folder
 
@@ -238,12 +250,17 @@ Done page has **Ask for the app's access to the SharePoint site**, with a messag
   2. Keep the parameters and select **Load**.
   3. When it asks how to connect to SharePoint, choose **Microsoft account** (or
      **Organizational account**), sign in with your work account and select **Connect**.
-  4. Save it as `ValueLens.pbix`.
-  5. Select **Publish**, choose the workspace, and select **Replace** if it asks.
+  4. Save it as `ValueLens.pbix`, or the name the steps give. Power BI names the report and its
+     model after the file.
+  5. Select **Publish** and choose the workspace. When the steps say so, select **Replace**: that
+     updates this install's own report.
 
   Then choose **I've published it**, **Keep the version that's there for now** or
   **Stop and resume later**. Once you've used Desktop, later updates go through Desktop too. If
   you stop, the Done page has **Publish the report from Power BI Desktop**.
+
+  Desktop never replaces a model the installer didn't publish. If the workspace already has a
+  `ValueLens` that isn't this install's, the steps give a free name, such as `ValueLens_2`.
 
 **Sign the model in to SharePoint.** Once, after publishing, the model needs your sign-in to
 read the folder. The installer shows the steps: in the workspace, open the model's settings, then
@@ -255,6 +272,11 @@ then **Sign in**. Do the same for each source. If a site fails the test, select
 **Refresh schedule.** Once the model is signed in, the installer schedules its refresh each day
 4 and 10 hours after the task, rounded up to the half hour: 06:00 and 12:00 for a 02:00 task, in
 this PC's time zone. Power BI emails if a refresh fails. Power BI Pro allows 8 refreshes a day.
+
+Power BI turns the schedule off after four failed refreshes in a row or an error that needs a
+fix, such as an expired sign-in, and pauses it when no one has opened the report for two months.
+**Check status** says when it's off. When the installer next refreshes the model, waits for it,
+and the refresh works, it turns the schedule back on. **Refresh the model** (`refresh`) does that.
 
 ### The app
 
@@ -311,6 +333,12 @@ owner.
   **Share the report with ValueLens Viewers** on the Done page, and **Repair or change** asks
   again.
 - **The app.** On the PAX route, the app is shared with the group too.
+- **Changing the group.** If you choose another group, in **Manage access** or
+  **Repair or change**, the installer takes away the old group's permissions on the model, where
+  the installer gave it Build. If Power BI refuses, the installer says so and tries again next
+  time. It doesn't change workspace roles. On the PAX route, the app stays shared with the old
+  group: if its members shouldn't open it, stop sharing it at
+  [managedapps.cloud.microsoft](https://managedapps.cloud.microsoft/).
 
 To give someone access, add them to the group: choose **Manage access** (`access`), or use
 [My Groups](https://myaccount.microsoft.com/groups). They need no workspace role. Unless the
@@ -351,6 +379,10 @@ client secret, the SharePoint folder and the model's last refresh. **Run now** (
 refresh now. Each run's log is in `%LOCALAPPDATA%\ValueLens\pax\logs\`. If the first refresh
 fails, the Done page has **Fix the first refresh**.
 
+If the model was deleted in Power BI, **Check status** says so. So do **Refresh the model** and
+the other commands that use the model, and the installer then forgets it. **Update** (`update`)
+publishes it again. Then sign it in to SharePoint and share the report, as the first time.
+
 ## A large tenant
 
 - **Fabric.** The advanced settings ask **How many people are in the tenant?** **More than
@@ -363,7 +395,8 @@ fails, the Done page has **Fix the first refresh**.
 ### Load more audit history
 
 `run --backfill-days <n>` reloads `n` days of audit history, 1 to 180. On the Fabric route it
-rebuilds the curated table. On the PAX route it adds the days to the SharePoint folder's files.
+rebuilds the curated table. On the PAX route it adds the days to the SharePoint folder's files, a
+week at a time like the first load. If it stops part way, the scheduled runs read the rest.
 
 ## Already set up by hand
 
@@ -374,7 +407,8 @@ rebuilds the curated table. On the PAX route it adds the days to the SharePoint 
   names, so a hand set-up from [4. SharePoint](../4.%20SharePoint/README.md) keeps running. If
   both write to the same SharePoint folder, the installer's refresh won't overwrite files it
   didn't write: it sets its own copy aside (see [The SharePoint folder](#the-sharepoint-folder)).
-  Give it its own folder.
+  Give it its own folder. In the Power BI workspace, the installer never replaces or deletes a
+  model or report it didn't publish: its own get the next free name.
 - **Analytics Hub.** The installer won't use a workspace that holds an Analytics Hub install, or
   an Analytics Hub install record (`valuelens-install.json`). Manage those with the
   [Analytics Hub installer](https://github.com/microsoft/AnalyticsHub-Dashboard).
@@ -399,6 +433,13 @@ and the app.
 (`install`). It goes through the set-up again from the install record and puts back what's
 missing. It also asks again about what you put off, such as sharing the report, Key Vault and the
 app.
+
+**Turning something off.** If you turn off a choice that needed a Microsoft Graph permission,
+such as a data source on the Fabric route or the Agent 365 file on the PAX route,
+**Repair or change** takes the permission off the app registration, if the installer created it.
+If you're a Global Administrator or Privileged Role Administrator, it also takes back the admin
+consent. Otherwise it names the permissions that keep their consent, with a link to the app's API
+permissions page for an admin. An app registration you brought keeps what it has.
 
 **The install record.** The installer keeps your answers in `valuelens-setup.json`, in
 `Documents\ValueLens` when you start it with the exe or the PowerShell command. It holds no
@@ -536,6 +577,11 @@ installed.
   is taken, choose another, or ask its admin to add you.
 - **Power BI wouldn't schedule the model's refresh.** It usually means the model isn't signed in
   to SharePoint. Sign it in, then run the installer again.
+- **The model's daily refresh is off.** Power BI turned it off. See [The report](#the-report).
+- **The model isn't in the workspace any more.** It was deleted in Power BI. Run `update` to
+  publish it again.
+- **The first load is taking more than a day.** It carries on over several runs. See
+  [The daily refresh](#the-daily-refresh).
 - **The app wasn't deployed.** See [The app](#the-app).
 - **Something else.** Run the command again with `--verbose` to print each API call, and
   [open an issue](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues).
