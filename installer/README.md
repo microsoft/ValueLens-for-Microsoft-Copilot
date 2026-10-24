@@ -401,7 +401,8 @@ publishes it again. Then sign it in to SharePoint and share the report, as the f
 
 ### Load more audit history
 
-`run --backfill-days <n>` reloads `n` days of audit history, 1 to 180. On the Fabric route it
+`run --backfill-days <n>` reloads `n` days of audit history, 1 to 180, and keeps older history.
+On the Fabric route it replaces the parsed audit rows from the first record it reads onwards, then
 rebuilds the curated table. On the PAX route it adds the days to the SharePoint folder's files, a
 week at a time like the first load. If it stops part way, the scheduled runs read the rest.
 
