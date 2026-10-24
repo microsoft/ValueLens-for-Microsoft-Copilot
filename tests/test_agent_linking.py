@@ -89,7 +89,7 @@ class ExcludeReasonTests(unittest.TestCase):
             with self.subTest(host=host, prompts=prompts, agent=agent):
                 self.assertEqual(expected, actual)
 
-    def test_processor_drops_every_reason_by_default_and_purges_merged_rows(self):
+    def test_processor_drops_every_reason_by_default_and_rebuilds_when_the_list_changes(self):
         code = cells(PROCESSOR)
         ns = {}
         exec(compile(code[1], "processor:cell1", "exec"), ns)
@@ -98,8 +98,9 @@ class ExcludeReasonTests(unittest.TestCase):
         self.assertEqual(reasons, set(ns["DROP_EXCLUDE_REASONS"]))
         self.assertIn('F.expr(EXCLUDE_REASON_SQL)', code[4])
         self.assertIn("isin(*DROP_EXCLUDE_REASONS)", code[4])
-        self.assertIn("isin(*DROP_EXCLUDE_REASONS)", code[15])
-        self.assertIn('_sql.replace("Prompts_Available", "\'TRUE\'")', code[15])
+        # Rows written before a reason was added are removed by the full rebuild that a
+        # change to the list triggers (it is part of the processor settings fingerprint).
+        self.assertIn('"drop_exclude_reasons": sorted(DROP_EXCLUDE_REASONS or [])', code[3])
 
 
 class IngesterRuntimeRecordTests(unittest.TestCase):

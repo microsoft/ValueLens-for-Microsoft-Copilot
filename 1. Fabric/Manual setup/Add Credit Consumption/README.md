@@ -40,9 +40,10 @@ stay empty.
 The [installer](../../installer/README.md#credit-consumption) does this for you when you set the
 **Copilot Cowork credits** card to **Connected (Dataflow)**. By hand:
 
-1. Viva Insights → **Analysis** → build a query with the Copilot credit metrics → turn on
-   **Auto-refresh** → **Analysis results** → **link icon** → copy the **Partition** and **Query**
-   identifiers. You need the **Insights Analyst** role. The partition ID is usually your tenant ID.
+1. Viva Insights → **Create analysis** → **Create custom query** → **Consumption query** → turn on
+   **Auto-refresh** → **Run** → **Analysis results** → **link icon** → copy the **Partition** and
+   **Query** identifiers. You need the **Insights Analyst** role. The partition ID is usually your
+   tenant ID.
 2. Fabric workspace → **New** → **Dataflow Gen2** → **Get data** → **Viva Insights**. Paste both
    identifiers and leave *Query Name* blank. Under **Advanced options** set **Schema Type = Pivoted** and
    **Data Granularity = Row-level data**.

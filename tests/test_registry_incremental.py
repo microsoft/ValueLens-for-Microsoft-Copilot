@@ -23,13 +23,13 @@ def detail_helpers():
         6,
         functions=(
             "_package_id", "_list_modified", "_parse_utc", "_iso_utc",
-            "_select_detail_targets", "_keep_list_modified", "_merge_fresh", "_merge_cached",
+            "_select_detail_targets", "_refresh_slot", "_keep_list_modified", "_merge_fresh", "_merge_cached",
             "_fetch_details", "_assemble_details", "_cache_from_rows", "_cache_to_rows",
             "_fresh_cache_entry", "_fmt_duration", "_progress_line", "_failure_reason",
             "_failure_census", "_http_status",
         ),
         import_names=("_json", "ThreadPoolExecutor", "as_completed", "datetime", "timedelta", "timezone",
-                      "_monotonic"),
+                      "_monotonic", "_hashlib"),
     )
     return ns
 
@@ -206,6 +206,94 @@ class DetailSelectionTests(unittest.TestCase):
     def test_list_item_without_an_id_fails(self):
         with self.assertRaisesRegex(ValueError, "missing id"):
             self.ns["_select_detail_targets"]([{"displayName": "x"}], {}, NOW)
+
+
+class StaggeredRefreshTests(unittest.TestCase):
+    """A large tenant's weekly refresh of every agent outgrew the load's time limit, so each
+    agent gets its own day of the week and a run refreshes about a seventh of them."""
+
+    STAMP = "2026-09-01T00:00:00Z"
+
+    def setUp(self):
+        self.ns = detail_helpers()
+        self.select = self.ns["_select_detail_targets"]
+        self.slot = self.ns["_refresh_slot"]
+        self.packages = [{"id": f"agent-{i}", "lastModifiedDateTime": self.STAMP} for i in range(700)]
+
+    def cache(self, as_of):
+        iso = as_of.strftime("%Y-%m-%dT%H:%M:%SZ")
+        return {p["id"]: {"detail": {}, "lastModifiedDateTime": self.STAMP, "detailAsOf": iso}
+                for p in self.packages}
+
+    def test_slots_are_stable_and_spread_over_the_week(self):
+        self.assertEqual(self.slot("agent-1", 7), self.slot("agent-1", 7))
+        counts = [0] * 7
+        for p in self.packages:
+            counts[self.slot(p["id"], 7)] += 1
+        self.assertTrue(all(60 <= n <= 140 for n in counts), counts)
+        self.assertEqual(self.slot("anything", 1), 0)
+
+    def test_only_agents_on_todays_slot_refresh_until_their_detail_is_a_week_old(self):
+        today = NOW.date().toordinal() % 7
+        targets = self.select(self.packages, self.cache(NOW - timedelta(days=2)), NOW, "incremental", 7)
+        self.assertTrue(0 < len(targets) < 200, len(targets))
+        self.assertTrue(all(self.slot(pid, 7) == today for pid in targets))
+        self.assertEqual(set(targets.values()), {"scheduled refresh"})
+        self.assertEqual(self.select(self.packages, self.cache(NOW - timedelta(hours=10)), NOW, "incremental", 7), {},
+                         "a second run on the same day refetches nothing")
+        stale = self.select(self.packages, self.cache(NOW - timedelta(days=7, minutes=1)), NOW, "incremental", 7)
+        self.assertEqual(len(stale), 700, "detail a week old is refreshed whatever its day")
+
+    def test_after_one_cycle_each_daily_run_refreshes_a_seventh_and_no_detail_passes_a_week(self):
+        cache = self.cache(NOW - timedelta(days=1))           # all fetched together, as before
+        daily = []
+        for day in range(21):
+            now = NOW + timedelta(days=day)
+            targets = self.select(self.packages, cache, now, "incremental", 7)
+            daily.append(len(targets))
+            for pid in targets:
+                cache[pid]["detailAsOf"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+            oldest = min(datetime.strptime(e["detailAsOf"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                         for e in cache.values())
+            self.assertLessEqual(now - oldest, timedelta(days=7), day)
+        self.assertEqual(sum(daily[7:14]), 700, "every agent refreshed once a week")
+        self.assertTrue(max(daily[7:]) < 200, daily)
+
+    def test_new_and_changed_agents_come_first_then_the_oldest_refreshes(self):
+        old = (NOW - timedelta(days=9)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        older = (NOW - timedelta(days=12)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        packages = [{"id": "r1", "lastModifiedDateTime": self.STAMP}, {"id": "r2", "lastModifiedDateTime": self.STAMP},
+                    {"id": "c", "lastModifiedDateTime": "2026-10-01T00:00:00Z"}, {"id": "n", "lastModifiedDateTime": self.STAMP}]
+        cache = {"r1": {"lastModifiedDateTime": self.STAMP, "detailAsOf": old},
+                 "r2": {"lastModifiedDateTime": self.STAMP, "detailAsOf": older},
+                 "c": {"lastModifiedDateTime": self.STAMP, "detailAsOf": NOW_ISO}}
+        targets = self.select(packages, cache, NOW, "incremental", 7)
+        self.assertEqual(list(targets), ["c", "n", "r2", "r1"])
+
+
+class TimeBudgetTests(unittest.TestCase):
+    def setUp(self):
+        self.ns = detail_helpers()
+
+    def test_no_call_starts_after_the_deadline_and_the_rest_are_in_neither_result(self):
+        ids = [f"a{i}" for i in range(50)]
+        clock = TickingClock(step=1.0)
+        fetched, failed = self.ns["_fetch_details"](ids, lambda p: {"id": p}, 2, clock=clock, deadline=10.0)
+        self.assertTrue(0 < len(fetched) < 50, len(fetched))
+        self.assertEqual(failed, {})
+        self.assertEqual(set(fetched), set(ids[:len(fetched)]), "started in order, so the oldest go first")
+
+    def test_without_a_deadline_every_call_runs(self):
+        fetched, _ = self.ns["_fetch_details"]([f"a{i}" for i in range(50)], lambda p: {"id": p}, 3)
+        self.assertEqual(len(fetched), 50)
+
+    def test_step_3_budgets_only_the_scheduled_refreshes(self):
+        source = code_from_cell(NOTEBOOK, 6)
+        self.assertIn("_fetch_details(_priority, _fetch_one_detail, DETAIL_WORKERS, **_fetch_options)", source)
+        self.assertIn("deadline=_step3_started + _BUDGET_MIN * 60 if _BUDGET_MIN > 0 else None", source)
+        self.assertIn("deferred to the next run", source)
+        config = code_from_cell(NOTEBOOK, 2)
+        self.assertRegex(config, r"(?m)^TIME_BUDGET_MIN = 75\b")
 
 
 class DetailMergeAndCacheTests(unittest.TestCase):
@@ -399,7 +487,7 @@ class RegistryWriteOrderTests(unittest.TestCase):
 class IncrementalRunSimulationTests(unittest.TestCase):
     """Two mocked runs end to end through the cell-6 helpers."""
 
-    def test_second_run_only_fetches_the_changed_agent(self):
+    def test_second_run_fetches_the_changed_agents_and_only_that_days_refreshes(self):
         ns = detail_helpers()
         calls = []
 
@@ -421,15 +509,23 @@ class IncrementalRunSimulationTests(unittest.TestCase):
         targets = ns["_select_detail_targets"](day2, cache, tomorrow, "incremental", 7)
         fetched, failed = ns["_fetch_details"](list(targets), fetch, 8)
         details, meta, cache2 = ns["_assemble_details"](day2, cache, fetched, failed, "2026-10-07T06:00:00Z")
-        self.assertEqual(sorted(calls), ["a1", "a50"])
+        slot_day = [p["id"] for p in day2[1:-1] if ns["_refresh_slot"](p["id"], 7) == tomorrow.date().toordinal() % 7]
+        self.assertTrue(0 < len(slot_day) < 20, slot_day)
+        self.assertEqual(sorted(calls), sorted(["a1", "a50"] + slot_day),
+                         "the changed and new agents, plus the agents whose refresh day it is")
         self.assertEqual(len(details), 50)
         self.assertNotIn("a0", cache2)
         self.assertTrue(all(d.get("botId") for d in details), "cached rows keep detail-only fields")
 
+        calls_day2 = set(calls)
         calls.clear()
         week_later = NOW + timedelta(days=7, hours=12)
         targets = ns["_select_detail_targets"](day2, cache2, week_later, "incremental", 7)
-        self.assertEqual(len(targets), 48, "every agent last fetched on day 1 is due its weekly refresh")
+        week_slot = week_later.date().toordinal() % 7
+        expected = {p["id"] for p in day2
+                    if p["id"] not in calls_day2 or ns["_refresh_slot"](p["id"], 7) == week_slot}
+        self.assertEqual(set(targets), expected,
+                         "every agent last fetched on day 1 is due its weekly refresh, plus that day's share")
 
 
 class LastUpdatedStabilityTests(unittest.TestCase):
@@ -474,7 +570,7 @@ class LastUpdatedStabilityTests(unittest.TestCase):
         statuses, cache = run({}, NOW, NOW_ISO)
         self.assertEqual(statuses, {"fetched"})
         statuses, cache = run(cache, NOW + timedelta(days=1), "2026-10-07T06:00:00Z")
-        self.assertEqual(statuses, {"cached"})
+        self.assertEqual(statuses, {"cached", "fetched"}, "that day's share of the weekly refresh is fetched")
         statuses, _ = run(cache, NOW + timedelta(days=8), "2026-10-14T06:00:00Z")
         self.assertEqual(statuses, {"fetched"}, "the weekly refresh refetches every agent")
         self.assertEqual(len(history), 495, "one history row per agent across fetched/cached runs")

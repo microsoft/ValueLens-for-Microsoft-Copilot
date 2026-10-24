@@ -41,9 +41,11 @@
 
 .PARAMETER AppendFile
   Interactions CSV to append into on each scheduled run (passed to Run-PAX-AIBV -AppendFile).
-  Recommended for the daily task: seed the file once manually with a back-fill run (no -AppendFile),
-  then set this so the scheduled runs append only the latest window (de-duplicated). Omit to have the
-  task run in non-append mode.
+  Recommended for the daily task: seed the file once manually with a back-fill run (no -AppendFile)
+  and the same -WorkRoot, rename the seeded <stem>_Interactions_<timestamp>.csv to a stable name such
+  as cumulative_Interactions.csv, then set this to that name so the scheduled runs append only the
+  latest window (de-duplicated). A bare name is read from <WorkRoot>\processed. Omit to have the task
+  run in non-append mode.
 
 .PARAMETER IncludeAgent365Info
   Also refresh the Agent 365 registry on each run (passed to Run-PAX-AIBV

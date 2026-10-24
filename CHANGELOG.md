@@ -18,6 +18,93 @@ Deployment instructions do **not** live here. They live in the READMEs:
 
 ---
 
+## Unreleased — ValueLens installer 0.1.0
+
+**Why.** Setting up ValueLens meant working through a path README by hand. The installer this repo
+shipped under `1. Fabric/installer` was the Analytics Hub's, and it stopped at installer-v0.4.2 when
+the Analytics Hub moved to its own repo. The new [`installer/`](installer/README.md) is a
+ValueLens-only port of the Analytics Hub installer at microsoft/AnalyticsHub-Dashboard@1af87db, with
+a second route that needs no Fabric.
+
+- **Two routes**, chosen on the first screen or with `--target fabric|pax`:
+  - **Fabric.** The Analytics Hub's Fabric route, cut to ValueLens: the `ValueLens (Fabric)` app
+    registration, with its client secret in the notebooks (the default) or in Key Vault, then the
+    workspace, Lakehouse, notebooks, pipeline, schedule, semantic model and report, and a first load
+    with checks. The Credit Consumption module, the Azure route and the Agent Evaluator aren't
+    ported. This route doesn't deploy the app yet.
+  - **No Fabric: PAX + SharePoint.** A daily task on the user's PC, `ValueLens - PAX refresh`, runs
+    PAX purview-v1.11.15, pinned by SHA-256. It uploads the rollups to a SharePoint folder as the
+    `ValueLens (PAX)` app registration, which has Sites.Selected on that one site. The installer
+    publishes `ValueLens - SharePoint.pbit` to a Power BI workspace through the item API, or through
+    Power BI Desktop where the service turns that down. The model is signed in to SharePoint once,
+    by hand, and refreshes after each PAX run. The installer then deploys the app as a Copilot
+    managed app. The app step is on by default. When the tenant isn't ready for it, the installer
+    says what's missing and finishes at the report.
+- **The task** runs as the signed-in user with limited rights. It never bypasses the execution
+  policy, and the installer stops with guidance when the policy is AllSigned or Restricted. The
+  client secret stays in Windows Credential Manager. PowerShell 7.2 and Python 3.10 or later are
+  checked up front, because PAX's rollup needs Python.
+- **Updates** come from the newest `valuelens-installer-v*` release in the release list, not from
+  GitHub's "Latest" release, which the dashboard releases take. The one-liner and every update hint
+  use a version-pinned `releases/download/<tag>/` URL.
+- **Viewers.** The `ValueLens Viewers` group gets Build on the semantic model, never a workspace
+  role, because workspace viewers can read the notebooks and any secret written into them. The
+  installer asks once to share the report with the group. "Later" leaves a card on the Done page,
+  and Repair asks again.
+- **Long loads on the PAX route.** The task reads history a week at a time, oldest first, and saves
+  its progress after each week. It stops before the task's 12-hour limit, and the next run carries
+  on. PAX reads days in the PC's time zone but keeps whole UTC days, so each week after the first
+  starts a day early, and PAX drops the rows it already has. If even one day read with the day
+  before can't finish inside the limit, the load reads on without the day before, and **Check
+  status** warns that each day can miss a few hours. A file copied down from SharePoint is used
+  only when its size matches SharePoint's. PAX 1.11.15 can exit 0 when its rollup step fails, so
+  the run reads PAX's log too, and fails when the rollup failed or PAX didn't write a file.
+- **The Power BI model.** When Power BI turns the model's refresh schedule off, the installer turns
+  it back on after the next refresh it waits for works. The installer never replaces or deletes a
+  model or report it didn't publish: its own get a free name, such as `ValueLens_2`. A model
+  deleted in Power BI is reported and forgotten, and **Update** publishes it again.
+- **Taking access back.** Turning a choice off takes the Graph permissions it needed off an app
+  registration the installer created, and takes back their consent when the user can. Choosing
+  another viewer group takes away the old group's Build on the model.
+- **Also:** repair and uninstall, a browser page (`--ui`) as well as the terminal, an admin pack
+  (`valuelens-admin-pack.md`) for the grants that need an admin, and a Windows exe,
+  `ValueLensInstaller.exe`, with Node, the app and the managed apps CLI inside. The
+  [exe workflow](.github/workflows/valuelens-installer-exe.yml) builds it. The install record is
+  `valuelens-setup.json`, and the installer leaves Analytics Hub records and workspaces alone.
+- **Supporting changes.** The Fabric notebooks now match the Analytics Hub ones the installer
+  deploys. `Run-PAX-AIBV.ps1` gains `-PaxSha256`, `-AppendUserInfo`, `-SkipVersionCheck`,
+  `-StartDate` and `-EndDate`. Its append runs work on PAX 1.11.15, and a run whose rollup step
+  failed now fails, even when PAX exits 0. `Upload-Rollups-SharePoint.ps1` gains `-File` and
+  `-RemoteName`. A contract test checks that the notebooks write every Lakehouse column the Fabric
+  template reads.
+
+`1. Fabric/installer` stays as it is for now. A follow-up removes it and points its links here.
+Nothing is released yet. The first tag will be `valuelens-installer-v0.1.0`.
+
+---
+
+## Unreleased — Org data: Department becomes Organization only when there's no Organization column
+
+**Why.** The org query renamed the first department-like column to Organization, even when the org
+data already had an Organization column. The Graph org data load always writes Organization, and
+Workday org data adds any column the table lacks. So a Workday export with a Department column, or
+an org data CSV with both columns, failed the refresh.
+
+- **The rename checks first.** *Chat + Agent Org Data* renames Department to Organization only when
+  there's no Organization column. With both, it leaves both as they are, and a blank Organization
+  stays blank rather than being filled from Department.
+- **Every active variant.** The Fabric, Fabric OneLake, SharePoint and Local CSV templates and the
+  Agent Evaluator get the same change. The installer builds its Fabric model from
+  `ValueLens - Fabric.pbit`, so it gets it too. The archived Power Automate + Dataverse template is
+  frozen, so it doesn't.
+- `scripts/Update-Org-Department-Rename.py` makes the change, and `--check` reports a stale
+  template. Nothing else in the templates changes.
+
+Download the template again to pick this up. The Analytics Hub made the same change in
+microsoft/AnalyticsHub-Dashboard#144.
+
+---
+
 ## Unreleased — The app comes first, and Power Automate + Dataverse is archived
 
 **Why.** The app is now the recommended way to use ValueLens, so the README starts with it and has

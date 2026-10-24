@@ -676,7 +676,7 @@ class AuditReliabilityTests(unittest.TestCase):
         for token in ["'Id'", "'Source_RecordKey'", "'Source_MessageKey'", "'Source_ResourceKey'"]:
             self.assertIn(token, self.ingester_cell16)
         self.assertIn("MERGE_KEYS       = [\"Id\"]", cells(PROCESSOR)[1])
-        self.assertIn("resolve_write_strategy", self.processor_cell15)
+        self.assertIn("resolve_write_strategy(WRITE_MODE, src_all.columns", cells(PROCESSOR)[3])
         self.assertIn("canonicalize_audit_record", cells(INGESTER)[10])
         self.assertIn("SourceRecordKey", cells(INGESTER)[12])
         self.assertIn("ArrayType", cells(INGESTER)[12])
@@ -900,14 +900,16 @@ class AgentIdentityTests(unittest.TestCase):
         self.assertTrue(re.search(pattern, "x@agents.contoso.com"))
         self.assertIsNone(re.search(pattern, "jane@contoso.com"))
 
-    def test_processor_filters_new_rows_and_cleans_merged_ones(self):
+    def test_processor_filters_new_rows_and_rebuilds_when_the_filter_changes(self):
         filter_cell = next(text for text in self.sources if "# 6b. AGENT IDENTITIES" in text)
         self.assertIn("AGENT_IDENTITY_REGEX = agent_identity_regex(EXCLUDE_AGENT_IDENTITIES, AGENT_IDENTITY_PATTERNS)", filter_cell)
         self.assertIn('F.lower(F.col("_NormUPN")).rlike(AGENT_IDENTITY_REGEX)', filter_cell)
         self.assertLess(filter_cell.index('fact = fact.withColumn("_NormUPN", norm)'), filter_cell.index("# 6b."))
-        writer = next(text for text in self.sources if "def write_curated_output" in text)
-        self.assertIn("if AGENT_IDENTITY_REGEX and \"Audit_UserId\" in target_columns:", writer)
-        self.assertIn(".rlike(AGENT_IDENTITY_REGEX))", writer)
+        # Switching the filter on (or changing the patterns) changes the settings
+        # fingerprint, so the next run rebuilds every month and drops rows written before.
+        planner = next(text for text in self.sources if "PROCESSOR_CONFIG = processor_config_fingerprint(" in text)
+        self.assertIn('"exclude_agent_identities": bool(EXCLUDE_AGENT_IDENTITIES)', planner)
+        self.assertIn('"agent_identity_patterns": list(AGENT_IDENTITY_PATTERNS or [])', planner)
 
 
 class FakeAuditGraph:

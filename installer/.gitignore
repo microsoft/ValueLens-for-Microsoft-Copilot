@@ -1,0 +1,11 @@
+node_modules/
+valuelens-setup*.json
+# Records from the Analytics Hub installer, which this one refuses.
+valuelens-install*.json
+*.draft.json
+*.tmp
+valuelens-preview/
+dist-exe/
+valuelens-feedback-flow.json
+valuelens-agent-inventory-flow.json
+valuelens-admin-pack.md
