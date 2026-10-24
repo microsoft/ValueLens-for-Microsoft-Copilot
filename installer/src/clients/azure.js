@@ -13,15 +13,10 @@ export const ROLES = {
   keyVaultSecretsOfficer: 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7',
   keyVaultSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6',
   reader: 'acdd72a7-3385-48ef-bd42-f606fba81ae7',
-  costManagementReader: '72fafb9e-0641-4937-9268-a91bfd8191a3',
-  monitoringReader: '43d0d8ad-25c7-4714-9337-8ba259a9fe05',
   storageBlobDataContributor: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe',
   owner: '8e3af657-a8ff-443c-a75c-2fe8c4bcb635',
   contributor: 'b24988ac-6180-42a0-ab88-20f7382dd24c',
   userAccessAdministrator: '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9',
-  cognitiveServicesOpenAiUser: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd',
-  storageTableDataContributor: '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3',
-  acrPull: '7f951dda-4ed3-4680-a7ca-43fe172d538d',
   rbacAdministrator: 'f58310d9-a9f6-439a-9e8d-f62e7b41a168',
 };
 
