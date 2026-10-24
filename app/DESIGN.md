@@ -1,5 +1,5 @@
 ---
-name: ValueLens (App Edition)
+name: ValueLens app
 description: Calm analyst workspace for Copilot value, adoption and readiness, computed in the browser from the ValueLens CSVs.
 colors:
   canvas: "#f3f6f5"
@@ -79,9 +79,9 @@ components:
     textColor: "{colors.ink-2}"
 ---
 
-# DESIGN.md: ValueLens (App Edition)
+# DESIGN.md: ValueLens app
 
-> This file records the shipped build: `src/index.css`, `src/ui/theme.ts` and the components in `src/ui/`. It reuses the AI in One App Edition design kit, so the two apps look and behave the same.
+> This file records the shipped build: `src/index.css`, `src/ui/theme.ts` and the components in `src/ui/`. It reuses the AI in One app's design kit, so the two apps look and behave the same.
 
 ## Overview
 

@@ -101,8 +101,8 @@ def find_repo_root(start: Path) -> Path:
     for candidate in (start, *start.parents):
         if (candidate / ".git").exists():
             return candidate
-    # Fall back to the pathway repo root (…/AI-Business-Value-Dashboard) derived from this file.
-    return Path(__file__).resolve().parents[2]
+    # Fall back to the repository root derived from this file (archive/<path>/scripts/<this file>).
+    return Path(__file__).resolve().parents[3]
 
 
 def is_within(path: Path, root: Path) -> bool:

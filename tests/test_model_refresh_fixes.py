@@ -69,8 +69,9 @@ class ModelRefreshFixes(unittest.TestCase):
     def test_every_consumption_central_variant_is_a_target(self):
         script = load_script()
         targets = {(ROOT / relative).resolve() for relative, _, _, dax in script.TARGETS if dax == "consumption"}
-        shipped = {path.resolve() for path in ROOT.glob("*/**/Consumption Central - *.pbit")}
-        self.assertEqual(len(shipped), 4)
+        shipped = {path.resolve() for path in ROOT.glob("*/**/Consumption Central - *.pbit")
+                   if "archive" not in path.relative_to(ROOT).parts}
+        self.assertEqual(len(shipped), 3)
         self.assertEqual(targets, shipped)
 
     def test_pending_query_copies_match_the_model(self):

@@ -417,8 +417,8 @@ chart. Where the columns come from depends on the variant:
 |---|---|---|---|
 | Fabric (both templates) | `Copilot_Audit_Log_Processor` | All five (agent ID, name, AppIdentity, PlatformAgentType, workload) | `agent_type_overrides` table |
 | Local CSV | Python processor (`--profile aibv`) | All five | `--agent-type-overrides` CSV |
-| Power Automate + Dataverse | Snapshots built by `Build-DataverseCoreFeeds.py`, which runs the Local CSV processor | All five | Not wired in |
-| Power Automate + Dataverse, snapshots built before this change | Power Query (`ValueLensDescribeAgent`) at refresh | Agent ID, name, AppIdentity only | None |
+| Power Automate + Dataverse (archived) | Snapshots built by `Build-DataverseCoreFeeds.py`, which runs the Local CSV processor | All five | Not wired in |
+| Power Automate + Dataverse (archived), snapshots built before this change | Power Query (`ValueLensDescribeAgent`) at refresh | Agent ID, name, AppIdentity only | None |
 | SharePoint (PAX rollup) | Power Query (`ValueLensDescribeAgent`) at refresh | Agent ID, name, AppIdentity only | None |
 
 `ValueLensDescribeAgent` is a Power Query port of the same rules. It runs only when the extract has

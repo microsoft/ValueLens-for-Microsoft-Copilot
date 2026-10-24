@@ -7,13 +7,51 @@ pull-request history — this repo shipped for a while before anyone thought to 
 changes down in one place, and back-filling that accurately from commit messages would be a
 worse record than pointing you at the commits themselves.
 
-Deployment instructions do **not** live here. They live in the path READMEs:
+Deployment instructions do **not** live here. They live in the READMEs:
+[the app](app/README.md) ·
 [1. Fabric](1.%20Fabric/README.md) ·
 [1. Fabric/Fabric App](1.%20Fabric/Fabric%20App/README.md) ·
 [2. Azure](2.%20Azure/README.md) ·
-[3. Power Automate + Dataverse](3.%20Power%20Automate%20+%20Dataverse/README.md) ·
 [4. SharePoint](4.%20SharePoint/README.md) ·
-[5. Local CSV](5.%20Local%20CSV/README.md).
+[5. Local CSV](5.%20Local%20CSV/README.md). The archived
+[Power Automate + Dataverse](archive/3.%20Power%20Automate%20%2B%20Dataverse/README.md) path keeps its own.
+
+---
+
+## Unreleased — The app comes first, and Power Automate + Dataverse is archived
+
+**Why.** The app is now the recommended way to use ValueLens, so the README starts with it and has
+every step to deploy it. Archiving the Power Automate + Dataverse path leaves fewer paths to choose
+between and keep up to date.
+
+- **The README starts with the app (preview).** Numbered steps cover the two Power Platform admin
+  settings, the licence each viewer needs (Power Apps Premium or Copilot Credits), installing the
+  `ms` CLI at the version the steps were checked with (0.29.0), then `ms auth login`,
+  `ms app init`, `ms app deploy` and `ms app share`. Then come where your data comes from, the
+  Power BI report, the Fabric App (alternative) and Archived. The list of agents the audit log
+  covers moved to [docs/AUDIT-LOG-COVERAGE.md](docs/AUDIT-LOG-COVERAGE.md). Nothing was removed,
+  and links to the old `#app-edition-preview`, `#pick-a-path` and `#watch-first` sections still
+  work.
+- **"App Edition" is now "the app".** The footer, the data dialog, the app README, PRODUCT.md and
+  DESIGN.md say so, and `app/download/ValueLens-App.html` was rebuilt. The Fabric App deploy keeps
+  `id: valuelens-app-edition` in `app/rayfin/rayfin.yml`, so redeploying still updates the existing
+  item instead of creating a second one.
+- **The app's builds make the sample data first.** Git ignores `app/public/sample/`, so an app
+  deployed from a fresh clone stopped at "Couldn't load the sample data", without the **Change
+  data** button. `npm run dev`, `npm run build` and `npm run build:file` now run
+  `scripts/prepare-sample.mjs` first, so `ms app deploy` and `npx rayfin up` ship the sample.
+- **Power Automate + Dataverse moved to
+  [`archive/3. Power Automate + Dataverse/`](archive/3.%20Power%20Automate%20%2B%20Dataverse/README.md).**
+  Installs you already have keep running, but the path is unsupported and no longer gets dashboard
+  changes. A README at the old path links to the new one, and a `.gitignore` there keeps the files
+  an earlier run left behind out of git. If a scheduled task runs the refresh from a clone, point it
+  at `archive\3. Power Automate + Dataverse\scripts\Invoke-DataverseCoreRefresh.ps1` after you
+  pull.
+- **Template scripts and tests skip the archive.** `Update-Template-Refresh-Sources.py`,
+  `Update-Template-Dax.py` and `Update-Model-Refresh-Fixes.py` no longer patch the archived
+  template. The template tests already skipped `archive/`, so two minimum counts in them went down.
+- **CONTRIBUTING** says report and app changes go to the app and the active paths only, and that
+  nothing in `archive/` is maintained.
 
 ---
 

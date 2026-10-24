@@ -220,7 +220,7 @@ Variants: App Service B1 Linux for the web app (+$13), or B1 Windows as in PnP (
 
 The logic is **already forked**. `5. Local CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py`
 (which PAX now embeds as `-Dashboard ValueLens`, `AIBV` before PAX v1.11.15) and the Dataverse bridge
-(`3. Power Automate + Dataverse/scripts/Build-DataverseCoreFeeds.py`) both re-implement parts of the
+(`archive/3. Power Automate + Dataverse/scripts/Build-DataverseCoreFeeds.py`) both re-implement parts of the
 Spark processor. The Azure version must not add a fourth copy.
 
 ### 4.2 Strategy: a shared DuckDB core, held to the notebooks by a parity harness

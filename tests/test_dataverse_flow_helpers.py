@@ -13,7 +13,8 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOL = ROOT / "3. Power Automate + Dataverse" / "scripts" / "Prepare-CollectorRawCapture.py"
+PATHWAY = ROOT / "archive" / "3. Power Automate + Dataverse"
+TOOL = PATHWAY / "scripts" / "Prepare-CollectorRawCapture.py"
 
 _spec = importlib.util.spec_from_file_location("prepare_collector_raw_capture", TOOL)
 prep = importlib.util.module_from_spec(_spec)
@@ -248,7 +249,7 @@ class PrepareRawCaptureTests(unittest.TestCase):
 
     def test_output_inside_repo_is_refused(self):
         write_solution_zip(self.source)
-        inside = self.repo_root / "3. Power Automate + Dataverse" / "processed" / "should-not-write.zip"
+        inside = PATHWAY / "processed" / "should-not-write.zip"
         with self.assertRaisesRegex(prep.PrepareError, "inside the repository"):
             prep.adapt_zip(self.source, inside, repo_root=self.repo_root)
         self.assertFalse(inside.exists())
@@ -466,9 +467,9 @@ class PrepareRawCaptureTests(unittest.TestCase):
     def test_no_private_raw_publication_in_repo(self):
         # Guard against accidental artefacts: the adapter must never create files under the repo.
         write_solution_zip(self.source)
-        before = {p for p in (self.repo_root / "3. Power Automate + Dataverse").rglob("*") if p.is_file()}
+        before = {p for p in PATHWAY.rglob("*") if p.is_file()}
         prep.adapt_zip(self.source, self.out, repo_root=self.repo_root)
-        after = {p for p in (self.repo_root / "3. Power Automate + Dataverse").rglob("*") if p.is_file()}
+        after = {p for p in PATHWAY.rglob("*") if p.is_file()}
         self.assertEqual(before, after)
 
 

@@ -57,5 +57,5 @@ Copilot Studio **per-user** consumption has no documented API, so these flows
 don't load it. That page is fed by a manual `StudioPerUser.csv` export from the
 Power Platform admin centre, as described in
 [docs/DATA-SOURCES.md](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot/blob/main/docs/DATA-SOURCES.md).
-The [Fabric installer's flow](../../1.%20Fabric/installer/README.md#power-automate-flows) also
+The [Fabric installer's flow](../../../1.%20Fabric/installer/README.md#power-automate-flows) also
 reads per-user figures, best effort, from an undocumented licensing API route.

@@ -19,8 +19,9 @@ compatibility, validation and any limitations. Follow the
 
 Run from the repository root with **Python 3.12** (the CI version) and
 **PowerShell 7** (`pwsh` on `PATH`). Python 3.12 satisfies both the Local CSV
-processor's documented 3.9+ baseline and the SharePoint / Dataverse paths' 3.10+
-prerequisites; those path-specific minimums are not a whole-repository test matrix.
+processor's documented 3.9+ baseline and the 3.10+ prerequisites of the SharePoint
+path and the archived Power Automate + Dataverse path; those path-specific minimums
+are not a whole-repository test matrix.
 
 ```text
 python -m pip install pytest
@@ -34,8 +35,8 @@ The optional Spark check in `test_snapshot_safety.py` skips when local PySpark /
 Spark is unavailable; the default CI job does not install Spark. Local tests do
 not certify Fabric execution, tenant permissions or Desktop / Service refresh.
 
-CI runs the full suite with no exclusions. The Dataverse directory-refresh
-checks launch PowerShell 7 (`pwsh`); on a machine with only
+CI runs the full suite with no exclusions. The directory-refresh checks for the
+archived Power Automate + Dataverse path launch PowerShell 7 (`pwsh`); on a machine with only
 Windows PowerShell 5.1 or a restrictive execution policy they fail at setup
 rather than on template content. Don't bypass the execution policy to run them;
 rely on CI or install PowerShell 7.
@@ -74,16 +75,23 @@ signature. A release that fails goes back to being a draft.
 
 ## Repository conventions
 
-- Keep the four numbered deployment paths stable. Put setup details in the relevant
-  path README and shared column contracts in the
+- Keep the numbered folder names stable: installers, tests and links depend on them.
+  Put setup details in the relevant README and shared column contracts in the
   [data dictionary](docs/DATA-DICTIONARY.md).
+- Make each report or app change in every active variant: [the app](app/), `1. Fabric`
+  (including the Fabric App), `2. Azure`, `4. SharePoint` and `5. Local CSV`. Leave
+  [`archive/`](archive/) alone. The Power Automate + Dataverse path has been frozen since
+  23 October 2026: the patch scripts in [`scripts/`](scripts/) and the template tests skip
+  its templates, but tests still cover its scripts.
 - Preserve existing names, formatting and README tone. Separate measured signals
   from estimates, and document optional sources, toggles and blank-data behaviour.
 - Use fabricated fixtures only. Never commit tenant exports, user identities,
   prompts, credentials, private solution packages or populated report files.
   Review notebook outputs and screenshots before attaching them.
 - Edit Fabric notebooks in `1. Fabric/Manual setup/notebooks/`. There are no mirrored copies to keep in sync.
-- Old templates live, flat, in [`archive/`](archive/). They aren't maintained.
+- Old templates live, flat, in [`archive/`](archive/). A retired path keeps its folder name
+  there, such as `archive/3. Power Automate + Dataverse/`, and a stub README stays at its old
+  path so links keep working. Nothing in `archive/` is maintained.
 - **`.pbit` templates are binary packages.** Source/helper changes do not update
   shipped templates automatically: rebuild with the relevant repository generator
   or Power BI Desktop workflow. Describe the rebuild, preserve unrelated report /

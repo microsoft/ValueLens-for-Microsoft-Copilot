@@ -1,0 +1,8 @@
+# Runtime audit payloads, curated customer data and private adapted solutions.
+processed/
+private/
+*.jsonl
+*.zip
+!Add Credit Consumption/flows/*.zip
+*.settings.json
+!scripts/power-automate-dataverse.settings.json.example

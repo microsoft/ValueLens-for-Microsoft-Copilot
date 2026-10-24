@@ -121,7 +121,7 @@ most recently updated), so the agent's distinct users are counted once. `Agent_M
 the Title ID that actually matched. Agent Builder agents and Microsoft agents are never merged,
 because their copies can be different agents.
 
-The Local CSV processor (Path 5, also run by the Power Automate path) drops the same records and
+The Local CSV processor (Path 5, also run by the archived Power Automate path) drops the same records and
 keeps the same runtime records. The SharePoint path processes audit data with the PAX script's own
 copy of that processor, which does so only once PAX takes the same change. On all three paths agent
 linking runs in the template, not the processor.

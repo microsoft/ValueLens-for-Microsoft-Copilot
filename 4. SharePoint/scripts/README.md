@@ -158,7 +158,7 @@ broken.
 interactive Graph sign-in. The script refuses to replace an existing
 file with an empty snapshot, and `-AllowEmpty` is for an intentional empty first export only.
 Point the template's `Agent 365` parameter at the output (Local CSV) or upload it
-(SharePoint, Dataverse CSV fallback).
+(SharePoint, or the archived Dataverse path's CSV fallback).
 
 `-UserInfoFile` (optional, BYOD): supply your own user directory CSV instead of pulling it live from
 Entra — copy [`OrgData-Template.csv`](../../5.%20Local%20CSV/scripts/OrgData-Template.csv) as a
