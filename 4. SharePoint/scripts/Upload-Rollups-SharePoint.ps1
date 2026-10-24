@@ -228,6 +228,9 @@ if ($PSCmdlet.ParameterSetName -eq 'File') {
 if ($PSCmdlet.ParameterSetName -eq 'Manifest') {
   if (-not (Test-Path -LiteralPath $Manifest)) { throw "Manifest not found: $Manifest" }
   $m = Get-Content -LiteralPath $Manifest -Raw | ConvertFrom-Json
+  if ($m.PSObject.Properties['only_user_info'] -and $m.only_user_info) {
+    throw "This manifest is from a Run-PAX-AIBV.ps1 -OnlyUserInfo run, which has no rollup to upload. Upload its users file with -File `"$($m.users_csv)`" -RemoteName <name>.csv."
+  }
   $InteractionsCsv = $m.interactions_csv
   $UsersCsv        = $m.users_csv
   if (-not $Agents365Csv -and $m.PSObject.Properties['agents365_csv'] -and $m.agents365_csv) {

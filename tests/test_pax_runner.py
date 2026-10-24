@@ -91,12 +91,17 @@ HINT = "Run 'test-installer repair'."
 INTERACTIONS = "copilot_interactions_rollup.csv"
 USERS = "copilot_users_rollup.csv"
 AGENTS = "agents_365.csv"
+# The file a userInfo product publishes: the user directory, replaced whole by every run.
+ORG_FILE = "entra_org.csv"
 GRAPH_SCOPE = "https://graph.microsoft.com/.default"
 PYTHON_MESSAGE = ("PAX needs Python 3.10 or later to build the rollup files, and this account has none. "
                   "Install it for this user with: winget install Python.Python.3.13 --scope user. "
                   "Then run the refresh again.")
 GRANT_MESSAGE = "The app needs write access to the SharePoint site, through a Sites.Selected grant."
 BUSY_MESSAGE = "Another refresh is running, so this one stopped. The next scheduled run starts as usual."
+USER_INFO_MESSAGE = f"SharePoint's {ORG_FILE} holds the user directory as this run read it."
+USER_INFO_DAYS_MESSAGE = ("ERROR: -Days says how many days of audit activity to read, and this refresh reads only "
+                          "the user directory, which every run replaces whole. Run it without -Days.")
 # A site as the installer writes it from a folder address, and its libraries as Graph lists them.
 SITE_PATH = "example.sharepoint.com:/sites/Analytics"
 SITE_URL = "https://example.sharepoint.com/sites/Analytics"
@@ -134,6 +139,16 @@ def default_config(**overrides):
         "deidentify": False,
         "repairHint": HINT,
     }
+    config.update(overrides)
+    return config
+
+
+def user_info_config(**overrides):
+    """refresh.json as the installer writes it for a product whose PAX run reads only the user directory:
+    mode userInfo, one file, and none of the audit load's settings."""
+    audit_only = ("seedDays", "maxDays", "minDays", "overlapDays", "keepRunFilesDays", "windowDays", "deidentify")
+    config = {key: value for key, value in default_config().items() if key not in audit_only}
+    config.update(mode="userInfo", files={"users": ORG_FILE})
     config.update(overrides)
     return config
 
@@ -790,6 +805,120 @@ def _upload_folder_is_file(c):
     c.run(Upload=source, RemoteFolder="Exports").run(Upload=source, RemoteFolder="New")
 
 
+# userInfo mode: one PAX pass reads the user directory, and its file replaces the last one whole.
+@refresh_case("user-info")
+def _user_info(c):
+    # No Python: a run that reads only the user directory builds no rollups.
+    c.config(raw=user_info_config()).run(python="none").run(python="none")
+
+
+@refresh_case("user-info-new-machine")
+def _user_info_new_machine(c):
+    # Another machine, or someone by hand, put the library's copy there.
+    c.remote_file(f"Reports/{ORG_FILE}", "Id\nanother-machines-user\n", 3)
+    c.config(raw=user_info_config()).run()
+
+
+@refresh_case("user-info-reinstall")
+def _user_info_reinstall(c):
+    # What an earlier install left: an audit load part way through, stopped inside a one-day
+    # window that read the day before, its coverage and a gap, and the last user directory, here
+    # and in the library.
+    progress = {"fromUtc": local_midnight_utc(30), "days": 30, "seed": True, "windowDays": 1, "noOverlap": True,
+                "throughUtc": local_midnight_utc(10),
+                "pending": {"from": local_midnight_utc(10), "to": local_midnight_utc(9), "days": 1, "first": True,
+                            "early": True}}
+    c.remote_file(f"Reports/{ORG_FILE}", "Id\nearlier-user\n", 2)
+    c.config(raw=user_info_config()).state(5, synced=False, progress=progress, gapFromUtc=local_midnight_utc(40))
+    c.data.mkdir(parents=True, exist_ok=True)
+    with open(c.data / "current_Users.csv", "w", encoding="utf-8", newline="") as handle:
+        handle.write("Id\nearlier-user\n")
+    c.run()
+
+
+@refresh_case("user-info-days")
+def _user_info_days(c):
+    # The lock is held throughout, so a refusal that came after it would say another run is busy.
+    c.spec["holdLock"] = True
+    c.config(raw=user_info_config()).run(Days=30)
+
+
+@refresh_case("user-info-fail")
+def _user_info_fail(c):
+    # An earlier run's directory file is still in the work folder, and the second run writes none.
+    c.file("work/processed/EntraUsers_MAClicensing_20250101_000000.csv", 1)
+    c.config(raw=user_info_config()).run(env={"STUB_MODE": "fail", "STUB_PAX_EXIT": 30})
+    c.run(env={"STUB_MODE": "stale"})
+
+
+@refresh_case("user-info-invalid")
+def _user_info_invalid(c):
+    c.config(raw=user_info_config(agent365=True, files={"users": "bad?.csv", "interactions": INTERACTIONS})).run()
+    second = c.install / "refresh-2.json"
+    c.config(path=second, raw=user_info_config(mode="users")).run(Config=second)
+
+
+# The checks a userInfo run's file passes before it replaces the org file this PC last published.
+LAST_ORG = "userPrincipalName\nlast-good-user\n"
+DROP_HINT = "If the drop is genuine, run: test-installer run --accept-drop"
+ACCEPT_DROP_REFUSED = ("ERROR: -AcceptDrop lets a refresh that reads only the user directory publish one with under "
+                       "half the rows of the last, and this refresh.json doesn't set mode userInfo. Run it without "
+                       "-AcceptDrop.")
+
+
+def org_rows(count):
+    """An org file of count users, each named after the run that read it."""
+    return "userPrincipalName,displayName\n" + "".join(f"user{k}-{{row}}@example.com,User {k}\n" for k in range(count))
+
+
+def quoted_org_rows(count):
+    """An org file whose header's quoted names hold a doubled quote, a comma and a line break, and whose rows hold a
+    comma and a blank line inside quotes, with a blank line after each. The stub writes it with a byte order mark."""
+    header = '"userPrincipalName","Display ""Name"", in full","Notes\non two lines"\n'
+    return header + "".join(f'"user{k}-{{row}}@example.com","User, {k}","line one\n\nline two"\n\n' for k in range(count))
+
+
+def _published_org(c, rows, **config):
+    """A PC whose last run published an org file of rows rows: its state, its copy and SharePoint's."""
+    c.config(raw=user_info_config(**config)).state(None, streams={"users": {"synced": True, "rows": rows}})
+    c.remote_file(f"Reports/{ORG_FILE}", LAST_ORG, 1)
+    c.data.mkdir(parents=True, exist_ok=True)
+    with open(c.data / "current_Users.csv", "w", encoding="utf-8", newline="") as handle:
+        handle.write(LAST_ORG)
+    return c
+
+
+@refresh_case("user-info-checks")
+def _user_info_checks(c):
+    _published_org(c, 12345)
+    # Held-back files stay 30 days, like set-aside ones; other CSVs go after keepRunFilesDays.
+    c.file(f"data/held-back-20250101-000000-{ORG_FILE}", 10)
+    c.file(f"data/held-back-20240101-000000-{ORG_FILE}", 31)
+    c.file("data/old-export.csv", 10)
+    for text in ("Id,displayName\n{row},Someone\n", "userPrincipalName,displayName\n", "<empty>", quoted_org_rows(2)):
+        c.run(env={"STUB_USER_CSV": text})
+    c.run(AcceptDrop=True, env={"STUB_USER_CSV": quoted_org_rows(3)})
+
+
+@refresh_case("user-info-drop")
+def _user_info_drop(c):
+    _published_org(c, 20, acceptDropHint=DROP_HINT)
+    c.run(env={"STUB_USER_CSV": org_rows(10)})
+    c.run(env={"STUB_USER_CSV": org_rows(4)})
+    c.run(AcceptDrop=True, env={"STUB_USER_CSV": org_rows(4)})
+    c.run(env={"STUB_USER_CSV": org_rows(1)})
+    c.run(AcceptDrop=True, env={"STUB_USER_CSV": "userPrincipalName,displayName\n"})
+    c.run(env={"STUB_USER_CSV": org_rows(9), "STUB_UPLOAD_FAIL": ORG_FILE})
+    c.run(env={"STUB_USER_CSV": org_rows(2)})
+
+
+@refresh_case("accept-drop-audit")
+def _accept_drop_audit(c):
+    # The lock is held throughout, so a refusal that came after it would say another run is busy.
+    c.spec["holdLock"] = True
+    c.config().run(AcceptDrop=True)
+
+
 @needs_pwsh
 @needs_windows
 class RefreshTests(unittest.TestCase):
@@ -1405,6 +1534,190 @@ class RefreshTests(unittest.TestCase):
                 self.assertEqual([path for path in files if path == "state.json" or "/" in path], [])
         self.assertEqual((c.log("pax"), c.log("upload")), ([], []))
 
+    def test_a_user_info_run_reads_only_the_user_directory_and_replaces_the_library_copy_whole(self):
+        c = self.case("user-info")
+        for n in (1, 2):
+            with self.subTest(run=n):
+                self.assertEqual(c.exit(n), 0, c.output(n))
+                pax = c.log("pax", n)
+                # One pass, with no dates, no file to append to and no Agent 365 registry.
+                self.assertEqual(len(pax), 1)
+                self.assertEqual(pax[0]["params"], {
+                    "TenantId": TENANT, "ClientId": CLIENT, "OnlyUserInfo": "True", "WorkRoot": str(c.install / "work"),
+                    "PaxReleaseTag": PAX_TAG, "PaxSha256": PAX_SHA, "SkipVersionCheck": "True"})
+                # Nothing is read back from the library: the run's file is the whole directory.
+                self.assertEqual(c.graph(n), [G("Reports", 200)])
+                self.assertEqual(c.downloads(n), [])
+                self.assertEqual(self.uploads(c, n), [(str(c.data / "current_Users.csv"), ORG_FILE, "/Reports")])
+                self.assertEqual(c.log("upload", n)[0]["content"].splitlines(), ["userPrincipalName", f"row-from-run-{n}"])
+                state = self.assertState(c, n, lastResult="success", lastError=None, lastMessage=USER_INFO_MESSAGE,
+                                         days=None, coveredThroughUtc=None, gapFromUtc=None, gapWarning=None,
+                                         progress=None, heldBack=None)
+                self.assertEqual(list(state["streams"]), ["users"])
+                users = state["streams"]["users"]
+                # The rows it published are what the next run's file is checked against.
+                self.assertEqual((users["mode"], users["synced"], users["updated"], users["rows"]),
+                                 ("replace", True, True, 1))
+                self.assertEqual([path for path in c.files_after(n) if path.startswith("data/")], ["data/current_Users.csv"])
+        # The library holds the second run's directory alone, and no audit file.
+        self.assertEqual(sorted(path for path, item in c.result["remote"].items() if not item["folder"]),
+                         [f"Reports/{ORG_FILE}"])
+        self.assertEqual(c.remote_lines(f"Reports/{ORG_FILE}"), ["userPrincipalName", "row-from-run-2"])
+
+    def test_a_user_info_run_on_a_new_machine_replaces_the_library_copy_without_reading_it(self):
+        c = self.case("user-info-new-machine")
+        self.assertEqual(c.exit(1), 0, c.output(1))
+        self.assertEqual(c.graph(1), [G("Reports", 200)])
+        self.assertEqual(c.downloads(1), [])
+        self.assertNotIn("AppendUserInfo", c.log("pax", 1)[0]["params"])
+        self.assertEqual([path for path in c.files_after(1) if "set-aside" in path], [])
+        self.assertEqual(self.remote_names(c, 1), [ORG_FILE])
+        self.assertEqual(c.remote_lines(f"Reports/{ORG_FILE}"), ["userPrincipalName", "row-from-run-1"])
+        self.assertState(c, 1, lastResult="success", lastError=None, lastMessage=USER_INFO_MESSAGE)
+
+    def test_a_user_info_reinstall_drops_the_earlier_load_and_replaces_the_directory_whole(self):
+        c = self.case("user-info-reinstall")
+        self.assertEqual(c.exit(1), 0, c.output(1))
+        self.assertEqual(c.graph(1), [G("Reports", 200)])
+        self.assertEqual(c.downloads(1), [])
+        params = c.log("pax", 1)[0]["params"]
+        self.assertEqual(set(params) & {"Days", "StartDate", "EndDate", "AppendFile", "AppendUserInfo"}, set())
+        # It reads no dates, so it has no windows, no day before and nothing to warn about.
+        for text in ("never finished its first window", "==> Window", "a day early", "without the day before"):
+            self.assertNotIn(text, c.output(1))
+        state = self.assertState(c, 1, lastResult="success", lastMessage=USER_INFO_MESSAGE, coveredThroughUtc=None,
+                                 gapFromUtc=None, gapDays=None, gapWarning=None, progress=None)
+        self.assertEqual(list(state["streams"]), ["users"])
+        self.assertEqual((c.data / "current_Users.csv").read_text(encoding="utf-8-sig").splitlines(),
+                         ["userPrincipalName", "row-from-run-1"])
+        self.assertEqual(c.remote_lines(f"Reports/{ORG_FILE}"), ["userPrincipalName", "row-from-run-1"])
+
+    def test_days_is_refused_in_user_info_mode_before_the_lock(self):
+        c = self.case("user-info-days")
+        self.assertEqual(c.exit(1), 1, c.output(1))
+        self.assertIn(USER_INFO_DAYS_MESSAGE, c.output(1))
+        self.assertNotIn(BUSY_MESSAGE, c.output(1))
+        self.assertEqual(set(c.files_after(1)), {"refresh.json", "refresh.lock"})
+        self.assertEqual(c.log("credential"), [])
+        self.assertEqual(c.log("pax"), [])
+        self.assertEqual(c.tokens(1), [])
+
+    def test_a_user_info_run_that_pax_failed_or_didnt_write_uploads_nothing(self):
+        c = self.case("user-info-fail")
+        self.assertEqual(c.exit(1), 1, c.output(1))
+        state = c.state_after(1)
+        self.assertEqual(state["lastError"], (
+            "The PAX run failed (exit code 1). PAX couldn't read users from Entra ID. Check that the app still has "
+            f"the User.Read.All permission. PAX failed. The log is {state['lastLog']}."))
+        # The earlier run's file is in the work folder, and the run's own check keeps it out.
+        self.assertEqual(c.exit(2), 1, c.output(2))
+        state = c.state_after(2)
+        self.assertEqual(state["lastError"],
+                         f"PAX didn't write the user directory, though it exited 0. The log is {state['lastLog']}.")
+        self.assertEqual(c.log("upload"), [])
+        self.assertNotIn(f"Reports/{ORG_FILE}", c.result["remote"])
+
+    def test_a_user_info_config_lists_its_own_problems(self):
+        c = self.case("user-info-invalid")
+        for n, path, problems in (
+                (1, c.config_path, ["files.users isn't a file name that SharePoint can use: 'bad?.csv'.",
+                                    "agent365 must be false in userInfo mode, which reads only the user directory."]),
+                (2, c.install / "refresh-2.json", ["mode is 'users', and this script reads audit or userInfo."])):
+            with self.subTest(run=n):
+                message = f"{path} has problems:\n  - " + "\n  - ".join(problems) + "\n" + HINT
+                self.assertEqual(c.exit(n), 1, c.output(n))
+                self.assertEqual(c.state_after(n)["lastError"].replace("\r\n", "\n"), message)
+        self.assertEqual(c.log("pax"), [])
+
+    def assertHeldBack(self, case, n, check, rows, columns, last_rows, message):
+        """Run n held PAX's file back: nothing reached SharePoint, this PC's copy and the baseline stand, and state.json,
+        the log and the exit code say which check failed. message's {kept} is the sentence naming the held-back file."""
+        self.assertEqual(case.exit(n), 1, case.output(n))
+        self.assertEqual((case.graph(n), case.log("upload", n)), ([], []))
+        before = case.files_after(n - 1)["data/current_Users.csv"] if n > 1 else len(LAST_ORG.encode())
+        self.assertEqual(case.files_after(n)["data/current_Users.csv"], before)
+        state = case.state_after(n)
+        held = state["heldBack"]
+        self.assertRegex(held["file"], "^" + re.escape(str(case.data)) + r"\\held-back-\d{8}-\d{6}-" + re.escape(ORG_FILE) + "$")
+        self.assertIn(Path(held["file"]).relative_to(case.install).as_posix(), case.files_after(n))
+        self.assertEqual(held, {"check": check, "rows": rows, "columns": columns, "lastRows": last_rows,
+                                "file": held["file"]})
+        expected = message.format(kept=f"SharePoint's {ORG_FILE} stays as it was, and PAX's file is now {held['file']}.")
+        self.assertEqual((state["lastResult"], state["lastError"], state["lastMessage"]), ("failed", expected, expected))
+        self.assertIn(flat(f"ERROR: {expected}"), flat(case.output(n)))
+        users = state["streams"]["users"]
+        self.assertEqual((users["synced"], users["updated"], users["rows"]), (True, False, last_rows))
+
+    def test_a_user_info_file_without_a_upn_column_or_rows_or_with_under_half_the_rows_is_held_back(self):
+        c = self.case("user-info-checks")
+        self.assertHeldBack(c, 1, "upn", 1, 2, 12345, (
+            "Held back: the user directory PAX read this run has no UPN column, such as userPrincipalName. It has "
+            "2 columns and 1 row. {kept}"))
+        self.assertHeldBack(c, 2, "rows", 0, 2, 12345, "Held back: the user directory PAX read this run has 0 rows. {kept}")
+        self.assertHeldBack(c, 3, "upn", 0, 0, 12345, (
+            "Held back: the user directory PAX read this run has no UPN column, such as userPrincipalName. It has "
+            "0 columns and 0 rows. {kept}"))
+        # Quoted names, with commas and line breaks inside quotes and blank lines between rows: 3 columns and 2 rows.
+        self.assertHeldBack(c, 4, "drop", 2, 3, 12345, (
+            f"Held back: the user directory PAX read this run has 2 rows, under half of the 12,345 rows in the {ORG_FILE} "
+            "this PC last published. {kept} If the drop is genuine, run this refresh once with -AcceptDrop."))
+        # -AcceptDrop publishes a smaller directory, which the next run is checked against.
+        self.assertEqual(c.exit(5), 0, c.output(5))
+        state = self.assertState(c, 5, lastResult="success", lastError=None, heldBack=None, lastMessage=(
+            f"{USER_INFO_MESSAGE} This run accepted the drop to 3 rows from the 12,345 rows this PC last published."))
+        self.assertEqual(state["streams"]["users"]["rows"], 3)
+        published = quoted_org_rows(3).replace("{row}", "row-from-run-5")
+        self.assertEqual(c.log("upload", 5)[0]["content"], published)
+        self.assertEqual(c.remote_lines(f"Reports/{ORG_FILE}"), published.splitlines())
+        self.assertNotIn("AcceptDrop", c.log("pax", 5)[0]["params"])
+        # Every file it held back is still on this PC, with the one from 10 days ago; older ones and old exports go.
+        files = c.files_after(5)
+        for n in range(1, 5):
+            self.assertIn(Path(c.state_after(n)["heldBack"]["file"]).relative_to(c.install).as_posix(), files)
+        self.assertIn(f"data/held-back-20250101-000000-{ORG_FILE}", files)
+        self.assertNotIn(f"data/held-back-20240101-000000-{ORG_FILE}", files)
+        self.assertNotIn("data/old-export.csv", files)
+
+    def test_accept_drop_is_for_one_run_and_only_a_published_file_sets_the_baseline(self):
+        c = self.case("user-info-drop")
+        published = {}
+        for n, rows in ((1, 10), (3, 4), (7, 2)):
+            with self.subTest(run=n):
+                self.assertEqual(c.exit(n), 0, c.output(n))
+                published[n] = org_rows(rows).replace("{row}", f"row-from-run-{n}")
+                self.assertEqual(c.log("upload", n)[0]["content"], published[n])
+                self.assertEqual(c.state_after(n)["streams"]["users"]["rows"], rows)
+        # Exactly half of the last file's rows passes.
+        self.assertState(c, 1, lastMessage=USER_INFO_MESSAGE, heldBack=None)
+        # refresh.json's acceptDropHint says how to accept it.
+        self.assertHeldBack(c, 2, "drop", 4, 2, 10, (
+            f"Held back: the user directory PAX read this run has 4 rows, under half of the 10 rows in the {ORG_FILE} "
+            "this PC last published. {kept} " + DROP_HINT))
+        self.assertState(c, 3, lastResult="success", heldBack=None, lastMessage=(
+            f"{USER_INFO_MESSAGE} This run accepted the drop to 4 rows from the 10 rows this PC last published."))
+        # The flag was for that run alone, and it doesn't accept an empty directory.
+        self.assertHeldBack(c, 4, "drop", 1, 2, 4, (
+            f"Held back: the user directory PAX read this run has 1 row, under half of the 4 rows in the {ORG_FILE} "
+            "this PC last published. {kept} " + DROP_HINT))
+        self.assertHeldBack(c, 5, "rows", 0, 2, 4, "Held back: the user directory PAX read this run has 0 rows. {kept}")
+        # A file that passed but didn't reach SharePoint leaves the baseline at 4, so 2 rows passes after it.
+        self.assertEqual(c.exit(6), 1, c.output(6))
+        state = c.state_after(6)
+        users = state["streams"]["users"]
+        self.assertTrue(users["error"].startswith(f"Uploading {ORG_FILE} to SharePoint failed: "), users["error"])
+        self.assertIn("HTTP 507 Insufficient Storage", state["lastError"])
+        self.assertEqual((state["lastResult"], state["heldBack"], users["rows"]), ("failed", None, 4))
+        self.assertState(c, 7, lastResult="success", lastMessage=USER_INFO_MESSAGE, heldBack=None)
+        self.assertEqual(c.remote_lines(f"Reports/{ORG_FILE}"), published[7].splitlines())
+
+    def test_accept_drop_is_refused_in_audit_mode_before_the_lock(self):
+        c = self.case("accept-drop-audit")
+        self.assertEqual(c.exit(1), 1, c.output(1))
+        self.assertIn(flat(ACCEPT_DROP_REFUSED), flat(c.output(1)))
+        self.assertNotIn(BUSY_MESSAGE, c.output(1))
+        self.assertEqual(set(c.files_after(1)), {"refresh.json", "refresh.lock"})
+        self.assertEqual((c.log("credential"), c.log("pax"), c.tokens(1)), ([], [], []))
+
 
 @needs_pwsh
 class RunnerSourceTests(unittest.TestCase):
@@ -1433,11 +1746,11 @@ class RunnerSourceTests(unittest.TestCase):
         # The secret travels in AIBV_CLIENT_SECRET, never on a command line that other processes can read.
         self.assertEqual(flags, {"TenantId", "ClientId", "Days", "StartDate", "EndDate", "WorkRoot", "PaxReleaseTag",
                                  "PaxSha256", "SkipVersionCheck", "AppendFile", "AppendUserInfo", "IncludeAgent365Info",
-                                 "Deidentify"})
+                                 "Deidentify", "OnlyUserInfo"})
         wrapper = self.params(WRAPPER)
         self.assertLessEqual(flags, set(wrapper), sorted(flags - set(wrapper)))
         self.assertEqual({name for name in flags if wrapper[name]["switch"]},
-                         {"SkipVersionCheck", "IncludeAgent365Info", "Deidentify"})
+                         {"SkipVersionCheck", "IncludeAgent365Info", "Deidentify", "OnlyUserInfo"})
 
     def test_send_file_binds_to_the_uploaders_single_file_set(self):
         keys = set(self.ast[REFRESH.name]["functions"]["Send-File"]["hashtableKeys"])

@@ -47,13 +47,32 @@
 
   Product names come only from refresh.json, so other products can reuse this script.
 
+  With "mode": "userInfo" in refresh.json, a refresh reads only the user directory. After
+  steps 1 and 2, Run-PAX-AIBV.ps1 -OnlyUserInfo runs once, with no audit query, window or
+  rollup, and needs no Python. Its file replaces files.users in the SharePoint folder whole,
+  so nothing is restored from SharePoint or carried over from the last run.
+
+  Before it replaces anything, a userInfo run checks PAX's file: it needs a UPN column, such
+  as userPrincipalName, at least one row, and at least half the rows of the last file this PC
+  published. The first run on a PC has no last file, so it skips that one. A file that fails a
+  check is held back: nothing is uploaded, so SharePoint keeps the last good copy, PAX's file
+  moves to data\held-back-<time>-<name>, and the run fails with a message that names the
+  check and the counts. state.json's heldBack says the same. When the directory really did
+  shrink, run once with -AcceptDrop.
+
 .PARAMETER Config
   The refresh.json that the installer wrote.
 
 .PARAMETER Days
   How many days of activity to ask PAX for, from 1 to 180, in place of the number this script
   works out. Use it once to fill a gap that state.json reports. The days are still read in
-  windows.
+  windows. A userInfo refresh reads no activity, so it refuses -Days.
+
+.PARAMETER AcceptDrop
+  A userInfo refresh only: publish this run's user directory even when it has under half the
+  rows of the last one, after a genuine drop such as a clean-up of old accounts. It counts for
+  this run alone, and the scheduled task never passes it, so the next run checks again. The
+  UPN column and row checks still apply.
 
 .PARAMETER Upload
   A local file to upload into the SharePoint folder.
@@ -69,12 +88,13 @@
 
 .NOTES
   Exit codes: 0 success; 1 failed; 2 another run holds the lock; 3 PAX found no Copilot
-  activity yet, so there was nothing to upload.
+  activity yet, so there was nothing to upload (audit mode only).
 #>
 [CmdletBinding(DefaultParameterSetName = 'Refresh')]
 param(
   [Parameter(Mandatory = $true)] [string]$Config,
   [Parameter(ParameterSetName = 'Refresh')] [ValidateRange(1, 180)] [int]$Days,
+  [Parameter(ParameterSetName = 'Refresh')] [switch]$AcceptDrop,
   [Parameter(ParameterSetName = 'Upload', Mandatory = $true)] [string]$Upload,
   [Parameter(ParameterSetName = 'Upload')] [string]$RemoteName,
   [Parameter(ParameterSetName = 'Upload')] [string]$RemoteFolder,
@@ -88,6 +108,10 @@ $PSNativeCommandUseErrorActionPreference = $false
 $script:ExitCode = 1
 $script:LastGraphStatus = $null
 $script:RepairHint = "Run the installer's repair command."
+$script:AcceptDropHint = 'If the drop is genuine, run this refresh once with -AcceptDrop.'
+# The user directory's UPN column, under any of the names the reports match it by, compared as
+# Get-ColumnKey leaves them.
+$script:UpnColumns = 'userprincipalname', 'upn', 'userprincipal'
 $script:Streams = [ordered]@{
   interactions = @{ Local = 'cumulative_Interactions.csv'; Manifest = 'interactions_csv' }
   users        = @{ Local = 'cumulative_Users.csv'; Manifest = 'users_csv' }
@@ -188,6 +212,7 @@ function Read-RefreshConfig {
   param([string]$Path)
   $config = [ordered]@{
     schema           = 1
+    mode             = 'audit'
     product          = 'Dashboard'
     tenantId         = $null
     clientId         = $null
@@ -213,6 +238,7 @@ function Read-RefreshConfig {
     agent365         = $false
     deidentify       = $false
     repairHint       = $script:RepairHint
+    acceptDropHint   = $script:AcceptDropHint
   }
   $problems = [System.Collections.Generic.List[string]]::new()
   $raw = Read-JsonFile $Path
@@ -223,8 +249,13 @@ function Read-RefreshConfig {
     foreach ($name in @($raw[$key].Keys)) { $config.files[$name] = $raw[$key][$name] }
   }
   if ($config.repairHint -is [string] -and $config.repairHint.Trim()) { $script:RepairHint = $config.repairHint.Trim() }
+  if ($config.acceptDropHint -is [string] -and $config.acceptDropHint.Trim()) { $script:AcceptDropHint = $config.acceptDropHint.Trim() }
 
   if ($config.schema -ne 1) { $problems.Add("schema is '$($config.schema)', and this script reads schema 1.") }
+  # userInfo reads only the user directory, as one file that each run replaces whole.
+  $userInfo = $config.mode -eq 'userInfo'
+  if ($config.mode -notin 'audit', 'userInfo') { $problems.Add("mode is '$($config.mode)', and this script reads audit or userInfo.") }
+  if ($userInfo) { $config.files = @{ users = $config.files.users } }
   $guid = [guid]::Empty
   foreach ($key in 'tenantId', 'clientId') {
     if (-not ($config[$key] -is [string] -and [guid]::TryParse($config[$key], [ref]$guid))) { $problems.Add("$key must be a GUID.") }
@@ -251,7 +282,7 @@ function Read-RefreshConfig {
     }
   }
   $names = @()
-  foreach ($key in $script:Streams.Keys) {
+  foreach ($key in $(if ($userInfo) { 'users' } else { $script:Streams.Keys })) {
     $name = $config.files[$key]
     if ($name -is [string] -and (Test-FileName $name)) { $names += $name }
     else { $problems.Add("files.$key isn't a file name that SharePoint can use: '$name'.") }
@@ -283,6 +314,7 @@ function Read-RefreshConfig {
   foreach ($key in 'agent365', 'deidentify') {
     if ($config[$key] -isnot [bool]) { $problems.Add("$key must be true or false.") }
   }
+  if ($userInfo -and $config.agent365 -eq $true) { $problems.Add('agent365 must be false in userInfo mode, which reads only the user directory.') }
   if ($problems.Count) {
     throw ("{0} has problems:`n  - {1}`n{2}" -f $Path, ($problems -join "`n  - "), $script:RepairHint)
   }
@@ -295,7 +327,7 @@ function Read-RefreshConfig {
 function New-StreamState {
   param($Previous)
   if ($Previous -isnot [hashtable]) { $Previous = @{} }
-  return [ordered]@{
+  $stream = [ordered]@{
     mode        = $null
     synced      = ($Previous.synced -eq $true)
     updated     = $false
@@ -305,6 +337,11 @@ function New-StreamState {
     error       = $null
     warning     = $null
   }
+  # The rows in the last user directory that a userInfo run published, which the next run's
+  # file is checked against.
+  $rows = $Previous.rows
+  if (($rows -is [int] -or $rows -is [long]) -and $rows -ge 1) { $stream.rows = [long]$rows }
+  return $stream
 }
 
 function ConvertTo-Progress {
@@ -465,7 +502,7 @@ function Stop-RunLog {
 }
 
 function Remove-OldFiles {
-  # Run files go after keepRunFilesDays; logs and files set aside after 30 days.
+  # Run files go after keepRunFilesDays; logs and files set aside or held back after 30 days.
   # work\pax, the PAX download, is never touched.
   $keepDays = if ($script:Cfg) { $script:Cfg.keepRunFilesDays } else { 3 }
   $managed = @($script:Streams.Values | ForEach-Object { $_.Local })
@@ -474,7 +511,8 @@ function Remove-OldFiles {
     if (-not (Test-Path -LiteralPath $folder)) { continue }
     foreach ($file in @(Get-ChildItem -LiteralPath $folder -File)) {
       if ($file.Name -in $managed) { continue }
-      $limit = if ($file.Extension -eq '.csv' -and $file.Name -notlike 'set-aside-*') { $keepDays } else { 30 }
+      $kept = $file.Name -like 'set-aside-*' -or $file.Name -like 'held-back-*'
+      $limit = if ($file.Extension -eq '.csv' -and -not $kept) { $keepDays } else { 30 }
       if (($now - $file.LastWriteTimeUtc).TotalDays -le $limit) { continue }
       try { Remove-Item -LiteralPath $file.FullName -Force }
       catch { Write-Warning "Couldn't remove the old file $($file.FullName): $($_.Exception.Message)" }
@@ -848,7 +886,9 @@ function Invoke-PaxChild {
   $arguments.AddRange([string[]]@(
       '-NoProfile', '-NonInteractive', '-File', (Join-Path $PSScriptRoot 'Run-PAX-AIBV.ps1'),
       '-TenantId', $cfg.tenantId, '-ClientId', $cfg.clientId))
-  if (@($script:Windows).Count -gt 1 -or $Window.Early) {
+  if ($cfg.mode -eq 'userInfo') {
+    $arguments.Add('-OnlyUserInfo')
+  } elseif (@($script:Windows).Count -gt 1 -or $Window.Early) {
     # PAX reads from the start date up to, but not including, the end date.
     $from = if ($Window.Early) { $Window.From.AddDays(-1) } else { $Window.From }
     $arguments.AddRange([string[]]@(
@@ -870,7 +910,7 @@ function Invoke-PaxChild {
   # A file that an earlier window wrote can look new to this one, so each file's time is
   # recorded first. Test-FreshFile passes only a file whose time then changes.
   $script:WrittenBefore = @{}
-  $files = @(Get-LocalPath 'interactions'; Get-LocalPath 'users')
+  $files = @(foreach ($name in 'interactions', 'users') { if ($script:Streams.Contains($name)) { Get-LocalPath $name } })
   $processed = Join-Path $script:WorkDir 'processed'
   if (Test-Path -LiteralPath $processed) {
     $files += @(Get-ChildItem -LiteralPath $processed -File -Recurse -Force | ForEach-Object FullName)
@@ -1034,6 +1074,114 @@ function Complete-PaxRun {
   $script:WindowRead = $true
 }
 
+function Measure-UserFile {
+  # The user directory's column names and row count. A quoted field can hold commas and line
+  # breaks, so a row starts only on a line that begins outside quotes. Blank lines aren't rows.
+  param([string]$Path)
+  $header = $null
+  $text = [System.Text.StringBuilder]::new()
+  $rows = 0L
+  $inQuotes = $false
+  $reader = [System.IO.StreamReader]::new($Path, [System.Text.Encoding]::UTF8, $true)
+  try {
+    while ($null -ne ($line = $reader.ReadLine())) {
+      $starts = -not $inQuotes
+      if ($starts -and -not $line.Trim()) { continue }
+      if ($null -eq $header) {
+        if ($text.Length) { [void]$text.Append("`n") }
+        [void]$text.Append($line)
+      } elseif ($starts) {
+        $rows++
+      }
+      if ($line.Contains('"') -and ($line.Length - $line.Replace('"', '').Length) % 2) { $inQuotes = -not $inQuotes }
+      if ($null -eq $header -and -not $inQuotes) { $header = $text.ToString() }
+    }
+  } finally {
+    $reader.Dispose()
+  }
+  $columns = [System.Collections.Generic.List[string]]::new()
+  if ($null -ne $header) {
+    $chars = $header.TrimStart([char]0xFEFF)
+    $field = [System.Text.StringBuilder]::new()
+    $quoted = $false
+    for ($i = 0; $i -lt $chars.Length; $i++) {
+      $c = $chars[$i]
+      if ($quoted) {
+        if ($c -ne '"') { [void]$field.Append($c) }
+        elseif ($i + 1 -lt $chars.Length -and $chars[$i + 1] -eq '"') { [void]$field.Append('"'); $i++ }
+        else { $quoted = $false }
+      } elseif ($c -eq '"') {
+        $quoted = $true
+      } elseif ($c -eq ',') {
+        $columns.Add($field.ToString().Trim())
+        [void]$field.Clear()
+      } else {
+        [void]$field.Append($c)
+      }
+    }
+    $columns.Add($field.ToString().Trim())
+  }
+  return [pscustomobject]@{ Columns = $columns.ToArray(); Rows = $rows }
+}
+
+function Format-Count {
+  param([long]$Count, [string]$Noun)
+  $number = $Count.ToString('N0', [cultureinfo]::InvariantCulture)
+  if ($Count -eq 1) { return "$number $Noun" }
+  return "$number ${Noun}s"
+}
+
+function Complete-UserInfoRun {
+  # Takes the user directory that PAX wrote this run, to replace the last one whole, once it has
+  # a UPN column, at least one row, and at least half the rows of the last one this PC
+  # published. A file that fails a check is held back, so SharePoint keeps the last good copy.
+  if ($script:ChildExit -ne 0) { throw (Get-PaxFailure) }
+  $manifest = @{}
+  $manifestPath = Join-Path $script:WorkDir 'processed\rollup-manifest.json'
+  if (Test-FreshFile $manifestPath) { $manifest = Read-JsonFile $manifestPath }
+  $made = $manifest[$script:Streams.users.Manifest]
+  if (-not ($made -and (Test-FreshFile $made))) {
+    throw "PAX didn't write the user directory, though it exited 0. The log is $($script:LogPath)."
+  }
+  $users = $script:State.streams.users
+  $name = $script:Cfg.files.users
+  $file = Measure-UserFile $made
+  $rows = $file.Rows
+  $last = $users.rows
+  # The column names as the reports match them: lower case, without spaces, _ or -.
+  $keys = @($file.Columns | ForEach-Object { $_.ToLowerInvariant().Replace(' ', '').Replace('_', '').Replace('-', '') })
+  $check = $null
+  if (-not @($keys | Where-Object { $_ -in $script:UpnColumns }).Count) { $check = 'upn' }
+  elseif ($rows -lt 1) { $check = 'rows' }
+  elseif ($last -and $rows * 2 -lt $last) {
+    if ($script:AcceptDrop) { $script:AcceptedDrop = $true } else { $check = 'drop' }
+  }
+  if ($check) {
+    $stamp = [datetime]::UtcNow.ToString('yyyyMMdd-HHmmss', [cultureinfo]::InvariantCulture)
+    $aside = Join-Path $script:DataDir "held-back-$stamp-$name"
+    Move-Item -LiteralPath $made -Destination $aside -Force
+    $kept = "SharePoint's $name stays as it was, and PAX's file is now $aside."
+    $message = switch ($check) {
+      'upn' { "Held back: the user directory PAX read this run has no UPN column, such as userPrincipalName. It has $(Format-Count $file.Columns.Count 'column') and $(Format-Count $rows 'row'). $kept" }
+      'rows' { "Held back: the user directory PAX read this run has 0 rows. $kept" }
+      'drop' { "Held back: the user directory PAX read this run has $(Format-Count $rows 'row'), under half of the $(Format-Count $last 'row') in the $name this PC last published. $kept $($script:AcceptDropHint)" }
+    }
+    $script:State.heldBack = [ordered]@{
+      check    = $check
+      rows     = $rows
+      columns  = $file.Columns.Count
+      lastRows = $last
+      file     = $aside
+    }
+    $script:State.lastMessage = $message
+    throw $message
+  }
+  Move-Item -LiteralPath $made -Destination (Get-LocalPath 'users') -Force
+  $users.updated = $true
+  $script:UserRows = $rows
+  $script:LastUserRows = $last
+}
+
 function Update-Coverage {
   # Records how far the cumulative files reach, and the oldest day they may be missing when
   # the refresh didn't run for longer than this run looks back. Save-State turns that day
@@ -1083,7 +1231,8 @@ function Publish-Streams {
     if ($stream.error) { $problems.Add($stream.error); continue }
     if ($name -eq 'agents365' -and -not $stream.updated) { continue }
     $local = Get-LocalPath $name
-    if (-not $stream.synced -and $name -ne 'agents365') {
+    # A file that replaces SharePoint's copy whole needs no check on who wrote that copy.
+    if (-not $stream.synced -and $stream.mode -ne 'replace') {
       # A file this machine didn't upload or restore may hold another machine's data.
       try { $existing = Get-RemoteItem $name }
       catch { $stream.error = $_.Exception.Message; $problems.Add($stream.error); continue }
@@ -1121,6 +1270,10 @@ function Invoke-Refresh {
   $library = if ($cfg.driveId) { $cfg.driveId } else { $cfg.library }
   Write-Host "SharePoint site $($cfg.siteId), library $library, folder $($cfg.folderPath)"
   New-Item -ItemType Directory -Force -Path $script:DataDir, $script:WorkDir | Out-Null
+  if ($cfg.mode -eq 'userInfo') {
+    Invoke-UserInfoRefresh
+    return
+  }
   Get-AppSecret
   Test-Python
   Connect-Graph
@@ -1199,6 +1352,37 @@ function Invoke-Refresh {
   $script:ExitCode = 0
 }
 
+function Invoke-UserInfoRefresh {
+  # One PAX pass reads the whole user directory, and its file replaces the last one whole, here
+  # and in SharePoint. So a new machine or a reinstall has nothing to restore or carry on from.
+  $state = $script:State
+  $script:Streams = [ordered]@{ users = @{ Local = 'current_Users.csv'; Manifest = 'users_csv' } }
+  $users = $state.streams.users
+  $state.streams = [ordered]@{ users = $users }
+  $users.mode = 'replace'
+  $state.progress = $null
+  $state.gapFromUtc = $null
+  $state.coveredThroughUtc = $null
+  $state.heldBack = $null
+  Get-AppSecret
+  Connect-Graph
+  Resolve-Drive
+  Write-Host 'PAX reads the user directory, with no audit activity.'
+  Invoke-PaxChild
+  Complete-UserInfoRun
+  Publish-Streams
+  # Only a file that reached SharePoint sets the rows the next run is checked against.
+  $users.rows = $script:UserRows
+  $state.lastResult = 'success'
+  $state.lastSuccessUtc = Format-UtcDate ([datetime]::UtcNow)
+  $state.lastMessage = "SharePoint's $($script:Cfg.files.users) holds the user directory as this run read it."
+  if ($script:AcceptedDrop) {
+    $state.lastMessage += " This run accepted the drop to $(Format-Count $script:UserRows 'row') from the $(Format-Count $script:LastUserRows 'row') this PC last published."
+  }
+  Write-Host $state.lastMessage
+  $script:ExitCode = 0
+}
+
 function Invoke-Upload {
   $script:Cfg = Read-RefreshConfig $script:ConfigPath
   if (-not (Test-Path -LiteralPath $script:UploadPath -PathType Leaf)) { throw "There's no file at $($script:UploadPath)." }
@@ -1250,6 +1434,7 @@ $script:WorkDir = Join-Path $script:Root 'work'
 $script:LogsDir = Join-Path $script:Root 'logs'
 $script:StatePath = Join-Path $script:Root 'state.json'
 if ($PSBoundParameters.ContainsKey('Days')) { $script:DaysOverride = $Days }
+$script:AcceptDrop = [bool]$AcceptDrop
 
 if ($PSCmdlet.ParameterSetName -eq 'Check') {
   # Like -Upload, a check keeps no state and doesn't wait for a scheduled refresh.
@@ -1281,6 +1466,19 @@ if ($PSCmdlet.ParameterSetName -eq 'Upload') {
     $script:GraphToken = $null
   }
   exit $script:ExitCode
+}
+
+if ($script:DaysOverride -or $script:AcceptDrop) {
+  # Only the mode is read here. A refresh.json with problems fails in the run, as usual.
+  $mode = try { (Read-JsonFile $script:ConfigPath).mode } catch { $null }
+  if ($script:DaysOverride -and $mode -eq 'userInfo') {
+    Write-Host 'ERROR: -Days says how many days of audit activity to read, and this refresh reads only the user directory, which every run replaces whole. Run it without -Days.'
+    exit 1
+  }
+  if ($script:AcceptDrop -and $mode -ne 'userInfo') {
+    Write-Host "ERROR: -AcceptDrop lets a refresh that reads only the user directory publish one with under half the rows of the last, and this refresh.json doesn't set mode userInfo. Run it without -AcceptDrop."
+    exit 1
+  }
 }
 
 if (-not (Enter-RunLock)) {

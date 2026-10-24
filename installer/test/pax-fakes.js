@@ -7,6 +7,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
+import { commandLine } from '../src/launch.js';
 import { PRODUCT } from '../src/product.js';
 import { paxPaths, PWSH_PROBE } from '../src/steps/pax/local.js';
 
@@ -18,13 +19,30 @@ import { paxPaths, PWSH_PROBE } from '../src/steps/pax/local.js';
  * `credential <Action>`, `task <Action>`, `refresh check`, `refresh upload` or `refresh run`.
  * @typedef {{ key: string, file: string, args: string[], input?: string }} PaxCall
  *
- * @typedef {'success' | 'no-data' | 'failed' | 'running' | 'busy' | 'partial'} FakeRun
+ * @typedef {'success' | 'no-data' | 'failed' | 'running' | 'busy' | 'partial' | 'held' | 'held-upn'} FakeRun
  *   `partial` is a success that stopped part way through a long load, leaving the rest to the
- *   next run, as refresh.ps1 does to stay inside the task's time limit.
+ *   next run, as refresh.ps1 does to stay inside the task's time limit. `held` is a user
+ *   directory with under half the rows of the last one, which refresh.ps1 holds back from
+ *   SharePoint unless it runs with -AcceptDrop. `held-upn` has no UPN column, which -AcceptDrop
+ *   doesn't publish.
  */
 
 /** What refresh.ps1 says when it stops part way through a load. */
 export const PARTIAL_MESSAGE = "This run loaded activity up to 2026-05-14, then stopped to stay inside the task's time limit. SharePoint has everything loaded so far, and the next scheduled run carries on from there.";
+
+const ORG = PRODUCT.pax.files.users;
+/** Where refresh.ps1 puts a user directory it held back. */
+export const HELD_FILE = `C:\\Users\\admin\\${PRODUCT.home}\\${PRODUCT.pax.folder}\\data\\held-back-20260601-120000-${ORG}`;
+const KEPT = `SharePoint's ${ORG} stays as it was, and PAX's file is now ${HELD_FILE}.`;
+
+/** What refresh.ps1 says when it holds back a drop, with the hint refresh.json gives it. */
+export const HELD_MESSAGE = `Held back: the user directory PAX read this run has 4 rows, under half of the 20 rows in the ${ORG} this PC last published. ${KEPT} If the drop is genuine, run: ${commandLine('run --accept-drop')}`;
+
+/** What refresh.ps1 says when it holds back a user directory with no UPN column. */
+export const HELD_UPN_MESSAGE = `Held back: the user directory PAX read this run has no UPN column, such as userPrincipalName. It has 3 columns and 20 rows. ${KEPT}`;
+
+/** What refresh.ps1 -AcceptDrop says when it publishes a drop. */
+export const ACCEPTED_MESSAGE = `SharePoint's ${ORG} holds the user directory as this run read it. This run accepted the drop to 4 rows from the 20 rows this PC last published.`;
 
 /** A script that printed one line of JSON and exited 0. @param {any} json @returns {RunResult} */
 export const printed = (json) => ({ code: 0, stdout: `${JSON.stringify(json)}\n`, stderr: '' });
@@ -80,7 +98,7 @@ export function fakePaxHost(o = {}) {
   const tasks = {};
   /** Files uploaded with refresh.ps1 -Upload. @type {{ file: string, remoteName?: string, remoteFolder?: string }[]} */
   const uploads = [];
-  /** Each refresh.ps1 run in this window, with its -Days. @type {{ days?: number }[]} */
+  /** Each refresh.ps1 run in this window, with its -Days and -AcceptDrop. @type {{ days?: number, acceptDrop?: true }[]} */
   const refreshes = [];
   /** @type {Record<string, (RunResult | ((call: PaxCall) => RunResult))[]>} */
   const answer = {};
@@ -100,8 +118,9 @@ export function fakePaxHost(o = {}) {
    * @param {FakeRun} result
    * @param {string} [taskName]
    * @param {number} [days]  The load's -Days, for a partial run. Default 90.
+   * @param {boolean} [acceptDrop]  The run had -AcceptDrop, which publishes a `held` drop.
    */
-  const finishRun = (result, taskName, days = 90) => {
+  const finishRun = (result, taskName, days = 90, acceptDrop = false) => {
     const at = now().toISOString();
     const task = taskName ? tasks[taskName] : undefined;
     if (result === 'running') {
@@ -112,14 +131,19 @@ export function fakePaxHost(o = {}) {
       if (task) Object.assign(task, { state: 'Ready', lastRunTime: at, lastTaskResult: EXIT_BUSY, neverRan: false });
       return;
     }
+    const accepted = result === 'held' && acceptDrop;
+    const held = !accepted && (result === 'held' || result === 'held-upn');
+    const heldMessage = result === 'held' ? HELD_MESSAGE : HELD_UPN_MESSAGE;
+    const worked = result === 'success' || result === 'partial' || accepted;
     const partial = result === 'partial';
     const from = now().getTime() - days * 86_400_000;
     writeState({
       lastRunUtc: at,
-      lastResult: partial ? 'success' : result,
-      lastError: result === 'failed' ? 'PAX could not sign in.' : null,
-      lastMessage: result === 'no-data' ? 'PAX found no Copilot activity.' : partial ? PARTIAL_MESSAGE : null,
-      ...(result === 'success' || partial ? { lastSuccessUtc: at } : {}),
+      lastResult: worked ? 'success' : held ? 'failed' : result,
+      lastError: result === 'failed' ? 'PAX could not sign in.' : held ? heldMessage : null,
+      lastMessage: result === 'no-data' ? 'PAX found no Copilot activity.' : partial ? PARTIAL_MESSAGE : accepted ? ACCEPTED_MESSAGE : held ? heldMessage : null,
+      ...(worked ? { lastSuccessUtc: at } : {}),
+      ...(held ? { heldBack: { check: result === 'held' ? 'drop' : 'upn', rows: result === 'held' ? 4 : 20, columns: 3, lastRows: 20, file: HELD_FILE } } : {}),
       ...(partial
         ? {
             progress: {
@@ -134,7 +158,7 @@ export function fakePaxHost(o = {}) {
         : {}),
       lastLog: join(root, 'logs', 'refresh.log'),
     });
-    if (task) Object.assign(task, { state: 'Ready', lastRunTime: at, lastTaskResult: result === 'failed' ? 1 : 0, neverRan: false });
+    if (task) Object.assign(task, { state: 'Ready', lastRunTime: at, lastTaskResult: worked || result === 'no-data' ? 0 : 1, neverRan: false });
   };
 
   /** @param {PaxCall} call @returns {RunResult} */
@@ -210,11 +234,13 @@ export function fakePaxHost(o = {}) {
         return { code: 0, stdout: 'Uploaded.\n', stderr: '' };
       case 'refresh run': {
         const days = argOf(args, '-Days');
-        refreshes.push(days ? { days: Number(days) } : {});
+        const acceptDrop = args.includes('-AcceptDrop');
+        refreshes.push({ ...(days ? { days: Number(days) } : {}), ...(acceptDrop ? { acceptDrop: /** @type {const} */ (true) } : {}) });
         if (state.run === 'busy') return failed('Another refresh is running.', EXIT_BUSY);
-        finishRun(state.run === 'running' ? 'success' : state.run, undefined, days ? Number(days) : undefined);
+        finishRun(state.run === 'running' ? 'success' : state.run, undefined, days ? Number(days) : undefined, acceptDrop);
         if (state.run === 'no-data') return { code: EXIT_NO_DATA, stdout: 'PAX found no Copilot activity.\n', stderr: '' };
         if (state.run === 'failed') return failed('PAX could not sign in.');
+        if (state.run === 'held-upn' || (state.run === 'held' && !acceptDrop)) return failed(state.run === 'held' ? HELD_MESSAGE : HELD_UPN_MESSAGE);
         return { code: 0, stdout: 'Done.\n', stderr: '' };
       }
       default:
