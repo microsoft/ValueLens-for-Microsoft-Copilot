@@ -153,7 +153,7 @@ export const POWER_BI_SETTINGS = [
   {
     name: 'CustomVisualsTenant',
     title: 'Allow visuals created using the Power BI SDK',
-    effect: 'The reports\' Tornado chart, Word cloud and Deneb visuals stay blank without it.',
+    effect: 'The report\'s Tornado chart and Word cloud visuals stay blank without it.',
     reports: true,
   },
 ];
