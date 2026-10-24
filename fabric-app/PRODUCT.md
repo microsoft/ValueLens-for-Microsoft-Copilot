@@ -18,7 +18,7 @@ still works at 390px wide.
 ## Purpose
 
 The ValueLens and Consumption Central reports as one app, or as one app each, over their live
-semantic models. It looks and navigates like the products' App Editions: a product switcher (in
+semantic models. It looks and navigates like the products' CSV apps: a product switcher (in
 the joined app), tabs and short sub-views instead of many report pages. Settings that were parameter tables (task times,
 prices, rates and budgets) are edited in the app.
 

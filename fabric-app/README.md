@@ -1,9 +1,10 @@
 # ValueLens and Consumption Central Fabric App
 
-ValueLens and Consumption Central as a web app in your Fabric workspace, in the App Edition's
-green design. It reads the products' published semantic models live: every figure comes from the
-models' own DAX measures, queried at the grain each view needs, as the person viewing it, so
-row-level security applies. The app keeps no copy of your data and never pulls raw rows.
+ValueLens and Consumption Central as a web app in your Fabric workspace, in the same green
+design as the products' CSV apps. It reads the products' published semantic models live: every
+figure comes from the models' own DAX measures, queried at the grain each view needs, as the
+person viewing it, so row-level security applies. The app keeps no copy of your data and never
+pulls raw rows.
 
 One codebase deploys as three apps. Each is its own Fabric item, so all three can sit in one
 workspace:

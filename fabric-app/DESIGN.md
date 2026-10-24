@@ -2,8 +2,8 @@
 
 This file records the shipped design: the tokens in [`src/global.css`](src/global.css) and the
 shell in [`src/components/app-shell.tsx`](src/components/app-shell.tsx). It follows the design
-of the ValueLens and Consumption Central App Editions, so they look and navigate alike. The
-difference is under the screens: the App Editions compute from uploaded CSVs in the browser, and
+of the ValueLens and Consumption Central apps (each repo's `app/`), so they look and navigate alike.
+The difference is under the screens: those apps compute from uploaded CSVs in the browser, and
 this app queries the semantic models live.
 
 ## Overview
@@ -47,7 +47,7 @@ The tokens are Tailwind theme variables, so every component reads them as utilit
 | `band-accent` | `#7fe0cf` | `#7fe0cf` | The active-tab underline and focus inside the band |
 | `segment` | `#e8eeec` | `#1f2d2b` | The segmented-control trough |
 
-- **Colour means something.** The `--vl-*` hues keep the App Editions' roles: teal for licensed
+- **Colour means something.** The `--vl-*` hues keep the CSV apps' roles: teal for licensed
   people, amber for unlicensed people, violet for agents, blue for Cowork, coral for bad.
   `positive`, `negative` and `caution` are the outcome colours on every page.
 - **Chart series** come from `--color-data-1` to `-10`. Consumption (`.palette-consumption`) leads

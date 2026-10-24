@@ -22,7 +22,7 @@ interface SectionProps {
 
 /**
  * A titled group of panels: a section title and one line saying what the
- * reader is looking at, as the App Editions head each group on a page.
+ * reader is looking at, as the CSV apps head each group on a page.
  */
 export function Section({ id, title, description, actions, children, className }: SectionProps) {
     return (
