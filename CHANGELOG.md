@@ -73,10 +73,16 @@ a second route that needs no Fabric.
   `valuelens-setup.json`, and the installer leaves Analytics Hub records and workspaces alone.
 - **Supporting changes.** The Fabric notebooks now match the Analytics Hub ones the installer
   deploys. `Run-PAX-AIBV.ps1` gains `-PaxSha256`, `-AppendUserInfo`, `-SkipVersionCheck`,
-  `-StartDate` and `-EndDate`. Its append runs work on PAX 1.11.15, and a run whose rollup step
-  failed now fails, even when PAX exits 0. `Upload-Rollups-SharePoint.ps1` gains `-File` and
-  `-RemoteName`. A contract test checks that the notebooks write every Lakehouse column the Fabric
-  template reads.
+  `-StartDate`, `-EndDate` and `-OnlyUserInfo`, which exports only the user directory. Its append
+  runs work on PAX 1.11.15, and a run whose rollup step failed now fails, even when PAX exits 0.
+  `Upload-Rollups-SharePoint.ps1` gains `-File` and `-RemoteName`. A contract test checks that the
+  notebooks write every Lakehouse column the Fabric template reads.
+- **Shared with Consumption Central.** Its installer copies the PAX route's code unchanged, so the
+  route has settings ValueLens leaves off: a folder parameter, parameter values from the install
+  record, a query read from a file, a privacy level, and a mode that exports only the user
+  directory, as one file replaced whole each run. In that mode, the run checks the file before it
+  uploads it, and holds back a file that looks wrong, such as one with under half the rows of the
+  last upload.
 
 `1. Fabric/installer` stays as it is for now. A follow-up removes it and points its links here.
 Nothing is released yet. The first tag will be `valuelens-installer-v0.1.0`.
