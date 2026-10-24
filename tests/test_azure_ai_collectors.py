@@ -80,7 +80,8 @@ def test_notebook_writes_every_new_table_with_matching_schema():
     for table, constant in (("azure_deployment_health", "HEALTH"), ("azure_solution_spend", "SOLUTION"),
                             ("azure_billing_reconciliation", "RECON")):
         assert f'LAKEHOUSE_{constant} = "{table}"' in " ".join(source.split())
-        assert f"saveAsTable(LAKEHOUSE_{constant})" in source
+        assert re.search(rf"write_windows\(\[\(spark\.createDataFrame\(\w+, schema={constant}_SCHEMA\), "
+                         rf"LAKEHOUSE_{constant},", source)
         schema = source.split(f'{constant}_SCHEMA = (', 1)[1].split(")\n", 1)[0]
         columns = [part.split()[0] for part in "".join(ast.literal_eval(f"({schema})")).split(", ")]
         assert columns == NOTEBOOK_NS[f"{constant}_HEADERS"]

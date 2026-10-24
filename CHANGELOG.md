@@ -18,12 +18,12 @@ Deployment instructions do **not** live here. They live in the READMEs:
 
 ---
 
-## Unreleased — Azure and Local CSV: Azure AI tables keep older rows
+## Unreleased — Azure AI tables keep older rows
 
-**Why.** The Azure route's `azure_ai` job and the Local CSV script `pull_azure_ai.py` (which the
-SharePoint add-on uses too) wrote each Azure AI table whole from the days they had just read, so a
-table never held more than the last 90 days. Each run now replaces only its own days and keeps the
-older rows.
+**Why.** The Fabric notebook `Ingest_Azure_AI`, the Azure route's `azure_ai` job and the Local CSV
+script `pull_azure_ai.py` (which the SharePoint add-on uses too) wrote each Azure AI table whole
+from the days they had just read, so a table never held more than the last 90 days. Each run now
+replaces only its own days and keeps the older rows.
 
 - **A run replaces its days.** Rows from the window's first day onwards are replaced, and older rows
   are kept. Rows with no date are always replaced. A source that returns no rows still replaces its
@@ -36,21 +36,26 @@ older rows.
 - **A stored table that can't be read isn't counted as empty.** A failed download or a corrupt file
   fails that table's write and leaves it as it was: counting it as empty would cut it back to 90
   days.
-  - The job reads all three strict tables (`azure_ai_spend`, `azure_ai_tokens` and
-    `copilot_payg_spend`) before it writes any, so when one can't be read, none of them is replaced.
-    A best-effort table is left as it was, with a warning.
+  - The notebook and the job check all three strict tables (`azure_ai_spend`, `azure_ai_tokens` and
+    `copilot_payg_spend`) before they write any, so when one can't be read, none of them is
+    replaced. A best-effort table is left as it was, with a warning.
   - The script publishes nothing when `AzureAiSpendDaily.csv` or `AzureAiTokensDaily.csv` can't be
     read, and leaves a best-effort CSV as it was, with a warning. Fix the file, or delete it to
     start it again.
+- **The notebook writes each table with Delta's `replaceWhere`.** That's one write per table, so a
+  write that fails leaves its table as it was. The six tables together aren't one transaction.
+  `mergeSchema` adds new columns. A column that has changed type stops the write and names the
+  column: the run stops if it's one of the three strict tables, and a best-effort table is left as
+  it was, with a warning. To start a table over, drop it and run the notebook again; its older rows
+  are lost.
 - **Otherwise the same.** A best-effort source that fails still leaves its table as it was.
   `AzureAiDeployments.csv` is the current inventory, so it's still replaced whole. The SQL publish
   copies the lake table, so SQL keeps the older days too.
-- The Fabric notebook `Ingest_Azure_AI` gets the month rule as a helper in its block of shared
-  helpers, which `tests/test_azure_ai_collectors.py` keeps identical in all three copies. The
-  notebook doesn't call it yet: a follow-up changes how it writes.
+- The month rule is a helper in the block of shared helpers, which `tests/test_azure_ai_collectors.py`
+  keeps identical in all three copies, so the notebook, the job and the script decide the same way.
 
-Azure installs get this with the next `valuelens-jobs` image. For Local CSV and SharePoint, download
-`pull_azure_ai.py` again.
+For Fabric, import `Ingest_Azure_AI` again. Azure installs get this with the next `valuelens-jobs`
+image. For Local CSV and SharePoint, download `pull_azure_ai.py` again.
 
 ---
 
