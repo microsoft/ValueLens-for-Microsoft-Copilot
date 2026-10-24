@@ -99,6 +99,12 @@ if ($env:PAX_STUB_SKIP_MERGE -ne '1') {
   if ($AppendFile) { Add-Content -LiteralPath $AppendFile -Value 'merged' }
   if ($AppendUserInfo) { Add-Content -LiteralPath $AppendUserInfo -Value 'merged' }
 }
+if ($env:PAX_STUB_MODE -eq 'coarse-time') {
+  # A file system can stamp a write slightly earlier than the caller's Get-Date.
+  foreach ($file in @($AppendFile, $AppendUserInfo) | Where-Object { $_ }) {
+    (Get-Item -LiteralPath $file).LastWriteTime = (Get-Date).AddSeconds(-1)
+  }
+}
 if ($OutputPath) { Set-Content -LiteralPath (Join-Path $OutputPath 'Purview_Stub_Interactions.csv') -Value 'Message_Id_Raw' }
 if ($OutputPathUserInfo) { Set-Content -LiteralPath (Join-Path $OutputPathUserInfo 'EntraUsers_Stub_Users.csv') -Value 'PersonId' }
 """
@@ -253,6 +259,18 @@ class ScriptBehaviourTests(unittest.TestCase):
             target = root / "work" / "processed" / leaf
             target.write_text("header\n", encoding="utf-8")
             os.utime(target, (hour_ago, hour_ago))
+
+        root = add("append_coarse_time", stubMode="coarse-time")
+        data = root / "data"
+        data.mkdir()
+        for leaf in ("cumulative_Interactions.csv", "cumulative_Users.csv"):
+            target = data / leaf
+            target.write_text("header\n", encoding="utf-8")
+            os.utime(target, (hour_ago, hour_ago))
+        cls.cases["append_coarse_time"]["case"]["args"].update({
+            "AppendFile": str(data / "cumulative_Interactions.csv"),
+            "AppendUserInfo": str(data / "cumulative_Users.csv"),
+        })
 
         add("bad_sha", args={"PaxSha256": "abc"})
         add("sha_with_latest", args={"PaxReleaseTag": "latest"})
@@ -431,6 +449,13 @@ class ScriptBehaviourTests(unittest.TestCase):
         self.assertIn("didn't update", output)
         self.assertIn("cumulative_Interactions.csv", output.split("didn't update", 1)[1])
         self.assertEqual(output.count("didn't update"), 2)
+
+    def test_an_append_stamped_before_the_run_started_still_counts(self):
+        self.assertRan("append_coarse_time")
+        self.assertNotIn("didn't update", self.result("append_coarse_time")["output"])
+        data = self.cases["append_coarse_time"]["root"] / "data"
+        for leaf in ("cumulative_Interactions.csv", "cumulative_Users.csv"):
+            self.assertIn("merged", (data / leaf).read_text(encoding="utf-8"))
 
     def test_bad_inputs_stop_before_any_download_or_pax_run(self):
         expected = {

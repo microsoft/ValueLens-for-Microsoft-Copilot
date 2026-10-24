@@ -554,6 +554,15 @@ if ($IncludeAgent365Info) {
   }
 }
 
+# Each append target's write time, to tell afterwards whether PAX wrote to it. A file system can
+# stamp a write slightly earlier than Get-Date, so the run's start time can't tell.
+$appendWrittenBefore = @{}
+foreach ($path in @($appendTarget, $appendUsersTarget) | Where-Object { $_ }) {
+  if (Test-Path -LiteralPath $path -PathType Leaf) {
+    $appendWrittenBefore[$path] = (Get-Item -LiteralPath $path).LastWriteTimeUtc
+  }
+}
+
 & $pax.Path @paxParams
 if (-not $?) {
   throw "PAX failed."
@@ -594,9 +603,9 @@ if ($appendUsersTarget) {
 # PAX leaves an append target untouched when it has nothing to add, or when the target is too old
 # to merge into safely (it then writes this run's rows to a new file beside it). Its merge failures
 # exit 40, which stops this script above.
-foreach ($target in @($(if ($appendTarget) { $interactions }), $(if ($appendUsersTarget) { $users })) | Where-Object { $_ }) {
-  if ($target.LastWriteTime -lt $paxStart) {
-    Write-Warning ("PAX didn't update {0} this run, so it still holds the earlier data. PAX's log next to it says why." -f $target.FullName)
+foreach ($path in @($appendTarget, $appendUsersTarget) | Where-Object { $_ }) {
+  if ($appendWrittenBefore.ContainsKey($path) -and (Get-Item -LiteralPath $path).LastWriteTimeUtc -eq $appendWrittenBefore[$path]) {
+    Write-Warning ("PAX didn't update {0} this run, so it still holds the earlier data. PAX's log next to it says why." -f $path)
   }
 }
 
