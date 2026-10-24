@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import { decodeText, mParameter, readTemplateModel } from '../src/transform/model.js';
-import { applyEntry, buildEntryModel, fillTemplate } from '../src/transform/template.js';
+import { applyEntry, buildEntryModel, fillTemplate, syncUnapplied } from '../src/transform/template.js';
 import { crc32, listZip, readZipEntry, replaceZipEntries } from '../src/transform/zip.js';
 import { realSources } from './fakes.js';
 
@@ -221,4 +221,90 @@ test('template: fillTemplate sets the SharePoint template parameters and changes
   assert.deepEqual([...listZip(filled).keys()], [...before.keys()]);
   for (const name of before.keys()) if (name !== 'DataModelSchema') assert.deepEqual(readZipEntry(filled, name), readZipEntry(pbit, name), name);
   assertConsistent(filled);
+});
+
+/** UTF-16 with a byte-order mark, as Power BI Desktop writes a template's text parts. @param {string} text */
+const utf16 = (text) => Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]);
+const PARAMETER_META = ' meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]';
+
+/**
+ * A template with smallModel's model and, unless queries is null, an UnappliedChanges that holds them.
+ * @param {any[] | null} queries
+ * @param {{ pretty?: boolean, utf8?: boolean }} [o]
+ */
+function unappliedPbit(queries, o = {}) {
+  /** @type {Record<string, { data: Buffer, deflate?: boolean }>} */
+  const files = { Version: { data: utf16('1.28') }, DataModelSchema: { data: utf16(JSON.stringify(smallModel(), null, 2)), deflate: true } };
+  if (queries) {
+    const text = JSON.stringify({ queries, firstLoad: false }, null, o.pretty ? 2 : undefined);
+    files.UnappliedChanges = { data: o.utf8 ? Buffer.from(text, 'utf8') : utf16(text), deflate: true };
+  }
+  return zipOf(files);
+}
+
+test("template: fillTemplate brings UnappliedChanges in line with the entry's queries, each in its own form", () => {
+  const other = { name: 'Other', text: 'let\n    x = 1\nin\n    x', loadEnabled: true };
+  const pbit = unappliedPbit([
+    { name: 'Folder', text: `null${PARAMETER_META}`, loadEnabled: false },
+    { name: 'Lines', text: ['let', '    Source = Folder.Files("C:\\x")', 'in', '    Source'] },
+    { name: 'One', text: 'let\r\n    Source = Folder.Files("C:\\x")\r\nin\r\n    Source' },
+    other,
+  ]);
+  const folder = 'https://contoso.sharepoint.com/sites/A/Shared%20Documents/X';
+  const filled = fillTemplate(pbit, {
+    parameters: { Folder: folder },
+    expressions: { Lines: 'let\r\n    Source = SharePoint.Files("s")\r\nin\r\n    Source', One: 'let\n    Source = SharePoint.Files("s")\nin\n    Source' },
+  });
+  const raw = readZipEntry(filled, 'UnappliedChanges');
+  assert.deepEqual(raw.subarray(0, 2), Buffer.from([0xff, 0xfe]), 'still UTF-16 with its byte-order mark');
+  const text = decodeText(raw);
+  assert.ok(!text.includes('\n'), 'still on one line');
+  const doc = JSON.parse(text);
+  assert.deepEqual(doc.queries[0], { name: 'Folder', text: `"${folder}"${PARAMETER_META}`, loadEnabled: false });
+  assert.deepEqual(doc.queries[1].text, ['let', '    Source = SharePoint.Files("s")', 'in', '    Source'], 'a list of lines stays one');
+  assert.equal(doc.queries[2].text, 'let\r\n    Source = SharePoint.Files("s")\r\nin\r\n    Source', 'the copy keeps its line breaks');
+  assert.deepEqual(doc.queries[3], other, "a query the entry doesn't set is untouched");
+  assert.equal(doc.firstLoad, false);
+  assert.equal(mParameter(readTemplateModel(filled).model, 'Folder'), folder);
+  assert.deepEqual(readZipEntry(filled, 'Version'), readZipEntry(pbit, 'Version'));
+  assertConsistent(filled);
+});
+
+test('template: an UnappliedChanges written over several lines, in UTF-8, stays that way', () => {
+  const pbit = unappliedPbit([{ name: 'Folder', text: `null${PARAMETER_META}` }], { pretty: true, utf8: true });
+  const raw = readZipEntry(fillTemplate(pbit, { parameters: { Folder: 'f' } }), 'UnappliedChanges');
+  assert.equal(raw.toString('utf8'), JSON.stringify({ queries: [{ name: 'Folder', text: `"f"${PARAMETER_META}` }], firstLoad: false }, null, 2));
+});
+
+test("template: fillTemplate leaves UnappliedChanges byte for byte alone when there's nothing to change, and adds none", () => {
+  const entry = { parameters: { Folder: 'f' } };
+  const cases = [
+    unappliedPbit([{ name: 'Other', text: 'x' }]),
+    unappliedPbit([{ name: 'Folder', text: `"f"${PARAMETER_META}` }], { pretty: true }),
+    unappliedPbit([]),
+    zipOf({ DataModelSchema: { data: utf16(JSON.stringify(smallModel())) }, UnappliedChanges: { data: Buffer.from('not JSON') } }),
+    zipOf({ DataModelSchema: { data: utf16(JSON.stringify(smallModel())) }, UnappliedChanges: { data: Buffer.from('{"tables":[]}') } }),
+  ];
+  for (const [i, pbit] of cases.entries()) {
+    const filled = fillTemplate(pbit, entry);
+    assert.equal(mParameter(readTemplateModel(filled).model, 'Folder'), 'f', `case ${i}`);
+    assert.deepEqual(readZipEntry(filled, 'UnappliedChanges'), readZipEntry(pbit, 'UnappliedChanges'), `case ${i}`);
+  }
+  const without = fillTemplate(unappliedPbit(null), entry);
+  assert.deepEqual([...listZip(without).keys()], ['Version', 'DataModelSchema']);
+});
+
+test("template: syncUnapplied changes only the entry's queries that the model has", () => {
+  const model = smallModel().model;
+  applyEntry(model, { parameters: { Folder: 'f' } });
+  const doc = { queries: [{ name: 'Lines', text: 'old' }, { name: 'Nope', text: 'old' }, { text: 'no name' }, null] };
+  const before = structuredClone(doc);
+  assert.equal(syncUnapplied(doc, model, { parameters: { Folder: 'f' }, expressions: { Nope: 'x' } }), false);
+  assert.deepEqual(doc, before);
+  assert.equal(syncUnapplied({ queries: [{ name: 'Folder', text: 'old' }] }, model, { parameters: { Folder: 'f' } }), true);
+  for (const bad of [undefined, null, {}, { queries: 'x' }]) assert.equal(syncUnapplied(bad, model, { parameters: { Folder: 'f' } }), false);
+});
+
+test("template: the SharePoint template has no UnappliedChanges, so a fill changes only its model", () => {
+  assert.ok(!listZip(readFileSync(PAX_TEMPLATE)).has('UnappliedChanges'));
 });

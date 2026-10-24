@@ -296,6 +296,47 @@ test('pax publish: paxEntry needs the SharePoint folder and its site', () => {
   }
 });
 
+test("pax publish: paxEntry takes a product's folder parameter, values from the record and expressions from a file", () => {
+  const home = mkdtempSync(join(dir, 'hooks-'));
+  const template = join(home, 'Other.pbit');
+  copyFileSync(PAX_TEMPLATE, template);
+  const sourceM = join(home, 'Source.m');
+  writeFileSync(sourceM, '\uFEFFlet\r\n    Source = SharePoint.Files("s")\r\nin\r\n    Source', 'utf8');
+  /** @type {InstallConfig[]} */
+  const asked = [];
+  const pax = {
+    files: FILES,
+    parameters: { ...PARAMS, folder: 'Data Folder' },
+    /** @param {InstallConfig} config */
+    values: (config) => {
+      asked.push(config);
+      return { 'Partition Id': 'p-1', Weeks: 4, Missing: undefined, [PARAMS.site]: 'not this' };
+    },
+    expressions: { Inline: 'SharePoint.Files("s")', 'Source Files': { file: 'Source.m' } },
+  };
+  const config = paxConfig();
+  const entry = paxEntry(config, template, pax);
+  assert.deepEqual(asked, [config], 'values gets the install record');
+  assert.equal(entry.parameters['Data Folder'], FOLDER_URL, 'the whole folder URL, as the record has it');
+  assert.equal(entry.parameters['Partition Id'], 'p-1');
+  assert.equal(entry.parameters.Weeks, '4', 'values are text');
+  assert.equal(entry.parameters.Missing, '');
+  assert.equal(entry.parameters[PARAMS.site], SITE_URL, 'the SharePoint value wins a clash');
+  assert.equal(entry.parameters[PARAMS.interactions], `${FOLDER_URL}/${encodeURIComponent(FILES.interactions)}`);
+  assert.deepEqual(entry.expressions, {
+    Inline: 'SharePoint.Files("s")',
+    'Source Files': 'let\r\n    Source = SharePoint.Files("s")\r\nin\r\n    Source',
+  }, 'the file is read as UTF-8, without its byte-order mark');
+
+  const hash = desktopHash(entry);
+  assert.equal(desktopHash(paxEntry(config, template, pax)), hash, 'stable');
+  assert.notEqual(desktopHash(paxEntry(config, template, { ...pax, values: () => ({ 'Partition Id': 'p-2' }) })), hash, 'the values are part of it');
+  writeFileSync(sourceM, 'SharePoint.Files("t")', 'utf8');
+  assert.notEqual(desktopHash(paxEntry(config, template, pax)), hash, "the expression file's text is part of it");
+  rmSync(sourceM);
+  assert.throws(() => paxEntry(config, template, pax), /ENOENT/, 'a missing expression file fails');
+});
+
 test('pax publish: paxSignature names the folder, whatever its case', () => {
   const config = paxConfig();
   assert.equal(paxSignature(config), `pax;${FOLDER_URL.toLowerCase()}`);
@@ -555,6 +596,7 @@ test('pax publish: credentialSteps walks through signing the model in to SharePo
     'Choose OAuth2 and the privacy level None, then select Sign in and sign in with your work account.',
     "Do the same for each source it lists. If a site's address fails the connection test, edit it again and tick Skip test connection.",
   ]);
+  assert.equal(credentialSteps(url, 'Organizational')[2], 'Choose OAuth2 and the privacy level Organizational, then select Sign in and sign in with your work account.');
 });
 
 /** The install record's powerBi section, or an empty one. @param {Setup} t @returns {any} */

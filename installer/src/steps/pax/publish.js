@@ -30,6 +30,18 @@ import { deployReport } from '../report.js';
 /** @typedef {import('../../transform/template.js').ModelEntry} ModelEntry */
 
 /**
+ * What this module reads from PRODUCT.pax. The last three are optional hooks for a product whose
+ * template needs them. ValueLens's has none.
+ * @typedef {object} PaxProduct
+ * @property {Record<string, string>} files
+ * @property {Record<string, string>} parameters
+ * @property {(config: InstallConfig) => Record<string, unknown>} [values]  More template values from the install record. A site, folder or file value of the same name wins.
+ * @property {Record<string, string | { file: string }>} [expressions]  Whole queries to replace: M text, or a UTF-8 file beside the template.
+ * @property {string} [privacyLevel]  The privacy level for the model's SharePoint sign-in. None by default.
+ */
+const PAX = /** @type {PaxProduct} */ (/** @type {unknown} */ (PRODUCT.pax));
+
+/**
  * How many hours after the PAX refresh starts Power BI refreshes the model: once when a daily run
  * has usually finished, and again later in case a long one hadn't.
  */
@@ -70,26 +82,33 @@ export function paxWrites(config, key) {
 export const folderFileUrl = (sp, name) => `${sp.folderUrl.replace(/\/+$/, '')}/${encodeURIComponent(name)}`;
 
 /**
- * The template's values for this install: `site` takes the site's address, and each file
- * parameter the file's full address in the folder. A file the refresh doesn't write is left
- * blank, so its table loads empty. PRODUCT.pax.expressions, when a product has it, replaces
- * whole queries.
+ * The template's values for this install: `site` takes the site's address, `folder` the folder's,
+ * and each file parameter the file's full address in the folder. A file the refresh doesn't write
+ * is left blank, so its table loads empty. A product's `values` hook adds values from the install
+ * record, and its `expressions` replace whole queries, so desktopHash covers both.
  * @param {InstallConfig} config
  * @param {string} template  The .pbit's path.
+ * @param {PaxProduct} [pax]  PRODUCT.pax, or a stand-in for tests.
  * @returns {ModelEntry}
  */
-export function paxEntry(config, template) {
+export function paxEntry(config, template, pax = PAX) {
   const sp = config.sharePoint;
   if (!sp?.folderUrl || !sp.siteUrl) throw new Error('The install record has no SharePoint folder yet. Run the installer to choose one.');
-  const files = /** @type {Record<string, string>} */ (PRODUCT.pax.files);
+  const files = pax.files;
   /** @type {Record<string, string>} */
   const parameters = {};
-  for (const [key, name] of Object.entries(PRODUCT.pax.parameters)) {
+  for (const [name, value] of Object.entries(pax.values?.(config) ?? {})) parameters[name] = String(value ?? '');
+  for (const [key, name] of Object.entries(pax.parameters)) {
     if (key === 'site') parameters[name] = sp.siteUrl;
+    else if (key === 'folder') parameters[name] = sp.folderUrl;
     else parameters[name] = files[key] && paxWrites(config, key) ? folderFileUrl(sp, files[key]) : '';
   }
-  const expressions = /** @type {{ expressions?: Record<string, string> }} */ (/** @type {unknown} */ (PRODUCT.pax)).expressions;
-  return { template, parameters, ...(expressions && Object.keys(expressions).length ? { expressions: { ...expressions } } : {}) };
+  /** @type {Record<string, string>} */
+  const expressions = {};
+  for (const [name, value] of Object.entries(pax.expressions ?? {})) {
+    expressions[name] = typeof value === 'string' ? value : readFileSync(join(dirname(template), value.file), 'utf8').replace(/^\uFEFF/, '');
+  }
+  return { template, parameters, ...(Object.keys(expressions).length ? { expressions } : {}) };
 }
 
 /** What the deployed model was built from, besides its definition. @param {InstallConfig} config */
@@ -444,12 +463,13 @@ export async function publishPax(ctx, o = {}) {
 /**
  * How to sign the model in to SharePoint, on its settings page.
  * @param {string} url
+ * @param {string} [privacyLevel]  PRODUCT.pax.privacyLevel, None by default.
  */
-export function credentialSteps(url) {
+export function credentialSteps(url, privacyLevel = PAX.privacyLevel ?? 'None') {
   return [
     `Open the model's settings: ${url}`,
     'Expand Data source credentials, and select Edit credentials beside a source.',
-    'Choose OAuth2 and the privacy level None, then select Sign in and sign in with your work account.',
+    `Choose OAuth2 and the privacy level ${privacyLevel}, then select Sign in and sign in with your work account.`,
     'Do the same for each source it lists. If a site\'s address fails the connection test, edit it again and tick Skip test connection.',
   ];
 }
