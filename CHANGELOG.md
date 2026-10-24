@@ -18,6 +18,54 @@ Deployment instructions do **not** live here. They live in the READMEs:
 
 ---
 
+## Unreleased — ValueLens installer 0.1.0
+
+**Why.** Setting up ValueLens meant working through a path README by hand. The installer this repo
+shipped under `1. Fabric/installer` was the Analytics Hub's, and it stopped at installer-v0.4.2 when
+the Analytics Hub moved to its own repo. The new [`installer/`](installer/README.md) is a
+ValueLens-only port of the Analytics Hub installer at microsoft/AnalyticsHub-Dashboard@1af87db, with
+a second route that needs no Fabric.
+
+- **Two routes**, chosen on the first screen or with `--target fabric|pax`:
+  - **Fabric.** The Analytics Hub's Fabric route, cut to ValueLens: the `ValueLens (Fabric)` app
+    registration and its secret in Key Vault, then the workspace, Lakehouse, notebooks, pipeline,
+    schedule, semantic model and report, and a first load with checks. The Credit Consumption
+    module, the Azure route and the Agent Evaluator aren't ported. This route doesn't deploy the
+    app yet.
+  - **No Fabric: PAX + SharePoint.** A daily task on the user's PC, `ValueLens - PAX refresh`, runs
+    PAX purview-v1.11.15, pinned by SHA-256. It uploads the rollups to a SharePoint folder as the
+    `ValueLens (PAX)` app registration, which has Sites.Selected on that one site. The installer
+    publishes `ValueLens - SharePoint.pbit` to a Power BI workspace through the item API, or through
+    Power BI Desktop where the service turns that down. The model is signed in to SharePoint once,
+    by hand, and refreshes after each PAX run. The installer then deploys the app as a Copilot
+    managed app. The app step is on by default. When the tenant isn't ready for it, the installer
+    says what's missing and finishes at the report.
+- **The task** runs as the signed-in user with limited rights. It never bypasses the execution
+  policy, and the installer stops with guidance when the policy is AllSigned or Restricted. The
+  client secret stays in Windows Credential Manager. PowerShell 7.2 and Python 3.10 or later are
+  checked up front, because PAX's rollup needs Python.
+- **Updates** come from the newest `valuelens-installer-v*` release in the release list, not from
+  GitHub's "Latest" release, which the dashboard releases take. The one-liner and every update hint
+  use a version-pinned `releases/download/<tag>/` URL.
+- **Viewers.** The `ValueLens Viewers` group gets Build on the semantic model, never a workspace
+  role, because workspace viewers can read the notebooks and any secret written into them. The
+  installer asks once to share the report with the group. "Later" leaves a card on the Done page,
+  and Repair asks again.
+- **Also:** repair and uninstall, a browser page (`--ui`) as well as the terminal, an admin pack
+  (`valuelens-admin-pack.md`) for the grants that need an admin, and a Windows exe,
+  `ValueLensInstaller.exe`, with Node, the app and the managed apps CLI inside. The
+  [exe workflow](.github/workflows/valuelens-installer-exe.yml) builds it. The install record is
+  `valuelens-setup.json`, and the installer leaves Analytics Hub records and workspaces alone.
+- **Supporting changes.** The Fabric notebooks now match the Analytics Hub ones the installer
+  deploys. `Run-PAX-AIBV.ps1` gains `-PaxSha256`, `-AppendUserInfo` and `-SkipVersionCheck`, and its
+  append runs work on PAX 1.11.15. `Upload-Rollups-SharePoint.ps1` gains `-File` and `-RemoteName`.
+  A contract test checks that the notebooks write every Lakehouse column the Fabric template reads.
+
+`1. Fabric/installer` stays as it is for now. A follow-up removes it and points its links here.
+Nothing is released yet. The first tag will be `valuelens-installer-v0.1.0`.
+
+---
+
 ## Unreleased — Org data: Department becomes Organization only when there's no Organization column
 
 **Why.** The org query renamed the first department-like column to Organization, even when the org
