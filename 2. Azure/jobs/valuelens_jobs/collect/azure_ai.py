@@ -10,21 +10,29 @@ managed identity. A port of the Fabric notebook `Ingest_Azure_AI` (same tables a
   the public Azure Retail Prices API, which is called without credentials.
 
 The managed identity needs Cost Management Reader and Monitoring Reader (or Reader) on each
-subscription. Every table is a full replace of the last 90 complete UTC days.
+subscription. Each run collects the last 90 complete UTC days and replaces them in every table,
+keeping the older rows, so a run never drops history. Rows with no date are replaced too. The
+monthly tables (health and reconciliation) replace whole months: see `monthly_replace_from`. A
+stored table that can't be read fails its write rather than counting as empty.
 """
 from __future__ import annotations
 
 import logging
 import math
 import re
+import tempfile
 from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import UUID
 
+import duckdb
+
 from ..api import ARM as ARM_SCOPE
 from ..api import HttpError
-from ..tables import write_rows
+from ..tables import ident, q, write_rows
+from .consumption import TableState
 
 log = logging.getLogger("valuelens_jobs.collect.azure_ai")
 
@@ -79,6 +87,11 @@ SCHEMAS = {
                 ("Representation", S), ("Amount", F), ("Currency", S), ("Status", S), ("EvidenceType", S),
                 ("Notes", S)],
 }
+# The date column a reload replaces each table from. The monthly tables also name the column
+# holding the last day a row covers, which monthly_replace_from reads.
+RELOAD = {TBL_SPEND: ("UsageDate", None), TBL_TOKENS: ("Date", None), TBL_PAYG: ("UsageDate", None),
+          TBL_HEALTH: ("MetricDate", "SnapshotDate"), TBL_SOLUTION: ("UsageDate", None),
+          TBL_RECON: ("PeriodStart", "PeriodEnd")}
 
 
 class ArmClient:
@@ -342,6 +355,26 @@ def tag_value(tags, keys):
 def month_end(day):
     following = (day.replace(day=28) + timedelta(days=4)).replace(day=1)
     return following - timedelta(days=1)
+
+
+def monthly_replace_from(start, stored):
+    """The first day a reload of a monthly table replaces; stored rows before it are kept.
+
+    A window that starts after the 1st covers only part of its first month. That month's
+    stored rows are kept when all of them were written after the month ended, so cover it to
+    its last day. Otherwise the new rows replace the whole month. `stored` pairs each stored
+    row's month (MetricDate or PeriodStart) with the last day it covers (SnapshotDate or
+    PeriodEnd).
+    """
+    last = month_end(start)
+    ends = []
+    for month, covered in stored:
+        day = as_day(month)
+        if day is not None and month_end(day) == last:
+            ends.append(as_day(covered))
+    if start.day > 1 and ends and all(day == last for day in ends):
+        return last + timedelta(days=1)
+    return start.replace(day=1)
 
 
 def metric_windows(start, end, days=30):
@@ -1037,19 +1070,46 @@ def _flush(found, warnings):
     found.clear()
 
 
-def write_table(store, table, rows) -> int:
-    """Replaces `raw/<table>/` with the rows (dicts keyed by column)."""
-    schema = SCHEMAS[table]
-    prefix = f"raw/{table}"
-    rel = f"{prefix}/part-0.parquet"
-    columns = [c for c, _ in schema]
-    n = write_rows(store.path(rel), columns, [[r.get(c) for c in columns] for r in rows], [t for _, t in schema])
-    store.push([rel])
-    stale = [r for r in store.list(prefix) if r != rel]
-    if stale:
-        store.remove(stale)
-    log.info("azure_ai: wrote %s: %s rows", table, n)
-    return n
+def write_tables(store, start, results) -> dict:
+    """Writes each table's new rows (dicts keyed by column) and keeps its older rows.
+
+    New rows replace a table's stored rows from `start` onwards (for a monthly table, from
+    monthly_replace_from), and stored rows with no date; new rows before that day are dropped.
+    Every table is read before any is written, so a stored file that can't be read (a failed
+    download or a corrupt file) raises and leaves all of them as they were; a missing one is
+    empty. Returns each table's row count.
+    """
+    con = duckdb.connect()
+    try:
+        con.execute("SET TimeZone = 'UTC'")
+        state = TableState(con, store, {table: SCHEMAS[table] for table in results}, container="raw")
+        try:
+            state.load()
+        except Exception as exc:
+            raise RuntimeError(f"the stored rows of {', '.join(results)} can't be read, so nothing was replaced "
+                               f"({type(exc).__name__}: {exc})") from exc
+        with tempfile.TemporaryDirectory() as tmp:
+            for table, rows in results.items():
+                column, covered = RELOAD[table]
+                cut = start
+                if covered is not None:
+                    stored = con.execute(f"SELECT {ident(column)}, {ident(covered)} FROM {ident(table)}")
+                    cut = monthly_replace_from(start, stored.fetchall())
+                columns = state.columns(table)
+                src = Path(tmp) / f"{table}.parquet"
+                write_rows(src, columns, [[r.get(c) for c in columns] for r in rows], [t for _, t in SCHEMAS[table]])
+                replaced = f"{ident(column)} >= DATE '{cut.isoformat()}' OR {ident(column)} IS NULL"
+                con.execute(f"DELETE FROM {ident(table)} WHERE {replaced}")
+                kept = state.count(table)
+                names = ", ".join(ident(c) for c in columns)
+                con.execute(f"INSERT INTO {ident(table)} ({names}) SELECT {names} FROM read_parquet({q(src)}) "
+                            f"WHERE {replaced}")
+                state.changed.add(table)
+                log.info("azure_ai: %s: %s rows from %s on; %s older rows kept", table, state.count(table) - kept,
+                         cut, kept)
+        return state.save()
+    finally:
+        con.close()
 
 
 def collect_azure_ai(api, store, settings, *, today: date | None = None) -> dict:
@@ -1065,14 +1125,15 @@ def collect_azure_ai(api, store, settings, *, today: date | None = None) -> dict
     log.info("azure_ai: subscription %s; PAYG %s; UTC window [%s, %s)", subscription,
              ", ".join(payg_subscriptions), start, end)
 
-    # Strict: the three core tables are written only once all of them have been collected.
+    # Strict: the three core tables are written only once all of them have been collected, and
+    # only if all three stored tables can be read.
     spend, resources, tags = collect_spend(arm, subscription, start, end)
     payg = collect_payg(arm, payg_subscriptions, start, end)
     accounts, points = collect_tokens(arm, subscription, start, end)
-    out = {TBL_SPEND: write_table(store, TBL_SPEND, spend), TBL_TOKENS: write_table(store, TBL_TOKENS, points),
-           TBL_PAYG: write_table(store, TBL_PAYG, payg)}
+    out = write_tables(store, start, {TBL_SPEND: spend, TBL_TOKENS: points, TBL_PAYG: payg})
 
-    # Best effort: a failure leaves that table as it was.
+    # Best effort: a failure leaves that table as it was. A step that returns no rows still
+    # replaces its window.
     warnings = []
     try:
         subscription_name = str(arm.get(f"{ARM}/subscriptions/{subscription}",
@@ -1090,7 +1151,7 @@ def collect_azure_ai(api, store, settings, *, today: date | None = None) -> dict
         try:
             rows = step()
             if rows is not None:
-                out[table] = write_table(store, table, rows)
+                out.update(write_tables(store, start, {table: rows}))
         except Exception as exc:
             warnings.append(f"{table} failed; left unchanged ({type(exc).__name__}: {exc})")
     for message in warnings:

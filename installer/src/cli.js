@@ -94,8 +94,8 @@ Options:
                        in Azure Cloud Shell
   --use-az             Use the account you are signed in to with the Azure CLI. In Azure Cloud
                        Shell, run ${AZ_LOGIN} first
-  --backfill-days <n>  With run: reload n days of audit history. Fabric rebuilds the curated
-                       table; PAX adds the days to the SharePoint folder's files
+  --backfill-days <n>  With run: reload n days of audit history and keep older history. Fabric
+                       rebuilds the curated table; PAX adds the days to the SharePoint files
   --out <dir>          With preview: where to write (default ./valuelens-preview)
   --yes                Take saved answers and defaults without asking. It never lets Fabric clear a
                        model's data: add --allow-model-reset for that

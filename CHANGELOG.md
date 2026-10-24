@@ -18,6 +18,72 @@ Deployment instructions do **not** live here. They live in the READMEs:
 
 ---
 
+## Unreleased — Azure AI tables keep older rows
+
+**Why.** The Fabric notebook `Ingest_Azure_AI`, the Azure route's `azure_ai` job and the Local CSV
+script `pull_azure_ai.py` (which the SharePoint add-on uses too) wrote each Azure AI table whole
+from the days they had just read, so a table never held more than the last 90 days. Each run now
+replaces only its own days and keeps the older rows.
+
+- **A run replaces its days.** Rows from the window's first day onwards are replaced, and older rows
+  are kept. Rows with no date are always replaced. A source that returns no rows still replaces its
+  days.
+- **The monthly tables replace whole months.** `azure_deployment_health` and
+  `azure_billing_reconciliation` (`AzureDeploymentHealth.csv` and `AzureBillingReconciliation.csv`)
+  hold a row per month. When the window starts after the 1st, that month's stored rows are kept only
+  if all of them were written after the month ended. Otherwise the run's rows replace them, so a
+  month still in progress never freezes at its first values.
+- **A stored table that can't be read isn't counted as empty.** A failed download or a corrupt file
+  fails that table's write and leaves it as it was: counting it as empty would cut it back to 90
+  days.
+  - The notebook and the job check all three strict tables (`azure_ai_spend`, `azure_ai_tokens` and
+    `copilot_payg_spend`) before they write any, so when one can't be read, none of them is
+    replaced. A best-effort table is left as it was, with a warning.
+  - The script publishes nothing when `AzureAiSpendDaily.csv` or `AzureAiTokensDaily.csv` can't be
+    read, and leaves a best-effort CSV as it was, with a warning. Fix the file, or delete it to
+    start it again.
+- **The notebook writes each table with Delta's `replaceWhere`.** That's one write per table, so a
+  write that fails leaves its table as it was. The six tables together aren't one transaction.
+  `mergeSchema` adds new columns. A column that has changed type stops the write and names the
+  column: the run stops if it's one of the three strict tables, and a best-effort table is left as
+  it was, with a warning. To start a table over, drop it and run the notebook again; its older rows
+  are lost.
+- **Otherwise the same.** A best-effort source that fails still leaves its table as it was.
+  `AzureAiDeployments.csv` is the current inventory, so it's still replaced whole. The SQL publish
+  copies the lake table, so SQL keeps the older days too.
+- The month rule is a helper in the block of shared helpers, which `tests/test_azure_ai_collectors.py`
+  keeps identical in all three copies, so the notebook, the job and the script decide the same way.
+
+For Fabric, import `Ingest_Azure_AI` again. Azure installs get this with the next `valuelens-jobs`
+image. For Local CSV and SharePoint, download `pull_azure_ai.py` again.
+
+---
+
+## Unreleased — Fabric: reloading audit history keeps older rows
+
+**Why.** A backfill wrote the parsed audit table whole, so a reload shorter than the history already
+loaded dropped the older days: a 30-day backfill after a 180-day first load left 30 days. Reloads
+now keep older rows.
+
+- **A backfill replaces from its first record onwards.** `Copilot_Audit_Log_Direct_Ingester` writes
+  a backfill with Delta's `replaceWhere`: parsed rows from the earliest `CreationDate` it read
+  onwards are replaced, and older rows are kept, including the older rows of that month. Rows with
+  no `CreationDate` are replaced by every backfill. `mergeSchema` adds new columns.
+- **An empty backfill writes nothing.** With no records, the table is left as it is: an empty write
+  with `replaceWhere` would delete the range.
+- **Otherwise the same.** A missing table is created. A table from before the stable key columns is
+  still replaced whole, once, which upgrades it. A table not yet stored by month is moved to month
+  partitions first, as incremental runs already do. Incremental runs merge by `Id`, and the
+  processor picks up the months a backfill changed, as it does after a merge.
+- **A column whose type changed** now fails a backfill, which used to rewrite the schema: drop the
+  table, then run a backfill.
+- The installer's `run --backfill-days` and **Run now** run this notebook, so they keep older
+  history too. The PAX route already did: it adds the days to the SharePoint files.
+
+Import the notebook again, or run the installer's `update`, to pick this up.
+
+---
+
 ## Unreleased — ValueLens installer 0.1.0
 
 **Why.** Setting up ValueLens meant working through a path README by hand. The installer this repo

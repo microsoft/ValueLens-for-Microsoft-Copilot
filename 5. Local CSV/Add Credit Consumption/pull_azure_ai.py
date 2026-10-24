@@ -11,15 +11,20 @@ metrics and deployment read permissions. Schedule daily after UTC midnight and
 refresh Power BI ONLY after exit code 0. Days are complete UTC days, not today.
 All queries and validation precede publication. Each CSV replacement is atomic,
 but the replacements are NOT a transaction; serialize runs and readers.
-Historical windows replace rather than append; costs can arrive late.
+Each run replaces its window's days in a CSV and keeps the older rows, since
+costs can arrive late and a rerun must not drop history; the health and
+reconciliation CSVs replace whole months. AzureAiDeployments.csv is the current
+inventory and is replaced whole. A CSV that can't be read is an error, not an
+empty file: fix it, or delete it to start it again.
 
 The three core CSVs (spend, tokens, deployments) are strict: any failure exits 1
 and publishes nothing. The report's Azure capacity, solution spend and billing
 reconciliation CSVs (AzureDeploymentHealth.csv, AzureSolutionSpend.csv,
 AzureBillingReconciliation.csv) are best effort: a failed account, metric or
-cost call prints a WARNING and is skipped, and a CSV whose source fails entirely
-is not replaced. Reconciliation list prices come from the public, unauthenticated
-Azure Retail Prices API (prices.azure.com); no credential is ever sent there.
+cost call prints a WARNING and is skipped, and a CSV whose source fails entirely,
+or whose existing file can't be read, is not replaced. Reconciliation list prices
+come from the public, unauthenticated Azure Retail Prices API (prices.azure.com);
+no credential is ever sent there.
 """
 
 import argparse
@@ -471,6 +476,26 @@ def month_end(day):
     return following - timedelta(days=1)
 
 
+def monthly_replace_from(start, stored):
+    """The first day a reload of a monthly table replaces; stored rows before it are kept.
+
+    A window that starts after the 1st covers only part of its first month. That month's
+    stored rows are kept when all of them were written after the month ended, so cover it to
+    its last day. Otherwise the new rows replace the whole month. `stored` pairs each stored
+    row's month (MetricDate or PeriodStart) with the last day it covers (SnapshotDate or
+    PeriodEnd).
+    """
+    last = month_end(start)
+    ends = []
+    for month, covered in stored:
+        day = as_day(month)
+        if day is not None and month_end(day) == last:
+            ends.append(as_day(covered))
+    if start.day > 1 and ends and all(day == last for day in ends):
+        return last + timedelta(days=1)
+    return start.replace(day=1)
+
+
 def metric_windows(start, end, days=30):
     windows, first = [], start
     while first < end:
@@ -912,6 +937,17 @@ def recon_rows(costs, prices, start, end):
 RETAIL_PRICES = "https://prices.azure.com/api/retail/prices"
 RETAIL_BATCH = 15
 DETAIL_FAILURES = (CollectionError, KeyError, TypeError, ValueError, AttributeError)
+# The date column from which a run replaces each CSV's rows; older rows are kept. The monthly
+# CSVs also name the column holding the last day a row covers, which monthly_replace_from
+# reads. AzureAiDeployments.csv is the current inventory, so it's replaced whole.
+RELOAD = {
+    "AzureAiSpendDaily.csv": ("UsageDate", None),
+    "AzureAiTokensDaily.csv": ("Date", None),
+    "AzureDeploymentHealth.csv": ("MetricDate", "SnapshotDate"),
+    "AzureSolutionSpend.csv": ("UsageDate", None),
+    "AzureBillingReconciliation.csv": ("PeriodStart", "PeriodEnd"),
+}
+STRICT = {"AzureAiSpendDaily.csv", "AzureAiTokensDaily.csv", "AzureAiDeployments.csv"}
 
 
 def warn(message):
@@ -1162,6 +1198,75 @@ def collect(client, subscription, start, end, details=True):
     return datasets
 
 
+def stored_rows(path, headers, column):
+    """A published CSV's rows, keyed by `headers` (a column the file lacks is blank).
+
+    A missing file has no rows. A file that can't be read, or whose `column` holds something
+    other than a date, raises CollectionError: counting it as empty would drop its history.
+    """
+    path = Path(path)
+    try:
+        with path.open(newline="", encoding="utf-8-sig") as handle:
+            reader = csv.DictReader(handle)
+            if not reader.fieldnames:
+                return []
+            if column not in reader.fieldnames:
+                raise CollectionError(f"{path.name} has no {column} column")
+            rows = []
+            for row in reader:
+                if None in row or None in row.values():
+                    raise CollectionError(f"{path.name} line {reader.line_num} has the wrong number of fields")
+                if row[column].strip() and as_day(row[column]) is None:
+                    raise CollectionError(f"{path.name} line {reader.line_num}: {column} {row[column]!r} "
+                                          "isn't a yyyy-mm-dd date")
+                rows.append({h: row.get(h, "") for h in headers})
+            return rows
+    except FileNotFoundError:
+        return []
+    except (OSError, UnicodeDecodeError, csv.Error) as exc:
+        raise CollectionError(f"{path.name} can't be read ({exc})") from exc
+
+
+def keep_older(outdir, datasets, start):
+    """Adds each CSV's stored rows from before the window to its new rows, in `datasets`.
+
+    The new rows replace a CSV's stored rows from `start` on (for a monthly CSV, from
+    monthly_replace_from), and stored rows with no date; new rows before that day are dropped.
+    A strict CSV that can't be read raises; a best-effort one is left as it is, with a warning.
+    Returns the number of older rows kept for each CSV.
+    """
+    kept = {}
+    for filename, (column, covered) in RELOAD.items():
+        if filename not in datasets:
+            continue
+        headers, rows = datasets[filename]
+        try:
+            stored = stored_rows(Path(outdir) / filename, headers, column)
+        except CollectionError as exc:
+            if filename in STRICT:
+                raise CollectionError(f"{exc}; nothing was published. Fix the file, or delete it "
+                                      "to start it again, then rerun.") from exc
+            warn(f"{filename} not refreshed; the existing file is kept ({exc})")
+            del datasets[filename]
+            continue
+        cut = start
+        if covered is not None:
+            cut = monthly_replace_from(start, [(row[column], row[covered]) for row in stored])
+        older = []
+        for row in stored:
+            day = as_day(row[column])
+            if day is not None and day < cut:
+                older.append(row)
+        newer = []
+        for row in rows:
+            day = as_day(row[column])
+            if day is None or day >= cut:
+                newer.append(row)
+        datasets[filename] = (headers, older + newer)
+        kept[filename] = len(older)
+    return kept
+
+
 def publish(outdir, datasets):
     outdir = Path(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -1229,9 +1334,11 @@ def main(argv=None):
         start = end - timedelta(days=args.days)
         print(f"Subscription {subscription}; UTC window [{start}, {end})")
         datasets = collect(client, subscription, start, end)
+        kept = keep_older(args.outdir, datasets, start)
         publish(args.outdir, datasets)
         for filename, (_, rows) in datasets.items():
-            print(f"Wrote {filename}: {len(rows)} rows")
+            older = kept.get(filename, 0)
+            print(f"Wrote {filename}: {len(rows)} rows" + (f" ({older} older rows kept)" if older else ""))
         print("Success. Per-file atomic replacements; not a multi-file transaction.")
         return 0
     except (CollectionError, OSError, ValueError, TypeError, KeyError,
