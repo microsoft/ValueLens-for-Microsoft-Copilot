@@ -142,7 +142,7 @@ ${ROUTE_NAMES.fabric} route options. Without --target or an install record, they
 ${ROUTE_NAMES.pax} route options. Without --target or an install record, they choose this route:
   --environment-id <id>
                        With install or deploy-app: the Power Platform environment for a new app.
-                       Default: the one the Power Apps CLI picks
+                       Default: your developer environment
   --folder <path>      With upload: a subfolder of the SharePoint folder to upload to, such as
                        Exports/2026. Missing folders are created
 `;

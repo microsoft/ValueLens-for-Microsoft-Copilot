@@ -18,7 +18,7 @@ import { reportsOn } from './report.js';
 
 export const VIEWER_GROUP_NAME = PRODUCT.viewerGroup;
 /** On the PAX route the report is in a workspace with no capacity, where Power BI asks each viewer for a licence. */
-export const PRO_VIEWERS = 'Unless the workspace is on a Fabric or Premium capacity, each of them needs Power BI Pro or Premium Per User.';
+export const PRO_VIEWERS = 'Unless the workspace is on a paid F64 or larger Fabric capacity, or a Power BI Premium capacity, each of them needs Power BI Pro or Premium Per User.';
 const GROUP_DESCRIPTION = `People who can view ${PRODUCT.name}. Add members to share it.`;
 
 /** Where a group's owners add and remove members themselves. @param {string} groupId */

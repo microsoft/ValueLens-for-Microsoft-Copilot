@@ -1077,7 +1077,8 @@ test('managed app: environment problems point to deploy-app --environment-id', (
     const problem = explain('init', result);
     has(problem.what, "That environment wasn't found, or didn't answer.");
     has(problem.what, deployElsewhere());
-    has(problem.what, 'choose Repair or change');
+    // Repair or change has no environment question, so it isn't offered as a way to pick one.
+    lacks(problem.what, 'Repair or change');
   }
 });
 
@@ -1393,15 +1394,14 @@ test('managed app: --environment-id is for a new app, so an app already deployed
   await deployTheApp(s.ctx, s.deps, { environmentId: DEV_ENV.toUpperCase() });
   lacks(s.said(), '  ! ');
 
-  // The environment chosen in the plan is checked the same way, and named as that.
+  // --environment-id can reach the step on ctx as well, and is checked the same way.
   s.reset();
   s.ctx.environmentId = OTHER_ENV;
   await deployTheApp(s.ctx, s.deps);
-  has(s.said(), `  ! The app is already in environment ${DEV_ENV}. The environment chosen in the plan is for a new app only, so it stays there.\n`);
-  lacks(s.said(), '--environment-id');
+  has(s.said(), warning);
 });
 
-test("managed app: a new app goes to --environment-id, then the plan's environment, then the one recorded for it", async () => {
+test('managed app: a new app goes to --environment-id, passed in or on ctx, then the one recorded for it', async () => {
   /** @type {{ o: Parameters<typeof setup>[0], opts: { environmentId?: string }, env: string }[]} */
   const cases = [
     { o: { environmentId: OTHER_ENV, record: { environmentId: DEV_ENV } }, opts: { environmentId: PROD_ENV }, env: PROD_ENV },
@@ -1452,8 +1452,8 @@ test("managed app: an app folder whose ms.config.json names no environment is st
   assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: true, state: 'deployed', url: PLAY_URL });
   assert.equal(s.ms.calls.some((c) => c.key === 'app init'), false);
   assert.deepEqual(s.config.managedApp, deployedRecord(s.distDir, { environmentId: OTHER_ENV }));
-  // The record says where that app is, so the plan's environment is still said to be for a new app.
-  has(s.said(), `  ! The app is already in environment ${OTHER_ENV}. The environment chosen in the plan is for a new app only, so it stays there.\n`);
+  // The record says where that app is, so --environment-id is still said to be for a new app.
+  has(s.said(), `  ! The app is already in environment ${OTHER_ENV}. --environment-id is for a new app only, so it stays there.\n`);
   lacks(s.said(), 'undefined');
 
   const other = setup({ appConfig: { appId: APP_ID }, record: { appId: OTHER_APP_ID, environmentId: OTHER_ENV }, environmentId: PROD_ENV });

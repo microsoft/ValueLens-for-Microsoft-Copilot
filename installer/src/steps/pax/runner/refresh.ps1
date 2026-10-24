@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+#Requires -Version 7.2
 <#
 .SYNOPSIS
   Runs the scheduled PAX refresh for a PAX + SharePoint install, or uploads one file to its

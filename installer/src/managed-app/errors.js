@@ -122,7 +122,7 @@ export function explain(step, result) {
   if (/environment .*(was )?not found|could not reach environment/i.test(message) || /EnvironmentNotFound|EnvironmentUnreachable/.test(codes)) {
     return problem({
       who: 'you',
-      what: `That environment wasn't found, or didn't answer. Check its ID and your connection, then deploy to one you can make apps in: ${deployElsewhere()}. Or run the installer again, choose Repair or change, and pick another environment.`,
+      what: `That environment wasn't found, or didn't answer. Check its ID and your connection, then deploy to one you can make apps in: ${deployElsewhere()}`,
     });
   }
   if (/ms\.config\.json already exists/i.test(message)) {

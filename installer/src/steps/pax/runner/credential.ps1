@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+#Requires -Version 7.2
 <#
 .SYNOPSIS
   Writes, reads, tests or deletes one generic credential in Windows Credential Manager.

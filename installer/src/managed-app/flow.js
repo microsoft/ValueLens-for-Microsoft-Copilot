@@ -10,7 +10,7 @@
  *
  * Ported from the AI in One installer's managed-app module, so the installers deploy their apps the
  * same way. Here the names come from product.js, the app's folder sits beside the PAX refresh's, and
- * a new app goes to the environment chosen in the plan, or named with --environment-id.
+ * a new app goes to the environment named with --environment-id, or your developer environment.
  */
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
@@ -65,8 +65,8 @@ export const appDirOf = (ctx) => join(dirname(paxHostOf(ctx).root), PRODUCT.mana
  * @param {Ctx} ctx
  * @param {AppDeps} [deps]
  * @param {{ force?: boolean, environmentId?: string }} [opts]  force: deploy even when the build hasn't
- *   changed. environmentId: the Power Platform environment for a new app. --environment-id, then the
- *   one chosen in the plan, and your developer environment when neither says.
+ *   changed. environmentId: the Power Platform environment for a new app, from --environment-id, as
+ *   ctx.environmentId is. Without it, the one recorded for the app, then your developer environment.
  * @returns {Promise<AppResult>}
  */
 export async function deployTheApp(ctx, deps = {}, opts = {}) {
@@ -86,8 +86,7 @@ export async function deployTheApp(ctx, deps = {}, opts = {}) {
   // Where the app already is: its folder says, or the record does when it's the same app.
   const where = existing && (existing.environmentId ?? (existing.appId === record.appId ? record.environmentId : undefined));
   if (where && wanted && where.toLowerCase() !== wanted.toLowerCase()) {
-    const chosen = opts.environmentId ? '--environment-id' : 'The environment chosen in the plan';
-    ui.warn(`The app is already in environment ${where}. ${chosen} is for a new app only, so it stays there.`);
+    ui.warn(`The app is already in environment ${where}. --environment-id is for a new app only, so it stays there.`);
   }
   const group = config.access?.groupId;
   const changed = !!opts.force || !existing || existing.appId !== record.appId || record.buildHash !== hash;

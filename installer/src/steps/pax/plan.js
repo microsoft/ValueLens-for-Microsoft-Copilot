@@ -414,7 +414,7 @@ export function paxPlanReview(ctx, pre) {
   /** @type {ReviewCost[]} */
   const costs = [];
   if (sm.enabled) {
-    costs.push({ what: 'Power BI Pro', detail: 'For you, to publish the report, and for each viewer unless the workspace is on a Fabric or Premium capacity.', url: PRICING.powerBiPro });
+    costs.push({ what: 'Power BI Pro', detail: 'For you, to publish the report, and for each viewer unless the workspace is on a paid F64 or larger Fabric capacity, or a Power BI Premium capacity.', url: PRICING.powerBiPro });
   }
   if (app) costs.push({ what: 'Power Apps Premium or Copilot Credits', detail: 'For each person who opens the app.', url: LINKS.licensing });
   return { creates, grants, runsOn, costs };

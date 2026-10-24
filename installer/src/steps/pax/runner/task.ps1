@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+#Requires -Version 7.2
 <#
 .SYNOPSIS
   Registers, starts, inspects or removes the daily scheduled task that runs refresh.ps1.

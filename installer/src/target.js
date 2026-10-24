@@ -111,7 +111,7 @@ export async function askTarget(ctx) {
         {
           name: ROUTE_NAMES.pax,
           value: 'pax',
-          description: 'A daily task on this Windows PC runs PAX and writes the data to a SharePoint folder, which the report and the app read. Needs Power BI Pro, PowerShell 7 and Python 3.10 or later.',
+          description: 'A daily task on this Windows PC runs PAX and writes the data to a SharePoint folder, which the report and the app read. Needs Power BI Pro, PowerShell 7.2 or later and Python 3.10 or later.',
         },
       ],
       /** @type {Target} */ (config.target ?? 'fabric'),

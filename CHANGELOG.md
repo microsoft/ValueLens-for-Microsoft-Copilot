@@ -28,10 +28,10 @@ a second route that needs no Fabric.
 
 - **Two routes**, chosen on the first screen or with `--target fabric|pax`:
   - **Fabric.** The Analytics Hub's Fabric route, cut to ValueLens: the `ValueLens (Fabric)` app
-    registration and its secret in Key Vault, then the workspace, Lakehouse, notebooks, pipeline,
-    schedule, semantic model and report, and a first load with checks. The Credit Consumption
-    module, the Azure route and the Agent Evaluator aren't ported. This route doesn't deploy the
-    app yet.
+    registration, with its client secret in the notebooks (the default) or in Key Vault, then the
+    workspace, Lakehouse, notebooks, pipeline, schedule, semantic model and report, and a first load
+    with checks. The Credit Consumption module, the Azure route and the Agent Evaluator aren't
+    ported. This route doesn't deploy the app yet.
   - **No Fabric: PAX + SharePoint.** A daily task on the user's PC, `ValueLens - PAX refresh`, runs
     PAX purview-v1.11.15, pinned by SHA-256. It uploads the rollups to a SharePoint folder as the
     `ValueLens (PAX)` app registration, which has Sites.Selected on that one site. The installer
