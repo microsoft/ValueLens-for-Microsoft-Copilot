@@ -269,8 +269,9 @@ Or, from the [download-and-run](#from-powershell) files,
   `%LOCALAPPDATA%\ValueLens`. It holds the installer and the app. The zip's `node.exe` is
   unpacked but not run.
 - **The app needs Node.js 24.11 or later.** The managed apps CLI that deploys it needs that. With
-  an older Node.js, the installer skips the app and the Done page has a **Finish the ValueLens
-  app** card. The rest of the set-up doesn't need it.
+  an older Node.js, the installer can't deploy the app or update it. When the app needs either,
+  the installer skips it, and the Done page has a **Finish the ValueLens app** card. The rest of
+  the set-up doesn't need it.
 - **Same install.** It uses the same folders and the same install record as the other Windows
   routes. The command it leaves behind, `valuelens.cmd`, keeps using the approved Node.js, and so
   does the update command the installer shows.

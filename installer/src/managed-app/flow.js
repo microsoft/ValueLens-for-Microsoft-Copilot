@@ -78,7 +78,7 @@ export async function deployTheApp(ctx, deps = {}, opts = {}) {
   const wanted = opts.environmentId ?? ctx.environmentId;
 
   const blocked = whyNot({ distDir, cliDir, nodeVersion: deps.nodeVersion ?? process.version });
-  if (blocked) return skip(ctx, blocked);
+  if (blocked && !hasBuild(distDir)) return skip(ctx, blocked);
   const dist = /** @type {string} */ (distDir);
 
   const hash = buildHash(dist);
@@ -97,6 +97,8 @@ export async function deployTheApp(ctx, deps = {}, opts = {}) {
     ctx.save();
     return { ok: true, state: 'up-to-date', ...(record.url ? { url: record.url } : {}) };
   }
+  // An app with nothing to do needs no CLI, so only now does an older Node.js or CLI stop it.
+  if (blocked) return skip(ctx, blocked);
 
   const run = deps.run ?? createCli({ cliDir }).run;
   const signedIn = await signIn(ctx, run);
@@ -214,7 +216,7 @@ export async function removeTheApp(ctx, deps = {}) {
  */
 export function whyNot({ distDir, cliDir, nodeVersion, needBuild = true }) {
   const then = `Then run: ${deployAgain()}`;
-  if (needBuild && !(distDir && existsSync(join(distDir, 'index.html')))) {
+  if (needBuild && !hasBuild(distDir)) {
     return {
       why: 'This copy of the installer has no build of the app.',
       steps: [`Use ${PRODUCT.exe}, which carries it. Or build it from a clone: in app, run npm ci, node scripts/prepare-sample.mjs, then npm run build.`, then],
@@ -240,6 +242,15 @@ export function whyNot({ distDir, cliDir, nodeVersion, needBuild = true }) {
     };
   }
   return undefined;
+}
+
+/**
+ * Whether the folder holds a build of the app.
+ * @param {string | undefined} distDir
+ * @returns {distDir is string}
+ */
+function hasBuild(distDir) {
+  return !!distDir && existsSync(join(distDir, 'index.html'));
 }
 
 /**
@@ -443,13 +454,9 @@ async function shareWith(ctx, run, appDir, group) {
   for (const w of shared.warnings) ui.warn(w);
   const checked = await verifyShare(run, { appDir, ids: [group] });
   if (!checked.ok || checked.missing.length) {
-    ui.warn(`Sharing the app with ${name} hasn't shown up yet. Check it at ${LINKS.portal}, or run ${deployAgain()}.`);
-    delete record.missing;
-    record.skipped = {
-      why: `Sharing the app with ${name} hadn't shown up when the installer checked.`,
-      steps: [`Check the app's sharing at ${LINKS.portal}.`, `Or run: ${deployAgain()}`],
-    };
-    return false;
+    // The share went through, and the list can lag behind it. It isn't recorded, so the next run shares it again.
+    ui.warn(`Shared the app with ${name}, but couldn't see it in the app's sharing yet. It can take a few minutes. Check it at ${LINKS.portal}.`);
+    return true;
   }
   const before = (record.sharedWith ?? []).filter((id) => id.toLowerCase() !== group.toLowerCase());
   record.sharedWith = [group];

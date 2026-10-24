@@ -41,6 +41,7 @@ import {
   verifyShare,
 } from '../src/managed-app/steps.js';
 import { PRODUCT } from '../src/product.js';
+import { nextSteps } from '../src/steps/next-steps.js';
 import { fakeCtx, fakeUi } from './fakes.js';
 import { fakePaxHost } from './pax-fakes.js';
 
@@ -1660,27 +1661,29 @@ test('managed app: a policy that blocks sharing is for a Power Platform admin', 
   has(s.said(), `    ${what}\n`);
 });
 
-test("managed app: a share that hasn't shown up yet fails the step, and the next run shares it again", async () => {
+test("managed app: a share that hasn't shown up yet isn't a failure; it says where to check, and the next run shares it again", async () => {
   const s = setup();
+  const lag = `  ! Shared the app with ${GROUP_NAME}, but couldn't see it in the app's sharing yet. It can take a few minutes. Check it at ${LINKS.portal}.\n`;
   // The CLI says yes, but the app's sharing doesn't list the group.
   s.ms.queue('app share', passed({ partialFailure: false, warnings: [] }));
-  assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: false, state: 'failed', url: PLAY_URL });
-  assert.deepEqual(s.config.managedApp?.skipped, {
-    why: `Sharing the app with ${GROUP_NAME} hadn't shown up when the installer checked.`,
-    steps: [`Check the app's sharing at ${LINKS.portal}.`, `Or run: ${deployAgain()}`],
-  });
-  assert.equal(s.config.managedApp?.sharedWith, undefined);
-  has(s.said(), `  ! Sharing the app with ${GROUP_NAME} hasn't shown up yet. Check it at ${LINKS.portal}, or run ${deployAgain()}.\n`);
+  assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: true, state: 'deployed', url: PLAY_URL });
+  assert.equal(s.config.managedApp?.skipped, undefined, 'no card on the Done page');
+  assert.equal(s.config.managedApp?.sharedWith, undefined, 'not recorded');
+  assert.deepEqual(nextSteps(s.config).filter((c) => c.id.startsWith('app-')), []);
+  has(s.said(), lag);
+  lacks(s.said(), '✗');
 
   // A list that fails is the same.
   s.reset();
   s.ms.queue('app share list', failedWith('The service is temporarily unavailable.'));
-  assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: false, state: 'failed', url: PLAY_URL });
-  assert.deepEqual(s.events, ['auth status', 'app share', 'app share list', 'save']);
-  has(s.said(), "hasn't shown up yet");
+  assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: true, state: 'deployed', url: PLAY_URL });
+  assert.deepEqual(s.events, ['auth status', 'app share', 'app share list', 'save'], 'shared again, not deployed again');
+  assert.equal(s.config.managedApp?.sharedWith, undefined);
+  has(s.said(), lag);
 
   s.reset();
   assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: true, state: 'deployed', url: PLAY_URL });
+  assert.deepEqual(s.events, ['auth status', 'app share', 'app share list', 'save']);
   assert.deepEqual(s.config.managedApp, deployedRecord(s.distDir));
 });
 
@@ -1748,7 +1751,7 @@ test("managed app: the build is the sources' appDist unless deps name one, and d
   assert.equal(existsSync(s.appDir), false);
 });
 
-test('managed app: without a build, the CLI, or a new enough Node.js, the app is skipped with what to do', async () => {
+test('managed app: without a build, the CLI, or a new enough Node.js, the app is skipped with what to do, unless it has nothing to do', async () => {
   const noBuild = setup();
   assert.deepEqual(await deployTheApp(noBuild.ctx, { ...noBuild.deps, distDir: join(temp(), 'none') }), { ok: true, state: 'skipped' });
   assert.deepEqual(noBuild.events, ['save']);
@@ -1764,11 +1767,20 @@ test('managed app: without a build, the CLI, or a new enough Node.js, the app is
   has(noCli.said(), `  ! Skipped ${THE_APP}: The managed apps CLI isn't installed here.\n`);
   assert.equal(noCli.ms.calls.length, 0);
 
-  // An app that's live keeps its link.
+  // An app with nothing to do needs no CLI, so an older Node.js, or no CLI, leaves it alone.
   const s = await deployedApp();
+  const live = deployedRecord(s.distDir);
   const old = 'v22.11.0';
+  assert.deepEqual(await deployTheApp(s.ctx, { ...s.deps, nodeVersion: old }), { ok: true, state: 'up-to-date', url: PLAY_URL });
+  assert.deepEqual(await deployTheApp(s.ctx, { ...s.deps, cliDir: writeCliPackage(temp(), { installed: null }) }), { ok: true, state: 'up-to-date', url: PLAY_URL });
+  assert.deepEqual(s.config.managedApp, live);
+  has(s.said(), `  ✓ The ${APP_NAME} app is up to date: ${PLAY_URL}\n`);
+  assert.equal(s.ms.calls.length, 0);
+
+  // A new build is skipped, and the app that's live keeps its link.
+  writeFiles(s.distDir, { 'assets/app-2.js': 'console.log("v2");' });
   assert.deepEqual(await deployTheApp(s.ctx, { ...s.deps, nodeVersion: old }), { ok: true, state: 'skipped', url: PLAY_URL });
-  assert.deepEqual(s.config.managedApp, { ...deployedRecord(s.distDir), skipped: whyNot({ distDir: s.distDir, cliDir: s.cliDir, nodeVersion: old }) });
+  assert.deepEqual(s.config.managedApp, { ...live, skipped: whyNot({ distDir: s.distDir, cliDir: s.cliDir, nodeVersion: old }) });
   assert.equal(s.ms.calls.length, 0);
 });
 
