@@ -13,7 +13,7 @@
     "src"
   ],
   "engines": {
-    "node": ">=20.12"
+    "node": ">=22.13"
   },
   "scripts": {
     "start": "node bin/valuelens-installer.js",
