@@ -10,7 +10,7 @@ import { ADMIN_STEPS, LINKS } from '../../managed-app/errors.js';
 import { APP_NAME, dataHint, NOT_READY_NAMES, THE_APP } from '../../managed-app/flow.js';
 import { PRODUCT } from '../../product.js';
 import { copilotSeats, seatCount } from '../../seats.js';
-import { appName, PAX_AGENT365_PERMISSIONS, requiredPermissions } from '../../target.js';
+import { appName, PAX_AGENT365_PERMISSIONS, paxHostProblem, requiredPermissions } from '../../target.js';
 import { c } from '../../ui.js';
 import { accessReview, planAccess, VIEWER_GROUP_NAME } from '../access.js';
 import { askAdvanced, asksAdvanced } from '../advanced.js';
@@ -69,6 +69,9 @@ const taskOf = (config) => config.pax?.task ?? { name: PRODUCT.pax.task, at: TAS
 export async function paxPreflight(ctx) {
   const { ui, api, user, config } = ctx;
   const host = paxHostOf(ctx);
+  // install asks for the route on a host that can run it; update and repair reach here from the record.
+  const hostProblem = paxHostProblem(host);
+  if (hostProblem) throw new Error(hostProblem);
   // Checking this PC runs PowerShell a few times, so it starts now and is read after the tenant.
   const pcCheck = checkHost(host).then(
     (check) => ({ check }),

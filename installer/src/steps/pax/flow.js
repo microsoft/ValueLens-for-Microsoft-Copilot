@@ -693,18 +693,21 @@ export async function paxUninstall(ctx) {
   /**
    * @param {string} what
    * @param {() => Promise<unknown>} remove
+   * @returns {Promise<boolean>} Whether it's gone.
    */
   const take = async (what, remove) => {
     try {
       await remove();
       ui.ok(`Removed ${what}.`);
+      return true;
     } catch (err) {
       if (isGone(err)) {
         ui.ok(`${what[0].toUpperCase()}${what.slice(1)} was already gone.`);
-      } else {
-        ui.warn(`Couldn't remove ${what}: ${messageOf(err)}`);
-        ok = false;
+        return true;
       }
+      ui.warn(`Couldn't remove ${what}: ${messageOf(err)}`);
+      ok = false;
+      return false;
     }
   };
   /**
@@ -730,7 +733,9 @@ export async function paxUninstall(ctx) {
   await attempt('the app', async () => {
     if (!(await removeTheApp(ctx, ctx.appDeps ?? {})).ok) ok = false;
   });
-  await attempt("the app's access to the SharePoint site", () => removeSiteGrant(ctx));
+  await attempt("the app's access to the SharePoint site", async () => {
+    if (!(await removeSiteGrant(ctx))) ok = false;
+  });
 
   const wsId = ws?.workspaceId;
   if (wsId) {
@@ -755,8 +760,8 @@ export async function paxUninstall(ctx) {
   if (objectId && !app?.existing) {
     const appName = app?.displayName ?? PRODUCT.pax.app;
     if (await ui.confirm(`Delete the app registration ${appName} too?`, false)) {
-      await take(`the app registration ${appName}`, () => api.graph.deleteApplication(objectId));
-      appKept = false;
+      // A registration that couldn't be deleted keeps working, so its secret still comes off.
+      appKept = !(await take(`the app registration ${appName}`, () => api.graph.deleteApplication(objectId)));
     }
   }
   if (appKept && objectId && pax) {
