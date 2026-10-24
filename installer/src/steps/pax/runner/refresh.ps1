@@ -717,8 +717,9 @@ function Restore-Stream {
 function Set-RunWindow {
   # PAX looks back to the day the cumulative files cover, plus a few days of overlap that
   # PAX's de-duplication absorbs, within minDays and maxDays. A load that the last run left
-  # unfinished carries on from its last finished window instead. The days are read in windows
-  # of up to windowDays days, oldest first, so a long load can stop between them.
+  # unfinished carries on at the day its last finished window stopped instead, so every window
+  # moves the load on. The days are read in windows of up to windowDays days, oldest first, so
+  # a long load can stop between them.
   $cfg = $script:Cfg
   $state = $script:State
   $interactions = $state.streams.interactions
@@ -736,7 +737,9 @@ function Set-RunWindow {
   if ($resume) {
     $reachFrom = ConvertTo-UtcDate $(if ($progress.throughUtc) { $progress.throughUtc } else { $progress.fromUtc })
     $behind = [math]::Ceiling([math]::Max(0, ($today - $reachFrom.ToLocalTime()).TotalDays))
-    $days = [math]::Min(180, [math]::Max($cfg.minDays, $behind + $cfg.overlapDays))
+    # No overlap or minimum here: re-reading days the load already has could leave a run that
+    # reads small windows with nothing new, or move the load backwards.
+    $days = [math]::Min(180, [math]::Max(1, $behind))
   } elseif ($script:DaysOverride) {
     $days = $script:DaysOverride
     $reachFrom = $script:Covered

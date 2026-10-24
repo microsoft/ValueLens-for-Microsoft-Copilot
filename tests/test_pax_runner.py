@@ -692,6 +692,14 @@ def _window_budget(c):
     c.config(windowDays=7, runHours=1e-05).config(path=full, windowDays=7).run().run(Config=full)
 
 
+@refresh_case("window-resume-small")
+def _window_resume_small(c):
+    # A load that has reached 5 days ago in one-day windows. The limit stops this run after one.
+    progress = {"fromUtc": local_midnight_utc(10), "days": 10, "seed": True, "windowDays": 1,
+                "throughUtc": local_midnight_utc(5), "pending": None}
+    c.config(windowDays=7, runHours=1e-05).state(5, progress=progress).local().run()
+
+
 # Files left by earlier runs: their age in days, and whether the refresh keeps them.
 PRUNE_FILES = {
     "data/old.log": (40, False),
@@ -1170,14 +1178,14 @@ class RefreshTests(unittest.TestCase):
                                  progress=self.progress(30, 30, 24))
         self.assertEqual(state["lastError"],
                          f"The PAX run failed (exit code 1). PAX stopped on an error. PAX failed. The log is {state['lastLog']}.")
-        # The next run starts from the last window read, less the usual overlap.
-        second = windows(26, 4)
+        # The next run carries on at the day the last window it read stopped.
+        second = windows(24, 4)
         self.assertEqual(c.exit(2), 0, c.output(2))
         self.assertEqual(self.spans(c, 2), second)
         self.assertIn(f"The last run stopped part way through a load, so this run carries on from {first[0][1]}.",
                       c.output(2))
-        self.assertIn("It reads them in 4 windows of up to 7 days, oldest first.", c.output(2))
-        self.assertState(c, 2, lastResult="success", days=26, coveredThroughUtc=local_midnight_utc(0), progress=None)
+        self.assertIn("It reads them in 4 windows of up to 6 days, oldest first.", c.output(2))
+        self.assertState(c, 2, lastResult="success", days=24, coveredThroughUtc=local_midnight_utc(0), progress=None)
         rows = [f"row-from-run-1-{first[0][0]}"] + [f"row-from-run-2-{start}" for start, _ in second]
         self.assertRolledUp(c, ["Message_Id_Raw", *rows], ["Id", *rows])
 
@@ -1213,13 +1221,22 @@ class RefreshTests(unittest.TestCase):
                              "the task's time limit. SharePoint has everything loaded so far, and the next scheduled "
                              "run carries on from there."))
         self.assertEqual(self.remote_names(c, 1), [INTERACTIONS, USERS])
-        second = windows(26, 4)
+        second = windows(24, 4)
         self.assertEqual(c.exit(2), 0, c.output(2))
         self.assertEqual(self.spans(c, 2), second)
-        self.assertState(c, 2, lastResult="success", lastMessage="SharePoint's files are up to date.", days=26,
+        self.assertState(c, 2, lastResult="success", lastMessage="SharePoint's files are up to date.", days=24,
                          coveredThroughUtc=local_midnight_utc(0), progress=None)
         rows = [f"row-from-run-1-{first[0][0]}"] + [f"row-from-run-2-{start}" for start, _ in second]
         self.assertRolledUp(c, ["Message_Id_Raw", *rows], ["Id", *rows])
+
+    def test_a_resumed_load_moves_on_with_every_window_however_small(self):
+        c = self.case("window-resume-small")
+        self.assertEqual(c.exit(1), 0, c.output(1))
+        # Starting with the usual overlap would read only days the load already has.
+        self.assertEqual(self.spans(c, 1), windows(5, 5)[:1])
+        self.assertIn("The run stops here.", c.output(1))
+        self.assertState(c, 1, lastResult="success", days=5, coveredThroughUtc=local_midnight_utc(4),
+                         progress=self.progress(10, 10, 4, window_days=1))
 
     def test_old_run_files_and_logs_are_pruned(self):
         c = self.case("prune")
