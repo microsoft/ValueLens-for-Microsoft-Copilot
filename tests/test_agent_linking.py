@@ -113,7 +113,7 @@ class IngesterRuntimeRecordTests(unittest.TestCase):
         self.assertIn("'message:none'", code[16])
         self.assertIn("Prompts_Available", code[16])
         self.assertIn("F.expr(EXCLUDE_REASON_SQL)", code[18])
-        self.assertIn("spark.databricks.delta.schema.autoMerge.enabled", code[20])
+        self.assertIn("spark.databricks.delta.schema.autoMerge.enabled", code[21])
 
     def test_platform_agent_id_split(self):
         ns = load_pure(PROCESSOR, 2, ["PLATFORM_AGENT_ID_PATTERN", "BARE_GUID_PATTERN"])

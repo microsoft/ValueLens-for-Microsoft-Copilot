@@ -18,6 +18,31 @@ Deployment instructions do **not** live here. They live in the READMEs:
 
 ---
 
+## Unreleased — Fabric: reloading audit history keeps older rows
+
+**Why.** A backfill wrote the parsed audit table whole, so a reload shorter than the history already
+loaded dropped the older days: a 30-day backfill after a 180-day first load left 30 days. Reloads
+now keep older rows.
+
+- **A backfill replaces from its first record onwards.** `Copilot_Audit_Log_Direct_Ingester` writes
+  a backfill with Delta's `replaceWhere`: parsed rows from the earliest `CreationDate` it read
+  onwards are replaced, and older rows are kept, including the older rows of that month. Rows with
+  no `CreationDate` are replaced by every backfill. `mergeSchema` adds new columns.
+- **An empty backfill writes nothing.** With no records, the table is left as it is: an empty write
+  with `replaceWhere` would delete the range.
+- **Otherwise the same.** A missing table is created. A table from before the stable key columns is
+  still replaced whole, once, which upgrades it. A table not yet stored by month is moved to month
+  partitions first, as incremental runs already do. Incremental runs merge by `Id`, and the
+  processor picks up the months a backfill changed, as it does after a merge.
+- **A column whose type changed** now fails a backfill, which used to rewrite the schema: drop the
+  table, then run a backfill.
+- The installer's `run --backfill-days` and **Run now** run this notebook, so they keep older
+  history too. The PAX route already did: it adds the days to the SharePoint files.
+
+Import the notebook again, or run the installer's `update`, to pick this up.
+
+---
+
 ## Unreleased — ValueLens installer 0.1.0
 
 **Why.** Setting up ValueLens meant working through a path README by hand. The installer this repo
