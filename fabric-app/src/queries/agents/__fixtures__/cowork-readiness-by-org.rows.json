@@ -1,0 +1,44 @@
+[
+  {
+    "[Organization]": "Sales",
+    "[Eligible Users]": 30,
+    "[Surfaces Per Day]": 1.7309160305343512,
+    "[Prompts Per Session]": 1,
+    "[Agent User Share]": 0.36666666666666664
+  },
+  {
+    "[Organization]": "IT",
+    "[Eligible Users]": 30,
+    "[Surfaces Per Day]": 1.5399239543726235,
+    "[Prompts Per Session]": 1,
+    "[Agent User Share]": 0.36666666666666664
+  },
+  {
+    "[Organization]": "Legal",
+    "[Eligible Users]": 30,
+    "[Surfaces Per Day]": 1.5048732943469785,
+    "[Prompts Per Session]": 1,
+    "[Agent User Share]": 0.3333333333333333
+  },
+  {
+    "[Organization]": "Marketing",
+    "[Eligible Users]": 30,
+    "[Surfaces Per Day]": 1.450381679389313,
+    "[Prompts Per Session]": 1,
+    "[Agent User Share]": 0.36666666666666664
+  },
+  {
+    "[Organization]": "Finance",
+    "[Eligible Users]": 30,
+    "[Surfaces Per Day]": 1.374015748031496,
+    "[Prompts Per Session]": 1,
+    "[Agent User Share]": 0.36666666666666664
+  },
+  {
+    "[Organization]": "HR",
+    "[Eligible Users]": 30,
+    "[Surfaces Per Day]": 1.351409978308026,
+    "[Prompts Per Session]": 1,
+    "[Agent User Share]": 0.36666666666666664
+  }
+]

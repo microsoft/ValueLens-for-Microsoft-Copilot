@@ -1,0 +1,16 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Copilot Licensed'[Dormancy Bucket Order],
+            'Copilot Licensed'[Dormancy Bucket],
+            "@LicensedUsers", [Licensed Seats by Dormancy (Verified)]
+        ),
+        NOT ISBLANK('Copilot Licensed'[Dormancy Bucket])
+            && NOT ISBLANK([@LicensedUsers])
+    ),
+    "Dormancy Bucket Order", 'Copilot Licensed'[Dormancy Bucket Order],
+    "Dormancy Bucket", 'Copilot Licensed'[Dormancy Bucket],
+    "Licensed Users", [@LicensedUsers]
+)
+ORDER BY [Dormancy Bucket Order]

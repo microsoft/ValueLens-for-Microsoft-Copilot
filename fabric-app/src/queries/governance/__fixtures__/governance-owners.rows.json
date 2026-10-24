@@ -1,0 +1,7 @@
+[
+  { "[Status Order]": 1, "[Owner Status]": "Owner active", "[Agents]": 102 },
+  { "[Status Order]": 2, "[Owner Status]": "Owner disabled", "[Agents]": 9 },
+  { "[Status Order]": 3, "[Owner Status]": "Owner not found", "[Agents]": 4 },
+  { "[Status Order]": 4, "[Owner Status]": "No owner on record", "[Agents]": 13 },
+  { "[Status Order]": 5, "[Owner Status]": "Not checked", "[Agents]": 7 }
+]

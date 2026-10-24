@@ -1,0 +1,13 @@
+EVALUATE
+ROW(
+    "Overall Users", [All Active Users],
+    "Overall Sessions", [Observed Sessions],
+    "Overall Hours Wk", [Expert Equivalent Hours Per Week],
+    "Overall Top Outcome", [Top Value Outcome],
+    "Licensed Users", [Active Licensed Users],
+    "Unlicensed Users", [Active Unlicensed Users],
+    "Agent Users", [Active Agent Users],
+    "Cowork Users", [Cowork Users],
+    "Cowork Hours Wk", [Cowork Expert Equivalent Hours Per Week],
+    "Cowork Top Outcome", [Cowork Top Value Outcome]
+)

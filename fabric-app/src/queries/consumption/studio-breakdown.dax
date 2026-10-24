@@ -1,0 +1,32 @@
+EVALUATE
+UNION(
+    SELECTCOLUMNS(
+        FILTER(
+            SUMMARIZECOLUMNS(
+                'Credit Consumption (Agent)'[LLM_Model],
+                "@Credits", [Studio Consumed Credits (Agent)],
+                "@Cost", [Billable Credit Cost (Agent)]
+            ),
+            NOT ISBLANK([@Credits])
+        ),
+        "Breakdown", "Model",
+        "Item", COALESCE('Credit Consumption (Agent)'[LLM_Model], "Not recorded"),
+        "Credits", [@Credits],
+        "Cost", [@Cost]
+    ),
+    SELECTCOLUMNS(
+        FILTER(
+            SUMMARIZECOLUMNS(
+                'Credit Consumption (Agent)'[Billable_Feature],
+                "@Credits", [Studio Consumed Credits (Agent)],
+                "@Cost", [Billable Credit Cost (Agent)]
+            ),
+            NOT ISBLANK([@Credits])
+        ),
+        "Breakdown", "Feature",
+        "Item", COALESCE('Credit Consumption (Agent)'[Billable_Feature], "Not recorded"),
+        "Credits", [@Credits],
+        "Cost", [@Cost]
+    )
+)
+ORDER BY [Breakdown] ASC, [Credits] DESC

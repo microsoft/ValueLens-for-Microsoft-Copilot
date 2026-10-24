@@ -1,0 +1,80 @@
+[
+  {
+    "[Lifecycle Order]": 1,
+    "[Lifecycle]": "Blocked by admin",
+    "[Type]": "Maker: Copilot Studio",
+    "[Agents]": 6
+  },
+  {
+    "[Lifecycle Order]": 1,
+    "[Lifecycle]": "Blocked by admin",
+    "[Type]": "Marketplace",
+    "[Agents]": 2
+  },
+  {
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Type]": "Microsoft",
+    "[Agents]": 26
+  },
+  {
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Type]": "Line of business",
+    "[Agents]": 10
+  },
+  {
+    "[Lifecycle Order]": 3,
+    "[Lifecycle]": "Deployed, not yet used",
+    "[Type]": "Marketplace",
+    "[Agents]": 1
+  },
+  {
+    "[Lifecycle Order]": 4,
+    "[Lifecycle]": "Tenant-built, no owner",
+    "[Type]": "Maker: Copilot Studio",
+    "[Agents]": 38
+  },
+  {
+    "[Lifecycle Order]": 5,
+    "[Lifecycle]": "Tenant-built, not deployed",
+    "[Type]": "Maker: Copilot Studio",
+    "[Agents]": 63
+  },
+  {
+    "[Lifecycle Order]": 5,
+    "[Lifecycle]": "Tenant-built, not deployed",
+    "[Type]": "Maker: Agent Builder",
+    "[Agents]": 30
+  },
+  {
+    "[Lifecycle Order]": 5,
+    "[Lifecycle]": "Tenant-built, not deployed",
+    "[Type]": "Maker: Foundry",
+    "[Agents]": 1
+  },
+  {
+    "[Lifecycle Order]": 5,
+    "[Lifecycle]": "Tenant-built, not deployed",
+    "[Type]": "Maker: SharePoint",
+    "[Agents]": 1
+  },
+  {
+    "[Lifecycle Order]": 6,
+    "[Lifecycle]": "Catalogue listing",
+    "[Type]": "Marketplace",
+    "[Agents]": 269
+  },
+  {
+    "[Lifecycle Order]": 6,
+    "[Lifecycle]": "Catalogue listing",
+    "[Type]": "Line of business",
+    "[Agents]": 17
+  },
+  {
+    "[Lifecycle Order]": 6,
+    "[Lifecycle]": "Catalogue listing",
+    "[Type]": "Microsoft",
+    "[Agents]": 5
+  }
+]

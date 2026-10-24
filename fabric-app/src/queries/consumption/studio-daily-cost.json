@@ -1,0 +1,98 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "encoding": {
+    "x": {
+      "field": "Day",
+      "type": "temporal",
+      "title": null,
+      "axis": { "labelExpr": "timeFormat(datum.value, '%-d %b')", "labelAngle": 0, "labelOverlap": true, "tickCount": "week", "grid": false }
+    }
+  },
+  "layer": [
+    {
+      "transform": [
+        { "fold": ["Prepaid Cost", "PAYG Cost"], "as": ["Series", "Value"] },
+        { "filter": "isValid(datum['Value'])" },
+        { "calculate": "datum['Series'] === 'Prepaid Cost' ? 'Prepaid' : 'Pay-as-you-go'", "as": "Billing" },
+        { "calculate": "datum['Series'] === 'Prepaid Cost' ? 1 : 2", "as": "Billing Order" },
+        { "calculate": "toDate(datum['Usage Date'])", "as": "Day" }
+      ],
+      "mark": { "type": "bar", "width": { "expr": "max(1, 0.7 * (scale('x', 86400000) - scale('x', 0)))" } },
+      "encoding": {
+        "y": {
+          "field": "Value",
+          "type": "quantitative",
+          "stack": "zero",
+          "title": "Cost ($)",
+          "axis": { "format": ",~f", "formatType": "number" }
+        },
+        "color": {
+          "field": "Billing",
+          "type": "nominal",
+          "title": null,
+          "sort": ["Prepaid", "Pay-as-you-go"],
+          "legend": { "orient": "top", "direction": "horizontal" }
+        },
+        "order": { "field": "Billing Order", "type": "quantitative" },
+        "tooltip": [
+          { "field": "Day", "type": "temporal", "title": "Day", "format": "%a %d %b %Y" },
+          { "field": "Billing", "type": "nominal", "title": "Billing" },
+          { "field": "Value", "type": "quantitative", "title": "Cost ($)", "format": "$,.2f" },
+          { "field": "Credits", "type": "quantitative", "title": "All credits", "format": ",.0f" }
+        ]
+      }
+    },
+    {
+      "transform": [
+        { "calculate": "toDate(datum['Usage Date'])", "as": "Usage Day" },
+        {
+          "calculate": "(isValid(datum['Prepaid Cost']) ? datum['Prepaid Cost'] : 0) + (isValid(datum['PAYG Cost']) ? datum['PAYG Cost'] : 0)",
+          "as": "Day Total"
+        },
+        {
+          "calculate": "utc(year(datum['Usage Day']), month(datum['Usage Day']), date(datum['Usage Day'])) / 86400000",
+          "as": "Day Number"
+        },
+        {
+          "joinaggregate": [
+            { "op": "min", "field": "Day Number", "as": "First Day Number" },
+            { "op": "max", "field": "Day Number", "as": "Last Day Number" }
+          ]
+        },
+        {
+          "calculate": "datum['Day Number'] === datum['First Day Number'] ? sequence(datum['First Day Number'], datum['Last Day Number'] + 1) : sequence(datum['Day Number'], datum['Day Number'] + 7)",
+          "as": "Window Days"
+        },
+        { "flatten": ["Window Days"], "as": ["Average Day Number"] },
+        {
+          "filter": "datum['Average Day Number'] >= datum['First Day Number'] + 6 && datum['Average Day Number'] <= datum['Last Day Number']"
+        },
+        {
+          "calculate": "datum['Average Day Number'] - datum['Day Number'] <= 6 ? datum['Day Total'] : 0",
+          "as": "Window Amount"
+        },
+        { "aggregate": [{ "op": "sum", "field": "Window Amount", "as": "Week Total" }], "groupby": ["Average Day Number"] },
+        {
+          "calculate": "toDate(datetime(utcyear(datum['Average Day Number'] * 86400000), utcmonth(datum['Average Day Number'] * 86400000), utcdate(datum['Average Day Number'] * 86400000)))",
+          "as": "Day"
+        },
+        { "calculate": "datum['Week Total'] / 7", "as": "Value" }
+      ],
+      "mark": { "type": "line", "color": "#605e5c", "strokeWidth": 2, "interpolate": "monotone" },
+      "encoding": {
+        "y": {
+          "field": "Value",
+          "type": "quantitative",
+          "title": "Cost ($)",
+          "axis": { "format": ",~f", "formatType": "number" }
+        },
+        "tooltip": [
+          { "field": "Day", "type": "temporal", "title": "Day", "format": "%a %d %b %Y" },
+          { "field": "Value", "type": "quantitative", "title": "7-day average", "format": "$,.2f" }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+EVALUATE
+SELECTCOLUMNS(
+    'Behavior Value Map',
+    "Signal", 'Behavior Value Map'[Signal],
+    "AI Tasks", 'Behavior Value Map'[Behavior],
+    "Use Case", 'Behavior Value Map'[Use Case],
+    "Value Outcome", 'Behavior Value Map'[Value Outcome],
+    "Human Equivalent (Minutes)",
+        LOOKUPVALUE('Human Time Estimates'[Human Baseline (min)], 'Human Time Estimates'[Behavior], 'Behavior Value Map'[Behavior]),
+    "Research Source",
+        LOOKUPVALUE('Human Time Estimates'[Primary Source], 'Human Time Estimates'[Behavior], 'Behavior Value Map'[Behavior]),
+    "Source URL",
+        LOOKUPVALUE('Human Time Estimates'[Source URL], 'Human Time Estimates'[Behavior], 'Behavior Value Map'[Behavior]),
+    "Confidence",
+        LOOKUPVALUE('Human Time Estimates'[Confidence], 'Human Time Estimates'[Behavior], 'Behavior Value Map'[Behavior]),
+    "Category",
+        LOOKUPVALUE('Human Time Estimates'[Category], 'Human Time Estimates'[Behavior], 'Behavior Value Map'[Behavior])
+)
+ORDER BY [Category], [AI Tasks], [Signal]

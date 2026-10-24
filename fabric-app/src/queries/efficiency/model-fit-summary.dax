@@ -1,0 +1,9 @@
+EVALUATE
+ROW(
+    "Sessions", [Model: Sessions],
+    "Logged Share", [Model: Logged Session Share],
+    "Well-matched Share", [Model: Well-matched Share],
+    "Over-specified Share", [Model: Over-specified Share],
+    "Under-specified Share", [Model: Under-specified Share],
+    "Coverage Notice", [Model: Coverage Notice]
+)

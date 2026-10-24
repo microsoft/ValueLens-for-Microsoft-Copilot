@@ -1,0 +1,11 @@
+// The distinct, non-blank values of one Consumption Central org attribute.
+// The app puts the attribute's name in place of __ATTRIBUTE__.
+EVALUATE
+CALCULATETABLE(
+    SELECTCOLUMNS(
+        FILTER(VALUES('Org Attribute Source'[Value]), LEN(TRIM('Org Attribute Source'[Value])) > 0),
+        "Value", 'Org Attribute Source'[Value]
+    ),
+    'Org Attribute Source'[Attribute] = __ATTRIBUTE__
+)
+ORDER BY [Value]

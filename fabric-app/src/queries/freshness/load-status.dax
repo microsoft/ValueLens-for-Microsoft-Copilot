@@ -1,0 +1,14 @@
+EVALUATE
+// How each load went on the latest pipeline run dbo.load_log records: one row
+// per load, with its plain-words reason when it failed or loaded with a warning.
+// Record_Load_Status runs after the model refresh, so a run's outcome shows from
+// the next refresh on.
+VAR _last = MAX('Load Log'[logged_at])
+RETURN
+SELECTCOLUMNS(
+    FILTER('Load Log', 'Load Log'[logged_at] = _last),
+    "Activity", 'Load Log'[activity],
+    "Source", 'Load Log'[source],
+    "Status", 'Load Log'[status],
+    "Reason", 'Load Log'[reason]
+)

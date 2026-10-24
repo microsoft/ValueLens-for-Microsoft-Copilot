@@ -1,0 +1,60 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "layer": [
+    {
+      "transform": [{ "aggregate": [{ "op": "median", "field": "Seats In Use Pct", "as": "Seats In Use Pct" }] }],
+      "mark": { "type": "rule", "strokeDash": [4, 3], "color": "#8a8886" },
+      "encoding": { "x": { "field": "Seats In Use Pct", "type": "quantitative", "title": "Licensed seats in use" } }
+    },
+    {
+      "transform": [{ "aggregate": [{ "op": "median", "field": "Hours Per Seat Month", "as": "Hours Per Seat Month" }] }],
+      "mark": { "type": "rule", "strokeDash": [4, 3], "color": "#8a8886" },
+      "encoding": { "y": { "field": "Hours Per Seat Month", "type": "quantitative", "title": "Expert hours per seat a month" } }
+    },
+    {
+      "mark": { "type": "circle", "opacity": 0.75 },
+      "encoding": {
+        "x": {
+          "field": "Seats In Use Pct",
+          "type": "quantitative",
+          "title": "Licensed seats in use",
+          "scale": { "zero": false },
+          "axis": { "format": ".0%", "tickCount": 5 }
+        },
+        "y": {
+          "field": "Hours Per Seat Month",
+          "type": "quantitative",
+          "title": "Expert hours per seat a month",
+          "axis": { "format": ",.1f", "tickCount": 5 }
+        },
+        "size": {
+          "field": "Licensed Seats",
+          "type": "quantitative",
+          "legend": null,
+          "scale": { "range": [40, 640] }
+        },
+        "tooltip": [
+          { "field": "Chat + Agent Org DataOrganization", "type": "nominal", "title": "Group" },
+          { "field": "Seats In Use Pct", "type": "quantitative", "title": "Seats in use", "format": ".0%" },
+          { "field": "Hours Per Seat Month", "type": "quantitative", "title": "Hours per seat a month", "format": ",.1f" },
+          { "field": "Licensed Seats", "type": "quantitative", "title": "Licensed seats", "format": ",.0f" },
+          { "field": "Habit Pct", "type": "quantitative", "title": "Habit rate", "format": ".0%" }
+        ]
+      }
+    },
+    {
+      "transform": [
+        { "window": [{ "op": "row_number", "as": "Seat Rank" }], "sort": [{ "field": "Licensed Seats", "order": "descending" }] },
+        { "filter": "datum['Seat Rank'] <= 6" }
+      ],
+      "mark": { "type": "text", "align": "left", "baseline": "middle", "dx": 16, "fontSize": 11, "limit": 140 },
+      "encoding": {
+        "x": { "field": "Seats In Use Pct", "type": "quantitative", "title": "Licensed seats in use" },
+        "y": { "field": "Hours Per Seat Month", "type": "quantitative", "title": "Expert hours per seat a month" },
+        "text": { "field": "Chat + Agent Org DataOrganization", "type": "nominal" }
+      }
+    }
+  ]
+}

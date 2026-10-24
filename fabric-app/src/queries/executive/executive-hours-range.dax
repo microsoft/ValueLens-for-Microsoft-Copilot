@@ -1,0 +1,9 @@
+EVALUATE
+// The Conservative to Optimistic range under the summary's hours, as its own
+// query: the app asks it beside executive-summary.dax, under the same filters,
+// so the summary's figures don't wait for it. On a large tenant it took about a
+// quarter of the summary's time. Both columns are as they were in the summary.
+ROW(
+    "Hours Conservative", CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Conservative"),
+    "Hours Optimistic", CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Optimistic")
+)

@@ -1,0 +1,431 @@
+@layer fabric-visual-tokens, theme, base, fabric-visuals, components, utilities;
+
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Bridged tokens — kept in `@theme static` so the CSS vars are always
+   emitted, not tree-shaken when no Tailwind utility consumes them.
+   Required because <VegaVisual> and <DataGrid> read these at runtime via
+   `useCssTheme()` and project them into a JS theme object (Vega's SVG output
+   cannot resolve `var()` references). */
+@theme static {
+  --color-brand:            #0f766e;  /* bar/area fills, button-like brand surfaces */
+  --color-brand-foreground: #0b5a52;  /* line/point marks, branded text & emphasis */
+  --color-hover:            #eef5f3;  /* row/cell hover surface in DataGrid + visuals */
+
+  /* Categorical data palette — the ValueLens and Consumption Central App
+     Editions' series order: teal leads, then blue, amber and violet, the
+     colours those apps give licensed people, Cowork, unlicensed people and
+     agents. The rest stay quiet enough to sit together in a stacked bar. */
+  --color-data-1:  #0f766e;
+  --color-data-2:  #2563eb;
+  --color-data-3:  #b45309;
+  --color-data-4:  #6d28d9;
+  --color-data-5:  #64748b;
+  --color-data-6:  #be185d;
+  --color-data-7:  #65a30d;
+  --color-data-8:  #0891b2;
+  --color-data-9:  #b42318;
+  --color-data-10: #12201e;
+}
+
+@theme {
+  /* Color tokens — light theme, the App Editions' teal-on-canvas palette.
+     Usage: bg-*, text-*, border-* (e.g. bg-primary text-primary-foreground)
+     Each token has a -foreground pair for text on that surface. */
+  --color-background: #f3f6f5;                                       /* page canvas */
+  --color-foreground: #12201e;                                       /* default text */
+
+  --color-card: #ffffff;                                             /* panel surfaces */
+  --color-card-foreground: #12201e;
+
+  --color-popover: #ffffff;                                          /* popover/dropdown surfaces */
+  --color-popover-foreground: #12201e;
+
+  --color-primary: #0f766e;                                          /* primary actions & buttons */
+  --color-primary-foreground: #ffffff;
+
+  --color-secondary: #eef5f3;                                        /* secondary actions, hover */
+  --color-secondary-foreground: #12201e;
+
+  --color-muted: #f7faf9;                                            /* subtle backgrounds */
+  --color-muted-foreground: #5f716e;                                 /* subdued text */
+
+  --color-accent: #e6f3f0;                                           /* accent highlights */
+  --color-accent-foreground: #0b5a52;
+
+  --color-destructive: #b42318;                                      /* errors & destructive actions */
+  --color-destructive-foreground: #ffffff;
+
+  --color-success: #0f766e;                                          /* success surfaces */
+  --color-success-foreground: #ffffff;
+
+  --color-border: #d9e2e0;                                           /* default border */
+  --color-input: #c9d6d3;                                            /* input field borders */
+  --color-ring: #0f766e;                                             /* focus rings */
+
+  /* The app band: the dark teal header every App Edition carries. */
+  --color-band: #0b3d3a;
+  --color-band-foreground: #ffffff;
+  --color-band-muted: #b9d3cf;
+  --color-band-accent: #7fe0cf;
+  --color-segment: #e8eeec;                                          /* segmented control track */
+
+  /* Outcome colours, shared by every destination so good and bad never
+     change meaning between sections. Text-safe shades; the chart fills are
+     `--vl-teal`, `--vl-coral` and `--vl-amber`, read by `useOutcomeColors`. */
+  --color-positive: var(--vl-teal-text);                             /* thumbs up, well matched */
+  --color-negative: var(--vl-coral-text);                            /* thumbs down, over-specified */
+  --color-caution: var(--vl-amber-text);                             /* worth a look, under-specified */
+
+  /* Elevation shadows, keyed by resting elevation in px; teal-tinted like the App Editions.
+     Usage: shadow-* (e.g. shadow-8, shadow-64) */
+  --shadow-card: 0 1px 2px rgb(16 40 37 / 0.06);                     /* panels and KPI tiles */
+  --shadow-2:  0 1px 2px rgb(16 40 37 / 0.08);
+  --shadow-4:  0 1px 3px rgb(16 40 37 / 0.1), 0 2px 6px rgb(16 40 37 / 0.06);
+  --shadow-8:  0 2px 8px rgb(16 40 37 / 0.12);
+  --shadow-16: 0 8px 28px rgb(16 40 37 / 0.18);                     /* popovers and sheets */
+  --shadow-28: 0 0 8px rgba(0, 0, 0, 0.12), 0 14px 28px rgba(0, 0, 0, 0.14);
+  --shadow-64: 0 0 8px rgba(0, 0, 0, 0.12), 0 32px 64px rgba(0, 0, 0, 0.14);
+
+  --radius-none: 0;
+  --radius-sm: 5px;                                                  /* segment buttons */
+  --radius-md: 7px;                                                  /* controls */
+  --radius-lg: 10px;                                                 /* chart cards (fabric-visuals reads this) */
+  --radius-xl: 10px;                                                 /* panels and KPI tiles */
+  --radius-2xl: 12px;
+  --radius-3xl: 16px;
+  --radius-4xl: 24px;
+  --radius-5xl: 32px;
+  --radius-6xl: 40px;
+  --radius-full: 9999px;
+  --radius: 4px;
+
+  /* Spacing — 4px grid; use only these tokens, no interpolation. *-nudge = base − 2px.
+     Usage: p-*, m-*, gap-* (e.g. p-400 gap-300) */
+  --spacing-none: 0;
+  --spacing-100-nudge: 2px;
+  --spacing-100: 4px;
+  --spacing-200-nudge: 6px;
+  --spacing-200: 8px;
+  --spacing-300-nudge: 10px;
+  --spacing-300: 12px;
+  --spacing-400: 16px;
+  --spacing-500: 20px;
+  --spacing-600: 24px;
+  --spacing-700: 28px;
+  --spacing-800: 32px;
+
+  /* Font Sizes — 100-based scale 
+     Usage: text-* (e.g. text-300, text-hero-900) */
+  --text-100: 10px;
+  --text-200: 12px;
+  --text-300: 14px;
+  --text-400: 16px;
+  --text-500: 20px;
+  --text-600: 24px;
+  --text-hero-700: 28px;
+  --text-hero-800: 32px;
+  --text-hero-900: 40px;
+  --text-hero-1000: 68px;
+
+  /* Line Heights — paired with font sizes
+     Usage: leading-* (e.g. leading-300) */
+  --leading-100: 14px;
+  --leading-200: 16px;
+  --leading-300: 20px;
+  --leading-400: 22px;
+  --leading-500: 28px;
+  --leading-600: 32px;
+  --leading-hero-700: 36px;
+  --leading-hero-800: 40px;
+  --leading-hero-900: 52px;
+  --leading-hero-1000: 92px;
+
+  /* Font Weights
+     Usage: font-* (e.g. font-semibold) */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Font Families — the Windows/M365 system stack, so the app matches its host
+     and needs no webfont download.
+     Usage: font-* (e.g. font-heading, font-base) */
+  --font-heading: 'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI',                   /* headings and titles */
+    -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+  --font-base: 'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI',                      /* body text, labels, UI controls */
+    -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+  --font-monospace: Consolas, 'Cascadia Mono', 'Courier New', monospace; /* code, pre-formatted text */
+  --font-numeric: 'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI',                   /* KPI values, numeric displays */
+    -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+
+  /* Icon Sizes — 100-based scale
+     Usage: icon-size-* custom utility (e.g. icon-size-200) */
+  --icon-size-100: 12px;
+  --icon-size-200: 16px;
+  --icon-size-300: 20px;
+  --icon-size-400: 24px;
+  --icon-size-500: 28px;
+  --icon-size-600: 32px;
+  --icon-size-700: 48px;
+}
+
+@utility icon-size-* {
+  width: --value(--icon-size-*);
+  height: --value(--icon-size-*);
+}
+
+@layer base {
+  .dark {
+    /* Native controls (scrollbars, the <select> list) follow the theme too. */
+    color-scheme: dark;
+
+    /* Color tokens — dark theme, the same teal family on a deep green-black. */
+    --color-background: #0e1615;
+    --color-foreground: #e8f0ee;
+
+    --color-card: #16211f;
+    --color-card-foreground: #e8f0ee;
+
+    --color-popover: #1a2725;
+    --color-popover-foreground: #e8f0ee;
+
+    --color-primary: #5fd0bd;
+    --color-primary-foreground: #0e1615;
+
+    --color-secondary: #1f2d2b;
+    --color-secondary-foreground: #e8f0ee;
+
+    --color-muted: #1a2725;
+    --color-muted-foreground: #9fb3af;
+
+    --color-accent: #133a35;
+    --color-accent-foreground: #8fe6d6;
+
+    --color-destructive: #f1707b;
+    --color-destructive-foreground: #0e1615;
+
+    --color-success: #5fd0bd;
+    --color-success-foreground: #0e1615;
+
+    --color-border: #2a3a37;
+    --color-input: #364946;
+    --color-ring: #5fd0bd;
+
+    --color-band: #08201e;
+    --color-band-foreground: #ffffff;
+    --color-band-muted: #a9c7c2;
+    --color-band-accent: #7fe0cf;
+    --color-segment: #1f2d2b;
+
+    --color-brand:            #3cb8a5;
+    --color-brand-foreground: #7fe0cf;
+    --color-hover:            #1f2d2b;
+
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+
+    /* Categorical data palette — dark. Lifted value and lowered chroma so
+       marks read against the dark canvas without vibrating. */
+    --color-data-1:  #3cb8a5;
+    --color-data-2:  #60a5fa;
+    --color-data-3:  #e8a25a;
+    --color-data-4:  #a78bfa;
+    --color-data-5:  #94a3b8;
+    --color-data-6:  #f472b6;
+    --color-data-7:  #a3d35a;
+    --color-data-8:  #38bdf8;
+    --color-data-9:  #f08070;
+    --color-data-10: #d6e2df;
+  }
+}
+
+/* Hue roles, retuned to the App Editions' palette so every chart, chip and
+   outcome colour sits in the same family as the teal chrome.
+
+   Each hue has three roles:
+     base  — chart marks
+     text  — a deeper (light) or paler (dark) shade that clears 4.5:1 on cards,
+             for text, controls and focus rings
+     tint  — a quiet surface for selection and callouts
+   Teal, amber, violet (`plum`) and blue are the App Editions' licensed,
+   unlicensed, agent and Cowork colours; coral is their "bad". */
+@layer base {
+  :root {
+    --vl-blue: #2563eb;        --vl-blue-text: #1d4ed8;      --vl-blue-tint: #eaf1fe;
+    --vl-amber: #b45309;       --vl-amber-text: #8a4a0a;     --vl-amber-tint: #fdf3e7;
+    --vl-amber-strong: #b45309;
+    --vl-plum: #6d28d9;        --vl-plum-text: #5b21b6;      --vl-plum-tint: #f1ebfd;
+    --vl-teal: #0f766e;        --vl-teal-text: #0b5a52;      --vl-teal-tint: #e6f3f0;
+    --vl-teal-strong: #0f766e;
+    --vl-lavender: #7c6fd6;    --vl-lavender-text: #5148b8;  --vl-lavender-tint: #efedfb;
+    --vl-coral: #b42318;       --vl-coral-text: #8f2d1f;     --vl-coral-tint: #fdeeec;
+    --vl-navy: #0b3d3a;        --vl-navy-text: #0b3d3a;      --vl-navy-tint: #e6efee;
+    /* Prepaid capacity: Consumption Central's lighter teal, so pay-as-you-go
+       amber always reads as the overflow on top of it. */
+    --vl-green: #64b5a8;       --vl-green-text: #2b6f65;     --vl-green-tint: #e3f4ef;
+    --vl-cyan: #0891b2;        --vl-cyan-text: #0e6a88;      --vl-cyan-tint: #e3f3f8;
+    --vl-indigo: #4f46e5;      --vl-indigo-text: #4338ca;    --vl-indigo-tint: #eceafd;
+    --vl-steel: #4a6b82;       --vl-steel-text: #36546a;     --vl-steel-tint: #eaf0f4;
+    --vl-periwinkle: #94a3b8;  --vl-periwinkle-text: #475569; --vl-periwinkle-tint: #eef2f6;
+    --vl-slate: #64748b;
+    --vl-ink: #12201e;
+    /* The habit ladder, Power (4) down to Inactive (0): the App Editions' teal
+       ramp, with Inactive stepping out of it into grey because it is an absence. */
+    --vl-ladder-4: #0b544c;
+    --vl-ladder-3: #23897c;
+    --vl-ladder-2: #64b5a8;
+    --vl-ladder-1: #b6ded8;
+    --vl-ladder-0: #c8cdd4;
+  }
+
+  .dark {
+    --vl-blue: #60a5fa;        --vl-blue-text: #93c5fd;      --vl-blue-tint: #1b2a44;
+    --vl-amber: #e8a25a;       --vl-amber-text: #f3c08a;     --vl-amber-tint: #3a2a17;
+    --vl-amber-strong: #e8a25a;
+    --vl-plum: #a78bfa;        --vl-plum-text: #c4b5fd;      --vl-plum-tint: #2a2145;
+    --vl-teal: #3cb8a5;        --vl-teal-text: #7fe0cf;      --vl-teal-tint: #133a35;
+    --vl-teal-strong: #3cb8a5;
+    --vl-lavender: #a39af0;    --vl-lavender-text: #c3bdf7;  --vl-lavender-tint: #27264a;
+    --vl-coral: #f08070;       --vl-coral-text: #f7a392;     --vl-coral-tint: #3d1f19;
+    --vl-navy: #5b9c95;        --vl-navy-text: #a9cfca;      --vl-navy-tint: #16302d;
+    --vl-green: #7cc9bc;       --vl-green-text: #a6ddd3;     --vl-green-tint: #16302d;
+    --vl-cyan: #38bdf8;        --vl-cyan-text: #7dd3fc;      --vl-cyan-tint: #14303a;
+    --vl-indigo: #818cf8;      --vl-indigo-text: #a5b4fc;    --vl-indigo-tint: #262848;
+    --vl-steel: #86a7bf;       --vl-steel-text: #adc6d8;     --vl-steel-tint: #1a2731;
+    --vl-periwinkle: #a7b4c6;  --vl-periwinkle-text: #cbd5e1; --vl-periwinkle-tint: #232a3a;
+    --vl-slate: #94a3b8;
+    --vl-ink: #d6e2df;
+    /* On a dark ground engagement reads as brightness. */
+    --vl-ladder-4: #b6ded8;
+    --vl-ladder-3: #64b5a8;
+    --vl-ladder-2: #2f8f81;
+    --vl-ladder-1: #1d5a52;
+    --vl-ladder-0: #4a5058;
+  }
+
+  /* Series orders. The chrome is the one teal everywhere, as in the App
+     Editions; a palette only reorders chart series where the order carries
+     meaning. Charts pick these up through `usePaletteTheme`. */
+
+  /* Consumption leads with prepaid teal and puts amber second, so
+     pay-as-you-go always reads as the overflow on top of it. */
+  .palette-consumption {
+    --color-brand: var(--vl-teal);
+    --color-brand-foreground: var(--vl-teal-text);
+    --color-data-1: var(--vl-green);
+    --color-data-2: var(--vl-amber);
+    --color-data-3: var(--vl-blue);
+    --color-data-4: var(--vl-plum);
+    --color-data-5: var(--vl-teal);
+    --color-data-6: var(--vl-slate);
+    --color-data-7: var(--vl-cyan);
+    --color-data-8: var(--vl-periwinkle);
+    --color-data-9: var(--vl-coral);
+    --color-data-10: var(--vl-ink);
+  }
+
+}
+
+@layer base {
+  /* The page column's side padding: the App Editions' 28px, 16px on a phone.
+     Full-bleed rows inside the column pull out by the same amount. */
+  :root {
+    --page-x: 28px;
+  }
+
+  @media (max-width: 639px) {
+    :root {
+      --page-x: 16px;
+    }
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Panels. Every card on a page is a white panel on the canvas with a hairline
+   and the App Editions' faint teal shadow; the screens draw them as
+   `rounded-xl border bg-card`, so the shadow is given here once rather than
+   in each of them. Dashed cards are placeholders and stay flat. */
+@layer components {
+  .rounded-xl.bg-card:not(.border-dashed):not([class*="shadow-"]) {
+    box-shadow: var(--shadow-card);
+  }
+
+  /* On the dark band focus rings take the band accent so they stay visible. */
+  [data-band] :focus-visible {
+    outline-color: var(--color-band-accent);
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+
+}
+
+/* Heat shading for grid cells (lib/heat.ts, components/heat-cell.tsx). The
+   tint has to fill the whole cell, but a cell renderer only owns the content,
+   so the span paints its own box and an outer shadow the grid cell's
+   `overflow: hidden` clips to the cell edge. The tint is mixed into the card
+   colour rather than into transparent: two translucent layers meeting on a
+   sub-pixel edge leave a visible seam, two opaque ones do not. */
+.vl-heat {
+  --heat-tint: color-mix(in srgb, var(--heat-color, var(--color-brand)) var(--heat-mix, 0%), var(--color-card));
+  display: block;
+  background-color: var(--heat-tint);
+  box-shadow: 0 0 0 100vmax var(--heat-tint);
+}
+
+@media (forced-colors: active) {
+  .vl-heat {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+/* Exports (lib/report-export.ts). "Download PDF" prints a report built from
+   the captured charts in place of the app, so the paper copy matches the
+   slides and no chart has to re-flow to the page width. A plain Ctrl+P still
+   prints the page itself, without the band, filters and buttons. */
+#vl-print-report {
+  display: none;
+}
+
+@media print {
+  html.vl-printing body > :not(#vl-print-report) {
+    display: none !important;
+  }
+
+  html.vl-printing #vl-print-report {
+    display: block;
+  }
+
+  html:not(.vl-printing),
+  html:not(.vl-printing) body,
+  html:not(.vl-printing) #root,
+  html:not(.vl-printing) [data-print="flow"] {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  html:not(.vl-printing) [data-print="hide"] {
+    display: none !important;
+  }
+
+  html:not(.vl-printing) [data-export] {
+    break-inside: avoid;
+  }
+}

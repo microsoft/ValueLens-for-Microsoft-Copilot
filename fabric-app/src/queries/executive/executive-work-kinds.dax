@@ -1,0 +1,19 @@
+EVALUATE
+// The kinds of work that produced the most expert-equivalent hours. General
+// Chat and General Assistance are left out, as they are from unique skills.
+VAR _kinds =
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category],
+            "Hours", CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Typical"),
+            "Tasks", [AI Tasks],
+            "People", [All Active Users]
+        ),
+        LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category])) > 0
+            && NOT 'Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category]
+                IN { "General Chat", "General Assistance", "General assistance / Other" }
+            && [Hours] > 0
+    )
+RETURN
+    TOPN(6, _kinds, [Hours], DESC, 'Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category], ASC)
+ORDER BY [Hours] DESC, 'Chat + Agent Interactions (Audit Logs)'[Task Breakdown Category] ASC

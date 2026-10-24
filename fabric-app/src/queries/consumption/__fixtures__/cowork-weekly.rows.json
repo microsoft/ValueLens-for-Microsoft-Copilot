@@ -1,0 +1,119 @@
+[
+  {
+    "[Week Index]": 1,
+    "[Week Start]": "2026-05-03T00:00:00",
+    "[Credits]": 34414.3428,
+    "[Active Users]": 35,
+    "[Prepaid Cost]": null,
+    "[PAYG Cost]": null,
+    "[Credits WoW]": null
+  },
+  {
+    "[Week Index]": 2,
+    "[Week Start]": "2026-05-10T00:00:00",
+    "[Credits]": 52801.0139,
+    "[Active Users]": 63,
+    "[Prepaid Cost]": null,
+    "[PAYG Cost]": null,
+    "[Credits WoW]": 0.5342734919232571
+  },
+  {
+    "[Week Index]": 3,
+    "[Week Start]": "2026-05-17T00:00:00",
+    "[Credits]": 79139.0356,
+    "[Active Users]": 97,
+    "[Prepaid Cost]": null,
+    "[PAYG Cost]": null,
+    "[Credits WoW]": 0.4988165899594592
+  },
+  {
+    "[Week Index]": 4,
+    "[Week Start]": "2026-05-24T00:00:00",
+    "[Credits]": 126515.6743,
+    "[Active Users]": 135,
+    "[Prepaid Cost]": null,
+    "[PAYG Cost]": null,
+    "[Credits WoW]": 0.5986506954603322
+  },
+  {
+    "[Week Index]": 5,
+    "[Week Start]": "2026-05-31T00:00:00",
+    "[Credits]": 183203.4622,
+    "[Active Users]": 133,
+    "[Prepaid Cost]": null,
+    "[PAYG Cost]": null,
+    "[Credits WoW]": 0.44806928638406673
+  },
+  {
+    "[Week Index]": 6,
+    "[Week Start]": "2026-06-07T00:00:00",
+    "[Credits]": 300757.1926,
+    "[Active Users]": 134,
+    "[Prepaid Cost]": null,
+    "[PAYG Cost]": null,
+    "[Credits WoW]": 0.6416567077300572
+  },
+  {
+    "[Week Index]": 7,
+    "[Week Start]": "2026-06-14T00:00:00",
+    "[Credits]": 211496.9076,
+    "[Active Users]": 129,
+    "[Prepaid Cost]": null,
+    "[PAYG Cost]": null,
+    "[Credits WoW]": -0.2967852047971271
+  },
+  {
+    "[Week Index]": 8,
+    "[Week Start]": "2026-06-21T00:00:00",
+    "[Credits]": 168668.5904,
+    "[Active Users]": 130,
+    "[Prepaid Cost]": null,
+    "[PAYG Cost]": null,
+    "[Credits WoW]": -0.2025009144861843
+  },
+  {
+    "[Week Index]": 9,
+    "[Week Start]": "2026-06-28T00:00:00",
+    "[Credits]": 133517.0333,
+    "[Active Users]": 135,
+    "[Prepaid Cost]": null,
+    "[PAYG Cost]": null,
+    "[Credits WoW]": -0.2084060643219793
+  },
+  {
+    "[Week Index]": 10,
+    "[Week Start]": "2026-07-05T00:00:00",
+    "[Credits]": 168677.6996,
+    "[Active Users]": 130,
+    "[Prepaid Cost]": 1248.21497704,
+    "[PAYG Cost]": 0,
+    "[Credits WoW]": 0.2633421776306048
+  },
+  {
+    "[Week Index]": 11,
+    "[Week Start]": "2026-07-12T00:00:00",
+    "[Credits]": 164432.7212,
+    "[Active Users]": 130,
+    "[Prepaid Cost]": 601.7850229600001,
+    "[PAYG Cost]": 764.6158713599999,
+    "[Credits WoW]": -0.02516620993804443
+  },
+  {
+    "[Week Index]": 12,
+    "[Week Start]": "2026-07-19T00:00:00",
+    "[Credits]": 172888.045,
+    "[Active Users]": 133,
+    "[Prepaid Cost]": 0,
+    "[PAYG Cost]": 1590.5700140000001,
+    "[Credits WoW]": 0.051421175410189666
+  },
+  {
+    "[Week Index]": 13,
+    "[Week Start]": "2026-07-26T00:00:00",
+    "[Credits]": 204416.8113,
+    "[Active Users]": 132,
+    "[Prepaid Cost]": 0,
+    "[PAYG Cost]": 1880.63466396,
+    "[Credits WoW]": 0.18236521964257266
+  }
+]

@@ -1,0 +1,254 @@
+[
+  {
+    "[Usage Date]": "2026-05-10T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 1.2753586
+  },
+  {
+    "[Usage Date]": "2026-05-10T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 1.99192421
+  },
+  {
+    "[Usage Date]": "2026-05-11T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 7.45829794
+  },
+  {
+    "[Usage Date]": "2026-05-11T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 10.56282369
+  },
+  {
+    "[Usage Date]": "2026-05-12T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 6.28013117
+  },
+  {
+    "[Usage Date]": "2026-05-12T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 7.0155579
+  },
+  {
+    "[Usage Date]": "2026-05-13T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 13.24800998
+  },
+  {
+    "[Usage Date]": "2026-05-13T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 18.63360514
+  },
+  {
+    "[Usage Date]": "2026-05-14T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 8.78631312
+  },
+  {
+    "[Usage Date]": "2026-05-14T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 12.33043686
+  },
+  {
+    "[Usage Date]": "2026-05-15T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 7.68940966
+  },
+  {
+    "[Usage Date]": "2026-05-15T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 12.13992512
+  },
+  {
+    "[Usage Date]": "2026-05-16T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 0.98302769
+  },
+  {
+    "[Usage Date]": "2026-05-16T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 1.5292083
+  },
+  {
+    "[Usage Date]": "2026-05-17T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 2.42494154
+  },
+  {
+    "[Usage Date]": "2026-05-17T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 3.26263802
+  },
+  {
+    "[Usage Date]": "2026-05-18T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 11.05027905
+  },
+  {
+    "[Usage Date]": "2026-05-18T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 11.91959377
+  },
+  {
+    "[Usage Date]": "2026-05-19T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 11.64943535
+  },
+  {
+    "[Usage Date]": "2026-05-19T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 14.79607316
+  },
+  {
+    "[Usage Date]": "2026-05-20T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 16.55327051
+  },
+  {
+    "[Usage Date]": "2026-05-20T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 20.73695956
+  },
+  {
+    "[Usage Date]": "2026-05-21T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 14.80866307
+  },
+  {
+    "[Usage Date]": "2026-05-21T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 18.39919965
+  },
+  {
+    "[Usage Date]": "2026-05-22T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 9.5767521
+  },
+  {
+    "[Usage Date]": "2026-05-22T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 13.95641102
+  },
+  {
+    "[Usage Date]": "2026-05-23T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 1.39557424
+  },
+  {
+    "[Usage Date]": "2026-05-23T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 2.22403335
+  },
+  {
+    "[Usage Date]": "2026-05-24T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 1.13178886
+  },
+  {
+    "[Usage Date]": "2026-05-24T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 1.9208002
+  },
+  {
+    "[Usage Date]": "2026-05-25T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 6.71994714
+  },
+  {
+    "[Usage Date]": "2026-05-25T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 12.41835372
+  },
+  {
+    "[Usage Date]": "2026-05-26T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 19.20377075
+  },
+  {
+    "[Usage Date]": "2026-05-26T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 27.63457124
+  },
+  {
+    "[Usage Date]": "2026-05-27T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 14.74698416
+  },
+  {
+    "[Usage Date]": "2026-05-27T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 23.44753158
+  },
+  {
+    "[Usage Date]": "2026-05-28T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 18.79801176
+  },
+  {
+    "[Usage Date]": "2026-05-28T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 28.43196607
+  },
+  {
+    "[Usage Date]": "2026-05-29T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 19.89897663
+  },
+  {
+    "[Usage Date]": "2026-05-29T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 29.4985154
+  },
+  {
+    "[Usage Date]": "2026-05-30T00:00:00",
+    "[Component]": "Input tokens",
+    "[Component Sort]": 1,
+    "[Cost]": 2.75816038
+  },
+  {
+    "[Usage Date]": "2026-05-30T00:00:00",
+    "[Component]": "Output tokens",
+    "[Component Sort]": 2,
+    "[Cost]": 4.38760919
+  }
+]

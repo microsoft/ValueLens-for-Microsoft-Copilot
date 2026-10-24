@@ -1,0 +1,38 @@
+[
+  {
+    "[Breakdown]": "Feature",
+    "[Item]": "Generative Actions",
+    "[Credits]": 4775,
+    "[Cost]": 26.293599999999998
+  },
+  {
+    "[Breakdown]": "Feature",
+    "[Item]": "Agent action",
+    "[Credits]": 2924,
+    "[Cost]": 17.1948
+  },
+  {
+    "[Breakdown]": "Feature",
+    "[Item]": "Generative answer",
+    "[Credits]": 2466,
+    "[Cost]": 13.0916
+  },
+  {
+    "[Breakdown]": "Feature",
+    "[Item]": "Classic answer",
+    "[Credits]": 1248,
+    "[Cost]": 0
+  },
+  {
+    "[Breakdown]": "Feature",
+    "[Item]": "Graph grounding",
+    "[Credits]": 1047,
+    "[Cost]": 0
+  },
+  {
+    "[Breakdown]": "Model",
+    "[Item]": "gpt-41-2025-04-14",
+    "[Credits]": 12460,
+    "[Cost]": 56.58
+  }
+]

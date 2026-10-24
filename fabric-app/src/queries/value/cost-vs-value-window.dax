@@ -1,0 +1,7 @@
+EVALUATE
+ROW(
+    "First Date", FORMAT(MIN('Chat + Agent Interactions (Audit Logs)'[ActivityDate]), "yyyy-MM-dd"),
+    "Last Date", FORMAT(MAX('Chat + Agent Interactions (Audit Logs)'[ActivityDate]), "yyyy-MM-dd"),
+    "Licensed Users", [Total Licensed Users],
+    "Currency Symbol", [Currency Symbol Value]
+)

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Workload",
+      "type": "nominal",
+      "title": null,
+      "sort": "-x",
+      "axis": { "labelLimit": 200 }
+    },
+    "x": {
+      "field": "Reach",
+      "type": "quantitative",
+      "title": "Share of active people",
+      "scale": { "domain": [0, 1] },
+      "axis": { "labelExpr": "format(datum.value, '.0%')" }
+    },
+    "tooltip": [
+      { "field": "Workload", "type": "nominal", "title": "Workload" },
+      { "field": "Reach", "type": "quantitative", "title": "Share of active people", "format": ".1%" },
+      { "field": "People", "type": "quantitative", "title": "People", "format": ",.0f" },
+      { "field": "Days Per Week", "type": "quantitative", "title": "Days per week, when used", "format": ",.1f" }
+    ]
+  }
+}

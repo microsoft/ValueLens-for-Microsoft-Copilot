@@ -1,0 +1,8 @@
+EVALUATE
+ROW(
+    "Satisfaction", 'ProductFeedback'[Satisfaction Rate],
+    "Total Feedback", 'ProductFeedback'[Total Feedback],
+    "Thumbs Up", 'ProductFeedback'[Thumbs Up Count],
+    "Thumbs Down", 'ProductFeedback'[Thumbs Down Count],
+    "Theme Summary", 'ProductFeedback'[📊 Feedback Theme Summary]
+)
