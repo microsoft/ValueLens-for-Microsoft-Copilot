@@ -31,6 +31,8 @@ import {
   REFRESH_WAIT_MS,
   refreshPaxModel,
   refreshTimes,
+  resumePaxSchedule,
+  SCHEDULE_OFF_WHY,
   setPaxSchedule,
   workspaceItems,
 } from '../src/steps/pax/publish.js';
@@ -151,6 +153,7 @@ function fakePbi(fabric) {
       base.calls.push(`setRefreshSchedule ${ws} ${id}`);
       fail('setRefreshSchedule');
       schedules.push(structuredClone(body));
+      Object.assign(base.schedule, body?.value ?? {});
     },
     refreshNow: async (/** @type {string} */ ws, /** @type {string} */ id) => {
       base.calls.push(`refreshNow ${ws} ${id}`);
@@ -310,7 +313,7 @@ test("pax publish: paxEntry takes a product's folder parameter, values from the 
     /** @param {InstallConfig} config */
     values: (config) => {
       asked.push(config);
-      return { 'Partition Id': 'p-1', Weeks: 4, Missing: undefined, [PARAMS.site]: 'not this' };
+      return { 'Partition Id': 'p-1', Weeks: 4, On: true, Missing: undefined, Blank: null, [PARAMS.site]: 'not this' };
     },
     expressions: { Inline: 'SharePoint.Files("s")', 'Source Files': { file: 'Source.m' } },
   };
@@ -319,8 +322,10 @@ test("pax publish: paxEntry takes a product's folder parameter, values from the 
   assert.deepEqual(asked, [config], 'values gets the install record');
   assert.equal(entry.parameters['Data Folder'], FOLDER_URL, 'the whole folder URL, as the record has it');
   assert.equal(entry.parameters['Partition Id'], 'p-1');
-  assert.equal(entry.parameters.Weeks, '4', 'values are text');
+  assert.equal(entry.parameters.Weeks, 4, 'a number stays a number, to be written as its parameter type says');
+  assert.equal(entry.parameters.On, true, 'so does true or false');
   assert.equal(entry.parameters.Missing, '');
+  assert.equal(entry.parameters.Blank, '');
   assert.equal(entry.parameters[PARAMS.site], SITE_URL, 'the SharePoint value wins a clash');
   assert.equal(entry.parameters[PARAMS.interactions], `${FOLDER_URL}/${encodeURIComponent(FILES.interactions)}`);
   assert.deepEqual(entry.expressions, {
@@ -1272,7 +1277,11 @@ test('pax publish: loadPaxModel refreshes the model and checks it answers querie
   withModel(t).refreshAt = '06:00';
   t.pbi.history.push(run('Completed'));
   assert.deepEqual(await loadPaxModel(t.ctx), { ok: true, status: 'Completed' });
-  assert.deepEqual(t.pbi.calls, ['refreshNow ws-1 ds-9', 'refreshes ws-1 ds-9 5', 'executeQueries ds-9'], 'the daily refresh is scheduled already');
+  assert.deepEqual(
+    t.pbi.calls,
+    ['refreshNow ws-1 ds-9', 'refreshes ws-1 ds-9 5', 'refreshSchedule ws-1 ds-9', 'executeQueries ds-9'],
+    'the daily refresh is scheduled already, and still on',
+  );
   printed(t, `✓ ${P.model} answers queries (its Calendar has 90 days)`);
 
   const u = setup();
@@ -1361,6 +1370,72 @@ test('pax publish: loadPaxModel goes on when Power BI turns the schedule down', 
   printed(t, `! Power BI wouldn't schedule ${P.model}'s daily refresh: Bad request`);
   assert.equal(pbiOf(t).refreshAt, undefined);
   assert.equal(callCount(t, 'executeQueries '), 1, 'and still checks the model');
+});
+
+test('pax publish: loadPaxModel turns the daily refresh back on after a refresh that worked, once Power BI has turned it off', async () => {
+  const t = setup();
+  withModel(t).refreshAt = '06:00';
+  t.pbi.history.push(run('Completed'));
+  t.pbi.schedule.enabled = false;
+  assert.deepEqual(await loadPaxModel(t.ctx), { ok: true, status: 'Completed' });
+  assert.deepEqual(t.pbi.calls, ['refreshNow ws-1 ds-9', 'refreshes ws-1 ds-9 5', 'refreshSchedule ws-1 ds-9', 'setRefreshSchedule ws-1 ds-9', 'executeQueries ds-9']);
+  assert.equal(t.pbi.schedule.enabled, true);
+  assert.deepEqual(t.pbi.schedules.map((s) => s.value.times), [refreshTimes(TASK_AT)]);
+  printed(t, `    Power BI had turned ${P.model}'s daily refresh off. ${SCHEDULE_OFF_WHY} This refresh worked, so the installer turns it back on.`);
+  printed(t, `✓ ${P.model} refreshes daily at ${refreshTimes(TASK_AT).join(' and ')}`);
+  printed(t, `✓ ${P.model} answers queries`);
+
+  /** @type {[string, Setup, (s: Setup) => Promise<unknown>][]} */
+  const left = [
+    ['a failed refresh', setup(), (s) => (s.pbi.history.push(run('Failed', { serviceExceptionJson: 'The column Day was not found' })), loadPaxModel(s.ctx))],
+    ['--yes without the sign-in', setup({ yes: true }), (s) => (s.pbi.history.push(run('Failed', { serviceExceptionJson: 'Credentials are missing' })), loadPaxModel(s.ctx))],
+    ['a refresh it did not wait for', setup(), (s) => loadPaxModel(s.ctx, { wait: false })],
+  ];
+  for (const [label, s, load] of left) {
+    withModel(s).refreshAt = '06:00';
+    s.pbi.schedule.enabled = false;
+    await load(s);
+    assert.equal(callCount(s, 'refreshSchedule '), 0, label);
+    assert.equal(callCount(s, 'setRefreshSchedule '), 0, label);
+    assert.equal(s.pbi.schedule.enabled, false, label);
+  }
+});
+
+test('pax publish: resumePaxSchedule leaves a schedule that is on, and waits for a signed-in model', async () => {
+  const t = setup();
+  withModel(t).refreshAt = '06:00';
+  assert.equal(await resumePaxSchedule(t.ctx), false);
+  assert.deepEqual(t.pbi.calls, ['refreshSchedule ws-1 ds-9']);
+  assert.equal(t.saves(), 0);
+  assert.equal(t.out(), '');
+
+  for (const signedIn of ['later', undefined]) {
+    const u = setup();
+    const pbi = withModel(u, { signedIn: false });
+    pbi.refreshAt = '06:00';
+    if (signedIn) pbi.credentials = signedIn;
+    u.pbi.schedule.enabled = false;
+    assert.equal(await resumePaxSchedule(u.ctx), false, String(signedIn));
+    assert.deepEqual(u.pbi.calls, [], String(signedIn));
+  }
+});
+
+test('pax publish: a schedule it cannot read only warns, and anything but an HTTP error stops', async () => {
+  const t = setup();
+  withModel(t).refreshAt = '06:00';
+  t.pbi.history.push(run('Completed'));
+  t.pbi.failures.refreshSchedule = [httpError(500, `Internal error ${'x'.repeat(400)}`)];
+  assert.deepEqual(await loadPaxModel(t.ctx), { ok: true, status: 'Completed' });
+  printed(t, `! Couldn't read ${P.model}'s refresh schedule, so couldn't check it's on: Internal error xxx`);
+  assert.ok(t.out().includes('x'.repeat(285)) && !t.out().includes('x'.repeat(286)), 'cut to 300 characters');
+  assert.equal(callCount(t, 'setRefreshSchedule '), 0);
+  assert.equal(callCount(t, 'executeQueries '), 1, 'and still checks the model');
+
+  const u = setup();
+  withModel(u).refreshAt = '06:00';
+  const err = new Error('socket hang up');
+  u.pbi.failures.refreshSchedule = [err];
+  await assert.rejects(resumePaxSchedule(u.ctx), (e) => e === err);
 });
 
 // ---- End to end ----

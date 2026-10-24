@@ -128,6 +128,8 @@ def default_config(**overrides):
         "minDays": 3,
         "overlapDays": 2,
         "keepRunFilesDays": 3,
+        # One window, so each run makes one PAX call with -Days. The window cases set their own.
+        "windowDays": 180,
         "agent365": False,
         "deidentify": False,
         "repairHint": HINT,
@@ -182,6 +184,19 @@ def local_midnight_utc(days_ago):
 
 def local_noon_epoch(days_ago):
     return int(datetime.combine(date.today() - timedelta(days=days_ago), time(12)).astimezone().timestamp())
+
+
+def windows(days, count):
+    """A load of days days, ending today, split as refresh.ps1 splits it: (StartDate, EndDate) per window,
+    oldest first. EndDate is the day after the window's last day."""
+    start = date.today() - timedelta(days=days)
+    bounds = [k * days // count for k in range(count + 1)]
+    return [((start + timedelta(days=bounds[k])).isoformat(), (start + timedelta(days=bounds[k + 1])).isoformat())
+            for k in range(count)]
+
+
+def day_before(iso_day):
+    return (date.fromisoformat(iso_day) - timedelta(days=1)).isoformat()
 
 
 ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
@@ -239,11 +254,13 @@ class Case:
         Path(path or self.config_path).write_text(json.dumps(data, indent=2), encoding="utf-8")
         return self
 
-    def state(self, days_ago, synced=True):
+    def state(self, days_ago, synced=True, **extra):
+        """A previous run's state.json. days_ago=None leaves coverage unset; extra adds keys such as progress."""
         data = {
             "schema": 1,
-            "coveredThroughUtc": local_midnight_utc(days_ago),
+            "coveredThroughUtc": None if days_ago is None else local_midnight_utc(days_ago),
             "streams": {"interactions": {"synced": synced}, "users": {"synced": synced}},
+            **extra,
         }
         (self.install / "state.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
         return self
@@ -577,6 +594,8 @@ INVALID_CONFIG = {
     "minDays": 20,
     "overlapDays": 31,
     "keepRunFilesDays": "3",
+    "windowDays": 0,
+    "runHours": 30,
     "agent365": "yes",
     "deidentify": 1,
     "repairHint": HINT,
@@ -597,7 +616,9 @@ INVALID_CONFIG_PROBLEMS = [
     "seedDays must be a whole number from 1 to 180.",
     "overlapDays must be a whole number from 0 to 30.",
     "keepRunFilesDays must be a whole number from 1 to 365.",
+    "windowDays must be a whole number from 1 to 180.",
     "minDays can't be more than maxDays.",
+    "runHours must be a number of hours above 0 and up to 23.",
     "agent365 must be true or false.",
     "deidentify must be true or false.",
 ]
@@ -623,6 +644,52 @@ def _missing_config(c):
 @refresh_case("days-override")
 def _days_override(c):
     c.config().state(1).local().run(Days=45)
+
+
+ROLLUP_LINE = "Rollup: post-processor returned non-zero exit code 1. Raw CSV(s) preserved."
+
+
+@refresh_case("rollup-fail")
+def _rollup_fail(c):
+    c.config().state(1).local().run(env={"STUB_MODE": "rollup-fail"})
+
+
+@refresh_case("rollup-exit0")
+def _rollup_exit0(c):
+    c.config().state(1).local().run(env={"STUB_MODE": "rollup-exit0"})
+
+
+# The window cases set windowDays 7, so a 30-day first run reads five windows of 6 days.
+@refresh_case("windowed-seed")
+def _windowed_seed(c):
+    c.config(windowDays=7, agent365=True).run()
+
+
+@refresh_case("window-fail-resume")
+def _window_fail_resume(c):
+    c.config(windowDays=7).run(env={"STUB_MODES": ",fail", "STUB_PAX_EXIT": 1}).run()
+
+
+@refresh_case("window-halving")
+def _window_halving(c):
+    # The last run ended inside its first window without a result, as when Task Scheduler stops
+    # a run at its time limit.
+    progress = {"fromUtc": local_midnight_utc(12), "days": 12, "seed": True, "windowDays": 7, "throughUtc": None,
+                "pending": {"from": local_midnight_utc(12), "to": local_midnight_utc(6), "days": 6, "first": True}}
+    c.config(windowDays=7, seedDays=12).state(None, progress=progress).run()
+
+
+@refresh_case("window-zero-first")
+def _window_zero_first(c):
+    c.config(windowDays=7).run(env={"STUB_MODES": "zero"})
+
+
+@refresh_case("window-budget")
+def _window_budget(c):
+    # A limit of a few hundredths of a second stops the first run after one window. The second
+    # run's config, in the same folder, shares its state and files and has the default limit.
+    full = c.install / "refresh-full.json"
+    c.config(windowDays=7, runHours=1e-05).config(path=full, windowDays=7).run().run(Config=full)
 
 
 # Files left by earlier runs: their age in days, and whether the refresh keeps them.
@@ -754,6 +821,15 @@ class RefreshTests(unittest.TestCase):
     @staticmethod
     def remote_names(case, n):
         return [entry["remoteName"] for entry in case.log("upload", n)]
+
+    @staticmethod
+    def spans(case, n):
+        return [(entry["params"].get("StartDate"), entry["params"].get("EndDate")) for entry in case.log("pax", n)]
+
+    @staticmethod
+    def progress(from_days_ago, days, through_days_ago, window_days=7):
+        return {"fromUtc": local_midnight_utc(from_days_ago), "days": days, "seed": True, "windowDays": window_days,
+                "throughUtc": local_midnight_utc(through_days_ago), "pending": None}
 
     def assertRolledUp(self, case, interactions, users, folder="Reports"):
         self.assertEqual(case.remote_lines(f"{folder}/{INTERACTIONS}"), interactions)
@@ -1042,6 +1118,109 @@ class RefreshTests(unittest.TestCase):
         self.assertEqual(self.days(c, 1), "45")
         self.assertState(c, 1, days=45)
 
+    def test_a_failed_rollup_step_that_the_wrapper_caught_is_named_once(self):
+        c = self.case("rollup-fail")
+        self.assertEqual(c.exit(1), 1, c.output(1))
+        state = self.assertState(c, 1, lastResult="failed", coveredThroughUtc=local_midnight_utc(1), progress=None)
+        pax_log = c.install / "work" / "processed" / "PAX_Stub.log"
+        # The error view can wrap the wrapper's message, so the text is compared without spaces.
+        self.assertEqual(flat(state["lastError"]), flat(
+            f"The PAX run failed (exit code 1). PAX's rollup step failed, though PAX exited 0: {ROLLUP_LINE} "
+            f"PAX's log: {pax_log} The log is {state['lastLog']}."))
+        self.assertEqual(c.log("upload", 1), [])
+        self.assertEqual(len(c.tokens(1)), 1)
+
+    def test_a_failed_rollup_step_fails_the_run_even_when_pax_exits_0(self):
+        c = self.case("rollup-exit0")
+        self.assertEqual(c.exit(1), 1, c.output(1))
+        state = self.assertState(c, 1, lastResult="failed", coveredThroughUtc=local_midnight_utc(1), progress=None)
+        self.assertEqual(state["lastError"],
+                         f"PAX's rollup step failed, though PAX exited 0: {ROLLUP_LINE} The log is {state['lastLog']}.")
+        self.assertEqual(c.log("upload", 1), [])
+        self.assertEqual(len(c.tokens(1)), 1)
+
+    def test_a_long_load_reads_its_days_in_windows_oldest_first(self):
+        c = self.case("windowed-seed")
+        expected = windows(30, 5)
+        self.assertEqual(c.exit(1), 0, c.output(1))
+        self.assertEqual(self.spans(c, 1), expected)
+        pax = c.log("pax", 1)
+        self.assertEqual([("Days" in run["params"], "AppendFile" in run["params"], "AppendUserInfo" in run["params"])
+                          for run in pax], [(False, False, False)] + [(False, True, True)] * 4)
+        # The Agent 365 registry is a snapshot, so only the first window reads it.
+        self.assertEqual(["IncludeAgent365Info" in run["params"] for run in pax], [True, False, False, False, False])
+        output = c.output(1)
+        self.assertIn(f"PAX looks back 30 days, from {expected[0][0]}.", output)
+        self.assertIn("It reads them in 5 windows of up to 6 days, oldest first.", output)
+        self.assertIn(f"==> Window 2 of 5: {expected[1][0]} to {day_before(expected[1][1])}", output)
+        self.assertEqual(len(c.tokens(1)), 2)
+        rows = [f"row-from-run-1-{start}" for start, _ in expected]
+        self.assertRolledUp(c, ["Message_Id_Raw", *rows], ["Id", *rows])
+        self.assertEqual(c.remote_lines(f"Reports/{AGENTS}"), ["AgentId", rows[0]])
+        self.assertState(c, 1, lastResult="success", lastMessage="SharePoint's files are up to date.", days=30,
+                         coveredThroughUtc=local_midnight_utc(0), progress=None)
+
+    def test_a_failed_window_keeps_the_ones_before_it_and_the_next_run_carries_on(self):
+        c = self.case("window-fail-resume")
+        first = windows(30, 5)
+        self.assertEqual(c.exit(1), 1, c.output(1))
+        self.assertEqual(self.spans(c, 1), first[:2])
+        self.assertEqual(c.log("upload", 1), [])
+        state = self.assertState(c, 1, lastResult="failed", coveredThroughUtc=local_midnight_utc(24),
+                                 progress=self.progress(30, 30, 24))
+        self.assertEqual(state["lastError"],
+                         f"The PAX run failed (exit code 1). PAX stopped on an error. PAX failed. The log is {state['lastLog']}.")
+        # The next run starts from the last window read, less the usual overlap.
+        second = windows(26, 4)
+        self.assertEqual(c.exit(2), 0, c.output(2))
+        self.assertEqual(self.spans(c, 2), second)
+        self.assertIn(f"The last run stopped part way through a load, so this run carries on from {first[0][1]}.",
+                      c.output(2))
+        self.assertIn("It reads them in 4 windows of up to 7 days, oldest first.", c.output(2))
+        self.assertState(c, 2, lastResult="success", days=26, coveredThroughUtc=local_midnight_utc(0), progress=None)
+        rows = [f"row-from-run-1-{first[0][0]}"] + [f"row-from-run-2-{start}" for start, _ in second]
+        self.assertRolledUp(c, ["Message_Id_Raw", *rows], ["Id", *rows])
+
+    def test_a_run_stopped_inside_its_first_window_halves_the_next_runs_windows(self):
+        c = self.case("window-halving")
+        self.assertEqual(c.exit(1), 0, c.output(1))
+        self.assertIn("The last run never finished its first window, of 6 days, so this run reads windows of up to "
+                      "3 days.", c.output(1))
+        self.assertEqual(self.spans(c, 1), windows(12, 4))
+        self.assertState(c, 1, lastResult="success", days=12, coveredThroughUtc=local_midnight_utc(0), progress=None)
+
+    def test_a_first_window_with_no_activity_leaves_the_files_to_a_later_window(self):
+        c = self.case("window-zero-first")
+        expected = windows(30, 5)
+        self.assertEqual(c.exit(1), 0, c.output(1))
+        self.assertEqual(self.spans(c, 1), expected)
+        self.assertIn(f"PAX found no Copilot activity from {expected[0][0]} to {day_before(expected[0][1])}, "
+                      "so a later window starts the files.", c.output(1))
+        self.assertEqual(["AppendFile" in run["params"] for run in c.log("pax", 1)], [False, False, True, True, True])
+        rows = [f"row-from-run-1-{start}" for start, _ in expected[1:]]
+        self.assertRolledUp(c, ["Message_Id_Raw", *rows], ["Id", *rows])
+        self.assertState(c, 1, lastResult="success", coveredThroughUtc=local_midnight_utc(0), progress=None)
+
+    def test_a_run_near_its_time_limit_publishes_what_it_has_and_the_next_carries_on(self):
+        c = self.case("window-budget")
+        first = windows(30, 5)
+        self.assertEqual(c.exit(1), 0, c.output(1))
+        self.assertEqual(self.spans(c, 1), first[:1])
+        self.assertIn("The run stops here.", c.output(1))
+        self.assertState(c, 1, lastResult="success", coveredThroughUtc=local_midnight_utc(24),
+                         progress=self.progress(30, 30, 24), lastMessage=(
+                             f"This run loaded activity up to {day_before(first[0][1])}, then stopped to stay inside "
+                             "the task's time limit. SharePoint has everything loaded so far, and the next scheduled "
+                             "run carries on from there."))
+        self.assertEqual(self.remote_names(c, 1), [INTERACTIONS, USERS])
+        second = windows(26, 4)
+        self.assertEqual(c.exit(2), 0, c.output(2))
+        self.assertEqual(self.spans(c, 2), second)
+        self.assertState(c, 2, lastResult="success", lastMessage="SharePoint's files are up to date.", days=26,
+                         coveredThroughUtc=local_midnight_utc(0), progress=None)
+        rows = [f"row-from-run-1-{first[0][0]}"] + [f"row-from-run-2-{start}" for start, _ in second]
+        self.assertRolledUp(c, ["Message_Id_Raw", *rows], ["Id", *rows])
+
     def test_old_run_files_and_logs_are_pruned(self):
         c = self.case("prune")
         self.assertEqual(c.exit(1), 0, c.output(1))
@@ -1153,8 +1332,8 @@ class RunnerSourceTests(unittest.TestCase):
         flags = {match.group(1) for text in strings if (match := re.fullmatch(r"-(\w+)", text))}
         flags -= {"NoProfile", "NonInteractive", "File"}
         # The secret travels in AIBV_CLIENT_SECRET, never on a command line that other processes can read.
-        self.assertEqual(flags, {"TenantId", "ClientId", "Days", "WorkRoot", "PaxReleaseTag", "PaxSha256",
-                                 "SkipVersionCheck", "AppendFile", "AppendUserInfo", "IncludeAgent365Info",
+        self.assertEqual(flags, {"TenantId", "ClientId", "Days", "StartDate", "EndDate", "WorkRoot", "PaxReleaseTag",
+                                 "PaxSha256", "SkipVersionCheck", "AppendFile", "AppendUserInfo", "IncludeAgent365Info",
                                  "Deidentify"})
         wrapper = self.params(WRAPPER)
         self.assertLessEqual(flags, set(wrapper), sorted(flags - set(wrapper)))

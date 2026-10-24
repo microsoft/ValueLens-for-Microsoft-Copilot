@@ -4,13 +4,15 @@
  * rather than building one: its Power Query parameters and, when a route needs it, whole shared
  * expressions. Nothing here names a product, so another installer can copy it.
  */
-import { decodeText, encodeTextLike, setMParameter } from './model.js';
+import { decodeText, encodeTextLike, mString } from './model.js';
 import { listZip, readZipEntry, replaceZipEntries } from './zip.js';
+
+/** @typedef {string | number | boolean} ParameterValue */
 
 /**
  * @typedef {object} ModelEntry
  * @property {string} template  The .pbit's path.
- * @property {Record<string, string>} parameters  Power Query parameter values, by name. Each must be in the template.
+ * @property {Record<string, ParameterValue>} parameters  Power Query parameter values, by name. Each must be in the template, and is written as the type it declares: see mLiteral.
  * @property {Record<string, string>} [expressions]  Shared expressions to replace whole, by name, as M text. Each must be in the template.
  */
 
@@ -20,14 +22,85 @@ const SCHEMA = 'DataModelSchema';
 /** Power BI Desktop's copy of each query's M, which some templates keep beside the model. */
 const UNAPPLIED = 'UnappliedChanges';
 
+const NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A parameter's value as an M literal of the type the parameter declares:
+ * - Number: a finite number, or text that is one, written bare.
+ * - Date: `yyyy-mm-dd`, written as `#date(y, m, d)`.
+ * - Logical: true or false.
+ * - Text, Any, or no type: quoted text. Null is blank.
+ * A value that doesn't fit throws, and so does any other type, so a wrong value fails in a desk
+ * test rather than in the service's refresh.
+ * @param {string} name  The parameter's name, for the error.
+ * @param {string | undefined} type  The Type in the parameter's meta record.
+ * @param {ParameterValue | null | undefined} value
+ */
+export function mLiteral(name, type, value) {
+  const wrong = (/** @type {string} */ want) => new Error(`"${name}" is a ${type} parameter, so its value must be ${want}, not ${typeof value === 'string' ? JSON.stringify(value) : String(value)}.`);
+  const text = typeof value === 'string' ? value.trim() : undefined;
+  switch (type ?? 'Any') {
+    case 'Text':
+    case 'Any':
+      return mString(String(value ?? ''));
+    case 'Number': {
+      const n = typeof value === 'number' ? value : text !== undefined && NUMBER.test(text) ? Number(text) : NaN;
+      if (!Number.isFinite(n)) throw wrong('a number');
+      return String(n);
+    }
+    case 'Date': {
+      const m = text === undefined ? null : DATE.exec(text);
+      const [y, mo, d] = m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0];
+      const day = new Date(Date.UTC(y, mo - 1, d));
+      if (!m || day.getUTCFullYear() !== y || day.getUTCMonth() !== mo - 1 || day.getUTCDate() !== d) throw wrong('a date written yyyy-mm-dd');
+      return `#date(${y}, ${mo}, ${d})`;
+    }
+    case 'Logical': {
+      const b = typeof value === 'boolean' ? value : text === 'true' ? true : text === 'false' ? false : undefined;
+      if (b === undefined) throw wrong('true or false');
+      return String(b);
+    }
+    default:
+      throw new Error(`"${name}" is a ${type} parameter, which the installer can't set.`);
+  }
+}
+
+/**
+ * The Type a parameter's meta record declares, if it declares one. Text in the record, such as a
+ * list of suggested values, is skipped.
+ * @param {string} meta  The record, from ` meta [`.
+ */
+function metaType(meta) {
+  for (const m of meta.matchAll(/"(?:[^"]|"")*"|\bType\s*=\s*"((?:[^"]|"")*)"/g)) if (m[1] !== undefined) return m[1].replace(/""/g, '"');
+  return undefined;
+}
+
+/**
+ * Sets a Power Query parameter's value as the type it declares, and keeps its `meta [...]` record.
+ * @param {import('./model.js').ModelBim['model']} model
+ * @param {string} name
+ * @param {ParameterValue | null | undefined} value
+ */
+export function setEntryParameter(model, name, value) {
+  const expr = model.expressions?.find((e) => e.name === name);
+  if (!expr) throw new Error(`The model has no "${name}" parameter.`);
+  const text = Array.isArray(expr.expression) ? expr.expression.join('\n') : String(expr.expression);
+  const at = text.indexOf(' meta [');
+  if (at < 0) throw new Error(`"${name}" is not a parameter.`);
+  const meta = text.slice(at);
+  expr.expression = `${mLiteral(name, metaType(meta), value)}${meta}`;
+}
+
 /**
  * Sets the entry's parameters and expressions on a model, in place. A parameter keeps its
- * `meta [...]` record; an expression keeps its form, one string or a list of lines.
+ * `meta [...]` record and is written as the type it declares; an expression keeps its form, one
+ * string or a list of lines.
  * @param {import('./model.js').ModelBim['model']} model
  * @param {EntryValues} entry
  */
 export function applyEntry(model, entry) {
-  for (const [name, value] of Object.entries(entry.parameters)) setMParameter(model, name, value);
+  for (const [name, value] of Object.entries(entry.parameters)) setEntryParameter(model, name, value);
   for (const [name, text] of Object.entries(entry.expressions ?? {})) {
     const expr = model.expressions?.find((e) => e.name === name);
     if (!expr) throw new Error(`The model has no "${name}" expression.`);

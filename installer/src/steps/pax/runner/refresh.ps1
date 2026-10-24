@@ -9,10 +9,16 @@
     1. Takes refresh.lock, so two runs never overlap.
     2. Reads the app's client secret from Windows Credential Manager with credential.ps1.
     3. When this machine has no cumulative files, restores them from the SharePoint folder.
-    4. Runs Run-PAX-AIBV.ps1 in a child pwsh process. PAX appends the new activity to the
-       cumulative files, or creates them on the first run.
+    4. Runs Run-PAX-AIBV.ps1 in a child pwsh process for each window of up to windowDays
+       days, oldest first. PAX appends the new activity to the cumulative files, or creates
+       them on the first run.
     5. Uploads the files to the SharePoint folder with Upload-Rollups-SharePoint.ps1.
     6. Writes state.json, and a log under logs\.
+
+  state.json records the load after each window. When the next window might not finish
+  inside runHours, the run stops there and uploads what it has, and the next run carries on
+  from the last finished window. So does the next run after one that failed part way. When
+  Task Scheduler stops a run inside its first window, the next run reads windows half that size.
 
   The folder holds:
     data\         the cumulative files, PAX's logs, and any files set aside
@@ -39,7 +45,8 @@
 
 .PARAMETER Days
   How many days of activity to ask PAX for, from 1 to 180, in place of the number this script
-  works out. Use it once to fill a gap that state.json reports.
+  works out. Use it once to fill a gap that state.json reports. The days are still read in
+  windows.
 
 .PARAMETER Upload
   A local file to upload into the SharePoint folder.
@@ -79,6 +86,8 @@ $script:Streams = [ordered]@{
   users        = @{ Local = 'cumulative_Users.csv'; Manifest = 'users_csv' }
   agents365    = @{ Local = 'current_Agents365.csv'; Manifest = 'agents365_csv' }
 }
+# PAX 1.11.15 prints one of these when its rollup step fails, and still exits 0.
+$script:RollupFailurePattern = 'Rollup: (post-processor (returned non-zero exit code|failed:)|expected (Fact|Users dim) CSV not produced)'
 
 # ---- Helpers ----
 
@@ -192,6 +201,8 @@ function Read-RefreshConfig {
     minDays          = 3
     overlapDays      = 2
     keepRunFilesDays = 3
+    windowDays       = 7
+    runHours         = 10
     agent365         = $false
     deidentify       = $false
     repairHint       = $script:RepairHint
@@ -243,7 +254,7 @@ function Read-RefreshConfig {
   }
   $ranges = @(
     @('seedDays', 1, 180), @('maxDays', 1, 180), @('minDays', 1, 180),
-    @('overlapDays', 0, 30), @('keepRunFilesDays', 1, 365)
+    @('overlapDays', 0, 30), @('keepRunFilesDays', 1, 365), @('windowDays', 1, 180)
   )
   foreach ($range in $ranges) {
     $value = $config[$range[0]]
@@ -255,6 +266,12 @@ function Read-RefreshConfig {
   }
   if ($config.minDays -is [int] -and $config.maxDays -is [int] -and $config.minDays -gt $config.maxDays) {
     $problems.Add("minDays can't be more than maxDays.")
+  }
+  $hours = $config.runHours
+  if (($hours -is [int] -or $hours -is [long] -or $hours -is [double] -or $hours -is [decimal]) -and $hours -gt 0 -and $hours -le 23) {
+    $config.runHours = [double]$hours
+  } else {
+    $problems.Add('runHours must be a number of hours above 0 and up to 23.')
   }
   foreach ($key in 'agent365', 'deidentify') {
     if ($config[$key] -isnot [bool]) { $problems.Add("$key must be true or false.") }
@@ -283,6 +300,37 @@ function New-StreamState {
   }
 }
 
+function ConvertTo-Progress {
+  # The load that the last run left unfinished, or $null when there's none or it doesn't read.
+  param($Value)
+  if ($Value -isnot [hashtable]) { return $null }
+  $from = Format-UtcDate $Value.fromUtc
+  if (-not $from) { return $null }
+  foreach ($key in 'days', 'windowDays') {
+    $number = $Value[$key]
+    if (-not (($number -is [int] -or $number -is [long]) -and $number -ge 1 -and $number -le 180)) { return $null }
+  }
+  $pending = $null
+  $window = $Value.pending
+  if ($window -is [hashtable] -and (Format-UtcDate $window.from) -and (Format-UtcDate $window.to) -and
+    ($window.days -is [int] -or $window.days -is [long]) -and $window.days -ge 1 -and $window.days -le 180) {
+    $pending = [ordered]@{
+      from  = Format-UtcDate $window.from
+      to    = Format-UtcDate $window.to
+      days  = [int]$window.days
+      first = ($window.first -eq $true)
+    }
+  }
+  return [ordered]@{
+    fromUtc    = $from
+    days       = [int]$Value.days
+    seed       = ($Value.seed -eq $true)
+    windowDays = [int]$Value.windowDays
+    throughUtc = Format-UtcDate $Value.throughUtc
+    pending    = $pending
+  }
+}
+
 function Initialize-State {
   # A new state that carries over what later runs need from the last one.
   $previous = $null
@@ -291,6 +339,7 @@ function Initialize-State {
     catch { Write-Warning "state.json couldn't be read, so this run starts a new one: $($_.Exception.Message)" }
   }
   if ($previous -isnot [hashtable]) { $previous = @{} }
+  $script:PreviousState = $previous
   $streams = if ($previous.streams -is [hashtable]) { $previous.streams } else { @{} }
   $script:State = [ordered]@{
     schema            = 1
@@ -304,6 +353,7 @@ function Initialize-State {
     gapDays           = $null
     gapWarning        = $null
     days              = $null
+    progress          = ConvertTo-Progress $previous.progress
     lastLog           = $script:LogPath
     streams           = [ordered]@{}
   }
@@ -311,8 +361,9 @@ function Initialize-State {
 }
 
 function Save-State {
+  param($Snapshot)
   if (-not $script:State) { return }
-  $state = $script:State
+  $state = if ($Snapshot) { $Snapshot } else { $script:State }
   $gapFrom = ConvertTo-UtcDate $state.gapFromUtc
   $state.gapDays = $null
   $state.gapWarning = $null
@@ -328,6 +379,34 @@ function Save-State {
   }
   try { Write-JsonFileAtomic $script:StatePath $state }
   catch { Write-Warning "state.json couldn't be saved: $($_.Exception.Message)" }
+}
+
+function Save-Progress {
+  # Saves the load's progress part way through a run, so a run that's stopped from outside
+  # leaves it for the next one. The result fields keep the last run's values until this run
+  # ends, so the installer doesn't take this save for the run's end.
+  $previous = $script:PreviousState
+  $snapshot = [ordered]@{}
+  foreach ($key in $script:State.Keys) { $snapshot[$key] = $script:State[$key] }
+  foreach ($key in 'lastRunUtc', 'lastSuccessUtc') { $snapshot[$key] = Format-UtcDate $previous[$key] }
+  foreach ($key in 'lastResult', 'lastError', 'lastMessage', 'lastLog', 'days') { $snapshot[$key] = $previous[$key] }
+  Save-State $snapshot
+}
+
+function Complete-Progress {
+  # Keeps a load that this run didn't finish, so the next run carries on from its last
+  # finished window. A one-window run that failed leaves nothing to carry on from.
+  if (-not $script:State -or -not $script:Load) { return }
+  $progress = $script:State.progress
+  if ($script:LoadDone -or -not $progress) {
+    $script:State.progress = $null
+    return
+  }
+  # A window that failed, rather than one that was stopped from outside, keeps its size.
+  $progress.pending = $null
+  if (-not $script:Stopped -and -not $progress.throughUtc -and @($script:Windows).Count -le 1) {
+    $script:State.progress = $null
+  }
 }
 
 function Enter-RunLock {
@@ -637,48 +716,132 @@ function Restore-Stream {
 
 function Set-RunWindow {
   # PAX looks back to the day the cumulative files cover, plus a few days of overlap that
-  # PAX's de-duplication absorbs, within minDays and maxDays.
+  # PAX's de-duplication absorbs, within minDays and maxDays. A load that the last run left
+  # unfinished carries on from its last finished window instead. The days are read in windows
+  # of up to windowDays days, oldest first, so a long load can stop between them.
   $cfg = $script:Cfg
-  $interactions = $script:State.streams.interactions
+  $state = $script:State
+  $interactions = $state.streams.interactions
   $script:Covered = $null
   if ($interactions.mode -eq 'append') {
     $script:Covered = $script:RestoredCovered
-    if (-not $script:Covered) { $script:Covered = ConvertTo-UtcDate $script:State.coveredThroughUtc }
+    if (-not $script:Covered) { $script:Covered = ConvertTo-UtcDate $state.coveredThroughUtc }
     if (-not $script:Covered) { $script:Covered = ConvertTo-DayStart (Get-Item -LiteralPath (Get-LocalPath 'interactions')).LastWriteTimeUtc }
   }
-  if ($script:DaysOverride) {
+  $script:CoveredAtStart = $script:Covered
+  $progress = $state.progress
+  $today = (Get-Date).Date
+  # Files restored from SharePoint hold only what was uploaded, so they don't resume a load.
+  $resume = $progress -and -not $script:DaysOverride -and $interactions.mode -eq 'append' -and -not $script:RestoredCovered
+  if ($resume) {
+    $reachFrom = ConvertTo-UtcDate $(if ($progress.throughUtc) { $progress.throughUtc } else { $progress.fromUtc })
+    $behind = [math]::Ceiling([math]::Max(0, ($today - $reachFrom.ToLocalTime()).TotalDays))
+    $days = [math]::Min(180, [math]::Max($cfg.minDays, $behind + $cfg.overlapDays))
+  } elseif ($script:DaysOverride) {
     $days = $script:DaysOverride
+    $reachFrom = $script:Covered
   } elseif ($interactions.mode -eq 'seed') {
     $days = $cfg.seedDays
+    $reachFrom = $null
   } else {
-    $behind = [math]::Ceiling([math]::Max(0, ((Get-Date).Date - $script:Covered.ToLocalTime()).TotalDays))
+    $behind = [math]::Ceiling([math]::Max(0, ($today - $script:Covered.ToLocalTime()).TotalDays))
     $days = [math]::Min($cfg.maxDays, [math]::Max($cfg.minDays, $behind + $cfg.overlapDays))
+    $reachFrom = $script:Covered
   }
   $script:RunDays = [int]$days
-  $script:WindowStart = (Get-Date).AddDays(-$script:RunDays).Date.ToUniversalTime()
-  $script:State.days = $script:RunDays
-  Write-Host ('PAX looks back {0} days, from {1:yyyy-MM-dd}.' -f $script:RunDays, (Get-Date).AddDays(-$script:RunDays))
+  $start = $today.AddDays(-$script:RunDays)
+  $script:WindowStart = $start.ToUniversalTime()
+  $state.days = $script:RunDays
+  # The oldest day this run can't reach, when the files stop short of where it starts.
+  $script:NewGapFrom = $null
+  if ($reachFrom -and $script:WindowStart -gt $reachFrom -and $script:RunDays -lt 180) { $script:NewGapFrom = $reachFrom }
+
+  $size = $cfg.windowDays
+  if ($progress) {
+    $size = [math]::Min($size, $progress.windowDays)
+    $pending = $progress.pending
+    if ($pending -and $pending.first) {
+      # The last run ended inside its first window without saving a result, which is what
+      # happens when Task Scheduler stops a run at its time limit.
+      $size = [math]::Min($size, [math]::Max(1, [math]::Floor($pending.days / 2)))
+      Write-Host ('The last run never finished its first window, of {0} days, so this run reads windows of up to {1} days.' -f $pending.days, $size)
+    }
+  }
+  $size = [int]$size
+  $count = [int][math]::Ceiling($script:RunDays / $size)
+  $total = $script:RunDays
+  $script:Windows = @(for ($k = 0; $k -lt $count; $k++) {
+      $first = [int][math]::Floor($k * $total / $count)
+      $next = [int][math]::Floor(($k + 1) * $total / $count)
+      $to = $start.AddDays($next)
+      [pscustomobject]@{ Index = $k + 1; From = $start.AddDays($first); To = $to; Days = $next - $first; Through = $to.ToUniversalTime() }
+    })
+
+  if ($resume) {
+    $script:Load = [ordered]@{ fromUtc = $progress.fromUtc; days = $progress.days; seed = $progress.seed }
+    $through = $progress.throughUtc
+    Write-Host ('The last run stopped part way through a load, so this run carries on from {0:yyyy-MM-dd}.' -f $reachFrom.ToLocalTime())
+  } else {
+    $script:Load = [ordered]@{ fromUtc = Format-UtcDate $script:WindowStart; days = $script:RunDays; seed = ($interactions.mode -eq 'seed') }
+    $through = $null
+  }
+  $state.progress = [ordered]@{
+    fromUtc    = $script:Load.fromUtc
+    days       = $script:Load.days
+    seed       = $script:Load.seed
+    windowDays = $size
+    throughUtc = $through
+    pending    = $null
+  }
+  Write-Host ('PAX looks back {0} days, from {1:yyyy-MM-dd}.' -f $script:RunDays, $start)
+  if ($count -gt 1) { Write-Host ('It reads them in {0} windows of up to {1} days, oldest first.' -f $count, [int][math]::Ceiling($total / $count)) }
 }
 
 function Invoke-PaxChild {
-  # Runs Run-PAX-AIBV.ps1 in a child pwsh, so PAX's exit and its session changes stay there.
-  # Its output is echoed as it arrives, so this run's log holds it.
+  # Runs Run-PAX-AIBV.ps1 for one window in a child pwsh, so PAX's exit and its session changes
+  # stay there. Its output is echoed as it arrives, so this run's log holds it.
+  param($Window)
   $cfg = $script:Cfg
   $arguments = [System.Collections.Generic.List[string]]::new()
   $arguments.AddRange([string[]]@(
       '-NoProfile', '-NonInteractive', '-File', (Join-Path $PSScriptRoot 'Run-PAX-AIBV.ps1'),
-      '-TenantId', $cfg.tenantId, '-ClientId', $cfg.clientId, '-Days', [string]$script:RunDays,
+      '-TenantId', $cfg.tenantId, '-ClientId', $cfg.clientId))
+  if (@($script:Windows).Count -gt 1) {
+    # PAX reads from the start date up to, but not including, the end date.
+    $arguments.AddRange([string[]]@(
+        '-StartDate', $Window.From.ToString('yyyy-MM-dd', [cultureinfo]::InvariantCulture),
+        '-EndDate', $Window.To.ToString('yyyy-MM-dd', [cultureinfo]::InvariantCulture)))
+  } else {
+    $arguments.AddRange([string[]]@('-Days', [string]$script:RunDays))
+  }
+  $arguments.AddRange([string[]]@(
       '-WorkRoot', $script:WorkDir, '-PaxReleaseTag', $cfg.paxReleaseTag, '-PaxSha256', $cfg.paxSha256,
       '-SkipVersionCheck'))
   if ($script:State.streams.interactions.mode -eq 'append') { $arguments.AddRange([string[]]@('-AppendFile', (Get-LocalPath 'interactions'))) }
   if ($script:State.streams.users.mode -eq 'append') { $arguments.AddRange([string[]]@('-AppendUserInfo', (Get-LocalPath 'users'))) }
-  if ($cfg.agent365) { $arguments.Add('-IncludeAgent365Info') }
+  # The registry is a snapshot, so one window reads it.
+  if ($cfg.agent365 -and $Window.Index -eq 1) { $arguments.Add('-IncludeAgent365Info') }
   if ($cfg.deidentify) { $arguments.Add('-Deidentify') }
   $argv = $arguments.ToArray()
+
+  # A file that an earlier window wrote can look new to this one, so each file's time is
+  # recorded first. Test-FreshFile passes only a file whose time then changes.
+  $script:WrittenBefore = @{}
+  $files = @(Get-LocalPath 'interactions'; Get-LocalPath 'users')
+  $processed = Join-Path $script:WorkDir 'processed'
+  if (Test-Path -LiteralPath $processed) {
+    $files += @(Get-ChildItem -LiteralPath $processed -File -Recurse -Force | ForEach-Object FullName)
+  }
+  foreach ($file in $files) {
+    if (Test-Path -LiteralPath $file -PathType Leaf) {
+      $script:WrittenBefore[[System.IO.Path]::GetFullPath($file)] = (Get-Item -LiteralPath $file).LastWriteTimeUtc
+    }
+  }
 
   $script:ChildErrors = [System.Collections.Generic.List[string]]::new()
   $script:ZeroRows = $false
   $script:PaxExitCode = $null
+  $script:RollupFailed = $null
   $pwsh = (Get-Process -Id $PID).Path
   # Under Stop, PowerShell 7.0 and 7.1 can end this run on the child's first error line.
   $ErrorActionPreference = 'Continue'
@@ -687,6 +850,10 @@ function Invoke-PaxChild {
     $script:PaxStart = [datetime]::UtcNow
     & $pwsh @argv 2>&1 | ForEach-Object {
       $line = $_.ToString() -replace '\x1b\[[0-9;?]*[ -/]*[@-~]', ''
+      if (-not $script:RollupFailed) {
+        $match = [regex]::Match($line, $script:RollupFailurePattern)
+        if ($match.Success) { $script:RollupFailed = $line.Substring($match.Index).Trim() }
+      }
       if ($_ -is [System.Management.Automation.ErrorRecord]) {
         $script:ChildErrors.Add($line)
       } elseif ($line -match '^ {2}(Exported:\s+0 rows|Retained:\s+0 records)\s*$') {
@@ -731,6 +898,10 @@ function Get-PaxFailure {
   if ($null -ne $script:PaxExitCode -and $reasons.ContainsKey($script:PaxExitCode)) { $text += ' ' + $reasons[$script:PaxExitCode] }
   $detail = Get-ChildErrorText
   if ($detail) { $text += " $detail" }
+  # The error view can wrap a long message, so the rollup line is compared without spaces.
+  if ($script:RollupFailed -and -not ($detail -and ($detail -replace '\s', '').Contains(($script:RollupFailed -replace '\s', '')))) {
+    $text += " PAX's rollup step failed: $($script:RollupFailed)"
+  }
   if ($script:LogPath) { $text += " The log is $($script:LogPath)." }
   return $text
 }
@@ -738,20 +909,40 @@ function Get-PaxFailure {
 # ---- After the run ----
 
 function Test-FreshFile {
+  # True when PAX wrote the file during this window's run.
   param([string]$Path)
   if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
-  return (Get-Item -LiteralPath $Path).LastWriteTimeUtc -ge $script:FreshAfter
+  $written = (Get-Item -LiteralPath $Path).LastWriteTimeUtc
+  $key = [System.IO.Path]::GetFullPath($Path)
+  if ($script:WrittenBefore -and $script:WrittenBefore.ContainsKey($key) -and $script:WrittenBefore[$key] -eq $written) {
+    return $false
+  }
+  return $written -ge $script:FreshAfter
 }
 
 function Complete-PaxRun {
-  # Checks what PAX wrote this run and moves first-run files into data\. Sets $script:Skip
-  # when there's nothing to upload yet.
+  # Checks what PAX wrote in a window and moves first-run files into data\. Sets $script:Skip
+  # when there's nothing to upload yet, and $script:WindowRead once the window's days are in
+  # the cumulative files.
+  param($Window)
+  $final = $Window.Index -eq @($script:Windows).Count
+  $script:WindowRead = $false
   $streams = $script:State.streams
   $seeding = $streams.interactions.mode -eq 'seed' -or $streams.users.mode -eq 'seed'
+  if ($script:ChildExit -eq 0 -and $script:RollupFailed) {
+    $text = "PAX's rollup step failed, though PAX exited 0: $($script:RollupFailed)"
+    if ($script:LogPath) { $text += " The log is $($script:LogPath)." }
+    throw $text
+  }
   # After a run that finds no activity, PAX writes no new files, so the wrapper fails when it
   # looks for a first run's files. That case is handled below.
   if ($script:ChildExit -ne 0 -and -not ($script:ZeroRows -and $seeding)) { throw (Get-PaxFailure) }
   if ($script:ZeroRows -and $streams.interactions.mode -eq 'seed') {
+    if (-not $final) {
+      Write-Host ('PAX found no Copilot activity from {0:yyyy-MM-dd} to {1:yyyy-MM-dd}, so a later window starts the files.' -f $Window.From, $Window.To.AddDays(-1))
+      return
+    }
+    $script:LoadDone = $true
     $script:State.lastResult = 'no-data'
     $script:State.lastMessage = "PAX found no Copilot activity in the last $($script:RunDays) days, so there's nothing to upload yet. The next scheduled run tries again."
     Write-Host $script:State.lastMessage
@@ -784,7 +975,7 @@ function Complete-PaxRun {
       $stream.error = "PAX didn't update $($info.Local), so it still holds the earlier data. PAX's log in $($script:DataDir) says why."
     }
   }
-  if ($script:Cfg.agent365) {
+  if ($script:Cfg.agent365 -and $Window.Index -eq 1) {
     $agents = $streams.agents365
     $agents.mode = 'replace'
     $made = $manifest[$script:Streams.agents365.Manifest]
@@ -796,25 +987,29 @@ function Complete-PaxRun {
     }
   }
   if ($streams.interactions.error) { throw $streams.interactions.error }
-  Update-Coverage
+  Update-Coverage -Through $Window.Through -Final:$final
+  $script:WindowRead = $true
 }
 
 function Update-Coverage {
-  # Records the oldest day the cumulative files may be missing, when the refresh didn't run
-  # for longer than this run looked back. Save-State turns it into a warning.
+  # Records how far the cumulative files reach, and the oldest day they may be missing when
+  # the refresh didn't run for longer than this run looks back. Save-State turns that day
+  # into a warning. A load clears an older gap only once its last window is read.
+  param([datetime]$Through, [switch]$Final)
   $state = $script:State
   $gapFrom = ConvertTo-UtcDate $state.gapFromUtc
-  if ($state.streams.interactions.mode -eq 'seed' -or $script:RunDays -ge 180) {
+  if ($Final) {
+    $load = $script:Load
     # A first run starts the files, and 180 days is as far back as Purview's records go.
-    $gapFrom = $null
-  } else {
-    if ($script:Covered -and $script:WindowStart -gt $script:Covered -and (-not $gapFrom -or $script:Covered -lt $gapFrom)) {
-      $gapFrom = $script:Covered
+    if ($load.seed -or $load.days -ge 180 -or ($gapFrom -and (ConvertTo-UtcDate $load.fromUtc) -le $gapFrom)) {
+      $gapFrom = $null
     }
-    if ($gapFrom -and $script:WindowStart -le $gapFrom) { $gapFrom = $null }
   }
+  if ($script:NewGapFrom -and (-not $gapFrom -or $script:NewGapFrom -lt $gapFrom)) { $gapFrom = $script:NewGapFrom }
   $state.gapFromUtc = Format-UtcDate $gapFrom
-  $state.coveredThroughUtc = Format-UtcDate (Get-Date).Date.ToUniversalTime()
+  $covered = $Through
+  if ($script:CoveredAtStart -and $script:CoveredAtStart -gt $covered) { $covered = $script:CoveredAtStart }
+  $state.coveredThroughUtc = Format-UtcDate $covered
 }
 
 function Send-File {
@@ -874,9 +1069,10 @@ function Publish-Streams {
 # ---- Main ----
 
 function Invoke-Refresh {
+  $script:RunStart = [datetime]::UtcNow
   $script:Cfg = Read-RefreshConfig $script:ConfigPath
   $cfg = $script:Cfg
-  $now = [datetime]::UtcNow.ToString('yyyy-MM-dd HH:mm', [cultureinfo]::InvariantCulture)
+  $now = $script:RunStart.ToString('yyyy-MM-dd HH:mm', [cultureinfo]::InvariantCulture)
   Write-Host "$($cfg.product): PAX refresh at $now UTC"
   Write-Host "Tenant $($cfg.tenantId), app $($cfg.clientId)"
   $library = if ($cfg.driveId) { $cfg.driveId } else { $cfg.library }
@@ -889,19 +1085,71 @@ function Invoke-Refresh {
   Restore-Stream 'interactions'
   Restore-Stream 'users'
   Set-RunWindow
-  Invoke-PaxChild
-  Complete-PaxRun
-  if ($script:Skip) { return }
-  Publish-Streams
   $state = $script:State
+  $windows = @($script:Windows)
+  $budget = [timespan]::FromHours($cfg.runHours)
+  $longest = [timespan]::Zero
+  $lastRead = $null
+  foreach ($window in $windows) {
+    if ($windows.Count -gt 1) {
+      Write-Host ('==> Window {0} of {1}: {2:yyyy-MM-dd} to {3:yyyy-MM-dd}' -f $window.Index, $windows.Count, $window.From, $window.To.AddDays(-1))
+    }
+    # A file that an earlier window started takes the later windows' activity.
+    foreach ($name in 'interactions', 'users') {
+      $stream = $state.streams[$name]
+      if ($stream.mode -eq 'seed' -and (Test-Path -LiteralPath (Get-LocalPath $name))) { $stream.mode = 'append' }
+    }
+    # Each window reads the users again, so only the last window's problem with them counts.
+    $state.streams.users.error = $null
+    $state.progress.pending = [ordered]@{
+      from  = Format-UtcDate $window.From
+      to    = Format-UtcDate $window.To
+      days  = $window.Days
+      first = ($window.Index -eq 1)
+    }
+    Save-Progress
+    $started = [datetime]::UtcNow
+    Invoke-PaxChild $window
+    Complete-PaxRun $window
+    if ($script:Skip) { return }
+    $state.progress.pending = $null
+    if ($script:WindowRead) {
+      $state.progress.throughUtc = Format-UtcDate $window.Through
+      $lastRead = $window
+    }
+    Save-Progress
+    $took = [datetime]::UtcNow - $started
+    if ($took -gt $longest) { $longest = $took }
+    if ($windows.Count -gt 1) { Write-Host ('Window {0} took {1:hh\:mm\:ss}.' -f $window.Index, $took) }
+    $elapsed = [datetime]::UtcNow - $script:RunStart
+    # Stops only once there's something to upload.
+    if ($window.Index -lt $windows.Count -and (Test-Path -LiteralPath (Get-LocalPath 'interactions')) -and $elapsed + $longest -gt $budget) {
+      $script:Stopped = $true
+      Write-Host ('This run has taken {0:N1} hours, and its longest window took {1:N1}, so the next window might not finish inside {2:N1} hours. The run stops here.' -f $elapsed.TotalHours, $longest.TotalHours, $budget.TotalHours)
+      break
+    }
+  }
+  $script:LoadDone = -not $script:Stopped
+  foreach ($name in $script:Streams.Keys) {
+    # A stream that took rows in any window has new rows, whatever the last window found.
+    if ($state.streams[$name].updated) { $state.streams[$name].noNewRows = $false }
+  }
+  $agents = $state.streams.agents365
+  if ($cfg.agent365 -and -not $agents.updated -and -not $agents.warning) {
+    $agents.mode = 'replace'
+    $agents.warning = "The Agent 365 registry didn't refresh this run, so SharePoint keeps its last copy."
+  }
+  Publish-Streams
   $state.lastResult = 'success'
   $state.lastSuccessUtc = Format-UtcDate ([datetime]::UtcNow)
-  $state.lastMessage = if ($state.streams.interactions.noNewRows) {
+  $state.lastMessage = if ($script:Stopped) {
+    "This run loaded activity up to {0:yyyy-MM-dd}, then stopped to stay inside the task's time limit. SharePoint has everything loaded so far, and the next scheduled run carries on from there." -f $(if ($lastRead) { $lastRead.To.AddDays(-1) } else { $windows[0].From.AddDays(-1) })
+  } elseif ($state.streams.interactions.noNewRows) {
     "PAX found no new Copilot activity, and SharePoint's files are up to date."
   } else {
     "SharePoint's files are up to date."
   }
-  if ($state.streams.agents365.warning) { $state.lastMessage += ' ' + $state.streams.agents365.warning }
+  if ($agents.warning) { $state.lastMessage += ' ' + $agents.warning }
   Write-Host $state.lastMessage
   $script:ExitCode = 0
 }
@@ -1006,6 +1254,7 @@ try {
   }
   $script:ExitCode = 1
 } finally {
+  Complete-Progress
   Save-State
   try { Remove-OldFiles } catch { Write-Warning "Removing old files failed: $($_.Exception.Message)" }
   Stop-RunLog

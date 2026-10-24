@@ -18,8 +18,13 @@ import { paxPaths, PWSH_PROBE } from '../src/steps/pax/local.js';
  * `credential <Action>`, `task <Action>`, `refresh check`, `refresh upload` or `refresh run`.
  * @typedef {{ key: string, file: string, args: string[], input?: string }} PaxCall
  *
- * @typedef {'success' | 'no-data' | 'failed' | 'running' | 'busy'} FakeRun
+ * @typedef {'success' | 'no-data' | 'failed' | 'running' | 'busy' | 'partial'} FakeRun
+ *   `partial` is a success that stopped part way through a long load, leaving the rest to the
+ *   next run, as refresh.ps1 does to stay inside the task's time limit.
  */
+
+/** What refresh.ps1 says when it stops part way through a load. */
+export const PARTIAL_MESSAGE = "This run loaded activity up to 2026-05-14, then stopped to stay inside the task's time limit. SharePoint has everything loaded so far, and the next scheduled run carries on from there.";
 
 /** A script that printed one line of JSON and exited 0. @param {any} json @returns {RunResult} */
 export const printed = (json) => ({ code: 0, stdout: `${JSON.stringify(json)}\n`, stderr: '' });
@@ -94,8 +99,9 @@ export function fakePaxHost(o = {}) {
    * Ends a run with `result`: state.json says how it went and the task is ready again.
    * @param {FakeRun} result
    * @param {string} [taskName]
+   * @param {number} [days]  The load's -Days, for a partial run. Default 90.
    */
-  const finishRun = (result, taskName) => {
+  const finishRun = (result, taskName, days = 90) => {
     const at = now().toISOString();
     const task = taskName ? tasks[taskName] : undefined;
     if (result === 'running') {
@@ -106,12 +112,26 @@ export function fakePaxHost(o = {}) {
       if (task) Object.assign(task, { state: 'Ready', lastRunTime: at, lastTaskResult: EXIT_BUSY, neverRan: false });
       return;
     }
+    const partial = result === 'partial';
+    const from = now().getTime() - days * 86_400_000;
     writeState({
       lastRunUtc: at,
-      lastResult: result,
+      lastResult: partial ? 'success' : result,
       lastError: result === 'failed' ? 'PAX could not sign in.' : null,
-      lastMessage: result === 'no-data' ? 'PAX found no Copilot activity.' : null,
-      ...(result === 'success' ? { lastSuccessUtc: at } : {}),
+      lastMessage: result === 'no-data' ? 'PAX found no Copilot activity.' : partial ? PARTIAL_MESSAGE : null,
+      ...(result === 'success' || partial ? { lastSuccessUtc: at } : {}),
+      ...(partial
+        ? {
+            progress: {
+              fromUtc: new Date(from).toISOString(),
+              days,
+              seed: false,
+              windowDays: 7,
+              throughUtc: new Date(from + 14 * 86_400_000).toISOString(),
+              pending: null,
+            },
+          }
+        : {}),
       lastLog: join(root, 'logs', 'refresh.log'),
     });
     if (task) Object.assign(task, { state: 'Ready', lastRunTime: at, lastTaskResult: result === 'failed' ? 1 : 0, neverRan: false });
@@ -192,7 +212,7 @@ export function fakePaxHost(o = {}) {
         const days = argOf(args, '-Days');
         refreshes.push(days ? { days: Number(days) } : {});
         if (state.run === 'busy') return failed('Another refresh is running.', EXIT_BUSY);
-        finishRun(state.run === 'running' ? 'success' : state.run);
+        finishRun(state.run === 'running' ? 'success' : state.run, undefined, days ? Number(days) : undefined);
         if (state.run === 'no-data') return { code: EXIT_NO_DATA, stdout: 'PAX found no Copilot activity.\n', stderr: '' };
         if (state.run === 'failed') return failed('PAX could not sign in.');
         return { code: 0, stdout: 'Done.\n', stderr: '' };

@@ -20,7 +20,7 @@ import {
   taskInfo, unregisterTask, writeRefreshConfig, writeScripts,
 } from './local.js';
 import { paxAppWanted, paxPreflight } from './plan.js';
-import { askCredentials, ensurePaxWorkspace, loadPaxModel, publishPax, setPaxSchedule } from './publish.js';
+import { askCredentials, ensurePaxWorkspace, loadPaxModel, publishPax, SCHEDULE_OFF_WHY, setPaxSchedule } from './publish.js';
 import {
   confirmFolderAccess, describeFolder, ensureSiteGrant, removeRetiredGrants, removeSiteGrant,
 } from './site.js';
@@ -39,7 +39,9 @@ import { paxUpload } from './upload.js';
  * @property {string} [folder]  `upload`'s subfolder of the SharePoint folder.
  *
  * @typedef {'running' | 'busy' | 'success' | 'no-data' | 'failed'} RunStatus
- * @typedef {{ status: RunStatus, error?: string, log?: string }} RunOutcome
+ * @typedef {{ status: RunStatus, error?: string, log?: string, partial?: boolean, message?: string }} RunOutcome
+ *   `partial` is a success that stopped to stay inside the task's time limit, with the rest of
+ *   the load left to the next run. `message` is what the run said about it.
  */
 
 /** How long set-up and `run` watch a run for a quick failure before leaving it to carry on. */
@@ -58,6 +60,8 @@ const RENEW_DAYS = 30;
 const DAY_MS = 86_400_000;
 /** Commands that need the scheduled refresh to be set up first. */
 const NEEDS_INSTALL = new Set(['update', 'run', 'status', 'check', 'refresh', 'rotate-secret']);
+/** What a run that stopped part way through a load says, when it left no message of its own. */
+const PARTIAL_LOAD = 'The refresh loaded part of the history into SharePoint, and the next scheduled run carries on from there.';
 
 /** @param {unknown} err */
 const isGone = (err) => err instanceof HttpError && err.status === 404;
@@ -263,7 +267,10 @@ async function ensureTask(ctx) {
  */
 export function endedSince(state, startedAt) {
   if (!state?.lastRunUtc || Date.parse(state.lastRunUtc) < Date.parse(startedAt) - CLOCK_SLACK_MS) return undefined;
-  if (state.lastResult === 'success') return { status: 'success' };
+  if (state.lastResult === 'success') {
+    if (!state.progress) return { status: 'success' };
+    return { status: 'success', partial: true, ...(state.lastMessage ? { message: String(state.lastMessage) } : {}) };
+  }
   return {
     status: state.lastResult === 'no-data' ? 'no-data' : 'failed',
     error: state.lastError || state.lastMessage || undefined,
@@ -379,7 +386,7 @@ async function startAndWatch(ctx, { wait = true, first = false }) {
       ui.info(`Another refresh was already running on this PC, so this one stopped. To see how it's going, run: ${commandLine('status')}`);
       return true;
     case 'success':
-      ui.ok('The refresh finished, and the rollups are in SharePoint.');
+      ui.ok(out.partial ? (out.message ?? PARTIAL_LOAD) : 'The refresh finished, and the rollups are in SharePoint.');
       return loadAfterRun(ctx, wait);
     case 'no-data':
       ui.warn('The refresh finished but found no Copilot audit records. If Copilot is in use, check that auditing is on in Microsoft Purview.');
@@ -412,10 +419,13 @@ async function reloadHistory(ctx, days) {
     return true;
   }
   if (r.code !== 0) throw scriptFailed(r, 'The refresh');
-  // The rollups keep what they had, so a shorter reload doesn't shorten the history.
+  // The rollups keep what they had, so a shorter reload doesn't shorten the history. A reload that
+  // stopped part way counts too: the scheduled runs read the rest.
   if (days > (config.history?.days ?? 0)) config.history = { ...config.history, days };
   ctx.save();
-  ui.ok(`Read ${days} days of the audit log and added them to the rollups in SharePoint.`);
+  const state = readState(host);
+  if (state?.progress) ui.ok(state.lastMessage ? String(state.lastMessage) : PARTIAL_LOAD);
+  else ui.ok(`Read ${days} days of the audit log and added them to the rollups in SharePoint.`);
   return loadAfterRun(ctx, true);
 }
 
@@ -577,6 +587,12 @@ export async function paxStatus(ctx) {
     ui.info(`Last run:     ${state.lastResult ?? 'unknown'}, ${when(state.lastRunUtc)}`);
     if (state.lastSuccessUtc) ui.info(`Last success: ${when(state.lastSuccessUtc)}`);
     if (state.coveredThroughUtc) ui.info(`Data up to:   ${when(state.coveredThroughUtc)}`);
+    const load = state.progress;
+    // A load longer than one window can take more than one run.
+    if (load?.days > load?.windowDays) {
+      const read = load.throughUtc ? `read up to ${when(load.throughUtc)} so far` : 'none read yet';
+      ui.info(`History:      loading ${load.days} days of activity, ${read}. Each run carries on where the last one stopped.`);
+    }
     if (state.gapWarning) ui.warn(String(state.gapWarning));
     if (state.lastResult === 'failed') {
       ok = false;
@@ -599,6 +615,7 @@ export async function paxStatus(ctx) {
   const sm = config.semanticModel;
   if (ws && sm?.id) {
     ui.heading('Power BI');
+    let gone = false;
     try {
       const [last] = await api.powerBi.refreshes(ws, sm.id, 1);
       ui.info(`Model:        ${last ? `${last.status}, ${when(last.endTime ?? last.startTime)}` : 'not refreshed yet'}`);
@@ -607,10 +624,42 @@ export async function paxStatus(ctx) {
       if (!isGone(err)) throw err;
       ui.warn(`The model isn't in the workspace any more. To publish it again, run: ${commandLine('update')}`);
       ok = false;
+      gone = true;
     }
+    if (!gone && config.powerBi?.refreshAt && !(await scheduleStatus(ctx, ws, sm.id))) ok = false;
   }
   if (config.managedApp?.url) ui.info(`App:          ${config.managedApp.url}`);
   return ok;
+}
+
+/**
+ * Status's line for the model's daily refresh. A schedule that can't be read only warns.
+ * @param {Ctx} ctx
+ * @param {string} ws
+ * @param {string} id
+ * @returns {Promise<boolean>}  False when the schedule is off.
+ */
+async function scheduleStatus(ctx, ws, id) {
+  const { ui, api } = ctx;
+  /** @type {any} */
+  let s;
+  try {
+    s = await api.powerBi.refreshSchedule(ws, id);
+  } catch (err) {
+    if (!(err instanceof HttpError)) throw err;
+    ui.warn(`Couldn't read the model's refresh schedule: ${messageOf(err).slice(0, 300)}`);
+    return true;
+  }
+  if (s?.enabled === false) {
+    ui.warn(`The model's daily refresh is off. ${SCHEDULE_OFF_WHY}`);
+    ui.info(`It turns back on after a refresh that works. To refresh now, run: ${commandLine('refresh')}`);
+    return false;
+  }
+  const days = Array.isArray(s?.days) ? s.days : [];
+  const times = Array.isArray(s?.times) ? s.times : [];
+  const on = days.length && days.length < 7 ? `on ${days.join(', ')}` : 'daily';
+  ui.info(`Schedule:     ${on}${times.length ? ` at ${times.join(' and ')}` : ''}${s?.localTimeZoneId ? ` (${s.localTimeZoneId})` : ''}`);
+  return true;
 }
 
 /**

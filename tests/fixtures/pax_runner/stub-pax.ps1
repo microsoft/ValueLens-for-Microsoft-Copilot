@@ -1,13 +1,31 @@
 # Stub Run-PAX-AIBV.ps1 body. test_pax_runner.py puts the real script's param block before it,
 # so refresh.ps1's child command line binds exactly as it would to the real script. The stub
 # writes rows the way PAX does, then picks its outputs and writes rollup-manifest.json the
-# way the real script does. STUB_MODE picks the behaviour:
-#   (unset)      appends a row to each target, or writes a first run's files
-#   zero         prints PAX's zero-row lines and writes nothing
-#   stale        writes nothing
-#   users-stale  writes the interactions only
-#   fail         prints "Exit code: $env:STUB_PAX_EXIT" and fails as the real script does
+# way the real script does. Its picks don't check that a file is new, so the runner's own
+# check is what keeps an earlier run's file out. STUB_MODE picks the behaviour:
+#   (unset)       appends a row to each target, or writes a first run's files
+#   zero          prints PAX's zero-row lines and writes nothing
+#   stale         writes nothing
+#   users-stale   writes the interactions only
+#   fail          prints "Exit code: $env:STUB_PAX_EXIT" and fails as the real script does
+#   rollup-fail   prints PAX's failed-rollup line, then fails as the real script does when it
+#                 finds that line in PAX's log
+#   rollup-exit0  prints PAX's failed-rollup line and exits 0, as a script that doesn't read
+#                 PAX's log would
+# STUB_MODES, a comma-separated list, sets the mode for each PAX call in a run in turn. An
+# empty item, or a call past the list's end, uses STUB_MODE.
 $ErrorActionPreference = 'Stop'
+
+$call = 1
+if (Test-Path -LiteralPath $env:STUB_PAX_LOG) {
+  $runPrefix = '{"run":"' + $env:STUB_RUN + '"'
+  $call += @(Get-Content -LiteralPath $env:STUB_PAX_LOG | Where-Object { $_.StartsWith($runPrefix) }).Count
+}
+$behaviour = $env:STUB_MODE
+if ($env:STUB_MODES) {
+  $modes = @($env:STUB_MODES -split ',')
+  if ($call -le $modes.Count -and $modes[$call - 1].Trim()) { $behaviour = $modes[$call - 1].Trim() }
+}
 
 $bound = [ordered]@{}
 foreach ($key in $PSBoundParameters.Keys) { $bound[$key] = [string]$PSBoundParameters[$key] }
@@ -19,7 +37,8 @@ foreach ($key in $PSBoundParameters.Keys) { $bound[$key] = [string]$PSBoundParam
 } | ConvertTo-Json -Depth 4 -Compress | Add-Content -LiteralPath $env:STUB_PAX_LOG -Encoding utf8
 
 $mode = if ($AppendFile) { 'append' } else { 'seed' }
-Write-Host "Stub PAX: run $env:STUB_RUN, $Days days, mode $mode"
+$span = if ($StartDate) { "$StartDate to $EndDate" } else { "$Days days" }
+Write-Host "Stub PAX: run $env:STUB_RUN, call $call, $span, mode $mode, behaviour $(if ($behaviour) { $behaviour } else { 'rows' })"
 
 if (-not (Test-Path -LiteralPath $WorkRoot)) { New-Item -ItemType Directory -Force -Path $WorkRoot | Out-Null }
 $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
@@ -34,12 +53,21 @@ if ($AppendUserInfo) {
   $appendUsersTarget = [System.IO.Path]::GetFullPath($(if ([System.IO.Path]::IsPathRooted($AppendUserInfo)) { $AppendUserInfo } else { Join-Path $OutDir $AppendUserInfo }))
 }
 $stamp = (Get-Date).ToString('yyyyMMdd_HHmmss_fff')
-$row = "row-from-run-$env:STUB_RUN"
+# A window's rows name its start, so a test can see which windows reached the files.
+$row = if ($StartDate) { "row-from-run-$env:STUB_RUN-$StartDate" } else { "row-from-run-$env:STUB_RUN" }
+$rollupLine = 'Rollup: post-processor returned non-zero exit code 1. Raw CSV(s) preserved.'
 
-switch ($env:STUB_MODE) {
+switch ($behaviour) {
   'fail' {
     Write-Host "Exit code: $env:STUB_PAX_EXIT"
     throw 'PAX failed.'
+  }
+  'rollup-fail' {
+    Write-Host "[ERROR] $rollupLine"
+    throw ("PAX's rollup step failed, though PAX exited 0: {0} PAX's log: {1}" -f $rollupLine, (Join-Path $OutDir 'PAX_Stub.log'))
+  }
+  'rollup-exit0' {
+    Write-Host "[ERROR] $rollupLine"
   }
   'zero' {
     Write-Host '  Retained:  0 records'
@@ -52,7 +80,7 @@ switch ($env:STUB_MODE) {
     } else {
       Set-Content -LiteralPath (Join-Path $OutDir "Purview_Stub_${stamp}_Interactions.csv") -Value 'Message_Id_Raw', $row
     }
-    if ($env:STUB_MODE -ne 'users-stale') {
+    if ($behaviour -ne 'users-stale') {
       if ($appendUsersTarget) {
         Add-Content -LiteralPath $appendUsersTarget -Value $row
       } elseif ($IncludeUserInfo) {

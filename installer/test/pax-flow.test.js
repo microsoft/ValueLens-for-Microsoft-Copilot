@@ -9,10 +9,11 @@ import { THE_APP } from '../src/managed-app/flow.js';
 import { PRODUCT } from '../src/product.js';
 import { shareReportPending } from '../src/steps/access.js';
 import { endedSince, paxCommand, paxInstall, paxModels, paxStatus, paxSummary, paxUninstall, settleFirstRun } from '../src/steps/pax/flow.js';
-import { RUNNER_DIR, TASK_AT, credentialTarget, paxPaths, registerTask, startTask } from '../src/steps/pax/local.js';
+import { RUNNER_DIR, TASK_AT, credentialTarget, paxPaths, readState, registerTask, startTask } from '../src/steps/pax/local.js';
 import { paxPlan, paxPreflight } from '../src/steps/pax/plan.js';
+import { refreshTimes, SCHEDULE_OFF_WHY } from '../src/steps/pax/publish.js';
 import { fakeAzureGraph, fakeCtx, fakeFabric, fakePowerBi, fakeUi, httpError, realSources } from './fakes.js';
-import { failed, fakePaxHost } from './pax-fakes.js';
+import { PARTIAL_MESSAGE, failed, fakePaxHost } from './pax-fakes.js';
 
 const FOLDER = 'https://contoso.sharepoint.com/sites/Analytics/Shared Documents/ValueLens';
 const SITE_URL = 'https://contoso.sharepoint.com/sites/Analytics';
@@ -436,6 +437,15 @@ test('pax flow: how a run ended, from state.json', { timeout: 10_000 }, () => {
   assert.equal(noData?.log, undefined);
 
   assert.equal(endedSince({ lastRunUtc: at(30), lastResult: 'something new' }, startedAt)?.status, 'failed', 'an unknown result is a failure');
+
+  // refresh.ps1 keeps a load's progress when it stops part way through it, to stay inside the task's time limit.
+  const progress = { fromUtc: at(-90 * 86_400), days: 90, seed: false, windowDays: 7, throughUtc: at(-76 * 86_400), pending: null };
+  assert.deepEqual(
+    endedSince({ lastRunUtc: at(30), lastResult: 'success', lastMessage: 'Loaded up to 2026-03-17.', progress }, startedAt),
+    { status: 'success', partial: true, message: 'Loaded up to 2026-03-17.' },
+  );
+  assert.deepEqual(endedSince({ lastRunUtc: at(30), lastResult: 'success', lastMessage: null, progress }, startedAt), { status: 'success', partial: true });
+  assert.equal(endedSince({ lastRunUtc: at(30), lastResult: 'failed', lastError: 'PAX stopped.', progress }, startedAt)?.status, 'failed', 'a failed window is still a failure');
 });
 
 /**
@@ -718,7 +728,41 @@ test('pax flow: status shows the task, the last run, the secret, the model and t
   assert.ok(text.includes('Files:        '), text);
   assert.match(text, /^Power BI$/m);
   assert.match(text, /Model: +Completed, /);
+  assert.ok(text.includes(`Schedule:     daily at ${refreshTimes(TASK_AT).join(' and ')} (${s.config.powerBi.timeZone ?? 'UTC'})`), text);
   assert.ok(text.includes(`App:          ${APP_URL}`), text);
+});
+
+test('pax flow: status says when the daily refresh is off, and a refresh that works turns it back on', { timeout: 10_000 }, async () => {
+  const s = await installed({ by: { [Q.signIn]: 'set' } });
+  s.pbi.schedule.enabled = false;
+  let text = '';
+  const look = async () => {
+    s.ui.out.length = 0;
+    const ok = await paxStatus(s.ctx);
+    text = plain(s.ui.text());
+    return ok;
+  };
+  assert.equal(await look(), false, text);
+  assert.ok(text.includes(`! The model's daily refresh is off. ${SCHEDULE_OFF_WHY}`), text);
+  assert.ok(text.includes(`    It turns back on after a refresh that works. To refresh now, run: ${commandLine('refresh')}`), text);
+  assert.ok(!text.includes('Schedule:'), text);
+
+  s.ui.out.length = 0;
+  assert.equal(await paxCommand(s.ctx, 'refresh'), true, plain(s.ui.text()));
+  assert.ok(plain(s.ui.text()).includes("daily refresh off. "), plain(s.ui.text()));
+  assert.equal(s.pbi.schedule.enabled, true);
+  assert.equal(await look(), true, text);
+  assert.ok(text.includes('Schedule:     daily at '), text);
+
+  s.pbi.failures.refreshSchedule = [httpError(500, 'Internal error')];
+  assert.equal(await look(), true, text);
+  assert.ok(text.includes("! Couldn't read the model's refresh schedule: Internal error"), text);
+
+  // Before the model is signed in, there's no schedule to look at.
+  const later = await installed();
+  later.pbi.schedule.enabled = false;
+  assert.equal(await paxStatus(later.ctx), true, plain(later.ui.text()));
+  assert.ok(!later.pbi.calls.some((c) => c.startsWith('refreshSchedule ')), later.pbi.calls.join('\n'));
 });
 
 test('pax flow: status says when the task or the secret has gone from this PC', { timeout: 10_000 }, async () => {
@@ -845,6 +889,49 @@ test('pax flow: run --backfill-days when a refresh is running, finds nothing or 
   await assert.rejects(paxCommand(s.ctx, 'run', { backfillDays: 60 }), /^Error: The refresh failed \(exit code 1\): .*PAX could not sign in\./);
   assert.equal(s.config.history.days, 30);
   assert.deepEqual(s.pax.refreshes, [{ days: 60 }, { days: 60 }, { days: 60 }]);
+});
+
+test('pax flow: a reload that stops part way says so, and status shows how far the load has got', { timeout: 10_000 }, async () => {
+  const s = await installed({ by: { [Q.signIn]: 'set' } });
+  const status = async () => {
+    s.ui.out.length = 0;
+    assert.equal(await paxStatus(s.ctx), true, plain(s.ui.text()));
+    return plain(s.ui.text());
+  };
+  assert.doesNotMatch(await status(), /History:/, 'no load carries on');
+
+  s.ui.out.length = 0;
+  s.pax.setRun('partial');
+  assert.equal(await paxCommand(s.ctx, 'run', { backfillDays: 120 }), true, plain(s.ui.text()));
+  const text = plain(s.ui.text());
+  assert.ok(text.includes(PARTIAL_MESSAGE), text);
+  assert.ok(!text.includes('Read 120 days of the audit log'), text);
+  assert.equal(s.config.history.days, 120, 'the scheduled runs read the rest');
+  assert.ok(s.pbi.calls.some((c) => c.startsWith('refreshNow pbi-ws-1 ')), 'the model loads what was read');
+
+  assert.match(
+    await status(),
+    /^ +History: +loading 120 days of activity, read up to \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC so far\. Each run carries on where the last one stopped\.$/m,
+  );
+  const state = /** @type {any} */ (readState(s.pax.host));
+  delete state.progress.throughUtc;
+  s.pax.writeState(state);
+  assert.match(await status(), /^ +History: +loading 120 days of activity, none read yet\./m);
+  state.progress.windowDays = 120;
+  s.pax.writeState(state);
+  assert.doesNotMatch(await status(), /History:/, 'a one-window load finishes in one run');
+});
+
+test('pax flow: a run that stops part way through a long load says the next run carries on', { timeout: 10_000 }, async () => {
+  const s = await installed({ by: { [Q.signIn]: 'set' } });
+  rmSync(paxPaths(s.pax.host).state);
+  s.pax.setRun('partial');
+  assert.equal(await paxCommand(s.ctx, 'run'), true, plain(s.ui.text()));
+  const text = plain(s.ui.text());
+  assert.ok(text.includes(PARTIAL_MESSAGE), text);
+  assert.ok(!text.includes('The refresh finished, and the rollups are in SharePoint.'), text);
+  assert.equal(s.config.pax.firstRun, undefined, 'it worked, as far as it went');
+  assert.ok(s.pbi.calls.some((c) => c.startsWith('refreshNow pbi-ws-1 ')), 'the model loads what was read');
 });
 
 test('pax flow: run starts the task, as a first run until one has worked', { timeout: 10_000 }, async () => {

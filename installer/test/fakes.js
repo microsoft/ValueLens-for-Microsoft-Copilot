@@ -566,6 +566,14 @@ export function fakePowerBi() {
   const failures = {};
   /** @type {{ id: string, name: string }[]} The workspaces groups() lists. */
   const workspaces = [];
+  /** The model's refresh schedule, as Power BI holds it. */
+  const schedule = {
+    enabled: true,
+    days: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+    times: ['06:00', '12:00'],
+    localTimeZoneId: 'UTC',
+    notifyOption: 'MailOnFailure',
+  };
   /** @type {any[]} */
   let datasources = [{ datasourceType: 'Sql', connectionDetails: { server: 'abc.datawarehouse.fabric.microsoft.com', database: 'ValueLens' } }];
   let n = 0;
@@ -588,8 +596,15 @@ export function fakePowerBi() {
     addGroupUser: async (/** @type {string} */ ws, /** @type {any} */ body) => {
       calls.push(`addGroupUser ${ws} ${body.identifier}`);
     },
-    setRefreshSchedule: async (/** @type {string} */ ws, /** @type {string} */ dataset) => {
+    refreshSchedule: async (/** @type {string} */ ws, /** @type {string} */ dataset) => {
+      calls.push(`refreshSchedule ${ws} ${dataset}`);
+      const err = failures.refreshSchedule?.shift();
+      if (err) throw err;
+      return structuredClone(schedule);
+    },
+    setRefreshSchedule: async (/** @type {string} */ ws, /** @type {string} */ dataset, /** @type {any} */ body) => {
       calls.push(`setRefreshSchedule ${ws} ${dataset}`);
+      Object.assign(schedule, body?.value ?? {});
     },
     updateDatasource: async (/** @type {string} */ gw, /** @type {string} */ ds, /** @type {any} */ body) => {
       calls.push(`updateDatasource ${gw} ${ds} ${body.credentialDetails.credentialType}`);
@@ -625,6 +640,7 @@ export function fakePowerBi() {
     failures,
     answers,
     workspaces,
+    schedule,
     /** @param {any[]} d */
     setDatasources: (d) => {
       datasources = d;

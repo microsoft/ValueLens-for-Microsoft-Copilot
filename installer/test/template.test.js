@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
+import { PRODUCT } from '../src/product.js';
 import { decodeText, mParameter, readTemplateModel } from '../src/transform/model.js';
 import { applyEntry, buildEntryModel, fillTemplate, syncUnapplied } from '../src/transform/template.js';
 import { crc32, listZip, readZipEntry, replaceZipEntries } from '../src/transform/zip.js';
@@ -307,4 +308,124 @@ test("template: syncUnapplied changes only the entry's queries that the model ha
 
 test("template: the SharePoint template has no UnappliedChanges, so a fill changes only its model", () => {
   assert.ok(!listZip(readFileSync(PAX_TEMPLATE)).has('UnappliedChanges'));
+});
+
+/** @param {string} type */
+const typedMeta = (type) => ` meta [IsParameterQuery=true, Type="${type}", IsParameterQueryRequired=true]`;
+
+/** Parameters of each type, as Power BI Desktop writes them. @returns {import('../src/transform/model.js').ModelBim} */
+const typedModel = () => ({
+  compatibilityLevel: 1567,
+  model: {
+    tables: [],
+    expressions: [
+      { name: 'Weeks', expression: `4${typedMeta('Number')}` },
+      { name: 'Since', expression: `#date(2026, 9, 1)${typedMeta('Date')}` },
+      { name: 'On', expression: `true${typedMeta('Logical')}` },
+      { name: 'Id', expression: `""${typedMeta('Text')}` },
+      { name: 'Anything', expression: `"x"${typedMeta('Any')}` },
+      { name: 'Untyped', expression: '"x" meta [IsParameterQuery=true, IsParameterQueryRequired=true]' },
+      // A suggested value that mentions a type comes before the parameter's own.
+      { name: 'Picked', expression: '"a" meta [IsParameterQuery=true, List={"Type=""Number""", "b"}, DefaultValue="a", Type="Text", IsParameterQueryRequired=true]' },
+      { name: 'When', expression: `#datetime(2026, 9, 1, 0, 0, 0)${typedMeta('DateTime')}` },
+    ],
+  },
+});
+
+/**
+ * The parameter's value as written, before its meta record.
+ * @param {import('../src/transform/model.js').ModelBim['model']} model
+ * @param {string} name
+ */
+const literal = (model, name) => String(model.expressions?.find((e) => e.name === name)?.expression).split(' meta [')[0];
+
+test('template: each parameter is written as the type it declares, and keeps its meta record', () => {
+  /** @type {[string, import('../src/transform/template.js').ParameterValue | null, string][]} */
+  const cases = [
+    ['Weeks', 6, '6'],
+    ['Weeks', '8', '8'],
+    ['Weeks', ' 2.50 ', '2.5'],
+    ['Weeks', '1e3', '1000'],
+    ['Weeks', -1.5, '-1.5'],
+    ['Weeks', 0.025, '0.025'],
+    ['Since', '2026-10-01', '#date(2026, 10, 1)'],
+    ['Since', '2028-02-29', '#date(2028, 2, 29)'],
+    ['On', false, 'false'],
+    ['On', 'true', 'true'],
+    ['Id', 'p-1', '"p-1"'],
+    ['Id', 'say "hi"', '"say ""hi"""'],
+    ['Id', '', '""'],
+    ['Id', null, '""'],
+    ['Id', 5, '"5"'],
+    ['Anything', 5, '"5"'],
+    ['Untyped', 'y', '"y"'],
+    ['Picked', 'b', '"b"'],
+  ];
+  for (const [name, value, want] of cases) {
+    const model = typedModel().model;
+    const before = String(model.expressions?.find((e) => e.name === name)?.expression);
+    applyEntry(model, { parameters: { [name]: /** @type {any} */ (value) } });
+    const after = String(model.expressions?.find((e) => e.name === name)?.expression);
+    assert.equal(literal(model, name), want, `${name} = ${JSON.stringify(value)}`);
+    assert.equal(after.slice(after.indexOf(' meta [')), before.slice(before.indexOf(' meta [')), `${name}: the meta record is kept`);
+  }
+});
+
+test("template: a value that doesn't fit its parameter's type fails, and so does a type the installer can't write", () => {
+  /** @type {[string, unknown, string][]} */
+  const cases = [
+    ['Weeks', 'abc', 'not "abc"'],
+    ['Weeks', '', 'not ""'],
+    ['Weeks', '1,5', 'not "1,5"'],
+    ['Weeks', null, 'not null'],
+    ['Weeks', NaN, 'not NaN'],
+    ['Weeks', Infinity, 'not Infinity'],
+    ['Weeks', true, 'not true'],
+  ];
+  for (const [name, value, shown] of cases) {
+    assert.throws(() => applyEntry(typedModel().model, { parameters: { [name]: /** @type {any} */ (value) } }), {
+      message: `"Weeks" is a Number parameter, so its value must be a number, ${shown}.`,
+    });
+  }
+  for (const value of ['2026-02-30', '2026-9-1', '2026-09-01T00:00:00', '01/09/2026', '', 20260901, null]) {
+    assert.throws(() => applyEntry(typedModel().model, { parameters: { Since: /** @type {any} */ (value) } }), /^Error: "Since" is a Date parameter, so its value must be a date written yyyy-mm-dd, not /, String(value));
+  }
+  for (const value of ['yes', 'True', 1, '']) {
+    assert.throws(() => applyEntry(typedModel().model, { parameters: { On: /** @type {any} */ (value) } }), /^Error: "On" is a Logical parameter, so its value must be true or false, not /, String(value));
+  }
+  assert.throws(() => applyEntry(typedModel().model, { parameters: { When: '2026-09-01' } }), { message: `"When" is a DateTime parameter, which the installer can't set.` });
+  assert.throws(() => applyEntry(typedModel().model, { parameters: { Nope: 1 } }), { message: 'The model has no "Nope" parameter.' });
+});
+
+test("template: fillTemplate writes typed values to the model and to UnappliedChanges' copies", () => {
+  const queries = [
+    { name: 'Weeks', text: `4${typedMeta('Number')}`, loadEnabled: false },
+    { name: 'Since', text: [`#date(2026, 9, 1)${typedMeta('Date')}`] },
+    { name: 'Id', text: `""${typedMeta('Text')}` },
+  ];
+  const pbit = zipOf({
+    DataModelSchema: { data: utf16(JSON.stringify(typedModel(), null, 2)), deflate: true },
+    UnappliedChanges: { data: utf16(JSON.stringify({ queries, firstLoad: false })), deflate: true },
+  });
+  const filled = fillTemplate(pbit, { parameters: { Weeks: 6, Since: '2026-10-01', Id: 'p-1' } });
+  const model = readTemplateModel(filled).model;
+  assert.deepEqual(['Weeks', 'Since', 'Id'].map((name) => literal(model, name)), ['6', '#date(2026, 10, 1)', '"p-1"']);
+  const doc = JSON.parse(decodeText(readZipEntry(filled, 'UnappliedChanges')));
+  assert.deepEqual(doc.queries, [
+    { name: 'Weeks', text: `6${typedMeta('Number')}`, loadEnabled: false },
+    { name: 'Since', text: [`#date(2026, 10, 1)${typedMeta('Date')}`] },
+    { name: 'Id', text: `"p-1"${typedMeta('Text')}` },
+  ]);
+  assertConsistent(filled);
+});
+
+test('template: every SharePoint template parameter the installer sets is text, so each is quoted as before', () => {
+  const model = readTemplateModel(readFileSync(PAX_TEMPLATE)).model;
+  const names = Object.values(/** @type {Record<string, string>} */ (PRODUCT.pax.parameters));
+  assert.ok(names.length > 0);
+  for (const name of names) {
+    const expr = model.expressions?.find((e) => e.name === name);
+    const text = Array.isArray(expr?.expression) ? expr.expression.join('\n') : String(expr?.expression);
+    assert.match(text, / meta \[[^\]]*\bType="Text"/, name);
+  }
 });

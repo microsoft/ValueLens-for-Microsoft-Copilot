@@ -991,6 +991,17 @@ test('pax local: task.ps1 registers the task with limited rights and the run lim
   assert.equal(Number(hours[1]) * 60 * 60_000, RUN_LIMIT_MS);
 });
 
+test("pax local: the refresh's own time budget stops a long load well inside the task's run limit", () => {
+  const body = readFileSync(join(RUNNER_DIR, 'refresh.ps1'), 'utf8');
+  const budget = /^\s*runHours\s*=\s*(\d+)\s*$/m.exec(body);
+  assert.ok(budget, "refresh.ps1 has no default runHours");
+  // The budget is checked before each window, so a window that starts just inside it needs room to finish.
+  assert.ok(Number(budget[1]) * 60 * 60_000 <= RUN_LIMIT_MS - 2 * 60 * 60_000, `runHours ${budget[1]}`);
+  // The installer leaves the window size and the budget to refresh.ps1's defaults, so an admin's own values in refresh.json survive a repair.
+  const cfg = refreshConfig(paxConfig());
+  assert.ok(!('windowDays' in cfg) && !('runHours' in cfg));
+});
+
 test("pax local: the task's name and start time pass task.ps1's checks", () => {
   const body = readFileSync(TASK_PS1, 'utf8');
   const at = /\[ValidatePattern\('([^']+)'\)\] \[string\]\$At = '([^']+)'/.exec(body);

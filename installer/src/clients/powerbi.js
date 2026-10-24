@@ -39,6 +39,8 @@ export function powerBiApi(http) {
      * @param {{ identifier: string, principalType: 'User' | 'Group' | 'App', datasetUserAccessRight: 'Read' | 'ReadExplore' | 'ReadReshare' | 'ReadReshareExplore' }} body
      */
     addDatasetUser: (workspaceId, datasetId, body) => http.post(`/groups/${workspaceId}/datasets/${datasetId}/users`, body),
+    /** The model's refresh schedule: enabled, days, times and time zone. @param {string} workspaceId @param {string} datasetId @returns {Promise<any>} */
+    refreshSchedule: (workspaceId, datasetId) => http.get(`/groups/${workspaceId}/datasets/${datasetId}/refreshSchedule`),
     /** @param {string} workspaceId @param {string} datasetId @param {any} body */
     setRefreshSchedule: (workspaceId, datasetId, body) => http.patch(`/groups/${workspaceId}/datasets/${datasetId}/refreshSchedule`, body),
     /** @param {string} gatewayId @param {string} datasourceId @param {any} body */

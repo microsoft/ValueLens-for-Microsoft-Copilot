@@ -19,7 +19,8 @@
   Windows Credential Manager.
 
 .PARAMETER Days
-  Lookback window in days. Used to derive the PAX start/end date range.
+  Lookback window in days, ending today. Used to derive the PAX start/end date range.
+  Ignored when -StartDate and -EndDate are given.
 
 .PARAMETER WorkRoot
   Working directory. Holds the downloaded PAX release cache and processed CSVs.
@@ -123,6 +124,15 @@
   Passes PAX -SkipVersionCheck, which skips PAX's check for a newer release. For scheduled
   runs on a pinned release.
 
+.PARAMETER StartDate
+  First day to export, as yyyy-MM-dd. Use it with -EndDate instead of -Days, for example to
+  load a long history in shorter windows. PAX reads each date as midnight UTC.
+
+.PARAMETER EndDate
+  The day after the last day to export, as yyyy-MM-dd: PAX reads up to, but not including,
+  this date. So windows that share a date (2026-09-01 to 2026-09-08, then 2026-09-08 to
+  2026-09-15) meet with no gap and no overlap.
+
 .EXAMPLE
   .\Run-PAX-AIBV.ps1 -TenantId <guid> -ClientId <guid>
 
@@ -174,7 +184,9 @@ param(
   [switch]$ForcePaxDownload,
   [string]$PaxSha256,
   [string]$AppendUserInfo,
-  [switch]$SkipVersionCheck
+  [switch]$SkipVersionCheck,
+  [string]$StartDate,
+  [string]$EndDate
 )
 
 $ErrorActionPreference = 'Stop'
@@ -205,6 +217,45 @@ if ($PaxSha256) {
 
 if ($AppendUserInfo -and -not $IncludeUserInfo) {
   throw "-AppendUserInfo merges the Users file, so it can't be used with -IncludeUserInfo:`$false."
+}
+
+$Invariant = [System.Globalization.CultureInfo]::InvariantCulture
+if ($StartDate -or $EndDate) {
+  if (-not ($StartDate -and $EndDate)) {
+    throw "-StartDate and -EndDate go together. Pass both, as yyyy-MM-dd, or neither to use -Days."
+  }
+  $windowFrom = [datetime]::MinValue
+  $windowTo = [datetime]::MinValue
+  if (-not [datetime]::TryParseExact($StartDate, 'yyyy-MM-dd', $Invariant, [System.Globalization.DateTimeStyles]::None, [ref]$windowFrom)) {
+    throw "-StartDate must be a date as yyyy-MM-dd, such as 2026-09-01. Got '$StartDate'."
+  }
+  if (-not [datetime]::TryParseExact($EndDate, 'yyyy-MM-dd', $Invariant, [System.Globalization.DateTimeStyles]::None, [ref]$windowTo)) {
+    throw "-EndDate must be a date as yyyy-MM-dd, such as 2026-09-08. Got '$EndDate'."
+  }
+  if ($windowTo -le $windowFrom) {
+    throw "-EndDate must be after -StartDate. PAX reads up to, but not including, -EndDate."
+  }
+  $Days = [int]($windowTo - $windowFrom).TotalDays
+}
+
+# PAX exits 0 when its rollup step fails (it only acts on that under -Dashboard AISID), so this
+# script reads PAX's log too. These are the lines PAX writes when the rollup fails.
+$RollupFailurePattern = 'Rollup: (post-processor (returned non-zero exit code|failed:)|expected (Fact|Users dim) CSV not produced)'
+
+function Find-PaxRollupFailure {
+  param([string[]]$Folders, [datetime]$Since)
+  foreach ($folder in @($Folders | Where-Object { $_ } | Select-Object -Unique)) {
+    if (-not (Test-Path -LiteralPath $folder -PathType Container)) { continue }
+    $logs = Get-ChildItem -LiteralPath $folder -Filter '*.log' -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.LastWriteTime -ge $Since } | Sort-Object LastWriteTime -Descending
+    foreach ($log in $logs) {
+      $hit = Select-String -LiteralPath $log.FullName -Pattern $RollupFailurePattern -List -ErrorAction SilentlyContinue
+      if ($hit) {
+        return [pscustomobject]@{ Line = $hit.Line.Substring($hit.Matches[0].Index).Trim(); Log = $log.FullName }
+      }
+    }
+  }
+  return $null
 }
 
 function Resolve-Secret {
@@ -390,8 +441,11 @@ if ($Auth -eq 'AppRegistration') {
 } elseif ($ClientSecret) {
   $secret = $ClientSecret
 }
-$StartDate = (Get-Date).AddDays(-$Days).ToString('yyyy-MM-dd')
-$EndDate = (Get-Date).ToString('yyyy-MM-dd')
+if (-not $StartDate) {
+  $today = (Get-Date).Date
+  $StartDate = $today.AddDays(-$Days).ToString('yyyy-MM-dd', $Invariant)
+  $EndDate = $today.ToString('yyyy-MM-dd', $Invariant)
+}
 
 $pax = Get-PaxReleaseScript -ReleaseTag $PaxReleaseTag -CacheRoot $PaxCacheRoot -Sha256 $PaxSha256 -ForceDownload:$ForcePaxDownload
 $paxDashboard = Get-PaxDashboardValue -ScriptPath $pax.Path
@@ -505,17 +559,26 @@ if (-not $?) {
   throw "PAX failed."
 }
 
+# A run's own files only: processed\ is reused across runs. Allow for coarse file times.
+$freshSince = $paxStart.AddSeconds(-2)
+$logFolders = @($OutDir) + @($appendTarget, $appendUsersTarget | Where-Object { $_ } | ForEach-Object { Split-Path -Parent $_ })
+$rollupFailure = Find-PaxRollupFailure -Folders $logFolders -Since $freshSince
+if ($rollupFailure) {
+  throw ("PAX's rollup step failed, though PAX exited 0: {0} PAX's log: {1}" -f $rollupFailure.Line, $rollupFailure.Log)
+}
+
 $paxElapsed = (Get-Date) - $paxStart
 Write-Host ("==> PAX finished in {0:N1} min" -f $paxElapsed.TotalMinutes) -ForegroundColor Green
 
-# An append run's output is its target. Otherwise take the newest file in the processed folder.
+# An append run's output is its target. Otherwise take the newest file this run wrote.
 if ($appendTarget) {
   $interactions = Get-Item -LiteralPath $appendTarget -ErrorAction SilentlyContinue
   if (-not $interactions) { throw "The interactions file $appendTarget is missing after the run." }
 } else {
   $interactions = Get-ChildItem $OutDir -Filter '*_Interactions*.csv' |
+    Where-Object { $_.LastWriteTime -ge $freshSince } |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
-  if (-not $interactions) { throw "No rollup interactions CSV found in $OutDir." }
+  if (-not $interactions) { throw "PAX wrote no rollup interactions CSV to $OutDir this run. PAX's log there says why." }
 }
 $users = $null
 if ($appendUsersTarget) {
@@ -523,11 +586,14 @@ if ($appendUsersTarget) {
   if (-not $users) { throw "The users file $appendUsersTarget is missing after the run." }
 } elseif ($IncludeUserInfo) {
   $users = Get-ChildItem $OutDir -Filter '*_Users*.csv' |
+    Where-Object { $_.LastWriteTime -ge $freshSince } |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
-  if (-not $users) { throw "No rollup users CSV found in $OutDir." }
+  if (-not $users) { throw "PAX wrote no rollup users CSV to $OutDir this run. PAX's log there says why." }
 }
 
-# PAX leaves an append target as it was when its merge fails, and still exits cleanly.
+# PAX leaves an append target untouched when it has nothing to add, or when the target is too old
+# to merge into safely (it then writes this run's rows to a new file beside it). Its merge failures
+# exit 40, which stops this script above.
 foreach ($target in @($(if ($appendTarget) { $interactions }), $(if ($appendUsersTarget) { $users })) | Where-Object { $_ }) {
   if ($target.LastWriteTime -lt $paxStart) {
     Write-Warning ("PAX didn't update {0} this run, so it still holds the earlier data. PAX's log next to it says why." -f $target.FullName)

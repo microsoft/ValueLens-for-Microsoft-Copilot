@@ -35,7 +35,10 @@ export const MIN_PYTHON = Object.freeze([3, 10]);
 export const TASK_AT = '02:00';
 /** How many days of activity the first refresh asks PAX for. */
 export const SEED_DAYS = 30;
-/** The longest a refresh may run, as task.ps1 sets it: the first on a large tenant reads a month of activity. */
+/**
+ * The longest a refresh may run, as task.ps1 sets it. refresh.ps1 reads a long load in windows and
+ * stops between them before its own runHours budget runs out, so the next run carries on.
+ */
 export const RUN_LIMIT_MS = 12 * 60 * 60_000;
 
 export const PWSH_INSTALL = 'winget install --id Microsoft.PowerShell --source winget';

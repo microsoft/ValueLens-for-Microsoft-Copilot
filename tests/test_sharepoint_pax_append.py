@@ -18,6 +18,7 @@ import subprocess
 import tempfile
 import time
 import unittest
+from datetime import date
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -83,6 +84,17 @@ foreach ($key in $PSBoundParameters.Keys) {
 }
 $bound['HasSecret'] = [bool]$ClientSecret
 $bound | ConvertTo-Json | Set-Content -LiteralPath $env:PAX_STUB_LOG -Encoding utf8
+if ($env:PAX_STUB_MODE -eq 'no-output') { exit 0 }
+if ($env:PAX_STUB_MODE -eq 'rollup-fail') {
+  # PAX logs a failed rollup and still exits 0. Its log sits beside the append target, or in
+  # the output folder on a seed run; a seed run can leave a partial interactions file.
+  $logDir = if ($AppendFile) { Split-Path -Parent $AppendFile } else { $OutputPath }
+  Set-Content -LiteralPath (Join-Path $logDir 'Purview_Audit_UsageActivity_CopilotInteraction_stub.log') -Value @(
+    '[2026-10-24 10:00:00] [INFO] Rollup: running the post-processor.',
+    '[2026-10-24 10:00:01] [ERROR] Rollup: post-processor returned non-zero exit code 1. Raw CSV(s) preserved.')
+  if ($OutputPath) { Set-Content -LiteralPath (Join-Path $OutputPath 'Purview_Stub_Interactions.csv') -Value 'Message_Id_Raw' }
+  exit 0
+}
 if ($env:PAX_STUB_SKIP_MERGE -ne '1') {
   if ($AppendFile) { Add-Content -LiteralPath $AppendFile -Value 'merged' }
   if ($AppendUserInfo) { Add-Content -LiteralPath $AppendUserInfo -Value 'merged' }
@@ -125,6 +137,7 @@ foreach ($case in (Get-Content -LiteralPath $CasesPath -Raw -Encoding UTF8 | Con
   $global:Calls = [System.Collections.Generic.List[object]]::new()
   $env:PAX_STUB_LOG = $case.stubLog
   $env:PAX_STUB_SKIP_MERGE = if ($case.skipMerge) { '1' } else { '0' }
+  $env:PAX_STUB_MODE = [string]$case.stubMode
   $params = @{}
   foreach ($prop in $case.args.PSObject.Properties) { $params[$prop.Name] = $prop.Value }
   $text = [System.Text.StringBuilder]::new()
@@ -203,6 +216,7 @@ class ScriptBehaviourTests(unittest.TestCase):
                 "args": {**base, **(args or {})},
                 "stubLog": str(root / "stub-bound.json"),
                 "skipMerge": False,
+                "stubMode": "",
                 "github": "offline",
                 "download": "offline",
                 "tag": TAG,
@@ -243,6 +257,33 @@ class ScriptBehaviourTests(unittest.TestCase):
         add("bad_sha", args={"PaxSha256": "abc"})
         add("sha_with_latest", args={"PaxReleaseTag": "latest"})
         add("users_append_without_users", args={"AppendUserInfo": "cumulative_Users.csv", "IncludeUserInfo": False})
+        add("dates_start_only", args={"StartDate": "2026-09-01"})
+        add("dates_bad_format", args={"StartDate": "01/09/2026", "EndDate": "2026-09-08"})
+        add("dates_end_not_after_start", args={"StartDate": "2026-09-08", "EndDate": "2026-09-08"})
+        add("explicit_dates", args={"StartDate": "2026-09-01", "EndDate": "2026-09-08", "Days": 30})
+
+        add("rollup_fail_seed", stubMode="rollup-fail")
+        root = add("rollup_fail_append", stubMode="rollup-fail")
+        data = root / "data"
+        data.mkdir()
+        for leaf in ("cumulative_Interactions.csv", "cumulative_Users.csv"):
+            (data / leaf).write_text("header\n", encoding="utf-8")
+        cls.cases["rollup_fail_append"]["case"]["args"].update({
+            "AppendFile": str(data / "cumulative_Interactions.csv"),
+            "AppendUserInfo": str(data / "cumulative_Users.csv"),
+        })
+
+        # An earlier run's failed-rollup log and outputs are left alone.
+        root = add("earlier_failure_log_ignored")
+        old_log = root / "work" / "processed" / "Purview_Audit_old.log"
+        old_log.write_text("[2026-10-01 10:00:01] [ERROR] Rollup: post-processor failed: old\n", encoding="utf-8")
+        os.utime(old_log, (hour_ago, hour_ago))
+        root = add("earlier_outputs_not_picked", stubMode="no-output")
+        for leaf in ("Purview_Old_Interactions.csv", "EntraUsers_Old_Users.csv"):
+            old = root / "work" / "processed" / leaf
+            old.write_text("old\n", encoding="utf-8")
+            os.utime(old, (hour_ago, hour_ago))
+
         add("cached_mismatch_redownloads", cache="tampered", github="release", download="good")
         add("download_mismatch_stops", cache=None, github="release", download="bad")
         add("cache_mismatch_offline_stops", cache="tampered")
@@ -318,6 +359,43 @@ class ScriptBehaviourTests(unittest.TestCase):
         self.assertIsNone(manifest["append_file"])
         self.assertIsNone(manifest["append_user_info"])
         self.assertEqual(manifest["pax_sha256"], self.sha)
+        start, end = (date.fromisoformat(bound[k]) for k in ("StartDate", "EndDate"))
+        self.assertEqual((end - start).days, 30)
+        self.assertEqual(manifest["window_days"], 30)
+
+    def test_explicit_dates_go_to_pax_and_set_the_window(self):
+        self.assertRan("explicit_dates")
+        bound = self.bound("explicit_dates")
+        self.assertEqual((bound["StartDate"], bound["EndDate"]), ("2026-09-01", "2026-09-08"))
+        manifest = self.manifest("explicit_dates")
+        self.assertEqual((manifest["window_start"], manifest["window_end"]), ("2026-09-01", "2026-09-08"))
+        self.assertEqual(manifest["window_days"], 7)
+
+    def test_a_failed_rollup_stops_the_run_though_pax_exits_0(self):
+        logs = {"rollup_fail_seed": self.cases["rollup_fail_seed"]["processed"],
+                "rollup_fail_append": self.cases["rollup_fail_append"]["root"] / "data"}
+        for name, folder in logs.items():
+            with self.subTest(name):
+                res = self.result(name)
+                self.assertIsNotNone(res["error"], res["output"])
+                self.assertIn("PAX's rollup step failed, though PAX exited 0: Rollup: post-processor returned "
+                              "non-zero exit code 1. Raw CSV(s) preserved.", res["error"])
+                self.assertNotIn("[ERROR]", res["error"])
+                log = res["error"].split("PAX's log: ", 1)[1].strip()
+                self.assertTrue(_same(log, folder / "Purview_Audit_UsageActivity_CopilotInteraction_stub.log"))
+                self.assertIsNone(self.manifest(name))
+                self.assertNotIn("PAX finished", res["output"])
+
+    def test_an_earlier_runs_failure_log_is_not_read(self):
+        self.assertRan("earlier_failure_log_ignored")
+        self.assertIsNotNone(self.manifest("earlier_failure_log_ignored"))
+
+    def test_an_earlier_runs_outputs_are_never_taken_for_this_runs(self):
+        res = self.result("earlier_outputs_not_picked")
+        self.assertIsNotNone(res["error"])
+        self.assertIn("PAX wrote no rollup interactions CSV to", res["error"])
+        self.assertIn("this run", res["error"])
+        self.assertIsNone(self.manifest("earlier_outputs_not_picked"))
 
     def test_pinned_cache_is_used_without_github(self):
         self.assertRan("seed")
@@ -359,6 +437,9 @@ class ScriptBehaviourTests(unittest.TestCase):
             "bad_sha": "-PaxSha256 must be 64 hex characters",
             "sha_with_latest": "-PaxSha256 needs a fixed -PaxReleaseTag",
             "users_append_without_users": "-AppendUserInfo merges the Users file",
+            "dates_start_only": "-StartDate and -EndDate go together",
+            "dates_bad_format": "-StartDate must be a date as yyyy-MM-dd",
+            "dates_end_not_after_start": "-EndDate must be after -StartDate",
         }
         for name, message in expected.items():
             with self.subTest(name):

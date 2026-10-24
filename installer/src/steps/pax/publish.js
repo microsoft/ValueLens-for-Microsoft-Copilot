@@ -35,7 +35,7 @@ import { deployReport } from '../report.js';
  * @typedef {object} PaxProduct
  * @property {Record<string, string>} files
  * @property {Record<string, string>} parameters
- * @property {(config: InstallConfig) => Record<string, unknown>} [values]  More template values from the install record. A site, folder or file value of the same name wins.
+ * @property {(config: InstallConfig) => Record<string, unknown>} [values]  More template values from the install record. Numbers and true or false keep their type, null is blank, and anything else becomes text. Each is written as the type its parameter declares. A site, folder or file value of the same name wins.
  * @property {Record<string, string | { file: string }>} [expressions]  Whole queries to replace: M text, or a UTF-8 file beside the template.
  * @property {string} [privacyLevel]  The privacy level for the model's SharePoint sign-in. None by default.
  */
@@ -95,9 +95,11 @@ export function paxEntry(config, template, pax = PAX) {
   const sp = config.sharePoint;
   if (!sp?.folderUrl || !sp.siteUrl) throw new Error('The install record has no SharePoint folder yet. Run the installer to choose one.');
   const files = pax.files;
-  /** @type {Record<string, string>} */
+  /** @type {ModelEntry['parameters']} */
   const parameters = {};
-  for (const [name, value] of Object.entries(pax.values?.(config) ?? {})) parameters[name] = String(value ?? '');
+  for (const [name, value] of Object.entries(pax.values?.(config) ?? {})) {
+    parameters[name] = typeof value === 'number' || typeof value === 'boolean' ? value : String(value ?? '');
+  }
   for (const [key, name] of Object.entries(pax.parameters)) {
     if (key === 'site') parameters[name] = sp.siteUrl;
     else if (key === 'folder') parameters[name] = sp.folderUrl;
@@ -561,6 +563,36 @@ export async function setPaxSchedule(ctx) {
   return true;
 }
 
+/** When Power BI turns a model's daily refresh off by itself. */
+export const SCHEDULE_OFF_WHY =
+  'Power BI turns it off after four failed refreshes in a row or an error that needs a fix, such as an expired sign-in, and pauses it when no one has opened the report for two months.';
+
+/**
+ * Turns the model's daily refresh back on when Power BI has turned it off. It runs after a refresh
+ * that worked, so a schedule that would only fail again stays off. Reading the schedule can fail
+ * without failing the refresh.
+ * @param {Ctx} ctx
+ * @returns {Promise<boolean>}  Whether it turned the schedule back on.
+ */
+export async function resumePaxSchedule(ctx) {
+  const { ui, config, api } = ctx;
+  const sm = config.semanticModel;
+  const ws = config.fabric.workspaceId;
+  if (!sm.id || !ws || powerBiOf(config).credentials !== 'set') return false;
+  /** @type {any} */
+  let schedule;
+  try {
+    schedule = await api.powerBi.refreshSchedule(ws, sm.id);
+  } catch (err) {
+    if (!(err instanceof HttpError)) throw err;
+    ui.warn(`Couldn't read ${sm.name}'s refresh schedule, so couldn't check it's on: ${errorText(err).slice(0, 300)}`);
+    return false;
+  }
+  if (schedule?.enabled !== false) return false;
+  ui.info(`Power BI had turned ${sm.name}'s daily refresh off. ${SCHEDULE_OFF_WHY} This refresh worked, so the installer turns it back on.`);
+  return setPaxSchedule(ctx);
+}
+
 /**
  * A refresh's state from Power BI's history: `Unknown` while it runs, so its extended status then.
  * @param {any} r
@@ -662,7 +694,8 @@ export async function refreshPaxModel(ctx, opts = {}) {
 /**
  * Refreshes the model and checks it answers queries. A refresh that fails to sign in to
  * SharePoint asks for the sign-in again, once. Once it's signed in, it schedules the daily
- * refresh: again after a new sign-in, as Power BI can turn the schedule off while refreshes fail.
+ * refresh: again after a new sign-in, or after a refresh that worked when Power BI has turned the
+ * schedule off.
  * @param {Ctx} ctx
  * @param {{ wait?: boolean }} [opts]
  * @returns {Promise<PaxRefreshResult>}
@@ -676,6 +709,7 @@ export async function loadPaxModel(ctx, opts = {}) {
     if (signedIn) r = await refreshPaxModel(ctx, opts);
   }
   if (!r.credentials && (signedIn || !pbi.refreshAt)) await setPaxSchedule(ctx);
+  else if (r.ok && r.status === 'Completed' && pbi.refreshAt) await resumePaxSchedule(ctx);
   if (r.ok && r.status === 'Completed') {
     const check = await verifyModel(ctx);
     if (!check.ok) return { ...r, ok: false };
