@@ -97,6 +97,12 @@ const COMMANDS = {
     desc: 'Send CSV exports from the admin centers to the Lakehouse drop folder. The next pipeline run loads them.',
     off: 'No source is set to Upload CSV. Choose Repair or change set-up to change that.',
   },
+  'deploy-app': {
+    title: 'Deploy the app', short: 'Deploy app', icon: 'app', section: 'The app',
+    row: 'Deploy the app', button: 'Deploy',
+    desc: `Deploy the ${PRODUCT_NAME} app to Power Platform as a Copilot managed app and share it with the viewer group. If the tenant isn't ready for managed apps, it says what a Power Platform admin turns on.`,
+    off: 'Nothing is installed yet.',
+  },
   uninstall: {
     title: `Uninstall ${PRODUCT_NAME}`, short: 'Uninstall', icon: 'x', section: 'Uninstall', adopt: true,
     row: 'Uninstall', button: 'Uninstall',
@@ -109,17 +115,56 @@ const COMMANDS = {
     desc: 'See which roles, licences, capacities and Azure access you have and which are missing. Changes nothing.',
   },
 };
-const ROW_ORDER = ['run', 'rerun-failed', 'refresh', 'status', 'upload', 'check', 'update', 'access', 'rotate-secret', 'uninstall', 'install'];
+// The PAX + SharePoint route's words, where they differ from the Fabric route's.
+const PAX_TEXT = {
+  run: {
+    title: 'Run the refresh', section: 'Refresh run',
+    desc: 'Start the scheduled refresh on this PC now: PAX reads the audit log and Entra, the CSV files in SharePoint are updated, then the report refreshes.',
+    off: 'The scheduled refresh isn\'t set up yet.',
+  },
+  refresh: { desc: 'Refresh the report\'s semantic model from the files in SharePoint now.' },
+  status: {
+    desc: 'The scheduled refresh and its last run, the client secret, the SharePoint folder and the model\'s last refresh. Changes nothing.',
+    off: 'The scheduled refresh isn\'t set up yet.',
+  },
+  check: {
+    title: 'Check the folder', short: 'Check folder', section: 'Folder check',
+    row: 'Check the SharePoint folder', button: 'Check the folder',
+    desc: 'Check that the app registration can write to the SharePoint folder. If it can\'t, see what an admin runs to give it access.',
+    off: 'The scheduled refresh isn\'t set up yet.',
+  },
+  update: {
+    desc: 'Write the refresh\'s scripts and task on this PC again, publish the report again and deploy the app if its build changed. Each step keeps what\'s already right.',
+    off: 'The scheduled refresh isn\'t set up yet.',
+  },
+  'rotate-secret': {
+    title: 'Create a new secret', short: 'New secret', section: 'New secret',
+    row: 'Create a new client secret', button: 'Create new secret',
+    desc: 'Replace the app registration\'s client secret in Windows Credential Manager on this PC, which the scheduled refresh signs in with.',
+    off: 'The scheduled refresh isn\'t set up yet.',
+  },
+  'deploy-app': { off: 'The scheduled refresh isn\'t set up yet.' },
+  uninstall: {
+    desc: 'Remove the scheduled refresh and its files from this PC, the app, the app registration\'s access to the SharePoint site and the report. It asks before it deletes a workspace, the model or the app registration. The files in SharePoint stay.',
+  },
+};
+/** A command's words on a route: the Fabric route's, with the PAX route's where they differ. */
+const commandFor = (cmd, route) => (route === 'pax' && PAX_TEXT[cmd] ? { ...COMMANDS[cmd], ...PAX_TEXT[cmd] } : COMMANDS[cmd]);
+const ROW_ORDER = ['run', 'rerun-failed', 'refresh', 'status', 'upload', 'check', 'update', 'deploy-app', 'access', 'rotate-secret', 'uninstall', 'install'];
+// Rows a route doesn't have. Until the Fabric route deploys the app too, its page has no Deploy the app row.
+const HIDDEN_ROWS = { fabric: new Set(['deploy-app']), pax: new Set(['rerun-failed', 'upload']) };
 
-// The install's stages in the order the installer prints them. Other headings (the target question,
-// Advanced settings, Who can view, Schedule...) slot in as they come.
+// The install's stages in the order the installer prints them, on either route. Other headings (the route
+// question, Advanced settings, Who can view, Schedule...) slot in as they come.
 const INSTALL_STAGES = [
-  'Sign in', 'Checking your tenant', 'Data sources', 'Power BI', 'Fabric', 'App registration',
-  'Key Vault for the app secret', 'Ready to set up', 'Setting up', 'Done',
+  'Sign in', 'Checking your tenant', 'Checking this PC', 'Data sources', 'What it collects', 'Power BI', 'Fabric',
+  'Where the files go', 'The app', 'App registration', 'Key Vault for the app secret', 'Ready to set up', 'Setting up', 'Done',
 ];
-// Stages only one target has. The rail shows the chosen target's; the record's target, else Fabric, until one is entered.
+// Stages only one route has. The rail shows the chosen route's: the record's route, else Fabric, until the
+// route question is answered or one of these is entered.
 const TARGET_STAGES = {
-  fabric: new Set(['Data sources', 'Fabric', 'App registration', 'Key Vault for the app secret']),
+  fabric: new Set(['Data sources', 'Power BI', 'Fabric', 'Key Vault for the app secret']),
+  pax: new Set(['Checking this PC', 'What it collects', 'Where the files go', 'The app']),
 };
 const stageTarget = (title) => Object.keys(TARGET_STAGES).find((k) => TARGET_STAGES[k].has(title));
 const applies = (run, s) => !s.only || s.only === run.platform;
@@ -135,12 +180,28 @@ const WAITING = {
   'device-code': 'Getting a sign-in code.',
   'azure-cli': 'Using your Azure CLI sign-in.',
 };
-const NEEDS = [
-  'An active Fabric capacity (F2 or larger, or a trial) you can assign workspaces to, or a workspace where you\'re an Admin or Member.',
-  'Optional: an Azure subscription where you can create a Key Vault, or a vault you can read secrets from. By default on Fabric, the app\'s client secret goes in the notebooks instead, where anyone with a role in the workspace can read it.',
-  'Permission to register apps in Entra, or an app registration you already have. If you have neither, you get an admin pack to send an admin.',
-  'A Global Administrator or Privileged Role Administrator to grant admin consent. If that isn\'t you, you get a link to send them.',
-];
+// What each route needs, for the Prerequisites panel before sign-in.
+const NEEDS = {
+  fabric: [
+    'An active Fabric capacity (F2 or larger, or a trial) you can assign workspaces to, or a workspace where you\'re an Admin or Member.',
+    'Optional: an Azure subscription where you can create a Key Vault, or a vault you can read secrets from. By default on Fabric, the app\'s client secret goes in the notebooks instead, where anyone with a role in the workspace can read it.',
+    'Permission to register apps in Entra, or an app registration you already have. If you have neither, you get an admin pack to send an admin.',
+    'A Global Administrator or Privileged Role Administrator to grant admin consent. If that isn\'t you, you get a link to send them.',
+  ],
+  pax: [
+    'A Windows PC that\'s on each day, with PowerShell 7.2 or later and Python 3.10 or later. The refresh runs there, as you.',
+    'A folder in a SharePoint document library for the CSV files, and a SharePoint or Global Administrator to give the app registration access to that one site if you can\'t.',
+    'A Power BI Pro or Premium Per User licence, to publish and share the report. In a workspace without a capacity, everyone who opens the report needs one too.',
+    'Permission to register apps in Entra, or an app registration you already have. If you have neither, you get an admin pack to send an admin.',
+    'A Global Administrator or Privileged Role Administrator to grant admin consent. If that isn\'t you, you get a link to send them.',
+    `For the app: managed apps turned on in Power Platform (app creation with the managed apps CLI, and external artifacts). Without them, setup finishes at the report and says what a Power Platform admin turns on. Each person who opens the app needs Power Apps Premium or Copilot Credits.`,
+  ],
+};
+const ROUTE_NAMES = { fabric: 'Fabric', pax: 'No Fabric: PAX + SharePoint' };
+const ROUTE_BLURBS = {
+  fabric: 'Notebooks and a pipeline in a Fabric workspace load the data each day. Needs a Fabric capacity.',
+  pax: 'A daily task on a Windows PC runs PAX and writes the data to a SharePoint folder. No Fabric.',
+};
 const launcher = () => app.state?.launcher ?? {};
 const installerName = () => launcher().command ?? PRODUCT_COMMAND;
 const installerWindow = () => launcher().window ?? 'your terminal';
@@ -428,11 +489,13 @@ function newStage(title, o = {}) {
 
 function createRun(e) {
   const cmd = e.command;
-  const title = cmd === 'install' && app.state?.record?.installed ? COMMANDS.install.row : COMMANDS[cmd].title;
+  const platform = app.state?.record?.target ?? 'fabric';
+  const words = commandFor(cmd, platform);
+  const title = cmd === 'install' && app.state?.record?.installed ? words.row : words.title;
   const run = {
     command: cmd, title, startedAt: e.at, endedAt: 0, state: 'running', error: '', phase: 'signin',
-    stages: cmd === 'install' ? INSTALL_STAGES.map((t) => newStage(t, { only: stageTarget(t) })) : [newStage('Sign in'), newStage(COMMANDS[cmd].section)],
-    platform: app.state?.record?.target ?? 'fabric',
+    stages: cmd === 'install' ? INSTALL_STAGES.map((t) => newStage(t, { only: stageTarget(t) })) : [newStage('Sign in'), newStage(words.section)],
+    platform,
     cur: null, child: null, doneTitle: '', signedIn: false, user: null, prompts: new Map(), progress: new Map(), adopted: false,
     events: [e],
   };
@@ -652,6 +715,8 @@ function apply(e) {
       if (item.kind === 'secret') for (const input of item.el?.querySelectorAll('input') ?? []) input.value = '';
       Object.assign(item, { t: 'qa', display: e.display ?? '', cancelled: !!e.cancelled, fresh: !app.replay && !reduced.matches });
       rerender(item);
+      // The route question settles which route's stages the rail shows.
+      if (run.cur?.title === 'Where it runs') run.platform = Object.keys(ROUTE_NAMES).find((k) => ROUTE_NAMES[k] === e.display) ?? run.platform;
       if (app.openPrompt === item) app.openPrompt = null;
       paintJump();
       schedule();
@@ -1482,7 +1547,10 @@ function renderHome() {
     kids.push(staleBanner(busy));
     if (running) kids.push(runningBanner());
     kids.push(h('p', { class: 'lede' },
-      `Answer a few questions and review the plan. Then the installer builds ${PRODUCT_NAME} in your tenant: an app registration with its secret in the notebooks (or, if you choose, in Key Vault), a Fabric workspace and Lakehouse, the notebooks and pipeline, and the semantic model with the ${PRODUCT_NAME} report on top.`));
+      `Answer a few questions and review the plan. Then the installer builds ${PRODUCT_NAME} in your tenant, on the route you choose:`));
+    kids.push(h('ul', { class: 'needs' },
+      h('li', null, h('strong', null, ROUTE_NAMES.fabric), `. An app registration with its secret in the notebooks (or, if you choose, in Key Vault), a Fabric workspace and Lakehouse, the notebooks and pipeline, and the semantic model with the ${PRODUCT_NAME} report on top.`),
+      h('li', null, h('strong', null, ROUTE_NAMES.pax), `. A daily task on this Windows PC runs PAX and writes the data to a SharePoint folder. The ${PRODUCT_NAME} report reads it from a Power BI workspace, and the app from Power Platform, as a Copilot managed app.`)));
     if (rec) kids.push(h('p', { class: 'hint' }, 'Your answers from last time are saved, so the questions start from them.'));
 
     const tenantInput = h('input', {
@@ -1522,29 +1590,37 @@ function renderHome() {
   const soon = days != null && days < 30;
   const firstRun = rec.firstRun ? rec.firstRun.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/ ([A-Z])/g, (_, c) => ` ${c.toLowerCase()}`) : 'Not run yet';
   const link = (text, url) => (url ? h('a', { href: url, target: '_blank', rel: 'noreferrer' }, text) : text);
+  const route = rec.target ?? 'fabric';
   const rows = [
     ['Tenant', rec.tenantId],
+    ['Route', ROUTE_NAMES[route]],
     ['Workspace', link(rec.workspace, rec.workspaceUrl)],
     ['Lakehouse', rec.lakehouse],
+    ['Files', link(rec.files, rec.filesUrl)],
     ['Collects', rec.data.join(', ')],
     ['Semantic model', rec.model ?? 'Not deployed'],
+    ['Report', rec.reportUrl ? link('Open the report', rec.reportUrl) : null],
+    ['App', link(rec.app, rec.appUrl)],
     ['Schedule', rec.schedule ?? 'Not set'],
     ['Client secret expires', rec.secretExpires ? h('span', { class: soon ? 'soon' : null }, `${rec.secretExpires} (${days < 0 ? 'expired' : `in ${days} days`})`) : 'Unknown'],
     ['First load', firstRun],
     ['Audit history', rec.historyDays ? `${rec.historyDays} days` : null],
     ['Install record', [h('div', null, st.configFile),
-      h('p', { class: 'hint' }, 'If OneDrive syncs your Documents folder, this record follows you to your other PCs.')]],
+      h('p', { class: 'hint' }, route === 'pax'
+        ? 'If OneDrive syncs your Documents folder, this record follows you to your other PCs. The scheduled refresh stays on this one.'
+        : 'If OneDrive syncs your Documents folder, this record follows you to your other PCs.')]],
   ].filter(([, v]) => v != null && v !== '');
   kids.push(h('section', { class: 'panel' },
     h('div', { class: 'panel-head' }, h('h2', null, 'Your installation'),
       rec.workspaceUrl ? h('a', { href: rec.workspaceUrl, target: '_blank', rel: 'noreferrer' }, 'Open the workspace') : null),
     h('div', { class: 'panel-body' }, h('dl', { class: 'record' }, rows.map(([k, v]) => [h('dt', null, k), h('dd', null, v)])))));
 
-  const primary = soon && rec.can['rotate-secret'] ? 'rotate-secret' : rec.firstRun !== 'Completed' && rec.can.run ? 'run' : 'status';
-  const actions = ROW_ORDER.map((cmd) => {
-    const c = COMMANDS[cmd];
+  const loading = rec.firstRun === 'Completed' || rec.firstRun === 'InProgress';
+  const primary = soon && rec.can['rotate-secret'] ? 'rotate-secret' : !loading && rec.can.run ? 'run' : 'status';
+  const actions = ROW_ORDER.filter((cmd) => !HIDDEN_ROWS[route]?.has(cmd)).map((cmd) => {
+    const c = commandFor(cmd, route);
     const can = cmd === 'install' || !!rec.can[cmd];
-    const history = cmd === 'run' && can ? historyPicker(busy) : null;
+    const history = cmd === 'run' && can ? historyPicker(busy, route) : null;
     return h('li', { class: 'row' }, icon(c.icon),
       h('div', { class: 'row-text' },
         h('span', { class: 'row-title' }, c.row),
@@ -1572,13 +1648,18 @@ const BACKFILL = [
 ];
 
 /** Run now can reload older audit history, like run --backfill-days. */
-function historyPicker(busy) {
+function historyPicker(busy, route = 'fabric') {
   const hint = h('span', { class: 'row-desc', id: 'backfill-hint' });
   const paint = () => {
     const n = Number(app.backfill || 0);
+    const pax = route === 'pax';
     hint.textContent = n >= 90
-      ? `In a large tenant, ${n} days can take several hours to load. The usual schedule carries on afterwards.`
-      : n ? 'Reloads these days and rebuilds the curated table, then runs the data check.' : '';
+      ? (pax
+        ? `In a large tenant, ${n} days can take several hours to read. Keep the installer open and this PC awake until it finishes. The daily refresh carries on afterwards.`
+        : `In a large tenant, ${n} days can take several hours to load. The usual schedule carries on afterwards.`)
+      : !n ? ''
+        : pax ? 'PAX reads these days on this PC and adds what the files in SharePoint are missing, then the report refreshes.'
+          : 'Reloads these days and rebuilds the curated table, then runs the data check.';
     hint.hidden = !n;
   };
   const sel = h('select', { id: 'backfill', class: 'field', disabled: busy, 'aria-describedby': 'backfill-hint' },
@@ -1591,34 +1672,59 @@ function historyPicker(busy) {
   return h('div', { class: 'history-pick' }, h('label', { class: 'label', for: 'backfill' }, 'Audit history'), sel, hint);
 }
 
+/** Which route the prerequisites check looks at, before anything is installed. */
+function routePicker(route, busy) {
+  return h('fieldset', { class: 'methods' },
+    h('legend', null, 'Route to check'),
+    Object.entries(ROUTE_NAMES).map(([value, name]) => {
+      const input = h('input', { type: 'radio', name: 'prereqs-route', value, checked: value === route });
+      input.addEventListener('change', () => {
+        app.prereqsTarget = value;
+        const fresh = prereqsPanel(busy);
+        input.closest('section')?.replaceWith(fresh);
+        fresh.querySelector(`input[name="prereqs-route"][value="${value}"]`)?.focus();
+      });
+      return h('label', { class: 'method' }, input,
+        h('span', { class: 'method-text' },
+          h('span', { class: 'method-name' }, name),
+          h('span', { class: 'method-desc' }, ROUTE_BLURBS[value])));
+    }));
+}
+
 /**
- * Roles, licences, capacities and Azure access: what the signed-in user has and lacks.
+ * Roles, licences and access on a route: what the signed-in user has and lacks.
  * Before sign-in it lists what's needed, with a button that signs in and checks.
  */
 function prereqsPanel(busy) {
   const st = app.state;
-  const p = st.prereqs;
+  const installed = !!st.record?.installed;
+  // Before an install the check can look at either route. After one, it looks at the record's.
+  const route = installed ? st.record.target ?? 'fabric' : app.prereqsTarget ?? st.prereqs?.target ?? 'fabric';
+  const p = st.prereqs && (st.prereqs.target ?? 'fabric') === route ? st.prereqs : null;
   const when = p ? new Date(p.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-  const button = h('button', { type: 'button', class: 'btn', disabled: busy, onclick: () => start('prereqs') },
+  const check = () => (installed ? start('prereqs') : start('prereqs', { target: route }));
+  const button = h('button', { type: 'button', class: 'btn', disabled: busy, onclick: check },
     p ? 'Check again' : st.user ? 'Check prerequisites' : 'Sign in and check');
   let body;
   if (p) {
     const counts = ['met', 'eligible', 'missing', 'unknown'].map((s) => [s, p.items.filter((i) => i.status === s).length]).filter(([, n]) => n);
     body = [
-      h('p', { class: 'hint' }, `Checked as ${p.upn} at ${when}. ${counts.map(([s, n]) => `${n} ${PREREQ_STATE[s].toLowerCase()}`).join(', ')}. Only active roles count. A role you can activate yourself in Entra (Privileged Identity Management) needs activating first.`),
+      h('p', { class: 'hint' }, `Checked the ${ROUTE_NAMES[route]} route as ${p.upn} at ${when}. ${counts.map(([s, n]) => `${n} ${PREREQ_STATE[s].toLowerCase()}`).join(', ')}. Only active roles count. A role you can activate yourself in Entra (Privileged Identity Management) needs activating first.`),
       renderPrereqs(p.items),
     ];
-  } else if (st.user) {
+  } else if (st.user && !st.prereqs) {
     body = [h('p', { class: 'hint' }, 'Checking your roles, licences and access in the background. This takes a few seconds.')];
   } else {
     body = [
-      h('p', { class: 'hint' }, 'Sign in to check which of these you have. The check only reads; it changes nothing.'),
-      h('ul', { class: 'needs' }, NEEDS.map((n) => h('li', null, n))),
+      h('p', { class: 'hint' }, st.user
+        ? `Check which of these you have for the ${ROUTE_NAMES[route]} route. The check only reads; it changes nothing.`
+        : 'Sign in to check which of these you have. The check only reads; it changes nothing.'),
+      h('ul', { class: 'needs' }, NEEDS[route].map((n) => h('li', null, n))),
     ];
   }
   return h('section', { class: 'panel' },
     h('div', { class: 'panel-head' }, h('h2', null, 'Prerequisites'), button),
-    h('div', { class: 'panel-body' }, body));
+    h('div', { class: 'panel-body' }, installed ? null : routePicker(route, busy), body));
 }
 
 /* ---------- Rendering: rail ---------- */
@@ -1675,7 +1781,7 @@ function renderRail() {
       h('button', {
         type: 'button', class: 'dest', 'data-key': 'run', 'aria-current': app.view === 'run' ? 'page' : null, onclick: () => show('run'),
       }, icon(COMMANDS[run.command].icon), h('span', { class: 'dest-text' },
-        h('span', { class: 'dest-label' }, run.command === 'install' ? run.title : COMMANDS[run.command].title),
+        h('span', { class: 'dest-label' }, run.title),
         h('span', { class: 'dest-blurb' }, blurb(run)))),
       h('ol', { class: 'stages', 'aria-label': 'Stages' }, run.stages.filter((s) => applies(run, s)).map((s) => h('li', null,
         stageButton(s),

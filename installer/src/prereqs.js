@@ -1,16 +1,21 @@
 // @ts-check
 /**
  * Read-only checks of what the signed-in user has and lacks for an install: roles, licences,
- * capacities and Azure access. Nothing here writes anything, and each check
- * reports "unknown" rather than failing when it can't be read.
+ * capacities and Azure access, or on the PAX route this PC, the SharePoint site and the app.
+ * Nothing here writes anything, and each check reports "unknown" rather than failing when it
+ * can't be read.
  */
 import { allowsAction, ROLES } from './clients/azure.js';
-import { APP_ROLES, CONSENT_ROLES, FABRIC_ADMIN_ROLE } from './clients/graph.js';
+import { APP_ROLES, CONSENT_ROLES, FABRIC_ADMIN_ROLE, POWER_PLATFORM_ADMIN_ROLE, SITE_ADMIN_ROLES } from './clients/graph.js';
 import { secretMode } from './config.js';
+import { CLI_PACKAGE_DIR } from './managed-app/cli.js';
+import { NOT_READY_NAMES, THE_APP, whyNot } from './managed-app/flow.js';
 import { PRODUCT } from './product.js';
 import { copilotLicences } from './seats.js';
 import { canWriteSecrets } from './steps/identity.js';
+import { checkHost, paxHostOf, TASK_AT } from './steps/pax/local.js';
 import { blockedSettings, runsFabric } from './steps/plan.js';
+import { isPax, paxHostProblem } from './target.js';
 
 /** @typedef {'met' | 'missing' | 'eligible' | 'unknown'} PrereqStatus */
 /**
@@ -89,16 +94,25 @@ export function azureAccess(perms) {
 }
 
 /**
- * @param {{ api: import('./install.js').Apis, user: import('./install.js').User, config: import('./config.js').InstallConfig }} ctx
+ * The checks for the record's route. With no route chosen yet, the Fabric route's.
+ * @param {{
+ *   api: import('./install.js').Apis,
+ *   user: import('./install.js').User,
+ *   config: import('./config.js').InstallConfig,
+ *   sources?: import('./sources.js').Sources,
+ *   paxHost?: import('./steps/pax/local.js').PaxHost,
+ * }} ctx  sources and paxHost: what the PAX route's checks read.
  * @returns {Promise<Prereq[]>}
  */
 export async function checkPrereqs(ctx) {
   const { api, user, config } = ctx;
+  const pax = isPax(config);
 
   const roles = api.graph.myDirectoryRoles();
   const eligible = api.graph.myEligibleRoles(user.id);
-  const groups = api.graph.myGroupIds().catch(() => /** @type {string[]} */ ([]));
-  const subs = api.arm.listSubscriptions().then((s) => s.filter((x) => x.state === 'Enabled'));
+  // The PAX route uses no Azure, so it reads no subscriptions.
+  const groups = pax ? Promise.resolve(/** @type {string[]} */ ([])) : api.graph.myGroupIds().catch(() => /** @type {string[]} */ ([]));
+  const subs = pax ? Promise.resolve([]) : api.arm.listSubscriptions().then((s) => s.filter((x) => x.state === 'Enabled'));
   // Unhandled until awaited by a check; these keep a rejected lookup from crashing the process.
   for (const p of [roles, eligible, subs]) p.catch(() => {});
   /** @type {ReturnType<typeof api.graph.myLicenseDetails> | undefined} */
@@ -145,8 +159,10 @@ export async function checkPrereqs(ctx) {
       return { status: 'missing', detail: `You don't have ${Object.values(wanted).join(' or ')} active.${elig ? '' : ' Couldn\'t check for roles you could activate yourself.'}` };
     });
 
-  /** Owner, or Contributor plus User Access Administrator, per subscription. */
-  const azureRbac = guard(
+  /** @type {Promise<Prereq> | undefined} */
+  let rbacCheck;
+  /** Owner, or Contributor plus User Access Administrator, per subscription. Only the Fabric route checks it. */
+  const azureRbac = () => (rbacCheck ??= guard(
     {
       id: 'azure-rbac',
       label: 'Azure: Owner, or Contributor and User Access Administrator',
@@ -190,7 +206,9 @@ export async function checkPrereqs(ctx) {
       const detail = `${met} of ${rows.length} ${rows.length === 1 ? 'subscription' : 'subscriptions'} give you this.${more}`;
       return { status, detail, rows };
     },
-  );
+  ));
+  /** A check only the Fabric route makes. @param {() => Promise<Prereq>} check */
+  const fabricOnly = (check) => (pax ? [] : [check()]);
 
   /** @type {Promise<Prereq>[]} */
   const checks = [
@@ -235,7 +253,9 @@ export async function checkPrereqs(ctx) {
       {
         id: 'power-bi-pro',
         label: 'Power BI Pro or Premium Per User licence',
-        neededFor: 'Publishing and sharing the semantic model and report.',
+        neededFor: pax
+          ? 'Publishing and sharing the semantic model and report. In a workspace without a capacity, everyone who opens the report needs Power BI Pro too.'
+          : 'Publishing and sharing the semantic model and report.',
         howTo: 'Ask your licence admin to assign you Power BI Pro (included in Microsoft 365 E5) or Premium Per User.',
       },
       async () => {
@@ -265,7 +285,7 @@ export async function checkPrereqs(ctx) {
           : { status: 'missing', detail: 'No Microsoft 365 Copilot licences found in this tenant.' };
       },
     ),
-    guard(
+    ...fabricOnly(() => guard(
       {
         id: 'power-automate-premium',
         label: 'Power Automate Premium licence',
@@ -281,8 +301,8 @@ export async function checkPrereqs(ctx) {
           ? { status: 'met', detail: [...new Set(found)].join(', ') }
           : { status: 'missing', detail: 'No Power Automate Premium (or per user) licence is assigned to you. Someone else who has one can sign in to the flows.' };
       },
-    ),
-    guard(
+    )),
+    ...fabricOnly(() => guard(
       {
         id: 'fabric-capacity',
         label: 'Active Fabric capacity',
@@ -295,9 +315,9 @@ export async function checkPrereqs(ctx) {
         const names = caps.slice(0, 3).map((cap) => `${cap.displayName ?? cap.id}${cap.sku ? ` (${cap.sku})` : ''}`);
         return { status: 'met', detail: `${caps.length} available: ${names.join(', ')}${caps.length > 3 ? ', ...' : ''}` };
       },
-    ),
-    azureRbac,
-    guard(
+    )),
+    ...fabricOnly(azureRbac),
+    ...fabricOnly(() => guard(
       {
         id: 'key-vault',
         label: 'Key Vault access for the app secret',
@@ -314,13 +334,13 @@ export async function checkPrereqs(ctx) {
             ? { status: 'met', detail: `You can write secrets to ${vault.name ?? kv.name}.` }
             : { status: 'missing', detail: `You can't write secrets to ${vault.name ?? kv.name}. A vault admin can add the secret for you, or give you Key Vault Secrets Officer.` };
         }
-        const rbac = await azureRbac;
+        const rbac = await azureRbac();
         if (rbac.rows?.some((r) => /^Can create resources/.test(r.detail ?? ''))) return { status: 'met', detail: 'You can create a new vault in one of your subscriptions.' };
         if (rbac.status === 'unknown') return { status: 'unknown', detail: 'Couldn\'t check your Azure access.' };
         return { status: rbac.status === 'eligible' ? 'eligible' : 'missing', detail: 'You can\'t create a vault in any subscription you can see. You can use an existing vault you can read, or choose no Key Vault and keep the secret in the notebooks.' };
       },
-    ),
-    ...(config.modules.defender
+    )),
+    ...(!pax && config.modules.defender
       ? [
           guard(
             {
@@ -343,11 +363,13 @@ export async function checkPrereqs(ctx) {
           ),
         ]
       : []),
+    ...(pax ? paxPrereqs({ config, sources: ctx.sources, host: paxHostOf(ctx), roles }, guard, entraRole) : []),
     guard(
       {
         id: 'tenant-settings',
-        label: 'Fabric tenant settings',
-        neededFor: 'The model\'s connection and the report\'s custom visuals each need a tenant setting on.',
+        label: pax ? 'Power BI tenant settings' : 'Fabric tenant settings',
+        // The PAX model signs in to SharePoint as you, not as the app, so only the report's settings count there.
+        neededFor: pax ? 'The report\'s custom visuals need a tenant setting on.' : 'The model\'s connection and the report\'s custom visuals each need a tenant setting on.',
         howTo: 'A Fabric administrator switches them on in the admin portal, under Tenant settings.',
       },
       async () => {
@@ -358,15 +380,77 @@ export async function checkPrereqs(ctx) {
         } catch {
           return { status: 'unknown', detail: 'Couldn\'t check: only a Fabric Administrator can read tenant settings.' };
         }
-        const off = blockedSettings(Object.fromEntries(list.map((s) => [s.settingName, s])), { reports: true });
+        const off = blockedSettings(Object.fromEntries(list.map((s) => [s.settingName, s])), { reports: true }).filter((s) => !pax || s.reports);
         return off.length
           ? { status: 'missing', detail: `Off: ${off.map((s) => s.title).join('; ')}.` }
           : { status: 'met', detail: `The settings ${PRODUCT.name} needs are on.` };
       },
     ),
-    ...(config.dataSources?.resourceGraph === 'api' ? [resourceGraphPrereq(api, config, guard)] : []),
+    ...(!pax && config.dataSources?.resourceGraph === 'api' ? [resourceGraphPrereq(api, config, guard)] : []),
   ];
   return Promise.all(checks);
+}
+
+/** @typedef {(base: Omit<Prereq, 'status' | 'detail'>, fn: () => Promise<Pick<Prereq, 'status' | 'detail'> & Partial<Prereq>>) => Promise<Prereq>} Guard */
+
+/**
+ * The PAX route's own checks: this PC, the SharePoint site's grant and the app.
+ * @param {{
+ *   config: import('./config.js').InstallConfig,
+ *   sources: import('./sources.js').Sources | undefined,
+ *   host: import('./steps/pax/local.js').PaxHost,
+ *   roles: Promise<{ roleTemplateId: string }[]>,
+ * }} o
+ * @param {Guard} guard
+ * @param {(base: Omit<Prereq, 'status' | 'detail'>, wanted: Record<string, string>) => Promise<Prereq>} entraRole
+ * @returns {Promise<Prereq>[]}
+ */
+function paxPrereqs({ config, sources, host, roles }, guard, entraRole) {
+  const thisPc = guard(
+    {
+      id: 'this-pc',
+      label: 'This PC: Windows, PowerShell 7.2 or later and Python 3.10 or later',
+      neededFor: `The daily task that runs PAX on this PC and saves the files to the SharePoint folder. The PC has to be on when the task runs (${TASK_AT} by default), so one that stays on suits it better than a laptop.`,
+      howTo: 'Install what\'s missing, then check again.',
+    },
+    async () => {
+      const wrongPc = paxHostProblem(host);
+      if (wrongPc) return { status: 'missing', detail: wrongPc, howTo: 'Run the installer on the Windows PC that will run the task.' };
+      const { pwsh, python, problems } = await checkHost(host);
+      if (problems.length) return { status: 'missing', detail: problems.map((p) => p.title).join('. ') + '.', howTo: problems.map((p) => p.fix).join(' ') };
+      return { status: 'met', detail: `PowerShell ${pwsh?.version} (execution policy ${pwsh?.policy}) and Python ${python?.version}.` };
+    },
+  );
+  const siteAdmin = entraRole(
+    {
+      id: 'site-admin',
+      label: 'SharePoint Administrator or Global Administrator',
+      neededFor: 'Giving the app write access to the SharePoint site that holds the files, and to no other site (Sites.Selected).',
+      howTo: 'If that isn\'t you, carry on: the installer shows the commands for one of them to run, and waits. The admin pack has them too.',
+      optional: true,
+    },
+    SITE_ADMIN_ROLES,
+  );
+  if (config.pax?.deployApp === false) return [thisPc, siteAdmin];
+  const app = guard(
+    {
+      id: 'managed-app',
+      label: `The ${PRODUCT.managedApp.name} app: Copilot managed apps`,
+      neededFor: `Deploying ${THE_APP} and sharing it with the viewer group. Without it, setup finishes at the report.`,
+      howTo: `Ask a Power Platform admin to allow ${NOT_READY_NAMES.createApps} and ${NOT_READY_NAMES.externalArtifacts}, in the Power Platform admin center under Copilot > Settings > Managed apps. Each person who opens the app needs Power Apps Premium or Copilot Credits.`,
+      optional: true,
+    },
+    async () => {
+      const blocked = whyNot({ distDir: sources?.appDist, cliDir: CLI_PACKAGE_DIR, nodeVersion: process.version });
+      if (blocked) return { status: 'missing', detail: blocked.why, howTo: blocked.steps.join(' ') };
+      const ppAdmin = (await roles).some((r) => r.roleTemplateId === POWER_PLATFORM_ADMIN_ROLE);
+      return {
+        status: 'unknown',
+        detail: `This copy of the installer can deploy it. Whether the tenant allows it shows when it deploys, because ${NOT_READY_NAMES.createApps} and ${NOT_READY_NAMES.externalArtifacts} are off until a Power Platform admin turns them on.${ppAdmin ? ' You\'re a Power Platform Administrator, so you can turn them on.' : ''}`,
+      };
+    },
+  );
+  return [thisPc, siteAdmin, app];
 }
 
 const ARG_PROBES = {

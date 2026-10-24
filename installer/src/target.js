@@ -72,6 +72,20 @@ export function paxHostProblem(host) {
 }
 
 /**
+ * Holds a command to the route its install record started on, without asking. install asks
+ * instead (askTarget); prereqs may look at either route, since it changes nothing.
+ * @param {import('./install.js').Ctx} ctx
+ */
+export function holdTarget(ctx) {
+  const settled = settledRoute(ctx.config);
+  if (!settled) return;
+  if (ctx.targetChosen && ctx.config.target !== settled) {
+    throw new Error(`This install record is for the ${ROUTE_NAMES[settled]} route, so --target ${ctx.config.target} doesn't apply to it. Leave out --target, or pass --config with the other route's install record.`);
+  }
+  ctx.config.target = settled;
+}
+
+/**
  * Asks which route to set up, unless the record or --target has settled it. A record that has
  * started on one route stays on it.
  * @param {import('./install.js').Ctx} ctx

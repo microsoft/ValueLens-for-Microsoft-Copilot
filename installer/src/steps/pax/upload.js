@@ -30,7 +30,15 @@ export function remoteFolderPath(text) {
 }
 
 /**
- * Uploads files to the SharePoint folder, replacing any of the same name.
+ * Paths typed at the prompt: separated by semicolons, each with or without quotes.
+ * @param {string} text
+ */
+export const splitPaths = (text) =>
+  text.split(';').map((p) => p.trim().replace(/^"(.*)"$/, '$1').trim()).filter(Boolean);
+
+/**
+ * Uploads files to the SharePoint folder, replacing any of the same name. With no files named, it
+ * asks for them, so the browser can run it too.
  * @param {Ctx} ctx
  * @param {{ files: string[], remoteFolder?: string }} o
  * @returns {Promise<boolean>}  Whether every file went up.
@@ -39,7 +47,14 @@ export async function paxUpload(ctx, o) {
   const { ui, config } = ctx;
   const sp = config.sharePoint;
   if (!sp || !config.app.appId) throw new Error(`${PRODUCT.name} isn't set up on this PC yet, so there's no SharePoint folder to upload to. Run install first.`);
-  if (!o.files.length) throw new Error('Name the files to upload.');
+  let files = o.files;
+  if (!files.length) {
+    if (ui.yes) throw new Error('Name the files to upload.');
+    ui.heading('Upload files');
+    files = splitPaths(await ui.input(`Which files go in ${describeFolder(sp)}? Give the full path of each on this PC, separated by semicolons.`, {
+      validate: (v) => (splitPaths(v).length ? true : 'Give at least one file.'),
+    }));
+  }
   const sub = o.remoteFolder ? remoteFolderPath(o.remoteFolder) : '';
 
   const host = paxHostOf(ctx);
@@ -49,7 +64,7 @@ export async function paxUpload(ctx, o) {
 
   const where = `${describeFolder(sp)}${sub ? `, in ${sub}` : ''}`;
   let failed = 0;
-  for (const given of o.files) {
+  for (const given of files) {
     const file = resolve(given);
     if (!existsSync(file) || !statSync(file).isFile()) {
       ui.fail(`${given}: no such file`);

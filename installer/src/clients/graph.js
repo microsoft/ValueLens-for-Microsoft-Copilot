@@ -16,6 +16,12 @@ export const APP_ROLES = {
   '158c047a-c907-4556-b7ef-446551a6b5f7': 'Cloud Application Administrator',
 };
 
+/** Roles that can give an app access to one SharePoint site (Sites.Selected). */
+export const SITE_ADMIN_ROLES = {
+  '62e90394-69f5-4237-9190-012177145e10': 'Global Administrator',
+  'f28a1f50-f6e7-4571-818b-6a12f2af6b6c': 'SharePoint Administrator',
+};
+
 export const FABRIC_ADMIN_ROLE = 'a9ea8996-122f-4c74-9520-8edcd192826c';
 export const GLOBAL_READER_ROLE = 'f2ef992c-3afb-46b9-b7cf-a126ee74c451';
 export const AI_ADMIN_ROLE = 'd2562ede-74db-457e-a7b6-544e236ebb61';

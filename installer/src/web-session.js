@@ -13,22 +13,30 @@ import { PRODUCT } from './product.js';
 import { loadSources } from './sources.js';
 import { describeSchedule, recordWorkspaceGone, staleRecordMessage } from './steps/fabric.js';
 import { isResumeLater } from './steps/identity.js';
+import { defaultPaxHost, readState } from './steps/pax/local.js';
+import { endedSince } from './steps/pax/flow.js';
+import { paxCollectedLabels } from './steps/pax/plan.js';
+import { describeFolder } from './steps/pax/site.js';
+import { reportUrl } from './steps/report.js';
+import { isPax, TARGETS } from './target.js';
 import { routerWanted } from './uploads.js';
 import { SETUP_SECTIONS, setupRecovery } from './setup.js';
 
-export const WEB_COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'status', 'rotate-secret', 'access', 'upload', 'uninstall', 'prereqs'];
+export const WEB_COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'status', 'rotate-secret', 'access', 'upload', 'deploy-app', 'uninstall', 'prereqs'];
 /** Commands that work before anything is installed. */
 const NO_RECORD = ['install', 'prereqs'];
 const METHODS = ['browser', 'device-code', 'azure-cli'];
 
 /** @typedef {'browser' | 'device-code' | 'azure-cli'} Method */
-/** @typedef {{ command: string, method?: Method, tenant?: string, backfillDays?: number, wait?: boolean, section?: string, retry?: boolean }} StartRequest */
+/** @typedef {{ command: string, method?: Method, tenant?: string, backfillDays?: number, wait?: boolean, section?: string, retry?: boolean, target?: import('./target.js').Target }} StartRequest */
 
 /**
  * What the home page shows about an install record.
  * @param {import('./config.js').InstallConfig} config
+ * @param {Record<string, any>} [local]  On the PAX route, the refresh's state.json on this PC.
  */
-export function describeRecord(config) {
+export function describeRecord(config, local) {
+  if (isPax(config)) return describePaxRecord(config, local);
   const f = config.fabric;
   const sm = config.semanticModel;
   const installed = !!(f.workspaceId && f.lakehouseId);
@@ -56,7 +64,74 @@ export function describeRecord(config) {
       'rotate-secret': !!(config.app.appId && (secretMode(config) === 'notebook' ? installed : config.keyVault.uri)),
       access: !!sm.id,
       upload: installed && !!f.notebooks.uploadRouter && routerWanted(config.dataSources),
+      'deploy-app': false,
       uninstall: !!f.workspaceId,
+    },
+  };
+}
+
+/** The first load's outcome, in the words the Fabric route's pipeline uses. */
+const FIRST_RUN_WORDS = Object.freeze({ success: 'Completed', 'no-data': 'FinishedWithNoData', failed: 'Failed' });
+
+/**
+ * How the PAX route's first load went. It stays on the record until a refresh succeeds and the
+ * installer next looks, so this PC's state.json, written as each refresh ends, has the last word.
+ * @param {import('./config.js').FirstRun | undefined} run
+ * @param {Record<string, any> | undefined} local
+ */
+export function paxFirstRun(run, local) {
+  if (!run?.startedAt) return local?.lastSuccessUtc ? 'Completed' : undefined;
+  const ended = endedSince(local, run.startedAt)?.status ?? run.result;
+  return ended ? FIRST_RUN_WORDS[ended] : 'InProgress';
+}
+
+/**
+ * What the home page shows about a PAX record: the scheduled refresh on this PC, the SharePoint
+ * folder it writes to, the report in Power BI and the app.
+ * @param {import('./config.js').InstallConfig} config
+ * @param {Record<string, any>} [local]
+ */
+function describePaxRecord(config, local) {
+  const pax = config.pax ?? {};
+  const task = pax.task;
+  const wsId = config.fabric.workspaceId;
+  const sm = config.semanticModel;
+  const sp = config.sharePoint;
+  const app = config.managedApp;
+  const installed = !!task?.registeredAt;
+  const signedIn = config.powerBi?.credentials === 'set';
+  return {
+    tenantId: config.tenantId,
+    target: config.target,
+    installed,
+    workspace: config.fabric.workspaceName ?? wsId,
+    workspaceUrl: wsId ? `https://app.powerbi.com/groups/${wsId}` : undefined,
+    lakehouse: undefined,
+    files: sp ? describeFolder(sp) : undefined,
+    filesUrl: sp?.folderUrl,
+    schedule: task?.name ? `${task.name}, daily at ${task.at}${task.logonType === 'Interactive' ? ", while you're signed in to this PC" : ''}` : undefined,
+    data: paxCollectedLabels(config),
+    model: sm.id ? (signedIn ? sm.name : `${sm.name}, not signed in to SharePoint yet`) : undefined,
+    reportUrl: wsId && sm.report?.id ? reportUrl(wsId, sm.report.id) : undefined,
+    secretExpires: pax.secretExpires?.slice(0, 10),
+    firstRun: paxFirstRun(pax.firstRun, local),
+    historyDays: config.history?.days,
+    viewers: config.access?.groupId ? config.access.groupName : undefined,
+    app: app?.url ? 'Open the app' : app?.skipped ? `Not deployed. ${app.skipped.why}` : pax.deployApp === false ? 'Not deployed' : undefined,
+    appUrl: app?.url,
+    can: {
+      update: installed,
+      run: installed,
+      'rerun-failed': false,
+      check: installed,
+      refresh: installed && !!sm.id,
+      status: installed,
+      'rotate-secret': installed && !!config.app.appId,
+      access: !!sm.id,
+      // Files sent with upload don't feed this route's report, so the page leaves it to the command line.
+      upload: false,
+      'deploy-app': installed,
+      uninstall: !!(task || pax.credentialTarget || sp || config.app.appId),
     },
   };
 }
@@ -66,13 +141,24 @@ export function describeRecord(config) {
  * Privileged Role Administrator is active, so the user can assign directory roles themselves.
  * @param {string} upn
  * @param {import('./prereqs.js').Prereq[]} items
+ * @param {import('./target.js').Target} [target]  The route it checked.
  */
-export const prereqsSnapshot = (upn, items) => ({
+export const prereqsSnapshot = (upn, items, target = 'fabric') => ({
   at: new Date().toISOString(),
   upn,
+  target,
   items,
   canAssignDirectoryRoles: items.some((i) => i.id === 'consent-role' && i.status === 'met'),
 });
+
+/** The PAX refresh's state.json on this PC, when there is one and it can be read. @param {import('./steps/pax/local.js').PaxHost} [host] */
+function localPaxState(host) {
+  try {
+    return readState(host ?? defaultPaxHost());
+  } catch {
+    return undefined;
+  }
+}
 
 /** @param {any} err */
 export function describeError(err) {
@@ -92,7 +178,8 @@ export function describeError(err) {
  *   method?: Method,
  *   connect?: typeof realConnect,
  *   debug?: (m: string) => void,
- * }} o
+ *   paxHost?: import('./steps/pax/local.js').PaxHost,
+ * }} o  paxHost: the PC the PAX route's steps run on, when it isn't this one. Tests pass a fake.
  */
 export function createSession(o) {
   const connect = o.connect ?? realConnect;
@@ -129,14 +216,15 @@ export function createSession(o) {
   /**
    * Checks the prerequisites in the background after a sign-in, without holding up the command.
    * @param {import('./config.js').InstallConfig} config
+   * @param {import('./sources.js').Sources} sources
    */
-  function checkInBackground(config) {
+  function checkInBackground(config, sources) {
     if (!signedIn) return;
     const { api, user } = signedIn;
-    checking = checkPrereqs({ api, user, config })
+    checking = checkPrereqs({ api, user, config, sources, ...(o.paxHost ? { paxHost: o.paxHost } : {}) })
       .then((items) => {
         if (signedIn?.user !== user) return;
-        prereqs = prereqsSnapshot(user.upn, items);
+        prereqs = prereqsSnapshot(user.upn, items, config.target);
         o.ui.emit({ type: 'prereqs-ready' });
       })
       .catch((err) => o.debug?.(`Prerequisites check failed: ${describeError(err)}`));
@@ -149,7 +237,7 @@ export function createSession(o) {
     let recordError;
     try {
       const r = loadConfig(o.configFile);
-      if (r.existed) record = describeRecord(r.config);
+      if (r.existed) record = describeRecord(r.config, isPax(r.config) ? localPaxState(o.paxHost) : undefined);
     } catch (err) {
       recordError = describeError(err);
     }
@@ -192,7 +280,7 @@ export function createSession(o) {
         ui.emit({ type: 'signin', state: 'started', method });
         const { api, user, getToken } = await connect({ tenantId: tenant || undefined, method, ui, debug: o.debug });
         signedIn = { api, user, method, tenant, getToken };
-        if (command !== 'prereqs') checkInBackground(config);
+        if (command !== 'prereqs') checkInBackground(config, sources);
       }
       ui.emit({ type: 'signin', state: reuse ? 'reused' : 'done', user: { upn: signedIn.user.upn, displayName: signedIn.user.displayName, tenantId: signedIn.user.tenantId } });
       const gone = existed ? await checkRecord(config) : null;
@@ -200,13 +288,15 @@ export function createSession(o) {
         ui.emit({ type: 'command', command, state: 'failed', stale: true, error: `${staleRecordMessage(gone)} Go back to the home page to start fresh, or keep the record.` });
         return;
       }
-      const ctx = createCtx({ ui, config, file: o.configFile, api: signedIn.api, user: signedIn.user, sources, getToken: signedIn.getToken });
+      const ctx = createCtx({ ui, config, file: o.configFile, api: signedIn.api, user: signedIn.user, sources, getToken: signedIn.getToken, paxHost: o.paxHost });
       ctx.setupSection = req.section;
       ctx.setupRetry = req.retry;
       let ok = true;
       if (command === 'prereqs') {
+        // Prerequisites change nothing, so they can look at either route, and the record isn't saved.
+        if (req.target) config.target = req.target;
         const items = await showPrereqs(ctx);
-        prereqs = prereqsSnapshot(signedIn.user.upn, items);
+        prereqs = prereqsSnapshot(signedIn.user.upn, items, config.target);
       } else ok = await runCommand(ctx, command, { wait: req.wait !== false, backfillDays: req.backfillDays });
       ui.emit({ type: 'command', command, state: ok ? 'done' : 'failed', ...(ok ? {} : { error: 'It didn\'t finish successfully. The details are above.' }) });
     } catch (err) {
@@ -269,6 +359,7 @@ export function createSession(o) {
       if (!WEB_COMMANDS.includes(req?.command)) return { ok: false, status: 400, error: 'Unknown command.' };
       if (req.section !== undefined && (req.command !== 'install' || !SETUP_SECTIONS.includes(req.section))) return { ok: false, status: 400, error: 'Unknown settings category.' };
       if (req.retry !== undefined && (req.command !== 'install' || typeof req.retry !== 'boolean')) return { ok: false, status: 400, error: 'Retry is only available for setup.' };
+      if (req.target !== undefined && (req.command !== 'prereqs' || !TARGETS.includes(req.target))) return { ok: false, status: 400, error: 'The route is "fabric" or "pax", and only the prerequisites check takes one.' };
       const method = req.method ?? o.method ?? 'browser';
       if (!METHODS.includes(method)) return { ok: false, status: 400, error: 'Unknown sign-in method.' };
       if (req.tenant !== undefined && (typeof req.tenant !== 'string' || !/^[A-Za-z0-9.-]{0,253}$/.test(req.tenant.trim()))) {

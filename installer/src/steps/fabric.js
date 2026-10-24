@@ -12,6 +12,7 @@ import { scheduleBody } from '../clients/fabric.js';
 import { normaliseResourceGraph, secretMode, AH_RELEASES } from '../config.js';
 import { HttpError } from '../http.js';
 import { PRODUCT } from '../product.js';
+import { isPax } from '../target.js';
 import { rlsOn } from '../transform/access.js';
 import { prepareNotebook, serialiseNotebook } from '../transform/notebook.js';
 import { buildPipeline, PIPELINE_CHANGE, PIPELINE_VERSION } from '../transform/pipeline.js';
@@ -249,7 +250,8 @@ export function clearPending(f, key) {
 /**
  * Whether the workspace an install record points at is gone, so the record is stale. Only a
  * definite answer counts: Fabric says it isn't there, or the record is for another tenant. A 403,
- * a network error or anything else returns null, and the record is used as it is.
+ * a network error or anything else returns null, and the record is used as it is. On the PAX
+ * route, only another tenant counts: its install makes a gone Power BI workspace again.
  * @param {{ config: import('../config.js').InstallConfig, fabric: { getWorkspace: (id: string) => Promise<any> }, tenantId?: string }} o
  * @returns {Promise<{ workspace: string, reason: 'not-found' | 'other-tenant' } | null>}
  */
@@ -258,6 +260,7 @@ export async function recordWorkspaceGone({ config, fabric, tenantId }) {
   if (!f?.workspaceId) return null;
   const workspace = f.workspaceName ?? f.workspaceId;
   if (config.tenantId && tenantId && config.tenantId.toLowerCase() !== tenantId.toLowerCase()) return { workspace, reason: 'other-tenant' };
+  if (isPax(config)) return null;
   try {
     await fabric.getWorkspace(f.workspaceId);
     return null;

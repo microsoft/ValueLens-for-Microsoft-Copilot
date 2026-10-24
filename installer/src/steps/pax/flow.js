@@ -255,8 +255,24 @@ async function ensureTask(ctx) {
 }
 
 /**
- * How the run that started at `startedAt` went, from state.json and the task. refresh.ps1 writes
- * state.json as a run ends, so a state.json from after the start means that run is done.
+ * How a run that started at `startedAt` ended, from state.json, or undefined while state.json is
+ * older than the run. refresh.ps1 writes state.json as each run ends.
+ * @param {Record<string, any> | undefined} state
+ * @param {string} startedAt
+ * @returns {RunOutcome | undefined}
+ */
+export function endedSince(state, startedAt) {
+  if (!state?.lastRunUtc || Date.parse(state.lastRunUtc) < Date.parse(startedAt) - CLOCK_SLACK_MS) return undefined;
+  if (state.lastResult === 'success') return { status: 'success' };
+  return {
+    status: state.lastResult === 'no-data' ? 'no-data' : 'failed',
+    error: state.lastError || state.lastMessage || undefined,
+    log: state.lastLog || undefined,
+  };
+}
+
+/**
+ * How the run that started at `startedAt` went, from state.json and the task.
  * @param {PaxHost} host
  * @param {string} taskName
  * @param {string} startedAt
@@ -264,17 +280,7 @@ async function ensureTask(ctx) {
  */
 async function runOutcome(host, taskName, startedAt) {
   const since = Date.parse(startedAt) - CLOCK_SLACK_MS;
-  /** @returns {RunOutcome | undefined} */
-  const fromState = () => {
-    const state = readState(host);
-    if (!state?.lastRunUtc || Date.parse(state.lastRunUtc) < since) return undefined;
-    if (state.lastResult === 'success') return { status: 'success' };
-    return {
-      status: state.lastResult === 'no-data' ? 'no-data' : 'failed',
-      error: state.lastError || state.lastMessage || undefined,
-      log: state.lastLog || undefined,
-    };
-  };
+  const fromState = () => endedSince(readState(host), startedAt);
   const done = fromState();
   if (done) return done;
   const info = await taskInfo(host, taskName);
@@ -406,7 +412,8 @@ async function reloadHistory(ctx, days) {
     return true;
   }
   if (r.code !== 0) throw scriptFailed(r, 'The refresh');
-  config.history = { ...config.history, days };
+  // The rollups keep what they had, so a shorter reload doesn't shorten the history.
+  if (days > (config.history?.days ?? 0)) config.history = { ...config.history, days };
   ctx.save();
   ui.ok(`Read ${days} days of the audit log and added them to the rollups in SharePoint.`);
   return loadAfterRun(ctx, true);
@@ -620,6 +627,7 @@ export async function paxCommand(ctx, command, opts = {}) {
   }
   switch (command) {
     case 'update':
+      ctx.ui.heading(`Updating ${PRODUCT.name}`);
       return paxInstall(ctx, await paxPreflight(ctx), { wait: opts.wait });
     case 'run':
       if (opts.backfillDays) return reloadHistory(ctx, opts.backfillDays);
@@ -633,9 +641,16 @@ export async function paxCommand(ctx, command, opts = {}) {
       return confirmFolderAccess(ctx);
     case 'refresh':
       return (await loadPaxModel(ctx, { wait: opts.wait ?? true })).ok;
-    case 'access':
+    case 'access': {
       await accessCommand(ctx, paxModels(config));
+      // The app is shared with the group when it's deployed, so a new group needs it shared again.
+      const group = config.access?.groupId;
+      const deployed = config.managedApp;
+      if (group && deployed?.deployedAt && !(deployed.sharedWith ?? []).includes(group)) {
+        ctx.ui.info(`The ${PRODUCT.managedApp.name} app isn't shared with ${config.access?.groupName ?? 'the viewer group'} yet. To share it, run: ${commandLine('deploy-app')}`);
+      }
       return true;
+    }
     case 'rotate-secret':
       return rotateSecret(ctx);
     case 'deploy-app': {

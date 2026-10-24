@@ -1,19 +1,26 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { request } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { emptyConfig } from '../src/config.js';
+import { emptyConfig, loadConfig, saveConfig } from '../src/config.js';
+import { HttpError } from '../src/http.js';
 import { memoApi, rewindable } from '../src/install.js';
 import { PRODUCT } from '../src/product.js';
 import { mirror, reopenOnEnter, startServer } from '../src/server.js';
 import { collectChoices } from '../src/steps/plan.js';
+import { reportUrl } from '../src/steps/report.js';
+import { ROUTE_NAMES } from '../src/target.js';
 import { createWebUi, plainText, SECRET_MASK, toSegments } from '../src/web-ui.js';
-import { describeRecord, prereqsSnapshot, WEB_COMMANDS } from '../src/web-session.js';
+import { createSession, describeRecord, paxFirstRun, prereqsSnapshot, WEB_COMMANDS } from '../src/web-session.js';
 import { fakeCtx } from './fakes.js';
+import { fakePaxHost } from './pax-fakes.js';
 
 const SRC = new URL('../src/', import.meta.url);
 
@@ -746,4 +753,227 @@ test('prereqsSnapshot: says whether the signer can assign directory roles, from 
   assert.equal(prereqsSnapshot('admin@contoso.com', [row('eligible')]).canAssignDirectoryRoles, false, 'eligible is not active');
   assert.equal(prereqsSnapshot('admin@contoso.com', [row('missing')]).canAssignDirectoryRoles, false);
   assert.equal(prereqsSnapshot('admin@contoso.com', []).canAssignDirectoryRoles, false);
+});
+
+/** What the home page gets for a record, as a plain object. @param {any} config @param {any} [local] */
+const describe = (config, local) => /** @type {Record<string, any>} */ (describeRecord(config, local));
+
+/** An installed PAX record in tenant-1: the refresh on this PC, the SharePoint folder, the report and the app. */
+function paxRecord() {
+  const config = emptyConfig();
+  config.target = 'pax';
+  config.tenantId = 'tenant-1';
+  config.app.appId = 'app-1';
+  config.fabric.workspaceId = 'ws-1';
+  config.fabric.workspaceName = PRODUCT.pax.workspace;
+  config.semanticModel = { name: PRODUCT.pax.model, id: 'sm-1', report: { id: 'rep-1', name: PRODUCT.pax.report } };
+  config.sharePoint = {
+    folderUrl: 'https://contoso.sharepoint.com/sites/Analytics/Shared%20Documents/ValueLens',
+    siteUrl: 'https://contoso.sharepoint.com/sites/Analytics',
+    sitePath: 'contoso.sharepoint.com:/sites/Analytics',
+    library: 'Shared Documents',
+    folderPath: '/ValueLens',
+  };
+  config.pax = {
+    credentialTarget: `${PRODUCT.pax.credentialPrefix}tenant-1`,
+    secretExpires: '2027-06-01T00:00:00.000Z',
+    task: { name: PRODUCT.pax.task, at: '02:00', registeredAt: '2026-06-01T12:00:00.000Z', logonType: 'Interactive' },
+  };
+  config.powerBi = { credentials: 'set' };
+  config.access = { groupId: 'g-1', groupName: PRODUCT.viewerGroup };
+  config.managedApp = { url: 'https://apps.powerplatform.example/valuelens' };
+  return config;
+}
+
+test('describeRecord on the PAX route: the refresh on this PC, the folder, the report and the app', () => {
+  const r = describe(paxRecord());
+  assert.equal(r.target, 'pax');
+  assert.equal(r.installed, true);
+  assert.equal(r.workspace, PRODUCT.pax.workspace);
+  assert.equal(r.workspaceUrl, 'https://app.powerbi.com/groups/ws-1', 'a Power BI workspace, not a Fabric one');
+  assert.equal(r.lakehouse, undefined);
+  assert.equal(r.files, 'Shared Documents/ValueLens on https://contoso.sharepoint.com/sites/Analytics');
+  assert.equal(r.filesUrl, 'https://contoso.sharepoint.com/sites/Analytics/Shared%20Documents/ValueLens');
+  assert.equal(r.schedule, `${PRODUCT.pax.task}, daily at 02:00, while you're signed in to this PC`);
+  assert.deepEqual(r.data, ['Copilot interactions', 'users']);
+  assert.equal(r.model, PRODUCT.pax.model);
+  assert.equal(r.reportUrl, reportUrl('ws-1', 'rep-1'));
+  assert.equal(r.secretExpires, '2027-06-01');
+  assert.equal(r.viewers, PRODUCT.viewerGroup);
+  assert.equal(r.app, 'Open the app');
+  assert.equal(r.appUrl, 'https://apps.powerplatform.example/valuelens');
+  assert.deepEqual(r.can, {
+    update: true, run: true, 'rerun-failed': false, check: true, refresh: true, status: true,
+    'rotate-secret': true, access: true, upload: false, 'deploy-app': true, uninstall: true,
+  });
+});
+
+test('describeRecord on the PAX route: what isn\'t done yet, and what each part allows', () => {
+  const fresh = emptyConfig();
+  fresh.target = 'pax';
+  const none = describe(fresh);
+  assert.equal(none.installed, false);
+  for (const field of ['workspaceUrl', 'schedule', 'files', 'model', 'reportUrl', 'app']) assert.equal(none[field], undefined, field);
+  assert.deepEqual(Object.keys(none.can).filter((c) => none.can[c]), [], 'nothing until the task is registered');
+
+  // A setup that stopped part way can still be taken out.
+  for (const part of [{ pax: { credentialTarget: 'PAX-ValueLens-tenant-1' } }, { sharePoint: paxRecord().sharePoint }, { app: { appId: 'app-1' } }]) {
+    const d = describe({ ...emptyConfig(), target: 'pax', ...part });
+    assert.equal(d.installed, false);
+    assert.equal(d.can.uninstall, true, JSON.stringify(part));
+    assert.equal(d.can['deploy-app'], false);
+  }
+
+  const c = /** @type {any} */ (paxRecord());
+  c.pax.task.logonType = 'Password';
+  c.pax.agent365 = true;
+  c.powerBi = { credentials: 'later' };
+  c.managedApp = { skipped: { why: 'Copilot managed apps are off in this tenant.', steps: [] } };
+  const d = describe(c);
+  assert.equal(d.schedule, `${PRODUCT.pax.task}, daily at 02:00`, 'it runs whether or not anyone is signed in');
+  assert.equal(d.model, `${PRODUCT.pax.model}, not signed in to SharePoint yet`);
+  assert.deepEqual(d.data, ['Copilot interactions', 'users', 'Agent 365']);
+  assert.equal(d.app, 'Not deployed. Copilot managed apps are off in this tenant.');
+  assert.equal(d.appUrl, undefined);
+
+  c.managedApp = {};
+  c.pax.deployApp = false;
+  assert.equal(describe(c).app, 'Not deployed');
+  delete c.app.appId;
+  assert.equal(describe(c).can['rotate-secret'], false);
+  c.semanticModel = { name: PRODUCT.pax.model };
+  const noModel = describe(c);
+  assert.deepEqual([noModel.can.refresh, noModel.can.access, noModel.reportUrl], [false, false, undefined]);
+});
+
+test('paxFirstRun: the first refresh as the home page shows it; this PC\'s state.json has the last word', () => {
+  const startedAt = '2026-06-01T12:00:00.000Z';
+  const state = (/** @type {string} */ lastResult, at = '2026-06-01T14:00:00.000Z') => ({ lastRunUtc: at, lastResult, ...(lastResult === 'success' ? { lastSuccessUtc: at } : {}) });
+  assert.equal(paxFirstRun(undefined, undefined), undefined);
+  assert.equal(paxFirstRun(undefined, state('success')), 'Completed', 'no first run on the record, and a refresh here has worked');
+  assert.equal(paxFirstRun(undefined, state('failed')), undefined);
+  assert.equal(paxFirstRun({ startedAt }, undefined), 'InProgress');
+  assert.equal(paxFirstRun({ startedAt }, state('success', '2026-06-01T11:00:00.000Z')), 'InProgress', 'state.json from before it started');
+  assert.equal(paxFirstRun({ startedAt }, state('success', '2026-06-01T11:59:30.000Z')), 'Completed', 'up to a minute before counts, as the clocks may differ');
+  assert.equal(paxFirstRun({ startedAt }, state('success')), 'Completed');
+  assert.equal(paxFirstRun({ startedAt }, state('no-data')), 'FinishedWithNoData');
+  assert.equal(paxFirstRun({ startedAt }, state('failed')), 'Failed');
+  assert.equal(paxFirstRun({ startedAt, result: 'failed' }, undefined), 'Failed', 'the record\'s result when this PC has no state.json');
+  assert.equal(paxFirstRun({ startedAt, result: 'failed' }, state('success')), 'Completed', 'a later refresh here worked');
+});
+
+test('page: the route names are the installer\'s, each route hides only rows it never allows, and the PAX needs are current', async () => {
+  const app = await readFile(new URL('web/app.js', SRC), 'utf8');
+  const names = /const ROUTE_NAMES = \{ fabric: '([^']+)', pax: '([^']+)' \};/.exec(app);
+  assert.ok(names, 'ROUTE_NAMES is in app.js');
+  assert.deepEqual({ fabric: names[1], pax: names[2] }, { ...ROUTE_NAMES }, 'the page reads the route from the answer to "Where it runs"');
+  assert.match(await readFile(new URL('target.js', SRC), 'utf8'), /heading\('Where it runs'\)/);
+  assert.match(app, /run\.cur\?\.title === 'Where it runs'/);
+
+  const quoted = (/** @type {string} */ s) => [...s.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  const rows = quoted(/const ROW_ORDER = \[([^\]]*)\]/.exec(app)?.[1] ?? '');
+  const hidden = /const HIDDEN_ROWS = \{ fabric: new Set\(\[([^\]]*)\]\), pax: new Set\(\[([^\]]*)\]\) \};/.exec(app);
+  assert.ok(hidden, 'HIDDEN_ROWS is in app.js');
+  const byRoute = { fabric: quoted(hidden[1]), pax: quoted(hidden[2]) };
+  assert.deepEqual(byRoute, { fabric: ['deploy-app'], pax: ['rerun-failed', 'upload'] });
+  for (const c of [...byRoute.fabric, ...byRoute.pax]) assert.ok(rows.includes(c) && WEB_COMMANDS.includes(c), c);
+  const fabric = emptyConfig();
+  Object.assign(fabric.fabric, { workspaceId: 'ws-1', lakehouseId: 'lh-1', pipelineId: 'pl-1' });
+  for (const c of byRoute.fabric) assert.equal(describe(fabric).can[c], false, c);
+  const pax = describe(paxRecord()).can;
+  for (const c of byRoute.pax) assert.equal(pax[c], false, c);
+  assert.deepEqual(Object.keys(pax).filter((c) => pax[c] && !rows.includes(c)), [], 'what the record allows has a row');
+
+  const needs = /\n {2}pax: \[\r?\n([\s\S]*?)\r?\n {2}\],\r?\n\};/.exec(app)?.[1] ?? '';
+  assert.match(needs, /Power BI Pro or Premium Per User licence, to publish and share the report\. In a workspace without a capacity, everyone who opens the report needs one too\./);
+  assert.doesNotMatch(needs, /from Power BI Desktop/, 'the installer publishes through the API, and Desktop is only the fallback');
+  assert.doesNotMatch(app, /App Edition/i);
+});
+
+/**
+ * A browser session over a record in a new temp folder, signed in to tenant-1 with read-only APIs.
+ * Azure and Fabric capacities throw if asked, and the PAX route's PC is a fake.
+ * @param {import('../src/config.js').InstallConfig | null} record
+ */
+function paxSession(record) {
+  const dir = mkdtempSync(join(tmpdir(), 'vl-web-pax-'));
+  const configFile = join(dir, PRODUCT.recordFile);
+  if (record) saveConfig(configFile, record);
+  const pc = fakePaxHost();
+  const ui = createWebUi({ now: () => 1000 });
+  const refuse = (/** @type {string} */ what) => () => {
+    throw new Error(`Asked for ${what}.`);
+  };
+  const api = {
+    graph: {
+      myDirectoryRoles: async () => [{ roleTemplateId: '62e90394-69f5-4237-9190-012177145e10', displayName: 'Global Administrator' }],
+      myEligibleRoles: async () => [],
+      myGroupIds: refuse('graph.myGroupIds'),
+      myLicenseDetails: async () => [{ servicePlans: [{ servicePlanName: 'BI_AZURE_P2', provisioningStatus: 'Success' }] }],
+      subscribedSkus: async () => [],
+      usersCanRegisterApps: async () => true,
+    },
+    arm: new Proxy({}, { get: (_, name) => refuse(`arm.${String(name)}`) }),
+    fabric: {
+      listCapacities: refuse('fabric.listCapacities'),
+      tenantSettings: async () => {
+        throw new HttpError('401 Unauthorized', { method: 'GET', url: 'https://api.fabric.microsoft.com/v1/admin/tenantsettings', status: 401 });
+      },
+      getWorkspace: async () => ({ id: 'ws-1' }),
+    },
+  };
+  const connect = async () => ({ api, user: { id: 'u', upn: 'admin@contoso.com', tenantId: 'tenant-1' } });
+  const s = createSession({ ui, configFile, version: '0.0.0', connect: /** @type {any} */ (connect), paxHost: pc.host });
+  const ended = () => ui.history().filter((e) => e.type === 'command' && e.state !== 'running');
+  const done = () => {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(pc.base, { recursive: true, force: true });
+  };
+  return { s, pc, configFile, ended, done };
+}
+
+test('web session: only the prerequisites check takes a route; it checks that route on this PC and saves nothing', async () => {
+  const fresh = paxSession(null);
+  try {
+    for (const req of [{ command: 'status', target: 'pax' }, { command: 'install', target: 'pax' }, { command: 'prereqs', target: 'azure' }]) {
+      assert.deepEqual(fresh.s.start(/** @type {any} */ (req)), { ok: false, status: 400, error: 'The route is "fabric" or "pax", and only the prerequisites check takes one.' }, JSON.stringify(req));
+    }
+    assert.deepEqual(fresh.s.start({ command: 'prereqs', target: 'pax' }), { ok: true });
+    await fresh.s.settled();
+    assert.deepEqual(fresh.ended().map((e) => e.state), ['done']);
+    const p = fresh.s.state().prereqs;
+    assert.equal(p?.target, 'pax');
+    assert.equal(p?.items.find((i) => i.id === 'this-pc')?.status, 'met', 'the session\'s PC, not the one running the tests');
+    assert.ok(!p?.items.some((i) => i.id === 'azure-rbac' || i.id === 'fabric-capacity'));
+    assert.ok(fresh.pc.keys().includes('pwsh'));
+    assert.equal(existsSync(fresh.configFile), false, 'checking makes no install record');
+  } finally {
+    fresh.done();
+  }
+
+  const record = emptyConfig();
+  record.tenantId = 'tenant-1';
+  Object.assign(record.fabric, { workspaceId: 'ws-1', workspaceName: 'Analytics', lakehouseId: 'lh-1' });
+  const fabric = paxSession(record);
+  try {
+    fabric.s.start({ command: 'prereqs', target: 'pax' });
+    await fabric.s.settled();
+    assert.equal(fabric.s.state().prereqs?.target, 'pax');
+    assert.equal(loadConfig(fabric.configFile).config.target, 'fabric', 'the record keeps its route');
+  } finally {
+    fabric.done();
+  }
+});
+
+test('web session: the home page reads the PAX refresh\'s state.json on the PC its steps run on', () => {
+  const record = /** @type {any} */ (paxRecord());
+  record.pax.firstRun = { startedAt: '2026-06-01T12:00:00.000Z' };
+  const { s, pc, done } = paxSession(record);
+  try {
+    assert.equal(s.state().record?.firstRun, 'InProgress');
+    pc.writeState({ lastRunUtc: '2026-06-01T15:00:00.000Z', lastResult: 'success', lastSuccessUtc: '2026-06-01T15:00:00.000Z' });
+    assert.equal(s.state().record?.firstRun, 'Completed');
+  } finally {
+    done();
+  }
 });

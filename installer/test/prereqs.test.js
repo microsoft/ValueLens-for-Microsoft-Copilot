@@ -1,11 +1,14 @@
 // @ts-check
 import assert from 'node:assert/strict';
+import { rmSync } from 'node:fs';
 import { test } from 'node:test';
 import { armApi, ROLES } from '../src/clients/azure.js';
-import { FABRIC_ADMIN_ROLE, graphApi } from '../src/clients/graph.js';
+import { FABRIC_ADMIN_ROLE, graphApi, POWER_PLATFORM_ADMIN_ROLE } from '../src/clients/graph.js';
 import { emptyConfig } from '../src/config.js';
 import { HttpError } from '../src/http.js';
 import { canAssignDirectoryRoles, checkPrereqs } from '../src/prereqs.js';
+import { PRODUCT } from '../src/product.js';
+import { fakePaxHost } from './pax-fakes.js';
 
 const GA = '62e90394-69f5-4237-9190-012177145e10';
 const USER = /** @type {any} */ ({ id: 'user-1', upn: 'admin@contoso.com', tenantId: 't-1' });
@@ -263,4 +266,117 @@ test('canAssignDirectoryRoles: true only with Global Administrator or Privileged
   assert.equal(await canAssignDirectoryRoles(fakeApis({ roles: [{ roleTemplateId: 'e8611ab8-c189-46e8-94e1-60213ab1f814', displayName: 'Privileged Role Administrator' }] })), true);
   assert.equal(await canAssignDirectoryRoles(fakeApis({ roles: [{ roleTemplateId: FABRIC_ADMIN_ROLE, displayName: 'Fabric Administrator' }] })), false);
   assert.equal(await canAssignDirectoryRoles(fakeApis({ roles: [] })), false);
+});
+
+/** A record on the PAX route that hasn't started yet. */
+function paxConfig() {
+  const config = emptyConfig();
+  config.target = 'pax';
+  return config;
+}
+
+/**
+ * The PAX route's checks, on a fake PC. Azure and Fabric capacities throw if asked: the route uses neither.
+ * @param {{ over?: any, config?: import('../src/config.js').InstallConfig, host?: Parameters<typeof fakePaxHost>[0], sources?: any }} [o]
+ */
+async function runPax(o = {}) {
+  const pc = fakePaxHost(o.host);
+  try {
+    const api = fakeApis(o.over);
+    const refuse = (/** @type {string} */ what) => () => {
+      throw new Error(`The PAX route asked for ${what}.`);
+    };
+    api.arm = new Proxy({}, { get: (_, name) => refuse(`arm.${String(name)}`) });
+    api.graph.myGroupIds = refuse('graph.myGroupIds');
+    api.fabric.listCapacities = refuse('fabric.listCapacities');
+    const items = await checkPrereqs({ api, user: USER, config: o.config ?? paxConfig(), sources: o.sources, paxHost: pc.host });
+    return { items, byId: Object.fromEntries(items.map((i) => [i.id, i])), keys: pc.keys() };
+  } finally {
+    rmSync(pc.base, { recursive: true, force: true });
+  }
+}
+
+test('checkPrereqs on the PAX route: this PC, the site and the app instead of capacity and Azure', async () => {
+  const { items, byId, keys } = await runPax();
+  assert.deepEqual(items.map((i) => i.id), ['consent-role', 'fabric-admin', 'register-apps', 'power-bi-pro', 'copilot-licences', 'this-pc', 'site-admin', 'managed-app', 'tenant-settings']);
+  for (const i of items) assert.ok(i.neededFor && i.howTo && i.label, i.id);
+  for (const gone of ['power-automate-premium', 'fabric-capacity', 'azure-rbac', 'key-vault', 'defender-licence', 'resource-graph']) assert.ok(!byId[gone], gone);
+
+  assert.equal(byId['this-pc'].status, 'met');
+  assert.equal(byId['this-pc'].detail, 'PowerShell 7.4.6 (execution policy RemoteSigned) and Python 3.12.4.');
+  assert.match(byId['this-pc'].neededFor, /The PC has to be on when the task runs \(02:00 by default\)/);
+  assert.deepEqual([...new Set(keys)], ['pwsh', 'python'], 'it only looks: nothing is written, registered or started');
+
+  assert.equal(byId['site-admin'].status, 'met');
+  assert.equal(byId['site-admin'].detail, 'Active: Global Administrator');
+  assert.equal(byId['site-admin'].optional, true, 'the installer shows the commands for an admin, and waits');
+
+  assert.match(byId['power-bi-pro'].neededFor, /everyone who opens the report needs Power BI Pro too/);
+  assert.equal(byId['tenant-settings'].label, 'Power BI tenant settings');
+  assert.equal(byId['tenant-settings'].status, 'unknown');
+});
+
+test('checkPrereqs on the PAX route: what this PC lacks, and how to fix it without bypassing the policy', async () => {
+  const linux = await runPax({ host: { platform: 'linux' } });
+  assert.equal(linux.byId['this-pc'].status, 'missing');
+  assert.match(linux.byId['this-pc'].detail, /needs a Windows PC/);
+  assert.equal(linux.byId['this-pc'].howTo, 'Run the installer on the Windows PC that will run the task.');
+  assert.deepEqual(linux.keys, [], 'nothing is probed on a PC that can\'t run the task');
+
+  const cloud = await runPax({ host: { platform: 'linux', cloudShell: true } });
+  assert.match(cloud.byId['this-pc'].detail, /can't be set up from Azure Cloud Shell/);
+
+  const none = await runPax({ host: { pwsh: null, python: null } });
+  assert.equal(none.byId['this-pc'].status, 'missing');
+  assert.equal(none.byId['this-pc'].detail, "PowerShell 7 isn't installed. Python isn't installed.");
+  assert.match(none.byId['this-pc'].howTo, /winget/i);
+
+  const old = await runPax({ host: { pwsh: { version: '7.1.3' }, python: { python: '3.9.7' } } });
+  assert.equal(old.byId['this-pc'].detail, 'PowerShell 7.1.3 is too old. Python 3.9.7 is too old.');
+
+  for (const policy of ['AllSigned', 'Restricted']) {
+    const locked = await runPax({ host: { pwsh: { policy } } });
+    assert.equal(locked.byId['this-pc'].status, 'missing', policy);
+    assert.match(locked.byId['this-pc'].detail, new RegExp(`execution policy is ${policy}, so the refresh scripts can't run`));
+    assert.match(locked.byId['this-pc'].howTo, /doesn't change or bypass the policy/);
+    assert.match(locked.byId['this-pc'].howTo, /Set-ExecutionPolicy -Scope CurrentUser RemoteSigned/);
+    assert.doesNotMatch(locked.byId['this-pc'].howTo, /-ExecutionPolicy Bypass/);
+  }
+  const constrained = await runPax({ host: { pwsh: { languageMode: 'ConstrainedLanguage' } } });
+  assert.match(constrained.byId['this-pc'].detail, /PowerShell runs in ConstrainedLanguage mode on this PC/);
+});
+
+test('checkPrereqs on the PAX route: the app\'s row, unless the app is turned off', async () => {
+  const { byId } = await runPax();
+  assert.equal(byId['managed-app'].status, 'missing');
+  assert.equal(byId['managed-app'].detail, 'This copy of the installer has no build of the app.');
+  assert.ok(byId['managed-app'].howTo.includes(PRODUCT.exe), 'the exe carries the build');
+  assert.equal(byId['managed-app'].optional, true, 'without it, setup finishes at the report');
+  assert.match(byId['managed-app'].neededFor, /Without it, setup finishes at the report\./);
+  assert.match(byId['managed-app'].label, new RegExp(`^The ${PRODUCT.managedApp.name} app`));
+  assert.doesNotMatch(JSON.stringify(byId['managed-app']), /App Edition/i);
+
+  const config = paxConfig();
+  config.pax = { deployApp: false };
+  const off = await runPax({ config });
+  assert.ok(!off.byId['managed-app']);
+  assert.deepEqual(off.items.map((i) => i.id).slice(-3), ['this-pc', 'site-admin', 'tenant-settings']);
+
+  const ppAdmin = await runPax({ over: { roles: [{ roleTemplateId: POWER_PLATFORM_ADMIN_ROLE, displayName: 'Power Platform Administrator' }] } });
+  assert.equal(ppAdmin.byId['site-admin'].status, 'missing', 'a Power Platform admin can\'t grant a site');
+});
+
+test('checkPrereqs on the PAX route: only the report\'s tenant settings count, since the model signs in as you', async () => {
+  const settings = (/** @type {Record<string, boolean>} */ on) => async () => Object.entries(on).map(([settingName, enabled]) => ({ settingName, enabled }));
+  const spOff = settings({ ServicePrincipalAccessPermissionAPIs: false, CustomVisualsTenant: true });
+  const pax = await runPax({ over: { tenantSettings: spOff } });
+  assert.equal(pax.byId['tenant-settings'].status, 'met');
+  assert.equal(pax.byId['tenant-settings'].detail, `The settings ${PRODUCT.name} needs are on.`);
+  const fabric = await run({ tenantSettings: spOff });
+  assert.equal(fabric['tenant-settings'].status, 'missing', 'the Fabric model signs in as the app');
+  assert.match(fabric['tenant-settings'].detail, /Service principals can call Fabric public APIs/);
+
+  const visualsOff = await runPax({ over: { tenantSettings: settings({ ServicePrincipalAccessPermissionAPIs: true, CustomVisualsTenant: false }) } });
+  assert.equal(visualsOff.byId['tenant-settings'].status, 'missing');
+  assert.equal(visualsOff.byId['tenant-settings'].detail, 'Off: Allow visuals created using the Power BI SDK.');
 });

@@ -8,6 +8,7 @@ import { plan, preflight, confirmPlan } from './steps/plan.js';
 import { isResumeLater } from './steps/identity.js';
 import { resourceGraphOn } from './steps/resource-graph.js';
 import { checkStaged } from './staging.js';
+import { isPax } from './target.js';
 
 /** @typedef {import('./install.js').Ctx} Ctx */
 /** @typedef {import('./config.js').InstallConfig} InstallConfig */
@@ -38,10 +39,11 @@ export function setupCategories(config) {
 
 /**
  * Retain error codes through explanatory wrappers; never require the browser to parse error prose.
+ * The settings sections are the Fabric route's, so a PAX failure offers none.
  * @param {unknown} err
- * @param {InstallConfig} _config
+ * @param {InstallConfig} config
  */
-export function setupRecovery(err, _config) {
+export function setupRecovery(err, config) {
   const e = /** @type {{ body?: unknown, cause?: unknown, message?: string, operations?: unknown }} */ (err ?? {});
   const source = e.cause ?? e;
   const cause = /** @type {{ body?: unknown, message?: string, operations?: unknown }} */ (source);
@@ -50,8 +52,10 @@ export function setupRecovery(err, _config) {
   const text = `${codes} ${e.message ?? ''} ${cause.message ?? ''} ${JSON.stringify(cause.operations ?? [])}`;
   let section;
   let label;
-  // Key Vault is the only Azure resource the Fabric route creates, under Identity and secrets.
-  if (/RequestDisallowedByPolicy|DenyPublicEndpointEnabled|public network|private.?dns|networking/i.test(text)) {
+  if (isPax(config)) {
+    // No section to reopen.
+  } else if (/RequestDisallowedByPolicy|DenyPublicEndpointEnabled|public network|private.?dns|networking/i.test(text)) {
+    // Key Vault is the only Azure resource the Fabric route creates, under Identity and secrets.
     section = 'identity';
     label = 'Review policy and networking';
   } else if (/region|location|capacity|quota|SkuNotAvailable|NotAvailableForSubscription|SubscriptionIsOverQuota/i.test(text)) {

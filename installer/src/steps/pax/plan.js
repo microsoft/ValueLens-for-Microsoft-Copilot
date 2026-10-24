@@ -39,12 +39,16 @@ import { describeFolder, folderConfig, folderValidator, parseSharePointFolder, S
 const LOCAL_FOLDER = `%LOCALAPPDATA%\\${PRODUCT.home}\\${PRODUCT.pax.folder}`;
 
 /**
+ * What the refresh collects, one label each.
+ * @param {InstallConfig} config
+ */
+export const paxCollectedLabels = (config) => ['Copilot interactions', 'users', ...(config.pax?.agent365 ? ['Agent 365'] : [])];
+
+/**
  * What the refresh collects, in words.
  * @param {InstallConfig} config
  */
-export function paxCollected(config) {
-  return ['Copilot interactions', 'users', ...(config.pax?.agent365 ? ['Agent 365'] : [])].join(', ');
-}
+export const paxCollected = (config) => paxCollectedLabels(config).join(', ');
 
 /**
  * Whether this install deploys the app: on unless switched off, and only from a copy of the
