@@ -142,7 +142,7 @@ export function createCli({ cliDir = CLI_PACKAGE_DIR, env = {}, spawn = nodeSpaw
     child.on('error', (err) => finish({ ok: false, exitCode: null, data: undefined, error: `Couldn't start the managed apps CLI: ${err.message}`, stdout, stderr }));
     child.on('close', (code) => {
       if (timedOut) {
-        finish({ ok: false, exitCode: code, data: undefined, error: `It didn't finish within ${Math.round(limit / 60_000)} minutes, so it was stopped.`, stdout, stderr, timedOut: true });
+        finish({ ok: false, exitCode: code, data: undefined, error: `It didn't finish within ${howLong(limit)}, so it was stopped.`, stdout, stderr, timedOut: true });
         return;
       }
       const data = onScreen ? undefined : parseJson(stdout) ?? parseJson(stderr);
@@ -212,3 +212,9 @@ function errorText(data, stderr, code) {
 
 /** @param {string} text */
 const keepEnd = (text) => (text.length > OUTPUT_CAP ? text.slice(-OUTPUT_CAP) : text);
+
+/** A time limit in words: 5 minutes, 1 minute, 30 seconds. @param {number} ms */
+function howLong(ms) {
+  const [n, unit] = ms < 60_000 ? [Math.max(1, Math.round(ms / 1000)), 'second'] : [Math.round(ms / 60_000), 'minute'];
+  return `${n} ${unit}${n === 1 ? '' : 's'}`;
+}

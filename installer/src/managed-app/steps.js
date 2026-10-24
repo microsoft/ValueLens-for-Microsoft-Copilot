@@ -122,7 +122,9 @@ export async function shareApp(run, { appDir, principals }) {
   const result = await run(['app', 'share', principals.join(','), '--access', 'play'], { cwd: appDir });
   if (!result.ok) return failed('share', result);
   const list = Array.isArray(result.data?.warnings) ? result.data.warnings : [];
-  const warnings = list.map((/** @type {any} */ w) => (w && typeof w === 'object' ? [w.input, w.reason].filter(Boolean).join(': ') : String(w)));
+  const warnings = list
+    .map((/** @type {any} */ w) => (w && typeof w === 'object' ? [w.input, w.reason].filter(Boolean).join(': ') : String(w ?? '')).trim())
+    .filter(Boolean);
   const rejected = list.map((/** @type {any} */ w) => w?.input).filter((/** @type {unknown} */ input) => typeof input === 'string' && input);
   return { ok: true, partial: Boolean(result.data?.partialFailure), rejected, warnings };
 }
@@ -172,17 +174,18 @@ export async function deleteApp(run, { appId, environmentId, cwd }) {
 }
 
 /**
- * The app's ID, environment and name from ms.config.json, when the folder is an app.
+ * The app's ID, environment and name from ms.config.json, when the folder is an app. A folder whose
+ * ms.config.json has an app ID is an app, even without its environment: the CLI won't make another there.
  * @param {string} appDir
- * @returns {{ appId: string, environmentId: string, displayName?: string, config: Record<string, any> } | undefined}
+ * @returns {{ appId: string, environmentId?: string, displayName?: string, config: Record<string, any> } | undefined}
  */
 export function readAppConfig(appDir) {
   try {
     const config = JSON.parse(stripBom(readFileSync(join(appDir, APP_CONFIG), 'utf8')));
-    if (typeof config?.appId !== 'string' || !config.appId || typeof config.environmentId !== 'string') return undefined;
+    if (typeof config?.appId !== 'string' || !config.appId) return undefined;
     return {
       appId: config.appId,
-      environmentId: config.environmentId,
+      ...(typeof config.environmentId === 'string' && config.environmentId ? { environmentId: config.environmentId } : {}),
       ...(typeof config.appDisplayName === 'string' ? { displayName: config.appDisplayName } : {}),
       config,
     };
@@ -195,6 +198,6 @@ export function readAppConfig(appDir) {
 function textsOf(list) {
   if (!Array.isArray(list)) return [];
   return list
-    .map((item) => (typeof item === 'string' ? item : typeof item?.message === 'string' ? item.message : JSON.stringify(item)))
+    .map((item) => (item == null ? '' : typeof item === 'string' ? item : typeof item?.message === 'string' ? item.message : JSON.stringify(item)).trim())
     .filter(Boolean);
 }

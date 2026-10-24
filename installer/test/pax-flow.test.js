@@ -332,9 +332,11 @@ function appDeps(run) {
   writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>ValueLens</title>');
   const cliDir = join(root, 'cli');
   const pkg = join(cliDir, 'node_modules', '@microsoft', 'managed-apps-cli');
-  mkdirSync(pkg, { recursive: true });
+  mkdirSync(join(pkg, 'dist'), { recursive: true });
   writeFileSync(join(cliDir, 'package.json'), JSON.stringify({ dependencies: { '@microsoft/managed-apps-cli': '1.0.0' } }));
   writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: '@microsoft/managed-apps-cli', version: '1.0.0' }));
+  // A stand-in for the CLI's entry point: the installer checks it's there, and the fake run never runs it.
+  writeFileSync(join(pkg, 'dist', 'Bin.js'), '');
   return { run, nodeVersion: 'v24.11.0', distDir, cliDir, appDir: join(root, 'app') };
 }
 

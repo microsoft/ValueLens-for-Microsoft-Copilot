@@ -17,7 +17,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statS
 import { dirname, join } from 'node:path';
 import { PRODUCT } from '../product.js';
 import { paxHostOf } from '../steps/pax/local.js';
-import { CLI_PACKAGE_DIR, createCli, installedVersion, MIN_NODE, nodeOk, pinnedVersion } from './cli.js';
+import { CLI_PACKAGE_DIR, cliBin, createCli, installedVersion, MIN_NODE, nodeOk, pinnedVersion } from './cli.js';
 import { ADMIN_STEPS, deployAgain, LINKS, notReady } from './errors.js';
 import { authStatus, createApp, deleteApp, deployApp, login, playUrl, readAppConfig, shareApp, switchAccount, verifyShare } from './steps.js';
 
@@ -83,8 +83,11 @@ export async function deployTheApp(ctx, deps = {}, opts = {}) {
 
   const hash = buildHash(dist);
   const existing = readAppConfig(appDir);
-  if (existing && wanted && existing.environmentId.toLowerCase() !== wanted.toLowerCase()) {
-    ui.warn(`The app is already in environment ${existing.environmentId}. --environment-id is for a new app only, so it stays there.`);
+  // Where the app already is: its folder says, or the record does when it's the same app.
+  const where = existing && (existing.environmentId ?? (existing.appId === record.appId ? record.environmentId : undefined));
+  if (where && wanted && where.toLowerCase() !== wanted.toLowerCase()) {
+    const chosen = opts.environmentId ? '--environment-id' : 'The environment chosen in the plan';
+    ui.warn(`The app is already in environment ${where}. ${chosen} is for a new app only, so it stays there.`);
   }
   const group = config.access?.groupId;
   const changed = !!opts.force || !existing || existing.appId !== record.appId || record.buildHash !== hash;
@@ -104,7 +107,9 @@ export async function deployTheApp(ctx, deps = {}, opts = {}) {
     // The folder's ms.config.json is the app the CLI deploys to.
     if (record.appId) ui.warn(`This PC's app settings are for app ${existing.appId}, not ${record.appId} as recorded, so ${existing.appId} is deployed.`);
     forgetDeploy(record);
-    Object.assign(record, { appId: existing.appId, environmentId: existing.environmentId });
+    record.appId = existing.appId;
+    if (existing.environmentId) record.environmentId = existing.environmentId;
+    else delete record.environmentId;
     ctx.save();
   }
   if (!existing) {
@@ -181,18 +186,23 @@ export async function removeTheApp(ctx, deps = {}) {
     forget();
     return { ok: true, removed: false };
   }
+  // Says why in the CLI's words, never what errors.js would say to do: that's to deploy it again.
   const leave = (/** @type {string} */ why) => {
-    ui.warn(`${The_app} (${record.appId}) is still there: ${why} Delete it at ${LINKS.portal}.`);
+    ui.warn(`${The_app} (${record.appId}) is still there: ${sentence(why)} Delete it at ${LINKS.portal}.`);
     return { ok: false, removed: false };
   };
   const blocked = whyNot({ distDir: undefined, cliDir, nodeVersion: deps.nodeVersion ?? process.version, needBuild: false });
   if (blocked) return leave(blocked.why);
 
   const run = deps.run ?? createCli({ cliDir }).run;
-  const signedIn = await signIn(ctx, run);
-  if (!signedIn.ok) return leave('skipped' in signedIn ? signedIn.skipped.why : signedIn.problem.what);
+  const signedIn = await signIn(ctx, run, 'Delete the app');
+  if (!signedIn.ok) {
+    if ('skipped' in signedIn) return leave(signedIn.skipped.why);
+    const said = signedIn.problem.message?.trim();
+    return leave(`The managed apps CLI couldn't sign in${said ? `: ${said}` : ''}`);
+  }
   const gone = await deleteApp(run, { appId: record.appId, environmentId: record.environmentId, cwd: existsSync(appDir) ? appDir : undefined });
-  if (!gone.ok) return leave(gone.problem.message ?? gone.problem.what);
+  if (!gone.ok) return leave(gone.problem.message?.trim() || 'The managed apps CLI couldn\'t delete it, and didn\'t say why');
   ui.ok(gone.existed ? `Deleted ${THE_APP}` : `${The_app} was already gone`);
   forget();
   return { ok: true, removed: gone.existed };
@@ -217,11 +227,16 @@ export function whyNot({ distDir, cliDir, nodeVersion, needBuild = true }) {
       steps: [`Use ${PRODUCT.exe}, which carries a new enough Node.js, or install it from ${LINKS.node}.`, then],
     };
   }
-  const pinned = pinnedVersion(cliDir);
-  const installed = installedVersion(cliDir);
-  if (installed !== pinned) {
+  let pinned;
+  try {
+    pinned = pinnedVersion(cliDir);
+  } catch {
+    pinned = undefined;
+  }
+  const installed = existsSync(cliBin(cliDir)) ? installedVersion(cliDir) : undefined;
+  if (!pinned || installed !== pinned) {
     return {
-      why: installed ? `The managed apps CLI here is ${installed}, and the installer needs ${pinned}.` : 'The managed apps CLI isn\'t installed here.',
+      why: pinned && installed ? `The managed apps CLI here is ${installed}, and the installer needs ${pinned}.` : 'The managed apps CLI isn\'t installed here.',
       steps: [`Use ${PRODUCT.exe}, which carries it. Or install it in a clone: npm ci --ignore-scripts --omit=dev --prefix installer/managed-cli`, then],
     };
   }
@@ -315,7 +330,7 @@ function failure(ctx, problem, result) {
   }
   delete record.missing;
   const again = deployAgain();
-  const steps = [problem.who === 'you' ? problem.what : `Ask a ${problem.who}: ${problem.what}`];
+  const steps = [problem.who === 'you' ? problem.what : `Ask ${someone(problem.who)}: ${problem.what}`];
   if (problem.link) steps.push(`More: ${problem.link}`);
   if (!problem.what.includes(again)) steps.push(`Then run: ${again}`);
   const said = (problem.message ?? '').split(/\r?\n/)[0].slice(0, 300);
@@ -324,7 +339,7 @@ function failure(ctx, problem, result) {
   ui.fail(`${The_app}: ${problem.message ?? problem.what}`);
   if (problem.details) ui.note(problem.details);
   if (problem.message) ui.info(problem.what);
-  if (problem.who !== 'you') ui.info(`Who fixes it: a ${problem.who}.`);
+  if (problem.who !== 'you') ui.info(`Who fixes it: ${someone(problem.who)}.`);
   if (problem.link) ui.note(problem.link);
   return { ok: false, state: 'failed', ...(record.url ? { url: record.url } : {}) };
 }
@@ -332,14 +347,21 @@ function failure(ctx, problem, result) {
 /** @param {string | undefined} a @param {string | undefined} b */
 const sameAccount = (a, b) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
 
+/** Who fixes it, with "a" or "an": an Entra admin, a Power Platform admin. @param {string} who */
+const someone = (who) => `${/^[aeiou]/i.test(who) ? 'an' : 'a'} ${who}`;
+
+/** Ends the text with a full stop when it hasn't one. @param {string} text */
+const sentence = (text) => (/[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`);
+
 /**
  * Signs the CLI in as the person running the installer: the account it's on, one it already has, or a
  * browser sign-in. With --yes it never opens a browser.
  * @param {Ctx} ctx
  * @param {RunCli} run
+ * @param {string} [doing]  What it signs in for, as the question about another account asks it.
  * @returns {Promise<{ ok: true, account?: string } | { ok: false, skipped: { why: string, steps: string[] } } | { ok: false, problem: Problem, result?: import('./cli.js').CliResult }>}
  */
-async function signIn(ctx, run) {
+async function signIn(ctx, run, doing = 'Deploy the app') {
   const { ui } = ctx;
   const want = ctx.user?.upn;
   const status = await authStatus(run);
@@ -366,7 +388,7 @@ async function signIn(ctx, run) {
   const after = await authStatus(run);
   if (!after.ok) return after;
   if (after.signedIn && (!want || sameAccount(after.account, want))) return { ok: true, account: after.account };
-  if (after.signedIn && (await ui.confirm(`The CLI signed in as ${after.account}, not ${want}. Deploy the app as ${after.account}?`, false))) {
+  if (after.signedIn && (await ui.confirm(`The CLI signed in as ${after.account}, not ${want}. ${doing} as ${after.account}?`, false))) {
     return { ok: true, account: after.account };
   }
   return {
@@ -415,7 +437,7 @@ async function shareWith(ctx, run, appDir, group) {
     delete record.missing;
     record.skipped = {
       why: `The app is live, but it isn't shared with ${name}, so nobody else can open it.`,
-      steps: [problem.who === 'you' ? problem.what : `Ask a ${problem.who}: ${problem.what}`, ...(problem.what.includes(rerun) ? [] : [`Then run: ${rerun}`])],
+      steps: [problem.who === 'you' ? problem.what : `Ask ${someone(problem.who)}: ${problem.what}`, ...(problem.what.includes(rerun) ? [] : [`Then run: ${rerun}`])],
     };
     return false;
   }
@@ -430,7 +452,11 @@ async function shareWith(ctx, run, appDir, group) {
     };
     return false;
   }
+  const before = (record.sharedWith ?? []).filter((id) => id.toLowerCase() !== group.toLowerCase());
   record.sharedWith = [group];
   ui.ok(`Shared the app with ${name}`);
+  if (before.length) {
+    ui.warn(`The app is still shared with the group it had before (${before.join(', ')}). If its members shouldn't open it, stop sharing it at ${LINKS.portal}.`);
+  }
   return true;
 }

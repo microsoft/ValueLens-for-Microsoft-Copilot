@@ -112,7 +112,7 @@ export function explain(step, result) {
   }
   const off = notReady(result);
   if (off.length) return problem(ADMIN_STEPS[off[0]]);
-  const codes = [result.data?.errorCode, result.errorData?.errorCode].filter((s) => typeof s === 'string').join('\n');
+  const codes = [result.data?.errorCode, result.errorData?.errorCode, result.errorData?.serverErrorCode].filter((s) => typeof s === 'string').join('\n');
   if (/(failed|unable) to resolve a developer environment|provision a developer environment/i.test(message)) {
     return problem({
       who: 'you',
