@@ -14,8 +14,8 @@
   --color-brand-foreground: #0b5a52;  /* line/point marks, branded text & emphasis */
   --color-hover:            #eef5f3;  /* row/cell hover surface in DataGrid + visuals */
 
-  /* Categorical data palette — the ValueLens and Consumption Central App
-     Editions' series order: teal leads, then blue, amber and violet, the
+  /* Categorical data palette — the ValueLens and Consumption Central CSV
+     apps' series order: teal leads, then blue, amber and violet, the
      colours those apps give licensed people, Cowork, unlicensed people and
      agents. The rest stay quiet enough to sit together in a stacked bar. */
   --color-data-1:  #0f766e;
@@ -31,7 +31,7 @@
 }
 
 @theme {
-  /* Color tokens — light theme, the App Editions' teal-on-canvas palette.
+  /* Color tokens — light theme, the CSV apps' teal-on-canvas palette.
      Usage: bg-*, text-*, border-* (e.g. bg-primary text-primary-foreground)
      Each token has a -foreground pair for text on that surface. */
   --color-background: #f3f6f5;                                       /* page canvas */
@@ -65,7 +65,7 @@
   --color-input: #c9d6d3;                                            /* input field borders */
   --color-ring: #0f766e;                                             /* focus rings */
 
-  /* The app band: the dark teal header every App Edition carries. */
+  /* The app band: the dark teal header every CSV app carries. */
   --color-band: #0b3d3a;
   --color-band-foreground: #ffffff;
   --color-band-muted: #b9d3cf;
@@ -79,7 +79,7 @@
   --color-negative: var(--vl-coral-text);                            /* thumbs down, over-specified */
   --color-caution: var(--vl-amber-text);                             /* worth a look, under-specified */
 
-  /* Elevation shadows, keyed by resting elevation in px; teal-tinted like the App Editions.
+  /* Elevation shadows, keyed by resting elevation in px; teal-tinted like the CSV apps.
      Usage: shadow-* (e.g. shadow-8, shadow-64) */
   --shadow-card: 0 1px 2px rgb(16 40 37 / 0.06);                     /* panels and KPI tiles */
   --shadow-2:  0 1px 2px rgb(16 40 37 / 0.08);
@@ -241,7 +241,7 @@
   }
 }
 
-/* Hue roles, retuned to the App Editions' palette so every chart, chip and
+/* Hue roles, retuned to the CSV apps' palette so every chart, chip and
    outcome colour sits in the same family as the teal chrome.
 
    Each hue has three roles:
@@ -249,7 +249,7 @@
      text  — a deeper (light) or paler (dark) shade that clears 4.5:1 on cards,
              for text, controls and focus rings
      tint  — a quiet surface for selection and callouts
-   Teal, amber, violet (`plum`) and blue are the App Editions' licensed,
+   Teal, amber, violet (`plum`) and blue are the CSV apps' licensed,
    unlicensed, agent and Cowork colours; coral is their "bad". */
 @layer base {
   :root {
@@ -271,7 +271,7 @@
     --vl-periwinkle: #94a3b8;  --vl-periwinkle-text: #475569; --vl-periwinkle-tint: #eef2f6;
     --vl-slate: #64748b;
     --vl-ink: #12201e;
-    /* The habit ladder, Power (4) down to Inactive (0): the App Editions' teal
+    /* The habit ladder, Power (4) down to Inactive (0): the CSV apps' teal
        ramp, with Inactive stepping out of it into grey because it is an absence. */
     --vl-ladder-4: #0b544c;
     --vl-ladder-3: #23897c;
@@ -305,8 +305,8 @@
     --vl-ladder-0: #4a5058;
   }
 
-  /* Series orders. The chrome is the one teal everywhere, as in the App
-     Editions; a palette only reorders chart series where the order carries
+  /* Series orders. The chrome is the one teal everywhere, as in the CSV
+     apps; a palette only reorders chart series where the order carries
      meaning. Charts pick these up through `usePaletteTheme`. */
 
   /* Consumption leads with prepaid teal and puts amber second, so
@@ -329,7 +329,7 @@
 }
 
 @layer base {
-  /* The page column's side padding: the App Editions' 28px, 16px on a phone.
+  /* The page column's side padding: the CSV apps' 28px, 16px on a phone.
      Full-bleed rows inside the column pull out by the same amount. */
   :root {
     --page-x: 28px;
@@ -357,7 +357,7 @@ body,
 }
 
 /* Panels. Every card on a page is a white panel on the canvas with a hairline
-   and the App Editions' faint teal shadow; the screens draw them as
+   and the CSV apps' faint teal shadow; the screens draw them as
    `rounded-xl border bg-card`, so the shadow is given here once rather than
    in each of them. Dashed cards are placeholders and stay flat. */
 @layer components {

@@ -35,7 +35,8 @@ between and keep up to date.
 - **"App Edition" is now "the app".** The footer, the data dialog, the app README, PRODUCT.md and
   DESIGN.md say so, and `app/download/ValueLens-App.html` was rebuilt. The Fabric App deploy keeps
   `id: valuelens-app-edition` in `app/rayfin/rayfin.yml`, so redeploying still updates the existing
-  item instead of creating a second one.
+  item instead of creating a second one. [`fabric-app/`](fabric-app/README.md)'s docs and code
+  comments now call it "the CSV app" too; nothing on screen changes.
 - **The app's builds make the sample data first.** Git ignores `app/public/sample/`, so an app
   deployed from a fresh clone stopped at "Couldn't load the sample data", without the **Change
   data** button. `npm run dev`, `npm run build` and `npm run build:file` now run

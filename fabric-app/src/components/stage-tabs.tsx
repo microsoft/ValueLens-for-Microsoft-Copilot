@@ -25,7 +25,7 @@ const KEYS: Record<string, (index: number, count: number) => number> = {
 };
 
 /**
- * A page's stages as its sub-views, drawn as the App Editions' segmented
+ * A page's stages as its sub-views, drawn as the CSV apps' segmented
  * control under the page title. A page shows one stage at a time, so it only
  * queries what is open. They keep tab semantics: arrow keys move between them.
  */

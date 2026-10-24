@@ -18,7 +18,7 @@ interface SegmentedControlProps<T extends string> {
 
 /**
  * The segmented toggle that replaces Power BI's bookmark buttons, drawn as
- * the App Editions draw theirs: a quiet track with the chosen option raised. Every
+ * the CSV apps draw theirs: a quiet track with the chosen option raised. Every
  * destination uses it to swap between cohorts and lenses without refetching,
  * so it behaves identically wherever it appears.
  */

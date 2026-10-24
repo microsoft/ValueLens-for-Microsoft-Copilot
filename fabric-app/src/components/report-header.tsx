@@ -46,7 +46,7 @@ interface ReportHeaderProps {
 const LABELS: Record<ExportFormat, string> = { pdf: "Download PDF", pptx: "Download PowerPoint" };
 
 /**
- * The page head of a destination or report pack, as the App Editions draw it
+ * The page head of a destination or report pack, as the CSV apps draw it
  * in the toolbar: which product it belongs to, what it is, how fresh its data
  * is, and downloads of it as a PDF or a PowerPoint deck drawn with the
  * current filters.

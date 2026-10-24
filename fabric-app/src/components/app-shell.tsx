@@ -126,7 +126,7 @@ interface BandTab {
 const COLUMN = "mx-auto w-full max-w-[1480px] px-[var(--page-x)]";
 
 /**
- * The App Editions' frame. A dark teal band carries the brand, a switcher
+ * The CSV apps' frame. A dark teal band carries the brand, a switcher
  * across the products this install shows — ValueLens and Consumption
  * Central — the open product's tabs, and the app-wide actions: the
  * assumptions, Ask, report packs, sharing and the theme. Under it a white
