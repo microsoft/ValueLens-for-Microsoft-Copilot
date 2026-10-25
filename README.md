@@ -32,12 +32,8 @@ value, consumption and governance in one place. It includes the ValueLens report
 <th width="50%">The Power BI report</th>
 </tr>
 <tr>
-<td><img src="Images/ValueLens-App-Adoption.png" alt="The ValueLens app's Adoption tab, showing the built-in sample data"></td>
-<td><img src="media/powerbi/valuelens.png" alt="The ValueLens Power BI report's User Activation page, showing sample data"></td>
-</tr>
-<tr>
-<td><img src="Images/ValueLens-App-Value.png" alt="The app's Value tab: expert-equivalent hours, value and return"></td>
-<td><img src="Images/ValueLens-App-Fit.png" alt="The app's Fit tab: how well each Cowork task suits Cowork"></td>
+<td><img src="Images/ValueLens-App-Preview.gif" alt="The ValueLens app cycling through its Adoption, Habits, Agents, Value, Fit, Readiness and Feedback tabs, showing the built-in sample data"></td>
+<td><img src="Images/ValueLens-Preview.gif" alt="The ValueLens Power BI report cycling through its pages, showing sample data"></td>
 </tr>
 </table>
 
@@ -46,8 +42,6 @@ All screenshots use synthetic sample data. Every name in them is invented.
 <a id="watch-first"></a>
 
 ## Videos
-
-![ValueLens preview](Images/ValueLens-Preview.gif)
 
 - **[Watch the demo](https://youtu.be/P0uHJb13ZR0)** (2 minutes). What the dashboard shows, page by page.
 - **[Watch the Fabric setup](1.%20Fabric/README.md#video)**. From a new app registration to a self-refreshing report.
