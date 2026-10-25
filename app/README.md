@@ -89,6 +89,7 @@ The Guide tab lists these differences too.
 npm install
 npm run dev         # local dev server
 npm run lint
+npm test            # unit tests for the upload checks (Node 24, no install needed)
 npm run build       # type-check and build to dist/ (Fabric App and Managed App hosting)
 npm run build:file  # build the single-file download to download/ValueLens-App.html
 ```

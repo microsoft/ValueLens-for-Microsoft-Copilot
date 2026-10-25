@@ -6,7 +6,7 @@ import { builtInTenant, estate, LIFECYCLE, linkageNote, registryFreshness, type 
 import { BarList } from '../ui/charts'
 import { DataTable, type Column } from '../ui/DataTable'
 import { dateLabel, int, pct } from '../ui/format'
-import { Kpi, KpiRow, Panel } from '../ui/primitives'
+import { Empty, Kpi, KpiRow, Panel } from '../ui/primitives'
 import { COLOR, LIFECYCLE_COLOR } from '../ui/theme'
 import { text } from './common'
 
@@ -77,6 +77,7 @@ export function Agents() {
   ]
   return (
     <>
+      {!ds.agents.length && <Empty>No Agent 365 registry is loaded. Add it to see registry records, lifecycle and usage review.</Empty>}
       <KpiRow>
         <Kpi tone="agent" label="Registry records" value={int(d.agents.length)} help={gloss('Registry records', P)} />
         <Kpi tone="agent" label="Built in your tenant" value={int(d.tenant)} help={gloss('Owner coverage', P)} />

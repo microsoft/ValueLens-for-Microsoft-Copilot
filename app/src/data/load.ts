@@ -3,14 +3,8 @@ import embeddedSample from 'virtual:embedded-sample'
 import estimates from './estimates.json'
 import type { AgentInfo, Dataset, Feedback, Lic, Person, Row, Thread, Tool } from './types'
 import { FRONTIER, NOT_ATTRIBUTED, UNKNOWN_ORG, WORKHORSE } from './types'
+import { checkCounts, type FileKind, type RowCounts } from './loadCheck'
 
-export type FileKind = 'interactions' | 'users' | 'agents' | 'feedback'
-export const FILE_LABEL: Record<FileKind, string> = {
-  interactions: 'Copilot interactions',
-  users: 'Organisation and licences',
-  agents: 'Agent 365 registry',
-  feedback: 'Product feedback',
-}
 type Rec = Record<string, string>
 
 export function parseCsv(text: string): { headers: string[]; rows: Rec[] } {
@@ -534,18 +528,21 @@ export async function loadSample(): Promise<Dataset> {
   return buildDataset(i, u, a, f, 'sample', 'Synthetic sample · Contoso')
 }
 
-export async function loadFiles(files: File[]): Promise<{ dataset: Dataset; found: FileKind[] }> {
+export async function loadFiles(files: File[]): Promise<{ dataset: Dataset; counts: RowCounts }> {
   const parts: Partial<Record<FileKind, Rec[]>> = {}
+  const counts: RowCounts = {}
   for (const f of files) {
     const { headers, rows } = parseCsv(await f.text())
     const kind = detectKind(headers)
-    if (kind) parts[kind] = rows
+    if (kind) {
+      parts[kind] = rows
+      counts[kind] = rows.length
+    }
   }
-  if (!parts.interactions) throw new Error('No Copilot interactions file found. It needs ThreadId and Audit_UserId (or Message_isPrompt) columns.')
-  const found = Object.keys(parts) as FileKind[]
+  checkCounts(counts)
   const label = files.map((f) => f.name).join(', ')
   return {
-    dataset: buildDataset(parts.interactions, parts.users ?? [], parts.agents ?? [], parts.feedback ?? [], 'upload', label),
-    found,
+    dataset: buildDataset(parts.interactions!, parts.users ?? [], parts.agents ?? [], parts.feedback ?? [], 'upload', label),
+    counts,
   }
 }
