@@ -64,7 +64,7 @@ export function nextSteps(config, user = {}) {
         siteGrantStep(config, user),
         firstRefreshStep(config),
         desktopPublishStep(config),
-        modelCredentialsStep(config),
+        modelCredentialsStep(config, user),
         shareReportStep(config, user),
         appSettingsStep(config, user),
         appSkippedStep(config),
@@ -210,13 +210,14 @@ function desktopPublishStep(config) {
  * The PAX route: signing the model in to SharePoint, which Power BI has no API for. Until then the
  * report can't refresh. Not while the report waits to be published from Desktop, which signs it in.
  * @param {import('../config.js').InstallConfig} config
+ * @param {{ tenantId?: string }} user
  * @returns {NextStep | null}
  */
-function modelCredentialsStep(config) {
+function modelCredentialsStep(config, user) {
   const sm = config.semanticModel;
   const ws = config.fabric?.workspaceId;
   if (!sm?.id || !ws || sm.bound || config.powerBi?.desktopPending) return null;
-  const url = modelSettingsUrl(ws, sm.id);
+  const url = modelSettingsUrl(ws, sm.id, user.tenantId ?? config.tenantId);
   return {
     id: 'model-credentials',
     title: `Sign ${sm.name} in to SharePoint`,

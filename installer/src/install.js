@@ -35,7 +35,7 @@ import { ensureModelConnection, ensureSemanticModel, modelUrl, pendingReloads, r
 import { confirmPlan, plan, preflight } from './steps/plan.js';
 import { checkPrereqs } from './prereqs.js';
 import { PRODUCT } from './product.js';
-import { ensureReports, reportsOn, reportsSummary } from './steps/report.js';
+import { ensureReports, reportsOn, reportsSummary, tenantQuery } from './steps/report.js';
 import { dataSourcesSummary, ensureUploads, uploadCommand } from './steps/data-sources.js';
 import { ensureFlows, FLOW_FILES, flowDefinitions, flowsSummary, flowsWanted } from './steps/flows.js';
 import { ensureAppResourceGraphAccess, resourceGraphOn } from './steps/resource-graph.js';
@@ -62,6 +62,7 @@ import { askTarget, holdTarget, isPax, requiredPermissions, ROUTE_NAMES } from '
  * @property {import('./clients/fabric.js').FabricApi} fabric
  * @property {import('./clients/graph.js').GraphApi} graph
  * @property {import('./clients/graph.js').GraphApi} [graphRoles]  Graph with the role management scope, asked for only when it's used.
+ * @property {import('./clients/graph.js').GraphApi} [graphSites]  Graph with Sites.FullControl.All, asked for only when a site administrator gives the PAX app its site.
  * @property {import('./clients/azure.js').ArmApi} arm
  * @property {import('./clients/azure.js').KeyVaultApi} keyVault
  * @property {import('./clients/onelake.js').OneLakeApi} oneLake
@@ -123,7 +124,10 @@ export async function connect(opts) {
     fabric: fabricApi(client('https://api.fabric.microsoft.com/v1', 'fabric')),
     graph: graphApi(client('https://graph.microsoft.com/v1.0', 'graph')),
     // The Azure CLI sign-in only hands out .default tokens, so it can't ask for this scope.
-    ...(opts.method === 'azure-cli' ? {} : { graphRoles: graphApi(client('https://graph.microsoft.com/v1.0', 'graphRoles')) }),
+    ...(opts.method === 'azure-cli' ? {} : {
+      graphRoles: graphApi(client('https://graph.microsoft.com/v1.0', 'graphRoles')),
+      graphSites: graphApi(client('https://graph.microsoft.com/v1.0', 'graphSites')),
+    }),
     arm: armApi(client('https://management.azure.com', 'arm')),
     keyVault: keyVaultApi(client('https://vault.azure.net', 'keyVault')),
     oneLake: oneLakeApi(client(ONELAKE_URL, 'storage')),
@@ -768,7 +772,7 @@ export async function summary(ctx, opts = {}) {
   }
   const left = nextSteps(config, ctx.user);
   if (left.length) ui.nextSteps(stepsLeftTitle(left), left);
-  ui.info(`Workspace:  ${f.workspaceName}  ${c.dim(`https://app.fabric.microsoft.com/groups/${ws}`)}`);
+  ui.info(`Workspace:  ${f.workspaceName}  ${c.dim(`https://app.fabric.microsoft.com/groups/${ws}${tenantQuery(ctx.user?.tenantId ?? config.tenantId)}`)}`);
   ui.info(`Lakehouse:  ${f.lakehouseName}`);
   ui.info(`Pipeline:   ${f.pipelineName ?? PIPELINE_NAME}, ${describeSchedule(config.schedule)}`);
   const mode = secretMode(config);
@@ -780,7 +784,7 @@ export async function summary(ctx, opts = {}) {
 
   const sm = config.semanticModel;
   if (sm.enabled && sm.id) {
-    ui.info(`Model:      ${sm.name}  ${c.dim(modelUrl(ws, sm.id))}`);
+    ui.info(`Model:      ${sm.name}  ${c.dim(modelUrl(ws, sm.id, ctx.user?.tenantId ?? config.tenantId))}`);
     if (sm.connectionName) ui.info(`            ${c.dim(`Reads the Lakehouse through "${sm.connectionName}"${sm.secretExpires ? `, whose secret expires ${sm.secretExpires.slice(0, 10)}` : ''}.`)}`);
     reportsSummary(ctx);
 

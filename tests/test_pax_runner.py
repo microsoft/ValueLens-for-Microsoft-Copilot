@@ -106,6 +106,9 @@ USER_INFO_DAYS_MESSAGE = ("ERROR: -Days says how many days of audit activity to 
 SITE_PATH = "example.sharepoint.com:/sites/Analytics"
 SITE_URL = "https://example.sharepoint.com/sites/Analytics"
 LOCKED_SITE = "example.sharepoint.com:/sites/Locked"
+# A site the app has no Sites.Selected grant on: Graph finds it, but lists none of its libraries.
+UNGRANTED_SITE = "example.sharepoint.com:/sites/Ungranted"
+UNGRANTED_URL = "https://example.sharepoint.com/sites/Ungranted"
 LIBRARIES = [
     {"id": "b!site-assets", "name": "Site Assets", "webUrl": f"{SITE_URL}/SiteAssets"},
     {"id": DRIVE, "name": "Documents", "webUrl": f"{SITE_URL}/Shared%20Documents"},
@@ -520,6 +523,11 @@ def _fail(c):
         c.run(env={"STUB_MODE": "fail", "STUB_PAX_EXIT": code})
 
 
+@refresh_case("search-401")
+def _search_401(c):
+    c.config().state(1).local().run(env={"STUB_MODE": "search-401"})
+
+
 @refresh_case("busy")
 def _busy(c):
     c.spec["holdLock"] = True
@@ -561,7 +569,7 @@ def _upload_fails(c):
 
 @refresh_case("agents-on")
 def _agents_on(c):
-    c.config(agent365=True, deidentify=True).state(1).local().run().run(env={"STUB_AGENTS": "none"})
+    c.config(agent365=True, deidentify=True, partitionHours=72, maxSearches=5).state(1).local().run().run(env={"STUB_AGENTS": "none"})
 
 
 def _site_with_libraries(c):
@@ -591,6 +599,9 @@ CHECK_RUNS = [
     ({"library": "Documents", "siteId": LOCKED_SITE}, {"ok": False, "status": 403, "error": (
         f"Finding the SharePoint site {LOCKED_SITE} failed with HTTP 403: Access denied. {GRANT_MESSAGE} {HINT}")}),
     ({"siteId": SITE, "driveId": DRIVE}, {"ok": True, "siteId": SITE, "driveId": DRIVE, "folder": "/Reports"}),
+    ({"library": "Documents", "siteId": UNGRANTED_SITE}, {"ok": False, "status": 403, "error": (
+        f"The app can see no document libraries on {UNGRANTED_URL}, so it hasn't been given access to the site "
+        f"yet. {GRANT_MESSAGE} {HINT}")}),
 ]
 
 
@@ -599,6 +610,8 @@ def _check(c):
     # The lock is held throughout: a check doesn't wait for a scheduled refresh.
     c.spec["holdLock"] = True
     _site_with_libraries(c).spec["status"] = {f"GET:sites/{LOCKED_SITE}": 403}
+    c.spec["sites"][UNGRANTED_SITE] = {"id": "ungranted-site", "webUrl": UNGRANTED_URL}
+    c.spec["drives"]["ungranted-site"] = []
     for n, (changes, _) in enumerate(CHECK_RUNS, start=1):
         path = c.install / f"check-{n}.json"
         c.config(path=path, **{"siteId": SITE_PATH, "driveId": None, **changes}).run(Config=path, Check=True)
@@ -626,6 +639,8 @@ INVALID_CONFIG = {
     "runHours": 30,
     "agent365": "yes",
     "deidentify": 1,
+    "partitionHours": 96,
+    "maxSearches": 0,
     "repairHint": HINT,
 }
 INVALID_CONFIG_PROBLEMS = [
@@ -646,6 +661,8 @@ INVALID_CONFIG_PROBLEMS = [
     "keepRunFilesDays must be a whole number from 1 to 365.",
     "windowDays must be a whole number from 1 to 180.",
     "minDays can't be more than maxDays.",
+    "partitionHours must be a whole number from 1 to 72.",
+    "maxSearches must be a whole number from 1 to 10.",
     "runHours must be a number of hours above 0 and up to 23.",
     "agent365 must be true or false.",
     "deidentify must be true or false.",
@@ -1194,6 +1211,19 @@ class RefreshTests(unittest.TestCase):
                 self.assertEqual(c.log("upload", n), [])
                 self.assertEqual(len(c.tokens(n)), 1)
 
+    def test_an_audit_search_refused_with_401_says_the_permissions_may_not_have_applied(self):
+        c = self.case("search-401")
+        self.assertEqual(c.exit(1), 1, c.output(1))
+        state = c.state_after(1)
+        self.assertEqual(state["lastError"],
+                         "The PAX run failed (exit code 1). PAX stopped on an error. PAX failed."
+                         " Microsoft Purview refused to start the audit log searches (HTTP 401). Just after setup,"
+                         " that's usually because the app's new permissions haven't applied yet. Wait 15 minutes,"
+                         " then run the refresh again. If it keeps happening, check that the app has the"
+                         " AuditLogsQuery.Read.All application permission with admin consent."
+                         f" The log is {state['lastLog']}.")
+        self.assertEqual(c.log("upload", 1), [])
+
     def test_a_second_refresh_stops_while_one_is_running(self):
         c = self.case("busy")
         self.assertEqual(c.exit(1), 2, c.output(1))
@@ -1258,6 +1288,8 @@ class RefreshTests(unittest.TestCase):
         self.assertEqual(c.exit(1), 0, c.output(1))
         params = c.log("pax", 1)[0]["params"]
         self.assertEqual((params.get("IncludeAgent365Info"), params.get("Deidentify")), ("True", "True"))
+        # A small tenant's audit search sizing, from refresh.json.
+        self.assertEqual((params.get("PartitionHours"), params.get("MaxConcurrency")), ("72", "5"))
         self.assertEqual(sorted(self.remote_names(c, 1)), sorted([INTERACTIONS, USERS, AGENTS]))
         self.assertEqual(c.exit(2), 0, c.output(2))
         self.assertEqual(sorted(self.remote_names(c, 2)), sorted([INTERACTIONS, USERS]))
@@ -1325,6 +1357,12 @@ class RefreshTests(unittest.TestCase):
                           for run in pax], [(False, False, False)] + [(False, True, True)] * 4)
         # The Agent 365 registry is a snapshot, so only the first window reads it.
         self.assertEqual(["IncludeAgent365Info" in run["params"] for run in pax], [True, False, False, False, False])
+        # state.json names each window as it starts, which the installer's status shows.
+        self.assertEqual([(run["pending"] or {}).get("index") for run in pax], [1, 2, 3, 4, 5])
+        self.assertEqual({(run["pending"] or {}).get("count") for run in pax}, {5})
+        # No partitionHours or maxSearches in refresh.json, so PAX sizes its own searches.
+        self.assertEqual([("PartitionHours" in run["params"], "MaxConcurrency" in run["params"]) for run in pax],
+                         [(False, False)] * 5)
         output = c.output(1)
         self.assertIn(f"PAX looks back 30 days, from {nominal[0][0]}.", output)
         self.assertIn("It reads them in 5 windows of up to 6 days, oldest first.", output)
@@ -1522,6 +1560,8 @@ class RefreshTests(unittest.TestCase):
         self.assertEqual((c.sites(4), c.graph(3), c.graph(4)), ([(LOCKED_SITE, SITE_LOOKUP, 403)], [], []))
         # A drive ID needs no lookup.
         self.assertEqual((c.sites(5), c.graph(5)), ([], [G("Reports", 200)]))
+        # No libraries listed means no grant, so the installer shows the admin step rather than failing.
+        self.assertEqual((c.sites(6), c.graph(6)), ([(UNGRANTED_SITE, SITE_LOOKUP, 200), ("ungranted-site/drives", DRIVES_PAGE_1, 200)], []))
         missing = len(CHECK_RUNS) + 1
         self.assertEqual(c.exit(missing), 1, c.output(missing))
         self.assertEqual(c.check_result(missing), {"ok": False, "error": (
@@ -1746,7 +1786,7 @@ class RunnerSourceTests(unittest.TestCase):
         # The secret travels in AIBV_CLIENT_SECRET, never on a command line that other processes can read.
         self.assertEqual(flags, {"TenantId", "ClientId", "Days", "StartDate", "EndDate", "WorkRoot", "PaxReleaseTag",
                                  "PaxSha256", "SkipVersionCheck", "AppendFile", "AppendUserInfo", "IncludeAgent365Info",
-                                 "Deidentify", "OnlyUserInfo"})
+                                 "Deidentify", "OnlyUserInfo", "PartitionHours", "MaxConcurrency"})
         wrapper = self.params(WRAPPER)
         self.assertLessEqual(flags, set(wrapper), sorted(flags - set(wrapper)))
         self.assertEqual({name for name in flags if wrapper[name]["switch"]},

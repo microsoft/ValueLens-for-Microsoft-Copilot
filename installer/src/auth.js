@@ -16,6 +16,8 @@ export const SCOPES = {
   powerApps: 'https://service.powerapps.com/.default',
   /** Asked for only when giving the app an Entra role, and only if the usual Graph sign-in can't. */
   graphRoles: 'https://graph.microsoft.com/RoleManagement.ReadWrite.Directory',
+  /** Asked for only when a SharePoint or Global Administrator gives the PAX app its site, and only if the usual Graph sign-in can't. */
+  graphSites: 'https://graph.microsoft.com/Sites.FullControl.All',
 };
 
 /** The APIs in SCOPES, as people know them. */
@@ -173,7 +175,7 @@ export function exitWhenDone(code) {
  * @param {(resource: Resource) => Promise<string>} getToken  From createTokenProvider, which keeps the tokens.
  * @param {(keyof typeof SCOPES)[]} [apis]
  */
-export async function checkTokens(getToken, apis = /** @type {(keyof typeof SCOPES)[]} */ (Object.keys(SCOPES))) {
+export async function checkTokens(getToken, apis = /** @type {(keyof typeof SCOPES)[]} */ (Object.keys(API_NAMES))) {
   /** @type {string[]} */
   const missing = [];
   for (const api of apis) {

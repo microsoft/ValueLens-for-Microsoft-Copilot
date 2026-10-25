@@ -395,6 +395,32 @@ test("pax site: ensureSiteGrant leaves the site to an administrator when the sig
   assert.equal(broken.sp.pendingAdminGrant, undefined);
 });
 
+test('pax site: ensureSiteGrant asks a site administrator for full control and gives the grant itself', async (t) => {
+  const GLOBAL_ADMIN = { roleTemplateId: '62e90394-69f5-4237-9190-012177145e10', displayName: 'Global Administrator' };
+  /** @param {import('node:test').TestContext} tc @param {boolean} admin */
+  const run = async (tc, admin) => {
+    const s = paxCtx(tc);
+    if (admin) s.graph.directoryRoles.push(GLOBAL_ADMIN);
+    const usual = siteGraph();
+    usual.failures.site = [httpError(403, 'Access denied')];
+    /** @type {any} */ (s.ctx.api).graphSites = s.graph.api;
+    s.ctx.api.graph = /** @type {any} */ (Object.assign(usual.api, { myDirectoryRoles: s.graph.api.myDirectoryRoles }));
+    return { s, ok: await ensureSiteGrant(s.ctx) };
+  };
+
+  const { s, ok } = await run(t, true);
+  assert.equal(ok, true);
+  assert.deepEqual(s.graph.calls, [`site ${SITE_PATH}`, `sitePermissions ${SITE_ID}`, `grantSitePermission ${SITE_ID} ${APP_ID} ${appName(s.config)} write`]);
+  assert.deepEqual(s.sp, { ...COPILOT, siteId: SITE_ID, grantId: 'perm-1', granted: true });
+  assert.ok(plain(s.out).includes("SharePoint's full control permission"), plain(s.out));
+
+  // Anyone else gets the administrator's steps, without being asked for a permission they can't have.
+  const other = await run(t, false);
+  assert.equal(other.ok, false);
+  assert.deepEqual(other.s.graph.calls, []);
+  assert.equal(other.s.sp.pendingAdminGrant, true);
+});
+
 test("pax site: recordFolderCheck notes the app's access, and Graph's site ID", (t) => {
   const s = paxCtx(t);
   s.sp.pendingAdminGrant = true;

@@ -12,8 +12,15 @@ import { createItem } from './fabric.js';
 /** @typedef {import('../install.js').Ctx} Ctx */
 /** @typedef {import('../config.js').ModelConfig} ModelConfig */
 
-/** @param {string} workspaceId @param {string} reportId */
-export const reportUrl = (workspaceId, reportId) => `https://app.powerbi.com/groups/${workspaceId}/reports/${reportId}`;
+/**
+ * The query that opens a Power BI or Fabric link in the given tenant, so a browser signed in to
+ * another tenant first doesn't say the item isn't found.
+ * @param {string} [tenantId]
+ */
+export const tenantQuery = (tenantId) => (tenantId ? `?ctid=${tenantId}` : '');
+
+/** @param {string} workspaceId @param {string} reportId @param {string} [tenantId] */
+export const reportUrl = (workspaceId, reportId, tenantId) => `https://app.powerbi.com/groups/${workspaceId}/reports/${reportId}${tenantQuery(tenantId)}`;
 
 /**
  * The reports are published: the user chose them, with the semantic model.
@@ -115,8 +122,9 @@ export async function ensureReports(ctx) {
  */
 export function reportsSummary(ctx) {
   const ws = /** @type {string} */ (ctx.config.fabric.workspaceId);
+  const tenant = ctx.user?.tenantId ?? ctx.config.tenantId;
   for (const w of reportsWanted(ctx)) {
     const r = w.model.report;
-    if (r?.id) ctx.ui.info(`Report:     ${r.name}  ${c.dim(reportUrl(ws, r.id))}`);
+    if (r?.id) ctx.ui.info(`Report:     ${r.name}  ${c.dim(reportUrl(ws, r.id, tenant))}`);
   }
 }

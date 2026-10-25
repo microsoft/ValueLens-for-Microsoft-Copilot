@@ -144,6 +144,15 @@
   -StartDate, -EndDate, -AppendFile, -AppendUserInfo, -RollupPlusRaw or the Agent 365
   parameters.
 
+.PARAMETER PartitionHours
+  Passes PAX -PartitionHours (1 to 72): the hours each audit search covers. PAX's default
+  is 12, so a week is 14 searches. A small tenant reads faster in fewer, larger searches.
+
+.PARAMETER MaxConcurrency
+  Passes PAX -MaxConcurrency (1 to 10): how many audit searches PAX runs at once. Purview
+  runs about ten at once for a tenant and throttles the rest, so a lower number avoids
+  HTTP 429 retries.
+
 .EXAMPLE
   .\Run-PAX-AIBV.ps1 -TenantId <guid> -ClientId <guid>
 
@@ -202,7 +211,11 @@ param(
   [switch]$SkipVersionCheck,
   [string]$StartDate,
   [string]$EndDate,
-  [switch]$OnlyUserInfo
+  [switch]$OnlyUserInfo,
+  [ValidateRange(1, 72)]
+  [int]$PartitionHours,
+  [ValidateRange(1, 10)]
+  [int]$MaxConcurrency
 )
 
 $ErrorActionPreference = 'Stop'
@@ -571,6 +584,14 @@ if ($FillerLabelText) {
 
 if ($SkipVersionCheck) {
   $paxParams.SkipVersionCheck = $true
+}
+
+if ($PartitionHours -and -not $OnlyUserInfo) {
+  $paxParams.PartitionHours = $PartitionHours
+}
+
+if ($MaxConcurrency -and -not $OnlyUserInfo) {
+  $paxParams.MaxConcurrency = $MaxConcurrency
 }
 
 $agentSource = $null

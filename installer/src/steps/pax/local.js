@@ -18,6 +18,7 @@ import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { commandLine, inCloudShell } from '../../launch.js';
 import { PRODUCT } from '../../product.js';
+import { SMALL_TENANT_SEATS } from '../../seats.js';
 
 /** @typedef {import('../../config.js').InstallConfig} InstallConfig */
 
@@ -35,6 +36,24 @@ export const MIN_PYTHON = Object.freeze([3, 10]);
 export const TASK_AT = '02:00';
 /** How many days of activity the first refresh asks PAX for. */
 export const SEED_DAYS = 30;
+
+/**
+ * Purview runs about ten audit searches at once for a tenant, and PAX starts one per partition
+ * (12 hours by default), so a week's window can ask for 14 and be throttled for hours. The
+ * refresh lets PAX run at most this many at once.
+ */
+export const MAX_AUDIT_SEARCHES = 5;
+/** On a small tenant, each audit search covers this many hours: PAX's largest, 3 days. */
+export const SMALL_TENANT_PARTITION_HOURS = 72;
+
+/**
+ * The audit search sizing for refresh.json: a small tenant reads each window in a few large
+ * searches. A larger tenant, or one whose seats couldn't be read, keeps PAX's 12-hour searches.
+ * @param {number | undefined} seats
+ */
+export function auditSearches(seats) {
+  return { maxSearches: MAX_AUDIT_SEARCHES, ...(seats && seats <= SMALL_TENANT_SEATS ? { partitionHours: SMALL_TENANT_PARTITION_HOURS } : {}) };
+}
 
 /**
  * Whether the refresh reads only the user directory (PAX -OnlyUserInfo) into one file that each
@@ -478,7 +497,7 @@ export function refreshConfig(config, o = {}) {
     paxReleaseTag: PAX_RELEASE.tag,
     paxSha256: PAX_RELEASE.sha256,
     files: { ...PRODUCT.pax.files },
-    ...(userInfo ? {} : { seedDays: config.pax?.seedDays ?? SEED_DAYS }),
+    ...(userInfo ? {} : { seedDays: config.pax?.seedDays ?? SEED_DAYS, ...auditSearches(config.pax?.seats) }),
     agent365: !userInfo && !!config.pax?.agent365,
     repairHint: `To fix it, run the ${PRODUCT.installer}'s repair: ${command('install')}`,
     // A user directory held back for a drop: the command that publishes it, once.

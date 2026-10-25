@@ -608,10 +608,11 @@ test('pax publish: credentialSteps walks through signing the model in to SharePo
   assert.deepEqual(credentialSteps(url), [
     `Open the model's settings: ${url}`,
     'Expand Data source credentials, and select Edit credentials beside a source.',
-    'Choose OAuth2 and the privacy level None, then select Sign in and sign in with your work account.',
-    "Do the same for each source it lists. If a site's address fails the connection test, edit it again and tick Skip test connection.",
+    'Choose OAuth2 and the privacy level None, and tick Skip test connection: the folder has no files until the first load writes them, so the test fails until then. Select Sign in and sign in with your work account.',
+    'Do the same for each source it lists.',
   ]);
-  assert.equal(credentialSteps(url, 'Organizational')[2], 'Choose OAuth2 and the privacy level Organizational, then select Sign in and sign in with your work account.');
+  assert.equal(credentialSteps(url, 'Organizational')[2], 'Choose OAuth2 and the privacy level Organizational, and tick Skip test connection: the folder has no files until the first load writes them, so the test fails until then. Select Sign in and sign in with your work account.');
+  assert.ok(modelSettingsUrl('ws-1', 'ds-9', 'tenant-1').endsWith('/settings/datasets/ds-9?ctid=tenant-1'), 'opens in the install\'s tenant');
 });
 
 /** The install record's powerBi section, or an empty one. @param {Setup} t @returns {any} */
@@ -1136,7 +1137,7 @@ test('pax publish: askCredentials with --yes shows the steps and leaves the sign
   assert.equal(await askCredentials(t.ctx), false);
   printed(t, 'Sign the report in to SharePoint\n');
   printed(t, `    ${P.model} reads the files in the SharePoint folder as you. Power BI has no way for the installer to sign it in, so do it once:\n`);
-  credentialSteps(modelSettingsUrl('ws-1', 'ds-9')).forEach((s, i) => printed(t, `${i + 1}. ${s}\n`));
+  credentialSteps(modelSettingsUrl('ws-1', 'ds-9', t.config.tenantId)).forEach((s, i) => printed(t, `${i + 1}. ${s}\n`));
   printed(t, `    Until it's signed in, the report has no data. Then run "${commandLine('refresh')}".\n`);
   assert.equal(pbiOf(t).credentials, 'later');
   assert.equal(t.config.semanticModel.bound, false);

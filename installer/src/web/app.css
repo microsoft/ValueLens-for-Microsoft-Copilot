@@ -309,6 +309,8 @@ a { overflow-wrap: anywhere; }
 .prereq.missing .gl, .prereq-rows .missing .gl { color: var(--fail); }
 .prereq.eligible { background: var(--warn-tint); }
 .prereq.eligible .gl, .prereq-rows .eligible .gl { color: var(--warn); }
+.prereq.optional.missing { background: transparent; }
+.prereq.optional.missing .gl { color: var(--muted-fg); }
 .prereq.unknown .gl, .prereq-rows .unknown .gl { color: var(--muted-fg); }
 .prereq-rows { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .prereq-rows li { display: flex; gap: 6px; align-items: flex-start; }
