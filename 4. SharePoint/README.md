@@ -1,23 +1,41 @@
-# 4. SharePoint — scheduled refresh on Power BI Pro
+# 4. SharePoint
 
-Use this path when you want ValueLens in Power BI Pro with scheduled refresh from SharePoint CSVs, and you do not use Fabric.
+ValueLens in Power BI Pro, without Fabric. A daily script exports the data to a SharePoint library,
+and the Power BI report refreshes from it. The app can read the same CSV files.
 
-## You need
+> **Installer coming soon.** A PAX + SharePoint installer is in review
+> ([#216](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/pull/216)). Until then,
+> follow the steps below.
 
-- Power BI Pro, PPU, or Premium, plus a workspace where you can publish and schedule refresh.
-- Power BI Desktop, June 2024 or later, to open the template. In older releases, the habit-stage charts and cards on the Habit Formation page can show errors, because their measures use `SUMMARIZECOLUMNS` in ways those releases don't fully support. Reports in the Power BI service aren't affected.
-- PowerShell 7+ (`pwsh`), Python 3.10+, and internet access to GitHub Releases on the machine that runs the extract.
-- An Entra app registration with tenant ID, client ID, and client secret.
-- The licences, roles, Graph permissions, admin consent, and SharePoint access listed in [`../docs/PERMISSIONS.md`](../docs/PERMISSIONS.md).
-- A SharePoint document library and folder for the CSVs. The examples use `/AIBV`.
-- Optional: an Agent 365 licence for `-IncludeAgent365Info`, or an admin-centre Agents export for `-Agents365Csv`.
+<a id="you-need"></a>
 
-Read the [disclaimer](../README.md#disclaimer) too: these aren't the official Copilot reports, and
-you're responsible for the CSVs once they're in SharePoint.
+## Before you start
 
-## Setup
+- [ ] **Power BI Pro**, PPU or Premium, and a workspace where you can publish and schedule refresh.
+- [ ] **Power BI Desktop**, June 2024 or later, to open the template.
+- [ ] **On the PC that runs the export:** PowerShell 7 (`pwsh`), Python 3.10 or later, and access to GitHub Releases.
+- [ ] **An Entra app registration** with a tenant ID, client ID and client secret.
+- [ ] **Admin consent and SharePoint access** for that app, as listed in [Permissions](../docs/PERMISSIONS.md).
+- [ ] **A SharePoint library and folder** for the CSV files. The examples use `/AIBV`.
+- [ ] **Read the [disclaimer](../README.md#disclaimer).** You're responsible for the CSV files once they're in SharePoint.
 
-Use [`scripts/README.md`](scripts/README.md) for the full parameter reference. Run scripts with PowerShell 7, not Windows PowerShell.
+Optional: an Agent 365 licence for `-IncludeAgent365Info`, or an admin center Agents export for
+`-Agents365Csv`.
+
+<details>
+<summary>Why June 2024 or later?</summary>
+
+In older releases, the habit-stage charts and cards on the Habit Formation page can show errors,
+because their measures use `SUMMARIZECOLUMNS` in ways those releases don't fully support. Reports
+in the Power BI service aren't affected.
+
+</details>
+
+<a id="setup"></a>
+
+## Steps
+
+Run every script from PowerShell 7, not Windows PowerShell. Every parameter is in [`scripts/README.md`](scripts/README.md).
 
 1. Create the Entra app registration, add the permissions from [`../docs/PERMISSIONS.md`](../docs/PERMISSIONS.md), grant admin consent, create a client secret, and copy the tenant ID, client ID, and secret.
 
@@ -104,7 +122,24 @@ Use [`scripts/README.md`](scripts/README.md) for the full parameter reference. R
 
    Rotate the secret by rerunning `cmdkey`. For Azure Container Apps or managed-identity scheduling notes, see [`azure-container/README.md`](azure-container/README.md).
 
-## Troubleshooting
+## After setup
+
+- **Check it worked.** In the Power BI service, the semantic model's refresh history shows a
+  successful refresh, and the report shows your organisation's data.
+- **Use the app.** Download `copilot_interactions_rollup.csv`, `copilot_users_rollup.csv` and
+  `agents_365.csv` from the SharePoint folder, then load them in [the app](../app/README.md#data).
+- **Optional:** add Copilot credit consumption with [Add Credit Consumption](Add%20Credit%20Consumption/README.md).
+- **Problems?** See [Troubleshooting](#troubleshooting) below, or
+  [open an issue](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues).
+
+---
+
+<a id="troubleshooting"></a>
+
+<details>
+<summary><strong>Troubleshooting</strong></summary>
+
+<br>
 
 | Issue | What to do |
 |---|---|
@@ -119,4 +154,4 @@ Use [`scripts/README.md`](scripts/README.md) for the full parameter reference. R
 | Agent 365 export returns `403` | Add the Agent 365 licence and permissions, or use `-Agents365Csv <admin-centre-agents-export.csv>`. |
 | Refresh hits the 1 GB or 2-hour Power BI Pro limit | Move to [`../1. Fabric/README.md`](../1.%20Fabric/README.md). |
 
-Optional: add Copilot credit consumption with [`Add Credit Consumption/README.md`](Add%20Credit%20Consumption/README.md).
+</details>

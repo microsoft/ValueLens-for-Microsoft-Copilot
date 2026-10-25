@@ -107,19 +107,94 @@ The same `npm run build` output runs in two hosts. Pick one. Nothing in this rep
 
 ### As a Copilot Managed App
 
-This is the recommended host. It runs on Copilot Managed Runtime, which is in preview. The [main README](../README.md#start-here-the-app-preview) has the full steps, including the two admin settings and the licence each viewer needs.
+This is the recommended host. It runs on Copilot Managed Runtime, which is in preview.
 
-In short: install Node.js 24.11 or later and the `ms` CLI (`npm install -g @microsoft/managed-apps-cli@0.29.0`, the version these steps were checked with). Then, from this folder:
+You deploy it once, from a copy of this repo, with Microsoft's `ms` command-line tool. Deploying
+doesn't need a licence; opening the app does (step 2).
 
-```powershell
-ms auth login
-npm ci
-ms app init -n "ValueLens" --repo none -b ./dist -S "npm run build"   # add -e <environment-id> if environment lookup times out
-ms app deploy
-ms app share alice@contoso.com,valuelens-viewers@contoso.com
-```
+1. **An admin allows apps from the command line.** A Global Administrator or Power Platform
+   Administrator opens the [Power Platform admin center](https://admin.powerplatform.microsoft.com),
+   goes to **Copilot** > **Settings** > **Managed apps**, and turns on both of these settings for
+   the environment you'll deploy to, or for its environment group. Both are off by default.
+   - **Allow app creation with the Copilot Managed Runtime command line interface (CLI)**
+   - **External artifacts in managed apps**, because the app is built on your PC and then uploaded
 
-`ms app init` writes `ms.config.json` with your tenant's app and environment IDs. The file is gitignored, so each deployer runs `ms app init` once. To update the app, run `ms app deploy` again. In Windows PowerShell, if running scripts is disabled, use `ms.cmd` and `npm.cmd`.
+   Unless you choose another environment in step 5, the `ms` tool uses your personal developer
+   environment. See
+   [Control whether apps can be created using the CLI](https://learn.microsoft.com/microsoft-365/admin/manage/apps/governance#control-whether-apps-can-be-created-using-the-cli).
+
+2. **Check that viewers have a licence.** Everyone who opens the app needs a **Power Apps Premium**
+   licence or **Copilot Credits**. The Power Apps rights included with Microsoft 365 don't count,
+   and nobody needs a Microsoft 365 Copilot licence for it. To use Copilot Credits, an admin turns
+   on usage-based billing in the [Microsoft 365 admin center](https://admin.microsoft.com) and adds
+   the viewers to a spending policy for managed apps. Each call the app makes, such as opening it,
+   uses 0.1 credits. During the preview, someone with neither gets a warning, then is blocked after
+   20 operations or five minutes. See the
+   [licensing FAQ](https://learn.microsoft.com/microsoft-365/admin/manage/apps/licensing-faq).
+
+3. **Install the tools:** [Node.js](https://nodejs.org/) 24.11 or later,
+   [Git](https://git-scm.com/downloads) and the `ms` tool. These steps were checked with version
+   0.29.0 of the `ms` tool, so install that one:
+
+   ```powershell
+   npm install -g @microsoft/managed-apps-cli@0.29.0
+   ms --version
+   ```
+
+   If PowerShell says running scripts is disabled, add `.cmd` to the tool's name (`npm.cmd`,
+   `ms.cmd`) here and in the steps below.
+
+4. **Sign in** to the tenant your viewers use. A browser opens. If you can't use a browser on this
+   PC, run `ms auth login --device-code` instead.
+
+   ```powershell
+   ms auth login
+   ```
+
+5. **Get the code and set up the app.** `ms app init` makes the `app` folder a managed app called
+   ValueLens and saves its IDs in `ms.config.json`, which git ignores. `--repo none` means you build
+   the app on your PC, which is why step 1 needs the second setting.
+
+   ```powershell
+   git clone https://github.com/microsoft/ValueLens-for-Microsoft-Copilot.git
+   cd ValueLens-for-Microsoft-Copilot/app
+   npm ci
+   ms app init -n "ValueLens" --repo none -b ./dist -S "npm run build"
+   ```
+
+   If it times out finding your environment, run it again with `-e <environment-id>`. The ID is on
+   the environment's page in the Power Platform admin center.
+
+6. **Deploy it.** This builds the app, uploads it and makes it live.
+
+   ```powershell
+   ms app deploy
+   ```
+
+   To update the app later, run `git pull` and `npm ci` in the same folder, then `ms app deploy`
+   again.
+
+7. **Share it** with the people or groups who'll use it, as a comma-separated list of email
+   addresses or Entra object IDs. Sharing gives them access, not a licence.
+
+   ```powershell
+   ms app share alice@contoso.com,valuelens-viewers@contoso.com
+   ```
+
+   Or run `ms app share link create` for a link that anyone in your organisation can use to get
+   access.
+
+8. **Viewers open it** at [managedapps.cloud.microsoft](https://managedapps.cloud.microsoft): they
+   choose **ValueLens**, then **Change data**, and pick their CSV files. The files are read in the
+   browser and never leave their PC. See [which files the app reads](#data) and
+   [where each path puts them](#getting-the-files-from-each-variant).
+
+**Can Copilot do this for me?** Don't give it this code to build from. Cowork, Copilot Studio and
+coding agents such as GitHub Copilot build a *new* app from a prompt, so you'd get an untested copy.
+A coding agent can run the steps above for you, but it should deploy this code, not rewrite it.
+
+`ms app init` writes `ms.config.json` with your tenant's app and environment IDs. The file is
+gitignored, so each deployer runs `ms app init` once.
 
 ### As a Fabric App in a Fabric workspace
 
