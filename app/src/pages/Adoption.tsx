@@ -12,7 +12,7 @@ import { BarList, Distribution, LineChart } from '../ui/charts'
 import { HeatGrid, Headline, Tornado } from '../ui/extra-charts'
 import { DataTable, type Column } from '../ui/DataTable'
 import { dateLabel, dayLabel, dec1, dec2, int, pct } from '../ui/format'
-import { Kpi, KpiRow, Panel, Segmented } from '../ui/primitives'
+import { Empty, Kpi, KpiRow, Panel, Segmented } from '../ui/primitives'
 import { COLOR } from '../ui/theme'
 import { labelCol, measureCol, searchText, usePersonLabel } from './cols'
 import { DRAFT_AGENT, text, useValueInputs } from './common'
@@ -99,12 +99,16 @@ export function AdoptionActivation() {
     <>
       <LensPicker value={lens} options={ACT_LENSES} onChange={setLens} />
       <Headline lines={[activationHeadline(a, lens)]} />
-      <KpiRow>
-        {kpis.map(([label, , value, tone]) => (
-          <Kpi key={label} label={label} value={value} tone={tone} help={gloss(label.startsWith('%') ? 'Licensed utilisation' : 'Active users', P)} />
-        ))}
-        <Kpi label={pair.inactiveLabel} value={int(pair.inactive)} help={gloss('Inactive licensed users', P)} />
-      </KpiRow>
+      {!ds.hasUsers && lens !== 'agent' ? (
+        <Empty>No organisation and licences file is loaded. Add it to see total users, licensed users and % active.</Empty>
+      ) : (
+        <KpiRow>
+          {kpis.map(([label, , value, tone]) => (
+            <Kpi key={label} label={label} value={value} tone={tone} help={gloss(label.startsWith('%') ? 'Licensed utilisation' : 'Active users', P)} />
+          ))}
+          <Kpi label={pair.inactiveLabel} value={int(pair.inactive)} help={gloss('Inactive licensed users', P)} />
+        </KpiRow>
+      )}
       <div className="grid grid-2-1">
         <Panel title="Active and inactive users by organisation" note={`${pair.inactiveLabel} on the left, ${pair.activeLabel.toLowerCase()} on the right`} help={gloss('Active users', P)}>
           <Tornado

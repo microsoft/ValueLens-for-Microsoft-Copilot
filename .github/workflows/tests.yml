@@ -66,6 +66,21 @@ jobs:
           npm ci --no-audit --no-fund
           npm test
 
+  valuelens-app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      # The tests import dependency-free modules only, so no npm install is needed.
+      - name: Test the app's data checks
+        working-directory: app
+        run: npm test
+
   arm-drift:
     # The installer ships a compiled copy of 2. Azure/infra; it must match the Bicep source.
     runs-on: ubuntu-latest
