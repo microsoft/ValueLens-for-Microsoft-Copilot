@@ -4,6 +4,8 @@ The ValueLens dashboard as an app (preview). It shows the same information as th
 
 Everything runs in the browser. The app reads your CSV files locally and calculates every number on the page. No data is sent anywhere.
 
+![The ValueLens app's Adoption tab, showing the built-in synthetic sample data](../Images/ValueLens-App-Adoption.png)
+
 ## Get the app
 
 None of these options needs a Power BI licence.
