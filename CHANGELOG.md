@@ -83,6 +83,11 @@ a second route that needs no Fabric.
   every few seconds. A run that reaches it saves its query ids and stops, and the pipeline's retry
   carries on from there. The run also says when the service is throttling. The first-load estimate
   is now one to two hours, not under an hour.
+- **The audit load stops at once when the service asks for a longer wait than the run has left.**
+  Microsoft allows about 200 audit searches per tenant in 24 hours, and other tools that search
+  the audit log count too. Once a tenant has used them, the service answers with a wait that can
+  run to hours. The load used to sit in that wait until its time budget ran out. Now it stops
+  straight away and says why, and the scheduled run carries on once the allowance frees up.
 - **Shared with Consumption Central.** Its installer copies the PAX route's code unchanged, so the
   route has settings ValueLens leaves off: a folder parameter, parameter values from the install
   record, a query read from a file, a privacy level, and a mode that exports only the user

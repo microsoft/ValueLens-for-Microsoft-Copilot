@@ -223,7 +223,18 @@ class AuditReliabilityTests(unittest.TestCase):
             ns.update(namespace)
         ns.setdefault("RUN_DEADLINE", None)
         return exec_named_defs(
-            INGESTER, 8, {"AuditQueryFailed", "BudgetReached", "budget_exhausted", "_read_query_status", "wait_for_query"}, ns
+            INGESTER,
+            8,
+            {
+                "AuditQueryFailed",
+                "BudgetReached",
+                "budget_exhausted",
+                "LONG_THROTTLE",
+                "check_retry_after",
+                "_read_query_status",
+                "wait_for_query",
+            },
+            ns,
         )
 
     def checkpoint_helpers(self, namespace=None):
@@ -243,6 +254,7 @@ class AuditReliabilityTests(unittest.TestCase):
             "AuditQueryFailed": query["AuditQueryFailed"],
             "BudgetReached": query["BudgetReached"],
             "budget_exhausted": query["budget_exhausted"],
+            "LONG_THROTTLE": {},
             "RUN_DEADLINE": None,
             "TIME_BUDGET_MIN": 0,
             "RESUME_QUERY_HOURS": 12,
@@ -1190,7 +1202,17 @@ class FailedWindowRecoveryTests(unittest.TestCase):
         from urllib3.util.retry import Retry
 
         ns = exec_named_defs(
-            INGESTER, 4, {"THROTTLE_LISTENERS", "BUDGET_CHECKS", "_notify_throttle", "_wait", "_ThrottleAwareRetry"},
+            INGESTER,
+            4,
+            {
+                "THROTTLE_LISTENERS",
+                "BUDGET_CHECKS",
+                "RETRY_AFTER_CHECKS",
+                "_check_retry_after",
+                "_notify_throttle",
+                "_wait",
+                "_ThrottleAwareRetry",
+            },
             {"Retry": Retry},
         )
 
@@ -1215,6 +1237,131 @@ class FailedWindowRecoveryTests(unittest.TestCase):
         self.assertLess(time.monotonic() - started, 10)
         ns["BUDGET_CHECKS"].clear()
         ns["_wait"](0)
+
+    def test_retry_after_longer_than_the_time_left_stops_at_once(self):
+        query = self.query_helpers({"RUN_DEADLINE": 1000.0})
+        query["check_retry_after"](600, now=0.0)  # 10 min asked, ~16 min left: wait it out
+        self.assertEqual(query["LONG_THROTTLE"], {})
+        with self.assertRaisesRegex(query["BudgetReached"], "asked to wait 60 min, longer than the 17 min left"):
+            query["check_retry_after"](3600, now=0.0)
+        self.assertEqual(query["LONG_THROTTLE"], {"seconds": 3600.0})
+        unbounded = self.query_helpers({"RUN_DEADLINE": None})
+        unbounded["check_retry_after"](86400)
+
+    def http_layer(self, namespace=None):
+        from urllib3.util.retry import Retry
+
+        ns = {"Retry": Retry, "SESSION": None, "_token": {"value": None}, "get_headers": lambda: {}}
+        ns.update(namespace or {})
+        return exec_named_defs(
+            INGESTER,
+            4,
+            {
+                "THROTTLE_LISTENERS",
+                "BUDGET_CHECKS",
+                "RETRY_AFTER_CHECKS",
+                "_wait",
+                "_check_retry_after",
+                "_retry_after_seconds",
+                "_notify_throttle",
+                "_ThrottleAwareRetry",
+                "_TRANSIENT",
+                "AUTH_RETRY_WAITS_SEC",
+                "_request",
+                "_send",
+            },
+            ns,
+        )
+
+    def test_urllib3_retry_stops_before_sleeping_a_long_retry_after(self):
+        ns = self.http_layer()
+
+        class TooLong(Exception):
+            pass
+
+        asked = []
+
+        def refuse(seconds):
+            asked.append(seconds)
+            raise TooLong()
+
+        ns["RETRY_AFTER_CHECKS"][:] = [refuse]
+        retry = ns["_ThrottleAwareRetry"](total=3, status_forcelist=(429,), respect_retry_after_header=True)
+        response = type(
+            "Resp", (), {"status": 429, "headers": {"Retry-After": "3600"}, "getheader": lambda self, name: "3600"}
+        )()
+        started = time.monotonic()
+        with self.assertRaises(TooLong):
+            retry.sleep(response)
+        self.assertLess(time.monotonic() - started, 1)
+        self.assertEqual(asked, [3600])
+
+    def test_outer_retry_stops_on_a_long_retry_after_but_not_on_the_last_attempt(self):
+        class TooLong(Exception):
+            pass
+
+        class Throttled:
+            status_code = 429
+            headers = {"Retry-After": "7200"}
+
+        class Session:
+            calls = 0
+
+            def request(self, *a, **k):
+                Session.calls += 1
+                return Throttled()
+
+        ns = self.http_layer({"SESSION": Session(), "print": lambda *a, **k: None})
+        asked = []
+
+        def refuse(seconds):
+            asked.append(seconds)
+            raise TooLong()
+
+        ns["RETRY_AFTER_CHECKS"][:] = [refuse]
+        with self.assertRaises(TooLong):
+            ns["_send"]("POST", "https://graph.microsoft.com/beta/security/auditLog/queries", attempts=5)
+        self.assertEqual((Session.calls, asked), (1, [7200.0]))
+
+        # With no check registered, or a Retry-After that isn't a number, the old waits apply.
+        ns["RETRY_AFTER_CHECKS"].clear()
+        Throttled.headers = {"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}
+        self.assertIsNone(ns["_retry_after_seconds"](Throttled()))
+        Session.calls = 0
+        waits = []
+        ns["_wait"] = waits.append
+        self.assertEqual(ns["_send"]("GET", "https://x/y", attempts=3).status_code, 429)
+        self.assertEqual((Session.calls, waits), (3, [2, 4]))
+
+    def test_stop_on_a_long_retry_after_explains_the_throttling(self):
+        query = self.query_helpers({"RUN_DEADLINE": time.monotonic() + 600})
+        helpers, graph = self.run_helpers(
+            lambda *a: "succeeded",
+            TIME_BUDGET_MIN=90,
+            RUN_DEADLINE=query["RUN_DEADLINE"],
+            BudgetReached=query["BudgetReached"],
+            LONG_THROTTLE=query["LONG_THROTTLE"],
+        )
+
+        def throttled_create(ws, we):
+            query["check_retry_after"](3 * 3600)
+
+        helpers["create_query"] = throttled_create
+        started = time.monotonic()
+        with self.assertRaises(RuntimeError) as caught:
+            helpers["fetch_windows"]([self.WIN, self.NEXT])
+        self.assertLess(time.monotonic() - started, 10)
+        message = str(caught.exception)
+        self.assertIn("Time budget of 90 min reached with 2 audit window(s) still to fetch", message)
+        self.assertIn("asked to wait 180 min, longer than the time left, so the run stopped now", message)
+        self.assertIn("about 200 audit searches per tenant in 24 hours", message)
+        self.assertEqual(graph.created, [])
+
+    def test_budget_stop_without_a_long_retry_after_says_nothing_about_throttling(self):
+        helpers, _ = self.run_helpers(lambda *a: "succeeded", RUN_DEADLINE=time.monotonic() - 1, TIME_BUDGET_MIN=1)
+        with self.assertRaises(RuntimeError) as caught:
+            helpers["fetch_windows"]([self.WIN])
+        self.assertNotIn("throttling", str(caught.exception))
 
     def test_http_layer_waits_only_through_the_budget_aware_sleep(self):
         source = cells(INGESTER)[4]
@@ -1403,6 +1550,8 @@ class FailedWindowRecoveryTests(unittest.TestCase):
         )
         self.assertIn("THROTTLE_LISTENERS[:] = [", source)
         self.assertIn("BUDGET_CHECKS[:] = [check_budget]", source)
+        self.assertIn("RETRY_AFTER_CHECKS[:] = [check_retry_after]", source)
+        self.assertIn("RETRY_AFTER_CHECKS.clear()", source)
         self.assertIn("ACTIVE_WINDOW_KEYS, total = fetch_windows(windows)\nfinally:\n    BUDGET_CHECKS.clear()", source)
         self.assertNotIn("as_completed", source)
 
