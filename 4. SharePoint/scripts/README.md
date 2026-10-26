@@ -7,8 +7,8 @@ reference.
 | Script | What it does | When you run it |
 |---|---|---|
 | `ProvisionSiteAccess-SP-AppReg.ps1` | Grants your Entra app `Sites.Selected` write access to one SharePoint site. Prints the `SiteId` and `DriveId` the upload script needs. | **Once per site.** |
-| `Run-PAX-AIBV.ps1` | Downloads the latest extract tool, runs the AIBV rollup, and drops two rollup CSVs into `.\processed\` (plus the Agent 365 registry CSV with `-IncludeAgent365Info`). | **Every refresh.** |
-| `Upload-Rollups-SharePoint.ps1` | Uploads the rollup CSVs (and the registry CSV, when the manifest lists one) to fixed file names in your SharePoint library (overwrites the previous run). | **Every refresh, after the extract.** |
+| `Run-PAX-AIBV.ps1` | Downloads the extract tool (the latest release, or one you pin), runs the AIBV rollup, and drops two rollup CSVs into `.\processed\` (plus the Agent 365 registry CSV with `-IncludeAgent365Info`). | **Every refresh.** |
+| `Upload-Rollups-SharePoint.ps1` | Uploads the rollup CSVs (and the registry CSV, when the manifest lists one) to fixed file names in your SharePoint library (overwrites the previous run). Can also upload one file you name. | **Every refresh, after the extract.** |
 | `Register-TaskScheduler.ps1` | Registers the above two as a single daily Windows Scheduled Task. | **Once, when you want to schedule.** |
 | `Get-Agents365Registry.ps1` | Optional. Exports the Agent 365 registry as the canonical 48-column CSV every template's `Agent 365` parameter reads (same shape as the Fabric notebook's `agents_365`). `Run-PAX-AIBV.ps1 -IncludeAgent365Info` calls it for you. | Ad-hoc, or every refresh via the extract. |
 
@@ -42,13 +42,18 @@ reference.
     -ClientId   <client-id> `
     [-ClientSecret <secret>] `
     [-Days 7] `
+    [-StartDate <yyyy-MM-dd> -EndDate <yyyy-MM-dd>] `
     [-WorkRoot .] `
     [-PaxReleaseTag latest] `
+    [-PaxSha256 <sha256>] `
+    [-SkipVersionCheck] `
     [-Auth AppRegistration|ManagedIdentity|DeviceCode|WebLogin|Credential|Silent] `
     [-RollupPlusRaw] `
     [-AppendFile <interactions.csv>] `
+    [-AppendUserInfo <users.csv>] `
     [-IncludeUserInfo:$false] `
     [-UserInfoFile <path|SharePoint-URL|OneLake-path>] `
+    [-OnlyUserInfo] `
     [-Deidentify] `
     [-FillerLabel Blank|RepeatSelf|RepeatManager|Fixed] `
     [-FillerLabelText "<text>"] `
@@ -76,13 +81,44 @@ and later) or `AIBV` (v1.11.5 to v1.11.14), which build the same rollup. A relea
 stops with an error. The manifest records the value as `pax_dashboard`.
 Defaults are `-Auth AppRegistration`, `-Rollup`, and `-IncludeUserInfo`.
 
-**Seed once, then append (interactions)** — `-AppendFile`: the Purview interactions data is a growing
-time-series, so run the **first** extract as a **back-fill with no `-AppendFile`** (e.g. `-Days 30`)
-to create the file, then have **every scheduled run** use `-AppendFile <that file>` with a short
-window (e.g. `-Days 2`). The append de-duplicates on each interaction's
-stable message identity, so overlapping days reconcile (nothing dropped or double-counted). Applies
-to interactions only; the Users/org and Agent 365 outputs are **snapshots** (overwritten each run).
-Keep `-Deidentify` consistent across all appends to the same file.
+**A date range** — `-StartDate` and `-EndDate`, both as `yyyy-MM-dd`, instead of `-Days`. PAX reads
+each date as midnight UTC, and reads up to, but not including, `-EndDate`. So windows that share a
+date, such as `2026-09-01` to `2026-09-08` and then `2026-09-08` to `2026-09-15`, meet with no gap
+and no overlap. Pass both or neither. The installer's refresh uses them to read a long history a
+week at a time.
+
+**A failed rollup fails the run.** PAX 1.11.15 can exit 0 when its rollup step fails. So the script
+also reads the logs PAX wrote this run, and stops with an error that names PAX's log if they show
+the rollup failed. Without `-AppendFile`, it also stops if PAX wrote no new rollup file this run.
+
+**Seed once, then append** — `-AppendFile` and `-AppendUserInfo`: the Purview interactions data is a
+growing time-series, so run the **first** extract as a **back-fill with no `-AppendFile`** (e.g.
+`-Days 30`), then rename its `<purview-stem>_Interactions_<ts>.csv` to a stable name ending in
+`_Interactions.csv`, such as `cumulative_Interactions.csv`. Have **every scheduled run** use
+`-AppendFile <that file>` with a short window (e.g. `-Days 2`). The append de-duplicates on each
+interaction's stable message identity, so overlapping days reconcile (nothing dropped or
+double-counted). A bare file name is read from `<WorkRoot>\processed`, so seed and append with the
+same `-WorkRoot`, or pass a full path. PAX takes an output folder or an append target, never both
+(v1.11.15 stops if it gets both), so an append run passes PAX only the target's full path, and PAX
+writes its log and working files next to the target.
+
+`-AppendUserInfo` does the same for the Users file: rename the seed run's
+`<entra-stem>_Users_<ts>.csv` to a name like `cumulative_Users.csv` and pass it. Users missing from
+a run are kept. Without it the Users/org output is a **snapshot** (overwritten each run), as the
+Agent 365 output always is. Keep `-Deidentify` consistent across all appends to the same file. If
+PAX can't merge a run into a target, it leaves the target as it was, and the script warns that PAX
+didn't update it.
+
+**Only the user directory** — `-OnlyUserInfo`: one PAX `-OnlyUserInfo` pass, with no audit query,
+date window or rollup. It leaves only `EntraUsers_MAClicensing_<ts>.csv` in `.\processed\`, and the
+manifest records it as `users_csv`. Each run's file is a whole snapshot of the directory, to replace
+the last one rather than add to it. The app needs `User.Read.All` and `Organization.Read.All`, not
+`AuditLogsQuery.Read.All`. It can't be used with `-Days`, the date range, `-AppendFile`,
+`-AppendUserInfo`, `-RollupPlusRaw` or the Agent 365 parameters. Upload the file with
+`Upload-Rollups-SharePoint.ps1 -File <csv> -RemoteName <name>.csv`: the `-Manifest` upload stops on
+this run's manifest, which has no rollup. The ValueLens report reads the rollups, so it doesn't use
+this mode. It's for dashboards that need only the user directory, such as Consumption Central's
+org file.
 
 **Agent type columns.** The PAX rollup does not write `Agent_Type` and the other five
 [agent-type columns](../../docs/DATA-DICTIONARY.md#agent-type-and-publisher). The SharePoint template
@@ -95,9 +131,27 @@ template uses them as they are.
 ```powershell
 # First run — seed with a back-fill (no -AppendFile)
 .\Run-PAX-AIBV.ps1 -TenantId <id> -ClientId <id> -Days 30
+# Give the seeded interactions file a stable name
+Get-ChildItem .\processed\*_Interactions_*.csv | Sort-Object LastWriteTime | Select-Object -Last 1 |
+    Rename-Item -NewName cumulative_Interactions.csv
 # Scheduled runs — append only the latest window
-.\Run-PAX-AIBV.ps1 -TenantId <id> -ClientId <id> -Days 2 -AppendFile Purview_CopilotInteraction_Rollup.csv
+.\Run-PAX-AIBV.ps1 -TenantId <id> -ClientId <id> -Days 2 -AppendFile cumulative_Interactions.csv
 ```
+
+**Pinning the extract tool** — `-PaxReleaseTag` and `-PaxSha256`: by default each run downloads the
+latest PAX release. For scheduled runs, pin a release and the SHA-256 of its script, so a new
+release can't change the output unannounced:
+
+```powershell
+.\Run-PAX-AIBV.ps1 -TenantId <id> -ClientId <id> -Days 2 -AppendFile cumulative_Interactions.csv `
+    -PaxReleaseTag purview-v1.11.15 `
+    -PaxSha256 13a8d41a70c462650207e452eb0ccab274729eb65b0d640bc0a52d6a40ad46c9 `
+    -SkipVersionCheck
+```
+
+The script checks the cached or downloaded copy against the hash and doesn't run PAX if they differ.
+A cached copy that matches is used without calling GitHub. `-SkipVersionCheck` turns off PAX's own
+check for a newer release. The manifest records the hash as `pax_sha256`.
 
 `-IncludeAgent365Info` (optional): exports the Agent 365 registry. By default
 (`-Agent365Source Canonical`) the extract runs `Get-Agents365Registry.ps1` after PAX and writes
@@ -209,6 +263,20 @@ Or skip the manifest and pass CSVs directly:
     -TenantId        <tenant-id> -ClientId <client-id> `
     -SiteId          '...' -DriveId '...'
 ```
+
+Or upload one file, under its own name or the name you give with `-RemoteName`:
+
+```powershell
+.\Upload-Rollups-SharePoint.ps1 `
+    -File       .\agents.csv `
+    -RemoteName agents_365.csv `
+    -TenantId   <tenant-id> -ClientId <client-id> `
+    -SiteId     '...' -DriveId '...' `
+    [-FolderPath /AIBV]
+```
+
+`-RemoteName` must be a file name, not a path. A `.csv` file uploads as `text/csv`, anything else
+as `application/octet-stream`.
 
 ---
 

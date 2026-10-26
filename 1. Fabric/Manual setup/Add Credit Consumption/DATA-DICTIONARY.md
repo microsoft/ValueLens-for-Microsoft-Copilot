@@ -91,6 +91,13 @@ Rows from the licensing API flow have `source_file = 'ppac-api'` and the all-zer
 day's credits by the tenant-wide prepaid share from the latest entitlement snapshot (all prepaid
 without one), and `entitled_quantity` is the environment's allocation.
 
+When the flow lands only the per-user file, rows with `source_file = 'ppac-api-users'` are summed from
+`studio_user_daily` for the days and environments that neither an export nor the per-agent file
+covers. Billed credits split by the same prepaid share, and non-billed credits count as prepaid.
+They're rebuilt on every run, so a later export or per-agent file replaces them. They are a floor:
+the per-user route leaves out credits not tied to a user. No feature or model breakdown comes with
+them; that needs a Power Platform admin center export.
+
 ---
 
 ## `studio_agent_daily`

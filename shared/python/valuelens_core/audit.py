@@ -268,9 +268,12 @@ class AdaptiveLimiter:
 
     A burst of failures with one cause (several windows failing in the same second) counts once:
     the cap moves at most once per cooldown_seconds.
+
+    check, if given, is called while a caller waits for a free slot; raising from it ends the wait
+    (the run's time budget uses this, so a throttled run can't wait past it).
     """
 
-    def __init__(self, limit, minimum=1, cooldown_seconds=60, clock=time.monotonic):
+    def __init__(self, limit, minimum=1, cooldown_seconds=60, clock=time.monotonic, check=None):
         self.minimum = max(1, int(minimum))
         self.limit = max(self.minimum, int(limit))
         self.active = 0
@@ -278,12 +281,15 @@ class AdaptiveLimiter:
         self._cooldown = float(cooldown_seconds)
         self._clock = clock
         self._last_shrink = None
+        self._check = check
         self._cond = threading.Condition()
 
     def __enter__(self):
         with self._cond:
             while self.active >= self.limit:
-                self._cond.wait()
+                if self._check is not None:
+                    self._check()
+                self._cond.wait(None if self._check is None else 5)
             self.active += 1
         return self
 

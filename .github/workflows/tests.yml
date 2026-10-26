@@ -28,12 +28,56 @@ jobs:
         # PySpark/Java are optional: the existing local-Spark check skips without them.
         run: python -B -m pytest tests -q -ra
 
+  pytest-windows:
+    # The installer's PAX route runs its refresh, scheduled task and credential scripts on Windows,
+    # and those tests skip elsewhere.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install test runner
+        run: python -m pip install pytest==9.1.1
+      - name: Check that PowerShell 7 can run the scripts
+        # The tests skip, rather than bypass, an execution policy that blocks local scripts.
+        shell: pwsh
+        run: |
+          if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'PowerShell 7 is required' }
+          $policy = Get-ExecutionPolicy
+          if ($policy -in 'Restricted', 'AllSigned') { throw "The execution policy is $policy, so the PAX runner tests would skip." }
+      - name: Run the Windows tests
+        run: python -B -m pytest tests/test_pax_runner.py tests/test_sharepoint_pax_append.py -q -ra
+
   installer:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         working-directory: '1. Fabric/installer'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      # The lock files may resolve through Microsoft's internal mirror of npm, which runners can't reach.
+      - name: Use the public npm registry
+        run: node packaging/public-registry.js package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run typecheck
+
+  valuelens-installer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: 'installer'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
