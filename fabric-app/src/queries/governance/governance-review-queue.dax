@@ -1,0 +1,41 @@
+EVALUATE
+// Capped at the top 1,000 in the queue's order; Total counts every flagged agent.
+VAR _queue =
+    SELECTCOLUMNS(
+        FILTER('Agents 365', NOT ISBLANK('Agents 365'[Governance Flags])),
+        "Agent", 'Agents 365'[Agent name],
+        "Registry Id", 'Agents 365'[Title ID],
+        "Type", 'Agents 365'[Agent Type Label],
+        "Creator", 'Agents 365'[Creator],
+        "Sharing Scope", 'Agents 365'[Sharing Scope],
+        "Data Access", 'Agents 365'[Data Access],
+        "Users", COALESCE('Agents 365'[Total Users], 0),
+        "Owner Account", COALESCE('Agents 365'[Owner account], "Not checked"),
+        "Flag Count",
+            LEN('Agents 365'[Governance Flags])
+                - LEN(SUBSTITUTE('Agents 365'[Governance Flags], ";", ""))
+                + 1,
+        "Priority",
+            IF(CONTAINSSTRING('Agents 365'[Governance Flags], "No sign-in required"), 3)
+                + IF(CONTAINSSTRING('Agents 365'[Governance Flags], "Owner has left"), 3)
+                + IF(CONTAINSSTRING('Agents 365'[Governance Flags], "Org-wide with org data"), 2)
+                + IF(CONTAINSSTRING('Agents 365'[Governance Flags], "No owner on record"), 2)
+                + IF(CONTAINSSTRING('Agents 365'[Governance Flags], "Shared, no recorded use"), 1)
+                + 0,
+        "Flags", 'Agents 365'[Governance Flags]
+    )
+VAR _total = COUNTROWS(_queue)
+RETURN
+    ADDCOLUMNS(
+        TOPN(
+            1000,
+            _queue,
+            [Priority], DESC,
+            [Flag Count], DESC,
+            [Users], DESC,
+            [Agent], ASC,
+            [Registry Id], ASC
+        ),
+        "Total", _total
+    )
+ORDER BY [Priority] DESC, [Flag Count] DESC, [Users] DESC, [Agent] ASC, [Registry Id] ASC

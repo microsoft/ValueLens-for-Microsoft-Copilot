@@ -1,0 +1,37 @@
+DEFINE
+    // Months the date filter spans, from the tenant's first to last day of activity inside it.
+    MEASURE 'Chat + Agent Interactions (Audit Logs)'[ValueLens Months In Range] =
+        VAR _first =
+            CALCULATE(
+                MIN('Chat + Agent Interactions (Audit Logs)'[ActivityDate]),
+                ALLEXCEPT('Chat + Agent Interactions (Audit Logs)', 'Chat + Agent Interactions (Audit Logs)'[ActivityDate]),
+                VALUES('Calendar'[Date])
+            )
+        VAR _last =
+            CALCULATE(
+                MAX('Chat + Agent Interactions (Audit Logs)'[ActivityDate]),
+                ALLEXCEPT('Chat + Agent Interactions (Audit Logs)', 'Chat + Agent Interactions (Audit Logs)'[ActivityDate]),
+                VALUES('Calendar'[Date])
+            )
+        RETURN DIVIDE(INT(_last - _first) + 1, 365.25 / 12)
+
+EVALUATE
+// Each department's seats, how many are in use, the habit rate and hours,
+// then hours per licensed seat a month so departments of different sizes
+// compare fairly.
+VAR _rows =
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Org Data'[Organization],
+            "Licensed Seats", [Licensed Users (Filter-Aware)],
+            "Seats In Use Pct", [% Active Licensed Users],
+            "Habit Pct", [Habitual Users %, Last Month] + [Power Users %, Last Month],
+            "Hours", CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Typical"),
+            "People", [All Active Users]
+        ),
+        LEN(TRIM('Chat + Agent Org Data'[Organization])) > 0 && ([Licensed Seats] > 0 || [Hours] > 0)
+    )
+VAR _months = [ValueLens Months In Range]
+RETURN
+    ADDCOLUMNS(_rows, "Hours Per Seat Month", DIVIDE([Hours], [Licensed Seats] * _months))
+ORDER BY [Hours Per Seat Month] DESC

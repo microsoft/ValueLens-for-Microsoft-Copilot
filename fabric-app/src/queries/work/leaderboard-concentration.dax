@@ -1,0 +1,60 @@
+EVALUATE
+// How much of one cohort's sessions the busiest people account for, from the
+// same person rows as the "Organization → User" table, so it holds for every
+// person rather than the top of that list. The measure name is filled in per
+// cohort by leaderboard-concentration.ts. A person under more than one group
+// counts once, with their rows summed.
+VAR __Rows =
+    SUMMARIZECOLUMNS(
+        'Chat + Agent Org Data'[Organization],
+        'Chat + Agent Interactions (Audit Logs)'[Audit_UserId],
+        KEEPFILTERS(
+            FILTER(
+                ALL('Chat + Agent Interactions (Audit Logs)'[AppHost]),
+                NOT CONTAINSSTRING('Chat + Agent Interactions (Audit Logs)'[AppHost], "SecurityCopilot")
+            )
+        ),
+        "@Sessions", [__SESSIONS__]
+    )
+VAR __Values =
+    FILTER(
+        GROUPBY(
+            SELECTCOLUMNS(
+                __Rows,
+                "@Person", COALESCE('Chat + Agent Interactions (Audit Logs)'[Audit_UserId], ""),
+                "@Sessions", [@Sessions]
+            ),
+            [@Person],
+            "@Value", SUMX(CURRENTGROUP(), [@Sessions])
+        ),
+        [@Value] > 0
+    )
+// The cuts lib/concentration.ts reads: every top slice's size, rounded up.
+// Leaderboards shows the top 1%, 5% and 25% without a curve, so it asks for
+// no other cut. Each cut's sum takes the busiest people, less any tied past
+// the cut, as the Studio and Value queries work it out.
+VAR __Total = SUMX(__Values, [@Value])
+VAR __Count = COUNTROWS(__Values) + 0
+VAR __Cuts =
+    ADDCOLUMNS(
+        FILTER(
+            DISTINCT(
+                SELECTCOLUMNS({ 1, 5, 25 }, "@Count", QUOTIENT(__Count * [Value] + 99, 100))
+            ),
+            [@Count] >= 1
+        ),
+        "@Cumulative",
+            VAR __Top = TOPN([@Count], __Values, [@Value], DESC)
+            VAR __Boundary = MINX(__Top, [@Value])
+            VAR __Higher = FILTER(__Top, [@Value] > __Boundary)
+            RETURN SUMX(__Higher, [@Value]) + ([@Count] - COUNTROWS(__Higher)) * __Boundary
+    )
+RETURN
+    SELECTCOLUMNS(
+        __Cuts,
+        "Count", [@Count],
+        "Cumulative", [@Cumulative],
+        "People", __Count,
+        "Total", __Total
+    )
+ORDER BY [Count]

@@ -1,0 +1,10 @@
+EVALUATE
+VAR People = COUNTROWS('Chat + Agent Org Data')
+RETURN
+    SELECTCOLUMNS(
+        FILTER(COLUMNSTATISTICS(), [Table Name] = "Chat + Agent Org Data"),
+        "Column", [Column Name],
+        "Cardinality", [Cardinality],
+        "Max Length", [Max Length],
+        "People", People
+    )

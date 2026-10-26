@@ -1,0 +1,581 @@
+//-----------------------------------------------------------------------
+// <copyright company="Microsoft Corporation">
+//        Copyright (c) Microsoft Corporation.  All rights reserved.
+//        Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// </copyright>
+//-----------------------------------------------------------------------
+
+import { useId, useMemo } from "react";
+import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
+import { stageAnchor } from "@/components/destinations";
+import { FilterMenu } from "@/components/filter-menu";
+import { FilterNote } from "@/components/filter-note";
+import { KpiCard, KpiStat } from "@/components/kpi-card";
+import { NotFilteredHint } from "@/components/not-filtered-hint";
+import { QueryEmpty, QueryError, QueryLoading } from "@/components/query-states";
+import { ChartPanel, NoteCard, Panel, type Note } from "@/components/report-panels";
+import { Section } from "@/components/section";
+import { SegmentedControl } from "@/components/segmented-control";
+import { TermsForm, type TermField } from "@/components/terms-form";
+import { useCommercialTerms } from "@/hooks/commercial-terms.context";
+import { useShowStage } from "@/hooks/navigation.context";
+import { useThemeContext } from "@/hooks/theme.context";
+import { SCENARIOS, useValueAssumptions } from "@/hooks/value-assumptions.context";
+import { gridHeight, rowChartHeight } from "@/lib/chart-height";
+import { formatDateRange } from "@/lib/filters";
+import { currencyPrefix, currencySymbol, DEFAULT_CURRENCY } from "@/lib/currency";
+import { formatKpi } from "@/lib/format-kpi";
+import { columnHeat, heatRenderer } from "@/lib/heat";
+import { runtimeConfig } from "@/lib/runtime-config";
+import { SMALL } from "@/lib/type-scale";
+import { cn } from "@/lib/utils";
+import { LICENSE_LIST_PRICE } from "@/queries/consumption";
+import { TOP_N } from "@/lib/top-n";
+import { agentTable, costValueSpec, pairTable, spanDays, spanMonths, topAgentLines, type DateSpan } from "@/queries/value";
+import { COST_IGNORED_FILTERS, useCostVsValue, type CostVsValue } from "./cost-vs-value-data";
+import { agentCoverageHeadline, pairReturnHeadline } from "./headlines";
+
+function asNumber(value: unknown): number | undefined {
+    return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function returnCell(value: unknown) {
+    const ratio = asNumber(value);
+    if (ratio === undefined) return null;
+    // Red whenever cost outruns value; formatKpi keeps any such figure below 1.0×.
+    const below = ratio < 1;
+    return <span className={below ? "text-destructive" : undefined}>{formatKpi(ratio, "multiple")}</span>;
+}
+
+function amountCell(prefix: string, format: "currency" | "money") {
+    return (value: unknown) => {
+        const amount = asNumber(value);
+        return amount === undefined ? null : formatKpi(amount, format, { prefix });
+    };
+}
+
+function wholeCell(value: unknown) {
+    const n = asNumber(value);
+    return n === undefined ? null : formatKpi(n, "whole");
+}
+
+function percentCell(value: unknown) {
+    const n = asNumber(value);
+    return n === undefined ? null : formatKpi(n, "percent");
+}
+
+const dollars = (value: number, digits = 0) =>
+    `$${value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+
+function rangeText(span: DateSpan): string {
+    const days = spanDays(span);
+    return `${formatDateRange(span.from, span.to)} (${days} ${days === 1 ? "day" : "days"})`;
+}
+
+/** Why the credit costs are, or aren't, in the comparison. */
+function creditsNote(data: CostVsValue): string {
+    switch (data.credits.kind) {
+        case "ready":
+            return "Copilot Studio and Cowork / Work IQ, from Consumption Central at the rates set under Rates & packs on the Consumption page. Cowork credits use the Capacity Pack first, at the prepaid rate, then pay-as-you-go, as on the Consumption page's Cowork section. Unused pack credits aren't counted.";
+        case "off":
+            return "Not counted: Consumption Central isn't set up for this app, so the cost is licences alone and the return reads high.";
+        case "apart":
+            return data.credits.held
+                ? `Not counted: Consumption Central holds ${formatDateRange(data.credits.held.from, data.credits.held.to)}, which doesn't overlap the activity. The cost is licences alone, so the return reads high.`
+                : "Not counted: Consumption Central holds no dated credits yet. The cost is licences alone, so the return reads high.";
+        case "error":
+            return `Not counted: Consumption Central couldn't be read (${data.credits.message}). The cost is licences alone, so the return reads high.`;
+        case "loading":
+            return "Reading Consumption Central…";
+    }
+}
+
+function howNotes(data: CostVsValue): Note[] {
+    const { span, prefix, code, rate, scenario, users, licencePrice, listPrice, credits, azure, dollar, exchangeRate } = data;
+    const counted = credits.kind === "ready";
+    return [
+        {
+            term: "Dates",
+            text: span
+                ? `${rangeText(span)}: the days ${counted ? "both ValueLens and Consumption Central hold" : "ValueLens holds activity for"}, inside the date filter.`
+                : undefined,
+        },
+        {
+            term: "Licences",
+            text:
+                span && users !== undefined
+                    ? `${formatKpi(users, "whole")} licensed users × ${dollars(licencePrice, 2)} a month${listPrice ? " (the US list price)" : ""} × ${spanMonths(span).toFixed(1)} months.`
+                    : undefined,
+        },
+        { term: "Credits", text: creditsNote(data) },
+        {
+            term: "Value",
+            text: `Expert-equivalent hours at ${prefix}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort. The rate is set under Estimated value; the scenario here or there. The range under Return uses the conservative and optimistic scenarios at the same rate.`,
+        },
+        {
+            term: "Pairing",
+            text: counted
+                ? "Licences pay for licensed users' Copilot chat and apps, Copilot Studio credits for agents, and Cowork credits for Cowork. Agents' value also covers built-in and Agent Builder agents a licence pays for, so that pair reads high."
+                : "Licences are set against licensed users' Copilot chat and apps.",
+        },
+        {
+            term: "Left out",
+            text: `${
+                data.comparison.unlicensedChat !== undefined && data.comparison.unlicensedChat > 0
+                    ? `Copilot Chat by people without a licence (${formatKpi(data.comparison.unlicensedChat, "currency", { prefix })} of value), as it's free with Microsoft 365 and no cost here pays for it. `
+                    : ""
+            }${
+                azure.cost !== undefined
+                    ? `Azure AI Foundry (${formatKpi(azure.cost, "money", { prefix: currencyPrefix(azure.currency ?? "USD") })} over these dates, as billed), as ValueLens doesn't record the work it does. `
+                    : "Azure AI Foundry, as ValueLens doesn't record the work it does. "
+            }GitHub Copilot, which neither model holds. Filters other than dates, as costs aren't split that way.`,
+        },
+        {
+            term: "Currency",
+            text: dollar
+                ? "US dollars, as licences and credits are billed. Choose another reporting currency under Prices."
+                : exchangeRate !== undefined
+                  ? `${code}, at $1 = ${prefix}${exchangeRate}, set under Prices. Licences and credits are billed in US dollars and converted at that rate.`
+                  : `${code}. Licences and credits are billed in US dollars, so set how many ${currencySymbol(code)} make $1 under Prices.`,
+        },
+    ];
+}
+
+function agentNotes(data: CostVsValue): Note[] {
+    const { prefix, rate, scenario, costs, agents } = data;
+    const studio = costs.studio !== undefined ? ` (${formatKpi(costs.studio, "currency", { prefix })})` : "";
+    return [
+        {
+            term: "Cost",
+            text: `Copilot Studio's cost over these dates${studio}, split by each agent's share of all the Copilot Studio credits Consumption Central holds by agent.`,
+        },
+        {
+            term: "Value",
+            text: `The work ValueLens records for the agent with the same name, at ${prefix}${formatKpi(rate, "whole")} an hour, ${scenario.toLowerCase()} effort.`,
+        },
+        {
+            term: "Not found",
+            text:
+                agents.unmatched.length > 0
+                    ? `${agents.unmatched.join(", ")}: no activity under that name in ValueLens over these dates, so ${agents.unmatched.length === 1 ? "its" : "their"} share isn't set against any value.`
+                    : undefined,
+        },
+    ];
+}
+
+/** The rate typed in at install, offered as the default for its own currency. */
+function installRate(code: string): string | undefined {
+    const install = runtimeConfig().reporting;
+    return install?.currency === code && install.exchangeRate !== undefined ? String(install.exchangeRate) : undefined;
+}
+
+const rateLabel = (code: string) => `${currencySymbol(code)} per $1`;
+const rateHint = (code: string) =>
+    installRate(code) !== undefined
+        ? `How many ${currencySymbol(code)} make $1. Empty uses the rate set at install.`
+        : `How many ${currencySymbol(code)} make $1, to set dollar costs against value.`;
+
+/**
+ * The prices the comparison's costs are worked out at, set for everyone who
+ * opens the app: the licence price, the reporting currency and, when that
+ * isn't US dollars, the exchange rate.
+ */
+function PricesMenu({ data }: { data: CostVsValue }) {
+    const { status } = useCommercialTerms();
+    const { dollar, code, listPrice, exchangeRate } = data;
+    const fields = useMemo<TermField[]>(
+        () => [
+            {
+                key: "licensePrice",
+                label: "Microsoft 365 Copilot licence",
+                hint: `$ per user per month. Empty uses the ${dollars(LICENSE_LIST_PRICE)} US list price.`,
+                placeholder: String(LICENSE_LIST_PRICE),
+                inputMode: "decimal",
+            },
+            {
+                key: "exchangeRate",
+                label: rateLabel,
+                hint: rateHint,
+                placeholder: installRate,
+                inputMode: "decimal",
+                showWhen: (currency) => currency !== DEFAULT_CURRENCY,
+            },
+        ],
+        [],
+    );
+
+    const needsRate = !dollar && exchangeRate === undefined;
+    const summary =
+        status === "loading"
+            ? "Loading…"
+            : needsRate
+              ? "Exchange rate needed"
+              : `${listPrice ? "List price" : "Set in this app"} · ${code}`;
+
+    return (
+        <FilterMenu label="Prices" summary={summary} active={!listPrice || !dollar} panelClassName="w-[320px]">
+            {(close) => (
+                <TermsForm
+                    fields={fields}
+                    currency={{ value: code, choose: true }}
+                    intro="Microsoft 365 Copilot licences and Copilot credits are billed in US dollars. Value and cost here are shown in the reporting currency, converted at the exchange rate."
+                    resetLabel="Use defaults"
+                    unavailableText="Prices can't be saved here right now, so the US list price applies."
+                    note="They're used on the Value page only."
+                    close={close}
+                />
+            )}
+        </FilterMenu>
+    );
+}
+
+const noop = () => {};
+
+const scenarioOptions = SCENARIOS.map((id) => ({ id, label: id }));
+
+/**
+ * Stands in for the comparison until an exchange rate is set: the box to type
+ * it in, right where the charts will appear.
+ */
+function RatePrompt({ code }: { code: string }) {
+    const headingId = useId();
+    const fields = useMemo<TermField[]>(
+        () => [
+            {
+                key: "exchangeRate",
+                label: rateLabel,
+                hint: (currency) => `For example 0.75 if $1 buys ${currencyPrefix(currency)}0.75.`,
+                inputMode: "decimal",
+            },
+        ],
+        [],
+    );
+    return (
+        <section
+            aria-labelledby={headingId}
+            className="flex flex-col gap-300 rounded-xl border border-dashed border-border bg-card p-500"
+        >
+            <h3 id={headingId} className="text-[length:var(--text-400)] leading-400 font-semibold text-foreground">
+                Set an exchange rate to compare
+            </h3>
+            <div className="max-w-[360px]">
+                <TermsForm
+                    fields={fields}
+                    currency={{ value: code, choose: false }}
+                    intro={`Licences and credits are billed in US dollars and this page reports in ${code}. Type how many ${currencySymbol(code)} make $1, or choose US dollars under Prices.`}
+                    resetLabel="Clear"
+                    unavailableText="The exchange rate can't be saved here right now."
+                    note="It's also under Prices, above."
+                    close={noop}
+                />
+            </div>
+        </section>
+    );
+}
+
+/**
+ * Sets what Copilot cost over the dates against the estimated value of the
+ * work it did: licences against licensed users' Copilot chat and apps, Copilot Studio credits
+ * against agents, and Cowork credits against Cowork, at the rate chosen on
+ * the Estimated value stage and the effort scenario shared with it.
+ */
+export function CostVsValueStage() {
+    const data = useCostVsValue();
+    const { setScenario } = useValueAssumptions();
+    const { theme } = useThemeContext();
+    const showEstimatedValue = useShowStage("value", "estimated-value");
+    const { prefix, code, rate, scenario, span, comparison, costs, usd, convertible, credits, summary, agents } = data;
+    const counted = credits.kind === "ready";
+
+    const products = useMemo(() => pairTable(data.pairs), [data.pairs]);
+    const agentRows = useMemo(() => agentTable(agents.lines), [agents.lines]);
+    // The chart draws the fifteen agents with the most value and the rest as Other; the grid below lists them all.
+    const agentChartRows = useMemo(() => agentTable(topAgentLines(agents.lines)), [agents.lines]);
+    const spec = useMemo(() => costValueSpec(prefix), [prefix]);
+
+    const productColumns: GridColumnDef[] = useMemo(
+        () => [
+            { id: "Cost Line", header: "Cost", minWidth: 220 },
+            // Each width fits its header beside the sort arrow, even with a three-letter currency code; the two text columns share the rest.
+            {
+                id: "Cost",
+                header: `Cost (${currencySymbol(code)})`,
+                width: 108,
+                numericStyling: true,
+                cellRenderer: amountCell(prefix, "currency"),
+            },
+            { id: "Set Against", header: "Set against", minWidth: 180 },
+            {
+                id: "Value",
+                header: `Estimated value (${currencySymbol(code)})`,
+                width: 168,
+                numericStyling: true,
+                cellRenderer: amountCell(prefix, "currency"),
+            },
+            { id: "Return", header: "Return", width: 96, numericStyling: true, cellRenderer: returnCell },
+            { id: "Pair", header: "Pair", hidden: true },
+            { id: "Sort", header: "Order", hidden: true },
+        ],
+        [prefix, code],
+    );
+
+    const agentColumns: GridColumnDef[] = useMemo(
+        () => [
+            { id: "Pair", header: "Agent", minWidth: 220 },
+            { id: "Share", header: "Share of credits", width: 136, numericStyling: true, cellRenderer: percentCell },
+            {
+                id: "Cost",
+                header: `Allocated cost (${currencySymbol(code)})`,
+                width: 168,
+                numericStyling: true,
+                cellRenderer: amountCell(prefix, "money"),
+            },
+            { id: "Sessions", header: "Sessions", width: 96, numericStyling: true, cellRenderer: wholeCell },
+            {
+                id: "Value",
+                header: `Estimated value (${currencySymbol(code)})`,
+                width: 172,
+                numericStyling: true,
+                cellRenderer: heatRenderer({
+                    domain: columnHeat(agentRows, "Value"),
+                    format: (value) => amountCell(prefix, "currency")(value),
+                }),
+            },
+            { id: "Return", header: "Return", width: 96, numericStyling: true, cellRenderer: returnCell },
+            { id: "Sort", header: "Order", hidden: true },
+        ],
+        [prefix, code, agentRows],
+    );
+
+    const needRate = "Needs an exchange rate, set below.";
+    const productsHeight = rowChartHeight(data.pairs.length, { perRow: 56, chrome: 140, min: 220 });
+    const agentsChartHeight = rowChartHeight(agentChartRows.rows.length, { perRow: 40, chrome: 140, min: 240 });
+
+    const body = (() => {
+        if (summary.error !== undefined && !data.activity) {
+            return <QueryError message={summary.error} onRetry={summary.refetch} />;
+        }
+        if (summary.isLoading && !data.activity) {
+            return (
+                <div className="grid gap-300 md:grid-cols-2 xl:grid-cols-4">
+                    <QueryLoading />
+                    <QueryLoading />
+                    <QueryLoading />
+                    <QueryLoading />
+                </div>
+            );
+        }
+        if (!data.activity) {
+            return (
+                <QueryEmpty
+                    title="No activity in these dates"
+                    description="ValueLens holds no Copilot activity inside the date filter, so there's no value to set against cost."
+                />
+            );
+        }
+        return null;
+    })();
+
+    return (
+        <Section
+            id={stageAnchor("cost-vs-value")}
+            title="Cost vs value"
+            description="What Copilot cost over these dates, set against the estimated value of the work it did."
+            actions={
+                <div className="flex flex-wrap items-center gap-200">
+                    <SegmentedControl label="Scenario" options={scenarioOptions} value={scenario} onChange={setScenario} />
+                    <PricesMenu data={data} />
+                </div>
+            }
+        >
+            <FilterNote ignored={COST_IGNORED_FILTERS} reason="costs aren't recorded that way, so they don't narrow this comparison." />
+            <NotFilteredHint from={[data.notFilteredBy]} />
+
+            {body ?? (
+                <>
+                    <p className={cn(SMALL, "text-muted-foreground")}>
+                        {span ? `${formatDateRange(span.from, span.to)} · ` : ""}
+                        {`At ${prefix}${formatKpi(rate, "whole")} an hour, as set under `}
+                        <button
+                            type="button"
+                            onClick={showEstimatedValue}
+                            className="text-foreground underline underline-offset-2 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        >
+                            Estimated value
+                        </button>
+                        {`, ${scenario.toLowerCase()} effort`}
+                        {!data.dollar && data.exchangeRate !== undefined ? ` · $1 = ${prefix}${data.exchangeRate}` : ""}
+                    </p>
+
+                    {summary.error !== undefined ? (
+                        <QueryError message={summary.error} onRetry={summary.refetch} />
+                    ) : summary.isLoading ? (
+                        <div className="grid gap-300 md:grid-cols-2 xl:grid-cols-4">
+                            <QueryLoading />
+                            <QueryLoading />
+                            <QueryLoading />
+                            <QueryLoading />
+                        </div>
+                    ) : (
+                        <div className="grid gap-300 md:grid-cols-2 xl:grid-cols-4">
+                            <KpiCard
+                                label="Return on cost"
+                                value={comparison.ratio}
+                                format="multiple"
+                                emphasis
+                                detail={
+                                    !convertible ? (
+                                        needRate
+                                    ) : (
+                                        <div className="flex flex-col gap-100">
+                                            <KpiStat label="Conservative" value={comparison.low} format="multiple" />
+                                            <KpiStat label="Optimistic" value={comparison.high} format="multiple" />
+                                            {!counted && <span>Licences only: credits aren't counted.</span>}
+                                        </div>
+                                    )
+                                }
+                            />
+                            <KpiCard
+                                label="Estimated value"
+                                value={comparison.value}
+                                format="currency"
+                                prefix={prefix}
+                                detail={
+                                    comparison.unlicensedChat !== undefined && comparison.unlicensedChat > 0
+                                        ? `${scenario} effort at ${prefix}${formatKpi(rate, "whole")} an hour. Leaves out ${formatKpi(comparison.unlicensedChat, "currency", { prefix })} of free Copilot Chat by people without a licence.`
+                                        : `${scenario} effort at ${prefix}${formatKpi(rate, "whole")} an hour`
+                                }
+                            />
+                            {convertible ? (
+                                <KpiCard
+                                    label="Cost"
+                                    value={comparison.cost}
+                                    format="currency"
+                                    prefix={prefix}
+                                    detail={
+                                        <div className="flex flex-col gap-100">
+                                            <KpiStat label="Licences" value={costs.licences} format="currency" prefix={prefix} />
+                                            {counted && (
+                                                <KpiStat label="Credits" value={comparison.credits} format="currency" prefix={prefix} />
+                                            )}
+                                        </div>
+                                    }
+                                />
+                            ) : (
+                                <KpiCard
+                                    label="Cost"
+                                    value={usd.total}
+                                    format="currency"
+                                    prefix="$"
+                                    detail={`In US dollars. ${needRate}`}
+                                />
+                            )}
+                            <KpiCard
+                                label="Break-even hourly rate"
+                                value={comparison.breakEvenRate}
+                                format="money"
+                                prefix={prefix}
+                                detail={
+                                    convertible
+                                        ? `The value covers the cost at any rate above this, ${scenario.toLowerCase()} effort.`
+                                        : needRate
+                                }
+                            />
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 gap-500 xl:grid-cols-[minmax(0,1fr)_320px]">
+                        {convertible ? (
+                            <div className="flex min-w-0 flex-col gap-300">
+                                <ChartPanel
+                                    result={summary}
+                                    table={products}
+                                    spec={spec}
+                                    height={productsHeight}
+                                    title="Each cost and the work it pays for"
+                                    headline={pairReturnHeadline}
+                                    subtitle={`Cost and estimated value, in ${code}`}
+                                    emptyTitle="Nothing to compare"
+                                    emptyDescription="There's no cost or value over these dates."
+                                />
+                                <Panel
+                                    result={summary}
+                                    table={products}
+                                    height={gridHeight(data.pairs.length, { perRow: 52 })}
+                                    emptyTitle="Nothing to compare"
+                                    emptyDescription="There's no cost or value over these dates."
+                                >
+                                    {(table) => (
+                                        <DataGrid
+                                            columns={productColumns}
+                                            data={table}
+                                            theme={theme}
+                                            header={{
+                                                title: "Cost and value side by side",
+                                                subtitle: "Below 1× the cost is more than the value it was set against.",
+                                            }}
+                                        />
+                                    )}
+                                </Panel>
+                            </div>
+                        ) : (
+                            <div className="min-w-0">
+                                <RatePrompt code={code} />
+                            </div>
+                        )}
+                        <NoteCard title="How this is worked out" notes={howNotes(data)} />
+                    </div>
+
+                    {counted && convertible && (
+                        <div className="flex flex-col gap-300">
+                            <div className="grid grid-cols-1 gap-500 xl:grid-cols-[minmax(0,1fr)_320px]">
+                                <div className="min-w-0">
+                                    <ChartPanel
+                                        result={data.agentResult}
+                                        table={agentChartRows}
+                                        spec={spec}
+                                        height={agentsChartHeight}
+                                        title="Copilot Studio agents"
+                                        headline={agentCoverageHeadline}
+                                        headlineTable={agentRows}
+                                        subtitle={
+                                            agents.lines.length > TOP_N
+                                                ? `Top ${TOP_N} of ${formatKpi(agents.lines.length, "whole")} agents by value, the rest as Other`
+                                                : "Each agent's share of the credit cost and the value of its work"
+                                        }
+                                        emptyTitle="No agents found by name"
+                                        emptyDescription="None of the agents with Copilot Studio credits has activity under the same name in ValueLens over these dates."
+                                    />
+                                </div>
+                                <div className="xl:self-start">
+                                    <NoteCard title="How agents are costed" notes={agentNotes(data)} />
+                                </div>
+                            </div>
+                            {agents.lines.length > 0 && (
+                                <Panel
+                                    result={data.agentResult}
+                                    table={agentRows}
+                                    height={gridHeight(agents.lines.length, { max: 520 })}
+                                    emptyTitle="No agents found by name"
+                                    emptyDescription="None of the agents with Copilot Studio credits has activity under the same name in ValueLens over these dates."
+                                >
+                                    {(table) => (
+                                        <DataGrid
+                                            columns={agentColumns}
+                                            data={table}
+                                            theme={theme}
+                                            header={{
+                                                title: "Agent cost and value",
+                                                subtitle: `${agents.lines.length} of ${agents.total} Copilot Studio agents found in ValueLens by name`,
+                                            }}
+                                        />
+                                    )}
+                                </Panel>
+                            )}
+                        </div>
+                    )}
+                </>
+            )}
+        </Section>
+    );
+}

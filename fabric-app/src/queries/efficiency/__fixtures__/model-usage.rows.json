@@ -1,0 +1,23 @@
+[
+  {
+    "[Model]": "COPILOT-PRO",
+    "[Cost Tier]": "Unclassified",
+    "[Tier Sort]": 9,
+    "[Sessions]": 2157,
+    "[Usage Share]": 0.3423809523809524
+  },
+  {
+    "[Model]": "GPT-4-TURBO",
+    "[Cost Tier]": "Workhorse (mid cost)",
+    "[Tier Sort]": 1,
+    "[Sessions]": 2104,
+    "[Usage Share]": 0.33396825396825397
+  },
+  {
+    "[Model]": "GPT-4",
+    "[Cost Tier]": "Workhorse (mid cost)",
+    "[Tier Sort]": 1,
+    "[Sessions]": 2039,
+    "[Usage Share]": 0.32365079365079363
+  }
+]

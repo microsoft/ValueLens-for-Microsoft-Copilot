@@ -1,0 +1,5 @@
+EVALUATE
+SELECTCOLUMNS(
+    DISTINCT('Org Attribute Source'[Attribute]),
+    "Attribute", 'Org Attribute Source'[Attribute]
+)

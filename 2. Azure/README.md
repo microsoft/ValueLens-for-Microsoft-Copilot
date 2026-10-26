@@ -1,15 +1,31 @@
 # 2. Azure
 
-Analytics Hub running in **your own Azure subscription**, without Microsoft Fabric. It has the
-same data, the same ValueLens Model and measures, and the same app pages as `1. Fabric`.
-The design and the roadmap are in [`docs/plans/AZURE-HOSTED-PLAN.md`](../docs/plans/AZURE-HOSTED-PLAN.md).
+Analytics Hub in **your own Azure subscription**, without Microsoft Fabric. It has the same data,
+the same ValueLens Model and measures, and the same app pages as `1. Fabric`.
 
-> **Status: work in progress.** It's set up by the [installer](../1.%20Fabric/installer/), which is
-> also a work in progress. The installer deploys it end to end: Azure SQL, the Container Apps jobs, the Power BI
-> models, the web app and a Teams package. It collects Copilot interactions, licences and org data, Microsoft
-> 365 activity, credit consumption (Copilot Studio, Cowork, Azure AI and pay-as-you-go), and optionally
-> Defender shadow AI and agent risk. The other modules
-> are coming. Try it in a demo or test tenant first.
+> **Work in progress.** Only the [installer](../1.%20Fabric/installer/) sets this path up, and
+> it's also a work in progress. Try it in a demo or test tenant first. There's no manual path.
+> The design and roadmap are in [`docs/plans/AZURE-HOSTED-PLAN.md`](../docs/plans/AZURE-HOSTED-PLAN.md).
+
+## What you get
+
+- Azure SQL, scheduled Container Apps jobs, Power BI models, a web app and a Teams package.
+- Copilot interactions, licences, org data, Microsoft 365 activity and credit consumption.
+- Optionally, Defender shadow AI and agent risk. Other modules are coming.
+
+## Before you start
+
+- [ ] **An Azure subscription.** Contributor plus User Access Administrator, or Owner, on the
+      subscription or resource group.
+- [ ] **Power BI Pro** and a Power BI workspace.
+- [ ] **Admin consent.** A Global Administrator or Privileged Role Administrator approves the
+      read-only Microsoft Graph permissions.
+- [ ] **Windows 10 or 11** for the installer, or Node.js on another system.
+- [ ] **Read the [disclaimer](../README.md#disclaimer).** You're responsible for the data once it's in your Azure SQL database.
+
+Every prerequisite, with links to Microsoft Learn, is in [Before you start](../docs/PREREQUISITES.md).
+Networking, regions and the commands are in the installer's
+[Azure target section](../1.%20Fabric/installer/README.md#azure-target).
 
 ## Install it
 
@@ -46,15 +62,22 @@ group and links to your contact or request link. For Teams, publish the package 
 catalog: see [teams](teams/README.md#give-it-to-everyone). Permissions are in
 [Viewing Analytics Hub](../docs/PERMISSIONS.md#viewing-analytics-hub-paths-1-and-2).
 
-What you need, networking, regions and the commands are in the installer's
-[Azure target section](../1.%20Fabric/installer/README.md#azure-target). The images come from
-`ghcr.io/microsoft/valuelens-jobs` and `valuelens-web`, tagged with the installer's version. For every
-prerequisite on one page, with links to Microsoft Learn, see [Prerequisites](../docs/PREREQUISITES.md).
+## After setup
 
-Read the [disclaimer](../README.md#disclaimer) too: these aren't the official Copilot reports, and
-you're responsible for the data once it's in your Azure SQL database.
+- **Check it worked.** Open the web app URL the installer printed. You should see your organisation's data.
+- **Keep it fresh.** The Container Apps job runs on its schedule.
+- **Status, updates or repairs:** open the installer again and choose **Repair or change**.
+- **Problems?** See the installer's [Troubleshooting](../1.%20Fabric/installer/README.md#troubleshooting),
+  or [open an issue](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues).
 
-## Credit consumption
+---
+
+<a id="credit-consumption"></a>
+
+<details>
+<summary><strong>Credit consumption</strong></summary>
+
+<br>
 
 Tick **Credit consumption** to get the Consumption Central pages, from a second Power BI model
 (*Consumption Central*) that reads the same Azure SQL database.
@@ -79,7 +102,14 @@ The jobs read the files where they land and don't move them, the same as the Fab
 Not on Azure yet: GitHub Copilot consumption, the dated Agent Daily table, Viva without a CSV, and
 `--flow-identity app` (the flow always signs in as you; the option warns and is ignored).
 
-## Ask
+</details>
+
+<a id="ask"></a>
+
+<details>
+<summary><strong>Ask: questions in plain language</strong></summary>
+
+<br>
 
 The app's **Ask** page answers questions about the dashboard in plain language, inline. The web app's
 `POST /api/ask` sends the question to an Azure OpenAI model, which can only call the named queries in
@@ -99,7 +129,14 @@ only what they can. The answer shows which queries it ran and links to the page 
 - **Logs.** The question and the names of the queries it ran, never the answer or the data.
 - **Cost.** Billed per token on the AI Services account. Light use costs a few dollars a month.
 
-## What's here
+</details>
+
+<a id="whats-here"></a>
+
+<details>
+<summary><strong>What's in this folder</strong></summary>
+
+<br>
 
 | Folder | Contents |
 |---|---|
@@ -114,7 +151,19 @@ port of `Copilot_Audit_Log_Processor`, held to the Fabric notebook row for row b
 `tests/test_valuelens_core_parity.py`. **The notebook is still the source of truth**: change both together,
 then run `python tests/valuelens_golden.py --regenerate` (this needs pyspark and Java) and `--check`.
 
-## Try the processor locally
+What you need, networking, regions and the commands are in the installer's
+[Azure target section](../1.%20Fabric/installer/README.md#azure-target). The images come from
+`ghcr.io/microsoft/valuelens-jobs` and `valuelens-web`, tagged with the installer's version. For every
+prerequisite on one page, with links to Microsoft Learn, see [Prerequisites](../docs/PREREQUISITES.md).
+
+</details>
+
+<a id="try-the-processor-locally"></a>
+
+<details>
+<summary><strong>Try the processor locally</strong></summary>
+
+<br>
 
 ```powershell
 pip install duckdb
@@ -126,7 +175,14 @@ python -m valuelens_jobs process --data-dir .\data
 
 Or run it on single files: `python -m valuelens_core --interactions in.csv --out curated.parquet`.
 
-## Validate the templates
+</details>
+
+<a id="validate-the-templates"></a>
+
+<details>
+<summary><strong>Validate the templates</strong></summary>
+
+<br>
 
 ```powershell
 az bicep build --file "2. Azure/infra/main.bicep" --stdout > $null
@@ -136,7 +192,14 @@ az deployment group what-if -g <rg> --template-file "2. Azure/infra/main.bicep" 
 The installer runs the same what-if for its plan screen, then deploys in incremental mode. It passes the
 live SQL capacity values back in, so scale changes you make survive updates.
 
-## After deployment (installer steps, not ARM)
+</details>
+
+<a id="after-deployment-installer-steps-not-arm"></a>
+
+<details>
+<summary><strong>What the installer does after the ARM deployment</strong></summary>
+
+<br>
 
 ARM can't do these, so the installer:
 - Grant the managed identity its Graph app roles (`AuditLogsQuery.Read.All`, `Reports.Read.All`,
@@ -146,3 +209,5 @@ ARM can't do these, so the installer:
 - Create or find the viewer group, give it Build on the models, and pass it to the web app as `VALUELENS_ACCESS`.
 - With credit consumption: the managed identity's Cost Management and Azure AI roles, write access to
   where the credit files land, the Consumption Central model, and the Copilot Studio Power Automate flow.
+
+</details>

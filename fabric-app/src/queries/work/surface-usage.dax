@@ -1,0 +1,35 @@
+EVALUATE
+VAR SurfaceRows =
+    SELECTCOLUMNS(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Interactions (Audit Logs)'[AppHost],
+            "AllTasks", [AI Tasks],
+            "LicensedTasks", [Copilot AI Tasks],
+            "UnlicensedTasks", [Unlicensed AI Tasks],
+            "AgentTasks", [Agent AI Tasks]
+        ),
+        "Lens", "Surface",
+        "Category", 'Chat + Agent Interactions (Audit Logs)'[AppHost],
+        "All Tasks", [AllTasks],
+        "Licensed Tasks", [LicensedTasks],
+        "Unlicensed Tasks", [UnlicensedTasks],
+        "Agent Tasks", [AgentTasks]
+    )
+VAR ModelRows =
+    SELECTCOLUMNS(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Interactions (Audit Logs)'[AI_Model],
+            "AllTasks", [AI Tasks],
+            "LicensedTasks", [Copilot AI Tasks],
+            "UnlicensedTasks", [Unlicensed AI Tasks],
+            "AgentTasks", [Agent AI Tasks]
+        ),
+        "Lens", "Model",
+        "Category", 'Chat + Agent Interactions (Audit Logs)'[AI_Model],
+        "All Tasks", [AllTasks],
+        "Licensed Tasks", [LicensedTasks],
+        "Unlicensed Tasks", [UnlicensedTasks],
+        "Agent Tasks", [AgentTasks]
+    )
+RETURN
+UNION(SurfaceRows, ModelRows)

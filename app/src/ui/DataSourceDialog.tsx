@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { useData } from '../data/store'
-import { FILE_LABEL, type FileKind } from '../data/load'
+import { loadMessage } from '../data/loadCheck'
 import { dateLabel, int } from './format'
 import { Sheet } from './Sheet'
-
-const KINDS = Object.keys(FILE_LABEL) as FileKind[]
 
 export function DataSourceDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { ds, loadFiles, loadSample } = useData()
@@ -16,12 +14,8 @@ export function DataSourceDialog({ open, onClose }: { open: boolean; onClose: ()
     setBusy(true)
     setMsg(null)
     try {
-      const found = await loadFiles([...files])
-      const missing = KINDS.filter((k) => !found.includes(k))
-      setMsg({
-        ok: true,
-        text: `Loaded ${found.map((k) => FILE_LABEL[k as FileKind]).join(', ')}.${missing.length ? ` Not found: ${missing.map((k) => FILE_LABEL[k]).join(', ')}, so related measures will be blank.` : ''}`,
-      })
+      const counts = await loadFiles([...files])
+      setMsg({ ok: true, text: loadMessage(counts) })
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) })
     } finally {

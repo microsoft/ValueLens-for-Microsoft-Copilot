@@ -24,10 +24,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const loadFiles = useCallback(async (files: File[]) => {
-    const { dataset, found } = await readFiles(files)
+    const { dataset, counts } = await readFiles(files)
     setDs(dataset)
     setFilters(EMPTY_FILTERS)
-    return found
+    return counts
   }, [])
 
   useEffect(() => {

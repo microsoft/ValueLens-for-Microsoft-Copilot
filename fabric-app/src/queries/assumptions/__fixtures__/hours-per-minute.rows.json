@@ -1,0 +1,162 @@
+[
+  {
+    "Behavior Value Map[Behavior]": "Email Drafting",
+    "[Hours Per Minute]": 14.633333333333333
+  },
+  {
+    "Behavior Value Map[Behavior]": "Email Summarising",
+    "[Hours Per Minute]": 8.933333333333334
+  },
+  {
+    "Behavior Value Map[Behavior]": "Teams Messaging",
+    "[Hours Per Minute]": 5.5
+  },
+  {
+    "Behavior Value Map[Behavior]": "Meeting Prep",
+    "[Hours Per Minute]": 5.05
+  },
+  {
+    "Behavior Value Map[Behavior]": "Meeting Scheduling",
+    "[Hours Per Minute]": 1.4333333333333333
+  },
+  {
+    "Behavior Value Map[Behavior]": "Document Drafting",
+    "[Hours Per Minute]": 6.833333333333333
+  },
+  {
+    "Behavior Value Map[Behavior]": "Document Summarising",
+    "[Hours Per Minute]": 8.15
+  },
+  {
+    "Behavior Value Map[Behavior]": "Presentation Creation",
+    "[Hours Per Minute]": 1.8166666666666667
+  },
+  {
+    "Behavior Value Map[Behavior]": "Presentation Summarising",
+    "[Hours Per Minute]": 0.9166666666666666
+  },
+  {
+    "Behavior Value Map[Behavior]": "Image Generation",
+    "[Hours Per Minute]": 1.55
+  },
+  {
+    "Behavior Value Map[Behavior]": "Video Summarising",
+    "[Hours Per Minute]": 0.5666666666666667
+  },
+  {
+    "Behavior Value Map[Behavior]": "Web Searching",
+    "[Hours Per Minute]": 7.466666666666667
+  },
+  {
+    "Behavior Value Map[Behavior]": "Enterprise Searching",
+    "[Hours Per Minute]": 4.883333333333334
+  },
+  {
+    "Behavior Value Map[Behavior]": "PDF Analysis",
+    "[Hours Per Minute]": 3.1666666666666665
+  },
+  {
+    "Behavior Value Map[Behavior]": "SharePoint Access",
+    "[Hours Per Minute]": 0.8166666666666667
+  },
+  {
+    "Behavior Value Map[Behavior]": "File Retrieval",
+    "[Hours Per Minute]": 2.0
+  },
+  {
+    "Behavior Value Map[Behavior]": "People Lookup",
+    "[Hours Per Minute]": 1.0333333333333334
+  },
+  {
+    "Behavior Value Map[Behavior]": "Data Querying",
+    "[Hours Per Minute]": 3.2
+  },
+  {
+    "Behavior Value Map[Behavior]": "Excel Assistance",
+    "[Hours Per Minute]": 3.8666666666666667
+  },
+  {
+    "Behavior Value Map[Behavior]": "Spreadsheet Review",
+    "[Hours Per Minute]": 0.75
+  },
+  {
+    "Behavior Value Map[Behavior]": "Code Writing",
+    "[Hours Per Minute]": 2.183333333333333
+  },
+  {
+    "Behavior Value Map[Behavior]": "Code Analysis",
+    "[Hours Per Minute]": 2.95
+  },
+  {
+    "Behavior Value Map[Behavior]": "Running a Workflow",
+    "[Hours Per Minute]": 0.1
+  },
+  {
+    "Behavior Value Map[Behavior]": "Note Taking",
+    "[Hours Per Minute]": 2.7666666666666666
+  },
+  {
+    "Behavior Value Map[Behavior]": "Form / Survey Work",
+    "[Hours Per Minute]": 0.8833333333333333
+  },
+  {
+    "Behavior Value Map[Behavior]": "Task Management",
+    "[Hours Per Minute]": 2.066666666666667
+  },
+  {
+    "Behavior Value Map[Behavior]": "Real-time Collaboration",
+    "[Hours Per Minute]": 0.9166666666666666
+  },
+  {
+    "Behavior Value Map[Behavior]": "Coaching",
+    "[Hours Per Minute]": 0.13333333333333333
+  },
+  {
+    "Behavior Value Map[Behavior]": "Research & Analysis",
+    "[Hours Per Minute]": 3.5
+  },
+  {
+    "Behavior Value Map[Behavior]": "Sales & Customer",
+    "[Hours Per Minute]": 1.5666666666666667
+  },
+  {
+    "Behavior Value Map[Behavior]": "HR & People",
+    "[Hours Per Minute]": 3.45
+  },
+  {
+    "Behavior Value Map[Behavior]": "Compliance & Policy",
+    "[Hours Per Minute]": 1.15
+  },
+  {
+    "Behavior Value Map[Behavior]": "IT & Service Desk",
+    "[Hours Per Minute]": 7.3
+  },
+  {
+    "Behavior Value Map[Behavior]": "Content Generation",
+    "[Hours Per Minute]": 0.2833333333333333
+  },
+  {
+    "Behavior Value Map[Behavior]": "Data & Reporting",
+    "[Hours Per Minute]": 1.3
+  },
+  {
+    "Behavior Value Map[Behavior]": "Knowledge Base",
+    "[Hours Per Minute]": 1.1666666666666667
+  },
+  {
+    "Behavior Value Map[Behavior]": "Ideation & Creative",
+    "[Hours Per Minute]": 0.05
+  },
+  {
+    "Behavior Value Map[Behavior]": "Domain-Specific Agent",
+    "[Hours Per Minute]": 2.8
+  },
+  {
+    "Behavior Value Map[Behavior]": "General Chat",
+    "[Hours Per Minute]": 14.866666666666667
+  },
+  {
+    "Behavior Value Map[Behavior]": null,
+    "[Hours Per Minute]": 9.616666666666667
+  }
+]

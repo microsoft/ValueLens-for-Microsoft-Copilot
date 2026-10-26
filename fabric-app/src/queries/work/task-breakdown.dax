@@ -1,0 +1,39 @@
+EVALUATE
+VAR BehaviourRows =
+    SELECTCOLUMNS(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Interactions (Audit Logs)'[Behavior_Enriched_Full],
+            "TaskCount", [AI Tasks],
+            "ShareOfActivity", [Activity Share]
+        ),
+        "Dimension", "Behaviour",
+        "Category", 'Chat + Agent Interactions (Audit Logs)'[Behavior_Enriched_Full],
+        "Tasks", [TaskCount],
+        "Share", [ShareOfActivity]
+    )
+VAR WorkflowRows =
+    SELECTCOLUMNS(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Interactions (Audit Logs)'[Workflow_Action],
+            "TaskCount", [AI Tasks],
+            "ShareOfActivity", [Activity Share]
+        ),
+        "Dimension", "Workflow action",
+        "Category", 'Chat + Agent Interactions (Audit Logs)'[Workflow_Action],
+        "Tasks", [TaskCount],
+        "Share", [ShareOfActivity]
+    )
+VAR OutcomeRows =
+    SELECTCOLUMNS(
+        SUMMARIZECOLUMNS(
+            'Chat + Agent Interactions (Audit Logs)'[Value_Outcome],
+            "TaskCount", [AI Tasks],
+            "ShareOfActivity", [Activity Share]
+        ),
+        "Dimension", "Value outcome",
+        "Category", 'Chat + Agent Interactions (Audit Logs)'[Value_Outcome],
+        "Tasks", [TaskCount],
+        "Share", [ShareOfActivity]
+    )
+RETURN
+UNION(BehaviourRows, WorkflowRows, OutcomeRows)
