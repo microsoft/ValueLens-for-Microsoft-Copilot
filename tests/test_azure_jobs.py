@@ -807,3 +807,29 @@ def test_adls_store_skips_hns_directory_markers(tmp_path):
         "raw/copilot_licensed_users/part-0.parquet", "raw/copilot_licensed_users/part-1.parquet"]
     store.remove([r for r in store.list("raw/copilot_licensed_users") if not r.endswith("part-0.parquet")])
     assert deleted == ["copilot_licensed_users/part-1.parquet"]
+
+
+def test_adls_store_pull_stamps_each_file_with_its_upload_time(tmp_path):
+    from datetime import datetime, timezone
+
+    from valuelens_jobs.storage import AdlsStore
+
+    uploaded = datetime(2026, 8, 31, 23, 30, tzinfo=timezone.utc)
+
+    class Blob:
+        def readinto(self, fh):
+            fh.write(b"a,b\n")
+
+    class Container:
+        def list_blobs(self, name_starts_with, include=None):
+            return [SimpleNamespace(name="studio/old.csv", metadata={}, last_modified=uploaded),
+                    SimpleNamespace(name="studio/unknown.csv", metadata={})]
+
+        def download_blob(self, name):
+            return Blob()
+
+    service = SimpleNamespace(get_container_client=lambda name: Container())
+    store = AdlsStore("acct", root=tmp_path, service=service)
+    assert store.pull("landing/studio") == ["landing/studio/old.csv", "landing/studio/unknown.csv"]
+    assert store.path("landing/studio/old.csv").stat().st_mtime == uploaded.timestamp()
+    assert store.path("landing/studio/unknown.csv").read_bytes() == b"a,b\n"

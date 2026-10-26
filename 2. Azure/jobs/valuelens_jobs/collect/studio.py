@@ -1,22 +1,30 @@
 """Copilot Studio credits: the Power Platform admin center exports and the Copilot Studio credits
 flow's licensing API files, merged into the Consumption Central tables.
 
-A port of the Fabric notebook `Ingest_Studio` (same tables, columns, keys and precedence rules):
+A port of the Fabric notebook `Ingest_Studio`: the same tables, columns, keys and precedence rules,
+and the same rules for an export's month, the backfill folders and the newest file.
 
 * Exports (`EntitlementConsumptionTenant*DetailsReport_MCSMessages*.csv`, or a renamed `*Tenant*`,
   `*PerAgent*`/`*Agent*`, `*PerUser*`/`*User*` file) feed `studio_tenant_daily` by day, and
-  `studio_agent` / `studio_user` by `snapshot_month` (the month the run happens in, since those two
-  exports have no date).
-* The flow's files (`StudioApiAgentDaily*`, `StudioApiEntitlement*`, `StudioApiUserDaily*`) feed
-  `studio_agent_daily` and `studio_user_daily`, and are rolled up into the other three tables with
-  `source_file = 'ppac-api'`.
+  `studio_agent` / `studio_user` by `snapshot_month`. Those two exports have no date, so each counts
+  as the month (UTC) it was uploaded to the studio folder, or as the month of its
+  `backfill/<YYYY-MM>/` folder. A file without its export's key columns is skipped before the
+  patterns are weighed, so `*Tenant*.csv` never reads the per-agent or per-user export.
+* Where two exports share a key, the newer file's rows win: by upload time, then by name.
+* The flow's files (`StudioApiAgentDaily*`, `StudioApiEntitlement*`, `StudioApiUserDaily*`), read only
+  from the top of the studio folder, feed `studio_agent_daily` and `studio_user_daily`, and are
+  rolled up into the other three tables with `source_file = 'ppac-api'`.
 * An export always wins: API rows are dropped wherever an export covers the same day and
   environment (tenant), or the same month (agents, users).
 
-The drop folder is re-read in full every run; the merges make that idempotent.
+The drop folder is re-read in full every run. Each export keeps its month, so the merges make that
+idempotent. A file directly in `backfill/`, a folder there that isn't named for a month (YYYY-MM), or
+a month after this one stops the Studio load before any of its tables is written. The other
+collectors still run.
 """
 from __future__ import annotations
 
+import fnmatch
 import logging
 import re
 import tempfile
@@ -27,14 +35,23 @@ from urllib.parse import quote
 import duckdb
 
 from ..dropfolder import open_dropfolder
-from .consumption import GUID, TableState, match_files, read_csvs, sql_list, text
+from .consumption import GUID, TableState, csv_header, match_files, read_csvs, sql_list, text
 
 log = logging.getLogger("valuelens_jobs.collect.studio")
 
 SUBDIR = "studio"
+# Earlier months' exports, a folder per month: studio/backfill/<YYYY-MM>/.
+BACKFILL = "backfill"
+MONTH_FOLDER = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
+STOP = ("Nothing was written. Each export in backfill/ goes in a folder named for its month, YYYY-MM, "
+        "no later than this one. Move or remove these, then run again:")
 PAT_TENANT = ("EntitlementConsumptionTenantDetailsReport_MCSMessages*.csv", "*Tenant*.csv")
 PAT_AGENT = ("EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages*.csv", "*PerAgent*.csv", "*Agent*.csv")
 PAT_USER = ("EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages*.csv", "*PerUser*.csv", "*User*.csv")
+# The columns a file must have to be read as that export, each as its aliases: the export's key.
+NEED_TENANT = [("Usage Date",), ("Environment Id",), ("BillingPlan Id",), ("Capacity Type",)]
+NEED_AGENT = [("Agent Id",), ("AI Feature/Billable Feature", "Billable Feature"), ("Channel",), ("Environment Id",)]
+NEED_USER = [("User Id",), ("Agent Id",)]
 PAT_API_AGENT = ("StudioApiAgentDaily*.csv",)
 PAT_API_ENTITLEMENT = ("StudioApiEntitlement*.csv",)
 PAT_API_USER = ("StudioApiUserDaily*.csv",)
@@ -132,24 +149,129 @@ def _joined(c):
     return f"coalesce(string_agg(DISTINCT {c}, ', ' ORDER BY {c}), '') AS {c}"
 
 
+def _name(rel: str) -> str:
+    return rel.rsplit("/", 1)[-1]
+
+
+def backfill(rels, folders, run_month: date, root: str = SUBDIR) -> dict:
+    """{path: month} for the files in `backfill/<YYYY-MM>/`, from the paths of the files and folders under the
+    studio folder. Raises, listing every problem, if a file is directly in backfill/, a folder there isn't
+    named for a month, or the month is after `run_month`: nothing is read or written then."""
+    split = {rel: rel.split("/") for rel in rels}
+    problems = [f"{root}/{rel}: a file outside a month folder"
+                for rel, parts in split.items() if len(parts) == 2 and parts[0] == BACKFILL]
+    names = ({f.split("/")[1] for f in folders if f.startswith(BACKFILL + "/")}
+             | {parts[1] for parts in split.values() if len(parts) > 2 and parts[0] == BACKFILL})
+    months = {}
+    for name in sorted(names):
+        if not MONTH_FOLDER.fullmatch(name):
+            problems.append(f"{root}/{BACKFILL}/{name}: the folder name isn't a month (YYYY-MM)")
+            continue
+        month = date(int(name[:4]), int(name[5:]), 1)
+        if month > run_month:
+            problems.append(f"{root}/{BACKFILL}/{name}: a month after this one ({run_month:%Y-%m})")
+        else:
+            months[name] = month
+    if problems:
+        raise ValueError(STOP + "\n  " + "\n  ".join(sorted(problems)))
+    for f in sorted(folders):
+        parts = f.split("/")
+        if len(parts) == 3 and parts[0] == BACKFILL and parts[1] in months:
+            log.warning("  ! %s/%s: a folder inside a month folder isn't read", root, f)
+    return {rel: months[parts[1]] for rel, parts in split.items()
+            if len(parts) == 3 and parts[0] == BACKFILL and parts[1] in months}
+
+
 class StudioIngest:
-    def __init__(self, con, state: TableState, files: dict, snapshot: date, api=None):
+    def __init__(self, con, state: TableState, files: dict, run_month: date, api=None, *, uploaded=None,
+                 months=None, root: str = SUBDIR):
         self.con = con
         self.state = state
-        self.files = files  # {name: local path}
-        self.snapshot = snapshot
+        self.files = files  # {path under the studio folder: local path}
+        self.run_month = run_month
         self.api = api
+        self.uploaded = uploaded or {}  # {path: upload time, POSIX seconds, or None}
+        self.months = months or {}  # {path: month} for the files in backfill/<YYYY-MM>/
+        self.root = root
         self.summary: dict = {}
+        self._headers: dict = {}
+        self._warned: set = set()
 
-    def read(self, view, *patterns, api=False):
-        """Files from the first pattern that matches anything. The flow's files (StudioApi*) are only
-        read with api=True, so a loose export pattern such as *Agent*.csv never picks them up."""
-        names = match_files(self.files, patterns, include=lambda n: n.lower().startswith("studioapi") == api)
-        if not names:
-            log.info("  no file matched %s", patterns)
+    def read(self, view, *patterns, api=False, need=(), kind="", month=True):
+        """Files from the first pattern that matches a usable file. The flow's files (StudioApi*) are only
+        read with api=True, and only from the top of the studio folder, so a loose export pattern such as
+        *Agent*.csv never picks them up.
+
+        An export is read from the top of the folder or from a month folder in backfill/, and is usable only
+        if it has the `need` columns (the export's key), so *Tenant*.csv never reads the per-agent export.
+        Each export's rows get `__order` (oldest file first: by upload time, then name) and, with
+        month=True, `__month`: its backfill folder's month, else the month (UTC) it was uploaded."""
+        if api:
+            names = match_files([r for r in self.files if "/" not in r], patterns,
+                                include=lambda n: n.lower().startswith("studioapi"))
+            if not names:
+                log.info("  no file matched %s", patterns)
+                return None
+            cols = read_csvs(self.con, [self.files[n] for n in names], view, norm)
+            return Columns(cols, f"file(s) {', '.join(names)}") if cols else None
+        candidates = [r for r in self.files
+                      if _name(r).lower().endswith(".csv") and not _name(r).lower().startswith("studioapi")
+                      and ("/" not in r or r in self.months)]
+        found = []
+        for p in patterns:
+            found = [r for r in sorted(candidates)
+                     if fnmatch.fnmatchcase(_name(r).lower(), p.lower()) and self._usable(r, need, kind)]
+            if found:
+                break
+        if not found:
+            log.info("  no usable file matched %s", patterns)
             return None
-        cols = read_csvs(self.con, [self.files[n] for n in names], view, norm)
-        return Columns(cols, f"file(s) {', '.join(names)}") if cols else None
+        order = sorted(found, key=lambda r: (self.uploaded.get(r) or 0, _name(r), r))
+        months = {r: self._month(r) for r in order} if month else {}
+        extra = {}
+        for i, r in enumerate(order):
+            extra[self.files[r]] = {"__order": str(i)}
+            if month:
+                extra[self.files[r]]["__month"] = f"DATE '{months[r].isoformat()}'"
+        log.info("  %s export(s), oldest first: %s", kind, ", ".join(
+            f"{r} ({months[r]:%Y-%m})" if month else r for r in order))
+        cols = read_csvs(self.con, [self.files[r] for r in order], view, norm, extra=extra)
+        return Columns(cols, f"file(s) {', '.join(order)}") if cols else None
+
+    def _usable(self, rel, need, kind):
+        """Whether the file has a column for each of `need`; warns once per file and export if not."""
+        if rel not in self._headers:
+            names = csv_header(self.con, self.files[rel])
+            self._headers[rel] = None if names is None else {norm(n) for n in names}
+        have = self._headers[rel]
+        if have is None:
+            return False
+        missing = [aliases[0] for aliases in need if not any(norm(a) in have for a in aliases)]
+        if missing and (rel, kind) not in self._warned:
+            self._warned.add((rel, kind))
+            log.warning("  ! %s/%s: skipped as the %s export, missing column(s): %s", self.root, rel, kind,
+                        ", ".join(missing))
+        return not missing
+
+    def _month(self, rel) -> date:
+        if rel in self.months:
+            return self.months[rel]
+        stamp = self.uploaded.get(rel)
+        if stamp:
+            return datetime.fromtimestamp(stamp, timezone.utc).date().replace(day=1)
+        log.warning("  ! %s/%s: no upload time, so it counts as this month, %s", self.root, rel,
+                    f"{self.run_month:%Y-%m}")
+        return self.run_month
+
+    def newest(self, src, keys):
+        """Drops the rows that a newer file has a row for with the same key (null-safe), so the newest file
+        wins each key. Rows that share a key within one file all stay, as the merge keeps them."""
+        match = " AND ".join(f"n.{k} IS NOT DISTINCT FROM {src}.{k}" for k in keys)
+        where = f"EXISTS (SELECT 1 FROM {src} n WHERE {match} AND n.__order > {src}.__order)"
+        n = self.con.execute(f"SELECT count(*) FROM {src} WHERE {where}").fetchone()[0]
+        if n:
+            self.con.execute(f"DELETE FROM {src} WHERE {where}")
+            log.info("  %s row(s) replaced by a newer export", n)
 
     def drop_api_rows(self, table, source, keys):
         if not self.state.exists(table):
@@ -159,7 +281,7 @@ class StudioIngest:
                                  f"(SELECT 1 FROM (SELECT DISTINCT {', '.join(keys)} FROM {source}) s WHERE {match})")
 
     def exports(self):
-        c = self.read("raw_tenant", *PAT_TENANT)
+        c = self.read("raw_tenant", *PAT_TENANT, need=NEED_TENANT, kind="tenant", month=False)
         if c is None:
             log.info("no tenant export - skipping")
         else:
@@ -172,23 +294,23 @@ class StudioIngest:
                     {_dbl(c.req('Prepaid Consumed Quantity'))} AS prepaid_consumed,
                     {_dbl(c.req('Pay as you go Consumed Quantity'))} AS payg_consumed,
                     CAST(try_strptime(trim({c.req('Usage Date')}), {USAGE_DATE_FORMATS!r}) AS DATE) AS usage_date,
-                    __source_file AS source_file
+                    __source_file AS source_file, __order
                 FROM raw_tenant"""
             c.check()
             self.con.execute(f"CREATE OR REPLACE TEMP TABLE src_tenant AS {sel}")
             bad = self.con.execute("SELECT count(*) FROM src_tenant WHERE usage_date IS NULL").fetchone()[0]
             if bad:
                 log.warning("  ! %s rows have an unparseable Usage Date - check the format", bad)
+            self.newest("src_tenant", TENANT_KEY)
             self.state.merge(TBL_TENANT, "src_tenant", TENANT_KEY)
             self.drop_api_rows(TBL_TENANT, "src_tenant", ["usage_date", "environment_id"])
             self.summary["tenant_export_rows"] = self._n("src_tenant")
 
-        month = f"DATE '{self.snapshot.isoformat()}'"
-        c = self.read("raw_agent", *PAT_AGENT)
+        c = self.read("raw_agent", *PAT_AGENT, need=NEED_AGENT, kind="per-agent")
         if c is None:
             log.info("no per-agent export - skipping")
         else:
-            sel = f"""SELECT {month} AS snapshot_month, {_str(c.req('Agent Name'))} AS agent_name,
+            sel = f"""SELECT __month AS snapshot_month, {_str(c.req('Agent Name'))} AS agent_name,
                     {_str(c.req('Agent Id'))} AS agent_id, {_str(c.req('Product'))} AS product,
                     {_str(c.req('AI Feature/Billable Feature', 'Billable Feature'))} AS billable_feature,
                     {_dbl(c.req('Billed credit'))} AS billed_credit,
@@ -197,32 +319,40 @@ class StudioIngest:
                     {_str(c.req('Tool Used'))} AS tool_used, {_str(c.req('LLM Model'))} AS llm_model,
                     {_str(c.req('Scenario Name'))} AS scenario_name,
                     {_str(c.req('Environment Id'))} AS environment_id,
-                    {_str(c.req('Environment Name'))} AS environment_name, __source_file AS source_file
+                    {_str(c.req('Environment Name'))} AS environment_name, __source_file AS source_file, __order
                 FROM raw_agent"""
             c.check()
             self.con.execute(f"CREATE OR REPLACE TEMP TABLE src_agent AS {sel}")
             # An agent appears once per feature per channel per environment, so all four are in the key.
+            self.newest("src_agent", AGENT_KEY)
+            self._log_months("src_agent")
             self.state.merge(TBL_AGENT, "src_agent", AGENT_KEY)
             self.drop_api_rows(TBL_AGENT, "src_agent", ["snapshot_month"])
             self.summary["agent_export_rows"] = self._n("src_agent")
 
-        c = self.read("raw_user", *PAT_USER)
+        c = self.read("raw_user", *PAT_USER, need=NEED_USER, kind="per-user")
         if c is None:
             log.info("no per-user export - skipping")
         else:
-            sel = f"""SELECT {month} AS snapshot_month, {_str(c.req('User Id'))} AS user_id,
+            sel = f"""SELECT __month AS snapshot_month, {_str(c.req('User Id'))} AS user_id,
                     lower(trim({c.req('User Email')})) AS user_email,
                     {_str(c.req('Agent Id'))} AS agent_id, {_str(c.req('Agent Name'))} AS agent_name,
                     {_dbl(c.req('Billable credit used'))} AS billable_credit_used,
                     {_dbl(c.req('Credits used'))} AS credits_used,
                     upper(trim({c.req('M365 Copilot Licensed')})) IN ('TRUE', 'YES', '1') AS m365_copilot_licensed,
-                    __source_file AS source_file
+                    __source_file AS source_file, __order
                 FROM raw_user"""
             c.check()
             self.con.execute(f"CREATE OR REPLACE TEMP TABLE src_user AS {sel}")
+            self.newest("src_user", USER_KEY)
+            self._log_months("src_user")
             self.state.merge(TBL_USER, "src_user", USER_KEY)
             self.drop_api_rows(TBL_USER, "src_user", ["snapshot_month"])
             self.summary["user_export_rows"] = self._n("src_user")
+
+    def _log_months(self, src):
+        months = [r[0] for r in self.con.execute(f"SELECT DISTINCT snapshot_month FROM {src} ORDER BY 1").fetchall()]
+        log.info("  snapshot month(s): %s", ", ".join(f"{m:%Y-%m}" for m in months))
 
     def _n(self, table):
         return self.con.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
@@ -334,7 +464,8 @@ class StudioIngest:
         if self.state.exists(TBL_TENANT):
             exported = f"""WHERE NOT EXISTS (SELECT 1 FROM {TBL_TENANT} x
                 WHERE (x.source_file IS NULL OR x.source_file <> '{API_SOURCE}')
-                  AND x.usage_date = t.usage_date AND x.environment_id = t.environment_id)"""
+                  AND x.usage_date IS NOT DISTINCT FROM t.usage_date
+                  AND x.environment_id IS NOT DISTINCT FROM t.environment_id)"""
         self.con.execute(f"""CREATE OR REPLACE TEMP TABLE tenant_api AS
             SELECT '{API_BILLING_PLAN}' AS billing_plan_id, 'Power Platform licensing API' AS billing_plan_name,
                    t.environment_id, t.environment_name, 'MCSMessages' AS capacity_type,
@@ -480,28 +611,37 @@ def _no_access(status):
                            "User.Read.All (application) so Copilot Studio users show by UPN.")
 
 
-def ingest(store, files: dict, *, api=None, today: date | None = None) -> dict:
-    """Merges the drop folder's Studio files (`{name: local path}`) into the tables in `store`."""
+def ingest(store, files: dict, *, api=None, today: date | None = None, uploaded: dict | None = None,
+           folders=(), root: str = SUBDIR) -> dict:
+    """Merges the drop folder's Studio files (`{path under the studio folder: local path}`) into the tables in
+    `store`. `uploaded` gives each file's upload time in POSIX seconds (by default its local copy's modified
+    time), and `folders` the folders under the studio folder, for the checks on backfill/. `root` names the
+    studio folder in messages."""
     today = today or datetime.now(timezone.utc).date()
+    run_month = today.replace(day=1)
+    months = backfill(files, folders, run_month, root)  # before anything is loaded, so a stop writes nothing
+    if uploaded is None:
+        uploaded = {rel: Path(p).stat().st_mtime for rel, p in files.items()}
+    csvs = [rel for rel in files if rel.lower().endswith(".csv")]
     con = duckdb.connect()
     con.execute("SET TimeZone = 'UTC'")
     try:
         state = TableState(con, store, SCHEMAS)
         state.load()
-        run = StudioIngest(con, state, files, today.replace(day=1), api=api)
-        log.info("studio: %s file(s) in the drop folder; snapshot month %s", len(files), run.snapshot)
+        run = StudioIngest(con, state, files, run_month, api=api, uploaded=uploaded, months=months, root=root)
+        log.info("studio: %s CSV file(s) in the drop folder; run month %s (UTC)", len(csvs), f"{run_month:%Y-%m}")
         run.exports()
         run.api_agents()
         run.api_users()
         written = state.save()
     finally:
         con.close()
-    return {"files": len(files), "tables": written, **run.summary}
+    return {"files": len(csvs), "tables": written, **run.summary}
 
 
 def collect_studio(api, store, settings, *, drop=None, today: date | None = None) -> dict:
     drop = drop or open_dropfolder(store, settings, api)
     with tempfile.TemporaryDirectory(prefix="valuelens-studio-") as tmp:
-        paths = drop.fetch(SUBDIR, tmp)
-        files = {Path(p).name: Path(p) for p in paths if Path(p).name.lower().endswith(".csv")}
-        return ingest(store, files, api=api, today=today)
+        tree = drop.fetch_tree(SUBDIR, tmp, nested=BACKFILL)
+        return ingest(store, {f.rel: f.path for f in tree.files}, api=api, today=today,
+                      uploaded={f.rel: f.uploaded for f in tree.files}, folders=tree.folders, root=tree.root)

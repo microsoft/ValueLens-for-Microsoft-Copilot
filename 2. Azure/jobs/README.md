@@ -31,13 +31,35 @@ Any failure is logged and the job exits with code 1, so Container Apps records t
 
 These collectors port the Fabric notebooks `Ingest_Studio`, `Ingest_Viva_Consumption` (its CSV path)
 and `Ingest_Azure_AI`. They write the same tables, with the same columns, so the Consumption Central
-model reads `dbo.<table>` in Azure SQL. Each collector fails on its own, and the others still run.
+model reads `dbo.<table>` in Azure SQL. `studio` also follows `Ingest_Studio`'s rules for which file
+is which export, an export's month, the backfill folders and the newest file. Each collector fails
+on its own, and the others still run.
 
-- **studio** (`collect/studio.py`) reads `studio/*.csv` from the drop folder. These are the Power
-  Platform admin center exports (`*Tenant*`, `*PerAgent*`/`*Agent*` and `*PerUser*`/`*User*`, where
-  the first pattern that matches wins) and the flow's licensing-API files (`StudioApiEntitlement*`,
-  `StudioApiAgentDaily*`, `StudioApiUserDaily*`). An export takes precedence over API rows for the
-  same month (agent and user) or the same day and environment (tenant).
+- **studio** (`collect/studio.py`) reads the drop folder's `studio/` folder: the Power Platform admin
+  center exports, and the flow's licensing-API files (`StudioApiEntitlement*`, `StudioApiAgentDaily*`,
+  `StudioApiUserDaily*`), which it reads only from the top of the folder. An export takes precedence
+  over API rows for the same month (agent and user) or the same day and environment (tenant).
+  - **Which file is which export.** Each kind tries the admin center's file name, then `*Tenant*`,
+    `*PerAgent*`/`*Agent*` or `*PerUser*`/`*User*`. The first pattern that matches a file with the
+    kind's key columns wins. A file without them is skipped, with a warning that names it and the
+    missing columns. So a per-agent or per-user export, whose name contains `Tenant`, isn't read as
+    the tenant export.
+  - **An export's month.** A tenant export has its own dates. A per-agent or per-user export counts
+    as the month, in UTC, that it was uploaded: its blob's last-modified time in `landing`, or its
+    SharePoint item's `lastModifiedDateTime`. A file with no upload time counts as the run's month,
+    with a warning. An export in `studio/backfill/<YYYY-MM>/` counts as that folder's month. Other
+    subfolders of `studio/` aren't read, nor is a folder inside a month folder (with a warning).
+  - **The newest file wins a key.** The exports of a kind are ordered by upload time, then name. A
+    row is dropped where a later file has a row with the same key (tenant: day, environment, billing
+    plan and capacity type; agents: month, agent, feature, channel and environment; users: month,
+    user and agent), so overlapping exports aren't added together. Rows that share a key in one
+    file all stay.
+  - **Stops.** A file directly in `backfill/`, a folder there not named `YYYY-MM`, or a folder for a
+    month after the run's (UTC) stops the collector before it writes any Studio table. The error starts
+    `Nothing was written.` and lists every path. The other collectors still run, and what they
+    collected is published and refreshed, then the job exits with code 1: the installer's
+    **Check status** (`status`) shows the execution as `Failed`, and the message is in its log (see
+    **Reading job logs** under [Pitfalls](#pitfalls)).
   - The per-user API rows get UPNs from Graph `$batch` on a best-effort basis: a failure is logged,
     and the user is kept without a UPN.
 - **viva** (`collect/viva.py`) reads `viva/PersonServiceCreditsMetrics*.csv`, merging on person,
