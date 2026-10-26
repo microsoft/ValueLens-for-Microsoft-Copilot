@@ -13,10 +13,17 @@ Two layouts, chosen by settings:
     Empty: the folder's first segment is the library's name (e.g. `Shared Documents/ValueLens`).
 
 Files are never moved or deleted: the collectors re-read everything and merge idempotently.
+
+`list`, `read_bytes` and `fetch` see only the files directly in a subfolder. `fetch_tree` also reads
+one named folder inside it, two levels deep, with each file's upload time: the Copilot Studio
+collector's `studio/backfill/<YYYY-MM>/`.
 """
 from __future__ import annotations
 
 import logging
+import os
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote, unquote, urlparse
 
@@ -28,11 +35,36 @@ GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 SUBDIRS = ("studio", "viva")
 
 
+@dataclass(frozen=True)
+class DropFile:
+    rel: str  # the path under the subfolder, such as "a.csv" or "backfill/2026-08/a.csv"
+    path: Path  # the local copy
+    uploaded: float | None  # when it was uploaded (POSIX seconds), or None if the source doesn't say
+
+
+@dataclass(frozen=True)
+class DropTree:
+    root: str  # the subfolder as its owner would name it, for messages
+    files: tuple = ()  # DropFile, by rel
+    folders: tuple = ()  # the paths of the named folder, the folders in it and the folders in those
+
+
 def _safe_name(name: str) -> str:
     name = Path(str(name).replace("\\", "/")).name
     if not name or name in (".", ".."):
         raise ValueError(f"Unsafe drop folder file name: {name!r}")
     return name
+
+
+def _posix(stamp) -> float | None:
+    """POSIX seconds for an ISO 8601 time such as Graph's `2026-09-05T10:00:00Z`; None if there isn't one."""
+    if not stamp:
+        return None
+    try:
+        t = datetime.fromisoformat(str(stamp).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return (t if t.tzinfo else t.replace(tzinfo=timezone.utc)).timestamp()
 
 
 class StoreDropFolder:
@@ -63,6 +95,23 @@ class StoreDropFolder:
     def fetch(self, subdir: str, dest=None) -> list[Path]:
         """Local paths of the files in `subdir` (already local after `pull`; `dest` is unused)."""
         return [self.store.path(f"{self._prefix(subdir)}/{name}") for name, _ in self.list(subdir)]
+
+    def fetch_tree(self, subdir: str, dest=None, *, nested: str) -> DropTree:
+        """The files directly in `subdir`, in its folder `nested` and in the folders in that, and the folders
+        found from `nested` down, one level further. Other folders aren't read. A file's upload time is its
+        blob's, which `pull` stamps on the local copy (`dest` is unused). A folder shows only through the
+        files in it: `pull` lists files, not folders, so an empty folder isn't seen."""
+        prefix = self._prefix(subdir)
+        files, folders = [], set()
+        for rel in self.store.pull(prefix):
+            parts = rel[len(prefix):].strip("/").split("/")
+            if not parts[0] or (len(parts) > 1 and parts[0] != nested):
+                continue
+            folders.update("/".join(parts[:n]) for n in range(1, min(len(parts), 4)))
+            p = self.store.path(rel)
+            if len(parts) <= 3 and p.is_file():
+                files.append(DropFile("/".join(parts), p, p.stat().st_mtime))
+        return DropTree(prefix, tuple(sorted(files, key=lambda f: f.rel)), tuple(sorted(folders)))
 
 
 class SharePointDropFolder:
@@ -163,6 +212,61 @@ class SharePointDropFolder:
             p.write_bytes(self.read_bytes(subdir, name))
             out.append(p)
         return out
+
+    def _item_url(self, item: str) -> str:
+        _, drive_id, _ = self.resolve()
+        return f"{GRAPH_V1}/drives/{quote(drive_id, safe='!')}/items/{quote(item)}"
+
+    def _children(self, url: str, what: str) -> list[dict] | None:
+        """The named items in a folder, page by page; None if there's no such folder."""
+        out = []
+        while url:
+            r = self.api.request("GET", url, scope=GRAPH)
+            if r.status_code == 404:
+                return None
+            page = raise_for_status(r, f"List the SharePoint drop folder '{what}'").json()
+            out += [item for item in page.get("value") or [] if item.get("name")]
+            url = page.get("@odata.nextLink")
+        return out
+
+    def fetch_tree(self, subdir: str, dest, *, nested: str) -> DropTree:
+        """Downloads the files directly in `subdir`, in its folder `nested` and in the folders in that into
+        `dest`, keeping their paths, and returns them with the folders found from `nested` down, one level
+        further. Other folders aren't read. A file's upload time is its item's `lastModifiedDateTime`, which
+        SharePoint sets when the file is saved, and is stamped on the local copy."""
+        subdir = subdir.strip("/")
+        root = "/".join(s for s in (self.folder_setting, subdir) if s)
+        top = self._children(self._children_url(subdir), subdir)
+        if top is None:
+            log.info("drop folder: no '%s' folder on SharePoint", subdir)
+            return DropTree(root)
+        dest = Path(dest) / subdir
+        files, folders = [], []
+
+        def walk(items, parents, depth):
+            for item in items:
+                rel = "/".join([*parents, item["name"]])
+                if "folder" not in item:
+                    files.append(self._download(subdir, rel, item, dest.joinpath(*map(_safe_name, rel.split("/")))))
+                elif depth or item["name"] == nested:
+                    folders.append(rel)
+                    if depth < 2:
+                        walk(self._children(self._item_url(item["id"]) + "/children", f"{subdir}/{rel}") or [],
+                             [*parents, item["name"]], depth + 1)
+
+        walk(top, [], 0)
+        return DropTree(root, tuple(sorted(files, key=lambda f: f.rel)), tuple(sorted(folders)))
+
+    def _download(self, subdir: str, rel: str, item: dict, target: Path) -> DropFile:
+        r = raise_for_status(self.api.request("GET", self._item_url(item["id"]) + "/content", scope=GRAPH,
+                                              timeout=300),
+                             f"Download {subdir}/{rel} from the SharePoint drop folder")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(r.content)
+        uploaded = _posix(item.get("lastModifiedDateTime"))
+        if uploaded is not None:
+            os.utime(target, (uploaded, uploaded))
+        return DropFile(rel, target, uploaded)
 
 
 def open_dropfolder(store, settings, api=None):
