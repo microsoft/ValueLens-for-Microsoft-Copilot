@@ -131,6 +131,8 @@ Use [`scripts/README.md`](scripts/README.md) for the full parameter reference. R
 
 ## Troubleshooting
 
+<sub>Stuck? Create a support file and email it to us: [`scripts/support_file.py`](../scripts/support_file.py).</sub>
+
 | Issue | What to do |
 |---|---|
 | `pwsh.exe not found` | Install PowerShell 7+ and rerun from `pwsh`. |

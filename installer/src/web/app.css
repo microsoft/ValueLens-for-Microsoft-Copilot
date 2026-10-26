@@ -594,3 +594,12 @@ a { overflow-wrap: anywhere; }
   .spin { animation-duration: 3s; }
   * { transition-duration: 0ms !important; }
 }
+
+/* The support file: a quiet footnote at the foot of the page. */
+.page-foot { margin-top: 32px; padding: 12px 0 16px; font-size: 12px; line-height: 16px; color: var(--muted-fg); }
+.support-link { padding: 0; border: 0; background: none; font: inherit; color: var(--muted-fg); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.support-link:hover { color: var(--fg); }
+.support { margin-top: 8px; max-width: 72ch; }
+.support-files { margin: 8px 0; padding: 0; list-style: none; }
+.support-files summary { cursor: pointer; font-family: var(--mono); }
+.support-files pre { margin: 4px 0 8px; padding: 8px 10px; max-height: 320px; overflow: auto; border-radius: 4px; background: var(--muted); font-family: var(--mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -245,6 +245,13 @@ export async function startServer(o) {
       }
       case '/api/keep':
         return json(res, 200, session.keepRecord());
+      case '/api/support-bundle': {
+        try {
+          return json(res, 200, await session.supportBundle());
+        } catch (err) {
+          return json(res, 500, { error: `Couldn't create the support file: ${/** @type {any} */ (err)?.message ?? err}` });
+        }
+      }
       case '/api/quit':
         if (session.running) return json(res, 409, { error: `"${session.running}" is still running.` });
         json(res, 200, { ok: true });
