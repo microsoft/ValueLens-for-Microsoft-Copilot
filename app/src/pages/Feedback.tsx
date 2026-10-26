@@ -5,9 +5,9 @@ import { groupByF, satisfaction, terms, themeStats, themeSummary } from '../metr
 import { BarList, ColumnChart, Distribution, LineChart } from '../ui/charts'
 import { Headline, TermCloud } from '../ui/extra-charts'
 import { DataTable, type Column } from '../ui/DataTable'
-import { int, monthShort, pct } from '../ui/format'
+import { int, monthShort, pct, pct0 } from '../ui/format'
 import { Empty, Kpi, KpiRow, Panel, Select } from '../ui/primitives'
-import { COLOR } from '../ui/theme'
+import { COLOR, NEUTRAL_RAMP } from '../ui/theme'
 
 const P = 'Feedback'
 type Theme = ReturnType<typeof themeStats>[number]
@@ -29,7 +29,7 @@ export function Feedback() {
       rate: months.map(([m, l]) => ({ key: m, values: [satisfaction(l).rate] })),
       emoji: [...groupByF(fb, (f) => f.emoji || 'None')]
         .sort((a, b) => b[1].length - a[1].length)
-        .map(([e, l], i) => ({ label: e, value: l.length, color: [COLOR.licensed, COLOR.agent, COLOR.cowork, COLOR.unlicensed, COLOR.neutral][i % 5] })),
+        .map(([e, l], i) => ({ label: e, value: l.length, color: NEUTRAL_RAMP[i % NEUTRAL_RAMP.length] })),
       surfaces: [...groupByF(fb, (f) => f.surface || f.app || 'Unknown')].map(([k, l]) => {
         const s = satisfaction(l)
         return { key: k, label: k, value: s.rate, hint: `${int(s.total)} items` }
@@ -55,8 +55,8 @@ export function Feedback() {
       <KpiRow>
         <Kpi tone="licensed" label="Satisfaction" value={pct(d.s.rate)} help={gloss('Sentiment', P)} />
         <Kpi label="Feedback items" value={int(d.s.total)} help={gloss('Feedback coverage', P)} />
-        <Kpi tone="licensed" label="Thumbs up" value={int(d.s.up)} />
-        <Kpi tone="unlicensed" label="Thumbs down" value={int(d.s.down)} />
+        <Kpi dot={COLOR.up} label="Thumbs up" value={int(d.s.up)} />
+        <Kpi dot={COLOR.down} label="Thumbs down" value={int(d.s.down)} />
       </KpiRow>
       <Headline>{d.summary}</Headline>
       <div className="grid grid-2">
@@ -73,7 +73,7 @@ export function Feedback() {
           />
         </Panel>
         <Panel title="Satisfaction by month" help={gloss('Sentiment', P)}>
-          <LineChart label="Satisfaction by month" data={d.rate} xFmt={monthShort} series={[{ name: 'Satisfaction', color: COLOR.licensed, fmt: pct }]} />
+          <LineChart label="Satisfaction by month" data={d.rate} xFmt={monthShort} yFmt={pct0} series={[{ name: 'Satisfaction', color: COLOR.licensed, fmt: pct }]} />
         </Panel>
       </div>
       <div className="grid grid-3">

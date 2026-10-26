@@ -23,7 +23,7 @@ import {
 import { BarList, Scatter } from '../ui/charts'
 import { DataTable, type Column, type TableRow } from '../ui/DataTable'
 import { groupByF } from '../metrics/feedback'
-import { dec1, dec2, int, pct } from '../ui/format'
+import { dec1, int, pct } from '../ui/format'
 import { Kpi, KpiRow, Panel } from '../ui/primitives'
 import { COLOR, DORMANCY_COLOR } from '../ui/theme'
 import { usePersonLabel } from './cols'
@@ -108,9 +108,9 @@ export function ReadinessLicence() {
       dm,
       dorm: DORMANCY.map((b, i) => ({ key: b, label: b, value: dm.counts.get(b) ?? 0, color: DORMANCY_COLOR[i] })),
       evidence: evidenceNotice(ds, usable),
-      reclaim: reclaimNotice(usable, assumptions.licenceCost, assumptions.currency),
+      reclaim: reclaimNotice(usable, assumptions.ppupm, assumptions.currency),
     }
-  }, [ds, base, filters.org, person, assumptions.licenceCost, assumptions.currency])
+  }, [ds, base, filters.org, person, assumptions.ppupm, assumptions.currency])
   const n = (v: number) => (d.usable ? v : NaN)
   const cols: Column<RankRec>[] = [
     nameCol('Organisation / person'),
@@ -155,7 +155,7 @@ export function ReadinessLicence() {
         <Kpi tone="licensed" label="Total licensed users" value={int(d.licensed)} />
         <Kpi tone="licensed" label="Licensed, inactive 30+ days" value={int(n(d.dm.inactive30))} />
         <Kpi tone="licensed" label="Average days since active" value={dec1(n(d.dm.avgDays))} />
-        <Kpi tone="licensed" label="Reclaimable value per month" value={money(n(d.dm.inactive30 * assumptions.licenceCost))} sub={assumptions.licenceCost > 0 ? undefined : 'Set a licence cost in Assumptions'} />
+        <Kpi tone="licensed" label="Reclaimable value per month" value={money(n(d.dm.inactive30 * assumptions.ppupm))} sub={`at ${assumptions.currency}${assumptions.ppupm} a seat`} />
       </KpiRow>
       <Panel title="Licensed seats by dormancy" note="Days since last active, against the audit window">
         {d.usable ? <BarList label="Licensed seats by dormancy" items={d.dorm} color={COLOR.licensed} keepOrder /> : null}
@@ -201,16 +201,16 @@ export function ReadinessCowork() {
     nameCol('Organisation / person'),
     rankCol('Rank 1 = strongest Cowork candidate, recalculated against the current selection.'),
     { key: 'score', label: 'Readiness score', value: (r) => r.score, fmt: int, align: 'right', bar: COLOR.cowork, help: gloss('Cowork readiness', PR) },
-    { key: 'a', label: 'Apps per day', value: (r) => r.a, fmt: dec2, align: 'right', help: 'Cross-app breadth: distinct apps used per active day, outside Cowork.' },
-    { key: 'b', label: 'Prompts per session', value: (r) => r.b, fmt: dec2, align: 'right', help: 'Session depth, outside Cowork.' },
+    { key: 'a', label: 'Apps per day', value: (r) => r.a, fmt: dec1, align: 'right', help: 'Cross-app breadth: distinct apps used per active day, outside Cowork.' },
+    { key: 'b', label: 'Prompts per session', value: (r) => r.b, fmt: dec1, align: 'right', help: 'Session depth, outside Cowork.' },
     { key: 'c', label: 'Agent use', value: (r) => r.c, fmt: pct, align: 'right', help: 'Organisation rows: share of eligible users with an agent session. Person rows: 100% if they have used an agent.' },
   ]
   return (
     <>
       <KpiRow>
         <Kpi tone="cowork" label="Eligible users" value={int(d.k.eligible)} sub="Active, never used Cowork" help={gloss('Cowork readiness', PR)} />
-        <Kpi tone="cowork" label="Prompts per session" value={dec2(d.k.depth)} />
-        <Kpi tone="cowork" label="Apps per active day" value={dec2(d.k.surfaces)} />
+        <Kpi tone="cowork" label="Prompts per session" value={dec1(d.k.depth)} />
+        <Kpi tone="cowork" label="Apps per active day" value={dec1(d.k.surfaces)} />
         <Kpi tone="cowork" label="Using agents" value={pct(d.k.agentShare)} sub="of eligible users" />
       </KpiRow>
       <div className="grid grid-2">
@@ -222,7 +222,7 @@ export function ReadinessCowork() {
           </p>
         </Panel>
         <Panel title="Cowork readiness map" note="Top right = readiest">
-          <Scatter label="Cowork readiness by organisation" points={d.scatter} color={COLOR.cowork} xLabel="Apps per active day" yLabel="Prompts per session" sizeLabel="Eligible users" xFmt={dec2} yFmt={dec2} />
+          <Scatter label="Cowork readiness by organisation" points={d.scatter} color={COLOR.cowork} xLabel="Apps per active day" yLabel="Prompts per session" sizeLabel="Eligible users" xFmt={dec1} yFmt={dec1} />
           <p className="panel-foot">
             Top right = users already working across several apps each day (right) and holding longer, multi-prompt sessions (up). Bubble size = eligible candidate users. Breadth and depth are 80% of the score; each is scaled to the
             highest value in the current selection, not an external benchmark.

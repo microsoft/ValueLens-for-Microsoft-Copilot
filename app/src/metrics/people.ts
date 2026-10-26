@@ -72,18 +72,18 @@ export function activationHeadline(a: Activation, lens: Exclude<Lens, 'cowork'>)
   switch (lens) {
     case 'licensed':
       return a.usable
-        ? `${n0(a.activeL)} of ${n0(a.licensed)} matched license holders active (${p1(a.activeL / a.licensed)}).`
-        : `${n0(a.activeL)} licensed users observed. License inventory does not reconcile; utilization is unavailable.`
+        ? `${n0(a.activeL)} of ${n0(a.licensed)} matched licence holders active (${p1(a.activeL / a.licensed)}).`
+        : `${n0(a.activeL)} licensed users observed. The licence inventory does not reconcile, so utilisation is unavailable.`
     case 'unlicensed':
       return `${n0(a.activeU)} unlicensed users observed.${
         Number.isFinite(a.unlicensed) && a.unlicensed > 0
           ? ` ${p1(a.activeU / a.unlicensed)} of the matched unlicensed population.`
-          : ' Population share unavailable: license inventory does not reconcile.'
-      } Usage alone does not establish a need for a paid license.`
+          : ' Population share unavailable: the licence inventory does not reconcile.'
+      } Usage alone does not establish a need for a paid licence.`
     case 'agent':
-      return `${n0(a.agentUsers)} users with observed agent activity | ${n0(a.agentSessions)} sessions in this selection. Cowork activity is shown separately.`
+      return `${n0(a.agentUsers)} users with observed agent activity, in ${n0(a.agentSessions)} sessions. Cowork activity is shown separately.`
     default:
-      return `${n0(a.active)} active users${a.total ? ` of ${n0(a.total)} roster users` : ''} | ${n0(a.activeL)} licensed, ${n0(a.activeU)} unlicensed observed in audit.`
+      return `${n0(a.active)} active users${a.total ? ` of ${n0(a.total)} roster users` : ''}: ${n0(a.activeL)} licensed, ${n0(a.activeU)} unlicensed.`
   }
 }
 
@@ -256,7 +256,7 @@ const longDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateStrin
 
 export function evidenceNotice(ds: Dataset, usable: boolean): string {
   if (!usable)
-    return 'License inventory does not reconcile to the organizational roster and observed licensed users. Dormancy and reclaim estimates are unavailable until identity/license mapping is corrected.'
+    return 'The licence inventory does not reconcile with the organisation roster and the licensed users seen. Dormancy and reclaim estimates are unavailable until the identity and licence mapping is corrected.'
   if (!ds.minDate) return 'No audit activity is loaded, so dormancy cannot be assessed.'
   const span = dayDiff(ds.minDate, ds.maxDate)
   return `Dormancy is measured against the audit window (${longDate(ds.minDate)} to ${longDate(ds.maxDate)}, ${span} days), not against today. ${
@@ -267,10 +267,10 @@ export function evidenceNotice(ds: Dataset, usable: boolean): string {
 }
 
 export function reclaimNotice(usable: boolean, cost: number, currency: string): string {
-  if (!usable) return 'Reclaim value is unavailable until license inventory reconciles - see the dormancy evidence note.'
+  if (!usable) return 'Reclaim value is unavailable until the licence inventory reconciles. See the dormancy evidence note.'
   return cost > 0
-    ? `Costed at ${currency}${Math.round(cost).toLocaleString('en-GB')} per licence per month (Monthly Licence Cost assumption).`
-    : 'Not costed: the Monthly Licence Cost assumption is 0, so the reclaimable value reads as zero. Set it in Assumptions to price the dormant seats.'
+    ? `Costed at ${currency}${cost.toLocaleString('en-GB', { maximumFractionDigits: 2 })} per licence per month, the licence price in Assumptions.`
+    : 'Not costed: the licence price in Assumptions is 0.'
 }
 
 // ---------- Cowork readiness ----------

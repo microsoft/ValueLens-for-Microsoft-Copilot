@@ -11,7 +11,7 @@ import type { Row } from '../data/types'
 import { BarList, Distribution, LineChart } from '../ui/charts'
 import { HeatGrid, Headline, Tornado } from '../ui/extra-charts'
 import { DataTable, type Column } from '../ui/DataTable'
-import { dateLabel, dayLabel, dec1, dec2, int, pct } from '../ui/format'
+import { dateLabel, dayLabel, dec1, int, pct } from '../ui/format'
 import { Empty, Kpi, KpiRow, Panel, Segmented } from '../ui/primitives'
 import { COLOR } from '../ui/theme'
 import { labelCol, measureCol, searchText, usePersonLabel } from './cols'
@@ -204,7 +204,7 @@ export function AdoptionUsage() {
         <Kpi tone={LENS_TONE[lens]} label="Active users" value={int(d.users)} sub={LENS_LABEL[lens]} help={gloss('Sessions / active user', P)} />
         <Kpi tone={LENS_TONE[lens]} label="Sessions per user per week" value={dec1(d.spupw)} help={gloss('Sessions / user / week', P)} />
         <Kpi tone={LENS_TONE[lens]} label="Observed sessions" value={int(d.sessions)} help={gloss('Tasks and sessions', P)} />
-        <Kpi tone={LENS_TONE[lens]} label="Expert-equivalent hours per week" value={int(d.eehpw)} help={gloss('Estimated time saved', 'Value')} />
+        <Kpi tone={LENS_TONE[lens]} label="Estimated hours saved per week" value={int(d.eehpw)} help={gloss('Estimated time saved', 'Value')} />
       </KpiRow>
       {lens === 'agent' && (
         <KpiRow>
@@ -222,10 +222,10 @@ export function AdoptionUsage() {
           data={d.weekly}
           xFmt={dayLabel}
           series={[
-            { name: 'Licensed', color: COLOR.licensed, fmt: dec2 },
-            { name: 'Unlicensed', color: COLOR.unlicensed, fmt: dec2 },
-            { name: 'Agents', color: COLOR.agent, fmt: dec2 },
-            { name: 'Cowork', color: COLOR.cowork, fmt: dec2 },
+            { name: 'Licensed', color: COLOR.licensed, fmt: dec1 },
+            { name: 'Unlicensed', color: COLOR.unlicensed, fmt: dec1 },
+            { name: 'Agents', color: COLOR.agent, fmt: dec1 },
+            { name: 'Cowork', color: COLOR.cowork, fmt: dec1 },
           ]}
         />
       </Panel>
@@ -234,7 +234,7 @@ export function AdoptionUsage() {
           <BarList label={behaviourTitle[lens]} items={d.beh} color={LENS_COLOR[lens]} limit={10} onSelect={lens === 'agent' ? (k) => openAgent(k) : undefined} />
         </Panel>
         <Panel title="Sessions per user by organisation" note={LENS_LABEL[lens]} help={gloss('Sessions / active user', P)}>
-          <BarList label="Sessions per user by organisation" items={d.orgs} color={LENS_COLOR[lens]} fmt={dec2} limit={10} />
+          <BarList label="Sessions per user by organisation" items={d.orgs} color={LENS_COLOR[lens]} fmt={dec1} limit={10} />
         </Panel>
       </div>
       <Panel title="Sessions by conversation depth" note="Prompts per session" help={gloss('Conversation depth', P)}>

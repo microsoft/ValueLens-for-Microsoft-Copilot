@@ -47,6 +47,8 @@ export function LineChart(props: {
   height?: number
   area?: boolean
   label: string
+  /** Format for the value axis; compact numbers by default. */
+  yFmt?: Fmt
 }) {
   const [ref, width] = useWidth<HTMLDivElement>()
   const [hover, setHover] = useState<number | null>(null)
@@ -66,7 +68,7 @@ export function LineChart(props: {
   return (
     <div className="chart" ref={ref}>
       <svg width={width} height={h} role="img" aria-label={props.label}>
-        <YAxis ticks={ticks} y={y} w={width} fmt={compact} />
+        <YAxis ticks={ticks} y={y} w={width} fmt={props.yFmt ?? compact} />
         {series.map((s, si) => {
           const pts = data.map((d, i) => `${x(i)},${y(d.values[si])}`)
           return (
@@ -342,6 +344,7 @@ export function Scatter(props: {
   }
   return (
     <div className="chart" ref={ref}>
+      <p className="axis-y-title">{props.yLabel}</p>
       <svg width={width} height={h} role="img" aria-label={props.label}>
         <YAxis ticks={yt} y={sy} w={width} fmt={compact} />
         <g className="axis">
@@ -388,7 +391,6 @@ export function Scatter(props: {
           </g>
         ))}
       </svg>
-      <p className="axis-y-title">{props.yLabel}</p>
       {hp && (
         <Tip x={sx(hp.x)} y={sy(hp.y)} width={width}>
           <strong>{hp.label}</strong>

@@ -2,11 +2,10 @@ import { useMemo, useState } from 'react'
 import { useData } from '../data/store'
 import { gloss } from '../data/glossary'
 import { activeUsers, aiTasks, groupBy, isAgent, promptUsers, sessions } from '../metrics/core'
-import { activityShare, BEHAVIOURS, eeh, ESTIMATES, executiveHeadline, licenceInvestment, skillsHeadline, topOrg, usersInCategory, valueMeasures, type Behaviour, type Estimate } from '../metrics/value'
+import { activityShare, BEHAVIOURS, eeh, ESTIMATES, licenceInvestment, topOrg, usersInCategory, valueMeasures, type Behaviour, type Estimate, type ValueInputs } from '../metrics/value'
 import { flat, pivot } from '../metrics/pivot'
 import type { Row } from '../data/types'
 import { BarList, LineChart } from '../ui/charts'
-import { Headline } from '../ui/extra-charts'
 import { DataTable, type Column } from '../ui/DataTable'
 import { dayLabel, dec1, int, pct } from '../ui/format'
 import { Kpi, KpiRow, Panel, Select } from '../ui/primitives'
@@ -16,6 +15,13 @@ import { DRAFT_AGENT, useMoney, useValueInputs } from './common'
 
 const P = 'Value'
 const PA = 'Activity'
+
+/** The same measures at the low and high effort scenarios, so every estimate can be quoted as a range. */
+const range = (rs: Row[], v: ValueInputs) => ({
+  lo: valueMeasures(rs, { ...v, scenario: 'Conservative' }),
+  hi: valueMeasures(rs, { ...v, scenario: 'Optimistic' }),
+})
+const span = (lo: number, hi: number, f: (n: number) => string) => (f(lo) === f(hi) ? undefined : `Range ${f(lo)}–${f(hi)}`)
 
 function AssumptionsLine() {
   const { assumptions, openAssumptions } = useData()
@@ -59,7 +65,7 @@ function SideTables({ rows }: { rows: Row[] }) {
 // ---------- Tasks ----------
 
 export function ValueTasks() {
-  const { rows, filters } = useData()
+  const { rows } = useData()
   const v = useValueInputs()
   const money = useMoney()
   const d = useMemo(() => {
@@ -96,8 +102,7 @@ export function ValueTasks() {
     )
     return {
       m,
-      exec: executiveHeadline(rows, v),
-      skills: skillsHeadline(rows, { cowork: filters.tool === 'Cowork', agent: filters.tool === 'Agents', lic: filters.lic }),
+      r: range(rows, v),
       weekly,
       engage,
       models,
@@ -106,18 +111,14 @@ export function ValueTasks() {
       eff: withTop(usersInCategory(rows, (r) => r.eff), (r) => r.eff),
       table,
     }
-  }, [rows, v, filters.tool, filters.lic])
+  }, [rows, v])
   return (
     <>
-      <div className="grid grid-2">
-        <Headline lines={d.exec} />
-        <Headline lines={d.skills} />
-      </div>
       <KpiRow>
-        <Kpi tone="licensed" label="Expert-equivalent hours" value={int(d.m.hours)} help={gloss('Estimated time saved', P)} />
-        <Kpi tone="licensed" label="AI-assisted value" value={money(d.m.value)} help={gloss('Estimated value / ROI', P)} />
-        <Kpi tone="licensed" label="Projected annual value" value={money(d.m.annualised)} help={gloss('Estimated value / ROI', P)} />
-        <Kpi tone={d.m.roi >= 0 ? 'licensed' : 'unlicensed'} label="Net ROI" value={money(d.m.roi)} sub={`after ${money(d.m.investment)} licences`} help={gloss('No discount factors', P)} />
+        <Kpi tone="licensed" label="Estimated hours saved" value={int(d.m.hours)} sub={span(d.r.lo.hours, d.r.hi.hours, int)} help={gloss('Estimated time saved', P)} />
+        <Kpi tone="licensed" label="Estimated value" value={money(d.m.value)} sub={span(d.r.lo.value, d.r.hi.value, money)} help={gloss('Estimated value / ROI', P)} />
+        <Kpi tone="licensed" label="Estimated annual value" value={money(d.m.annualised)} sub={span(d.r.lo.annualised, d.r.hi.annualised, money)} help={gloss('Estimated value / ROI', P)} />
+        <Kpi tone={d.m.roi >= 0 ? 'licensed' : 'unlicensed'} label="Estimated value after licences" value={money(d.m.roi)} sub={`after ${money(d.m.investment)} of licences`} help={gloss('No discount factors', P)} />
       </KpiRow>
       <AssumptionsLine />
       <Panel title="AI-assisted value vs licence investment, by week" help={gloss('AI Assisted Value basis', P)}>
@@ -144,12 +145,12 @@ export function ValueTasks() {
           <BarList label="Share of AI tasks by task category" items={d.cats} color={COLOR.licensed} fmt={pct} limit={10} />
         </Panel>
         <Panel title="What new skills are being unlocked?" note="Share of active users reaching each role" help={gloss('Task classification', PA)}>
-          <BarList label="Share of users by expertise role" items={d.roles} color={COLOR.agent} fmt={pct} limit={10} />
+          <BarList label="Share of users by expertise role" items={d.roles} color={COLOR.neutral} fmt={pct} limit={10} />
         </Panel>
       </div>
       <div className="grid grid-1-2">
         <Panel title="What is AI producing?" note="Share of active users" help={gloss('Which breakdown dimension is used', PA)}>
-          <BarList label="Share of users by efficiency breakdown" items={d.eff} color={COLOR.cowork} fmt={pct} />
+          <BarList label="Share of users by efficiency breakdown" items={d.eff} color={COLOR.neutral} fmt={pct} />
         </Panel>
         <Panel title="Copilot value table" note="Value outcome, then task" help={gloss('Task Category', P)}>
           <DataTable
@@ -178,6 +179,7 @@ export function ValueEstimated() {
     const hpw = (rs: Row[]) => eeh(rs, v.all, v.scenario) / (v.windowWeeks || 1)
     return {
       m: valueMeasures(rows, v),
+      r: range(rows, v),
       where: [...groupBy(rows, (r) => r.taskCat)]
         .filter(([k]) => k)
         .map(([k, rs]) => ({ key: k, label: k, value: hpw(rs) }))
@@ -195,9 +197,9 @@ export function ValueEstimated() {
   return (
     <>
       <KpiRow>
-        <Kpi tone="licensed" label="Expert-equivalent hours per week" value={int(d.m.hoursPerWeek)} sub={`${dec1(d.m.hoursPerUser)} hours per user in total`} help={gloss('Estimated time saved', P)} />
-        <Kpi tone="licensed" label="AI-assisted value" value={money(d.m.value)} sub={`${money(d.m.valuePerWeek)} per week`} help={gloss('Estimated value / ROI', P)} />
-        <Kpi tone="licensed" label="Projected annual value" value={money(d.m.annualised)} help={gloss('Estimated value / ROI', P)} />
+        <Kpi tone="licensed" label="Estimated hours saved per week" value={int(d.m.hoursPerWeek)} sub={span(d.r.lo.hoursPerWeek, d.r.hi.hoursPerWeek, int) ?? `${dec1(d.m.hoursPerUser)} hours per user in total`} help={gloss('Estimated time saved', P)} />
+        <Kpi tone="licensed" label="Estimated value" value={money(d.m.value)} sub={span(d.r.lo.value, d.r.hi.value, money) ?? `${money(d.m.valuePerWeek)} per week`} help={gloss('Estimated value / ROI', P)} />
+        <Kpi tone="licensed" label="Estimated annual value" value={money(d.m.annualised)} sub={span(d.r.lo.annualised, d.r.hi.annualised, money)} help={gloss('Estimated value / ROI', P)} />
       </KpiRow>
       <AssumptionsLine />
       <div className="grid grid-1-2">

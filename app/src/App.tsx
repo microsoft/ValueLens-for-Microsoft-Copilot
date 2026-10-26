@@ -168,11 +168,18 @@ export default function App() {
             </h2>
             <p>{view?.intro ?? route.tab.intro}</p>
           </div>
-          {route.tab.views.length > 1 && <Segmented label={`${route.tab.label} views`} value={route.view} options={route.tab.views} onChange={(v) => go(route.tab.id, v)} />}
+          {route.tab.views.length > 1 && (
+            <Segmented label={`${route.tab.label} views`} value={route.view} options={route.tab.views} onChange={(v) => go(route.tab.id, v)} controls="main" />
+          )}
         </div>
         <FilterBar route={route} />
       </div>
-      <main id="main" className="main" tabIndex={-1}>
+      <main
+        id="main"
+        className="main"
+        tabIndex={-1}
+        {...(route.tab.views.length > 1 ? { role: 'tabpanel', 'aria-label': view ? `${route.tab.label}: ${view.label}` : route.tab.label } : {})}
+      >
         <Page route={route} />
       </main>
       <footer className="foot">ValueLens. Everything is calculated in your browser and never leaves it.</footer>

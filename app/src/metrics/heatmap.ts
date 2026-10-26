@@ -6,10 +6,10 @@ import { eeh } from './value'
 
 export type HeatMetric = 'users' | 'days' | 'hours' | 'sessions'
 export const HEAT_LABEL: Record<HeatMetric, string> = {
-  users: 'Active Users',
-  days: 'Active Days / User',
-  hours: 'Modeled Hours / User',
-  sessions: 'Sessions / User',
+  users: 'Active users',
+  days: 'Active days per user',
+  hours: 'Modelled hours per user',
+  sessions: 'Sessions per user',
 }
 
 export function heatValue(rs: Row[], m: HeatMetric, all: Row[], s: Scenario): number {
