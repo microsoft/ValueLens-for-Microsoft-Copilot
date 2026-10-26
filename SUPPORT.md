@@ -32,6 +32,8 @@ Use a minimal fabricated example where possible. Do not post tenant exports,
 credentials, user identities, prompts or private solution packages. Redact logs
 and screenshots before sharing them.
 
+<sub>Stuck? Create a support file and email it to us: run the installer with `--support-bundle`, or, without the installer, [`scripts/support_file.py`](scripts/support_file.py).</sub>
+
 ## Security and contributions
 
 Do **not** report security vulnerabilities in public issues. Follow the private
