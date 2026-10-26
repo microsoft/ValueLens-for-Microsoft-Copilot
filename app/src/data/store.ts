@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { Dataset, Grading, Row, Scenario } from './types'
 import type { Lens } from '../metrics/core'
+import type { RowCounts } from './loadCheck'
 
 export interface Filters {
   from: string
@@ -53,7 +54,7 @@ export interface DataState {
   nameOf: (user: string) => string
   openAgent: (name: string | null) => void
   openAssumptions: () => void
-  loadFiles: (files: File[]) => Promise<string[]>
+  loadFiles: (files: File[]) => Promise<RowCounts>
   loadSample: () => Promise<void>
 }
 

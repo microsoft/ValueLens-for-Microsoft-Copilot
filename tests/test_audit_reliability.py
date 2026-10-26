@@ -685,6 +685,50 @@ class AuditReliabilityTests(unittest.TestCase):
         self.assertIn("ambiguous synthetic SourceRecordKey", self.ingester_cell16)
         self.assertIn("dropDuplicates(['Id'])", self.ingester_cell16)
 
+    def _request_with_session(self, statuses, tokens):
+        sent, sleeps = [], []
+
+        class Session:
+            def request(self, method, url, **kwargs):
+                sent.append(dict(kwargs.get("headers") or {}))
+                return type("R", (), {"status_code": statuses.pop(0)})()
+
+        token_iter = iter(tokens)
+        ns = {
+            "SESSION": Session(),
+            "_token": {"value": "t0", "ts": 0.0},
+            "_notify_throttle": lambda: None,
+            "time": type("T", (), {"sleep": staticmethod(sleeps.append)}),
+        }
+        ns["get_headers"] = lambda: {"Authorization": f"Bearer {ns['_token']['value'] or next(token_iter)}"}
+        exec_named_defs(INGESTER, 4, ["_TRANSIENT", "AUTH_RETRY_WAITS_SEC", "_request", "_send"], ns, include_imports=False)
+        return ns, sent, sleeps
+
+    def test_transient_401_gets_a_new_token_and_is_sent_again(self):
+        ns, sent, sleeps = self._request_with_session([401, 401, 200], ["t1", "t2"])
+        r = ns["_request"]("POST", "https://graph.microsoft.com/beta/security/auditLog/queries",
+                           headers={"Authorization": "Bearer t0", "Content-Type": "application/json"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual([h["Authorization"] for h in sent], ["Bearer t0", "Bearer t1", "Bearer t2"])
+        self.assertTrue(all(h["Content-Type"] == "application/json" for h in sent))
+        self.assertEqual(sleeps, list(ns["AUTH_RETRY_WAITS_SEC"][:2]))
+
+    def test_persistent_401_is_returned_after_the_auth_retries(self):
+        waits = 4
+        ns, sent, sleeps = self._request_with_session([401] * (waits + 1), [f"t{i}" for i in range(1, waits + 1)])
+        self.assertEqual(len(ns["AUTH_RETRY_WAITS_SEC"]), waits)
+        r = ns["_request"]("GET", "https://graph.microsoft.com/beta/security/auditLog/queries/q",
+                           headers={"Authorization": "Bearer t0"})
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(len(sent), waits + 1)
+        self.assertEqual(sleeps, list(ns["AUTH_RETRY_WAITS_SEC"]))
+
+    def test_401_without_a_graph_token_is_not_retried(self):
+        ns, sent, sleeps = self._request_with_session([401], [])
+        r = ns["_request"]("POST", "https://login.microsoftonline.com/t/oauth2/v2.0/token", data={})
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual((len(sent), sleeps), (1, []))
+
     def test_wait_for_query_distinguishes_success_failure_and_malformed_status(self):
         responses = iter(
             [

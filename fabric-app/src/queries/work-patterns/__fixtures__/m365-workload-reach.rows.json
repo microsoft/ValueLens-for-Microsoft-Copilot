@@ -1,0 +1,38 @@
+[
+  {
+    "[Workload]": "Teams",
+    "[People]": 201,
+    "[Reach]": 0.9663461538461539,
+    "[Days Per Week]": 4.21
+  },
+  {
+    "[Workload]": "Email",
+    "[People]": 194,
+    "[Reach]": 0.9326923076923077,
+    "[Days Per Week]": 3.86
+  },
+  {
+    "[Workload]": "Office apps",
+    "[People]": 162,
+    "[Reach]": 0.7788461538461539,
+    "[Days Per Week]": 2.74
+  },
+  {
+    "[Workload]": "SharePoint",
+    "[People]": 139,
+    "[Reach]": 0.6682692307692307,
+    "[Days Per Week]": 1.92
+  },
+  {
+    "[Workload]": "OneDrive",
+    "[People]": 127,
+    "[Reach]": 0.6105769230769231,
+    "[Days Per Week]": 1.65
+  },
+  {
+    "[Workload]": "Viva Engage",
+    "[People]": 31,
+    "[Reach]": 0.14903846153846154,
+    "[Days Per Week]": 0.58
+  }
+]

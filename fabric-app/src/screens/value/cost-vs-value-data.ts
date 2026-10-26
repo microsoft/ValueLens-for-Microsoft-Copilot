@@ -1,0 +1,346 @@
+//-----------------------------------------------------------------------
+// <copyright company="Microsoft Corporation">
+//        Copyright (c) Microsoft Corporation.  All rights reserved.
+//        Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// </copyright>
+//-----------------------------------------------------------------------
+
+import { useMemo } from "react";
+import type { DataTable } from "@microsoft/fabric-visuals-core";
+import { useCommercialTerms } from "@/hooks/commercial-terms.context";
+import { useReportingCurrency } from "@/hooks/reporting-currency";
+import { useConsumptionSummary, useConsumptionTable } from "@/hooks/use-consumption-query";
+import { useSummaryQuery, useTableQuery, type TableResult } from "@/hooks/use-table-query";
+import { useValueAssumptions, type Scenario } from "@/hooks/value-assumptions.context";
+import { isConnectionConfigured } from "@/lib/connections";
+import { dateBetween, treatAs } from "@/lib/dax-filters";
+import type { NotFiltered } from "@/lib/filter-profiles";
+import { FILTER_KEYS, type FilterKey } from "@/lib/filters";
+import { readNumber, readText } from "@/lib/summary-row";
+import { runtimeConfig } from "@/lib/runtime-config";
+import {
+    consumptionByProduct,
+    consumptionDates,
+    consumptionNotes,
+    coworkWindowCost,
+    groupByFilter,
+    isoDate,
+    LICENSE_LIST_PRICE,
+    reportingDateFilter,
+    studioAgents,
+} from "@/queries/consumption";
+import { consumptionConnection } from "@/queries/shared";
+import {
+    compare,
+    costValueAgents,
+    costValueBySource,
+    costValueWindow,
+    licenceCost,
+    matchAgents,
+    overlapSpan,
+    pairLines,
+    readAgentCredits,
+    readAgentValues,
+    readSourceValues,
+    toValueCurrency,
+    type AgentMatch,
+    type Comparison,
+    type Costs,
+    type DateSpan,
+    type PairId,
+    type PairLine,
+} from "@/queries/value";
+
+/** Costs aren't recorded by license, activity or agent, so only the date and org filters narrow this stage. */
+export const COST_IGNORED_FILTERS: readonly FilterKey[] = FILTER_KEYS.filter(
+    (key) => key !== "dateRange" && key !== "organizations",
+);
+
+/** The credit queries take the compared dates themselves, so the filter bar's dates aren't applied twice. */
+const CREDIT_IGNORES: readonly FilterKey[] = ["dateRange", ...COST_IGNORED_FILTERS];
+
+function orgReason(notFilteredBy: readonly NotFiltered[] | undefined): string | undefined {
+    return notFilteredBy?.find((entry) => entry.key === "organizations")?.reason;
+}
+
+/** Whether the install set up Consumption Central, where the credit costs come from. */
+export const CONSUMPTION_CONFIGURED = isConnectionConfigured(runtimeConfig().semanticModels, consumptionConnection);
+
+/**
+ * Whether the credit costs can be counted: Consumption Central isn't set up
+ * (`off`), is still answering, couldn't be read, holds dates that miss the
+ * activity entirely (`apart`), or is `ready`.
+ */
+export type CreditsState =
+    | { kind: "off" }
+    | { kind: "loading" }
+    | { kind: "error"; message: string }
+    | { kind: "apart"; held: DateSpan | undefined }
+    | { kind: "ready" };
+
+const STUDIO = /studio/i;
+const AZURE = /azure|foundry/i;
+
+function productCost(table: DataTable | undefined, pattern: RegExp): number | undefined {
+    if (!table) return undefined;
+    const product = table.columns.findIndex((column) => column.name === "Product");
+    const cost = table.columns.findIndex((column) => column.name === "Cost");
+    const row = table.rows.find((candidate) => pattern.test(String(candidate[product] ?? "")));
+    const value = row?.[cost];
+    return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function sumKnown(parts: readonly (number | undefined)[]): number | undefined {
+    const known = parts.filter((part): part is number => part !== undefined);
+    return known.length === 0 ? undefined : known.reduce((a, b) => a + b, 0);
+}
+
+const SKIP = { connection: "", query: "" };
+
+export interface CostVsValue {
+    rate: number;
+    scenario: Scenario;
+    /** ISO code of the reporting currency every figure here is in. */
+    code: string;
+    /** Printed before an amount in the reporting currency. */
+    prefix: string;
+    /** Whether that is the US dollar, so costs need no exchange rate. */
+    dollar: boolean;
+    /** The reporting currency per US dollar, when one is set. */
+    exchangeRate: number | undefined;
+    /** Whether a cost in dollars can be set against value: the value is in dollars or a rate is set. */
+    convertible: boolean;
+    /** The days compared, once known. */
+    span: DateSpan | undefined;
+    /** The days ValueLens holds activity for inside the date filter, once known. */
+    activity: DateSpan | undefined;
+    credits: CreditsState;
+    users: number | undefined;
+    licencePrice: number;
+    /** Whether the licence price is the US list price because none is saved. */
+    listPrice: boolean;
+    /** Each cost in US dollars, as billed. */
+    usd: { licences: number | undefined; studio: number | undefined; cowork: number | undefined; total: number | undefined };
+    /** Each cost in the reporting currency, undefined until it can be converted. */
+    costs: Costs;
+    comparison: Comparison;
+    pairs: PairLine[];
+    agents: AgentMatch;
+    azure: { cost: number | undefined; currency: string | undefined };
+    /** The headline figures and the products comparison. */
+    summary: TableResult;
+    /** The agents comparison. */
+    agentResult: TableResult;
+    /** Costs left out because the org filter can't narrow them, and why. */
+    notFilteredBy: NotFiltered[];
+}
+
+/**
+ * Everything the Cost vs value stage reads: the activity's dates, licences and
+ * currency from ValueLens, value by source and by agent over the dates both
+ * models hold, and the credit costs from Consumption Central.
+ */
+export function useCostVsValue(): CostVsValue {
+    const { rate, scenario } = useValueAssumptions();
+    const terms = useCommercialTerms();
+
+    const windowSource = costValueWindow();
+    const activityWindow = useSummaryQuery(windowSource, [], COST_IGNORED_FILTERS);
+    const firstActivity = isoDate(activityWindow.row?.["[First Date]"]);
+    const lastActivity = isoDate(activityWindow.row?.["[Last Date]"]);
+    const activity = useMemo(
+        () => (firstActivity && lastActivity ? { from: firstActivity, to: lastActivity } : undefined),
+        [firstActivity, lastActivity],
+    );
+    const modelSymbol = readText(activityWindow.row, "[Currency Symbol]");
+    const currency = useReportingCurrency(modelSymbol);
+    const users = readNumber(activityWindow.row, "[Licensed Users]");
+
+    const dates = useConsumptionSummary(CONSUMPTION_CONFIGURED ? consumptionDates() : { ...consumptionDates(), ...SKIP });
+    const firstCredit = isoDate(dates.row?.["[First Date]"]);
+    const lastCredit = isoDate(dates.row?.["[Last Date]"]);
+    const held = useMemo(
+        () => (firstCredit && lastCredit ? { from: firstCredit, to: lastCredit } : undefined),
+        [firstCredit, lastCredit],
+    );
+
+    const overlap = useMemo(() => overlapSpan(activity, held), [activity, held]);
+    const credits: CreditsState = !CONSUMPTION_CONFIGURED
+        ? { kind: "off" }
+        : dates.error !== undefined
+          ? { kind: "error", message: dates.error }
+          : !dates.loaded
+            ? { kind: "loading" }
+            : overlap
+              ? { kind: "ready" }
+              : { kind: "apart", held };
+    const span = credits.kind === "ready" ? overlap : credits.kind === "loading" ? undefined : activity;
+    const ready = credits.kind === "ready";
+
+    const valueExtra = useMemo(
+        () =>
+            span
+                ? [treatAs("'Hourly Value'[Hourly Value]", [rate]), dateBetween("'Calendar'[Date]", span.from, span.to)]
+                : [],
+        [rate, span],
+    );
+    const agentExtra = useMemo(
+        () => (span ? [...valueExtra, treatAs("'Effort Scenario'[Scenario]", [scenario])] : []),
+        [valueExtra, scenario, span],
+    );
+    const bySourceSource = costValueBySource();
+    const bySource = useTableQuery(
+        span ? bySourceSource : { ...bySourceSource, query: "" },
+        valueExtra,
+        COST_IGNORED_FILTERS,
+    );
+    const agentValueSource = costValueAgents();
+    const agentValues = useTableQuery(
+        span && ready ? agentValueSource : { ...agentValueSource, query: "" },
+        agentExtra,
+        COST_IGNORED_FILTERS,
+    );
+
+    const creditExtra = useMemo(() => (ready && span ? [reportingDateFilter(span.from, span.to)] : []), [ready, span]);
+    const byProductSource = consumptionByProduct();
+    const byProduct = useConsumptionTable(
+        ready ? byProductSource : { ...byProductSource, ...SKIP },
+        creditExtra,
+        CREDIT_IGNORES,
+    );
+    const coworkSource = coworkWindowCost();
+    const coworkCost = useConsumptionSummary(
+        ready ? coworkSource : { ...coworkSource, ...SKIP },
+        creditExtra,
+        CREDIT_IGNORES,
+    );
+    const notes = useConsumptionSummary(
+        ready ? consumptionNotes() : { ...consumptionNotes(), ...SKIP },
+        creditExtra,
+        FILTER_KEYS,
+    );
+    const studioSource = studioAgents();
+    const agentExtraCredits = useMemo(() => [groupByFilter(undefined)], []);
+    const agentCredits = useConsumptionTable(
+        ready ? studioSource : { ...studioSource, ...SKIP },
+        agentExtraCredits,
+        CREDIT_IGNORES,
+    );
+
+    // A cost the org filter can't narrow would be set against the org's value alone, so it is left out.
+    const studioReason = ready ? orgReason(byProduct.notFilteredBy) : undefined;
+    const coworkReason = ready ? orgReason(coworkCost.notFilteredBy) : undefined;
+    const notFilteredBy = useMemo<NotFiltered[]>(
+        () => [
+            ...(studioReason
+                ? [{ key: "organizations" as const, reason: "Copilot Studio is billed for the tenant, not per person, so its cost is left out." }]
+                : []),
+            ...(coworkReason
+                ? [{ key: "organizations" as const, reason: `${coworkReason.replace(/\.$/, "")}, so Cowork's cost is left out.` }]
+                : []),
+        ],
+        [studioReason, coworkReason],
+    );
+
+    const saved = terms.saved;
+    const licencePrice = saved?.licensePrice ?? LICENSE_LIST_PRICE;
+    const exchangeRate = currency.exchangeRate;
+    const dollar = currency.isUsd;
+    const code = currency.code;
+
+    const usd = useMemo(() => {
+        const licences = users !== undefined && span ? licenceCost(users, licencePrice, span) : undefined;
+        const studio = ready && !studioReason ? productCost(byProduct.table, STUDIO) : undefined;
+        const cowork = ready && !coworkReason ? readNumber(coworkCost.row, "[Cost]") : undefined;
+        return { licences, studio, cowork, total: sumKnown([licences, studio, cowork]) };
+    }, [users, span, licencePrice, ready, byProduct.table, coworkCost.row, studioReason, coworkReason]);
+
+    const costs = useMemo<Costs>(
+        () => ({
+            licences: toValueCurrency(usd.licences, code, exchangeRate),
+            studio: toValueCurrency(usd.studio, code, exchangeRate),
+            cowork: toValueCurrency(usd.cowork, code, exchangeRate),
+        }),
+        [usd, code, exchangeRate],
+    );
+
+    const sourceValues = useMemo(() => readSourceValues(bySource.table), [bySource.table]);
+    const comparison = useMemo(() => compare(sourceValues, costs, scenario, rate), [sourceValues, costs, scenario, rate]);
+    const pairIds = useMemo<PairId[]>(
+        () =>
+            ready
+                ? [
+                      "licences",
+                      ...(studioReason ? [] : (["studio"] as const)),
+                      ...(coworkReason ? [] : (["cowork"] as const)),
+                  ]
+                : ["licences"],
+        [ready, studioReason, coworkReason],
+    );
+    const pairs = useMemo(() => pairLines(sourceValues, costs, scenario, pairIds), [sourceValues, costs, scenario, pairIds]);
+    const agents = useMemo(
+        () => matchAgents(readAgentValues(agentValues.table), readAgentCredits(agentCredits.table), costs.studio),
+        [agentValues.table, agentCredits.table, costs.studio],
+    );
+
+    // A skipped query keeps its last result, so its error counts only while it runs.
+    const summaryError =
+        activityWindow.error ??
+        (span ? bySource.error : undefined) ??
+        (ready ? (byProduct.error ?? coworkCost.error) : undefined);
+    const summaryLoading =
+        summaryError === undefined &&
+        (!activityWindow.loaded ||
+            terms.status === "loading" ||
+            credits.kind === "loading" ||
+            (activity !== undefined && !bySource.table) ||
+            (ready && (!byProduct.table || !coworkCost.loaded)));
+    const summary: TableResult = {
+        table: bySource.table,
+        error: summaryError,
+        isLoading: summaryLoading,
+        refetch: () => {
+            activityWindow.refetch();
+            if (span) bySource.refetch();
+            if (ready) {
+                byProduct.refetch();
+                coworkCost.refetch();
+            }
+        },
+    };
+    const agentError = ready ? ((span ? agentValues.error : undefined) ?? agentCredits.error) : undefined;
+    const agentResult: TableResult = {
+        table: agentValues.table,
+        error: agentError,
+        isLoading: agentError === undefined && (summaryLoading || !agentValues.table || !agentCredits.table),
+        refetch: () => {
+            agentValues.refetch();
+            agentCredits.refetch();
+        },
+    };
+
+    return {
+        rate,
+        scenario,
+        code,
+        prefix: currency.prefix,
+        dollar,
+        exchangeRate,
+        convertible: dollar || exchangeRate !== undefined,
+        span,
+        activity,
+        credits,
+        users,
+        licencePrice,
+        listPrice: saved?.licensePrice === undefined,
+        usd,
+        costs,
+        comparison,
+        pairs,
+        agents,
+        azure: { cost: ready ? productCost(byProduct.table, AZURE) : undefined, currency: readText(notes.row, "[Azure Currency]") },
+        summary,
+        agentResult,
+        notFilteredBy,
+    };
+}

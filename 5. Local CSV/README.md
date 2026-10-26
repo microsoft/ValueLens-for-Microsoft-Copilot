@@ -1,10 +1,31 @@
 # 5. Local CSV
 
-Power BI Desktop only: no tenant setup is needed to try it, and it ships with a fabricated sample dataset.
+Power BI Desktop only. No tenant setup is needed to try it, and it comes with a made-up sample dataset.
+The app can read the same CSV files.
 
-Use Power BI Desktop from June 2024 or later. In older releases, the habit-stage charts and cards on the Habit Formation page can show errors, because their measures use [`SUMMARIZECOLUMNS`](https://learn.microsoft.com/dax/summarizecolumns-function-dax#contextual-summarizecolumns) in ways those releases don't fully support. Reports published to the Power BI service aren't affected.
+There's no installer for this path: it's a few exports and one script.
 
-## 1. Try it with sample data
+## Before you start
+
+- [ ] **Power BI Desktop**, June 2024 or later.
+- [ ] **To use your own data:** Python 3.9 or later.
+- [ ] **To use your own data:** access to the Purview audit export, the Microsoft Entra users export
+      and the Microsoft 365 admin center Copilot user export. The roles are in [Permissions](../docs/PERMISSIONS.md).
+- [ ] **Optional:** access to Agent 365 registry data or product feedback.
+- [ ] **Read the [disclaimer](../README.md#disclaimer).** You're responsible for the exported CSV files.
+
+<details>
+<summary>Why June 2024 or later?</summary>
+
+In older releases, the habit-stage charts and cards on the Habit Formation page can show errors,
+because their measures use [`SUMMARIZECOLUMNS`](https://learn.microsoft.com/dax/summarizecolumns-function-dax#contextual-summarizecolumns)
+in ways those releases don't fully support. Reports published to the Power BI service aren't affected.
+
+</details>
+
+<a id="1-try-it-with-sample-data"></a>
+
+## Try it with sample data
 
 1. Open [`ValueLens - Local CSV.pbit`](ValueLens%20-%20Local%20CSV.pbit) in Power BI Desktop.
 2. When Power BI asks for parameters, use full local paths to these files:
@@ -20,20 +41,10 @@ Use Power BI Desktop from June 2024 or later. In older releases, the habit-stage
 
 See [`sample-data/README.md`](sample-data/README.md) for what the sample contains.
 
-## 2. Use your own data
+<a id="2-use-your-own-data"></a>
+<a id="steps"></a>
 
-### You need
-
-- Power BI Desktop, June 2024 or later.
-- Python 3.9+.
-- Access to the Purview audit export, the Microsoft Entra users export, and the Microsoft 365 Admin Center Copilot user export.
-- Roles and permissions listed in [`../docs/PERMISSIONS.md`](../docs/PERMISSIONS.md).
-- Optional access for Agent 365 registry data or product feedback.
-
-Read the [disclaimer](../README.md#disclaimer) too: these aren't the official Copilot reports, and
-you're responsible for the exported CSV files.
-
-### Steps
+## Use your own data
 
 1. Export Copilot interactions from Microsoft Purview > Audit: search `CopilotInteraction`, export CSV, and save it as `raw_copilot_interactions.csv`.
 2. Export licensed users from the Microsoft 365 Admin Center Copilot user export: include UPN and `Has License`, and save it as `m365_copilot_licence_list.csv`.
@@ -84,14 +95,29 @@ you're responsible for the exported CSV files.
 
 9. Select **Load**.
 
-## How to update
+<a id="how-to-update"></a>
 
-1. Re-export the Purview audit CSV, licensed users CSV, org data CSV, and any optional Agent 365 or product feedback CSV.
-2. Re-run `scripts\Adapt-OrgFile-To-EntraUsers.py` if you used it.
-3. Re-run `scripts\Purview_CopilotInteraction_Processor_v4.0.0.py`.
-4. In Power BI Desktop, update parameter paths if the file names changed, then select **Refresh**.
+## After setup
 
-## Troubleshooting
+- **Check it worked.** The report pages show your organisation's data, not the sample.
+- **Use the app.** Load the same `*_Interactions_*.csv` and `*_Users_*.csv` files in [the app](../app/README.md#data).
+- **Keep it fresh:**
+  1. Re-export the Purview audit CSV, licensed users CSV, org data CSV, and any optional Agent 365 or product feedback CSV.
+  2. Re-run `scripts\Adapt-OrgFile-To-EntraUsers.py` if you used it.
+  3. Re-run `scripts\Purview_CopilotInteraction_Processor_v4.0.0.py`.
+  4. In Power BI Desktop, update parameter paths if the file names changed, then select **Refresh**.
+- **Optional:** add credit and cost reporting with [Add Credit Consumption](Add%20Credit%20Consumption/README.md).
+- **Problems?** See [Troubleshooting](#troubleshooting) below, or
+  [open an issue](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues).
+
+---
+
+<a id="troubleshooting"></a>
+
+<details>
+<summary><strong>Troubleshooting</strong></summary>
+
+<br>
 
 | Issue | Fix |
 |---|---|
@@ -102,4 +128,4 @@ you're responsible for the exported CSV files.
 | UPNs are masked | In the Microsoft 365 admin center, go to **Settings** > **Org settings** > **Services** > **Reports**, turn off concealed user names, then export again. |
 | Agent Registry or feedback pages are blank | Set the optional `Agent 365` or `Feedback File` parameter, or leave it blank if you skipped that source. |
 
-Optional: add credit and cost reporting with [`Add Credit Consumption`](Add%20Credit%20Consumption/README.md).
+</details>

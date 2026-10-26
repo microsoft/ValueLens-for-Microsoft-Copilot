@@ -1,0 +1,23 @@
+EVALUATE
+SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            CreditsWeekly[Week Index],
+            "@Start", MIN(CreditsWeekly[MetricDate]),
+            "@Credits", [Weekly Credits],
+            "@Users", [Weekly Active Users],
+            "@Prepaid", [Cowork Weekly Prepaid Cost],
+            "@PAYG", [Cowork Weekly PAYG Cost],
+            "@WoW", [Weekly Credits WoW %]
+        ),
+        NOT ISBLANK([@Credits])
+    ),
+    "Week Index", CreditsWeekly[Week Index],
+    "Week Start", [@Start],
+    "Credits", [@Credits],
+    "Active Users", [@Users],
+    "Prepaid Cost", [@Prepaid],
+    "PAYG Cost", [@PAYG],
+    "Credits WoW", [@WoW]
+)
+ORDER BY [Week Index] ASC

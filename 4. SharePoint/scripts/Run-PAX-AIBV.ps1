@@ -7,6 +7,8 @@
   rollup pipeline, and leaves the two rollup CSVs the SharePoint PBIT consumes
   in .\processed\. No separate local Python processor is used here. With
   -IncludeAgent365Info it also writes the Agent 365 registry CSV (see below).
+  With -OnlyUserInfo it runs no audit query or rollup, and leaves only the user
+  directory CSV in .\processed\ (see below).
 
 .PARAMETER TenantId
   Target Entra tenant GUID.
@@ -133,6 +135,15 @@
   this date. So windows that share a date (2026-09-01 to 2026-09-08, then 2026-09-08 to
   2026-09-15) meet with no gap and no overlap.
 
+.PARAMETER OnlyUserInfo
+  Exports only the user directory, with PAX -OnlyUserInfo: one pass, with no audit query,
+  date window or rollup. PAX writes EntraUsers_MAClicensing_<timestamp>.csv to .\processed\,
+  and the manifest records it as users_csv. Each run's file is a whole snapshot of the
+  directory, to replace the last one rather than add to it. The app needs User.Read.All and
+  Organization.Read.All, and not AuditLogsQuery.Read.All. Can't be used with -Days,
+  -StartDate, -EndDate, -AppendFile, -AppendUserInfo, -RollupPlusRaw or the Agent 365
+  parameters.
+
 .EXAMPLE
   .\Run-PAX-AIBV.ps1 -TenantId <guid> -ClientId <guid>
 
@@ -158,6 +169,10 @@
   # neither -Append switch, then rename its two outputs to these names:
   .\Run-PAX-AIBV.ps1 -TenantId <guid> -ClientId <guid> -Days 3 -PaxReleaseTag purview-v1.11.15 `
     -PaxSha256 <sha256> -AppendFile cumulative_Interactions.csv -AppendUserInfo cumulative_Users.csv
+
+.EXAMPLE
+  # The user directory only, as one whole snapshot:
+  .\Run-PAX-AIBV.ps1 -TenantId <guid> -ClientId <guid> -OnlyUserInfo
 #>
 [CmdletBinding()]
 param(
@@ -186,7 +201,8 @@ param(
   [string]$AppendUserInfo,
   [switch]$SkipVersionCheck,
   [string]$StartDate,
-  [string]$EndDate
+  [string]$EndDate,
+  [switch]$OnlyUserInfo
 )
 
 $ErrorActionPreference = 'Stop'
@@ -217,6 +233,13 @@ if ($PaxSha256) {
 
 if ($AppendUserInfo -and -not $IncludeUserInfo) {
   throw "-AppendUserInfo merges the Users file, so it can't be used with -IncludeUserInfo:`$false."
+}
+
+if ($OnlyUserInfo) {
+  foreach ($name in 'Days', 'StartDate', 'EndDate', 'AppendFile', 'AppendUserInfo', 'RollupPlusRaw', 'IncludeAgent365Info', 'Agents365Csv', 'Agent365Source') {
+    if ($PSBoundParameters.ContainsKey($name)) { throw "-OnlyUserInfo exports only the user directory, so it can't be used with -$name." }
+  }
+  if (-not $IncludeUserInfo) { throw "-OnlyUserInfo exports only the user directory, so it can't be used with -IncludeUserInfo:`$false." }
 }
 
 $Invariant = [System.Globalization.CultureInfo]::InvariantCulture
@@ -441,23 +464,28 @@ if ($Auth -eq 'AppRegistration') {
 } elseif ($ClientSecret) {
   $secret = $ClientSecret
 }
-if (-not $StartDate) {
+if (-not $StartDate -and -not $OnlyUserInfo) {
   $today = (Get-Date).Date
   $StartDate = $today.AddDays(-$Days).ToString('yyyy-MM-dd', $Invariant)
   $EndDate = $today.ToString('yyyy-MM-dd', $Invariant)
 }
 
 $pax = Get-PaxReleaseScript -ReleaseTag $PaxReleaseTag -CacheRoot $PaxCacheRoot -Sha256 $PaxSha256 -ForceDownload:$ForcePaxDownload
-$paxDashboard = Get-PaxDashboardValue -ScriptPath $pax.Path
+# -OnlyUserInfo builds no rollup, so it takes no -Dashboard.
+$paxDashboard = if ($OnlyUserInfo) { $null } else { Get-PaxDashboardValue -ScriptPath $pax.Path }
 
 Write-Host ""
 Write-Host "==== PAX run ====" -ForegroundColor Cyan
 Write-Host ("Tenant   : {0}" -f $TenantId)
 Write-Host ("App      : {0}" -f $ClientId)
-Write-Host ("Window   : {0} -> {1} ({2} days)" -f $StartDate, $EndDate, $Days)
+if ($OnlyUserInfo) {
+  Write-Host "Window   : none (user directory only)"
+} else {
+  Write-Host ("Window   : {0} -> {1} ({2} days)" -f $StartDate, $EndDate, $Days)
+}
 Write-Host ("Release  : {0} ({1})" -f $pax.Tag, $pax.Asset)
 Write-Host ("SHA-256  : {0}" -f $pax.Sha256)
-Write-Host ("Dashboard: {0}" -f $paxDashboard)
+if ($paxDashboard) { Write-Host ("Dashboard: {0}" -f $paxDashboard) }
 Write-Host ("Out dir  : {0}" -f $OutDir)
 Write-Host ""
 
@@ -466,16 +494,24 @@ $paxParams = @{
   TenantId = $TenantId
   ClientId = $ClientId
   Auth = $Auth
-  Dashboard = $paxDashboard
-  StartDate = $StartDate
-  EndDate = $EndDate
+}
+if (-not $OnlyUserInfo) {
+  $paxParams.Dashboard = $paxDashboard
+  $paxParams.StartDate = $StartDate
+  $paxParams.EndDate = $EndDate
 }
 
 if ($secret) {
   $paxParams.ClientSecret = $secret
 }
 
-if ($RollupPlusRaw) {
+if ($OnlyUserInfo) {
+  # PAX turns on -IncludeUserInfo itself, and with no -OutputPath writes its log and working
+  # files to the -OutputPathUserInfo folder too.
+  $paxParams.OnlyUserInfo = $true
+  $paxParams.OutputPathUserInfo = $OutDir
+  Write-Host "Mode     : USERS ONLY - exports the user directory, with no audit query or rollup." -ForegroundColor Cyan
+} elseif ($RollupPlusRaw) {
   $paxParams.RollupPlusRaw = $true
 } else {
   $paxParams.Rollup = $true
@@ -493,7 +529,7 @@ if ($AppendFile) {
     Write-Host ("Mode     : APPEND requested but '{0}' was not found." -f $appendTarget) -ForegroundColor Yellow
     Write-Host "            Seed it first with a back-fill run WITHOUT -AppendFile, then append on subsequent runs." -ForegroundColor DarkGray
   }
-} else {
+} elseif (-not $OnlyUserInfo) {
   $paxParams.OutputPath = $OutDir
   Write-Host "Mode     : SEED (no -AppendFile) - creates a fresh interactions file; add -AppendFile on scheduled runs." -ForegroundColor DarkGray
 }
@@ -510,7 +546,7 @@ if ($AppendUserInfo) {
     Write-Host ("Users    : APPEND requested but '{0}' was not found." -f $appendUsersTarget) -ForegroundColor Yellow
     Write-Host "            Seed it first with a run WITHOUT -AppendUserInfo, then append on subsequent runs." -ForegroundColor DarkGray
   }
-} elseif ($IncludeUserInfo) {
+} elseif ($IncludeUserInfo -and -not $OnlyUserInfo) {
   $paxParams.IncludeUserInfo = $true
   $paxParams.OutputPathUserInfo = $OutDir
 }
@@ -580,7 +616,9 @@ $paxElapsed = (Get-Date) - $paxStart
 Write-Host ("==> PAX finished in {0:N1} min" -f $paxElapsed.TotalMinutes) -ForegroundColor Green
 
 # An append run's output is its target. Otherwise take the newest file this run wrote.
-if ($appendTarget) {
+if ($OnlyUserInfo) {
+  $interactions = $null
+} elseif ($appendTarget) {
   $interactions = Get-Item -LiteralPath $appendTarget -ErrorAction SilentlyContinue
   if (-not $interactions) { throw "The interactions file $appendTarget is missing after the run." }
 } else {
@@ -590,7 +628,12 @@ if ($appendTarget) {
   if (-not $interactions) { throw "PAX wrote no rollup interactions CSV to $OutDir this run. PAX's log there says why." }
 }
 $users = $null
-if ($appendUsersTarget) {
+if ($OnlyUserInfo) {
+  $users = Get-ChildItem -LiteralPath $OutDir -Filter 'EntraUsers_MAClicensing_*.csv' |
+    Where-Object { $_.LastWriteTime -ge $freshSince } |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  if (-not $users) { throw "PAX wrote no user directory CSV to $OutDir this run. PAX's log there says why." }
+} elseif ($appendUsersTarget) {
   $users = Get-Item -LiteralPath $appendUsersTarget -ErrorAction SilentlyContinue
   if (-not $users) { throw "The users file $appendUsersTarget is missing after the run." }
 } elseif ($IncludeUserInfo) {
@@ -650,8 +693,10 @@ if (-not $agents365 -and $Agents365Csv) {
 }
 
 Write-Host ""
-Write-Host "==== Rollup outputs ====" -ForegroundColor Cyan
-Write-Host ("  Interactions : {0} ({1:N0} bytes)" -f $interactions.FullName, $interactions.Length)
+Write-Host $(if ($OnlyUserInfo) { "==== User directory ====" } else { "==== Rollup outputs ====" }) -ForegroundColor Cyan
+if ($interactions) {
+  Write-Host ("  Interactions : {0} ({1:N0} bytes)" -f $interactions.FullName, $interactions.Length)
+}
 if ($users) {
   Write-Host ("  Users        : {0} ({1:N0} bytes)" -f $users.FullName, $users.Length)
 }
@@ -662,16 +707,17 @@ if ($agents365) {
 $manifest = [pscustomobject]@{
   generated_utc      = (Get-Date).ToUniversalTime().ToString('o')
   tenant_id          = $TenantId
-  window_days        = $Days
-  window_start       = $StartDate
-  window_end         = $EndDate
+  only_user_info     = [bool]$OnlyUserInfo
+  window_days        = if ($OnlyUserInfo) { $null } else { $Days }
+  window_start       = if ($OnlyUserInfo) { $null } else { $StartDate }
+  window_end         = if ($OnlyUserInfo) { $null } else { $EndDate }
   pax_release_tag    = $pax.Tag
   pax_release_asset  = $pax.Asset
   pax_sha256         = $pax.Sha256
   pax_dashboard      = $paxDashboard
   pax_elapsed_min    = [math]::Round($paxElapsed.TotalMinutes, 2)
   pax_auth_mode      = $Auth
-  rollup_mode        = if ($RollupPlusRaw) { 'RollupPlusRaw' } else { 'Rollup' }
+  rollup_mode        = if ($OnlyUserInfo) { $null } elseif ($RollupPlusRaw) { 'RollupPlusRaw' } else { 'Rollup' }
   include_userinfo   = [bool]$IncludeUserInfo
   user_info_file     = $UserInfoFile
   append_file        = $appendTarget
@@ -683,7 +729,7 @@ $manifest = [pscustomobject]@{
   include_agent365   = [bool]$IncludeAgent365Info
   agent365_source    = $agentSource
   agents365_csv      = if ($agents365) { $agents365.FullName } else { $null }
-  interactions_csv   = $interactions.FullName
+  interactions_csv   = if ($interactions) { $interactions.FullName } else { $null }
   users_csv          = if ($users) { $users.FullName } else { $null }
 }
 
@@ -693,4 +739,8 @@ $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -En
 Write-Host ""
 Write-Host ("Manifest written: {0}" -f $manifestPath) -ForegroundColor Green
 Write-Host ""
-Write-Host "Next: .\Upload-Rollups-SharePoint.ps1 -Manifest `"$manifestPath`" -SiteId <...> -DriveId <...> -FolderPath /AIBV" -ForegroundColor Yellow
+if ($OnlyUserInfo) {
+  Write-Host "Next: .\Upload-Rollups-SharePoint.ps1 -File `"$($users.FullName)`" -RemoteName <name>.csv -SiteId <...> -DriveId <...> -FolderPath /AIBV" -ForegroundColor Yellow
+} else {
+  Write-Host "Next: .\Upload-Rollups-SharePoint.ps1 -Manifest `"$manifestPath`" -SiteId <...> -DriveId <...> -FolderPath /AIBV" -ForegroundColor Yellow
+}

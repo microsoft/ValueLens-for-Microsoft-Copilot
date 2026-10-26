@@ -1,0 +1,59 @@
+EVALUATE
+-- The model's `License Priority Rank (Dynamic)` scores every user in the
+-- selection again for each row it ranks, so its cost grows with the square of
+-- the user count. Each user is scored once here instead. Inside the measure,
+-- ALLSELECTED brings back the filters this query runs under, which are the
+-- users VALUES sees here, and its dense rank is one more than the number of
+-- distinct higher scores.
+VAR __Scored =
+    FILTER(
+        ADDCOLUMNS(
+            VALUES('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+            "@Score", [License Priority Score (User)]
+        ),
+        NOT ISBLANK([@Score])
+    )
+-- The rank counts users with any unlicensed activity, whatever the licence filter says.
+VAR __Scores =
+    DISTINCT(
+        SELECTCOLUMNS(
+            FILTER(
+                __Scored,
+                CALCULATE(
+                    COUNTROWS('Chat + Agent Interactions (Audit Logs)'),
+                    'Chat + Agent Interactions (Audit Logs)'[License Status] = "Unlicensed"
+                ) > 0
+            ),
+            "@Value", [@Score]
+        )
+    )
+VAR __Candidates =
+    ADDCOLUMNS(
+        FILTER(__Scored, CALCULATE([Observed Unlicensed Sessions]) > 0),
+        "@Sessions", [Observed Unlicensed Sessions per User per Week]
+    )
+VAR __Total = COUNTROWS(__Candidates)
+RETURN
+SELECTCOLUMNS(
+    TOPN(
+        1000,
+        __Candidates,
+        [@Score], DESC,
+        [@Sessions], DESC,
+        'Chat + Agent Interactions (Audit Logs)'[Audit_UserId], ASC
+    ),
+    "Rank",
+        VAR __Score = [@Score]
+        RETURN COUNTROWS(FILTER(__Scores, [@Value] > __Score)) + 1,
+    "User", 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId],
+    "Organization",
+        LOOKUPVALUE(
+            'Chat + Agent Org Data'[Organization],
+            'Chat + Agent Org Data'[PersonId], 'Chat + Agent Interactions (Audit Logs)'[Audit_UserId]
+        ),
+    "Priority Score", [@Score],
+    "Sessions Per Week", [@Sessions],
+    "Active Days Per Week", [Median Chat + Agent Active Days Per User Per Week (Unlicensed)],
+    "Total", __Total
+)
+ORDER BY [Rank], [Priority Score] DESC, [Sessions Per Week] DESC, [User]

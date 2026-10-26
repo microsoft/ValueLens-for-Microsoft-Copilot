@@ -139,10 +139,16 @@ a second route that needs no Fabric.
   `valuelens-setup.json`, and the installer leaves Analytics Hub records and workspaces alone.
 - **Supporting changes.** The Fabric notebooks now match the Analytics Hub ones the installer
   deploys. `Run-PAX-AIBV.ps1` gains `-PaxSha256`, `-AppendUserInfo`, `-SkipVersionCheck`,
-  `-StartDate` and `-EndDate`. Its append runs work on PAX 1.11.15, and a run whose rollup step
-  failed now fails, even when PAX exits 0. `Upload-Rollups-SharePoint.ps1` gains `-File` and
-  `-RemoteName`. A contract test checks that the notebooks write every Lakehouse column the Fabric
-  template reads.
+  `-StartDate`, `-EndDate` and `-OnlyUserInfo`, which exports only the user directory. Its append
+  runs work on PAX 1.11.15, and a run whose rollup step failed now fails, even when PAX exits 0.
+  `Upload-Rollups-SharePoint.ps1` gains `-File` and `-RemoteName`. A contract test checks that the
+  notebooks write every Lakehouse column the Fabric template reads.
+- **Shared with Consumption Central.** Its installer copies the PAX route's code unchanged, so the
+  route has settings ValueLens leaves off: a folder parameter, parameter values from the install
+  record, a query read from a file, a privacy level, and a mode that exports only the user
+  directory, as one file replaced whole each run. In that mode, the run checks the file before it
+  uploads it, and holds back a file that looks wrong, such as one with under half the rows of the
+  last upload.
 
 `1. Fabric/installer` stays as it is for now. A follow-up removes it and points its links here.
 Nothing is released yet. The first tag will be `valuelens-installer-v0.1.0`.
@@ -171,6 +177,29 @@ microsoft/AnalyticsHub-Dashboard#144.
 
 ---
 
+## Unreleased — Azure: Copilot Studio exports keep the month they were uploaded
+
+**Why.** The per-agent and per-user exports from the Power Platform admin center carry no date, so
+the Azure run job gave them the month it ran in. It re-reads every export in `studio/` on every run,
+so an export left in the folder was stored again as each new month's, and where two exports shared a
+key both rows were added together.
+
+- **Each per-agent or per-user export counts as the UTC month it was uploaded**: its blob's
+  last-modified time in `landing`, or its SharePoint item's. Where two exports of a kind share a key,
+  the newer upload's rows win. The jobs now keep each blob's upload time when they download it.
+- **Earlier months go in `studio/backfill/YYYY-MM/`.** A file outside a month folder, a folder not
+  named `YYYY-MM`, or a future month stops the Studio load before it writes; the other loads still
+  run and the run fails, naming what to move.
+- **With no tenant export, the per-agent and per-user exports now load.** A CSV whose name matches an
+  export but lacks its key columns is skipped with a warning rather than failing the load.
+- **A tenant export's day with no environment now replaces the flow's figures for it**, as it does
+  for a named environment, rather than both being counted.
+- **Updating** leaves the copies earlier versions stored; there's no cleanup step. See
+  [Credit consumption](2.%20Azure/README.md). Ported from the Analytics Hub repository's fix
+  (microsoft/AnalyticsHub-Dashboard#211).
+
+---
+
 ## Unreleased — The app comes first, and Power Automate + Dataverse is archived
 
 **Why.** The app is now the recommended way to use ValueLens, so the README starts with it and has
@@ -188,7 +217,8 @@ between and keep up to date.
 - **"App Edition" is now "the app".** The footer, the data dialog, the app README, PRODUCT.md and
   DESIGN.md say so, and `app/download/ValueLens-App.html` was rebuilt. The Fabric App deploy keeps
   `id: valuelens-app-edition` in `app/rayfin/rayfin.yml`, so redeploying still updates the existing
-  item instead of creating a second one.
+  item instead of creating a second one. [`fabric-app/`](fabric-app/README.md)'s docs and code
+  comments now call it "the CSV app" too; nothing on screen changes.
 - **The app's builds make the sample data first.** Git ignores `app/public/sample/`, so an app
   deployed from a fresh clone stopped at "Couldn't load the sample data", without the **Change
   data** button. `npm run dev`, `npm run build` and `npm run build:file` now run

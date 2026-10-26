@@ -1,0 +1,17 @@
+EVALUATE
+// One cohort's cards, the one License and Activity pick (they filter this
+// query too): its four figures and the bookmark's extra card, if it has one.
+// leaderboard-summary.ts fills in the cards.
+CALCULATETABLE(
+    ROW(
+        __CARDS__
+    ),
+    // As on the report's Leaderboard page: Security Copilot's automated
+    // sessions would otherwise top every ranking.
+    KEEPFILTERS(
+        FILTER(
+            ALL('Chat + Agent Interactions (Audit Logs)'[AppHost]),
+            NOT CONTAINSSTRING('Chat + Agent Interactions (Audit Logs)'[AppHost], "SecurityCopilot")
+        )
+    )
+)

@@ -21,6 +21,7 @@ from __future__ import annotations
 import csv
 import logging
 import os
+import time
 from datetime import date, datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
@@ -82,7 +83,9 @@ def load_consumption(store, folder: Path | None = None) -> dict:
         return {}
     files = {f.name: f for f in folder.glob("*.csv")}
     studio_files = {n: f for n, f in files.items() if n.lower().startswith("studio")}
-    out = {"studio": studio.ingest(store, studio_files), "viva": viva.ingest(store, files)}
+    # The sample's per-agent and per-user exports count as this month's, as if uploaded now.
+    uploaded = dict.fromkeys(studio_files, time.time())
+    out = {"studio": studio.ingest(store, studio_files, uploaded=uploaded), "viva": viva.ingest(store, files)}
     con = duckdb.connect()
     con.execute("SET TimeZone = 'UTC'")
     for name, table in AZURE_SAMPLES.items():

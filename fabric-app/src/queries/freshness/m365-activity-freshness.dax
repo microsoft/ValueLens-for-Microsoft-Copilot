@@ -1,0 +1,4 @@
+EVALUATE
+// The last day of Microsoft 365 activity loaded. Its own query, so a model
+// without the table fails here alone.
+ROW("Last Date", MAX('M365 Activity'[ActivityDate]))

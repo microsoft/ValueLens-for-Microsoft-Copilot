@@ -53,6 +53,7 @@ reference.
     [-AppendUserInfo <users.csv>] `
     [-IncludeUserInfo:$false] `
     [-UserInfoFile <path|SharePoint-URL|OneLake-path>] `
+    [-OnlyUserInfo] `
     [-Deidentify] `
     [-FillerLabel Blank|RepeatSelf|RepeatManager|Fixed] `
     [-FillerLabelText "<text>"] `
@@ -107,6 +108,17 @@ a run are kept. Without it the Users/org output is a **snapshot** (overwritten e
 Agent 365 output always is. Keep `-Deidentify` consistent across all appends to the same file. If
 PAX can't merge a run into a target, it leaves the target as it was, and the script warns that PAX
 didn't update it.
+
+**Only the user directory** — `-OnlyUserInfo`: one PAX `-OnlyUserInfo` pass, with no audit query,
+date window or rollup. It leaves only `EntraUsers_MAClicensing_<ts>.csv` in `.\processed\`, and the
+manifest records it as `users_csv`. Each run's file is a whole snapshot of the directory, to replace
+the last one rather than add to it. The app needs `User.Read.All` and `Organization.Read.All`, not
+`AuditLogsQuery.Read.All`. It can't be used with `-Days`, the date range, `-AppendFile`,
+`-AppendUserInfo`, `-RollupPlusRaw` or the Agent 365 parameters. Upload the file with
+`Upload-Rollups-SharePoint.ps1 -File <csv> -RemoteName <name>.csv`: the `-Manifest` upload stops on
+this run's manifest, which has no rollup. The ValueLens report reads the rollups, so it doesn't use
+this mode. It's for dashboards that need only the user directory, such as Consumption Central's
+org file.
 
 **Agent type columns.** The PAX rollup does not write `Agent_Type` and the other five
 [agent-type columns](../../docs/DATA-DICTIONARY.md#agent-type-and-publisher). The SharePoint template

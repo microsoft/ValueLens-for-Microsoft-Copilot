@@ -1,0 +1,25 @@
+EVALUATE
+// The report's "<cohort> · App / surface → Activity" table, or for Cowork
+// "Task group → Task category". The grouping columns and measure names are
+// filled in per cohort by leaderboard-tasks.ts.
+SUMMARIZECOLUMNS(
+    ROLLUPADDISSUBTOTAL(
+        'Chat + Agent Interactions (Audit Logs)'[__GROUP__], "Is Grand Total",
+        'Chat + Agent Interactions (Audit Logs)'[__LEAF__], "Is Group Total"
+    ),
+    // As on the report's Leaderboard page: Security Copilot's automated
+    // sessions would otherwise top every ranking.
+    KEEPFILTERS(
+        FILTER(
+            ALL('Chat + Agent Interactions (Audit Logs)'[AppHost]),
+            NOT CONTAINSSTRING('Chat + Agent Interactions (Audit Logs)'[AppHost], "SecurityCopilot")
+        )
+    ),
+    "Active Users", [__USERS__],
+    "Sessions", [__SESSIONS__],
+    "Sessions Per User Per Week", [__PER_WEEK__]
+)
+ORDER BY
+    [Is Grand Total] DESC,
+    [Is Group Total] DESC,
+    [Sessions] DESC

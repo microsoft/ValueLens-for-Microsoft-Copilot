@@ -65,23 +65,40 @@ test('notebooks: a re-run from a newer release pushes changed notebooks', async 
   assert.deepEqual(fabric.calls, [], 'the same version is left in place');
 });
 
-test('notebooks: with the secret in the notebooks, only those without it are hashed', async () => {
+test('notebooks: with the secret in the notebooks, all are hashed by their code, not the secret', async () => {
   const fabric = fakeFabric();
   const graph = fakeGraphApi();
   const { ctx, config } = fakeCtx({ fabric: fabric.api, graph: graph.api });
   config.keyVault = { secretName: 'valuelens-client-secret', mode: 'notebook' };
   await ensureNotebooks(ctx);
   const plain = defaultNotebooks.filter((nb) => !usesSecret(nb));
-  assert.ok(plain.length > 0);
-  assert.deepEqual(Object.keys(config.fabric.notebookHashes ?? {}).sort(), plain.map((nb) => nb.key).sort());
+  const secretOnes = defaultNotebooks.filter((nb) => usesSecret(nb));
+  assert.ok(plain.length > 0 && secretOnes.length > 0);
+  assert.deepEqual(Object.keys(config.fabric.notebookHashes ?? {}).sort(), defaultNotebooks.map((nb) => nb.key).sort());
   assert.doesNotMatch(JSON.stringify(config), /secret-1/);
 
-  delete config.fabric.notebookHashes;
   fabric.calls.length = 0;
   graph.calls.length = 0;
   await ensureNotebooks(ctx);
-  assert.deepEqual(fabric.calls, plain.map((nb) => `updateNotebook ${nb.displayName}`));
+  assert.deepEqual(fabric.calls, [], 'the same version is left in place');
   assert.deepEqual(graph.calls, [], 'no new secret is made');
+
+  // A newer release changed the audit ingester's code: it is rewritten, with a fresh secret.
+  const audit = secretOnes.find((nb) => nb.displayName === 'Copilot_Audit_Log_Direct_Ingester') ?? secretOnes[0];
+  const calls = /** @type {string[]} */ (fabric.calls);
+  /** @type {any} */ (config.fabric.notebookHashes)[audit.key] = 'older';
+  await ensureNotebooks(ctx);
+  assert.ok(calls.includes(`updateNotebook ${audit.displayName}`), 'the changed code reaches Fabric');
+  for (const nb of secretOnes) assert.ok(calls.includes(`updateNotebook ${nb.displayName}`), `${nb.key} gets the fresh secret`);
+  for (const nb of plain) assert.ok(!calls.includes(`updateNotebook ${nb.displayName}`), `${nb.key} is unchanged`);
+  assert.ok(graph.calls.some((c) => /addPassword/.test(c)), 'a fresh secret is made');
+  assert.notEqual(config.fabric.notebookHashes?.[audit.key], 'older');
+
+  // A record from before secret notebooks were hashed: plain ones are updated as before.
+  for (const nb of secretOnes) delete (/** @type {any} */ (config.fabric.notebookHashes))[nb.key];
+  fabric.calls.length = 0;
+  await ensureNotebooks(ctx);
+  for (const nb of secretOnes) assert.ok(calls.includes(`updateNotebook ${nb.displayName}`));
 });
 
 test('notebooks: a deleted one is deployed again; one with the same name that is not ours is left alone', async () => {

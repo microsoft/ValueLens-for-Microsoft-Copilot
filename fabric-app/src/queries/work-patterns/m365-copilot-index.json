@@ -1,0 +1,47 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [
+    { "calculate": "datum['Index'] >= 1 ? 'More' : 'Less'", "as": "Direction" }
+  ],
+  "layer": [
+    {
+      "mark": { "type": "bar" },
+      "encoding": {
+        "y": {
+          "field": "Metric",
+          "type": "nominal",
+          "title": null,
+          "sort": { "field": "Index", "order": "descending" },
+          "axis": { "labelLimit": 200 }
+        },
+        "x": {
+          "field": "Index",
+          "type": "quantitative",
+          "title": "Copilot users compared with everyone else (1× = the same)",
+          "scale": { "zero": true },
+          "axis": { "labelExpr": "format(datum.value, '.1f') + '×'" }
+        },
+        "x2": { "datum": 1 },
+        "color": {
+          "field": "Direction",
+          "type": "nominal",
+          "title": null,
+          "sort": ["More", "Less"],
+          "legend": null
+        },
+        "tooltip": [
+          { "field": "Metric", "type": "nominal", "title": "Per person, per week" },
+          { "field": "Copilot Users", "type": "quantitative", "title": "Copilot users", "format": ",.1f" },
+          { "field": "Others", "type": "quantitative", "title": "Everyone else", "format": ",.1f" },
+          { "field": "Index", "type": "quantitative", "title": "Ratio", "format": ".2f" }
+        ]
+      }
+    },
+    {
+      "mark": { "type": "rule", "strokeDash": [4, 3] },
+      "encoding": { "x": { "datum": 1 } }
+    }
+  ]
+}

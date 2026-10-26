@@ -1,0 +1,43 @@
+EVALUATE
+VAR __Date = MAX('Foundry Resources'[SnapshotDate])
+VAR __Foundry = FILTER('Foundry Resources', 'Foundry Resources'[SnapshotDate] = __Date)
+VAR __Accounts = FILTER(__Foundry, NOT ('Foundry Resources'[IsProject] = TRUE()))
+VAR __Spend =
+    FILTER(
+        ADDCOLUMNS(
+            FILTER(
+                VALUES('AzureSolutionSpend'[ResourceId]),
+                CONTAINSSTRING('AzureSolutionSpend'[ResourceId], "/providers/microsoft.cognitiveservices/")
+                    || CONTAINSSTRING('AzureSolutionSpend'[ResourceId], "/providers/microsoft.machinelearningservices/")
+            ),
+            "@Id", LOWER('AzureSolutionSpend'[ResourceId]),
+            "@Cost", [Azure Selected Cost]
+        ),
+        NOT ISBLANK([@Cost])
+    )
+VAR __Covered = CALCULATETABLE(VALUES('AzureSolutionSpend'[SubscriptionId]), REMOVEFILTERS('AzureSolutionSpend'[Currency]))
+RETURN
+    SELECTCOLUMNS(
+        GENERATE(
+            __Accounts,
+            VAR __Id = LOWER('Foundry Resources'[ResourceId])
+            VAR __Projects =
+                COUNTROWS(
+                    FILTER(
+                        __Foundry,
+                        'Foundry Resources'[IsProject] = TRUE() && LOWER('Foundry Resources'[AccountId]) = __Id
+                    )
+                )
+            VAR __Cost = SUMX(FILTER(__Spend, [@Id] = __Id || LEFT([@Id], LEN(__Id) + 1) = __Id & "/"), [@Cost])
+            RETURN ROW("@Projects", __Projects + 0, "@Cost", __Cost)
+        ),
+        "Resource", 'Foundry Resources'[ResourceName],
+        "Kind", IF('Foundry Resources'[Kind] = "", 'Foundry Resources'[ResourceType], 'Foundry Resources'[Kind]),
+        "Resource Group", 'Foundry Resources'[ResourceGroup],
+        "Subscription", 'Foundry Resources'[SubscriptionId],
+        "Projects", [@Projects],
+        "Network", IF('Foundry Resources'[PublicNetwork] = TRUE(), "Public", "Private"),
+        "Cost Export", IF('Foundry Resources'[SubscriptionId] IN __Covered, "Covered", "Not covered"),
+        "Cost", [@Cost]
+    )
+ORDER BY [Cost] DESC, [Resource] ASC

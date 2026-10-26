@@ -1,0 +1,4 @@
+EVALUATE
+// The last day the audit log has Copilot Chat or agent interactions for. The
+// date table runs on past the data, so the fact table's own date is read.
+ROW("Last Date", MAX('Chat + Agent Interactions (Audit Logs)'[ActivityDate]))

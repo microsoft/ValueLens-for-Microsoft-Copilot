@@ -1,0 +1,45 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [
+    { "filter": "isValid(datum['Cost'])" },
+    { "calculate": "toDate(datum['Usage Date'])", "as": "Day" }
+  ],
+  "encoding": {
+    "x": {
+      "field": "Day",
+      "type": "temporal",
+      "title": null,
+      "axis": { "labelExpr": "timeFormat(datum.value, '%-d %b')", "labelAngle": 0, "labelOverlap": true, "tickCount": "week", "grid": false }
+    },
+    "y": {
+      "field": "Cost",
+      "type": "quantitative",
+      "stack": "zero",
+      "title": "Cost",
+      "axis": { "format": ",~f", "formatType": "number" }
+    },
+    "color": {
+      "field": "Component",
+      "type": "nominal",
+      "title": null,
+      "sort": { "field": "Component Sort", "order": "ascending" },
+      "legend": { "orient": "top", "direction": "horizontal" }
+    },
+    "order": { "field": "Component Sort", "type": "quantitative" }
+  },
+  "layer": [
+    { "mark": { "type": "area", "interpolate": "monotone", "line": false, "fillOpacity": 0.85 } },
+    {
+      "mark": { "type": "point", "filled": true, "size": 40, "opacity": 0 },
+      "encoding": {
+        "tooltip": [
+          { "field": "Day", "type": "temporal", "title": "Day", "format": "%a %d %b %Y" },
+          { "field": "Component", "type": "nominal", "title": "Component" },
+          { "field": "Cost", "type": "quantitative", "title": "Cost", "format": ",.2f" }
+        ]
+      }
+    }
+  ]
+}

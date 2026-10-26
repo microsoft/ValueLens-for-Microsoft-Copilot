@@ -1,0 +1,45 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": "container",
+  "transform": [
+    { "calculate": "datum['Thumbs Up'] + datum['Thumbs Down']", "as": "Rated" },
+    { "fold": ["Thumbs Up", "Thumbs Down"], "as": ["Feedback Type", "Count"] },
+    { "filter": "datum.Rated > 0" },
+    { "calculate": "datum.Count / datum.Rated", "as": "Share" },
+    { "calculate": "datum['Feedback Type'] === 'Thumbs Down' ? -datum.Share : datum.Share", "as": "Signed Share" }
+  ],
+  "mark": { "type": "bar", "cornerRadiusEnd": 2 },
+  "encoding": {
+    "y": {
+      "field": "Surface / Agent",
+      "type": "nominal",
+      "title": null,
+      "sort": { "field": "Satisfaction", "op": "max", "order": "descending" },
+      "axis": { "labelLimit": 220 }
+    },
+    "x": {
+      "field": "Signed Share",
+      "type": "quantitative",
+      "title": "Share of ratings: thumbs down to the left, thumbs up to the right",
+      "stack": "zero",
+      "scale": { "domain": [-1, 1] },
+      "axis": { "labelExpr": "format(abs(datum.value), '.0%')", "tickCount": 5 }
+    },
+    "color": {
+      "field": "Feedback Type",
+      "type": "nominal",
+      "title": null,
+      "sort": ["Thumbs Up", "Thumbs Down"],
+      "legend": { "orient": "top", "direction": "horizontal" }
+    },
+    "tooltip": [
+      { "field": "Surface / Agent", "type": "nominal", "title": "Surface or agent" },
+      { "field": "Feedback Type", "type": "nominal", "title": "Feedback" },
+      { "field": "Count", "type": "quantitative", "title": "Items", "format": ",.0f" },
+      { "field": "Share", "type": "quantitative", "title": "Share of ratings", "format": ".0%" },
+      { "field": "Satisfaction", "type": "quantitative", "title": "Satisfaction", "format": ".0%" },
+      { "field": "Total Feedback", "type": "quantitative", "title": "Feedback items", "format": ",.0f" }
+    ]
+  }
+}

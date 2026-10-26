@@ -611,6 +611,14 @@ export async function ensureNotebooks(ctx, opts = {}) {
   const switched = !!f.secretInNotebooks !== inNotebooks;
   // An app the user brought has a secret they paste, so the installer can't replace it.
   const rotate = !!opts.rotate && inNotebooks && !config.app.existing;
+  // Hashed with the secret placeholder, so a notebook holding the secret is still updated when a
+  // newer release changes its code. Writing it then needs a fresh secret, as a rotation does.
+  /** @param {import('../catalog.js').NotebookInfo} nb */
+  const codeHash = (nb) =>
+    createHash('sha256')
+      .update(serialiseNotebook(prepareNotebook(sources.notebooks[nb.key], notebookSettings({ ...ctx, pendingSecret: undefined }, nb))))
+      .digest('hex')
+      .slice(0, 16);
 
   /** @param {import('../catalog.js').NotebookInfo} nb */
   const stale = (nb) => {
@@ -621,6 +629,7 @@ export async function ensureNotebooks(ctx, opts = {}) {
       !!opts.force ||
       (switched && usesSecret(nb)) ||
       (rotate && usesSecret(nb)) ||
+      (inNotebooks && usesSecret(nb) && codeHash(nb) !== f.notebookHashes?.[nb.key]) ||
       (nb.key === 'uploadRouter' && routerSignature(config) !== f.deployedRouter)
     );
   };
@@ -635,9 +644,8 @@ export async function ensureNotebooks(ctx, opts = {}) {
       const content = serialiseNotebook(prepareNotebook(sources.notebooks[nb.key], notebookSettings(ctx, nb)));
       const routed = nb.key === 'uploadRouter' ? routerSignature(config) : undefined;
       // Notebooks are updated when this checkout's version differs, so running the installer again
-      // from a newer release pushes their fixes. Not those holding an inline secret: their content
-      // changes with each secret, and writing them needs a fresh one.
-      const hash = inNotebooks && usesSecret(nb) ? undefined : createHash('sha256').update(content).digest('hex').slice(0, 16);
+      // from a newer release pushes their fixes.
+      const hash = codeHash(nb);
       f.notebookHashes ??= {};
       f.notebookNames ??= {};
       let id = f.notebooks[nb.key];

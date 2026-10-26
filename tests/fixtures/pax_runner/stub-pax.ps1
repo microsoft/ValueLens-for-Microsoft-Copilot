@@ -3,7 +3,10 @@
 # writes rows the way PAX does, then picks its outputs and writes rollup-manifest.json the
 # way the real script does. Its picks don't check that a file is new, so the runner's own
 # check is what keeps an earlier run's file out. STUB_MODE picks the behaviour:
-#   (unset)       appends a row to each target, or writes a first run's files
+#   (unset)       appends a row to each target, or writes a first run's files. With
+#                 -OnlyUserInfo it writes the user directory alone, as PAX does: a
+#                 userPrincipalName column and one row, or STUB_USER_CSV's text when that's
+#                 set, with {row} as the run's row. STUB_USER_CSV=<empty> writes an empty file
 #   zero          prints PAX's zero-row lines and writes nothing
 #   stale         writes nothing
 #   users-stale   writes the interactions only
@@ -36,8 +39,8 @@ foreach ($key in $PSBoundParameters.Keys) { $bound[$key] = [string]$PSBoundParam
   secretOk = ($env:AIBV_CLIENT_SECRET -ceq 'stub-secret')
 } | ConvertTo-Json -Depth 4 -Compress | Add-Content -LiteralPath $env:STUB_PAX_LOG -Encoding utf8
 
-$mode = if ($AppendFile) { 'append' } else { 'seed' }
-$span = if ($StartDate) { "$StartDate to $EndDate" } else { "$Days days" }
+$mode = if ($OnlyUserInfo) { 'only-user-info' } elseif ($AppendFile) { 'append' } else { 'seed' }
+$span = if ($OnlyUserInfo) { 'no window' } elseif ($StartDate) { "$StartDate to $EndDate" } else { "$Days days" }
 Write-Host "Stub PAX: run $env:STUB_RUN, call $call, $span, mode $mode, behaviour $(if ($behaviour) { $behaviour } else { 'rows' })"
 
 if (-not (Test-Path -LiteralPath $WorkRoot)) { New-Item -ItemType Directory -Force -Path $WorkRoot | Out-Null }
@@ -75,12 +78,21 @@ switch ($behaviour) {
   }
   'stale' { }
   default {
-    if ($appendTarget) {
+    if ($OnlyUserInfo) {
+      $directory = Join-Path $OutDir "EntraUsers_MAClicensing_${stamp}.csv"
+      if ($env:STUB_USER_CSV -eq '<empty>') {
+        [System.IO.File]::WriteAllBytes($directory, [byte[]]@())
+      } elseif ($env:STUB_USER_CSV) {
+        [System.IO.File]::WriteAllText($directory, $env:STUB_USER_CSV.Replace('{row}', $row), [System.Text.UTF8Encoding]::new($true))
+      } else {
+        Set-Content -LiteralPath $directory -Value 'userPrincipalName', $row
+      }
+    } elseif ($appendTarget) {
       Add-Content -LiteralPath $appendTarget -Value $row
     } else {
       Set-Content -LiteralPath (Join-Path $OutDir "Purview_Stub_${stamp}_Interactions.csv") -Value 'Message_Id_Raw', $row
     }
-    if ($behaviour -ne 'users-stale') {
+    if (-not $OnlyUserInfo -and $behaviour -ne 'users-stale') {
       if ($appendUsersTarget) {
         Add-Content -LiteralPath $appendUsersTarget -Value $row
       } elseif ($IncludeUserInfo) {
@@ -91,7 +103,9 @@ switch ($behaviour) {
 }
 
 # The real script's picks, with its messages.
-if ($appendTarget) {
+if ($OnlyUserInfo) {
+  $interactions = $null
+} elseif ($appendTarget) {
   $interactions = Get-Item -LiteralPath $appendTarget -ErrorAction SilentlyContinue
   if (-not $interactions) { throw "The interactions file $appendTarget is missing after the run." }
 } else {
@@ -100,7 +114,11 @@ if ($appendTarget) {
   if (-not $interactions) { throw "No rollup interactions CSV found in $OutDir." }
 }
 $users = $null
-if ($appendUsersTarget) {
+if ($OnlyUserInfo) {
+  $users = Get-ChildItem -LiteralPath $OutDir -Filter 'EntraUsers_MAClicensing_*.csv' |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  if (-not $users) { throw "PAX wrote no user directory CSV to $OutDir this run. PAX's log there says why." }
+} elseif ($appendUsersTarget) {
   $users = Get-Item -LiteralPath $appendUsersTarget -ErrorAction SilentlyContinue
   if (-not $users) { throw "The users file $appendUsersTarget is missing after the run." }
 } elseif ($IncludeUserInfo) {
@@ -117,7 +135,7 @@ if ($IncludeAgent365Info -and $env:STUB_AGENTS -ne 'none') {
 }
 
 [ordered]@{
-  interactions_csv = $interactions.FullName
+  interactions_csv = if ($interactions) { $interactions.FullName } else { $null }
   users_csv        = if ($users) { $users.FullName } else { $null }
   agents365_csv    = if ($agents365) { $agents365.FullName } else { $null }
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutDir 'rollup-manifest.json') -Encoding utf8

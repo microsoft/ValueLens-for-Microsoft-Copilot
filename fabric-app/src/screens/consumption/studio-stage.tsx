@@ -1,0 +1,355 @@
+//-----------------------------------------------------------------------
+// <copyright company="Microsoft Corporation">
+//        Copyright (c) Microsoft Corporation.  All rights reserved.
+//        Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// </copyright>
+//-----------------------------------------------------------------------
+
+import { useMemo, useState } from "react";
+import { DataGrid, type GridColumnDef } from "@microsoft/fabric-datagrid";
+import { ChoiceMenu } from "@/components/choice-menu";
+import { ConcentrationPanel } from "@/components/concentration-panel";
+import { stageAnchor } from "@/components/destinations";
+import { NotFilteredHint } from "@/components/not-filtered-hint";
+import { KpiCard, KpiStat } from "@/components/kpi-card";
+import { Section } from "@/components/section";
+import { SegmentedControl } from "@/components/segmented-control";
+import { TruncationNote } from "@/components/truncation-note";
+import { useThemeContext } from "@/hooks/theme.context";
+import { gridHeight, rowChartHeight } from "@/lib/chart-height";
+import { readConcentration } from "@/lib/concentration";
+import { listTotal } from "@/lib/list-total";
+import { columnHeat, heatRenderer } from "@/lib/heat";
+import { readNumber, readText } from "@/lib/summary-row";
+import { formatCell } from "@/lib/tree-grid";
+import {
+    breakdownRows,
+    groupByChoices,
+    groupByFilter,
+    offeredGroupBy,
+    studioAgents,
+    studioBreakdown,
+    studioConcentration,
+    studioCreditsSummary,
+    studioDaily,
+    studioPeriodFilter,
+    studioUsers,
+    STUDIO_LABEL_COLUMN,
+    toStudioUserTree,
+    withTrendLineColor,
+    type ConsumptionLens,
+    type ConsumptionOptions,
+} from "@/queries/consumption";
+import { AzureBilledPanel } from "./azure-billed";
+import { CREDIT_CURRENCY, LENSES, moneyCell, standalone, useConsumptionSummary, useConsumptionTable } from "./data";
+import { PpacExportHowTo } from "./ppac-export-how-to";
+import { PPAC_EXPORT_TITLE, studioDailyEmpty, studioTotalsEmpty } from "./studio-empty";
+import { BREAKDOWN_COST_HEADLINE, BREAKDOWN_CREDITS_HEADLINE, STUDIO_COST_HEADLINE, STUDIO_CREDITS_HEADLINE } from "./headlines";
+import { ChartPanel, KpiRowState, NoteCard, Panel, RollupGrid, type TreeColumn } from "@/components/report-panels";
+
+const KPI_GRID = "grid gap-300 md:grid-cols-2 xl:grid-cols-5";
+const money = moneyCell(CREDIT_CURRENCY);
+const BREAKDOWN_CHART = { perRow: 36, chrome: 130, min: 220 };
+// A label on each of ~90 daily bars can't fit; the tooltip carries the numbers.
+const NO_STACK_LABELS = { disableStackedDataLabels: true };
+
+// Each width fits its header beside the sort arrow, and Billing policy fits a
+// typical policy name on one line, so the agents and users tables both fit
+// side by side from 1,536 px.
+const CONSUMPTION_COLUMNS: readonly TreeColumn[] = [
+    { id: "Credits Used", header: "Credits used", width: 120, format: formatCell("whole"), heat: true },
+    { id: "Credit Share", header: "Share", width: 84, format: formatCell("percent") },
+    { id: "Policy", header: "Billing policy", width: 160 },
+];
+
+const COST_COLUMNS: readonly TreeColumn[] = [
+    { id: "Billable Credits", header: "Billable credits", width: 132, format: formatCell("whole") },
+    { id: "Estimated Cost", header: "Estimated cost", width: 132, format: money, heat: true },
+];
+
+/** The model's own "all days" period, which is what the page shows before anyone picks one. */
+function defaultStudioPeriod(periods: readonly string[]): string | undefined {
+    return periods.find((period) => /^all\b/i.test(period)) ?? periods[periods.length - 1];
+}
+
+interface StudioStageProps {
+    options: ConsumptionOptions | undefined;
+    rates: string | undefined;
+}
+
+/**
+ * The report's two Copilot Studio pages as one stage. Tenant totals follow
+ * the period; the per-agent and per-user tables are a month-to-date snapshot
+ * (a PPAC export, or the licensing API flow's rollup), as the report's own note says.
+ */
+export function StudioStage({ options, rates }: StudioStageProps) {
+    const { theme } = useThemeContext();
+    const [lens, setLens] = useState<ConsumptionLens>("consumption");
+    const [period, setPeriod] = useState<string>();
+    const [chosenGroupBy, setGroupBy] = useState<string>();
+
+    const periods = useMemo(() => options?.studioPeriods ?? [], [options?.studioPeriods]);
+    const allPeriods = defaultStudioPeriod(periods);
+    const groupChoices = useMemo(() => groupByChoices(options?.groupBy ?? [], "Studio"), [options?.groupBy]);
+    const groupBy = offeredGroupBy(groupChoices, chosenGroupBy);
+
+    const extra = useMemo(
+        () => [groupByFilter(groupBy), ...(period ? [studioPeriodFilter(period)] : [])],
+        [groupBy, period],
+    );
+
+    const summary = useConsumptionSummary(studioCreditsSummary(), extra);
+    const dailySource = studioDaily(lens);
+    const daily = useConsumptionTable(dailySource, extra);
+    const dailySpec = useMemo(
+        () => withTrendLineColor(dailySource.vegaLiteSpec, theme.foreground),
+        [dailySource.vegaLiteSpec, theme.foreground],
+    );
+    const breakdownSource = studioBreakdown(lens);
+    const breakdown = useConsumptionTable(breakdownSource, extra);
+    const agents = useConsumptionTable(studioAgents(), extra);
+    const users = useConsumptionTable(studioUsers(), extra);
+    const spread = useConsumptionTable(studioConcentration(), extra);
+    const spreadSummary = useMemo(() => readConcentration(spread.table), [spread.table]);
+    const hasUserCredits = (spreadSummary?.people ?? 0) > 0;
+    const totalsEmpty = studioTotalsEmpty(hasUserCredits);
+    const dailyEmpty = studioDailyEmpty(hasUserCredits);
+
+    const row = summary.row;
+    const cost = lens === "cost";
+    // Studio users only group once they can be matched to the org directory.
+    const matchRate = readNumber(row, "[Org Match Rate]") ?? 0;
+    const canGroup = matchRate > 0 && groupChoices.length > 0;
+    const groupLabel = groupChoices.find((choice) => choice.value === groupBy)?.label;
+
+    const models = useMemo(() => (breakdown.table ? breakdownRows(breakdown.table, "Model") : undefined), [breakdown.table]);
+    const features = useMemo(() => (breakdown.table ? breakdownRows(breakdown.table, "Feature") : undefined), [breakdown.table]);
+
+    const agentColumns: GridColumnDef[] = useMemo(() => {
+        const table = agents.table;
+        return cost
+            ? [
+                  { id: "Agent", header: "Agent", width: 232 },
+                  { id: "Billable Credits", header: "Billable credits", width: 132, numericStyling: true, cellRenderer: formatCell("whole") },
+                  {
+                      id: "Estimated Cost",
+                      header: "Estimated cost",
+                      width: 132,
+                      numericStyling: true,
+                      cellRenderer: heatRenderer({ domain: columnHeat(table, "Estimated Cost"), format: money }),
+                  },
+              ]
+            : [
+                  { id: "Agent", header: "Agent", width: 232 },
+                  {
+                      id: "Credits Used",
+                      header: "Credits used",
+                      width: 120,
+                      numericStyling: true,
+                      cellRenderer: heatRenderer({ domain: columnHeat(table, "Credits Used"), format: formatCell("whole") }),
+                  },
+                  { id: "Credit Share", header: "Share", width: 84, numericStyling: true, cellRenderer: formatCell("percent") },
+              ];
+    }, [agents.table, cost]);
+
+    const breakdownHeight = rowChartHeight(Math.max(models?.rows.length ?? 3, features?.rows.length ?? 3), BREAKDOWN_CHART);
+
+    return (
+        <Section
+            id={stageAnchor("studio-credits")}
+            title="Copilot Studio"
+            description={
+                cost
+                    ? "What agents cost: prepaid capacity, pay-as-you-go and the rate they blend to."
+                    : "Who is using agents, and how many credits they consume."
+            }
+            actions={
+                <div className="flex flex-wrap items-center gap-200">
+                    {periods.length > 1 && allPeriods && (
+                        <ChoiceMenu
+                            label="Period"
+                            allLabel={allPeriods}
+                            choices={periods.filter((value) => value !== allPeriods).map((value) => ({ value, label: value }))}
+                            value={period}
+                            onChange={setPeriod}
+                        />
+                    )}
+                    {canGroup && (
+                        <ChoiceMenu
+                            label="Group by"
+                            allLabel="All users"
+                            choices={groupChoices}
+                            value={groupBy}
+                            onChange={setGroupBy}
+                        />
+                    )}
+                    <SegmentedControl label="Copilot Studio view" options={LENSES} value={lens} onChange={setLens} />
+                </div>
+            }
+        >
+            <NotFilteredHint from={[summary.notFilteredBy, daily.notFilteredBy, breakdown.notFilteredBy, agents.notFilteredBy, users.notFilteredBy]} />
+            <KpiRowState
+                summary={summary}
+                count={5}
+                className={KPI_GRID}
+                emptyTitle={totalsEmpty.title}
+                emptyDescription={totalsEmpty.description}
+            >
+                {cost ? (
+                    <>
+                        <KpiCard
+                            label="Total cost"
+                            value={readNumber(row, "[Total Cost]")}
+                            format="money"
+                            prefix={CREDIT_CURRENCY}
+                            emphasis
+                            detail={
+                                <div className="flex flex-col gap-100">
+                                    <KpiStat label="Prepaid" value={readNumber(row, "[Prepaid Cost]")} format="money" prefix={CREDIT_CURRENCY} />
+                                    <KpiStat label="Pay-as-you-go" value={readNumber(row, "[PAYG Cost]")} format="money" prefix={CREDIT_CURRENCY} />
+                                </div>
+                            }
+                        />
+                        <KpiCard label="Pay-as-you-go share" value={readNumber(row, "[PAYG Share]")} format="percent" />
+                        <KpiCard
+                            label="Effective rate"
+                            value={readNumber(row, "[Effective Rate]")}
+                            format="price"
+                            prefix={CREDIT_CURRENCY}
+                            detail="Per credit, prepaid and pay-as-you-go together"
+                        />
+                        <KpiCard
+                            label="Cost per user"
+                            value={readNumber(row, "[Avg Cost Per User]")}
+                            format="money"
+                            prefix={CREDIT_CURRENCY}
+                        />
+                        <KpiCard label="Credits consumed" value={readNumber(row, "[Credits Consumed]")} />
+                    </>
+                ) : (
+                    <>
+                        <KpiCard
+                            label="Credits consumed"
+                            value={readNumber(row, "[Credits Consumed]")}
+                            emphasis
+                            detail={standalone(readText(row, "[Period Label]"))}
+                        />
+                        <KpiCard label="Active users" value={readNumber(row, "[Active Users]")} />
+                        <KpiCard label="Agents with credits" value={readNumber(row, "[Agents With Credits]")} />
+                        <KpiCard label="Credits per user" value={readNumber(row, "[Avg Credits Per User]")} />
+                        <KpiCard label="Agents per user" value={readNumber(row, "[Avg Agents Per User]")} format="rate" />
+                    </>
+                )}
+            </KpiRowState>
+
+            <div className="grid grid-cols-1 gap-500 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <ChartPanel
+                    result={daily}
+                    spec={dailySpec}
+                    capabilities={NO_STACK_LABELS}
+                    height={340}
+                    title={cost ? "Cost over time" : "Consumption over time"}
+                    headline={cost ? STUDIO_COST_HEADLINE : STUDIO_CREDITS_HEADLINE}
+                    subtitle={
+                        cost
+                            ? "Tenant cost each day, prepaid then pay-as-you-go. The line is the 7-day average."
+                            : "Tenant credits each day, prepaid then pay-as-you-go. The line is the 7-day average."
+                    }
+                    emptyTitle={dailyEmpty.title}
+                    emptyDescription={dailyEmpty.description}
+                />
+                <NoteCard
+                    title="About these figures"
+                    notes={[
+                        { term: "Billing period", text: readText(row, "[Billing Period]") },
+                        { term: "Concentration", text: readText(row, "[Concentration]") },
+                        { term: "User snapshot", text: readText(row, "[Snapshot Note]") },
+                        { term: "Group by", text: canGroup ? undefined : readText(row, "[Org Filter Status]") },
+                        { term: "Rates in use", text: rates },
+                    ]}
+                />
+            </div>
+
+            <AzureBilledPanel lens={lens} extra={extra} />
+
+            <div className="grid grid-cols-1 gap-500 md:grid-cols-2">
+                <ChartPanel
+                    result={breakdown}
+                    table={models}
+                    spec={breakdownSource.vegaLiteSpec}
+                    height={breakdownHeight}
+                    title={cost ? "Cost by model" : "Consumption by model"}
+                    headline={cost ? BREAKDOWN_COST_HEADLINE : BREAKDOWN_CREDITS_HEADLINE}
+                    subtitle="The model behind each agent's credits"
+                    emptyTitle={PPAC_EXPORT_TITLE}
+                    emptyDescription={<PpacExportHowTo what="model" />}
+                />
+                <ChartPanel
+                    result={breakdown}
+                    table={features}
+                    spec={breakdownSource.vegaLiteSpec}
+                    height={breakdownHeight}
+                    title={cost ? "Cost by feature" : "Consumption by feature"}
+                    headline={cost ? BREAKDOWN_COST_HEADLINE : BREAKDOWN_CREDITS_HEADLINE}
+                    subtitle="The billable feature each credit was spent on"
+                    emptyTitle={PPAC_EXPORT_TITLE}
+                    emptyDescription={<PpacExportHowTo what="feature" />}
+                />
+            </div>
+
+            {/* The users table is the wider of the two, so it takes a little more of the row. */}
+            <div className="grid grid-cols-1 items-start gap-500 2xl:grid-cols-[minmax(0,6fr)_minmax(0,7fr)]">
+                <div className="flex flex-col gap-200">
+                    <Panel
+                        result={agents}
+                        height={gridHeight(agents.table?.rows.length ?? 6)}
+                        emptyTitle="No agents in the snapshot"
+                        emptyDescription="The user snapshot has no agents with credits."
+                    >
+                        {(table) => (
+                            <DataGrid
+                                key={lens}
+                                columns={agentColumns}
+                                data={table}
+                                theme={theme}
+                                header={{
+                                    title: cost ? "Agents — estimated cost" : "Agents in the user snapshot",
+                                    subtitle: cost ? "Billable credits and what they cost" : "Credits and each agent's share of them",
+                                }}
+                            />
+                        )}
+                    </Panel>
+                    {agents.table && !agents.isLoading && agents.error === undefined && (
+                        <TruncationNote shown={agents.table.rows.length} total={listTotal(agents.table)} noun="agents" by="by credits" />
+                    )}
+                </div>
+                <RollupGrid
+                    result={users}
+                    toTree={toStudioUserTree}
+                    labelColumn={STUDIO_LABEL_COLUMN}
+                    labelHeader={`${groupLabel ?? "Group"} / user`}
+                    labelWidth={216}
+                    columns={cost ? COST_COLUMNS : CONSUMPTION_COLUMNS}
+                    variant={lens}
+                    title={cost ? "Users — estimated cost" : "Top users by consumption"}
+                    subtitle="From the user snapshot, largest first"
+                    emptyTitle="No users in the snapshot"
+                    emptyDescription="The user snapshot has no one with Copilot Studio credits."
+                    truncation={{ noun: "user", by: "by credits" }}
+                />
+            </div>
+
+            <div className="max-w-[960px]">
+                <ConcentrationPanel
+                    result={spread}
+                    summary={spreadSummary}
+                    noun="credits"
+                    title="How concentrated credits are"
+                    subtitle="Each user's share of credits, busiest first, from the month-to-date user snapshot"
+                    emptyTitle="No users in the snapshot"
+                    emptyDescription="The user snapshot has no one with Copilot Studio credits."
+                />
+            </div>
+        </Section>
+    );
+}

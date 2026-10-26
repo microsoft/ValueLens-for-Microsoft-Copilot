@@ -1,0 +1,36 @@
+DEFINE
+    // Cowork's credits over the selected dates, counted as the model's
+    // Reporting Cowork Cost counts them, then priced as the Cowork section
+    // prices them: up to the Capacity Pack balance at the prepaid rate, the
+    // rest at pay-as-you-go. The pack applies to the credits in these dates.
+    MEASURE 'Settings'[ValueLens Cowork Window Credits] =
+        VAR Lo = [Reporting Start]
+        VAR Hi = [Reporting End]
+        RETURN
+            CALCULATE(
+                SUM('CreditsWeekly'[CreditsUsed]),
+                REMOVEFILTERS('Date'),
+                KEEPFILTERS(
+                    FILTER(
+                        ALL('CreditsWeekly'[MetricDate]),
+                        'CreditsWeekly'[MetricDate] >= Lo && 'CreditsWeekly'[MetricDate] <= Hi
+                    )
+                )
+            )
+    MEASURE 'Settings'[ValueLens Cowork Window Prepaid] =
+        VAR Used = [ValueLens Cowork Window Credits]
+        RETURN IF(NOT ISBLANK(Used), MIN(Used, [Cowork Capacity Pack Balance Value]))
+    MEASURE 'Settings'[ValueLens Cowork Window Cost] =
+        VAR Used = [ValueLens Cowork Window Credits]
+        VAR Prepaid = [ValueLens Cowork Window Prepaid]
+        RETURN
+            IF(
+                NOT ISBLANK(Used),
+                Prepaid * [Cowork Prepaid Rate Value] + (Used - Prepaid) * [Cowork PAYG Rate Value]
+            )
+EVALUATE
+ROW(
+    "Credits", [ValueLens Cowork Window Credits],
+    "Prepaid Credits", [ValueLens Cowork Window Prepaid],
+    "Cost", [ValueLens Cowork Window Cost]
+)

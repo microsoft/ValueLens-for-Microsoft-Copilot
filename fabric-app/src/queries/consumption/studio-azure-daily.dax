@@ -1,0 +1,26 @@
+// Each day's Copilot pay-as-you-go billed in Azure, by product, over the
+// same window as studio-azure-billing.dax.
+EVALUATE
+VAR WindowDays = [Studio Period Days]
+VAR AzureLast = CALCULATE(MAX('CopilotPaygSpend'[UsageDate]), REMOVEFILTERS('CopilotPaygSpend'))
+VAR ExportLast = CALCULATE(MAX('Credit Consumption (Tenant)'[Usage_Date]), REMOVEFILTERS('Credit Consumption (Tenant)'))
+VAR Hi = IF(WindowDays = 0, AzureLast, COALESCE(ExportLast, AzureLast))
+VAR Lo = IF(WindowDays = 0, CALCULATE(MIN('CopilotPaygSpend'[UsageDate]), REMOVEFILTERS('CopilotPaygSpend')), Hi - WindowDays + 1)
+VAR Billed = FILTER(ALL('CopilotPaygSpend'), 'CopilotPaygSpend'[UsageDate] >= Lo && 'CopilotPaygSpend'[UsageDate] <= Hi)
+RETURN
+SELECTCOLUMNS(
+    FILTER(
+        ADDCOLUMNS(
+            SUMMARIZE(Billed, 'CopilotPaygSpend'[UsageDate], 'CopilotPaygSpend'[Product]),
+            "@Cost", CALCULATE(SUM('CopilotPaygSpend'[Cost])),
+            "@Credits", CALCULATE(SUM('CopilotPaygSpend'[UsageQuantity]), CONTAINSSTRING('CopilotPaygSpend'[Meter], "Copilot Credit"))
+        ),
+        NOT ISBLANK([@Cost])
+    ),
+    "Usage Date", 'CopilotPaygSpend'[UsageDate],
+    "Product", 'CopilotPaygSpend'[Product],
+    "Product Sort", SWITCH('CopilotPaygSpend'[Product], "Copilot Studio", 1, "Cowork", 2, 3),
+    "Cost", [@Cost],
+    "Credits", [@Credits]
+)
+ORDER BY [Usage Date] ASC, [Product Sort] ASC

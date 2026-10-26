@@ -540,6 +540,7 @@ test('pax local: refreshConfig fills refresh.json from the install record and pr
   const cfg = refreshConfig(paxConfig());
   assert.deepEqual(cfg, {
     schema: 1,
+    mode: 'audit',
     product: PRODUCT.name,
     tenantId: TENANT,
     clientId: APP_ID,
@@ -877,6 +878,15 @@ test('pax local: runRefresh runs the refresh in this window, with -Days when ask
   assert.deepEqual(options, [{ timeoutMs: RUN_LIMIT_MS }, { timeoutMs: RUN_LIMIT_MS }, { timeoutMs: 5_000 }]);
   assert.deepEqual(f.refreshes, [{ days: 7 }, {}, { days: 180 }]);
   assert.equal(readState(f.host)?.lastResult, 'success');
+});
+
+test('pax local: runRefresh passes -AcceptDrop only when asked', async (t) => {
+  const f = pc(t);
+  const { config } = paxPaths(f.host);
+  await runRefresh(f.host, { acceptDrop: true });
+  await runRefresh(f.host, { acceptDrop: false });
+  assert.deepEqual(f.calls.map((c) => c.args.slice(4)), [['-Config', config, '-AcceptDrop'], ['-Config', config]]);
+  assert.deepEqual(f.refreshes, [{ acceptDrop: true }, {}]);
 });
 
 test('pax local: runRefresh refuses days refresh.ps1 would refuse, without running it', async (t) => {

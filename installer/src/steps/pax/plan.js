@@ -16,7 +16,7 @@ import { accessReview, planAccess, VIEWER_GROUP_NAME } from '../access.js';
 import { askAdvanced, asksAdvanced } from '../advanced.js';
 import { foreignInstall, foreignWorkspaceMessage } from '../fabric.js';
 import { askAppId, askMoreHistory, blockedSettings, HISTORY_CHOICES, keepAwake, planAdminPack, PRICING, reloadLine, uniqueName, validateTime } from '../plan.js';
-import { checkHost, paxHostOf, PAX_RELEASE, secretStored, SEED_DAYS, TASK_AT } from './local.js';
+import { checkHost, paxHostOf, PAX_RELEASE, secretStored, SEED_DAYS, TASK_AT, userInfoMode } from './local.js';
 import { refreshTimes, workspaceItems } from './publish.js';
 import { describeFolder, folderConfig, folderValidator, parseSharePointFolder, SITE_ADMIN } from './site.js';
 
@@ -42,7 +42,8 @@ const LOCAL_FOLDER = `%LOCALAPPDATA%\\${PRODUCT.home}\\${PRODUCT.pax.folder}`;
  * What the refresh collects, one label each.
  * @param {InstallConfig} config
  */
-export const paxCollectedLabels = (config) => ['Copilot interactions', 'users', ...(config.pax?.agent365 ? ['Agent 365'] : [])];
+export const paxCollectedLabels = (config) =>
+  userInfoMode() ? ['users and their departments, as the org file'] : ['Copilot interactions', 'users', ...(config.pax?.agent365 ? ['Agent 365'] : [])];
 
 /**
  * What the refresh collects, in words.
@@ -204,11 +205,18 @@ export async function paxPlan(ctx, pre, section) {
 
   if (editing('data')) {
     ui.heading('What it collects');
-    ui.info(`Copilot interactions, from the Purview audit log, and users, from Entra ID. PAX (the Portable Audit eXporter) reads them on this PC each day.`);
-    if (!section) await askAdvanced(ctx, 'the Agent 365 file, who can view, the new workspace\'s name, the first load\'s history and when the refresh runs');
-    if (advanced()) {
-      ui.note(`The Agent 365 file lists your tenant's agents. It needs two more Microsoft Graph permissions: ${PAX_AGENT365_PERMISSIONS.join(' and ')}.`);
-      pax.agent365 = await ui.confirm('Also collect the Agent 365 file?', !!pax.agent365);
+    if (userInfoMode()) {
+      ui.info(
+        `The org file, ${PRODUCT.pax.files.users}: your users and their departments, from Entra ID. PAX (the Portable Audit eXporter) reads them on this PC each day, and each run replaces the file whole. The report reads the rest through its own connectors.`,
+      );
+      if (!section) await askAdvanced(ctx, 'who can view, the new workspace\'s name and when the refresh runs');
+    } else {
+      ui.info(`Copilot interactions, from the Purview audit log, and users, from Entra ID. PAX (the Portable Audit eXporter) reads them on this PC each day.`);
+      if (!section) await askAdvanced(ctx, 'the Agent 365 file, who can view, the new workspace\'s name, the first load\'s history and when the refresh runs');
+      if (advanced()) {
+        ui.note(`The Agent 365 file lists your tenant's agents. It needs two more Microsoft Graph permissions: ${PAX_AGENT365_PERMISSIONS.join(' and ')}.`);
+        pax.agent365 = await ui.confirm('Also collect the Agent 365 file?', !!pax.agent365);
+      }
     }
   }
 
@@ -290,10 +298,13 @@ export async function paxPlan(ctx, pre, section) {
   if (editing('schedule')) {
     const task = (pax.task ??= { name: PRODUCT.pax.task, at: TASK_AT });
     const started = !!(task.registeredAt || pax.firstRun);
-    if (!started) {
+    if (userInfoMode()) {
+      // Each run replaces the org file whole, so there's no history to load or reload.
+      delete ctx.reloadHistoryDays;
+    } else if (!started) {
       delete ctx.reloadHistoryDays;
       pax.seedDays = advanced() ? await ui.select('How much audit history should the first load pull?', HISTORY_CHOICES, pax.seedDays ?? SEED_DAYS) : pax.seedDays ?? SEED_DAYS;
-      config.history.days = pax.seedDays;
+      config.history = { ...config.history, days: pax.seedDays };
     } else {
       await askMoreHistory(
         ctx,
@@ -332,6 +343,8 @@ export function paxPlanReview(ctx, pre) {
   const model = sm.name && sm.name !== MODEL_NAME ? sm.name : PRODUCT.pax.model;
   const access = accessReview(config, `Semantic model ${model} in workspace ${workspace}`);
   const group = config.access ? `${config.access.groupName ?? VIEWER_GROUP_NAME} (group)` : undefined;
+  const userInfo = userInfoMode();
+  const orgFile = PRODUCT.pax.files.users;
 
   /** @type {ReviewItem[]} */
   const creates = [
@@ -355,8 +368,22 @@ export function paxPlanReview(ctx, pre) {
         : 'Kept in Windows Credential Manager on this PC, for your account only. Repair replaces it before it expires.',
     },
     { kind: 'PAX', name: `PAX ${PAX_RELEASE.tag}`, isNew: pax.version !== PAX_RELEASE.tag, detail: `The refresh downloads it from GitHub into ${LOCAL_FOLDER} and checks its SHA-256 before running it.` },
-    { kind: 'Scheduled task', name: task.name, isNew: !task.registeredAt, detail: `Daily at ${task.at} on this PC, as you. Runs PAX, then uploads its files to the SharePoint folder.` },
-    { kind: 'SharePoint folder', name: sp ? describeFolder(sp) : 'not chosen', isNew: false, detail: 'Yours. Made if it\'s missing. The refresh keeps its CSV files here.' },
+    {
+      kind: 'Scheduled task',
+      name: task.name,
+      isNew: !task.registeredAt,
+      detail: userInfo
+        ? `Daily at ${task.at} on this PC, as you. Runs PAX for the user directory, then replaces ${orgFile} in the SharePoint folder.`
+        : `Daily at ${task.at} on this PC, as you. Runs PAX, then uploads its files to the SharePoint folder.`,
+    },
+    {
+      kind: 'SharePoint folder',
+      name: sp ? describeFolder(sp) : 'not chosen',
+      isNew: false,
+      detail: userInfo
+        ? `Yours. Made if it's missing. The refresh keeps the org file, ${orgFile}, at its top, and replaces it whole each run.`
+        : 'Yours. Made if it\'s missing. The refresh keeps its CSV files here.',
+    },
   ];
   if (sm.enabled) {
     creates.push(
@@ -408,7 +435,13 @@ export function paxPlanReview(ctx, pre) {
   ];
   if (sm.enabled) runsOn.push({ what: 'Semantic model and report', where: `Power BI workspace ${workspace}` });
   if (app) runsOn.push({ what: THE_APP, where: 'Copilot managed apps, in a Power Platform environment', detail: 'Your developer environment, unless you pass --environment-id.' });
-  if (ctx.runFirstLoad) runsOn.push({ what: 'First load', where: `${pax.seedDays ?? SEED_DAYS} days of audit history, straight after setup`, detail: 'One PAX run on this PC. It takes hours on a large tenant.' });
+  if (ctx.runFirstLoad) {
+    runsOn.push(
+      userInfo
+        ? { what: 'First load', where: 'The org file, straight after setup', detail: 'One PAX run on this PC.' }
+        : { what: 'First load', where: `${pax.seedDays ?? SEED_DAYS} days of audit history, straight after setup`, detail: 'One PAX run on this PC. It takes hours on a large tenant.' },
+    );
+  }
   if (ctx.reloadHistoryDays) runsOn.push({ what: 'History reload', where: reloadLine(ctx.reloadHistoryDays), detail: 'One PAX run on this PC that adds what the files are missing.' });
 
   /** @type {ReviewCost[]} */
@@ -440,7 +473,7 @@ export async function confirmPaxPlan(ctx, pre) {
     ui.info(`Power BI:    ${sm.name ?? PRODUCT.pax.model} in ${f.workspaceName ?? f.workspaceId ?? PRODUCT.pax.workspace} ${f.workspaceId ? '' : c.dim('(new workspace)')}`.trimEnd());
   }
   ui.info(`App:         ${paxAppWanted(ctx) ? `${APP_NAME} ${config.managedApp?.appId ? '' : isNew}`.trimEnd() : c.dim('not deployed')}`);
-  if (ctx.runFirstLoad) ui.info(`First load:  ${config.pax?.seedDays ?? SEED_DAYS} days of history, straight after setup`);
+  if (ctx.runFirstLoad) ui.info(`First load:  ${userInfoMode() ? 'the org file' : `${config.pax?.seedDays ?? SEED_DAYS} days of history`}, straight after setup`);
   if (ctx.reloadHistoryDays) ui.info(`History:     ${reloadLine(ctx.reloadHistoryDays)}`);
   ui.review(paxPlanReview(ctx, pre));
   ui.note(keepAwake());

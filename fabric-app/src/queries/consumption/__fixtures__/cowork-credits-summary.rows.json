@@ -1,0 +1,19 @@
+[
+  {
+    "[Credits Used]": 710415,
+    "[Consuming Users]": 150,
+    "[Weekly Active Users]": 150,
+    "[Avg Credits Per User]": 4736.1,
+    "[Allowance Used]": 0.5263584896853252,
+    "[Users Over Limit]": 0.16,
+    "[Policies]": 3,
+    "[Total Cost]": 6085.818,
+    "[Prepaid Cost]": 1850,
+    "[PAYG Cost]": 4235.818,
+    "[Blended Rate]": 0.008566567428897194,
+    "[Avg Cost Per User]": 40.57212,
+    "[Policy Headroom]": 5614585,
+    "[Billing Basis]": "Capacity Packs, then pay-as-you-go",
+    "[Period Label]": "the current billing period"
+  }
+]

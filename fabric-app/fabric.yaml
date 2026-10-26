@@ -1,0 +1,13 @@
+# Placeholders for local builds and tests. At deploy time scripts/deploy.mjs finds the models in
+# the target workspace and writes public/fabric.config.json, which the app reads instead (see README).
+# IDs are in each model's URL: app.powerbi.com/groups/<workspaceId>/datasets/<itemId>/
+activeProfile: default
+profiles:
+  default:
+    semanticModels:
+      vl:
+        workspaceId: "<ValueLens workspace ID>"
+        itemId: "<ValueLens semantic model ID>"
+      cc:
+        workspaceId: "<Consumption Central workspace ID>"
+        itemId: "<Consumption Central semantic model ID>"

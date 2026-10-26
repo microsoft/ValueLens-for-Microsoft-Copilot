@@ -1,0 +1,44 @@
+// The filter bar's choices on an install with Consumption Central alone, in
+// the same Kind / Value rows as filter-options.dax: the agents it bills for
+// and the dates it has credits or spend for. 'Reporting Date' runs on past
+// the data, so each fact table's own date is read; MINX and MAXX skip a
+// source with no rows.
+EVALUATE
+UNION(
+    SELECTCOLUMNS(
+        FILTER(VALUES('Agent Bridge'[Agent Name]), LEN(TRIM('Agent Bridge'[Agent Name])) > 0),
+        "Kind", "agentName",
+        "Value", 'Agent Bridge'[Agent Name]
+    ),
+    ROW(
+        "Kind", "firstDate",
+        "Value", FORMAT(
+            MINX(
+                {
+                    MIN(CreditsWeekly[MetricDate]),
+                    MIN('Credit Consumption (Tenant)'[Usage_Date]),
+                    MIN('AzureSolutionSpend'[UsageDate]),
+                    MIN('AzureAiSpend'[UsageDate])
+                },
+                [Value]
+            ),
+            "yyyy-MM-dd"
+        )
+    ),
+    ROW(
+        "Kind", "lastDate",
+        "Value", FORMAT(
+            MAXX(
+                {
+                    MAX(CreditsWeekly[MetricDate]),
+                    MAX('Credit Consumption (Tenant)'[Usage_Date]),
+                    MAX('AzureSolutionSpend'[UsageDate]),
+                    MAX('AzureAiSpend'[UsageDate])
+                },
+                [Value]
+            ),
+            "yyyy-MM-dd"
+        )
+    )
+)
+ORDER BY [Kind], [Value]

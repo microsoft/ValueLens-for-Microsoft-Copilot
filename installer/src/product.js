@@ -95,6 +95,12 @@ export const PRODUCT = deepFreeze({
     folder: 'pax',
     /** Windows Credential Manager target for the PAX app's secret, followed by the tenant ID. */
     credentialPrefix: 'PAX-ValueLens-',
+    /**
+     * What the refresh asks PAX for. `audit`: Copilot interactions, the user directory and the
+     * Agent 365 registry. `userInfo`: the user directory only, one whole snapshot each run,
+     * replaced whole.
+     */
+    mode: /** @type {'audit' | 'userInfo'} */ ('audit'),
     /** The Power BI workspace the SharePoint report is published to. */
     workspace: 'ValueLens',
     /**

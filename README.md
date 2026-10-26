@@ -1,209 +1,143 @@
-# ValueLens for Microsoft Copilot
+<div align="center">
 
-Shows how your organisation uses Microsoft 365 Copilot and agents, and the hours and value they
-deliver. Use it as an app (preview) or as a Power BI report.
+<br>
+
+# 🔍 ValueLens for Microsoft Copilot
+
+**The hours and value Microsoft 365 Copilot and agents deliver, as an app or a Power BI report.**
+
+<br>
+
+All reports and guides can be found on the [Analytics Hub](https://microsoft.github.io/Analytics-Hub/).
 
 **Also see [Analytics Hub for Microsoft Copilot](https://github.com/microsoft/AnalyticsHub-Dashboard):**
 one installer sets up an app on Microsoft Fabric or Azure that shows Copilot and agent adoption,
 value, consumption and governance in one place. It includes the ValueLens report.
 
-![ValueLens preview](Images/ValueLens-Preview.gif)
+<br>
 
-> **This isn't the official Copilot report, and you're responsible for the data it extracts.**
-> Read the [disclaimer](#disclaimer) first.
+**Found this useful? ⭐ Star this repo to help others discover it!**
 
-**▶ [Watch the demo](https://youtu.be/P0uHJb13ZR0)**: what the dashboard measures, page by page (2m 4s).
+<br>
 
-1. [Start here: the app](#start-here-the-app-preview)
-2. [Where your data comes from](#where-your-data-comes-from)
-3. [The Power BI report](#the-power-bi-report)
-4. [The Fabric App (alternative)](#the-fabric-app-alternative)
-5. [Archived](#archived)
+**[Before you start ↓](#before-you-start)** &nbsp;·&nbsp; **[Choose your path ↓](#choose-your-path)** &nbsp;·&nbsp; **[After setup ↓](#after-setup)** &nbsp;·&nbsp; **[Watch the demo ↗](https://youtu.be/P0uHJb13ZR0)**
 
-<a id="app-edition-preview"></a>
+<br>
 
-## Start here: the app (preview)
+</div>
 
-The app is the ValueLens dashboard as a web app. It keeps every measure, chart and table from the
-report, with the DAX ported to TypeScript, and groups them into seven tabs that are easier to
-navigate. It reads the CSV files that every [data path](#where-your-data-comes-from) can produce,
-and works out every number in the viewer's browser, so the data never leaves their PC. It runs on
-Copilot Managed Runtime, which is in preview.
+<table>
+<tr>
+<th width="50%">The app</th>
+<th width="50%">The Power BI report</th>
+</tr>
+<tr>
+<td><img src="Images/ValueLens-App-Preview.gif" alt="The ValueLens app cycling through its Adoption, Habits, Agents, Value, Fit, Readiness and Feedback tabs, showing the built-in sample data"></td>
+<td><img src="Images/ValueLens-Preview.gif" alt="The ValueLens Power BI report cycling through its pages, showing sample data"></td>
+</tr>
+</table>
 
-**Have a look first:** open [`app/download/ValueLens-App.html`](app/download/ValueLens-App.html),
-choose **Download raw file**, and open the file in Edge or Chrome. It works offline and opens with a
-labelled synthetic sample, with nothing to install. Choose **Change data** to load your own CSVs.
-
-### Deploy the app
-
-You deploy it once, from a copy of this repo, with Microsoft's `ms` command-line tool. Deploying
-doesn't need a licence; opening the app does (step 2).
-
-1. **An admin allows apps from the command line.** A Global Administrator or Power Platform
-   Administrator opens the [Power Platform admin center](https://admin.powerplatform.microsoft.com),
-   goes to **Copilot** > **Settings** > **Managed apps**, and turns on both of these settings for
-   the environment you'll deploy to, or for its environment group. Both are off by default.
-   - **Allow app creation with the Copilot Managed Runtime command line interface (CLI)**
-   - **External artifacts in managed apps**, because the app is built on your PC and then uploaded
-
-   Unless you choose another environment in step 5, the `ms` tool uses your personal developer
-   environment. See
-   [Control whether apps can be created using the CLI](https://learn.microsoft.com/microsoft-365/admin/manage/apps/governance#control-whether-apps-can-be-created-using-the-cli).
-
-2. **Check that viewers have a licence.** Everyone who opens the app needs a **Power Apps Premium**
-   licence or **Copilot Credits**. The Power Apps rights included with Microsoft 365 don't count,
-   and nobody needs a Microsoft 365 Copilot licence for it. To use Copilot Credits, an admin turns
-   on usage-based billing in the [Microsoft 365 admin center](https://admin.microsoft.com) and adds
-   the viewers to a spending policy for managed apps. Each call the app makes, such as opening it,
-   uses 0.1 credits. During the preview, someone with neither gets a warning, then is blocked after
-   20 operations or five minutes. See the
-   [licensing FAQ](https://learn.microsoft.com/microsoft-365/admin/manage/apps/licensing-faq).
-
-3. **Install the tools:** [Node.js](https://nodejs.org/) 24.11 or later,
-   [Git](https://git-scm.com/downloads) and the `ms` tool. These steps were checked with version
-   0.29.0 of the `ms` tool, so install that one:
-
-   ```powershell
-   npm install -g @microsoft/managed-apps-cli@0.29.0
-   ms --version
-   ```
-
-   If PowerShell says running scripts is disabled, add `.cmd` to the tool's name (`npm.cmd`,
-   `ms.cmd`) here and in the steps below.
-
-4. **Sign in** to the tenant your viewers use. A browser opens. If you can't use a browser on this
-   PC, run `ms auth login --device-code` instead.
-
-   ```powershell
-   ms auth login
-   ```
-
-5. **Get the code and set up the app.** `ms app init` makes the `app` folder a managed app called
-   ValueLens and saves its IDs in `ms.config.json`, which git ignores. `--repo none` means you build
-   the app on your PC, which is why step 1 needs the second setting.
-
-   ```powershell
-   git clone https://github.com/microsoft/ValueLens-for-Microsoft-Copilot.git
-   cd ValueLens-for-Microsoft-Copilot/app
-   npm ci
-   ms app init -n "ValueLens" --repo none -b ./dist -S "npm run build"
-   ```
-
-   If it times out finding your environment, run it again with `-e <environment-id>`. The ID is on
-   the environment's page in the Power Platform admin center.
-
-6. **Deploy it.** This builds the app, uploads it and makes it live.
-
-   ```powershell
-   ms app deploy
-   ```
-
-   To update the app later, run `git pull` and `npm ci` in the same folder, then `ms app deploy`
-   again.
-
-7. **Share it** with the people or groups who'll use it, as a comma-separated list of email
-   addresses or Entra object IDs. Sharing gives them access, not a licence.
-
-   ```powershell
-   ms app share alice@contoso.com,valuelens-viewers@contoso.com
-   ```
-
-   Or run `ms app share link create` for a link that anyone in your organisation can use to get
-   access.
-
-8. **Viewers open it** at [managedapps.cloud.microsoft](https://managedapps.cloud.microsoft): they
-   choose **ValueLens**, then **Change data**, and pick their CSV files. The files are read in the
-   browser and never leave their PC. See [which files the app reads](app/README.md#data) and
-   [where each path puts them](app/README.md#getting-the-files-from-each-variant).
-
-**Can Copilot do this for me?** Don't give it this code to build from. Cowork, Copilot Studio and
-coding agents such as GitHub Copilot build a *new* app from a prompt, so you'd get an untested copy.
-A coding agent can run the steps above for you, but it should deploy this code, not rewrite it.
-
-More about the app, including local development, is in the [app README](app/README.md).
-
-<a id="pick-a-path"></a>
-
-## Where your data comes from
-
-The app and the report show the same data. Pick the path that matches what you have, then follow
-the steps in its README. Every path can produce the CSV files the app reads. Power BI Pro and Power
-BI Desktop are only needed for the report.
-
-| Path | You need | Setup |
-|---|---|---|
-| **[1. Fabric](1.%20Fabric/)** (recommended) | Fabric capacity (F2 or larger, or a [free trial](https://learn.microsoft.com/fabric/fundamentals/fabric-trial#method-1-start-a-new-trial-capacity-from-the-account-manager)) | Import the notebooks, schedule the pipeline and publish the report. **[🎥 Watch the setup](1.%20Fabric/README.md#set-it-up)**. The [installer](1.%20Fabric/README.md#valuelens-installer) that automates it is a work in progress. |
-| **[2. Azure](2.%20Azure/)** (work in progress) | An Azure subscription (Contributor plus User Access Administrator) and Power BI Pro | Open the installer and pick **Your Azure subscription**. It runs the data collection in your Azure subscription (scheduled jobs in Azure Container Apps, with Azure SQL and the web app) and publishes to a Power BI workspace, with no Fabric. See [Azure target](1.%20Fabric/installer/README.md#azure-target). |
-| **[4. SharePoint](4.%20SharePoint/)** | Power BI Pro | App registration, a SharePoint library and a scheduled export. |
-| **[5. Local CSV](5.%20Local%20CSV/)** | Power BI Desktop, June 2024 or later | Open the template. Sample data is included. |
-
-Path 3, Power Automate + Dataverse, is [archived](#archived).
-
-**Have Fabric?** Follow the [manual setup](1.%20Fabric/README.md#set-it-up): import the notebooks,
-schedule the pipeline and publish the report. **[🎥 Watch the setup](1.%20Fabric/README.md#set-it-up)**.
-The [ValueLens installer](1.%20Fabric/README.md#valuelens-installer) automates it, but it's a work
-in progress: try it in a test tenant first. Analytics Hub has
-[its own installer](https://github.com/microsoft/AnalyticsHub-Dashboard).
-
-**Before you start**, see [what you need](1.%20Fabric/README.md#before-you-start). No Fabric capacity?
-[Start a free trial](https://learn.microsoft.com/fabric/fundamentals/fabric-trial#method-1-start-a-new-trial-capacity-from-the-account-manager).
-
-## The Power BI report
-
-Each path also gives you the ValueLens Power BI report.
+All screenshots use synthetic sample data. Every name in them is invented.
 
 <a id="watch-first"></a>
 
+## Videos
+
+- **[Watch the demo](https://youtu.be/P0uHJb13ZR0)** (2 minutes). What the dashboard shows, page by page.
+- **[Watch the Fabric setup](1.%20Fabric/README.md#video)**. From a new app registration to a self-refreshing report.
+  Or [download the video](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/installer-v0.2.2/ValueLens_Fabric_Setup.mp4).
+
 [![Watch the demo on YouTube](https://img.youtube.com/vi/P0uHJb13ZR0/maxresdefault.jpg)](https://youtu.be/P0uHJb13ZR0)
 
-**Just want a look?** Use [5. Local CSV](5.%20Local%20CSV/) with its sample data. It takes two
-minutes and needs no access to your tenant.
+## What you get
 
-**Opening a template?** Use Power BI Desktop from June 2024 or later. In older releases, some
-charts and cards on the Habit Formation page show errors ([why](5.%20Local%20CSV/README.md)).
-Reports in the Power BI service and Fabric aren't affected.
+- **An app** that shows how your organisation uses Microsoft 365 Copilot and agents.
+- **The hours and value** they deliver, by team, tool and task.
+- **A Power BI report** with the same numbers.
 
-### Report interpretation guide
+> **Just looking?** Open the [app on your PC](app/download/ValueLens-App.html)
+> (choose **Download raw file**, then open it in Edge or Chrome). It runs on sample data.
 
-A page-by-page guide to reading the ValueLens report — 15 report pages, with the key questions each one answers. Built for both internal teams and external customers.
+## Before you start
 
-[![ValueLens Report Interpretation Guide](Images/Report-Interpretation-Guide-Cover.png)](docs/ValueLens-Report-Interpretation-Guide.pdf)
+- [ ] **Licences:** Power Apps Premium or Copilot Credits (app), Power BI Pro (report).
+- [ ] **A home for the data:** Fabric F2+ ([free trial](https://learn.microsoft.com/fabric/fundamentals/fabric-trial#method-1-start-a-new-trial-capacity-from-the-account-manager)), Azure, SharePoint, or your PC.
+- [ ] **Admins:** a Global Admin approves read-only Graph access; a Power Platform Admin allows managed apps.
+- [ ] **Tools:** Windows 10/11, Power BI Desktop (June 2024+). For the app: Node.js 24.11+, Git, `ms`.
+- [ ] **The [disclaimer](#disclaimer):** not the official Copilot report; you own the extracted data.
 
-**[📖 Open the Report Interpretation Guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf)**
+Full list, by who does what: [Before you start](docs/PREREQUISITES.md) · [Permissions](docs/PERMISSIONS.md).
 
-### Optional add-ons
+<a id="start-here-the-app-preview"></a>
+<a id="app-edition-preview"></a>
 
-- **Credit consumption and cost:** each path has an `Add Credit Consumption` folder. In Fabric,
-  [set it up by hand](1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/).
-- **Copilot Studio agent conversations:** in Fabric,
-  [set up Agent Evaluator by hand](1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/).
-- **Shadow AI and agent risk:** in Fabric, run the
-  [Defender notebook](1.%20Fabric/Manual%20setup/notebooks/README.md#optional-notebooks). It reads Microsoft Defender, needs Defender for Endpoint P2 or Defender for Cloud
-  Apps, and fills the Shadow AI section of the Analytics Hub app's Governance page
-  ([details](1.%20Fabric/installer/README.md#defender-shadow-ai-and-agent-risk)).
+## Choose your path
 
-## The Fabric App (alternative)
+```mermaid
+flowchart LR
+    start([Start]) --> q{Set it up for me?}
+    q -- "Yes" --> inst["<b>Installer</b><br/>Fabric or SharePoint"]
+    q -- "No, step by step" --> man["<b>Manual</b><br/>Fabric, SharePoint<br/>or Local CSV"]
+    inst --> done(["The app<br/>+ Power BI report"])
+    man --> done
+```
 
-You can host the dashboard in your own Fabric workspace instead, as a Fabric App (also in preview).
-Instead of the settings in step 1, it needs a workspace on Fabric capacity (F2 or larger, or a
-trial; *My workspace* won't work) and the **Fabric Apps (preview)** tenant setting. These options
-stay in the repo as alternatives to the app.
+| Path | Best for |
+|---|---|
+| **[Installer](#installer)** (recommended) | Most people. Answer a few questions; it does the rest. |
+| **[Manual](#manual)** | Full control, or if you can't run the installer. |
 
-- **[Analytics Hub app](1.%20Fabric/Fabric%20App/)**: queries your published ValueLens semantic
-  model live, as the person viewing it, so row-level security applies. The
-  [installer](1.%20Fabric/installer/README.md) deploys it. It also needs the **Semantic Model
-  Execute Queries REST API** tenant setting.
-- **The app, in Fabric**: the same `app/` code, reading the same CSV files, hosted in your
-  workspace. See [As a Fabric App](app/README.md#as-a-fabric-app-in-a-fabric-workspace).
+## Installer
 
-## Archived
+> Work in progress: try a test tenant first.
 
-- **[Power Automate + Dataverse](archive/3.%20Power%20Automate%20%2B%20Dataverse/README.md)**, path
-  3, was archived on 23 October 2026. Existing installs keep running, but it's no longer supported
-  and gets no updates. For a new install, [pick another path](#where-your-data-comes-from).
-- Older report templates are kept in [`archive/`](archive/) for reference.
+1. **Send each admin** their part of the [checklist](docs/PREREQUISITES.md).
+2. **Get it.** In PowerShell, no admin rights needed:
 
-## Disclaimer
+   ```powershell
+   irm https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/valuelens-installer-v0.1.0/install.ps1 | iex
+   ```
+
+   Or download and open [ValueLensInstaller.exe](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/valuelens-installer-v0.1.0/ValueLensInstaller.exe)
+   ([warning?](docs/INSTALL.md#check-the-download)). It opens in your browser; keep its window open.
+3. **Choose Set up ValueLens** and sign in.
+4. **Answer the questions:** Fabric or **No Fabric: PAX + SharePoint**, then your data. **No** to advanced settings keeps the defaults.
+5. **Approve the plan.** Nothing is created until you do.
+6. **Check the Done page** for your links. The first load can take an hour or more.
+
+More: [Fabric](1.%20Fabric/README.md#installer) · [SharePoint](4.%20SharePoint/README.md#installer) ·
+[installer reference](installer/README.md). Analytics Hub has [its own installer](https://github.com/microsoft/AnalyticsHub-Dashboard), which also covers Azure.
+
+<a id="where-your-data-comes-from"></a>
+<a id="pick-a-path"></a>
+
+## Manual
+
+1. **Collect the data** with one path:
+   **[1. Fabric](1.%20Fabric/)** (recommended) · **[4. SharePoint](4.%20SharePoint/)** ·
+   **[5. Local CSV](5.%20Local%20CSV/)** (Power BI Desktop only, sample data included).
+   [2. Azure](2.%20Azure/) is set up by the Analytics Hub installer only.
+2. **[Deploy the app](app/README.md#as-a-copilot-managed-app)** with the `ms` tool, once an admin turns on two settings.
+3. **Share it.** Viewers choose **Change data** and pick [the CSV files](app/README.md#data) from step 1.
+4. **Optional:** publish the Power BI report (every path has it), or [add extras](1.%20Fabric/README.md#optional-extras).
+
+## After setup
+
+- **Check it worked:** the app no longer says **Sample data**.
+- **Keep it fresh:** Fabric and Azure run on a schedule, SharePoint daily, Local CSV when you re-export.
+  Reopen the installer for status and repairs.
+- **Read the numbers:** [interpretation guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf) ·
+  [how value is calculated](docs/METHODOLOGY.md).
+- **Get help:** [open an issue](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues) · [Support](SUPPORT.md).
+
+---
+
+<a id="disclaimer"></a>
+
+<details>
+<summary><strong>Disclaimer</strong></summary>
+
+<br>
 
 - **This isn't the official Copilot report.** The official sources are the
   [Microsoft 365 admin center Copilot usage reports](https://learn.microsoft.com/en-us/microsoft-365/admin/activity-reports/microsoft-365-copilot-usage)
@@ -215,35 +149,105 @@ stay in the repo as alternatives to the app.
   set in Purview, Microsoft 365, Entra ID, Dataverse and the other sources don't apply to those
   copies. Managing that data and meeting your organisation's requirements is up to you.
 
-## Reference
-
-- [How the value is calculated](docs/METHODOLOGY.md)
-- [Analytics Hub app guide](docs/APP-GUIDE.md)
-- [Before you start](docs/PREREQUISITES.md)
-- [Permissions](docs/PERMISSIONS.md)
-- [Data dictionary](docs/DATA-DICTIONARY.md)
-- [Which agents the audit log covers](docs/AUDIT-LOG-COVERAGE.md)
-- [Report interpretation guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf)
-- [Installer reference](1.%20Fabric/installer/README.md) (work in progress)
-- [What changed](CHANGELOG.md)
-
-## Help
-
-[Open an issue](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues) ·
-[Support](SUPPORT.md) · [Report a vulnerability](SECURITY.md) · [Contributing](CONTRIBUTING.md) ·
-[MIT licence](LICENSE)
-
-<details>
-<summary>Usage and compliance disclaimer</summary>
-
-While this tool helps customers understand the business value of their AI usage data, Microsoft has
-**no visibility** into the data customers input, nor control over how the template is used. Customers
-are solely responsible for ensuring their use complies with all applicable laws and regulations
-(including data privacy and security). **Microsoft disclaims all liability** arising from use of this
-template.
+**Usage and compliance.** While this tool helps customers understand the business value of their AI
+usage data, Microsoft has **no visibility** into the data customers input, nor control over how the
+template is used. Customers are solely responsible for ensuring their use complies with all
+applicable laws and regulations (including data privacy and security). **Microsoft disclaims all
+liability** arising from use of this template.
 
 This is an **experimental** template with Purview audit logs as the primary source. Audit logs
 provide visibility into Copilot/agent interactions but are not intended as the sole source of truth
 for licensing or full‑fidelity reporting. Not supported through Microsoft support channels — please
 open an issue in this repo.
+
+</details>
+
+<a id="the-power-bi-report"></a>
+
+<details>
+<summary><strong>The Power BI report and add-ons</strong></summary>
+
+<br>
+
+- **Quick look:** [5. Local CSV](5.%20Local%20CSV/) with its sample data. Two minutes, no tenant access.
+- **Desktop version:** June 2024 or later. Older releases show errors on the Habit Formation page
+  ([why](5.%20Local%20CSV/README.md)). The Power BI service and Fabric aren't affected.
+- **Guide:** the [report interpretation guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf)
+  explains all 15 pages.
+
+[![ValueLens Report Interpretation Guide](Images/Report-Interpretation-Guide-Cover.png)](docs/ValueLens-Report-Interpretation-Guide.pdf)
+
+Add-ons:
+
+- **Credit consumption and cost:** an `Add Credit Consumption` folder in each path
+  ([Fabric](1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/)).
+- **Copilot Studio conversations:** [Agent Evaluator](1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/) (Fabric).
+- **Shadow AI and agent risk:** the [Defender notebook](1.%20Fabric/Manual%20setup/notebooks/README.md#optional-notebooks)
+  (Fabric). Needs Defender for Endpoint P2 or Defender for Cloud Apps, and fills the Governance page's
+  Shadow AI section ([details](1.%20Fabric/installer/README.md#defender-shadow-ai-and-agent-risk)).
+
+</details>
+
+<a id="the-fabric-app-alternative"></a>
+
+<details>
+<summary><strong>Other ways to host the app: the Fabric App</strong></summary>
+
+<br>
+
+Host the dashboard in your own Fabric workspace instead (preview). You need a workspace on Fabric
+capacity (F2 or larger, or a trial; not *My workspace*) and the **Fabric Apps (preview)** tenant setting.
+
+- **[Analytics Hub app](1.%20Fabric/Fabric%20App/):** reads your published semantic model live, as the
+  viewer, so row-level security applies. The [installer](1.%20Fabric/installer/README.md) deploys it.
+- **[`fabric-app/`](fabric-app/README.md):** reads the ValueLens and
+  [Consumption Central](https://github.com/microsoft/ConsumptionCentral-for-Microsoft-Copilot) models
+  live and keeps no copy of your data. Deploy with `npm run deploy:vl`, `deploy:cc` or `deploy:both`
+  (add `--dry-run` first). The same folder is kept in the Consumption Central repo.
+- **[The app, in Fabric](app/README.md#as-a-fabric-app-in-a-fabric-workspace):** the same `app/` code and CSV files.
+
+The first two also need the **Semantic Model Execute Queries REST API** tenant setting.
+
+</details>
+
+<details>
+<summary><strong>Troubleshooting</strong></summary>
+
+<br>
+
+- [Installer](installer/README.md#troubleshooting)
+- [Fabric notebooks: an audit window keeps failing](1.%20Fabric/Manual%20setup/notebooks/README.md#an-audit-window-keeps-failing)
+- [SharePoint](4.%20SharePoint/README.md#troubleshooting) · [Local CSV](5.%20Local%20CSV/README.md#troubleshooting)
+- [The app](app/README.md#as-a-copilot-managed-app): admin settings, licences and timeouts
+
+</details>
+
+<details>
+<summary><strong>Reference</strong></summary>
+
+<br>
+
+- [How the value is calculated](docs/METHODOLOGY.md) · [Data dictionary](docs/DATA-DICTIONARY.md) ·
+  [Audit log coverage](docs/AUDIT-LOG-COVERAGE.md)
+- [Before you start](docs/PREREQUISITES.md) · [Permissions](docs/PERMISSIONS.md) ·
+  [Analytics Hub app guide](docs/APP-GUIDE.md)
+- [Report interpretation guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf) ·
+  [Installer reference](installer/README.md) (work in progress)
+- [What changed](CHANGELOG.md) · [Support](SUPPORT.md) · [Security](SECURITY.md) ·
+  [Contributing](CONTRIBUTING.md) · [MIT licence](LICENSE)
+
+</details>
+
+<a id="archived"></a>
+
+<details>
+<summary><strong>Archived options</strong></summary>
+
+<br>
+
+- **[Power Automate + Dataverse](archive/3.%20Power%20Automate%20%2B%20Dataverse/README.md)** (path 3)
+  was archived on 23 October 2026. Existing installs keep running, with no updates or support.
+  For a new install, [choose another path](#choose-your-path).
+- Older report templates are in [`archive/`](archive/).
+
 </details>

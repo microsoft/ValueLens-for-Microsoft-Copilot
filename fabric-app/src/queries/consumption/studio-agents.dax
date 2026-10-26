@@ -1,0 +1,25 @@
+EVALUATE
+VAR _all = SELECTCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Agent Bridge'[Agent Name],
+            "@Credits", [Studio Total Credits Used],
+            "@Share", [Group Credit Share %],
+            "@Billable", [Total Billable Credits Used],
+            "@Cost", [Billable Credit Cost (User)]
+        ),
+        NOT ISBLANK([@Credits])
+    ),
+    "Agent", 'Agent Bridge'[Agent Name],
+    "Credits Used", [@Credits],
+    "Credit Share", [@Share],
+    "Billable Credits", [@Billable],
+    "Estimated Cost", [@Cost]
+)
+VAR _total = COUNTROWS(_all)
+RETURN
+    ADDCOLUMNS(
+        TOPN(1000, _all, [Credits Used], DESC, [Agent], ASC),
+        "Total", _total
+    )
+ORDER BY [Credits Used] DESC, [Agent] ASC

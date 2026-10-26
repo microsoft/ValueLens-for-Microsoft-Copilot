@@ -1,0 +1,82 @@
+[
+  {
+    "[Lens]": "Surface",
+    "[Category]": "Custom",
+    "[All Tasks]": 521,
+    "[Licensed Tasks]": 521,
+    "[Unlicensed Tasks]": null,
+    "[Agent Tasks]": 521
+  },
+  {
+    "[Lens]": "Surface",
+    "[Category]": "PowerPoint",
+    "[All Tasks]": 917,
+    "[Licensed Tasks]": 890,
+    "[Unlicensed Tasks]": 27,
+    "[Agent Tasks]": 529
+  },
+  {
+    "[Lens]": "Surface",
+    "[Category]": "Outlook",
+    "[All Tasks]": 909,
+    "[Licensed Tasks]": 878,
+    "[Unlicensed Tasks]": 31,
+    "[Agent Tasks]": 544
+  },
+  {
+    "[Lens]": "Surface",
+    "[Category]": "Excel",
+    "[All Tasks]": 953,
+    "[Licensed Tasks]": 923,
+    "[Unlicensed Tasks]": 30,
+    "[Agent Tasks]": 557
+  },
+  {
+    "[Lens]": "Surface",
+    "[Category]": "Word",
+    "[All Tasks]": 838,
+    "[Licensed Tasks]": 816,
+    "[Unlicensed Tasks]": 22,
+    "[Agent Tasks]": 518
+  },
+  {
+    "[Lens]": "Surface",
+    "[Category]": "Teams",
+    "[All Tasks]": 862,
+    "[Licensed Tasks]": 835,
+    "[Unlicensed Tasks]": 27,
+    "[Agent Tasks]": 531
+  },
+  {
+    "[Lens]": "Surface",
+    "[Category]": "autonomous",
+    "[All Tasks]": 1300,
+    "[Licensed Tasks]": 1300,
+    "[Unlicensed Tasks]": null,
+    "[Agent Tasks]": 1300
+  },
+  {
+    "[Lens]": "Model",
+    "[Category]": "GPT-4",
+    "[All Tasks]": 2039,
+    "[Licensed Tasks]": 1997,
+    "[Unlicensed Tasks]": 42,
+    "[Agent Tasks]": 1465
+  },
+  {
+    "[Lens]": "Model",
+    "[Category]": "COPILOT-PRO",
+    "[All Tasks]": 2157,
+    "[Licensed Tasks]": 2115,
+    "[Unlicensed Tasks]": 42,
+    "[Agent Tasks]": 1544
+  },
+  {
+    "[Lens]": "Model",
+    "[Category]": "GPT-4-TURBO",
+    "[All Tasks]": 2104,
+    "[Licensed Tasks]": 2051,
+    "[Unlicensed Tasks]": 53,
+    "[Agent Tasks]": 1491
+  }
+]

@@ -254,7 +254,7 @@ if ($HarnessCase.Contains('holdLock') -and $HarnessCase.holdLock) {
 try {
   foreach ($harnessRun in $HarnessCase.runs) {
     $harnessN++
-    foreach ($harnessName in 'STUB_MODE', 'STUB_MODES', 'STUB_PAX_EXIT', 'STUB_AGENTS', 'STUB_UPLOAD_FAIL', 'STUB_NO_SECRET') {
+    foreach ($harnessName in 'STUB_MODE', 'STUB_MODES', 'STUB_PAX_EXIT', 'STUB_AGENTS', 'STUB_UPLOAD_FAIL', 'STUB_NO_SECRET', 'STUB_USER_CSV') {
       Remove-Item -LiteralPath "Env:$harnessName" -ErrorAction SilentlyContinue
     }
     if ($harnessRun.Contains('env') -and $harnessRun.env) {

@@ -1,0 +1,379 @@
+{
+    "$comment": "What Ask can answer. `pages` are the suggested questions the Ask page lists, by destination. `tools` are the only queries Ask may run: the app's own named queries, by path under app/src/queries, on the model alias they read. The Fabric data agent's instructions and the Azure /api/ask tools are both built from this file.",
+    "minPeople": 5,
+    "pages": [
+        {
+            "destination": "executive",
+            "questions": [
+                "What's the bottom line this month, and what changed?",
+                "Which departments get the most hours per licensed seat?"
+            ]
+        },
+        {
+            "destination": "adoption",
+            "questions": [
+                "Which orgs have the lowest activation?",
+                "How many people are habitual or power users last month?",
+                "Is weekly usage going up or down?"
+            ]
+        },
+        {
+            "destination": "leaderboards",
+            "questions": [
+                "Which agents have the most users?",
+                "How many registered agents are actually in use?"
+            ]
+        },
+        {
+            "destination": "work-patterns",
+            "questions": [
+                "How many Microsoft 365 users also use Copilot?",
+                "Which orgs use Copilot least in the flow of work?"
+            ]
+        },
+        {
+            "destination": "governance",
+            "questions": [
+                "Which agents have no active owner?",
+                "How many agents need a review, and why?",
+                "How much shadow AI have we found?"
+            ]
+        },
+        {
+            "destination": "readiness",
+            "questions": [
+                "Who are heavy users without a licence?",
+                "Which orgs have the most active unlicensed users?",
+                "How many licences are in use?"
+            ]
+        },
+        {
+            "destination": "consumption",
+            "questions": [
+                "Will we stay within the Cowork budget?",
+                "Which product uses the most credits?",
+                "What did Copilot Studio cost, prepaid against pay-as-you-go?"
+            ]
+        },
+        {
+            "destination": "value",
+            "questions": [
+                "Which tasks deliver the most expert-equivalent hours?",
+                "Which orgs get the most AI-assisted value?",
+                "What is the projected annualised value?"
+            ]
+        },
+        {
+            "destination": "efficiency",
+            "questions": [
+                "Where are we using a premium model for simple work?",
+                "What share of sessions use a well-matched model?"
+            ]
+        },
+        {
+            "destination": "feedback",
+            "questions": [
+                "What do people say about Copilot?",
+                "Which feedback categories get the most thumbs down?"
+            ]
+        }
+    ],
+    "tools": [
+        {
+            "name": "bottom_line",
+            "page": "executive",
+            "model": "vl",
+            "query": "executive/executive-summary.dax",
+            "filters": ["dateRange", "organizations"],
+            "omit": ["People With Organization"],
+            "references": [
+                "[Expert Equivalent Hours]",
+                "[AI Tasks]",
+                "[All Active Users]",
+                "[Licensed Users (Filter-Aware)]",
+                "[Active Licensed Users]",
+                "[% Active Licensed Users]",
+                "[Active Unlicensed Users]",
+                "[Habitual Users %, Last Month]",
+                "[Power Users %, Last Month]",
+                "[Active Agent Users]",
+                "'Behavior Value Map'[Behavior]",
+                "'Chat + Agent Interactions (Audit Logs)'[Cowork Task Category]",
+                "'Chat + Agent Interactions (Audit Logs)'[AppHost]",
+                "'Effort Scenario'[Scenario]",
+                "'Chat + Agent Interactions (Audit Logs)'[WeekStart]",
+                "'Calendar'[Date]",
+                "'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)]",
+                "'Chat + Agent Interactions (Audit Logs)'[AgentName]",
+                "'Chat + Agent Interactions (Audit Logs)'[Audit_UserId]",
+                "'Chat + Agent Org Data'[Organization]"
+            ],
+            "description": "The executive summary's headline row: expert-equivalent hours at typical effort (hours_range has the conservative to optimistic range), AI tasks, active people, licensed seats and seats in use, unlicensed users, habit and power-user shares for the last full month, agent users and hours, agents in use, satisfaction and feedback count."
+        },
+        {
+            "name": "hours_range",
+            "page": "executive",
+            "model": "vl",
+            "query": "executive/executive-hours-range.dax",
+            "filters": ["dateRange", "organizations"],
+            "description": "The range around the executive summary's expert-equivalent hours: the hours at conservative and at optimistic effort, for the same dates and organizations as bottom_line's typical figure."
+        },
+        {
+            "name": "monthly_trend",
+            "page": "executive",
+            "model": "vl",
+            "query": "executive/executive-months.dax",
+            "filters": ["dateRange", "organizations"],
+            "references": [
+                "[Expert Equivalent Hours]",
+                "[AI Tasks]",
+                "[% Active Licensed Users]",
+                "[Habitual Users (Monthly)]",
+                "[Power Users (Monthly)]",
+                "[Inactive Users (Monthly)]",
+                "[All Active Users]",
+                "'Calendar'[Date]",
+                "'Effort Scenario'[Scenario]",
+                "'Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)]"
+            ],
+            "description": "The executive summary's month-by-month figures, to say what changed between months."
+        },
+        {
+            "name": "departments",
+            "page": "executive",
+            "model": "vl",
+            "query": "executive/executive-departments.dax",
+            "filters": ["dateRange", "organizations"],
+            "people": ["People"],
+            "description": "Per organization: licensed seats, share of seats in use, habit share, skills per person, expert-equivalent hours, active people and hours per licensed seat a month."
+        },
+        {
+            "name": "activation_summary",
+            "page": "adoption",
+            "model": "vl",
+            "query": "adoption/activation-summary.dax",
+            "filters": ["dateRange", "organizations"],
+            "description": "Active and inactive people overall, licensed, unlicensed and using agents, with each active share."
+        },
+        {
+            "name": "activation_by_org",
+            "page": "adoption",
+            "model": "vl",
+            "query": "adoption/activation-by-org.dax",
+            "filters": ["dateRange", "organizations"],
+            "people": ["All Active", "All Inactive"],
+            "description": "Per organization (top 50 by active people): active and inactive people overall, licensed, unlicensed and using agents. Activation is All Active divided by All Active plus All Inactive."
+        },
+        {
+            "name": "adoption_trend",
+            "page": "adoption",
+            "model": "vl",
+            "query": "adoption/adoption-trend.dax",
+            "filters": ["dateRange", "organizations"],
+            "description": "By week: sessions per user (licensed, unlicensed, agents), all sessions and expert-equivalent hours."
+        },
+        {
+            "name": "habit_summary",
+            "page": "adoption",
+            "model": "vl",
+            "query": "adoption/habit-summary.dax",
+            "filters": ["organizations"],
+            "description": "For the last full month: power, habitual, developing, beginner and inactive users, as counts and shares."
+        },
+        {
+            "name": "agent_usage",
+            "page": "leaderboards",
+            "model": "vl",
+            "query": "agents/agent-usage.dax",
+            "filters": ["dateRange", "organizations"],
+            "people": ["Users"],
+            "description": "The 15 most used agents: sessions, users and how many organizations use each."
+        },
+        {
+            "name": "agent_estate",
+            "page": "leaderboards",
+            "model": "vl",
+            "query": "agents/agent-estate-summary.dax",
+            "filters": ["dateRange"],
+            "description": "Registered agents, how many were built in the tenant, how many are seen in use, and sessions on agents outside the registry."
+        },
+        {
+            "name": "m365_copilot_summary",
+            "page": "work-patterns",
+            "model": "vl",
+            "query": "work-patterns/m365-copilot-summary.dax",
+            "filters": ["dateRange", "organizations"],
+            "description": "People active in Microsoft 365, how many of them use Copilot, and how many of them are licensed."
+        },
+        {
+            "name": "m365_by_org",
+            "page": "work-patterns",
+            "model": "vl",
+            "query": "work-patterns/m365-by-org.dax",
+            "filters": ["dateRange", "organizations"],
+            "description": "Per organization: Microsoft 365 activity and the share using Copilot. Organizations under the minimum number of people are already left out."
+        },
+        {
+            "name": "governance_summary",
+            "page": "governance",
+            "model": "vl",
+            "query": "governance/governance-summary.dax",
+            "filters": [],
+            "description": "Tenant-built agents, how many need a review, and how many have no sign-in, an owner who has left, or no owner on record."
+        },
+        {
+            "name": "agent_owners",
+            "page": "governance",
+            "model": "vl",
+            "query": "governance/governance-owners.dax",
+            "filters": [],
+            "description": "Live agents grouped by owner status: owner active, owner disabled, owner not found, no owner on record, not checked."
+        },
+        {
+            "name": "shadow_ai_summary",
+            "page": "governance",
+            "model": "vl",
+            "query": "governance/shadow-ai-summary.dax",
+            "filters": [],
+            "description": "Shadow AI from Defender: AI tools watched, unsanctioned tools, tools found and found this week, devices and users, and the source's status."
+        },
+        {
+            "name": "licence_estate",
+            "page": "readiness",
+            "model": "vl",
+            "query": "licensing/license-estate-summary.dax",
+            "filters": ["dateRange", "organizations"],
+            "description": "Total licensed users, average days since last active, and notices on how complete the licence evidence is."
+        },
+        {
+            "name": "licence_demand",
+            "page": "readiness",
+            "model": "vl",
+            "query": "licensing/license-demand-summary.dax",
+            "filters": ["dateRange", "organizations"],
+            "description": "Active unlicensed users, their share of all active users, and their median and observed sessions per user per week."
+        },
+        {
+            "name": "licence_priority_by_org",
+            "page": "readiness",
+            "model": "vl",
+            "query": "licensing/license-priority-by-org.dax",
+            "filters": ["dateRange", "organizations"],
+            "people": ["Active Unlicensed Users"],
+            "description": "Per organization: active unlicensed users, their active days per week and sessions per user per week."
+        },
+        {
+            "name": "heavy_unlicensed_users",
+            "page": "readiness",
+            "model": "vl",
+            "query": "licensing/unlicensed-heavy-users.dax",
+            "filters": ["organizations"],
+            "description": "The people who used Copilot Chat most in the last full month without a Copilot licence, as the Readiness page lists them."
+        },
+        {
+            "name": "consumption_by_product",
+            "page": "consumption",
+            "model": "cc",
+            "query": "consumption/consumption-by-product.dax",
+            "filters": [],
+            "description": "Credits and cost by product (Cowork / Work IQ, Copilot Studio, Azure AI Foundry), with the cost basis and how complete each is."
+        },
+        {
+            "name": "cowork_credits",
+            "page": "consumption",
+            "model": "cc",
+            "query": "consumption/cowork-credits-summary.dax",
+            "filters": [],
+            "description": "Cowork credits used, consuming and weekly active users, credits per user, share of the per-person allowance used, users over the limit and spending policies. The basis for whether Cowork stays within budget."
+        },
+        {
+            "name": "studio_credits",
+            "page": "consumption",
+            "model": "cc",
+            "query": "consumption/studio-credits-summary.dax",
+            "filters": [],
+            "description": "Copilot Studio credits consumed, active users, agents with credits, total, prepaid and pay-as-you-go cost, the pay-as-you-go share and the billing period."
+        },
+        {
+            "name": "value_summary",
+            "page": "value",
+            "model": "vl",
+            "query": "value/value-summary.dax",
+            "filters": ["dateRange", "organizations"],
+            "description": "Expert-equivalent hours per week, AI-assisted value, projected annualised value, value per week, and the currency symbol."
+        },
+        {
+            "name": "value_by_task",
+            "page": "value",
+            "model": "vl",
+            "query": "value/value-by-task.dax",
+            "filters": ["dateRange", "organizations"],
+            "description": "Each task group and task with its share of activity, expert-equivalent hours per week and AI-assisted value per week, with group subtotals and a grand total."
+        },
+        {
+            "name": "value_by_org",
+            "page": "value",
+            "model": "vl",
+            "query": "value/organization-value.dax",
+            "filters": ["dateRange", "organizations"],
+            "people": ["Active Users"],
+            "description": "Per organization (top 100 by value): active users, expert-equivalent hours per week and AI-assisted value."
+        },
+        {
+            "name": "work_summary",
+            "page": "value",
+            "model": "vl",
+            "query": "work/work-summary.dax",
+            "filters": ["dateRange", "organizations"],
+            "description": "AI tasks and active users overall, licensed, unlicensed and on agents, tasks per user for each, and the share of licensed users who are active."
+        },
+        {
+            "name": "model_fit_summary",
+            "page": "efficiency",
+            "model": "vl",
+            "query": "efficiency/model-fit-summary.dax",
+            "filters": ["dateRange", "organizations"],
+            "description": "Sessions graded for model fit: the share logged, and the shares well-matched, over-specified (a premium model for simple work) and under-specified."
+        },
+        {
+            "name": "model_match_by_tool",
+            "page": "efficiency",
+            "model": "vl",
+            "query": "efficiency/model-match-by-tool.dax",
+            "filters": ["dateRange", "organizations"],
+            "description": "Per activity (Copilot chat, agents, Cowork): sessions and share that were a good match, over-specified or under-specified."
+        },
+        {
+            "name": "feedback_summary",
+            "page": "feedback",
+            "model": "vl",
+            "query": "feedback/feedback-summary.dax",
+            "filters": ["dateRange"],
+            "description": "Satisfaction rate, total feedback, thumbs up and down, and the model's summary of feedback themes."
+        },
+        {
+            "name": "feedback_by_category",
+            "page": "feedback",
+            "model": "vl",
+            "query": "feedback/feedback-category.dax",
+            "filters": ["dateRange"],
+            "description": "Feedback by category with totals, thumbs up and thumbs down."
+        },
+        {
+            "name": "data_freshness",
+            "page": "executive",
+            "model": "vl",
+            "query": "freshness/audit-log-freshness.dax",
+            "filters": [],
+            "description": "The last day the audit log has Copilot activity for. Quote it as the freshness line."
+        },
+        {
+            "name": "glossary",
+            "page": "appendix",
+            "model": "vl",
+            "query": "appendix/glossary.dax",
+            "filters": [],
+            "description": "Every metric's definition, by page. Use it to explain what a figure means."
+        }
+    ]
+}

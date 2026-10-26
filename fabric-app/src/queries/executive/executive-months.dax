@@ -1,0 +1,102 @@
+EVALUATE
+// One row per month of the dates in the filter. The caller sets the dates to
+// six whole months, so the trend always spans the same time, and compares the
+// last two full months for the arrows on the cards.
+VAR _months =
+    DISTINCT(
+        SELECTCOLUMNS(
+            VALUES('Calendar'[Date]),
+            "Month Start", DATE(YEAR('Calendar'[Date]), MONTH('Calendar'[Date]), 1)
+        )
+    )
+// Dates and the audit log never filter the seat list or the people list, so
+// the seat counts are the same every month: work them out once.
+VAR _seats = [Licensed Users (Filter-Aware)]
+VAR _seatsInScope =
+    CALCULATE(
+        [Total Licensed Users],
+        TREATAS(VALUES('Chat + Agent Org Data'[PersonId]), 'Copilot Licensed'[UPN_Normalized])
+    )
+// [All Active Users] and [Active Licensed Users] now test each user ID with
+// LEN(TRIM()) only when Audit_UserId is filtered directly, but models deployed
+// from older templates still test every ID every month, which takes seconds
+// on a large tenant. Counting the users with a usage row, less the blank IDs
+// found once here, gives the same number on any model, so these counts stay.
+VAR _blankIds =
+    FILTER(
+        ALL('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+        LEN(TRIM('Chat + Agent Interactions (Audit Logs)'[Audit_UserId])) = 0
+    )
+RETURN
+    GENERATE(
+        _months,
+        VAR _start = [Month Start]
+        RETURN
+            CALCULATETABLE(
+                // [All Active Users], and the [Active Licensed Users] that
+                // Seats In Use and [Inactive Users (Monthly)] both read.
+                VAR _users =
+                    CALCULATE(
+                        DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                        KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Is Usage Row] = TRUE())
+                    )
+                        - CALCULATE(
+                            DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                            KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Is Usage Row] = TRUE()),
+                            KEEPFILTERS(_blankIds)
+                        )
+                VAR _licensedUsers =
+                    CALCULATE(
+                        DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                        KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Is Usage Row] = TRUE()),
+                        KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[License Status] = "M365 Copilot Licensed")
+                    )
+                        - CALCULATE(
+                            DISTINCTCOUNT('Chat + Agent Interactions (Audit Logs)'[Audit_UserId]),
+                            KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Is Usage Row] = TRUE()),
+                            KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[License Status] = "M365 Copilot Licensed"),
+                            KEEPFILTERS(_blankIds)
+                        )
+                // Blank rather than 0 when nobody is counted, as COUNTROWS gives.
+                VAR _active = IF(_users > 0, _users)
+                VAR _activeLicensed = IF(_licensedUsers > 0, _licensedUsers)
+                // [Inactive Users (Monthly)]: unused seats, only when every
+                // activity and the licensed users are in view.
+                VAR _activity = SELECTEDVALUE('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)], "")
+                VAR _licence = SELECTEDVALUE('Chat + Agent Interactions (Audit Logs)'[Environment], "")
+                VAR _inactive =
+                    IF(
+                        NOT (_activity IN {"Agents", "Cowork"}) && _licence <> "Unlicensed" && COUNTROWS('Calendar') > 0,
+                        MAX(_seatsInScope - _activeLicensed, 0)
+                    )
+                RETURN
+                    ROW(
+                        "Copilot Hours",
+                            CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Typical",
+                                KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)] = "Copilot")),
+                        "Agent Hours",
+                            CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Typical",
+                                KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)] = "Agents")),
+                        "Cowork Hours",
+                            CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Typical",
+                                KEEPFILTERS('Chat + Agent Interactions (Audit Logs)'[Agent Filter (Normalized)] = "Cowork")),
+                        "Hours", CALCULATE([Expert Equivalent Hours], 'Effort Scenario'[Scenario] = "Typical"),
+                        "Tasks", [AI Tasks],
+                        // [% Active Licensed Users].
+                        "Seats In Use Pct", IF(_seats > 0 && _activeLicensed <= _seats, DIVIDE(_activeLicensed, _seats)),
+                        // The Adoption page's monthly habit mix: Habitual and Power
+                        // over everyone counted that month, inactive included.
+                        "Habit Pct",
+                            DIVIDE(
+                                [Habitual Users (Monthly)] + [Power Users (Monthly)],
+                                COALESCE(_inactive, 0) + _active
+                            ),
+                        "Satisfaction", 'ProductFeedback'[Satisfaction Rate],
+                        "Feedback", 'ProductFeedback'[Total Feedback]
+                    ),
+                KEEPFILTERS(
+                    FILTER(ALL('Calendar'[Date]), 'Calendar'[Date] >= _start && 'Calendar'[Date] <= EOMONTH(_start, 0))
+                )
+            )
+    )
+ORDER BY [Month Start]
