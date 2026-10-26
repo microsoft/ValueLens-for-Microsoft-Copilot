@@ -13,7 +13,7 @@ import { PRODUCT } from './product.js';
 import { runWizard } from './server.js';
 import { loadSources } from './sources.js';
 import { checkPrereqs } from './prereqs.js';
-import { attachRunLog, createSupportBundle, diagnosticsFile } from './support.js';
+import { attachRunLog, createSupportBundle, runLogFile } from './support.js';
 import { recordWorkspaceGone, staleRecordMessage } from './steps/fabric.js';
 import { isResumeLater, MAX_SECRET_DAYS, NOTEBOOK_SECRET_DAYS } from './steps/identity.js';
 import { isManagementGroupId, managementGroupId } from './steps/resource-graph.js';
@@ -103,6 +103,9 @@ Options:
   --support-bundle     Write a support file to email us when something goes wrong: one zip of
                        text files you can read first, with secrets removed and people's names
                        hashed. Add --use-az or --device-code to include live run statuses
+  --log <file>         With --support-bundle: also summarise this collector or PAX log. Repeat it
+                       for more than one
+  --offline            With --support-bundle: don't sign in; use only the files on this PC
   --yes                Take saved answers and defaults without asking. It never lets Fabric clear a
                        model's data: add --allow-model-reset for that
   --no-wait            Don't wait for the first load or a refresh to finish
@@ -194,6 +197,8 @@ export function parseCli(argv, env = process.env) {
       'environment-id': { type: 'string' },
       folder: { type: 'string' },
       'support-bundle': { type: 'boolean' },
+      log: { type: 'string', multiple: true },
+      offline: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
     },
@@ -201,6 +206,8 @@ export function parseCli(argv, env = process.env) {
   const supportBundle = !!values['support-bundle'];
   if (supportBundle && (positionals.length || values['dry-run'])) throw new Error('--support-bundle runs on its own. Leave out the command.');
   if (supportBundle && values.ui) throw new Error('With --ui, use "Having trouble? Create a support file" at the foot of the page.');
+  if (!supportBundle && (values.log?.length || values.offline)) throw new Error(`${values.log?.length ? '--log' : '--offline'} goes with --support-bundle.`);
+  if (values.offline && (values['use-az'] || values['device-code'])) throw new Error(`--offline doesn't sign in, so leave out ${values['use-az'] ? '--use-az' : '--device-code'}.`);
   const command = values['dry-run'] ? 'preview' : positionals[0] ?? 'install';
   const files = command === 'upload' ? positionals.slice(1) : [];
   if (command !== 'upload' && positionals.length > 1) throw new Error(`Unexpected argument: ${positionals[1]}`);
@@ -293,7 +300,9 @@ export function parseCli(argv, env = process.env) {
     outDir: values.out ?? (supportBundle ? '.' : 'valuelens-preview'),
     supportBundle,
     // The support file signs in only when asked to: without a flag it uses the files on this PC.
-    signInForSupport: !!values['use-az'] || !!values['device-code'],
+    signInForSupport: !values.offline && (!!values['use-az'] || !!values['device-code']),
+    offline: !!values.offline,
+    supportLogs: (values.log ?? []).map((f) => resolve(f)),
     yes: !!values.yes,
     wait: !values['no-wait'],
     ui: !!values.ui,
@@ -389,11 +398,18 @@ async function supportBundle(args, debug) {
     } catch (err) {
       ui.warn(`Couldn't sign in (${/** @type {any} */ (err)?.message ?? err}). The support file has what's on this PC.`);
     }
-  } else ui.note('Making the support file from the files on this PC. Add --use-az or --device-code to include live run statuses and row counts.');
-  const out = await createSupportBundle({ configFile: args.configFile, version: version(), live, outDir: args.outDir });
+  } else ui.note(args.offline ? 'Making the support file from the files on this PC (--offline).' : 'Making the support file from the files on this PC. Add --use-az or --device-code to include live run statuses and row counts.');
+  const out = await createSupportBundle({
+    configFile: args.configFile,
+    version: version(),
+    live,
+    outDir: args.outDir,
+    logs: args.supportLogs,
+    ...(args.offline ? { offline: 'Offline: --offline skipped the sign-in, so this was made from the files on this PC.' } : {}),
+  });
   ui.ok(`Support file: ${out.path}`);
-  for (const f of out.files) ui.info(`  ${f.name}`);
-  ui.note('It\'s plain text, with secrets removed and people\'s names hashed. Open it to check what\'s inside, then email it to us.');
+  for (const f of out.files) ui.info(`  ${f.name} (${Buffer.byteLength(f.text)} bytes)`);
+  ui.note('It\'s plain text, with secrets removed and people\'s names hashed. Open the zip to check it, then email it to us.');
   return 0;
 }
 
@@ -424,7 +440,7 @@ export async function main(argv) {
     }
     const ui = createUi({ yes: args.yes });
     if (args.command !== 'preview') {
-      runLog = attachRunLog(ui, diagnosticsFile(args.configFile));
+      runLog = attachRunLog(ui, runLogFile(args.configFile));
       runLog.begin(args.command);
     }
     const uploaded = args.cloudShell && args.command !== 'prereqs' ? adoptUploadedRecord(args.configFile) : undefined;

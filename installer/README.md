@@ -635,6 +635,8 @@ started with: `& $env:LOCALAPPDATA\ValueLens\valuelens.cmd status`,
 | `--backfill-days <n>` | With `run`: reload `n` days of audit history, 1 to 180 |
 | `--out <dir>` | With `preview`: where to write (default `./valuelens-preview`). With `--support-bundle`: the folder for the support file (default: this folder) |
 | `--support-bundle` | Write `valuelens-support-<UTC time>.zip` to email us: plain-text files with secrets removed and people's names hashed. Uses the files on this PC; add `--use-az` or `--device-code` for live run statuses and row counts |
+| `--log <file>` | With `--support-bundle`: a collector or PAX log to summarise (429s, 401s, time-outs, windows). Repeat for more |
+| `--offline` | With `--support-bundle`: don't sign in; use only the files on this PC |
 | `--yes` | Take saved answers and defaults without asking. It never lets Fabric clear a model's data: add `--allow-model-reset` for that |
 | `--no-wait` | Don't wait for the first load or a refresh to finish |
 | `--verbose` | Print each API call |

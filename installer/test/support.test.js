@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  SUPPORT_FILES, REMOVED, SECRET_KEY, createRedactor, attachRunLog, diagnosticsFile, summariseLog,
+  SUPPORT_FILES, REMOVED, SECRET_KEY, createRedactor, attachRunLog, runLogFile, summariseLog,
   collectSupportBundle, createSupportBundle, supportFileName, csvRowCounts,
 } from '../src/support.js';
 import { listZip, readZipEntry } from '../src/transform/zip.js';
@@ -21,7 +21,7 @@ const WORKSPACE = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 const NOW = new Date(Date.UTC(2026, 9, 27, 8, 5, 9));
 
 /** Every secret shape the tests plant, none of which may reach the zip. */
-const SECRETS = [JWT, CLIENT_SECRET, 'SuperSecretSig', 'QUJDREVGR0hJSktMTU5PUA==', 'hunter2', 'plain-client-secret-value', 'Bearer abc.def'];
+const SECRETS = [JWT, CLIENT_SECRET, 'SuperSecretSig', 'QUJDREVGR0hJSktMTU5PUA==', 'hunter2', 'plain-client-secret-value', 'Bearer abc.defghij'];
 const PEOPLE = ['ada.lovelace@example.com', 'Ada Lovelace', 'grace@example.org', 'Grace Hopper'];
 
 function tmp() {
@@ -40,7 +40,7 @@ function fabricRecord() {
     fabric: { workspaceId: WORKSPACE, lakehouseId: 'bbbbbbbb-0000-0000-0000-000000000001', pipelineId: 'cccccccc-0000-0000-0000-000000000002', pipelineName: 'VL pipeline', notebooks: { collect: 'dddddddd-0000-0000-0000-000000000003' }, notebookNames: { collect: 'VL collect' } },
     semanticModel: { id: 'eeeeeeee-0000-0000-0000-000000000004', displayName: 'ValueLens model' },
     storage: { connectionString: CONN, url: SAS },
-    notes: `Owner Grace Hopper (grace@example.org) shared ${JWT} and Bearer abc.def and password=hunter2 and ${CLIENT_SECRET}`,
+    notes: `Owner Grace Hopper (grace@example.org) shared ${JWT} and Bearer abc.defghij and password=hunter2 and ${CLIENT_SECRET}`,
   };
 }
 
@@ -68,20 +68,37 @@ const json = (files, name) => JSON.parse(/** @type {any} */ (files.find((f) => f
 
 test('the redactor removes secret keys but keeps keyVault and GUIDs', () => {
   const r = createRedactor({ salt: Buffer.alloc(16, 1) });
-  const out = /** @type {any} */ (r.value({ clientSecret: 'x', accessToken: 'y', password: 'z', sasUrl: 'u', connectionString: 'c', authorization: 'a', apiKey: 'k', keyVault: { name: 'kv-1' }, tenantId: TENANT, signature: 's' }));
-  for (const k of ['clientSecret', 'accessToken', 'password', 'sasUrl', 'connectionString', 'authorization', 'apiKey', 'signature']) assert.equal(out[k], REMOVED, k);
+  const out = /** @type {any} */ (r.value({ clientSecret: 'x', accessToken: 'y', password: 'z', sasUrl: 'u', connectionString: 'c', authorization: 'a', apiKey: 'k', keyVault: { name: 'kv-1' }, tenantId: TENANT, signature: 's', cookie: 'c' }));
+  for (const k of ['clientSecret', 'accessToken', 'password', 'sasUrl', 'connectionString', 'authorization', 'apiKey', 'signature', 'cookie']) assert.equal(out[k], REMOVED, k);
   assert.deepEqual(out.keyVault, { name: 'kv-1' });
   assert.equal(out.tenantId, TENANT);
   assert.ok(!SECRET_KEY.test('keyVault'));
-  assert.ok(r.counts.secrets >= 8);
+  assert.ok(r.counts.secrets >= 9);
+});
+
+test('under a secret key, GUIDs, dates, numbers and booleans stay', () => {
+  const out = /** @type {any} */ (createRedactor().value({ app: { secretExpires: '2027-01-31T00:00:00Z', secretKeyId: TENANT, secretDays: 90, secretAttempts: [{ ref: 'r1', at: '2026-10-01' }], tokenCached: true, clientSecret: 'shh' } }));
+  assert.equal(out.app.secretExpires, '2027-01-31T00:00:00Z');
+  assert.equal(out.app.secretKeyId, TENANT);
+  assert.equal(out.app.secretDays, 90);
+  assert.equal(out.app.tokenCached, true);
+  assert.deepEqual(out.app.secretAttempts, [{ ref: REMOVED, at: '2026-10-01' }]);
+  assert.equal(out.app.clientSecret, REMOVED);
+});
+
+test('the hash matches the Analytics Hub installer\'s test vector', () => {
+  assert.equal(createRedactor({ salt: Buffer.alloc(16) }).token('  Ada.Lovelace@Contoso.com '), 'user-1a37274c6a');
 });
 
 test('the redactor removes credential-shaped values wherever they appear', () => {
   const r = createRedactor();
-  const out = r.text(`token ${JWT}; Authorization: Bearer abc.def; ${SAS}; ${CONN}; Server=x;password=hunter2; secret ${CLIENT_SECRET}`);
+  const out = r.text(`token ${JWT}; Authorization: Bearer abc.defghij; ${SAS}; ${CONN}; Server=x;password=hunter2; secret ${CLIENT_SECRET}`);
   for (const s of SECRETS.filter((x) => x !== 'plain-client-secret-value')) assert.ok(!out.includes(s), `leaked ${s}`);
   assert.ok(out.includes(REMOVED));
   assert.ok(out.includes('AccountName=acct'), 'keeps the parts that are not secret');
+  const path = `/subscriptions/${TENANT}/resourceGroups/rg-valuelens-analytics-prod/providers/Microsoft.Storage/storageAccounts/abc`;
+  assert.equal(r.text(path), path, 'a long resource path is not a key');
+  assert.equal(r.text(`k ${'Ab1'.repeat(30)}`), `k ${REMOVED}`, 'a long base64 string is');
 });
 
 test('the redactor hashes people the same way throughout one file, and differently in another', () => {
@@ -89,11 +106,13 @@ test('the redactor hashes people the same way throughout one file, and different
   const a = r.text('ada.lovelace@example.com');
   assert.match(a, /^user-[0-9a-f]{10}$/);
   assert.equal(r.text('  ADA.Lovelace@Example.com'), `  ${a}`, 'lowercased and trimmed before hashing');
-  const v = /** @type {any} */ (r.value({ upn: 'ada.lovelace@example.com', displayName: 'Ada Lovelace', app: { displayName: 'ValueLens collector' } }));
-  assert.equal(v.upn, a);
-  assert.match(v.displayName, /^user-[0-9a-f]{10}$/);
+  r.learnFrom({ user: { displayName: 'Ada Lovelace' } });
+  const v = /** @type {any} */ (r.value({ user: { upn: 'ada.lovelace@example.com', displayName: 'Ada Lovelace' }, app: { displayName: 'ValueLens collector' } }));
+  assert.equal(v.user.upn, a);
+  assert.match(v.user.displayName, /^user-[0-9a-f]{10}$/);
   assert.equal(v.app.displayName, 'ValueLens collector', 'a thing\'s name is kept');
-  assert.equal(r.text('Ran by Ada Lovelace today'), `Ran by ${v.displayName} today`, 'learned names are hashed in free text');
+  assert.equal(r.text('Ran by Ada Lovelace today'), `Ran by ${v.user.displayName} today`, 'learned names are hashed in free text');
+  assert.equal(r.text('guest ada_example.com#EXT#@tenant.onmicrosoft.com'), `guest ${r.token('ada_example.com#EXT#@tenant.onmicrosoft.com')}`, 'a guest UPN is one token');
   assert.notEqual(createRedactor().text('ada.lovelace@example.com'), a, 'a fresh salt per file');
 });
 
@@ -103,7 +122,7 @@ test('the support file holds the eight files in order, with no secret, email or 
     const configFile = join(dir, 'valuelens-setup.json');
     writeFileSync(configFile, JSON.stringify(fabricRecord()));
     const ui = fakeUi().ui;
-    const log = attachRunLog(ui, diagnosticsFile(configFile), { now: () => NOW });
+    const log = attachRunLog(ui, runLogFile(configFile), { now: () => NOW });
     log.begin('install');
     log.signedIn({ upn: 'ada.lovelace@example.com', displayName: 'Ada Lovelace' });
     ui.step(1, 2, 'Sign in');
@@ -124,6 +143,9 @@ test('the support file holds the eight files in order, with no secret, email or 
     assert.ok(text.includes(TENANT) && text.includes(WORKSPACE), 'GUIDs are kept');
 
     const manifest = json(out.files, 'manifest.json');
+    assert.deepEqual(Object.keys(manifest), ['product', 'installerVersion', 'madeBy', 'createdAt', 'route', 'signedIn', 'files', 'redaction']);
+    assert.equal(manifest.madeBy, 'installer 1.2.3');
+    assert.equal(manifest.signedIn, true);
     assert.equal(manifest.product, 'valuelens');
     assert.equal(manifest.installerVersion, '1.2.3');
     assert.equal(manifest.route, 'fabric');
@@ -241,20 +263,50 @@ test('summariseLog redacts the first error it quotes', () => {
   assert.equal(s.firstError, `failed: ${REMOVED}`);
 });
 
-test('a successful run has no failed step', () => {
+test('a successful run has no failed step; the log keeps the last five runs, without status, preview or secrets', async () => {
   const dir = tmp();
   try {
-    const file = join(dir, 'd.json');
+    const configFile = join(dir, 'valuelens-setup.json');
+    const file = runLogFile(configFile);
+    assert.equal(file, join(dir, 'valuelens-setup.log.json'));
     const ui = fakeUi().ui;
-    const log = attachRunLog(ui, file);
-    log.begin('check');
-    ui.step(1, 1, 'Check');
-    ui.ok('Fine');
-    log.end(true);
+    let minute = 0;
+    const log = attachRunLog(ui, file, { now: () => new Date(Date.UTC(2026, 9, 27, 8, minute++)) });
+    for (const command of ['install', 'run', 'refresh', 'check', 'access', 'status', 'preview', 'check']) {
+      log.begin(command);
+      ui.step(1, 1, 'Check');
+      ui.ok(`Fine, with ${JWT}`);
+      log.end(command !== 'refresh');
+    }
     const d = JSON.parse(readFileSync(file, 'utf8'));
-    assert.equal(d.lastRun.ok, true);
-    assert.equal(d.lastRun.failedStep, null);
-    assert.equal(d.lastRun.error, null);
+    assert.deepEqual(d.runs.map((/** @type {any} */ x) => x.command), ['run', 'refresh', 'check', 'access', 'check']);
+    const last = d.runs[4];
+    assert.equal(last.ok, true);
+    assert.equal(last.failedStep, null);
+    assert.equal(last.error, null);
+    assert.ok(!readFileSync(file, 'utf8').includes(JWT), 'secrets are removed before saving');
+
+    const files = await collectSupportBundle({ configFile, version: '1.2.3', now: NOW });
+    const lastRun = json(files, 'last-run.json');
+    assert.equal(lastRun.command, 'check');
+    assert.deepEqual(lastRun.earlierRuns.map((/** @type {any} */ x) => [x.command, x.ok]), [['access', true], ['check', true], ['refresh', false], ['run', true]]);
+    assert.deepEqual(Object.keys(lastRun.earlierRuns[0]), ['command', 'startedAt', 'ok', 'failedStep', 'error']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('--log adds a summary of each log, and --offline says why live parts are missing', async () => {
+  const dir = tmp();
+  try {
+    const logFile = join(dir, 'collector.log');
+    writeFileSync(logFile, 'HTTP 429 Too Many Requests\nERROR timed out for grace@example.org\n');
+    const files = await collectSupportBundle({ configFile: join(dir, 'valuelens-setup.json'), version: '1.2.3', now: NOW, logs: [logFile, join(dir, 'gone.log')], offline: 'Offline: no sign-in.' });
+    const logs = json(files, 'logs-summary.json');
+    assert.equal(logs['collector.log'].http429, 1);
+    assert.equal(logs['collector.log'].timeouts, 1);
+    assert.match(logs['collector.log'].firstError, /^ERROR timed out for user-[0-9a-f]{10}$/);
+    assert.ok(logs['gone.log'].notCollected);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -273,4 +325,11 @@ test('--support-bundle runs on its own and defaults --out to this folder', () =>
   assert.equal(parseCli(['--support-bundle', '--use-az']).signInForSupport, true);
   assert.throws(() => parseCli(['install', '--support-bundle']), /runs on its own/);
   assert.throws(() => parseCli(['--support-bundle', '--ui']), /Create a support file/);
+  const b = parseCli(['--support-bundle', '--log', 'a.log', '--log', 'b.log', '--offline']);
+  assert.equal(b.offline, true);
+  assert.equal(b.signInForSupport, false);
+  assert.deepEqual(b.supportLogs.map((f) => f.split(/[\\/]/).pop()), ['a.log', 'b.log']);
+  assert.throws(() => parseCli(['--log', 'a.log']), /--log goes with --support-bundle/);
+  assert.throws(() => parseCli(['check', '--offline']), /--offline goes with --support-bundle/);
+  assert.throws(() => parseCli(['--support-bundle', '--offline', '--use-az']), /--offline doesn't sign in/);
 });

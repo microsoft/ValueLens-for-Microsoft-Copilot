@@ -22,7 +22,7 @@ import { reportUrl, tenantQuery } from './steps/report.js';
 import { isPax, TARGETS } from './target.js';
 import { routerWanted } from './uploads.js';
 import { SETUP_SECTIONS, setupRecovery } from './setup.js';
-import { attachRunLog, createSupportBundle, diagnosticsFile } from './support.js';
+import { attachRunLog, createSupportBundle, runLogFile } from './support.js';
 
 export const WEB_COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'status', 'rotate-secret', 'access', 'upload', 'deploy-app', 'uninstall', 'prereqs'];
 /** Commands that work before anything is installed. */
@@ -186,7 +186,7 @@ export function describeError(err) {
  */
 export function createSession(o) {
   const connect = o.connect ?? realConnect;
-  const runLog = attachRunLog(o.ui, diagnosticsFile(o.configFile));
+  const runLog = attachRunLog(o.ui, runLogFile(o.configFile));
   /** @type {{ api: import('./install.js').Apis, user: import('./install.js').User, method: Method, tenant: string, getToken?: (resource: import('./auth.js').Resource) => Promise<string> } | null} */
   let signedIn = null;
   /** @type {string | null} */

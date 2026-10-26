@@ -44,8 +44,8 @@ def test_secret_keys_removed_keyvault_and_guids_kept():
 
 def test_credential_shaped_values_removed():
     r = sf.Redactor()
-    out = r.text(f"{JWT} Bearer abc.def sig=SuperSecretSig&x AccountKey=QUJDREVGR0hJSktMTU5PUA==; password=hunter2 {CLIENT_SECRET}")
-    for s in SECRETS[:-1] + ["Bearer abc.def"]:
+    out = r.text(f"{JWT} Bearer abc.defghij sig=SuperSecretSig&x AccountKey=QUJDREVGR0hJSktMTU5PUA==; password=hunter2 {CLIENT_SECRET}")
+    for s in SECRETS[:-1] + ["Bearer abc.defghij"]:
         assert s not in out
     assert r.counts["secrets"] == 6
 
@@ -161,3 +161,45 @@ def test_cli_writes_to_out(tmp_path, capsys):
 def test_bad_route_rejected():
     with pytest.raises(ValueError):
         sf.collect("dataverse")
+
+
+def test_parity_vector_with_analytics_hub():
+    assert sf.Redactor(salt=bytes(16)).token("  Ada.Lovelace@Contoso.com ") == "user-1a37274c6a"
+
+
+def test_secret_keys_keep_ids_dates_numbers_and_booleans():
+    r = sf.Redactor()
+    out = r.value({"secretExpiry": "2027-01-31T00:00:00Z", "clientSecretId": TENANT, "tokenLifetime": 3600, "keyRotated": True, "sasUrl": "https://x/y?sv=1", "secret": {"value": "s3cret", "id": TENANT}})
+    assert out == {"secretExpiry": "2027-01-31T00:00:00Z", "clientSecretId": TENANT, "tokenLifetime": 3600, "keyRotated": True, "sasUrl": sf.REMOVED, "secret": {"value": sf.REMOVED, "id": TENANT}}
+
+
+def test_resource_paths_kept_long_base64_removed():
+    r = sf.Redactor()
+    path = "/subscriptions/" + TENANT + "/resourceGroups/rg-valuelens-collector-production-westeurope/providers/Microsoft.Web/sites/collector"
+    blob = "Ab1" * 30
+    assert r.text(path) == path
+    assert r.text(f"key {blob}") == f"key {sf.REMOVED}"
+
+
+def test_guest_upn_hashed():
+    r = sf.Redactor()
+    assert re.fullmatch(r"user-[0-9a-f]{10}", r.text("ada_example.com#EXT#@tenant.onmicrosoft.com"))
+
+
+def test_manifest_matches_analytics_hub_and_run_log_fills_last_run(tmp_path):
+    rec = tmp_path / "valuelens-setup.json"
+    rec.write_text(json.dumps({"tenantId": TENANT, "signedInAs": "ada.lovelace@example.com"}), encoding="utf-8")
+    runs = [{"command": "install", "startedAt": f"2026-10-2{i}T08:00:00Z", "ok": i == 3, "failedStep": None if i == 3 else 2, "error": None if i == 3 else "HTTP 401 for ada.lovelace@example.com", "steps": []} for i in (1, 2, 3)]
+    (tmp_path / "valuelens-setup.log.json").write_text(json.dumps({"runs": runs, "prereqs": {"at": "2026-10-23T08:00:00Z", "items": [{"name": "Fabric admin", "ok": False}]}}), encoding="utf-8")
+    log = tmp_path / "collector.log"
+    log.write_text("HTTP 429\nERROR timed out\n", encoding="utf-8")
+    files = _files(sf.collect("fabric", config=rec, log_files=[log, tmp_path / "missing.log"], now=NOW))
+    m = json.loads(files["manifest.json"])
+    assert list(m) == ["product", "installerVersion", "madeBy", "createdAt", "route", "signedIn", "files", "redaction"]
+    assert m["madeBy"] == f"support_file.py {sf.TOOL_VERSION}" and m["signedIn"] is False
+    last = json.loads(files["last-run.json"])
+    assert last["startedAt"] == "2026-10-23T08:00:00Z" and [x["startedAt"] for x in last["earlierRuns"]] == ["2026-10-22T08:00:00Z", "2026-10-21T08:00:00Z"]
+    assert "ada.lovelace" not in files["last-run.json"]
+    assert json.loads(files["prereqs.json"])["live"] is False
+    logs = json.loads(files["logs-summary.json"])
+    assert logs["collector.log"]["http429"] == 1 and "notCollected" in logs["missing.log"]

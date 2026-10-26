@@ -58,29 +58,37 @@ ROUTE_NAMES = {
 }
 
 # The same rules as the installer (installer/src/support.js) and the Analytics Hub installer.
-SECRET_KEY = re.compile(r"secret|password|token|key(?!Vault)|signature|connectionString|sas|credential|authorization", re.I)
-SECRET_VALUES = [
-    re.compile(r"\beyJ[\w-]{4,}\.[\w-]{4,}\.[\w-]*"),  # JWT
-    re.compile(r"\bBearer\s+[\w.~+/=-]+", re.I),
-    re.compile(r"\bsig=[^&\s\"';]+", re.I),  # SAS signature
-    re.compile(r"\bAccountKey=[^;\s\"']+", re.I),
-    re.compile(r"\b(?:password|pwd)=[^;\s\"'&]+", re.I),
-    re.compile(r"[\w~.-]{3}\dQ~[\w~.-]{31,34}"),  # Entra client secret
-]
-EMAIL = re.compile(r"[A-Za-z0-9._%+'-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
+SECRET_KEY = re.compile(r"secret|passw(or)?d|^pwd$|token|key(?!vault)|signature|connectionstring|^sas|sas(url|uri)?$|credential|authori[sz]ation|cookie", re.I)
 PERSON_KEY = re.compile(
-    r"^(upn|userPrincipalName|mail|email|adminEmail|contact|owner|createdBy|userName|userDisplayName|signedInUser|displayName|givenName|surname)$",
+    r"^(givenName|surname|fullName|userName|contact|owner|owners|createdBy|lastModifiedBy|requestedBy|upn|userPrincipalName|mail|email|adminEmail|user|signedInAs|signedInUser|userDisplayName)$",
     re.I,
 )
-THING_PARENT = re.compile(r"^(app|keyVault|fabric|semanticModel|managedApp|powerBi|sharePoint|pax|access)$", re.I)
+GUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$")
+EMAIL = re.compile(r"[A-Za-z0-9._%+'#-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
+SECRET_TEXT = [
+    (re.compile(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*"), REMOVED),  # JWT
+    (re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]{8,}", re.I), "Bearer " + REMOVED),
+    (
+        re.compile(
+            r"\b(sig|AccountKey|SharedAccessKey|SharedAccessSignature|client_secret|client_assertion|code_verifier|refresh_token|access_token|id_token|password|pwd)(\s*[=:]\s*)(\"?)[^;&\s\"',}]+",
+            re.I,
+        ),
+        r"\1\2\3" + REMOVED,
+    ),
+    (re.compile(r"\b[A-Za-z0-9_.-]{2,5}~[A-Za-z0-9_.~-]{30,}"), REMOVED),  # Entra client secret
+]
+LONG_BASE64 = re.compile(r"[A-Za-z0-9+/_=-]{80,}")
+RESOURCE_PATH = re.compile(r"/(subscriptions|resourceGroups|providers|groups|workspaces|items)/", re.I)
 
 REDACTION_RULES = [
-    f'Values under keys matching /{SECRET_KEY.pattern}/i are replaced with "{REMOVED}".',
-    f'Values that look like a JWT, a Bearer token, a SAS signature (sig=), an AccountKey=, a password= or an Entra client secret are replaced with "{REMOVED}".',
-    "Email addresses, UPNs and people's names are replaced with user-<hash>: SHA-256 of a random salt and the lowercased value. "
-    "The salt is never saved, so the hashes can't be reversed, but the same person gets the same hash throughout this file.",
-    "Tenant, workspace and item IDs (GUIDs) are kept: they are needed to troubleshoot.",
-    "No data rows are read or included: only row counts.",
+    "Values under keys that name a secret, token, key, password, signature, SAS, credential or connection string are removed. "
+    "GUIDs, dates, numbers and true/false under them stay, such as when a secret expires.",
+    "Tokens (JWTs), bearer tokens, SAS signatures, account and shared access keys, client secrets and long base64 strings are removed from any text.",
+    "Email addresses, UPNs and people's names are replaced by user- and 10 hex digits: a SHA-256 hash with a random salt that is used for "
+    "this file only and kept nowhere. The same person has the same token throughout the file.",
+    "Tenant, workspace and item IDs (GUIDs) are kept, so we can find the right run.",
+    "No data rows are read: tables appear as row counts only.",
 ]
 
 LOG_RULES = {
@@ -100,12 +108,13 @@ def not_collected(reason: str) -> Dict[str, str]:
 
 
 class Redactor:
-    """Hashes people and removes secrets, counting what it changed. One per support file."""
+    """Removes secrets and hashes people, counting what it changed. One per support file."""
 
-    def __init__(self, salt: Optional[bytes] = None) -> None:
+    def __init__(self, salt: Optional[bytes] = None, people: bool = True) -> None:
         self.salt = salt if salt is not None else _secrets.token_bytes(16)
+        self.people = people
         self.counts = {"secrets": 0, "emails": 0, "names": 0}
-        self.names: List[str] = []
+        self.names: set = set()
 
     def token(self, value: str) -> str:
         h = hashlib.sha256(self.salt + value.strip().lower().encode("utf-8")).hexdigest()
@@ -115,39 +124,50 @@ class Redactor:
         if not isinstance(name, str):
             return
         n = name.strip()
-        if len(n) < 3 or "@" in n or re.fullmatch(r"user-[0-9a-f]{10}", n):
+        if len(n) < 3 or "@" in n or GUID.match(n) or re.fullmatch(r"user-[0-9a-f]{10}", n):
             return
-        if n not in self.names:
-            self.names = sorted([*self.names, n], key=len, reverse=True)
+        self.names.add(n)
 
-    def learn_from(self, v: Any, key: Optional[str] = None, parent: Optional[str] = None) -> None:
+    def learn_from(self, v: Any, person: bool = False) -> None:
+        """Learns every name under a person key, so the same names in free text are hashed too."""
         if isinstance(v, str):
-            if key and PERSON_KEY.match(key) and not (key == "displayName" and parent and THING_PARENT.match(parent)):
+            if person:
                 self.learn(v)
         elif isinstance(v, list):
             for x in v:
-                self.learn_from(x, None, key)
+                self.learn_from(x, person)
         elif isinstance(v, dict):
             for k, x in v.items():
-                self.learn_from(x, k, key)
+                self.learn_from(x, person or bool(PERSON_KEY.match(str(k))))
 
     def text(self, s: str) -> str:
-        out = str(s)
+        out = re.sub(r"\x1b\[[0-9;]*m", "", str(s))
+        for rx, to in SECRET_TEXT:
 
-        def removed(_m: "re.Match[str]") -> str:
+            def removed(m: "re.Match[str]", to: str = to) -> str:
+                self.counts["secrets"] += 1
+                return m.expand(to)
+
+            out = rx.sub(removed, out)
+
+        def base64(m: "re.Match[str]") -> str:
+            s = m.group(0)
+            if RESOURCE_PATH.search(s) or not (re.search(r"\d", s) and re.search(r"[A-Z]", s) and re.search(r"[a-z]", s)):
+                return s
             self.counts["secrets"] += 1
             return REMOVED
 
-        for rx in SECRET_VALUES:
-            out = rx.sub(removed, out)
+        out = LONG_BASE64.sub(base64, out)
+        if not self.people:
+            return out
 
         def email(m: "re.Match[str]") -> str:
             self.counts["emails"] += 1
             return self.token(m.group(0))
 
         out = EMAIL.sub(email, out)
-        for n in self.names:
-            rx = re.compile(r"(?<![\w])" + re.escape(n) + r"(?![\w])", re.I)
+        for n in sorted(self.names, key=len, reverse=True):
+            rx = re.compile(r"(?<![\w-])" + re.escape(n) + r"(?![\w-])", re.I)
 
             def name(_m: "re.Match[str]", n: str = n) -> str:
                 self.counts["names"] += 1
@@ -156,23 +176,28 @@ class Redactor:
             out = rx.sub(name, out)
         return out
 
-    def value(self, value: Any, key: Optional[str] = None, parent: Optional[str] = None) -> Any:
-        if key is not None and SECRET_KEY.search(key) and value not in (None, "", False):
-            self.counts["secrets"] += 1
-            return REMOVED
-        if isinstance(value, str):
-            if key is not None and PERSON_KEY.match(key) and not (key == "displayName" and parent and THING_PARENT.match(parent)) and value.strip():
-                if "@" in value:
-                    return self.text(value)
-                self.learn(value)
-                self.counts["names"] += 1
-                return self.token(value)
-            return self.text(value)
-        if isinstance(value, list):
-            return [self.value(v, None, key) for v in value]
-        if isinstance(value, dict):
-            return {k: self.value(v, k, key) for k, v in value.items()}
-        return value
+    def _walk(self, v: Any, secret: bool, person: bool) -> Any:
+        if v is None or isinstance(v, (bool, int, float)):
+            return v
+        if isinstance(v, str):
+            if secret:
+                if not v or GUID.match(v) or ISO_DATE.match(v):
+                    return v
+                self.counts["secrets"] += 1
+                return REMOVED
+            if person and self.people and v.strip() and not GUID.match(v):
+                self.counts["emails" if "@" in v else "names"] += 1
+                return self.token(v)
+            return self.text(v)
+        if isinstance(v, list):
+            return [self._walk(x, secret, person) for x in v]
+        if isinstance(v, dict):
+            return {k: self._walk(x, secret or bool(SECRET_KEY.search(str(k))), person or bool(PERSON_KEY.match(str(k)))) for k, x in v.items()}
+        return REMOVED
+
+    def value(self, v: Any) -> Any:
+        """A redacted copy of any JSON value."""
+        return self._walk(v, False, False)
 
 
 def summarise_log(text: str, r: Redactor) -> Dict[str, Any]:
@@ -247,6 +272,7 @@ def collect(
     data: Optional[Path] = None,
     logs: Optional[Path] = None,
     pax_root: Optional[Path] = None,
+    log_files: Optional[List[Path]] = None,
     table_counts: Optional[Callable[[], Dict[str, Any]]] = None,
     runs: Any = None,
     now: Optional[datetime] = None,
@@ -275,8 +301,21 @@ def collect(
         files["settings.json"] = not_collected("No settings file was given. Pass --config with your settings or install record.")
 
     manual = "Made with the manual support script, not the installer, so there is no installer run to show."
-    files["last-run.json"] = not_collected(manual)
-    files["prereqs.json"] = not_collected(manual + " Run the installer's prereqs command to check prerequisites and permissions.")
+    run_log = read_json(Path(str(config)[: -len(".json")] + ".log.json") if config and str(config).lower().endswith(".json") else None)
+    runs_logged = run_log.get("runs") if isinstance(run_log, dict) and isinstance(run_log.get("runs"), list) else []
+    r.learn_from(run_log)
+    if runs_logged:
+        last = dict(runs_logged[-1])
+        last["earlierRuns"] = [
+            {k: x.get(k) for k in ("command", "startedAt", "ok", "failedStep", "error")} for x in reversed(runs_logged[:-1]) if isinstance(x, dict)
+        ]
+        files["last-run.json"] = r.value(last)
+    else:
+        files["last-run.json"] = not_collected(manual)
+    prereqs = run_log.get("prereqs") if isinstance(run_log, dict) else None
+    files["prereqs.json"] = r.value({**prereqs, "live": False}) if isinstance(prereqs, dict) else not_collected(
+        manual + " Run the installer's prereqs command to check prerequisites and permissions."
+    )
 
     if runs is not None:
         files["runs.json"] = r.value(runs)
@@ -298,11 +337,11 @@ def collect(
     files["row-counts.json"] = counts if counts is not None else not_collected("No data folder or tables were given. Pass --data with the folder that holds the CSVs.")
 
     summaries: Dict[str, Any] = {}
-    for p in newest_logs(Path(logs)) if logs else []:
+    for p in [*(newest_logs(Path(logs)) if logs else []), *[Path(x) for x in (log_files or [])]]:
         try:
             summaries[p.name] = summarise_log(p.read_text(encoding="utf-8", errors="replace"), r)
         except OSError:
-            summaries[p.name] = not_collected("The log couldn't be read.")
+            summaries[p.name] = not_collected(f"Couldn't read {p.name}.")
     files["logs-summary.json"] = summaries or not_collected("No logs were found. Pass --logs with the folder that holds them.")
 
     body = [{"name": n, "text": json.dumps(files[n], indent=2, ensure_ascii=False) + "\n"} for n in SUPPORT_FILES[2:]]
@@ -311,10 +350,9 @@ def collect(
     manifest = {
         "product": PRODUCT,
         "installerVersion": None,
-        "tool": f"support_file.py {TOOL_VERSION}",
+        "madeBy": f"support_file.py {TOOL_VERSION}",
         "createdAt": created,
         "route": route,
-        "routeName": ROUTE_NAMES[route],
         "signedIn": False,
         "files": [{"name": "README.txt", "bytes": len(readme.encode("utf-8"))}]
         + [{"name": f["name"], "bytes": len(f["text"].encode("utf-8"))} for f in body],
@@ -408,11 +446,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--data", type=Path, help="The folder that holds the CSV output. Only the rows are counted.")
     p.add_argument("--logs", type=Path, help="The folder that holds the refresh logs.")
     p.add_argument("--pax-root", type=Path, help="The PAX refresh folder (holds state.json, logs and data).")
+    p.add_argument("--log", type=Path, action="append", default=[], help="A log file to summarise. Repeat for more.")
     p.add_argument("--out", type=Path, default=Path("."), help="The folder for the zip (default: this folder).")
     a, _ = p.parse_known_args(argv)
     route = a.route or ("pax" if a.pax_root else "csv")
     now = datetime.now(timezone.utc)
-    files = collect(route, config=a.config, data=a.data, logs=a.logs, pax_root=a.pax_root, now=now)
+    files = collect(route, config=a.config, data=a.data, logs=a.logs, pax_root=a.pax_root, log_files=a.log, now=now)
     path = write_zip(files, a.out / file_name(now))
     print(f"Support file: {path.resolve()}")
     for f in files:
