@@ -6,9 +6,10 @@ HTTP is faked at the session level; Azure SQL is stood in for by sqlite3.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import duckdb
@@ -69,11 +70,26 @@ def no_http(method, url, kw):
     raise AssertionError(f"unexpected HTTP {method} {url}")
 
 
-def write_csv(folder: Path, name: str, header: list[str], rows: list[list]) -> Path:
+def utc(*when) -> float:
+    return datetime(*when, tzinfo=timezone.utc).timestamp()
+
+
+# When the drop folder's files were uploaded, unless a test says otherwise: in TODAY's month, so a Studio
+# per-agent or per-user export counts as that month's.
+UPLOADED = utc(2026, 9, 5, 12)
+
+
+def csv_text(header: list[str], rows: list[list]) -> str:
+    lines = [",".join(header)] + [",".join("" if v is None else str(v) for v in r) for r in rows]
+    return "\n".join(lines) + "\n"
+
+
+def write_csv(folder: Path, name: str, header: list[str], rows: list[list], uploaded: float | None = UPLOADED) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / name
-    lines = [",".join(header)] + [",".join("" if v is None else str(v) for v in r) for r in rows]
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    path.write_text(csv_text(header, rows), encoding="utf-8")
+    if uploaded is not None:
+        os.utime(path, (uploaded, uploaded))
     return path
 
 
@@ -81,6 +97,24 @@ def table(store: LocalStore, name: str, where: str = "TRUE", order: str = "ALL")
     path = (store.root / "curated" / name / "part-0.parquet").as_posix()
     rel = duckdb.sql(f"SELECT * FROM read_parquet('{path}') WHERE {where} ORDER BY {order}")
     return [dict(zip(rel.columns, r)) for r in rel.fetchall()]
+
+
+def pick(store: LocalStore, name: str, cols: list[str], where: str = "TRUE") -> list[tuple]:
+    return [tuple(r[c] for c in cols) for r in table(store, name, where, ", ".join(cols))]
+
+
+def seed(store: LocalStore, name: str, rows: list[dict]) -> None:
+    """Stores `rows` as the Studio table `name`, as an earlier version left it; columns not given are NULL."""
+    cols = studio.SCHEMAS[name]
+    columns = ", ".join(f'"{c}" {t}' for c, t in cols)
+    con = duckdb.connect()
+    con.execute(f"CREATE TABLE t ({columns})")
+    con.executemany(f"INSERT INTO t VALUES ({', '.join('?' for _ in cols)})",
+                    [[r.get(c) for c, _ in cols] for r in rows])
+    target = store.root / "curated" / name / "part-0.parquet"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    con.execute(f"COPY t TO '{target.as_posix()}' (FORMAT PARQUET)")
+    con.close()
 
 
 # ---------------------------------------------------------------- settings
@@ -190,6 +224,45 @@ def test_sharepoint_dropfolder_site_lookup_failure_is_an_error():
         SharePointDropFolder(api, "contoso.sharepoint.com,1,2", "b!d", "").list("studio")
 
 
+def test_dropfolder_list_and_fetch_still_skip_the_backfill_folder(tmp_path):
+    # The other collectors read only the files directly in their folder, on both drop folders.
+    write_csv(tmp_path / "landing" / "studio", "a.csv", ["x"], [[1]])
+    write_csv(tmp_path / "landing" / "studio" / "backfill" / "2026-08", "c.csv", ["x"], [[1]])
+    drop = StoreDropFolder(LocalStore(tmp_path))
+    assert [n for n, _ in drop.list("studio")] == ["a.csv"]
+    assert [p.name for p in drop.fetch("studio")] == ["a.csv"]
+
+    site = "contoso.sharepoint.com,1111,2222"
+    routes = {
+        f"{G}/sites/{site}": Resp(200, {"id": site}),
+        f"{G}/drives/b!drive/root:/ValueLens/studio:/children": Resp(200, {"value": [
+            {"name": "a.csv", "id": "i1", "file": {}, "lastModifiedDateTime": "2026-09-05T12:00:00Z"},
+            {"name": "backfill", "id": "bf", "folder": {"childCount": 1}}]}),
+        f"{G}/drives/b!drive/items/i1/content": Resp(200, content=b"x\n1\n"),
+    }
+    api, session = make_api(_sharepoint_handler(routes))
+    drop = SharePointDropFolder(api, site, "b!drive", "ValueLens")
+    assert [n for n, _ in drop.list("studio")] == ["a.csv"]
+    assert [p.name for p in drop.fetch("studio", tmp_path / "dl")] == ["a.csv"]
+    assert not any("/items/bf" in c[1] for c in session.calls)
+
+
+def test_store_dropfolder_fetch_tree_reads_one_folder_two_levels_down(tmp_path):
+    folder = tmp_path / "landing" / "studio"
+    write_csv(folder, "a.csv", ["x"], [[1]])
+    write_csv(folder / "backfill", "stray.csv", ["x"], [[1]], uploaded=utc(2026, 8, 1))
+    write_csv(folder / "backfill" / "2026-08", "c.csv", ["x"], [[1]], uploaded=utc(2026, 8, 2))
+    write_csv(folder / "backfill" / "2026-08" / "old", "d.csv", ["x"], [[1]])
+    write_csv(folder / "archive", "e.csv", ["x"], [[1]])
+    tree = StoreDropFolder(LocalStore(tmp_path)).fetch_tree("studio", nested="backfill")
+    assert tree.root == "landing/studio"
+    # The upload time is the blob's, which pull stamps on the local copy.
+    assert [(f.rel, f.uploaded) for f in tree.files] == [
+        ("a.csv", UPLOADED), ("backfill/2026-08/c.csv", utc(2026, 8, 2)), ("backfill/stray.csv", utc(2026, 8, 1))]
+    assert tree.files[0].path == folder / "a.csv"
+    assert tree.folders == ("backfill", "backfill/2026-08", "backfill/2026-08/old")
+
+
 # ---------------------------------------------------------------- studio
 TENANT_HEADER = ["BillingPlan Id", "BillingPlan Name", "Environment Id", "Environment Name", "Capacity Type",
                  "Entitled Quantity", "Prepaid Consumed Quantity", "Pay as you go Consumed Quantity", "Usage Date"]
@@ -247,6 +320,27 @@ def _export_files(folder: Path) -> dict:
                 ["user-x", "Alex@Contoso-Demo.com", "agent-1", "HR Bot", 50, 60, "Yes"],
             ]),
     }
+
+
+def _agent(agent_id: str, billed) -> list:
+    """A per-agent export row: Classic answer, Teams, env-1."""
+    return ["HR Bot", agent_id, "Copilot Studio", "Classic answer", billed, 0, "Teams", "", "", "", "", "env-1",
+            "Env One"]
+
+
+def _user(user_id: str, billed) -> list:
+    """A per-user export row for agent-1."""
+    return [user_id, f"{user_id}@contoso-demo.com", "agent-1", "HR Bot", billed, billed, "Yes"]
+
+
+def _day(day: str, prepaid, env: str = "env-1") -> list:
+    """A tenant export row for plan-1 on `day` (M/D) 2026."""
+    return ["plan-1", "Prepaid plan", env, "Env One", "MCSMessages", 1000, prepaid, 0, f"{day}/2026 0:00"]
+
+
+def _api_day(day: str, billed, env: str = "env-1") -> list:
+    """A flow row (StudioApiAgentDaily) for agent-1 on `day` (YYYY-MM-DD)."""
+    return [day, "agent-1", "HR Bot", env, "", "Classic answer", "Teams", "", "", "", billed, 0, 1]
 
 
 def test_studio_api_rollups_and_tenant_split(tmp_path):
@@ -363,10 +457,42 @@ def test_studio_user_lookup_failure_is_not_fatal(tmp_path):
     assert "network down" in out["upn_lookup_error"]
 
 
-def test_studio_export_missing_column_fails(tmp_path):
+def test_studio_export_without_its_key_columns_is_skipped_with_a_warning(tmp_path, caplog):
+    caplog.set_level("INFO", logger="valuelens_jobs.collect.studio")
     bad = write_csv(tmp_path, "Tenant.csv", ["Environment Id"], [["env-1"]])
-    with pytest.raises(ValueError, match="BillingPlan Id"):
-        studio.ingest(LocalStore(tmp_path / "store"), {"Tenant.csv": bad}, today=TODAY)
+    out = studio.ingest(LocalStore(tmp_path / "store"), {"Tenant.csv": bad}, today=TODAY)
+    assert out["tables"] == {}
+    assert ("studio/Tenant.csv: skipped as the tenant export, missing column(s): Usage Date, BillingPlan Id, "
+            "Capacity Type") in caplog.text
+    assert "no tenant export - skipping" in caplog.text
+
+    # A file with its export's key columns is read, so any other column that export needs is still required.
+    agent = write_csv(tmp_path, "PerAgent.csv", AGENT_HEADER[1:], [_agent("agent-1", 1)[1:]])
+    with pytest.raises(ValueError, match="no column 'Agent Name'"):
+        studio.ingest(LocalStore(tmp_path / "store2"), {"PerAgent.csv": agent}, today=TODAY)
+
+
+def test_studio_per_agent_and_per_user_exports_load_without_a_tenant_export(tmp_path, caplog):
+    # Their names contain "Tenant", so *Tenant*.csv matches them; the header check keeps them out of the tenant load.
+    caplog.set_level("INFO", logger="valuelens_jobs.collect.studio")
+    files = _export_files(tmp_path / "drop")
+    files.pop("EntitlementConsumptionTenantDetailsReport_MCSMessages_1.csv")
+    store = LocalStore(tmp_path / "store")
+    out = studio.ingest(store, files, today=TODAY)
+    assert out["tables"] == {"studio_agent": 1, "studio_user": 1}
+    assert ("studio/EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_1.csv: skipped as the tenant "
+            "export, missing column(s): Usage Date, BillingPlan Id, Capacity Type") in caplog.text
+    assert ("studio/EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_1.csv: skipped as the tenant "
+            "export, missing column(s): Usage Date, Environment Id, BillingPlan Id, Capacity Type") in caplog.text
+    assert pick(store, "studio_agent", ["snapshot_month", "agent_id", "billed_credit"]) == [
+        (date(2026, 9, 1), "agent-1", 99.0)]
+
+    # A per-user export whose name matches *Agent*.csv is read as the per-user export only.
+    users = write_csv(tmp_path / "drop2", "AgentUsers.csv", USER_HEADER, [_user("user-x", 5)])
+    out = studio.ingest(LocalStore(tmp_path / "s2"), {"AgentUsers.csv": users}, today=TODAY)
+    assert out["tables"] == {"studio_user": 1}
+    assert ("studio/AgentUsers.csv: skipped as the per-agent export, missing column(s): AI Feature/Billable "
+            "Feature, Channel, Environment Id") in caplog.text
 
 
 def test_collect_studio_reads_landing_container(tmp_path):
@@ -378,6 +504,282 @@ def test_collect_studio_reads_landing_container(tmp_path):
     assert out["tables"] == {"studio_tenant_daily": 1, "studio_agent": 1, "studio_user": 1}
     assert (tmp_path / "curated" / "studio_agent" / "part-0.parquet").is_file()
     assert sorted(p.name for p in (tmp_path / "landing" / "studio").iterdir()) == sorted(_export_files(tmp_path / "x"))
+
+
+def test_collect_studio_counts_each_export_as_the_month_it_was_uploaded(tmp_path):
+    # The month is UTC's: one minute either side of midnight on 1 September.
+    folder = tmp_path / "landing" / "studio"
+    write_csv(folder, "PerAgent_aug.csv", AGENT_HEADER, [_agent("agent-1", 8)], uploaded=utc(2026, 8, 31, 23, 59))
+    write_csv(folder, "PerAgent_sep.csv", AGENT_HEADER, [_agent("agent-1", 9)], uploaded=utc(2026, 9, 1, 0, 1))
+    write_csv(folder, "PerUser_aug.csv", USER_HEADER, [_user("user-x", 2)], uploaded=utc(2026, 8, 2))
+    write_csv(folder, "PerUser_sep.csv", USER_HEADER, [_user("user-x", 9)], uploaded=utc(2026, 9, 9))
+    store = LocalStore(tmp_path)
+    out = studio.collect_studio(None, store, Settings(), today=TODAY)
+    assert out["files"] == 4 and out["tables"] == {"studio_agent": 2, "studio_user": 2}
+    assert pick(store, "studio_agent", ["snapshot_month", "agent_id", "billed_credit", "source_file"]) == [
+        (date(2026, 8, 1), "agent-1", 8.0, "PerAgent_aug.csv"), (date(2026, 9, 1), "agent-1", 9.0, "PerAgent_sep.csv")]
+    assert pick(store, "studio_user", ["snapshot_month", "user_id", "billable_credit_used", "source_file"]) == [
+        (date(2026, 8, 1), "user-x", 2.0, "PerUser_aug.csv"), (date(2026, 9, 1), "user-x", 9.0, "PerUser_sep.csv")]
+
+
+def test_collect_studio_reads_sharepoint_upload_months_and_backfill(tmp_path, caplog):
+    caplog.set_level("INFO", logger="valuelens_jobs.collect.studio")
+    site, items = "contoso.sharepoint.com,1111,2222", f"{G}/drives/b!drive/items"
+    content = {f"a{n}": csv_text(AGENT_HEADER, [_agent("agent-1", n)]) for n in (7, 8, 9)}
+    content["u9"] = csv_text(USER_HEADER, [_user("user-x", 9)])
+    routes = {
+        f"{G}/sites/{site}": Resp(200, {"id": site}),
+        f"{G}/drives/b!drive/root:/ValueLens/studio:/children": Resp(200, {"value": [
+            {"name": "PerAgent_aug.csv", "id": "a8", "file": {}, "lastModifiedDateTime": "2026-08-31T23:59:00Z"},
+            {"name": "backfill", "id": "bf", "folder": {"childCount": 1}},
+            {"name": "archive", "id": "ar", "folder": {"childCount": 1}}],
+            "@odata.nextLink": f"{G}/studio-page-2"}),
+        f"{G}/studio-page-2": Resp(200, {"value": [
+            {"name": "PerAgent_sep.csv", "id": "a9", "file": {}, "lastModifiedDateTime": "2026-09-01T00:01:00Z"},
+            {"name": "PerUser.csv", "id": "u9", "file": {}}]}),
+        f"{items}/bf/children": Resp(200, {"value": [{"name": "2026-07", "id": "m7", "folder": {"childCount": 2}}]}),
+        f"{items}/m7/children": Resp(200, {"value": [
+            # Uploaded in September, but its folder makes it July's.
+            {"name": "PerAgent_jul.csv", "id": "a7", "file": {}, "lastModifiedDateTime": "2026-09-03T08:00:00Z"},
+            {"name": "old", "id": "old", "folder": {"childCount": 1}}]}),
+        f"{G}/drives/b!drive/root:/ValueLens/viva:/children": Resp(404, {"error": {"code": "itemNotFound"}}),
+        **{f"{items}/{i}/content": Resp(200, content=body.encode()) for i, body in content.items()},
+    }
+    api, session = make_api(_sharepoint_handler(routes))
+    store = LocalStore(tmp_path / "store")
+    s = Settings(drop_site_id=site, drop_drive_id="b!drive", drop_folder="ValueLens")
+    out = studio.collect_studio(api, store, s, today=TODAY)
+    assert out["files"] == 4
+    assert pick(store, "studio_agent", ["snapshot_month", "billed_credit"]) == [
+        (date(2026, 7, 1), 7.0), (date(2026, 8, 1), 8.0), (date(2026, 9, 1), 9.0)]
+    assert pick(store, "studio_user", ["snapshot_month", "user_id"]) == [(date(2026, 9, 1), "user-x")]
+    assert "ValueLens/studio/PerUser.csv: no upload time, so it counts as this month, 2026-09" in caplog.text
+    assert "ValueLens/studio/backfill/2026-07/old: a folder inside a month folder isn't read" in caplog.text
+    assert not any(f"{items}/ar/" in c[1] or f"{items}/old/" in c[1] for c in session.calls)
+
+    drop = SharePointDropFolder(api, site, "b!drive", "ValueLens")
+    tree = drop.fetch_tree("studio", tmp_path / "dl", nested="backfill")
+    assert tree.root == "ValueLens/studio"
+    assert tree.folders == ("backfill", "backfill/2026-07", "backfill/2026-07/old")
+    assert [(f.rel, f.uploaded) for f in tree.files] == [
+        ("PerAgent_aug.csv", utc(2026, 8, 31, 23, 59)), ("PerAgent_sep.csv", utc(2026, 9, 1, 0, 1)),
+        ("PerUser.csv", None), ("backfill/2026-07/PerAgent_jul.csv", utc(2026, 9, 3, 8))]
+    jul = tree.files[-1].path
+    assert jul == tmp_path / "dl" / "studio" / "backfill" / "2026-07" / "PerAgent_jul.csv"
+    assert jul.read_bytes() == content["a7"].encode() and jul.stat().st_mtime == utc(2026, 9, 3, 8)
+    empty = drop.fetch_tree("viva", tmp_path / "dl", nested="backfill")
+    assert (empty.root, empty.files, empty.folders) == ("ValueLens/viva", (), ())
+
+
+def test_studio_newest_export_wins_each_key(tmp_path, caplog):
+    caplog.set_level("INFO", logger="valuelens_jobs.collect.studio")
+    drop = tmp_path / "drop"
+    files = {
+        "PerAgent_a.csv": write_csv(drop, "PerAgent_a.csv", AGENT_HEADER, [_agent("agent-1", 30)],
+                                    uploaded=utc(2026, 9, 8)),
+        "PerAgent_b.csv": write_csv(drop, "PerAgent_b.csv", AGENT_HEADER, [_agent("agent-1", 10), _agent("agent-2", 5)],
+                                    uploaded=utc(2026, 9, 2)),
+        # Uploaded at the same moment: the name decides.
+        "PerUser_y.csv": write_csv(drop, "PerUser_y.csv", USER_HEADER, [_user("user-x", 1)], uploaded=utc(2026, 9, 4)),
+        "PerUser_z.csv": write_csv(drop, "PerUser_z.csv", USER_HEADER, [_user("user-x", 2), _user("user-x", 3)],
+                                   uploaded=utc(2026, 9, 4)),
+    }
+    store = LocalStore(tmp_path / "store")
+    studio.ingest(store, files, today=TODAY)
+    assert pick(store, "studio_agent", ["agent_id", "billed_credit", "source_file"]) == [
+        ("agent-1", 30.0, "PerAgent_a.csv"), ("agent-2", 5.0, "PerAgent_b.csv")]
+    # Rows that share a key within one file all stay, as the merge keeps them.
+    assert pick(store, "studio_user", ["user_id", "billable_credit_used", "source_file"]) == [
+        ("user-x", 2.0, "PerUser_z.csv"), ("user-x", 3.0, "PerUser_z.csv")]
+    assert "row(s) replaced by a newer export" in caplog.text
+
+    before = {t: table(store, t) for t in ("studio_agent", "studio_user")}
+    studio.ingest(store, files, today=TODAY)
+    assert {t: table(store, t) for t in before} == before
+
+
+def test_studio_overlapping_tenant_exports_count_each_day_once(tmp_path):
+    drop = tmp_path / "drop"
+    files = {
+        "Tenant_1.csv": write_csv(drop, "Tenant_1.csv", TENANT_HEADER, [_day("8/4", 12), _day("8/5", 6)],
+                                  uploaded=utc(2026, 8, 6)),
+        "Tenant_2.csv": write_csv(drop, "Tenant_2.csv", TENANT_HEADER, [_day("8/5", 7), _day("8/6", 5)],
+                                  uploaded=utc(2026, 9, 1)),
+    }
+    store = LocalStore(tmp_path / "store")
+    studio.ingest(store, files, today=TODAY)
+    assert pick(store, "studio_tenant_daily", ["usage_date", "prepaid_consumed", "source_file"]) == [
+        (date(2026, 8, 4), 12.0, "Tenant_1.csv"), (date(2026, 8, 5), 7.0, "Tenant_2.csv"),
+        (date(2026, 8, 6), 5.0, "Tenant_2.csv")]
+
+
+def test_collect_studio_reads_backfill_month_folders(tmp_path, caplog):
+    caplog.set_level("INFO", logger="valuelens_jobs.collect.studio")
+    folder = tmp_path / "landing" / "studio"
+    write_csv(folder, "PerAgent.csv", AGENT_HEADER, [_agent("agent-1", 20)])
+    write_csv(folder / "backfill" / "2026-07", "PerAgent.csv", AGENT_HEADER, [_agent("agent-1", 7)],
+              uploaded=utc(2026, 9, 6))
+    write_csv(folder / "backfill" / "2026-08", "Users.csv", USER_HEADER, [_user("user-x", 8)])
+    # Never read: the flow's files in backfill/, other folders, and a folder inside a month folder.
+    write_csv(folder / "backfill" / "2026-07", "StudioApiUserDaily_1.csv", API_USER_HEADER,
+              [["2026-07-02", "user-y", "env-1", "agent-1", 70, 0]])
+    write_csv(folder / "archive", "PerAgent_old.csv", AGENT_HEADER, [_agent("agent-9", 1)])
+    write_csv(folder / "backfill" / "2026-07" / "old", "PerAgent_old.csv", AGENT_HEADER, [_agent("agent-9", 1)])
+    store = LocalStore(tmp_path)
+    out = studio.collect_studio(None, store, Settings(), today=TODAY)
+    assert out["files"] == 4 and out["tables"] == {"studio_agent": 2, "studio_user": 1}
+    assert pick(store, "studio_agent", ["snapshot_month", "agent_id", "billed_credit", "source_file"]) == [
+        (date(2026, 7, 1), "agent-1", 7.0, "PerAgent.csv"), (date(2026, 9, 1), "agent-1", 20.0, "PerAgent.csv")]
+    assert pick(store, "studio_user", ["snapshot_month", "user_id", "billable_credit_used"]) == [
+        (date(2026, 8, 1), "user-x", 8.0)]
+    assert "landing/studio/backfill/2026-07/old: a folder inside a month folder isn't read" in caplog.text
+
+
+@pytest.mark.parametrize("bad, problem", [
+    ("backfill/stray.csv", "backfill/stray.csv: a file outside a month folder"),
+    ("backfill/July/a.csv", "backfill/July: the folder name isn't a month (YYYY-MM)"),
+    ("backfill/2026-13/a.csv", "backfill/2026-13: the folder name isn't a month (YYYY-MM)"),
+    ("backfill/2026-10/a.csv", "backfill/2026-10: a month after this one (2026-09)"),
+], ids=["file-in-backfill", "not-a-month", "month-13", "future-month"])
+def test_collect_studio_stops_on_a_misplaced_backfill_export_and_writes_nothing(tmp_path, bad, problem):
+    folder = tmp_path / "landing" / "studio"
+    _api_files(folder)
+    _export_files(folder)
+    store = LocalStore(tmp_path)
+    studio.collect_studio(None, store, Settings(), today=TODAY)
+    before = {p: p.read_bytes() for p in (tmp_path / "curated").rglob("*.parquet")}
+    assert len(before) == 5
+
+    target = folder / bad
+    write_csv(target.parent, target.name, AGENT_HEADER, [_agent("agent-1", 1)])
+    with pytest.raises(ValueError) as err:
+        studio.collect_studio(None, store, Settings(), today=TODAY)
+    assert str(err.value) == f"{studio.STOP}\n  landing/studio/{problem}"
+    assert {p: p.read_bytes() for p in (tmp_path / "curated").rglob("*.parquet")} == before
+
+
+def test_collect_studio_stop_lists_every_problem(tmp_path):
+    folder = tmp_path / "landing" / "studio"
+    for rel in ("backfill/stray.csv", "backfill/notes.txt", "backfill/July/a.csv", "backfill/2026-13/a.csv",
+                "backfill/2026-10/a.csv", "backfill/2026-08/a.csv"):
+        target = folder / rel
+        write_csv(target.parent, target.name, AGENT_HEADER, [_agent("agent-1", 1)])
+    with pytest.raises(ValueError) as err:
+        studio.collect_studio(None, LocalStore(tmp_path), Settings(), today=TODAY)
+    assert str(err.value).splitlines() == [studio.STOP] + [f"  landing/studio/backfill/{p}" for p in (
+        "2026-10: a month after this one (2026-09)", "2026-13: the folder name isn't a month (YYYY-MM)",
+        "July: the folder name isn't a month (YYYY-MM)", "notes.txt: a file outside a month folder",
+        "stray.csv: a file outside a month folder")]
+    assert not (tmp_path / "curated").exists()
+
+
+def test_a_backfill_stop_fails_the_studio_collector_and_the_others_still_run(tmp_path, monkeypatch):
+    write_csv(tmp_path / "landing" / "studio" / "backfill", "stray.csv", AGENT_HEADER, [_agent("agent-1", 1)])
+    ran = []
+    monkeypatch.setattr(viva, "collect_viva", lambda api, store, settings: ran.append("viva") or {})
+    out = jobs_main.collect(LocalStore(tmp_path), Settings(modules=frozenset({"consumption"})), api=object())
+    assert out["errors"]["studio"].startswith("ValueError: Nothing was written. Each export in backfill/ goes in")
+    assert "\n  landing/studio/backfill/stray.csv: a file outside a month folder" in out["errors"]["studio"]
+    assert ran == ["viva"] and "studio" not in out
+    assert not (tmp_path / "curated").exists()
+
+
+def test_studio_export_with_no_environment_still_covers_its_day(tmp_path):
+    drop = tmp_path / "drop"
+    files = {
+        "Tenant.csv": write_csv(drop, "Tenant.csv", TENANT_HEADER, [_day("8/5", 12, env="")]),
+        "StudioApiAgentDaily_1.csv": write_csv(drop, "StudioApiAgentDaily_1.csv", API_AGENT_HEADER, [
+            _api_day("2026-08-05", 10, env=""), _api_day("2026-08-06", 4, env="")]),
+    }
+    store = LocalStore(tmp_path / "store")
+    studio.ingest(store, files, today=TODAY)
+    # The export's day isn't counted again from the flow's figures: the match on the environment is null-safe.
+    assert pick(store, "studio_tenant_daily", ["usage_date", "environment_id", "prepaid_consumed", "source_file"]) == [
+        (date(2026, 8, 5), None, 12.0, "Tenant.csv"), (date(2026, 8, 6), None, 4.0, "ppac-api")]
+
+
+def test_studio_export_with_no_upload_time_counts_as_the_run_month(tmp_path, caplog):
+    caplog.set_level("INFO", logger="valuelens_jobs.collect.studio")
+    path = write_csv(tmp_path / "drop", "PerAgent.csv", AGENT_HEADER, [_agent("agent-1", 7)], uploaded=utc(2026, 7, 15))
+    store = LocalStore(tmp_path / "store")
+    studio.ingest(store, {"PerAgent.csv": path}, today=TODAY, uploaded={"PerAgent.csv": None})
+    assert pick(store, "studio_agent", ["snapshot_month", "agent_id"]) == [(date(2026, 9, 1), "agent-1")]
+    assert "studio/PerAgent.csv: no upload time, so it counts as this month, 2026-09" in caplog.text
+
+    # Without `uploaded`, the local copy's modified time is the upload time.
+    fresh = LocalStore(tmp_path / "fresh")
+    studio.ingest(fresh, {"PerAgent.csv": path}, today=TODAY)
+    assert pick(fresh, "studio_agent", ["snapshot_month", "agent_id"]) == [(date(2026, 7, 1), "agent-1")]
+
+
+def test_studio_first_run_after_updating_from_an_earlier_version(tmp_path, caplog):
+    """Earlier versions counted every per-agent and per-user export in the folder as the month the job ran, on
+    every run. This seeds the tables as they left them after runs in July, August and September."""
+    caplog.set_level("INFO", logger="valuelens_jobs.collect.studio")
+    jul, aug, sep, oct_ = (date(2026, m, 1) for m in (7, 8, 9, 10))
+    july, august = utc(2026, 7, 3), utc(2026, 8, 4)
+    folder = tmp_path / "landing" / "studio"
+    write_csv(folder, "Tenant_jul.csv", TENANT_HEADER, [_day("7/1", 5), _day("7/2", 6)], uploaded=july)
+    write_csv(folder, "Tenant_aug.csv", TENANT_HEADER, [_day("7/2", 7), _day("8/3", 8)], uploaded=august)
+    write_csv(folder, "PerAgent_jul.csv", AGENT_HEADER, [_agent("agent-1", 10), _agent("agent-2", 20)], uploaded=july)
+    write_csv(folder, "PerAgent_aug.csv", AGENT_HEADER, [_agent("agent-1", 11), _agent("agent-3", 30)], uploaded=august)
+    write_csv(folder, "PerUser_jul.csv", USER_HEADER, [_user("user-x", 1), _user("user-y", 2)], uploaded=july)
+    write_csv(folder, "PerUser_aug.csv", USER_HEADER, [_user("user-x", 3), _user("user-z", 4)], uploaded=august)
+    write_csv(folder, "StudioApiAgentDaily_1.csv", API_AGENT_HEADER, [_api_day("2026-09-02", 4)])
+    write_csv(folder, "StudioApiUserDaily_1.csv", API_USER_HEADER, [["2026-09-02", "user-x", "env-1", "agent-1", 4, 0]])
+
+    store = LocalStore(tmp_path)
+    seed(store, "studio_tenant_daily", [
+        {"usage_date": day, "environment_id": "env-1", "billing_plan_id": "plan-1", "capacity_type": "MCSMessages",
+         "prepaid_consumed": value, "source_file": name}
+        for day, value, name in ((date(2026, 7, 1), 5.0, "Tenant_jul.csv"), (date(2026, 7, 2), 6.0, "Tenant_jul.csv"),
+                                 (date(2026, 7, 2), 7.0, "Tenant_aug.csv"), (date(2026, 8, 3), 8.0, "Tenant_aug.csv"))])
+    agents_jul = [("agent-1", 10.0, "PerAgent_jul.csv"), ("agent-2", 20.0, "PerAgent_jul.csv")]
+    agents_aug = [("agent-1", 11.0, "PerAgent_aug.csv"), ("agent-3", 30.0, "PerAgent_aug.csv")]
+    seed(store, "studio_agent", [
+        {"snapshot_month": month, "agent_id": agent, "billable_feature": "Classic answer", "channel": "Teams",
+         "environment_id": "env-1", "billed_credit": billed, "source_file": name}
+        for month, rows in ((jul, agents_jul), (aug, agents_jul + agents_aug), (sep, agents_jul + agents_aug))
+        for agent, billed, name in rows])
+    users_jul = [("user-x", 1.0, "PerUser_jul.csv"), ("user-y", 2.0, "PerUser_jul.csv")]
+    users_aug = [("user-x", 3.0, "PerUser_aug.csv"), ("user-z", 4.0, "PerUser_aug.csv")]
+    seed(store, "studio_user", [
+        {"snapshot_month": month, "user_id": user, "agent_id": "agent-1", "billable_credit_used": billed,
+         "source_file": name}
+        for month, rows in ((jul, users_jul), (aug, users_jul + users_aug), (sep, users_jul + users_aug))
+        for user, billed, name in rows])
+
+    studio.collect_studio(None, store, Settings(), today=TODAY)
+    # Tenant: each day in an export still in the folder is rewritten from the newest export that has it.
+    assert pick(store, "studio_tenant_daily", ["usage_date", "prepaid_consumed", "source_file"]) == [
+        (date(2026, 7, 1), 5.0, "Tenant_jul.csv"), (date(2026, 7, 2), 7.0, "Tenant_aug.csv"),
+        (date(2026, 8, 3), 8.0, "Tenant_aug.csv"), (date(2026, 9, 2), 4.0, "ppac-api")]
+    agent_cols = ["snapshot_month", "agent_id", "billed_credit", "source_file"]
+    agents = [
+        (jul, "agent-1", 10.0, "PerAgent_jul.csv"), (jul, "agent-2", 20.0, "PerAgent_jul.csv"),
+        # August's own export replaces the copies it has a row for; agent-2, which it doesn't list, keeps July's copy.
+        (aug, "agent-1", 11.0, "PerAgent_aug.csv"), (aug, "agent-2", 20.0, "PerAgent_jul.csv"),
+        (aug, "agent-3", 30.0, "PerAgent_aug.csv"),
+        # September has no export of its own, so it keeps every copy, and the flow's figures don't replace them.
+        (sep, "agent-1", 10.0, "PerAgent_jul.csv"), (sep, "agent-1", 11.0, "PerAgent_aug.csv"),
+        (sep, "agent-2", 20.0, "PerAgent_jul.csv"), (sep, "agent-3", 30.0, "PerAgent_aug.csv")]
+    assert pick(store, "studio_agent", agent_cols) == agents
+    user_cols = ["snapshot_month", "user_id", "billable_credit_used", "source_file"]
+    users = [
+        (jul, "user-x", 1.0, "PerUser_jul.csv"), (jul, "user-y", 2.0, "PerUser_jul.csv"),
+        (aug, "user-x", 3.0, "PerUser_aug.csv"), (aug, "user-y", 2.0, "PerUser_jul.csv"),
+        (aug, "user-z", 4.0, "PerUser_aug.csv"),
+        (sep, "user-x", 1.0, "PerUser_jul.csv"), (sep, "user-x", 3.0, "PerUser_aug.csv"),
+        (sep, "user-y", 2.0, "PerUser_jul.csv"), (sep, "user-z", 4.0, "PerUser_aug.csv")]
+    assert pick(store, "studio_user", user_cols) == users
+    assert "2026-09: an export covers this month, so the API figures aren't used" in caplog.text
+
+    # From the next month on, the flow's figures apply; the exports keep their months.
+    write_csv(folder, "StudioApiAgentDaily_2.csv", API_AGENT_HEADER, [_api_day("2026-10-02", 5)])
+    write_csv(folder, "StudioApiUserDaily_2.csv", API_USER_HEADER, [["2026-10-02", "user-x", "env-1", "agent-1", 5, 0]])
+    studio.collect_studio(None, store, Settings(), today=date(2026, 10, 10))
+    assert pick(store, "studio_agent", agent_cols) == agents + [(oct_, "agent-1", 5.0, "ppac-api")]
+    assert pick(store, "studio_user", user_cols) == users + [(oct_, "user-x", 5.0, "ppac-api")]
 
 
 # ---------------------------------------------------------------- viva

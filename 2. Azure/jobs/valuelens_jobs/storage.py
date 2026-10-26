@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -80,27 +81,35 @@ class AdlsStore(LocalStore):
     def _container(self, name):
         return self._service.get_container_client(name)
 
-    def list(self, prefix: str) -> list[str]:
+    def _blobs(self, prefix: str) -> list[tuple[str, object]]:
+        """[(path, last modified)] under `prefix`, by path."""
         container, name = self._split(prefix)
         # Hierarchical-namespace accounts also list directories, as empty blobs marked hdi_isfolder.
-        names = self._container(container).list_blobs(name_starts_with=name, include=["metadata"])
-        return sorted(f"{container}/{b.name}" for b in names
-                      if (b.metadata or {}).get("hdi_isfolder") != "true"
-                      and (b.name == name or not name or b.name.startswith(name.rstrip("/") + "/")))
+        blobs = self._container(container).list_blobs(name_starts_with=name, include=["metadata"])
+        return sorted(((f"{container}/{b.name}", getattr(b, "last_modified", None)) for b in blobs
+                       if (b.metadata or {}).get("hdi_isfolder") != "true"
+                       and (b.name == name or not name or b.name.startswith(name.rstrip("/") + "/"))),
+                      key=lambda blob: blob[0])
+
+    def list(self, prefix: str) -> list[str]:
+        return [rel for rel, _ in self._blobs(prefix)]
 
     def pull(self, prefix: str) -> list[str]:
-        rels = self.list(prefix)
+        blobs = self._blobs(prefix)
         local = self.root / prefix
         if local.is_dir():
             shutil.rmtree(local)
-        for rel in rels:
+        for rel, modified in blobs:
             container, name = self._split(rel)
             target = self.path(rel)
             target.parent.mkdir(parents=True, exist_ok=True)
             with open(target, "wb") as fh:
                 self._container(container).download_blob(name).readinto(fh)
-        log.info("pulled %s file(s) under %s", len(rels), prefix)
-        return rels
+            if modified is not None:
+                # The upload time, not the download time: the drop folder picks the newest upload by it.
+                os.utime(target, (modified.timestamp(), modified.timestamp()))
+        log.info("pulled %s file(s) under %s", len(blobs), prefix)
+        return [rel for rel, _ in blobs]
 
     def push(self, rels) -> None:
         for rel in rels:

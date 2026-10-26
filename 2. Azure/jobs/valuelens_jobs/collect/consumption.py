@@ -106,22 +106,37 @@ def match_files(names, patterns, *, include=lambda n: True) -> list[str]:
     return []
 
 
-def read_csvs(con, files, view: str, norm) -> set | None:
-    """Every CSV in `files` unioned by name into temp table `view`, with columns renamed to
-    `norm(header)` (first wins) and a `__source_file` column. None when there are no rows.
+def csv_source(path) -> str:
+    """DuckDB's read of one drop folder CSV, every column as text.
 
     The quote/escape settings matter: agent names, scenarios and knowledge sources are free text,
     and one comma or line break inside a value would shift every column after it for that row.
     """
+    return (f"read_csv({q(Path(path))}, header=true, all_varchar=true, delim=',', quote='\"', escape='\"', "
+            "null_padding=true)")
+
+
+def csv_header(con, path) -> list[str] | None:
+    """The CSV's column names as written, or None (with a warning) if it can't be read."""
+    try:
+        return [d[0] for d in con.execute(f"SELECT * FROM {csv_source(path)} LIMIT 0").description]
+    except Exception as exc:
+        log.warning("  can't read %s (%s); skipped", Path(path).name, exc)
+        return None
+
+
+def read_csvs(con, files, view: str, norm, extra=None) -> set | None:
+    """Every CSV in `files` unioned by name into temp table `view`, with columns renamed to
+    `norm(header)` (first wins) and a `__source_file` column. None when there are no rows.
+
+    `extra` (`{path: {column: SQL literal}}`) adds columns to the rows of the files it names.
+    """
     parts, columns = [], set()
     for path in files:
+        more = "".join(f", {value} AS {ident(column)}" for column, value in (extra or {}).get(path, {}).items())
         path = Path(path)
-        src = (f"read_csv({q(path)}, header=true, all_varchar=true, delim=',', quote='\"', escape='\"', "
-               "null_padding=true)")
-        try:
-            names = [d[0] for d in con.execute(f"SELECT * FROM {src} LIMIT 0").description]
-        except Exception as exc:
-            log.warning("  can't read %s (%s); skipped", path.name, exc)
+        names = csv_header(con, path)
+        if names is None:
             continue
         seen, select = set(), []
         for n in names:
@@ -133,7 +148,7 @@ def read_csvs(con, files, view: str, norm) -> set | None:
             continue
         columns |= seen
         literal = "'" + path.name.replace("'", "''") + "'"
-        parts.append(f"SELECT {', '.join(select)}, {literal} AS __source_file FROM {src}")
+        parts.append(f"SELECT {', '.join(select)}, {literal} AS __source_file{more} FROM {csv_source(path)}")
     if not parts:
         return None
     con.execute(f"CREATE OR REPLACE TEMP TABLE {ident(view)} AS " + " UNION ALL BY NAME ".join(parts))

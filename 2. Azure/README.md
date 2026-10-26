@@ -99,6 +99,25 @@ Where the files land depends on networking:
 
 The jobs read the files where they land and don't move them, the same as the Fabric notebooks.
 
+**Copilot Studio exports and their month.** A tenant export has its own dates. The per-agent and
+per-user exports carry none, so each counts as the month, in UTC, that it was uploaded to `studio/`:
+the blob's last-modified time in Storage, or the item's last-modified time in SharePoint. A file left
+in the folder keeps its month. Where two exports of a kind share a key, the newer upload's rows win. A
+CSV whose name matches an export but lacks that export's key columns is skipped, with a warning.
+
+**Loading an earlier month's export.** Upload it to `studio/backfill/<YYYY-MM>/` for the month it
+covers. It counts as that month on every run. The Studio load stops before writing, and lists the
+paths, if `backfill/` holds a file outside a month folder, a folder not named `YYYY-MM`, or a month
+after the current one (UTC). The other loads still run, but the run fails; its log message starts
+`Nothing was written.` Move or remove what it lists, then run again.
+
+**Updating from an earlier version.** Earlier versions stored a per-agent or per-user export left in
+`studio/` again as each later month's, and added together rows two exports shared. Updating leaves
+those copies, so each month holding one stays covered by an export, and with the flow its figures
+aren't used for that month (this month too, if an earlier version already ran in it). A month's own
+export replaces the copied rows it matches on the table's key; a copied agent or user it doesn't list
+stays. There's no cleanup step.
+
 Not on Azure yet: GitHub Copilot consumption, the dated Agent Daily table, Viva without a CSV, and
 `--flow-identity app` (the flow always signs in as you; the option warns and is ignored).
 
