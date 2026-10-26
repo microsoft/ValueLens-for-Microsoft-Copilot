@@ -9,27 +9,181 @@ and the Analytics Hub app. Then it loads the first data and checks it.
 
 ## Before you start
 
-Go through the **[Before you start checklist](../../docs/PREREQUISITES.md)** first. It lists what you
-need and what to ask other admins for, by person, with each optional extra and the costs. In short,
-you need Windows 10 or 11 (or [Node.js](#without-the-exe)), a Fabric capacity, an Azure
-subscription or resource group for the Key Vault (or [another place for the secret](#where-the-secret-goes)),
-and permission to register apps (or [an admin who can](#if-you-cant-register-apps)). A Fabric admin
-turns on three tenant settings, and a Global Administrator or Privileged Role Administrator grants
-admin consent. If you want Copilot Cowork credits, ask your Viva Insights analyst for the query
-[before you start](../../docs/PREREQUISITES.md#send-this-to-your-viva-insights-analyst-first).
+Work through the **[Before you start checklist](../../docs/PREREQUISITES.md)**. It says what to ask
+each admin for. In short:
 
-**Check what you have.** Once you sign in, the home page's **Prerequisites** panel checks most of
-the checklist for you, and says what each item is for and how to get it. It only reads; nothing is
-changed. Each one shows as met, missing, or couldn't check (for example, the Fabric tenant
-settings, which only a Fabric administrator can read). Only roles that are switched on count. Some
-organisations make admins switch a role on before they use it, in Privileged Identity Management.
-A role like that shows as **can be activated**: switch it on, then choose **Check again**.
-Azure access is checked for each subscription, and Power Platform access for each environment.
-Optional rows say whether the tenant has Microsoft 365 Copilot licences, whether you have Power
-Automate Premium (for the flows) and that the Viva Insights Insights Analyst role, which the
-installer can't check, is needed for the Cowork credits query. In the terminal, run `prereqs`.
+- [ ] Windows 10 or 11 (or [Node.js](#without-the-exe)).
+- [ ] A Fabric capacity.
+- [ ] An Azure subscription or resource group for the Key Vault (or [another place for the secret](#where-the-secret-goes)).
+- [ ] Permission to register apps (or [an admin who can](#if-you-cant-register-apps)).
+- [ ] A Fabric admin to turn on three tenant settings, and a Global or Privileged Role Administrator for admin consent.
+- [ ] Copilot Cowork credits? Ask your Viva Insights analyst for the query
+      [first](../../docs/PREREQUISITES.md#send-this-to-your-viva-insights-analyst-first).
 
-### Where the secret goes
+Setting up on Azure instead? See [Azure target](#azure-target).
+
+<details>
+<summary><strong>Check what you have</strong></summary>
+
+<br>
+
+Once you sign in, the home page's **Prerequisites** panel checks most of the list. It only reads;
+nothing is changed. Each item shows as met, missing, or couldn't check (for example, Fabric tenant
+settings, which only a Fabric administrator can read), with what it's for and how to get it.
+
+- Only active roles count. A role you must switch on first in Privileged Identity Management shows
+  as **can be activated**: switch it on, then choose **Check again**.
+- Azure access is checked per subscription, and Power Platform access per environment.
+- Optional rows cover Microsoft 365 Copilot licences in the tenant, Power Automate Premium (for the
+  flows), and the Viva Insights Insights Analyst role (needed for the Cowork credits query; the
+  installer can't check it).
+
+In the terminal, run `prereqs`.
+
+</details>
+
+## Run it
+
+1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe).
+   This link always gets the newest version. If Edge says it isn't commonly downloaded, choose
+   **…** next to the file, then **Keep**, **Show more** and **Keep anyway**. To check the file,
+   see [Check the download](#check-the-download).
+2. Open it. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
+3. The first time, it takes about a minute to unpack. Then it opens in your browser. Keep its
+   window open while you use the page, and keep the PC awake and plugged in until it finishes. If
+   you close the page, go back to that window and press **Enter** to open it again.
+4. Choose **Set up Analytics Hub** and sign in.
+5. Answer the questions. This takes about 5 minutes:
+   1. **Data sources.** Each source has a card: **Connected (API)**, **Upload CSV** or **Skip**.
+      Copilot usage, licences and org data are always connected. Microsoft 365 activity is
+      connected by default; the rest are skipped until you choose otherwise. The **Copilot Studio
+      credits**, **Copilot Cowork credits** and **Azure AI costs** cards make up
+      [Credit consumption](#credit-consumption). A CSV card says
+      where to export the file, and you can pick the exports to upload now. A source that needs
+      more to work asks for it next, such as the Power Platform environment for a flow. See
+      [Data sources and exports](#data-sources-and-exports).
+   2. **Change the advanced settings?** **No** (the default) takes the defaults that suit most
+      organisations. See [Advanced settings](#advanced-settings).
+   3. **Capacity and workspace.** A new workspace is named `Analytics Hub` and its Lakehouse
+      `Analytics_Hub`, or the next free name. F64 or larger is recommended for more than 10,000
+      people. An existing install keeps its names.
+   4. **App registration:** create one, use your own (it's checked first), or let an admin
+      register it. See [If you can't register apps](#if-you-cant-register-apps).
+   5. **Key Vault:** create one, or pick one you have. If you can't write to it, a vault admin
+      can add the secret. See [Where the secret goes](#where-the-secret-goes).
+6. Check the plan and approve it. Nothing is created until you do. The plan shows every setting,
+   including the defaults, and a **Costs** list of what's billed (the Fabric capacity, Power
+   Automate Premium for the flows, the Azure resources), with links to the pricing pages. The exe
+   stops Windows going to sleep while it runs.
+7. Wait for it to finish. Setting up takes about 15 minutes. The first data reaches the app about
+   25 minutes after you choose **Go ahead** with 30 days of history, or about 2 hours with 180 days
+   ([a large tenant](#a-large-tenant) takes longer). Copilot Studio credits arrive after the Studio
+   flow's first run: see [Load the Studio credits now](#power-automate-flows).
+8. When it finishes, open the link to the app.
+
+<details>
+<summary><strong>More about running it</strong>: changing answers, the install record, updates and item names</summary>
+
+<br>
+
+**Want to change an answer?** Choose **Back**, on any question or on the plan. It opens the
+previous question with your answer filled in, and the questions after it are asked again. If you
+go back to the client secret, leave the box empty to keep the one you pasted. If you go back
+further, you'll be asked for it again.
+
+It keeps your answers in `Documents\Analytics Hub`, in an install record named
+`valuelens-install.json`. Keep that folder. To run the pipeline, check status, update, or repair
+the set-up later, open the exe again. **Manage Analytics Hub** shows the record's full path. If
+OneDrive syncs your Documents folder, the record follows you to your other PCs.
+
+**The workspace has gone?** After you sign in, the installer checks that the record's workspace
+still exists. If Fabric says it doesn't, or the record is for another tenant, the home page says
+so. Choose **Start fresh** to set up again. The old record is kept beside the new one, renamed
+with the date and time, such as `valuelens-install.20260507-090302.json`. Or choose **Keep this
+record** to carry on with it. In the terminal, `install` asks whether to start fresh. If Fabric
+can't be reached, or you can't read the workspace, nothing changes.
+
+**Updates.** When it opens, the installer checks
+[the latest release](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest). If
+there's a newer one, its window and the page say so. Download it, open it, and choose **Repair or
+change** to update your install. The check sends nothing about you or your tenant, and it's
+skipped if GitHub can't be reached. To turn it off, set the environment variable
+`ANALYTICS_HUB_NO_UPDATE_CHECK=1`.
+
+**Using a workspace that already has things in it?** The installer never changes anything it
+didn't create. If one of its names is taken, its own item gets the next free name, such as
+`AnalyticsHub_Pipeline_2` or `Analytics Hub 2`. The plan shows the names before you approve it.
+
+**Item names.** A new install names its items after Analytics Hub: `Analytics Hub Model`,
+`AnalyticsHub_Pipeline`, the `Analytics Hub SQL …` connection and the `Analytics Hub Data Collector`
+app registration. An install from an earlier version keeps the names it already has, such as
+`ValueLens Model`.
+
+</details>
+
+### Advanced settings
+
+After the data sources, the installer asks **Change the advanced settings?** With **No** (the
+default, and what `--yes` answers) it uses what you chose last time, or else the defaults below.
+With **Yes** it asks about each one as it comes. To change one later, choose **Repair or change**,
+then **Yes**.
+
+| Setting | Default |
+|---|---|
+| [Power BI](#power-bi-reports) | The semantic model, the Power BI reports and the app. Or the model and reports, the model and app, the model only, or neither. |
+| Who can view | A new **Analytics Hub Viewers** group. You're who people ask for access. **Manage access** changes it later. |
+| [Audit history](#load-more-audit-history) for the first load | 30 days. Or 90 or 180. |
+| [How many people are in the tenant](#a-large-tenant) | More than 10,000 on an F64 or larger capacity, otherwise up to 10,000. |
+| Lakehouse name | `Analytics_Hub`, or the next free name (`ValueLens` on earlier installs, which keep it). Spaces and hyphens become underscores. |
+| A new Key Vault's resource group, region and name, and the secret's name | `rg-valuelens`, the capacity's region, `valuelens-` and six random characters, and the default secret name. If you can't use `rg-valuelens`, it asks. |
+| Schedule | Daily, at the default time. Or weekly, and the time (UTC). |
+| Run the first load as soon as setup finishes | Yes. |
+| Value page currency | US dollars. See below. |
+| [Agent configuration and Foundry](#agent-configuration-and-foundry) | The whole tenant, agents and Foundry. |
+| [Ask data agent](#ask) | Yes, on a paid F2 or larger, or Premium, capacity. |
+
+**Currency for the Value page.** Licences and credits are billed in US dollars, so it reports in
+dollars unless you choose another, such as euros or pounds. For another currency you can type how
+many of it make $1, or leave it blank and set it under **Prices** in the app. It also sets the
+Power BI model's currency symbol. Nothing is looked up online. To choose it without the question,
+use `install --currency GBP --exchange-rate 0.79`. The installer keeps your choice for next time.
+
+The [Azure target](#azure-target) asks the same question. Its advanced settings also cover
+[demo mode](#demo-mode), the Azure SQL region, the name prefix, extra tags,
+[networking](#networking), where credits come from, agent configuration and Foundry, and
+[which model Ask uses](#ask).
+
+## After it finishes
+
+- **Admin consent.** If you couldn't grant it, send the link the installer gives you to an admin.
+  They select **Grant admin consent**. Then open the exe again and choose **Run now**.
+- **Share the app and reports.** The installer creates **Analytics Hub Viewers** (or uses a group
+  you name) with you as owner, and gives it **Build** on the models. Then:
+  1. **Once:** share the app with the group. In the workspace, choose **…** next to the
+     **Analytics Hub** app, then **Share**, add the group and choose **Grant**. Do the same for the
+     **ValueLens** report.
+  2. **To give someone access:** add them to the group in
+     [My Groups](https://myaccount.microsoft.com/groups).
+
+  Keep viewers off workspace roles. See [Viewing Analytics Hub](../../docs/PERMISSIONS.md#viewing-analytics-hub-paths-1-and-2).
+- **Own reports.** Connect Power BI Desktop to `Analytics Hub Model`, or use **Save a copy** on a
+  published report.
+- **Flows and the Cowork Dataflow.** If you chose them, the end of the install lists what to sign
+  in to. See [Power Automate flows](#power-automate-flows) and
+  [Credit consumption](#credit-consumption).
+- **Someone else takes over the pipeline?** The notebooks run as the person who last changed the
+  pipeline, or the schedule's owner. Give them Key Vault Secrets User on the vault and Contributor
+  on the workspace first. With the secret in the notebooks, they only need Contributor.
+- **Secrets expire after 12 months.** **Check status** warns you 30 days before. Choose
+  **Create new secrets** (`rotate-secret`). Where the secret goes decides what happens:
+  - **Key Vault, written by the installer:** it creates and stores a new secret.
+  - **A vault admin adds it:** it shows the admin the same steps again, then waits for you to
+    say it's done.
+  - **In the notebooks:** it creates a new secret, rewrites the notebooks and removes the old
+    one. If you brought the app, paste its new secret when asked. Rotate it regularly: anyone
+    who could read the old one could keep using it until then.
+
+## Where the secret goes
 
 The notebooks sign in as the app registration with its client secret. The installer offers three
 places for it:
@@ -66,7 +220,7 @@ choose `--flow-identity app`). To move to Key Vault
 later, run the installer again and choose **Use Key Vault instead**. It rewrites the notebooks to
 read the secret from the vault and removes the secret they held from the app.
 
-### If you can't register apps
+## If you can't register apps
 
 Choose **An admin will register the app for me** in the app registration question. Before
 anything is created, the installer writes `analytics-hub-admin-pack.md` next to the install record.
@@ -178,140 +332,6 @@ Azure commands:
 - `update` re-runs preflight/what-if and redeploys with the current installer image tag.
 - `rotate-secret` creates a new SQL reader secret and rebinds the Power BI credential.
 - `uninstall` deletes the created resource group, or only tagged resources if you used an existing group.
-
-## Run it
-
-1. [Download the installer](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe).
-   This link always gets the newest version. If Edge says it isn't commonly downloaded, choose
-   **…** next to the file, then **Keep**, **Show more** and **Keep anyway**. To check the file,
-   see [Check the download](#check-the-download).
-2. Open it. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
-3. The first time, it takes about a minute to unpack. Then it opens in your browser. Keep its
-   window open while you use the page, and keep the PC awake and plugged in until it finishes. If
-   you close the page, go back to that window and press **Enter** to open it again.
-4. Choose **Set up Analytics Hub** and sign in.
-5. Answer the questions. This takes about 5 minutes:
-   1. **Data sources.** Each source has a card: **Connected (API)**, **Upload CSV** or **Skip**.
-      Copilot usage, licences and org data are always connected. Microsoft 365 activity is
-      connected by default; the rest are skipped until you choose otherwise. The **Copilot Studio
-      credits**, **Copilot Cowork credits** and **Azure AI costs** cards make up
-      [Credit consumption](#credit-consumption). A CSV card says
-      where to export the file, and you can pick the exports to upload now. A source that needs
-      more to work asks for it next, such as the Power Platform environment for a flow. See
-      [Data sources and exports](#data-sources-and-exports).
-   2. **Change the advanced settings?** **No** (the default) takes the defaults that suit most
-      organisations. See [Advanced settings](#advanced-settings).
-   3. **Capacity and workspace.** A new workspace is named `Analytics Hub` and its Lakehouse
-      `Analytics_Hub`, or the next free name. F64 or larger is recommended for more than 10,000
-      people. An existing install keeps its names.
-   4. **App registration:** create one, use your own (it's checked first), or let an admin
-      register it. See [If you can't register apps](#if-you-cant-register-apps).
-   5. **Key Vault:** create one, or pick one you have. If you can't write to it, a vault admin
-      can add the secret. See [Where the secret goes](#where-the-secret-goes).
-6. Check the plan and approve it. Nothing is created until you do. The plan shows every setting,
-   including the defaults, and a **Costs** list of what's billed (the Fabric capacity, Power
-   Automate Premium for the flows, the Azure resources), with links to the pricing pages. The exe
-   stops Windows going to sleep while it runs.
-7. Wait for it to finish. Setting up takes about 15 minutes. The first data reaches the app about
-   25 minutes after you choose **Go ahead** with 30 days of history, or about 2 hours with 180 days
-   ([a large tenant](#a-large-tenant) takes longer). Copilot Studio credits arrive after the Studio
-   flow's first run: see [Load the Studio credits now](#power-automate-flows).
-8. When it finishes, open the link to the app.
-
-**Want to change an answer?** Choose **Back**, on any question or on the plan. It opens the
-previous question with your answer filled in, and the questions after it are asked again. If you
-go back to the client secret, leave the box empty to keep the one you pasted. If you go back
-further, you'll be asked for it again.
-
-It keeps your answers in `Documents\Analytics Hub`, in an install record named
-`valuelens-install.json`. Keep that folder. To run the pipeline, check status, update, or repair
-the set-up later, open the exe again. **Manage Analytics Hub** shows the record's full path. If
-OneDrive syncs your Documents folder, the record follows you to your other PCs.
-
-**The workspace has gone?** After you sign in, the installer checks that the record's workspace
-still exists. If Fabric says it doesn't, or the record is for another tenant, the home page says
-so. Choose **Start fresh** to set up again. The old record is kept beside the new one, renamed
-with the date and time, such as `valuelens-install.20260507-090302.json`. Or choose **Keep this
-record** to carry on with it. In the terminal, `install` asks whether to start fresh. If Fabric
-can't be reached, or you can't read the workspace, nothing changes.
-
-**Updates.** When it opens, the installer checks
-[the latest release](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest). If
-there's a newer one, its window and the page say so. Download it, open it, and choose **Repair or
-change** to update your install. The check sends nothing about you or your tenant, and it's
-skipped if GitHub can't be reached. To turn it off, set the environment variable
-`ANALYTICS_HUB_NO_UPDATE_CHECK=1`.
-
-**Using a workspace that already has things in it?** The installer never changes anything it
-didn't create. If one of its names is taken, its own item gets the next free name, such as
-`AnalyticsHub_Pipeline_2` or `Analytics Hub 2`. The plan shows the names before you approve it.
-
-**Item names.** A new install names its items after Analytics Hub: `Analytics Hub Model`,
-`AnalyticsHub_Pipeline`, the `Analytics Hub SQL …` connection and the `Analytics Hub Data Collector`
-app registration. An install from an earlier version keeps the names it already has, such as
-`ValueLens Model`.
-
-### Advanced settings
-
-After the data sources, the installer asks **Change the advanced settings?** With **No** (the
-default, and what `--yes` answers) it uses what you chose last time, or else the defaults below.
-With **Yes** it asks about each one as it comes. To change one later, choose **Repair or change**,
-then **Yes**.
-
-| Setting | Default |
-|---|---|
-| [Power BI](#power-bi-reports) | The semantic model, the Power BI reports and the app. Or the model and reports, the model and app, the model only, or neither. |
-| Who can view | A new **Analytics Hub Viewers** group. You're who people ask for access. **Manage access** changes it later. |
-| [Audit history](#load-more-audit-history) for the first load | 30 days. Or 90 or 180. |
-| [How many people are in the tenant](#a-large-tenant) | More than 10,000 on an F64 or larger capacity, otherwise up to 10,000. |
-| Lakehouse name | `Analytics_Hub`, or the next free name (`ValueLens` on earlier installs, which keep it). Spaces and hyphens become underscores. |
-| A new Key Vault's resource group, region and name, and the secret's name | `rg-valuelens`, the capacity's region, `valuelens-` and six random characters, and the default secret name. If you can't use `rg-valuelens`, it asks. |
-| Schedule | Daily, at the default time. Or weekly, and the time (UTC). |
-| Run the first load as soon as setup finishes | Yes. |
-| Value page currency | US dollars. See below. |
-| [Agent configuration and Foundry](#agent-configuration-and-foundry) | The whole tenant, agents and Foundry. |
-| [Ask data agent](#ask) | Yes, on a paid F2 or larger, or Premium, capacity. |
-
-**Currency for the Value page.** Licences and credits are billed in US dollars, so it reports in
-dollars unless you choose another, such as euros or pounds. For another currency you can type how
-many of it make $1, or leave it blank and set it under **Prices** in the app. It also sets the
-Power BI model's currency symbol. Nothing is looked up online. To choose it without the question,
-use `install --currency GBP --exchange-rate 0.79`. The installer keeps your choice for next time.
-
-The [Azure target](#azure-target) asks the same question. Its advanced settings also cover
-[demo mode](#demo-mode), the Azure SQL region, the name prefix, extra tags,
-[networking](#networking), where credits come from, agent configuration and Foundry, and
-[which model Ask uses](#ask).
-
-## After it finishes
-
-- **Admin consent.** If you couldn't grant it, send the link the installer gives you to an admin.
-  They select **Grant admin consent**. Then open the exe again and choose **Run now**.
-- **Share the app and reports.** The installer creates **Analytics Hub Viewers** (or uses a group
-  you name) with you as owner, and gives it **Build** on the models. Then:
-  1. **Once:** share the app with the group. In the workspace, choose **…** next to the
-     **Analytics Hub** app, then **Share**, add the group and choose **Grant**. Do the same for the
-     **ValueLens** report.
-  2. **To give someone access:** add them to the group in
-     [My Groups](https://myaccount.microsoft.com/groups).
-
-  Keep viewers off workspace roles. See [Viewing Analytics Hub](../../docs/PERMISSIONS.md#viewing-analytics-hub-paths-1-and-2).
-- **Own reports.** Connect Power BI Desktop to `Analytics Hub Model`, or use **Save a copy** on a
-  published report.
-- **Flows and the Cowork Dataflow.** If you chose them, the end of the install lists what to sign
-  in to. See [Power Automate flows](#power-automate-flows) and
-  [Credit consumption](#credit-consumption).
-- **Someone else takes over the pipeline?** The notebooks run as the person who last changed the
-  pipeline, or the schedule's owner. Give them Key Vault Secrets User on the vault and Contributor
-  on the workspace first. With the secret in the notebooks, they only need Contributor.
-- **Secrets expire after 12 months.** **Check status** warns you 30 days before. Choose
-  **Create new secrets** (`rotate-secret`). Where the secret goes decides what happens:
-  - **Key Vault, written by the installer:** it creates and stores a new secret.
-  - **A vault admin adds it:** it shows the admin the same steps again, then waits for you to
-    say it's done.
-  - **In the notebooks:** it creates a new secret, rewrites the notebooks and removes the old
-    one. If you brought the app, paste its new secret when asked. Rotate it regularly: anyone
-    who could read the old one could keep using it until then.
 
 ## Power BI reports
 
