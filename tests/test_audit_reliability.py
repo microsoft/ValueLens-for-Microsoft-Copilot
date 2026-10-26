@@ -698,7 +698,7 @@ class AuditReliabilityTests(unittest.TestCase):
             "SESSION": Session(),
             "_token": {"value": "t0", "ts": 0.0},
             "_notify_throttle": lambda: None,
-            "time": type("T", (), {"sleep": staticmethod(sleeps.append)}),
+            "_wait": sleeps.append,
         }
         ns["get_headers"] = lambda: {"Authorization": f"Bearer {ns['_token']['value'] or next(token_iter)}"}
         exec_named_defs(INGESTER, 4, ["_TRANSIENT", "AUTH_RETRY_WAITS_SEC", "_request", "_send"], ns, include_imports=False)
@@ -1134,6 +1134,94 @@ class FailedWindowRecoveryTests(unittest.TestCase):
             helpers["fetch_windows"]([self.WIN, self.NEXT])
         self.assertEqual(graph.created, [])
 
+    def test_throttled_run_stops_at_the_budget_instead_of_waiting_for_a_slot(self):
+        # A live 30-day backfill hung for the whole 2 h activity timeout: Purview throttled the
+        # audit searches, one window sat in retry waits and the rest waited for a limiter slot.
+        helpers, graph = self.run_helpers(lambda *a: "succeeded")
+        budget = helpers["BudgetReached"]
+        deadline = time.monotonic() + 0.3
+
+        def check():
+            if time.monotonic() >= deadline:
+                raise budget("Time budget reached while waiting on the audit service")
+
+        def throttled_create(ws, we):
+            while True:  # every request keeps getting HTTP 429; each retry wait checks the budget
+                check()
+                time.sleep(0.01)
+
+        helpers["create_query"] = throttled_create
+        helpers["QUERY_LIMITER"] = helpers["AdaptiveLimiter"](1, 1, check=check)
+        started = time.monotonic()
+        with self.assertRaisesRegex(RuntimeError, "Time budget of .* reached with 2 audit window"):
+            helpers["fetch_windows"]([self.WIN, self.NEXT])
+        self.assertLess(time.monotonic() - started, 10)
+        manifest = helpers["_load_manifest"]()
+        self.assertEqual({manifest[self.key(helpers, w)]["status"] for w in (self.WIN, self.NEXT)}, {"waiting"})
+
+    def test_limiter_wait_ends_when_the_check_raises(self):
+        limiter = self.ingester_helpers()["AdaptiveLimiter"](1, 1, check=lambda: None)
+        stop = [False]
+
+        def check():
+            if stop[0]:
+                raise TimeoutError("budget")
+
+        limiter._check = check
+        with limiter:
+            result = []
+
+            def waiter():
+                try:
+                    with limiter:
+                        result.append("entered")
+                except TimeoutError:
+                    result.append("stopped")
+
+            thread = threading.Thread(target=waiter)
+            thread.start()
+            stop[0] = True
+            thread.join(15)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(result, ["stopped"])
+        self.assertEqual(limiter.active, 0)
+
+    def test_http_retry_waits_stop_at_the_budget(self):
+        from urllib3.util.retry import Retry
+
+        ns = exec_named_defs(
+            INGESTER, 4, {"THROTTLE_LISTENERS", "BUDGET_CHECKS", "_notify_throttle", "_wait", "_ThrottleAwareRetry"},
+            {"Retry": Retry},
+        )
+
+        class Spent(Exception):
+            pass
+
+        calls = []
+
+        def spent():
+            calls.append(1)
+            if len(calls) > 1:
+                raise Spent()
+
+        ns["BUDGET_CHECKS"][:] = [spent]
+        retry = ns["_ThrottleAwareRetry"](total=3, status_forcelist=(429,), respect_retry_after_header=True)
+        response = type(
+            "Resp", (), {"status": 429, "headers": {"Retry-After": "3600"}, "getheader": lambda self, name: "3600"}
+        )()
+        started = time.monotonic()
+        with self.assertRaises(Spent):
+            retry.sleep(response)  # urllib3 would sleep the full hour the service asked for
+        self.assertLess(time.monotonic() - started, 10)
+        ns["BUDGET_CHECKS"].clear()
+        ns["_wait"](0)
+
+    def test_http_layer_waits_only_through_the_budget_aware_sleep(self):
+        source = cells(INGESTER)[4]
+        self.assertNotIn("time.sleep(wait)", source)
+        self.assertEqual(source.count("_wait(wait)"), 3)
+        self.assertIn("def sleep(self, response=None):", source)
+
     def seed_waiting(self, helpers, created_at, qid="old-q"):
         key = self.key(helpers, self.WIN)
         helpers["_mark_window"](key, "waiting", query_id=qid, query_created_at=created_at.isoformat())
@@ -1310,9 +1398,12 @@ class FailedWindowRecoveryTests(unittest.TestCase):
     def test_main_loop_wires_the_gap_guard_limiter_and_throttle_hook(self):
         source = cells(INGESTER)[10]
         self.assertIn("if MODE == 'incremental' and not ALLOW_UNRECOVERED_GAPS:", source)
-        self.assertIn("QUERY_LIMITER = AdaptiveLimiter(MAX_CONCURRENT_QUERIES, MIN_CONCURRENT_QUERIES)", source)
+        self.assertIn(
+            "QUERY_LIMITER = AdaptiveLimiter(MAX_CONCURRENT_QUERIES, MIN_CONCURRENT_QUERIES, check=check_budget)", source
+        )
         self.assertIn("THROTTLE_LISTENERS[:] = [", source)
-        self.assertIn("ACTIVE_WINDOW_KEYS, total = fetch_windows(windows)", source)
+        self.assertIn("BUDGET_CHECKS[:] = [check_budget]", source)
+        self.assertIn("ACTIVE_WINDOW_KEYS, total = fetch_windows(windows)\nfinally:\n    BUDGET_CHECKS.clear()", source)
         self.assertNotIn("as_completed", source)
 
 

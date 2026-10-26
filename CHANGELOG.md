@@ -77,6 +77,12 @@ a second route that needs no Fabric.
   runs work on PAX 1.11.15, and a run whose rollup step failed now fails, even when PAX exits 0.
   `Upload-Rollups-SharePoint.ps1` gains `-File` and `-RemoteName`. A contract test checks that the
   notebooks write every Lakehouse column the Fabric template reads.
+- **The audit load's time budget now covers throttling.** It was checked only between polls, so
+  while the audit service was throttling, the retry waits and the wait for a free search slot ran
+  past it until the pipeline's 2-hour timeout stopped the run. Every wait now checks the budget
+  every few seconds. A run that reaches it saves its query ids and stops, and the pipeline's retry
+  carries on from there. The run also says when the service is throttling. The first-load estimate
+  is now one to two hours, not under an hour.
 - **Shared with Consumption Central.** Its installer copies the PAX route's code unchanged, so the
   route has settings ValueLens leaves off: a folder parameter, parameter values from the install
   record, a query read from a file, a privacy level, and a mode that exports only the user

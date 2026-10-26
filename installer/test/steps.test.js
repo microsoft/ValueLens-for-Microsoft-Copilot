@@ -767,7 +767,7 @@ test("run starts the first load again when the last one didn't load the history"
   assert.match(fabric.calls[0], /"AuditMode":"backfill"/);
   assert.match(fabric.calls[0], /"BackfillDays":30/);
   assert.match(ui.text(), /Started the first load: 30 days of audit history/);
-  assert.match(ui.text(), /usually takes under an hour/);
+  assert.match(ui.text(), /usually takes one to two hours/);
   assert.equal(config.firstRun?.jobId, 'job-1');
   assert.equal(config.firstRun?.status, 'Incomplete', 'job-1 has no proof the history loaded');
 });
@@ -815,8 +815,8 @@ test('tenant size: a big capacity suggests a large tenant, and the first-load es
   for (const sku of ['F64', 'F128', 'P1', 'p3', 'FTL64', 'ftl128']) assert.equal(largeCapacity({ sku }), true, sku);
   for (const sku of ['F2', 'F32', 'FT1', 'FTL4', 'FTL32', 'Trial', 'A4', 'PP3', undefined]) assert.equal(largeCapacity({ sku }), false, String(sku));
 
-  assert.match(firstLoadEstimate(30, 'standard'), /under an hour/);
-  assert.match(firstLoadEstimate(30, undefined), /under an hour/);
+  assert.match(firstLoadEstimate(30, 'standard'), /one to two hours.*throttling.*picks up where the last stopped/);
+  assert.match(firstLoadEstimate(30, undefined), /one to two hours/);
   assert.match(firstLoadEstimate(90, 'standard'), /90 days of history can take a few hours/);
   assert.match(firstLoadEstimate(30, 'large'), /several hours.*picks up where the last stopped.*F64/);
 

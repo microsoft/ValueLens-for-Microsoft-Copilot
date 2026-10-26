@@ -315,7 +315,7 @@ export const HISTORY_CHOICES = [
 const pipelineReloadChoice = (days) =>
   days > 30
     ? `Runs the pipeline once with ${days} days of history: a few hours, and many hours on a large tenant. The scheduled runs carry on after it.`
-    : `Runs the pipeline once with ${days} days of history, usually in under an hour.`;
+    : `Runs the pipeline once with ${days} days of history, usually in one to two hours.`;
 
 /**
  * Repair or change, once the history has loaded: offers to reload more of it after setup. Only
@@ -1141,7 +1141,7 @@ export const reloadLine = (days) => `Reload ${days} days of history after setup`
  * @param {number} days
  */
 export const reloadDetail = (days) =>
-  days > 30 ? 'One pipeline run: a few hours, and many hours on a large tenant. The scheduled runs carry on after it.' : 'One pipeline run, usually under an hour.';
+  days > 30 ? 'One pipeline run: a few hours, and many hours on a large tenant. The scheduled runs carry on after it.' : 'One pipeline run, usually one to two hours.';
 
 /**
  * Prints the plan and asks to go ahead.

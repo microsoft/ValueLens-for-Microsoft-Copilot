@@ -145,7 +145,7 @@ export function firstLoadEstimate(days, scale) {
   if (days > 30) {
     return `Loading ${days} days of history can take a few hours, longer on a trial or small capacity. Each run picks up where the last stopped. `;
   }
-  return 'Loading the history usually takes under an hour, longer on a trial or small capacity. ';
+  return 'Loading the history usually takes one to two hours, longer on a trial or small capacity or while Microsoft is throttling audit searches. Each run picks up where the last stopped. ';
 }
 
 /** A run that started longer ago than this is stuck, not running. */
