@@ -1659,7 +1659,7 @@ function historyPicker(busy, route = 'fabric') {
         : `In a large tenant, ${n} days can take several hours to load. The usual schedule carries on afterwards.`)
       : !n ? ''
         : pax ? 'PAX reads these days on this PC and adds what the files in SharePoint are missing, then the report refreshes.'
-          : 'Reloads these days and rebuilds the curated table, then runs the data check.';
+          : 'Reloads these days (older days are kept) and rebuilds the curated table, then runs the data check.';
     hint.hidden = !n;
   };
   const sel = h('select', { id: 'backfill', class: 'field', disabled: busy, 'aria-describedby': 'backfill-hint' },
