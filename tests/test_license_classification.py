@@ -134,6 +134,51 @@ class LicenseClassificationTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "missing 'Assigned Products'"):
                         exec(compile(code, "report-fetch", "exec"), namespace)
 
+    def test_report_fetch_drops_rows_marked_is_deleted(self):
+        text = ("User Principal Name,Is Deleted,Assigned Products\n"
+                "ada@example.com,False,Microsoft 365 Copilot\n"
+                "gone@example.com,True,Microsoft 365 Copilot\n")
+        response = SimpleNamespace(text=text, raise_for_status=lambda: None)
+        namespace = {"graph_get": lambda *a, **k: response, "REPORT_PERIOD": "D7", "headers": {}}
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            exec(compile(cells(COPIES[0])[6], "report-fetch", "exec"), namespace)
+        self.assertEqual([row["User Principal Name"] for row in namespace["rows"]], ["ada@example.com"])
+        self.assertIn("1 row(s) the report marks Is Deleted are not counted", output.getvalue())
+
+    def test_live_licence_cell_unticks_skips_on_403_and_can_be_turned_off(self):
+        import requests
+
+        import notebook_source
+
+        code = cells(COPIES[0])[10]
+        self.assertIn("apply_live_veto(rows, report_upn_col, live)", code)
+        helpers = notebook_source.namespace(NOTEBOOK)
+        plan = [{"servicePlanId": "a62f8878-de10-42f3-b68f-6149a25ceb97", "capabilityStatus": "Enabled"}]
+        users = {"value": [{"userPrincipalName": "ada@example.com", "assignedPlans": plan},
+                           {"userPrincipalName": "bob@example.com", "assignedPlans": []}]}
+
+        def forbidden(*a, **k):
+            response = SimpleNamespace(status_code=403)
+            raise requests.HTTPError("403", response=response)
+
+        for graph_get, enabled, expected, says in [
+            (lambda *a, **k: SimpleNamespace(json=lambda: users), True, ["TRUE", "FALSE", "TRUE"],
+             "Unticked by live check : 1"),
+            (forbidden, True, ["TRUE", "TRUE", "TRUE"], "HTTP 403"),
+            (forbidden, False, ["TRUE", "TRUE", "TRUE"], "Live licence check is off"),
+        ]:
+            with self.subTest(says=says):
+                namespace = dict(helpers, requests=requests, graph_get=graph_get, LIVE_LICENCE_CHECK=enabled,
+                                 report_upn_col="User Principal Name",
+                                 rows=[{"User Principal Name": upn, "HasCopilot": "TRUE"}
+                                       for upn in ("Ada@example.com", "bob@example.com", "cy@example.com")])
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    exec(compile(code, "live-licence-check", "exec"), namespace)
+                self.assertEqual([row["HasCopilot"] for row in namespace["rows"]], expected)
+                self.assertIn(says, output.getvalue())
+
     def test_active_pbits_consume_flags_not_assigned_product_classifiers(self):
         paths = [p for p in ROOT.rglob("*.pbit")
                  if "archive" not in p.parts

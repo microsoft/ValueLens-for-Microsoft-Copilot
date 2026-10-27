@@ -330,12 +330,30 @@ LICENSED_CSV = ("\ufeffReport Refresh Date,User Principal Name,Display Name,Assi
                 "2026-09-09,bob@contoso.com,Bob,Microsoft 365 E3\n")
 
 
-def test_collect_licensed_and_org(tmp_path):
-    users_page2 = graph.org.USERS_URL + "&$skiptoken=2"
-
+def _licensed_handler(users=None, status=200):
+    """Serves the report, and /users with assignedPlans for the live licence check."""
     def handler(m, url, kw):
         if "getOffice365ActiveUserDetail" in url:
             return Resp(200, text=LICENSED_CSV, content=LICENSED_CSV.encode("utf-8-sig"))
+        if url == graph.licensed.LIVE_USERS_URL:
+            return Resp(status, {"value": users or []})
+        raise AssertionError(url)
+    return handler
+
+
+def _licensed_flags(store):
+    path = store.path("raw/copilot_licensed_users/part-0.parquet").as_posix()
+    return duckdb.sql(f"SELECT UPN_Normalized, Has_license FROM '{path}' ORDER BY 1").fetchall()
+
+
+def test_collect_licensed_and_org(tmp_path):
+    users_page2 = graph.org.USERS_URL + "&$skiptoken=2"
+    plan = [{"servicePlanId": graph.licensed.COPILOT_PLAN_ID, "capabilityStatus": "Enabled"}]
+    live = _licensed_handler([{"userPrincipalName": "ada@contoso.com", "assignedPlans": plan}])
+
+    def handler(m, url, kw):
+        if "getOffice365ActiveUserDetail" in url or url == graph.licensed.LIVE_USERS_URL:
+            return live(m, url, kw)
         if url == graph.org.USERS_URL:
             return Resp(200, {"value": [{"userPrincipalName": "ceo@contoso.com", "displayName": "Ceo"}],
                               "@odata.nextLink": users_page2})
@@ -382,6 +400,36 @@ def test_collect_licensed_403_names_permission(tmp_path):
     api, _ = make_api(lambda m, u, kw: Resp(403, {}))
     with pytest.raises(PermissionError, match="Reports.Read.All"):
         graph.collect_licensed(api, LocalStore(tmp_path), settings())
+
+
+def test_collect_licensed_live_veto_unticks_removed_licence(tmp_path, caplog):
+    removed = [{"servicePlanId": graph.licensed.COPILOT_PLAN_ID, "capabilityStatus": "Deleted"}]
+    api, _ = make_api(_licensed_handler([{"userPrincipalName": "Ada@contoso.com", "assignedPlans": removed},
+                                         {"userPrincipalName": "bob@contoso.com", "assignedPlans": []}]))
+    store = LocalStore(tmp_path)
+    with caplog.at_level("INFO", logger="valuelens_jobs.collect"):
+        assert graph.collect_licensed(api, store, settings()) == 2
+    assert _licensed_flags(store) == [("ada@contoso.com", "FALSE"), ("bob@contoso.com", "FALSE")]
+    assert "1 user(s) unticked" in caplog.text
+
+
+@pytest.mark.parametrize("status", [400, 403, 404])
+def test_collect_licensed_skips_live_check_when_users_unreadable(tmp_path, caplog, status):
+    api, _ = make_api(_licensed_handler(status=status))
+    store = LocalStore(tmp_path)
+    with caplog.at_level("WARNING", logger="valuelens_jobs.collect"):
+        assert graph.collect_licensed(api, store, settings()) == 2
+    assert _licensed_flags(store) == [("ada@contoso.com", "TRUE"), ("bob@contoso.com", "FALSE")]
+    assert f"HTTP {status}" in caplog.text and "User.Read.All" in caplog.text
+
+
+def test_collect_licensed_skips_live_check_when_no_names_match(tmp_path, caplog):
+    api, _ = make_api(_licensed_handler([{"userPrincipalName": "someone@else.com", "assignedPlans": []}]))
+    store = LocalStore(tmp_path)
+    with caplog.at_level("WARNING", logger="valuelens_jobs.collect"):
+        graph.collect_licensed(api, store, settings())
+    assert _licensed_flags(store) == [("ada@contoso.com", "TRUE"), ("bob@contoso.com", "FALSE")]
+    assert "concealed" in caplog.text
 
 
 def test_collect_m365_writes_day_files(tmp_path):
