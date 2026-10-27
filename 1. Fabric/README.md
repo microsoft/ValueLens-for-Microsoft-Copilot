@@ -8,7 +8,9 @@ on a schedule. The ValueLens Power BI report reads the result.
 This video walks through the manual setup, from a new app registration to a self-refreshing
 Power BI report.
 
-https://github.com/user-attachments/assets/c834bed3-49fa-4f6a-bc7a-01bded2fd53e
+[![Watch the Fabric setup on YouTube](https://img.youtube.com/vi/-pAuSQSP5pc/maxresdefault.jpg)](https://youtu.be/-pAuSQSP5pc)
+
+**▶ [Watch on YouTube](https://youtu.be/-pAuSQSP5pc)**
 
 > Prefer to download it? [Get the walkthrough video](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/installer-v0.2.2/ValueLens_Fabric_Setup.mp4).
 
