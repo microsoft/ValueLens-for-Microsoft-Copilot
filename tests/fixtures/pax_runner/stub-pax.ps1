@@ -11,6 +11,7 @@
 #   stale         writes nothing
 #   users-stale   writes the interactions only
 #   fail          prints "Exit code: $env:STUB_PAX_EXIT" and fails as the real script does
+#   search-401    prints PAX's line for an audit search that got HTTP 401, then fails with exit code 1
 #   rollup-fail   prints PAX's failed-rollup line, then fails as the real script does when it
 #                 finds that line in PAX's log
 #   rollup-exit0  prints PAX's failed-rollup line and exits 0, as a script that doesn't read
@@ -32,11 +33,18 @@ if ($env:STUB_MODES) {
 
 $bound = [ordered]@{}
 foreach ($key in $PSBoundParameters.Keys) { $bound[$key] = [string]$PSBoundParameters[$key] }
+# The window that state.json says is running, as the installer's status would read it.
+$statePath = Join-Path (Split-Path -Parent ([System.IO.Path]::GetFullPath($WorkRoot))) 'state.json'
+$pending = $null
+if (Test-Path -LiteralPath $statePath) {
+  try { $pending = (Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json).progress.pending } catch { $pending = $null }
+}
 [ordered]@{
   run      = $env:STUB_RUN
   params   = $bound
   argv     = @([Environment]::GetCommandLineArgs())
   secretOk = ($env:AIBV_CLIENT_SECRET -ceq 'stub-secret')
+  pending  = $pending
 } | ConvertTo-Json -Depth 4 -Compress | Add-Content -LiteralPath $env:STUB_PAX_LOG -Encoding utf8
 
 $mode = if ($OnlyUserInfo) { 'only-user-info' } elseif ($AppendFile) { 'append' } else { 'seed' }
@@ -63,6 +71,11 @@ $rollupLine = 'Rollup: post-processor returned non-zero exit code 1. Raw CSV(s) 
 switch ($behaviour) {
   'fail' {
     Write-Host "Exit code: $env:STUB_PAX_EXIT"
+    throw 'PAX failed.'
+  }
+  'search-401' {
+    Write-Host '[2026-10-25 16:42:43] [INFO]   [PARENT-CREATE] Partition 1/12 creation failed (category: Other; HTTP 401 | client-request-id: 0 | request-id: ) - worker not launched this pass'
+    Write-Host 'Exit code: 1'
     throw 'PAX failed.'
   }
   'rollup-fail' {

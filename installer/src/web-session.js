@@ -17,7 +17,7 @@ import { defaultPaxHost, readState } from './steps/pax/local.js';
 import { endedSince } from './steps/pax/flow.js';
 import { paxCollectedLabels } from './steps/pax/plan.js';
 import { describeFolder } from './steps/pax/site.js';
-import { reportUrl } from './steps/report.js';
+import { reportUrl, tenantQuery } from './steps/report.js';
 import { isPax, TARGETS } from './target.js';
 import { routerWanted } from './uploads.js';
 import { SETUP_SECTIONS, setupRecovery } from './setup.js';
@@ -45,11 +45,12 @@ export function describeRecord(config, local) {
     target: config.target,
     installed,
     workspace: f.workspaceName ?? f.workspaceId,
-    workspaceUrl: f.workspaceId ? `https://app.fabric.microsoft.com/groups/${f.workspaceId}` : undefined,
+    workspaceUrl: f.workspaceId ? `https://app.fabric.microsoft.com/groups/${f.workspaceId}${tenantQuery(config.tenantId)}` : undefined,
     lakehouse: f.lakehouseName,
     schedule: f.scheduleId ? describeSchedule(config.schedule) : undefined,
     data: collectedLabels(config.modules),
     model: sm.id ? sm.name : undefined,
+    reportUrl: f.workspaceId && sm.report?.id ? reportUrl(f.workspaceId, sm.report.id, config.tenantId) : undefined,
     secretExpires: config.app.secretExpires?.slice(0, 10),
     firstRun: config.firstRun?.status,
     historyDays: config.history?.days,
@@ -105,14 +106,14 @@ function describePaxRecord(config, local) {
     target: config.target,
     installed,
     workspace: config.fabric.workspaceName ?? wsId,
-    workspaceUrl: wsId ? `https://app.powerbi.com/groups/${wsId}` : undefined,
+    workspaceUrl: wsId ? `https://app.powerbi.com/groups/${wsId}${tenantQuery(config.tenantId)}` : undefined,
     lakehouse: undefined,
     files: sp ? describeFolder(sp) : undefined,
     filesUrl: sp?.folderUrl,
     schedule: task?.name ? `${task.name}, daily at ${task.at}${task.logonType === 'Interactive' ? ", while you're signed in to this PC" : ''}` : undefined,
     data: paxCollectedLabels(config),
     model: sm.id ? (signedIn ? sm.name : `${sm.name}, not signed in to SharePoint yet`) : undefined,
-    reportUrl: wsId && sm.report?.id ? reportUrl(wsId, sm.report.id) : undefined,
+    reportUrl: wsId && sm.report?.id ? reportUrl(wsId, sm.report.id, config.tenantId) : undefined,
     secretExpires: pax.secretExpires?.slice(0, 10),
     firstRun: paxFirstRun(pax.firstRun, local),
     historyDays: config.history?.days,

@@ -43,6 +43,9 @@ import {
   scriptsHash,
   secretStored,
   SEED_DAYS,
+  MAX_AUDIT_SEARCHES,
+  SMALL_TENANT_PARTITION_HOURS,
+  auditSearches,
   startTask,
   storeSecret,
   TASK_AT,
@@ -552,6 +555,7 @@ test('pax local: refreshConfig fills refresh.json from the install record and pr
     paxSha256: PAX_RELEASE.sha256,
     files: { ...PRODUCT.pax.files },
     seedDays: SEED_DAYS,
+    maxSearches: MAX_AUDIT_SEARCHES,
     agent365: false,
     repairHint: `To fix it, run the ${PRODUCT.installer}'s repair: ${commandLine('install')}`,
   });
@@ -573,6 +577,22 @@ test("pax local: refreshConfig prefers Graph's site ID and takes the record's PA
   assert.equal(cfg.seedDays, 90);
   assert.equal(cfg.agent365, true);
   assert.equal(cfg.repairHint, `To fix it, run the ${PRODUCT.installer}'s repair: ${commandLine(`install --config "${file}"`)}`);
+});
+
+test('pax local: refreshConfig reads a small tenant in a few large audit searches, and caps how many run at once', () => {
+  assert.deepEqual(auditSearches(undefined), { maxSearches: MAX_AUDIT_SEARCHES }, "seats that couldn't be read keep PAX's 12-hour searches");
+  assert.deepEqual(auditSearches(0), { maxSearches: MAX_AUDIT_SEARCHES });
+  assert.deepEqual(auditSearches(25), { maxSearches: MAX_AUDIT_SEARCHES, partitionHours: SMALL_TENANT_PARTITION_HOURS });
+  assert.deepEqual(auditSearches(1_000), { maxSearches: MAX_AUDIT_SEARCHES, partitionHours: SMALL_TENANT_PARTITION_HOURS });
+  assert.deepEqual(auditSearches(1_001), { maxSearches: MAX_AUDIT_SEARCHES });
+  assert.ok(MAX_AUDIT_SEARCHES < 10, "below Purview's limit of about ten searches at once");
+  const config = paxConfig();
+  config.pax = { seats: 40 };
+  const cfg = refreshConfig(config);
+  assert.equal(cfg.partitionHours, 72);
+  assert.equal(cfg.maxSearches, MAX_AUDIT_SEARCHES);
+  config.pax.seats = 40_000;
+  assert.equal('partitionHours' in refreshConfig(config), false);
 });
 
 test('pax local: refreshConfig needs the folder, the app and the tenant', () => {

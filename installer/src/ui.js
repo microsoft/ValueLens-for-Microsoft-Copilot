@@ -164,7 +164,9 @@ export function createUi(opts = {}) {
     prereqs: (items) => {
       const glyph = { met: c.green('✓'), missing: c.red('✗'), eligible: c.yellow('◐'), unknown: c.dim('?') };
       for (const it of items) {
-        line(`  ${glyph[it.status]} ${it.label}${it.optional ? c.dim(' (optional)') : ''}`);
+        // A missing optional one isn't a failure, so it isn't shown in red.
+        const mark = it.optional && it.status === 'missing' ? c.dim('–') : glyph[it.status];
+        line(`  ${mark} ${it.label}${it.optional ? c.dim(' (optional)') : ''}`);
         line(`    ${it.detail}`);
         for (const r of it.rows ?? []) line(`      ${glyph[r.status]} ${r.name}${r.detail ? c.dim(`: ${r.detail}`) : ''}`);
         line(`    ${c.dim(`Needed for: ${it.neededFor}`)}`);

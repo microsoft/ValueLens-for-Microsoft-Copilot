@@ -790,14 +790,15 @@ test('describeRecord on the PAX route: the refresh on this PC, the folder, the r
   assert.equal(r.target, 'pax');
   assert.equal(r.installed, true);
   assert.equal(r.workspace, PRODUCT.pax.workspace);
-  assert.equal(r.workspaceUrl, 'https://app.powerbi.com/groups/ws-1', 'a Power BI workspace, not a Fabric one');
+  assert.equal(r.workspaceUrl, 'https://app.powerbi.com/groups/ws-1?ctid=tenant-1', 'a Power BI workspace, not a Fabric one, in the install\'s tenant');
   assert.equal(r.lakehouse, undefined);
   assert.equal(r.files, 'Shared Documents/ValueLens on https://contoso.sharepoint.com/sites/Analytics');
   assert.equal(r.filesUrl, 'https://contoso.sharepoint.com/sites/Analytics/Shared%20Documents/ValueLens');
   assert.equal(r.schedule, `${PRODUCT.pax.task}, daily at 02:00, while you're signed in to this PC`);
   assert.deepEqual(r.data, ['Copilot interactions', 'users']);
   assert.equal(r.model, PRODUCT.pax.model);
-  assert.equal(r.reportUrl, reportUrl('ws-1', 'rep-1'));
+  assert.equal(r.reportUrl, reportUrl('ws-1', 'rep-1', 'tenant-1'));
+  assert.ok(r.reportUrl.endsWith('/reports/rep-1?ctid=tenant-1'), r.reportUrl);
   assert.equal(r.secretExpires, '2027-06-01');
   assert.equal(r.viewers, PRODUCT.viewerGroup);
   assert.equal(r.app, 'Open the app');

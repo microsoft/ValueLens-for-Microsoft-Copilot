@@ -24,11 +24,11 @@ export const CONNECTION_SECRET_NAME = 'ValueLens semantic model connection';
 /** @param {string} workspaceId */
 export const connectionName = (workspaceId) => `${PRODUCT.fabric.sqlConnection} ${workspaceId.slice(0, 8)}`;
 
-/** @param {string} workspaceId @param {string} modelId */
-export const modelSettingsUrl = (workspaceId, modelId) => `https://app.powerbi.com/groups/${workspaceId}/settings/datasets/${modelId}`;
+/** @param {string} workspaceId @param {string} modelId @param {string} [tenantId] */
+export const modelSettingsUrl = (workspaceId, modelId, tenantId) => `https://app.powerbi.com/groups/${workspaceId}/settings/datasets/${modelId}${tenantId ? `?ctid=${tenantId}` : ''}`;
 
-/** @param {string} workspaceId @param {string} modelId */
-export const modelUrl = (workspaceId, modelId) => `https://app.powerbi.com/groups/${workspaceId}/datasets/${modelId}/details`;
+/** @param {string} workspaceId @param {string} modelId @param {string} [tenantId] */
+export const modelUrl = (workspaceId, modelId, tenantId) => `https://app.powerbi.com/groups/${workspaceId}/datasets/${modelId}/details${tenantId ? `?ctid=${tenantId}` : ''}`;
 
 export const ENDPOINT_POLL_MS = 15_000;
 export const CONNECTION_RETRY_MS = 30_000;
@@ -478,7 +478,7 @@ export async function bindModel(ctx, m) {
       return true;
     } catch (err) {
       ui.warn(`Couldn't connect ${m.name} to "${sm.connectionName}" (${/** @type {Error} */ (err).message}).`);
-      ui.info(`Choose it under "Gateway and cloud connections" in the model's settings: ${modelSettingsUrl(ws, id)}`);
+      ui.info(`Choose it under "Gateway and cloud connections" in the model's settings: ${modelSettingsUrl(ws, id, ctx.user?.tenantId ?? ctx.config.tenantId)}`);
       if (ui.yes) return false;
       const next = await ui.select(
         'Then:',
