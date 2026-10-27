@@ -20,10 +20,15 @@ Pulled automatically by the 3 core notebooks via one **Entra app registration** 
 | Source | Graph application permission | Manual-export role (if pulling by hand) |
 |---|---|---|
 | Audit logs (`copilot_interactions_parsed`) | `AuditLogsQuery.Read.All` | Audit Reader or Compliance Administrator |
-| Licensed users (`copilot_licensed_users`) | `Reports.Read.All` | Global Reader or Reports Reader |
+| Licensed users (`copilot_licensed_users`) | `Reports.Read.All`, plus `User.Read.All` for the live licence check | Global Reader or Reports Reader |
 | Org data (`copilot_org_data`) | `User.Read.All` | Global Reader or User Administrator |
 
 One app registration covers all three. Put the client secret in **Azure Key Vault**, not in a notebook.
+
+The licensed-users pull checks each report user's flag against their `assignedPlans` in Microsoft
+Entra and unticks anyone without an enabled Microsoft 365 Copilot plan today. That needs
+`User.Read.All`, which is **already granted** for org data, so there's nothing new to consent. If
+`/users` returns 403, the check is skipped and the run log says so.
 
 The optional **Microsoft 365 activity** notebook (Fabric path, `m365_activity_daily`) reads the
 Microsoft 365 usage reports with the same `Reports.Read.All`, so it needs no extra permission.

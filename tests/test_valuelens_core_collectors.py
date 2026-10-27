@@ -46,7 +46,8 @@ USERS = [
 
 @pytest.fixture(scope="module")
 def nb_licensed():
-    return notebook_source.namespace(LICENSED_NB, {"COPILOT_SKU_PATTERNS", "COPILOT_SKU_EXCLUDE", "_pats", "_excl"})
+    return notebook_source.namespace(LICENSED_NB, {"COPILOT_SKU_PATTERNS", "COPILOT_SKU_EXCLUDE", "_pats", "_excl",
+                                                   "COPILOT_PLAN_ID", "LIVE_USERS_URL"})
 
 
 def test_licence_patterns_match_notebook(nb_licensed):
@@ -84,6 +85,127 @@ def test_licensed_empty_guard():
     with pytest.raises(ValueError):
         licensed.build_snapshot(header, allow_empty=True, table_exists=True)
     assert licensed.build_snapshot(header, allow_empty=True)[1] == []
+
+
+PLAN = licensed.COPILOT_PLAN_ID
+
+
+def _entra_user(upn, *plans):
+    return {"userPrincipalName": upn,
+            "assignedPlans": [{"servicePlanId": pid, "capabilityStatus": status} for pid, status in plans]}
+
+
+def _live(*users):
+    return licensed.live_copilot_licences(users)
+
+
+def test_live_licences_need_an_enabled_copilot_plan():
+    known, enabled = _live(
+        _entra_user("Ada@contoso.com", (PLAN.upper(), "Enabled")),
+        _entra_user("bob@contoso.com", (PLAN, "Deleted")),
+        _entra_user("cy@contoso.com", (PLAN, "Suspended"), ("other-plan", "Enabled")),
+        _entra_user("dee@contoso.com"),
+        {"userPrincipalName": None},
+    )
+    assert known == {"ada@contoso.com", "bob@contoso.com", "cy@contoso.com", "dee@contoso.com"}
+    assert enabled == {"ada@contoso.com"}
+
+
+def test_live_veto_unticks_but_never_ticks():
+    csv = ("User Principal Name,Assigned Products\n"
+           "ada@contoso.com,Microsoft 365 Copilot\n"      # licensed, still enabled -> stays TRUE
+           "bob@contoso.com,Microsoft 365 Copilot\n"      # licence removed in Entra -> FALSE
+           "cy@contoso.com,Microsoft 365 E3\n"            # enabled in Entra but no product -> stays FALSE
+           "dee@contoso.com,Microsoft 365 Copilot\n")     # not returned by Entra -> left alone
+    live = _live(_entra_user("ada@contoso.com", (PLAN, "Enabled")),
+                 _entra_user("bob@contoso.com", (PLAN, "Deleted")),
+                 _entra_user("cy@contoso.com", (PLAN, "Enabled")))
+    stats = {}
+    cols, rows = licensed.build_snapshot(csv, live=live, stats=stats)
+    flags = {r[cols.index("UPN_Normalized")]: r[cols.index("Has_license")] for r in rows}
+    assert flags == {"ada@contoso.com": "TRUE", "bob@contoso.com": "FALSE",
+                     "cy@contoso.com": "FALSE", "dee@contoso.com": "TRUE"}
+    assert stats == {"deleted": 0, "live_checked": True, "live_removed": 1, "live_missed": 1}
+
+
+def test_live_veto_skipped_without_live_data_or_matching_names():
+    rows = [{"UPN": "ada@contoso.com", "HasCopilot": "TRUE"}]
+    assert licensed.apply_live_veto(rows, "UPN", None) == {"checked": False, "removed": 0, "missed": 0}
+    concealed = [{"UPN": "0123456789ABCDEF0123456789ABCDEF", "HasCopilot": "TRUE"}]
+    live = _live(_entra_user("ada@contoso.com"))
+    assert licensed.apply_live_veto(concealed, "UPN", live)["checked"] is False
+    assert concealed[0]["HasCopilot"] == "TRUE"
+    stats = {}
+    licensed.build_snapshot(CSV, live=None, stats=stats)
+    assert stats["live_checked"] is False and stats["live_removed"] == 0
+
+
+def test_fetch_live_licences_pages_and_skips():
+    page2 = licensed.LIVE_USERS_URL + "&$skiptoken=2"
+    pages = {licensed.LIVE_USERS_URL: {"value": [_entra_user("a@contoso.com", (PLAN, "Enabled"))],
+                                       "@odata.nextLink": page2},
+             page2: {"value": [_entra_user("b@contoso.com")]}}
+    assert licensed.fetch_live_licences(pages.__getitem__) == (
+        {"a@contoso.com", "b@contoso.com"}, {"a@contoso.com"})
+    assert licensed.fetch_live_licences(lambda url: None) is None  # 400/403/404
+    with pytest.raises(RuntimeError, match="looped"):
+        licensed.fetch_live_licences(lambda url: {"value": [], "@odata.nextLink": licensed.LIVE_USERS_URL})
+    with pytest.raises(RuntimeError, match="non-Graph"):
+        licensed.fetch_live_licences(lambda url: {"value": [], "@odata.nextLink": "https://evil.example/u"})
+
+
+def test_is_deleted_rows_are_excluded():
+    csv = ("User Principal Name,Display Name,Is Deleted,Assigned Products\n"
+           "ada@contoso.com,Ada,False,Microsoft 365 Copilot\n"
+           "gone@contoso.com,Gone,True,Microsoft 365 Copilot\n"
+           # A reused UPN: the deleted account's row must not count or clash with the live one.
+           "bob@contoso.com,Bob (old),TRUE,Microsoft 365 Copilot\n"
+           "bob@contoso.com,Bob,False,Microsoft 365 E3\n")
+    stats = {}
+    cols, rows = licensed.build_snapshot(csv, stats=stats)
+    flags = {r[cols.index("UPN_Normalized")]: r[cols.index("Has_license")] for r in rows}
+    assert flags == {"ada@contoso.com": "TRUE", "bob@contoso.com": "FALSE"}
+    assert stats["deleted"] == 2
+    kept, dropped = licensed.drop_deleted_rows([{"isDeleted": "yes"}, {"isDeleted": ""}, {"Other": "1"}])
+    assert (len(kept), dropped) == (2, 1)
+
+
+@pytest.mark.parametrize("name", ["COPILOT_PLAN_ID", "LIVE_USERS_URL", "drop_deleted_rows",
+                                  "live_copilot_licences", "fetch_live_licences", "apply_live_veto"])
+def test_live_veto_helpers_are_verbatim_in_notebook(name):
+    import ast
+    import inspect
+    import json
+
+    def segments(source):
+        out = {}
+        for node in ast.parse(source).body:
+            if isinstance(node, ast.FunctionDef):
+                out[node.name] = ast.get_source_segment(source, node)
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        out[target.id] = ast.get_source_segment(source, node)
+        return out
+
+    core = segments(inspect.getsource(licensed))
+    cells = json.loads((notebook_source.NOTEBOOKS / LICENSED_NB).read_text(encoding="utf-8"))["cells"]
+    nb = {}
+    for cell in cells:
+        if cell["cell_type"] == "code":
+            nb.update(segments("".join(cell["source"])))
+    assert nb[name] == core[name]
+
+
+def test_notebook_veto_matches_core(nb_licensed):
+    users = [_entra_user("ada@contoso.com", (PLAN, "Enabled")), _entra_user("bob@contoso.com")]
+    live = nb_licensed["fetch_live_licences"](lambda url: {"value": users})
+    assert live == licensed.fetch_live_licences(lambda url: {"value": users})
+    nb_rows = [{"U": "ada@contoso.com", "HasCopilot": "TRUE"}, {"U": "bob@contoso.com", "HasCopilot": "TRUE"}]
+    core_rows = [dict(r) for r in nb_rows]
+    assert nb_licensed["apply_live_veto"](nb_rows, "U", live) == licensed.apply_live_veto(core_rows, "U", live)
+    assert nb_rows == core_rows == [{"U": "ada@contoso.com", "HasCopilot": "TRUE"},
+                                    {"U": "bob@contoso.com", "HasCopilot": "FALSE"}]
 
 
 def test_org_matches_notebook():

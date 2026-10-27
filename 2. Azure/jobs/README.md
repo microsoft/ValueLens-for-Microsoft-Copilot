@@ -11,7 +11,7 @@ in step with the Fabric notebooks by the golden tests in `tests/`. No Spark or J
 
 | Step | What it does | Module |
 |---|---|---|
-| collect | Licensed users (`Reports.Read.All`), then Copilot interactions from the Purview audit log (`AuditLogsQuery.Read.All`) | core |
+| collect | Licensed users (`Reports.Read.All`), with flags checked against today's licences in `/users` (`User.Read.All`), then Copilot interactions from the Purview audit log (`AuditLogsQuery.Read.All`) | core |
 | | Org data from `/users` (`User.Read.All`) | orgData |
 | | Microsoft 365 daily activity reports (`Reports.Read.All`) | m365Activity |
 | | Copilot Studio credits and Viva (Copilot Chat) credits from the drop folder; Azure AI spend, tokens and Copilot pay-as-you-go from Azure Resource Manager | consumption |

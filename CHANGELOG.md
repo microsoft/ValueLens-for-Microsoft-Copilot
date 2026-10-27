@@ -18,6 +18,32 @@ Deployment instructions do **not** live here. They live in the READMEs:
 
 ---
 
+## Unreleased — Licensed users: check flags against today's licences in Microsoft Entra
+
+**Why.** The Microsoft 365 active-user report can run days behind licence changes. In a large tenant,
+users whose Copilot licence had been removed still showed as licensed, and accounts the report marks
+`Is Deleted` were counted too.
+
+- **Live licence check (veto only).** After classifying the report's assigned products, the Fabric
+  licensed-users notebook and the Azure licensed-users collect read each user's `assignedPlans` from
+  `/v1.0/users` and untick `HasCopilot` for anyone without an enabled Microsoft 365 Copilot service
+  plan (`M365_COPILOT_APPS`, `a62f8878-de10-42f3-b68f-6149a25ceb97`) today. The check never ticks a
+  flag, and users Entra doesn't return are left as they are. Users with an enabled plan but no
+  matching assigned product are counted in the log so you can review `COPILOT_SKU_PATTERNS`.
+- **Skipped, with a log line, when it can't run**: `/users` returns HTTP 400, 403 or 404, or none of
+  the report's users are found in Entra (concealed names). The Fabric notebook also has
+  `LIVE_LICENCE_CHECK = True` in its config cell; set it to `False` to turn the check off.
+- **Rows the report marks `Is Deleted` are dropped** before classification, so a deleted account
+  doesn't count and a reused UPN doesn't raise a false duplicate conflict.
+- **No new permission.** The check uses `User.Read.All`, which the app registration (Fabric) and the
+  jobs' managed identity (Azure) already have for org data.
+- The app, the Fabric App, SharePoint and Local CSV read licence flags that these producers (or the
+  admin-centre export) have already worked out, so they need no change.
+
+Ported from the Analytics Hub repository's fix (microsoft/AnalyticsHub-Dashboard#215).
+
+---
+
 ## Unreleased — Azure: Copilot Studio exports keep the month they were uploaded
 
 **Why.** The per-agent and per-user exports from the Power Platform admin center carry no date, so
