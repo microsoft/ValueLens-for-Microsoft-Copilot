@@ -20,9 +20,9 @@ export const EMPTY_FILTERS: Filters = { from: '', to: '', org: '', lic: '', tool
 export interface Assumptions {
   hourly: number
   currency: string
+  /** Licence price per user per month: drives investment, return and reclaimable value. */
   ppupm: number
   penalty: number
-  licenceCost: number
   scenario: Scenario
   grading: Grading
 }
@@ -32,7 +32,6 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   currency: '£',
   ppupm: 30,
   penalty: 1,
-  licenceCost: 0,
   scenario: 'Typical',
   grading: 'Balanced',
 }

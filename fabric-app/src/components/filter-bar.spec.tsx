@@ -105,6 +105,37 @@ describe("FilterBar", () => {
         expect(searchBox(panel).value).toBe("");
         expect(choices(panel)).toEqual(organizations);
     });
+
+    it("folds a long bar's other filters behind More filters, counting the ones in effect", () => {
+        render(
+            <FilterContext.Provider
+                value={{
+                    filters: { ...defaultFilters, licence: "licensed", agentNames: ["Agent A"] },
+                    setFilters: () => {},
+                    options: undefined,
+                    optionsError: undefined,
+                    applicable: ["dateRange", "organizations", "licence", "audience", "agentTypes", "agentNames"],
+                    orgAttribute: describeOrgAttribute(DEFAULT_ORG_ATTRIBUTE),
+                    orgAttributes: [DEFAULT_ORG_ATTRIBUTE],
+                    orgValues: undefined,
+                    requestFilterChoices: () => {},
+                }}
+            >
+                <FilterBar destinationLabel="Value" />
+            </FilterContext.Provider>,
+        );
+
+        expect(screen.getByRole("button", { name: /^Date/ })).toBeTruthy();
+        const more = screen.getByRole("button", { name: "More filters 2 active" });
+        expect(more.getAttribute("aria-expanded")).toBe("false");
+        expect(screen.queryByRole("group", { name: filterLabel("licence", "") })).toBeNull();
+        expect(screen.queryByRole("button", { name: /^Agent/ })).toBeNull();
+
+        fireEvent.click(more);
+        expect(more.getAttribute("aria-expanded")).toBe("true");
+        expect(document.getElementById(more.getAttribute("aria-controls")!)!.hidden).toBe(false);
+        expect(screen.getByRole("group", { name: filterLabel("licence", "") })).toBeTruthy();
+    });
 });
 
 describe("FilterBar's tenant default dates", () => {

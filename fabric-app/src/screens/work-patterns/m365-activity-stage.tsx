@@ -134,7 +134,6 @@ export function M365ActivityStage({ concealed }: M365ActivityStageProps) {
                         <KpiCard
                             label="People active"
                             value={people}
-                            emphasis
                             detail={
                                 <KpiStat
                                     label="Workloads per active day"
@@ -206,7 +205,7 @@ export function M365ActivityStage({ concealed }: M365ActivityStageProps) {
                 )}
             </div>
 
-            <div className="grid gap-400 xl:grid-cols-2">
+            <div className="grid grid-cols-1 gap-400 xl:grid-cols-2">
                 <div className="h-[340px]" style={reachHeight ? { height: reachHeight } : undefined}>
                     {reachResult.data?.status === "error" ? (
                         <QueryError className="h-full" message={reachResult.data.error.message} onRetry={reachResult.refetch} />

@@ -8,6 +8,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FileStack, MessageSquareText, Moon, SlidersHorizontal, Sun } from "lucide-react";
 import { DataToContext } from "@/hooks/data-to.context";
+import { PageTitleContext } from "@/hooks/page-title.context";
 import { useReportPacks } from "@/hooks/report-packs.context";
 import { useSourceFreshness } from "@/hooks/use-source-freshness";
 import { paletteClass, usePaletteTheme } from "@/hooks/use-palette-theme";
@@ -46,6 +47,7 @@ import { ReportsNav } from "./reports-nav";
 import { BAND_BUTTON } from "./band-button";
 import { BandPopover } from "./band-popover";
 import { SharePanel } from "./share-panel";
+import { stageTabId } from "./stage-tab-id";
 import { StageTabs } from "./stage-tabs";
 
 interface VersionResponse {
@@ -124,6 +126,9 @@ interface BandTab {
 }
 
 const COLUMN = "mx-auto w-full max-w-[1480px] px-[var(--page-x)]";
+
+/** The id of the panel a page's stage tabs control. */
+const STAGE_PANEL = "stage-panel";
 
 /**
  * The CSV apps' frame. A dark teal band carries the brand, a switcher
@@ -226,6 +231,12 @@ export function AppShell({ view, onNavigate, onOpenPack, children }: AppShellPro
         [current, single],
     );
     const showFilters = !noScope && !!title && filterKeys.length > 0;
+    // A product of one page names each of its stages, as the band's tabs do, rather than repeating the page.
+    const heading =
+        current && single && current.id === single.id
+            ? (single.stages.find((stage) => stage.id === activeStage)?.label ?? current.label)
+            : current?.label;
+    const tabbed = !noScope && !!current && subViews.length > 1;
     const ask = available.find((destination) => destination.id === "ask");
     const assumptions = available.find((destination) => destination.id === "assumptions");
 
@@ -241,7 +252,7 @@ export function AppShell({ view, onNavigate, onOpenPack, children }: AppShellPro
             data-print="flow"
         >
             <div ref={scrollRef} data-print="flow" className="relative flex min-h-0 flex-1 flex-col overflow-y-auto [scrollbar-gutter:stable]">
-                <header data-band="" data-print="hide" className="bg-band text-band-foreground">
+                <header data-band="" data-print="hide" className="bg-band text-band-foreground dark:border-b dark:border-white/10">
                     <div className={cn(COLUMN, "relative flex flex-wrap items-center gap-x-600 gap-y-300 pt-400 pb-300-nudge")}>
                         <div className="flex min-w-0 flex-col">
                             <span className="font-heading text-[19px] leading-[24px] font-semibold tracking-[-0.01em]">{appName(runtimeConfig().variant)}</span>
@@ -333,7 +344,7 @@ export function AppShell({ view, onNavigate, onOpenPack, children }: AppShellPro
                     </div>
 
                     <nav aria-label="Sections" className={COLUMN}>
-                        <ul aria-label={productLabel ? `${productLabel} tabs` : undefined} className="-mx-[14px] flex gap-100 overflow-x-auto scrollbar-none">
+                        <ul aria-label={productLabel ? `${productLabel} tabs` : undefined} className="-mx-[14px] flex gap-100 overflow-x-auto scrollbar-none max-sm:scroll-fade-x">
                             {bandTabs.map((tab) => (
                                 <li key={tab.key} className="shrink-0">
                                     <button
@@ -391,6 +402,7 @@ export function AppShell({ view, onNavigate, onOpenPack, children }: AppShellPro
                                         icon={current.icon}
                                         crumb={isBandDestination(current) ? undefined : productLabel}
                                         title={current.label}
+                                        heading={heading}
                                         blurb={current.blurb}
                                         sources={headerSources}
                                         dates={dates}
@@ -402,12 +414,13 @@ export function AppShell({ view, onNavigate, onOpenPack, children }: AppShellPro
                                     />
                                 )
                             )}
-                            {!noScope && current && subViews.length > 1 && (
+                            {tabbed && current && (
                                 <StageTabs
                                     label={`${current.label} stages`}
                                     stages={subViews}
                                     open={activeStage}
                                     onOpen={(stage) => onNavigate(current.id, stage)}
+                                    panelId={STAGE_PANEL}
                                 />
                             )}
                         </div>
@@ -427,8 +440,12 @@ export function AppShell({ view, onNavigate, onOpenPack, children }: AppShellPro
                         ) : (
                             <ThemeContext.Provider value={{ ...themeContext, theme: paletteTheme }}>
                                 <DataToContext.Provider value={dataTo}>
+                                    <PageTitleContext.Provider value={view.kind === "destination" ? heading : undefined}>
                                     <div
                                         ref={contentRef}
+                                        id={tabbed ? STAGE_PANEL : undefined}
+                                        role={tabbed ? "tabpanel" : undefined}
+                                        aria-labelledby={tabbed && activeStage ? stageTabId(STAGE_PANEL, activeStage) : undefined}
                                         aria-busy={refreshing || undefined}
                                         data-refreshing={refreshing || undefined}
                                         className="flex flex-col gap-700 transition-opacity duration-200 data-[refreshing]:opacity-55 data-[refreshing]:delay-150"
@@ -439,6 +456,7 @@ export function AppShell({ view, onNavigate, onOpenPack, children }: AppShellPro
                                             children
                                         )}
                                     </div>
+                                    </PageTitleContext.Provider>
                                 </DataToContext.Provider>
                             </ThemeContext.Provider>
                         )}

@@ -34,11 +34,11 @@ const capabilities: VegaVisualCapabilities = {
 const columnMetadata: ColumnMetadataMap = {
     "Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]": {
         name: TASK_GROUP_COLUMN,
-        displayName: "Task Category",
+        displayName: "Task category",
     },
     "Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]": {
         name: TASK_CATEGORY_COLUMN,
-        displayName: "Task Breakdown",
+        displayName: "Task breakdown",
     },
     "[Is Grand Total]": { name: GRAND_TOTAL_FLAG },
     "[Is Group Total]": { name: GROUP_TOTAL_FLAG },
@@ -128,8 +128,8 @@ export function toValueTaskTree(table: DataTable): ValueTaskTree {
         i === undefined ? undefined : table.columns[i],
     );
     const taskColumns = [
-        { name: TASK_GROUP_COLUMN, displayName: "Task Category" },
-        { name: TASK_CATEGORY_COLUMN, displayName: "Task Breakdown" },
+        { name: TASK_GROUP_COLUMN, displayName: "Task category" },
+        { name: TASK_CATEGORY_COLUMN, displayName: "Task breakdown" },
         ...MEASURES.map((name, i) => measureColumns[i] ?? { name }),
     ];
 

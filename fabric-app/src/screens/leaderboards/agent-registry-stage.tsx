@@ -520,7 +520,6 @@ export function AgentRegistryStage() {
                     <KpiCard
                         label="Agent users"
                         value={readNumber(activityRow, "[Agent Users]")}
-                        emphasis
                         detail={
                             <KpiStat
                                 label="Share of active users"

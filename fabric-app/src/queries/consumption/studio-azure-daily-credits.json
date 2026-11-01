@@ -6,12 +6,13 @@
     { "filter": "isValid(datum['Credits'])" },
     { "calculate": "toDate(datum['Usage Date'])", "as": "Day" }
   ],
-  "mark": { "type": "bar", "width": { "expr": "max(1, 0.7 * (scale('x', 86400000) - scale('x', 0)))" } },
+  "mark": { "type": "bar", "width": { "expr": "min(48, max(1, 0.7 * (scale('x', 86400000) - scale('x', 0))))" } },
   "encoding": {
     "x": {
       "field": "Day",
       "type": "temporal",
       "title": null,
+      "scale": { "padding": 32 },
       "axis": { "labelExpr": "timeFormat(datum.value, '%-d %b')", "labelAngle": 0, "labelOverlap": true, "tickCount": "week", "grid": false }
     },
     "y": {

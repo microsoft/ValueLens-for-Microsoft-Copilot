@@ -13,12 +13,19 @@ import type { DataTable } from "@microsoft/fabric-visuals-core";
 const { mounts } = vi.hoisted(() => ({ mounts: { count: 0 } }));
 
 vi.mock("@microsoft/fabric-visuals", async () => {
-    const Stub = forwardRef<{ id: string }, { data: DataTable }>(function Stub({ data }, ref) {
+    const Stub = forwardRef<{ id: string }, { data: DataTable; spec: { description?: string } }>(function Stub(
+        { data, spec },
+        ref,
+    ) {
         useImperativeHandle(ref, () => ({ id: "handle" }));
         useEffect(() => {
             mounts.count += 1;
         }, []);
-        return <div data-testid="vega">{data.rows.map((row) => row[0]).join(",")}</div>;
+        return (
+            <div data-testid="vega" aria-label={spec.description}>
+                {data.rows.map((row) => row[0]).join(",")}
+            </div>
+        );
     });
     return { VegaVisual: Stub };
 });
@@ -60,6 +67,18 @@ describe("VegaVisual", () => {
         view.rerender(<VegaVisual data={table(["x"])} {...props} />);
         expect(mounts.count).toBe(2);
         expect(view.getByTestId("vega").textContent).toBe("x");
+    });
+
+    it("names the chart after its title", () => {
+        const view = render(<VegaVisual data={table(["a"])} {...props} header={{ title: "Credits by month" }} />);
+        expect(view.getByTestId("vega").getAttribute("aria-label")).toBe("Credits by month");
+    });
+
+    it("levels the stock h4 title under the section heading", () => {
+        const view = render(<VegaVisual data={table(["a"])} {...props} />);
+        const heading = document.createElement("h4");
+        view.container.querySelector("div")!.append(heading);
+        return Promise.resolve().then(() => expect(heading.getAttribute("aria-level")).toBe("3"));
     });
 
     it("still hands its ref to the chart", () => {

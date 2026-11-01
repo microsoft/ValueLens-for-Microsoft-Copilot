@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { DASH, int, pct0, type Fmt } from './format'
 import { Empty, Legend } from './primitives'
-import { HEAT_RAMP } from './theme'
+import { HEAT_RAMP, inkOn } from './theme'
 
 const fin = (n: number) => (Number.isFinite(n) ? n : 0)
 
@@ -68,7 +68,7 @@ export function Stack100(props: {
               <span className="s1-bar" role="img" aria-label={`${d.key}: ${desc}`}>
                 {d.values.map((v, i) =>
                   fin(v) > 0 ? (
-                    <span key={i} style={{ flexGrow: fin(v), background: props.series[i].color }} title={`${props.series[i].name}: ${pct0(fin(v) / tot)}`}>
+                    <span key={i} style={{ flexGrow: fin(v), background: props.series[i].color, color: inkOn(props.series[i].color) }} title={`${props.series[i].name}: ${pct0(fin(v) / tot)}`}>
                       {fin(v) / tot >= 0.12 ? pct0(fin(v) / tot) : ''}
                     </span>
                   ) : null,

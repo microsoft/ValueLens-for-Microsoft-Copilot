@@ -80,7 +80,7 @@ function signalColumns(minutesHeat: HeatDomain | undefined): GridColumnDef[] {
     return [
         {
             id: "AI Tasks",
-            header: "Task Breakdown",
+            header: "Task breakdown",
             width: 152,
             cellRenderer: (value, row: Row) => (
                 <span className="flex flex-col gap-100 whitespace-normal">
@@ -144,7 +144,7 @@ function signalColumns(minutesHeat: HeatDomain | undefined): GridColumnDef[] {
         },
         { id: "Source URL", header: "Source URL", hidden: true },
         { id: "Confidence", header: "Confidence", hidden: true },
-        { id: "Category", header: "Task Category", hidden: true },
+        { id: "Category", header: "Task category", hidden: true },
     ];
 }
 
@@ -195,7 +195,7 @@ export function SignalImpactStage() {
             actions={
                 categories.length > 1 ? (
                     <ChoiceMenu
-                        label="Task Category"
+                        label="Task category"
                         allLabel="All task categories"
                         choices={categories}
                         value={selected}

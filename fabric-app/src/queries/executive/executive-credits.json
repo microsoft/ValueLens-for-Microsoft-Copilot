@@ -68,7 +68,12 @@
       ],
       "mark": { "type": "text", "baseline": "bottom", "dy": -4, "fontWeight": 600 },
       "encoding": {
-        "y": { "field": "Total", "type": "quantitative", "title": null },
+        "y": {
+          "field": "Total",
+          "type": "quantitative",
+          "title": null,
+          "axis": { "labelExpr": "compactFormat(datum.value, '#,0')", "minExtent": 48, "tickCount": 4 }
+        },
         "text": { "field": "Total Label", "type": "nominal" },
         "opacity": { "field": "Emphasis", "type": "quantitative", "scale": null, "legend": null }
       }

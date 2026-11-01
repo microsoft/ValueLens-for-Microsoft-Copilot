@@ -28,7 +28,7 @@ const columnMetadata: ColumnMetadataMap = {
     "[Agent Rate]": { name: "Agent Rate", displayName: "Tasks per agent user", format: FORMAT_RATE },
     "[Licensed Utilisation]": {
         name: "Licensed Utilisation",
-        displayName: "% of licences active",
+        displayName: "% of licenses active",
         format: FORMAT_PERCENT,
     },
 };

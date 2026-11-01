@@ -8,6 +8,7 @@
 import { useRef, type KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
 import type { StageId } from "./destinations";
+import { stageTabId } from "./stage-tab-id";
 
 interface StageTabsProps {
     /** Names the tab list for assistive technology, e.g. "Adoption stages". */
@@ -15,6 +16,8 @@ interface StageTabsProps {
     stages: readonly { id: StageId; label: string }[];
     open: StageId | undefined;
     onOpen: (stage: StageId) => void;
+    /** The id of the tab panel the open stage is drawn in. */
+    panelId: string;
 }
 
 const KEYS: Record<string, (index: number, count: number) => number> = {
@@ -29,7 +32,7 @@ const KEYS: Record<string, (index: number, count: number) => number> = {
  * control under the page title. A page shows one stage at a time, so it only
  * queries what is open. They keep tab semantics: arrow keys move between them.
  */
-export function StageTabs({ label, stages, open, onOpen }: StageTabsProps) {
+export function StageTabs({ label, stages, open, onOpen, panelId }: StageTabsProps) {
     const refs = useRef<(HTMLButtonElement | null)[]>([]);
 
     const onKeyDown = (event: KeyboardEvent, index: number) => {
@@ -46,7 +49,7 @@ export function StageTabs({ label, stages, open, onOpen }: StageTabsProps) {
             role="tablist"
             aria-label={label}
             data-print="hide"
-            className="flex max-w-full gap-100-nudge self-start overflow-x-auto rounded-[9px] bg-segment p-[3px] scrollbar-none"
+            className="flex max-w-full gap-100-nudge self-start overflow-x-auto rounded-[9px] bg-segment p-[3px] scrollbar-none max-sm:scroll-fade-x"
         >
             {stages.map((stage, index) => {
                 const selected = stage.id === open;
@@ -58,6 +61,8 @@ export function StageTabs({ label, stages, open, onOpen }: StageTabsProps) {
                         }}
                         type="button"
                         role="tab"
+                        id={stageTabId(panelId, stage.id)}
+                        aria-controls={panelId}
                         aria-selected={selected}
                         tabIndex={selected ? 0 : -1}
                         onClick={() => onOpen(stage.id)}
@@ -67,7 +72,7 @@ export function StageTabs({ label, stages, open, onOpen }: StageTabsProps) {
                             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                             selected
                                 ? "bg-card font-semibold text-foreground shadow-[0_1px_2px_rgb(16_40_37/0.14)]"
-                                : "font-medium text-muted-foreground hover:text-foreground",
+                                : "font-medium text-segment-foreground hover:text-foreground",
                         )}
                     >
                         {stage.label}

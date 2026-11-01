@@ -175,7 +175,7 @@ users seen in the audit log. Your own registry export does the same if it lacks 
   agent type, agent, creator). One that doesn't apply is cleared when you switch.
 - **Info buttons** show each metric's glossary definition.
 - **Assumptions** (in the header) replace the report's parameter tables: hourly rate, currency,
-  licence price, effort scenario, Cowork grading and monthly licence cost. Changes apply everywhere.
+  licence price, effort scenario and Cowork grading. The one licence price drives investment, return and reclaimable seats. Changes apply everywhere.
 
 ## Differences from Power BI
 

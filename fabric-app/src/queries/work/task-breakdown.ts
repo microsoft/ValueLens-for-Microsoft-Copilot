@@ -25,8 +25,8 @@ const lenses: Record<TaskDimension, { dimension: string; label: string; title: s
     behaviour: {
         // The query's own name for this lens; people see the label.
         dimension: "Behaviour",
-        label: "Task Breakdown",
-        title: "Tasks by Task Breakdown",
+        label: "Task breakdown",
+        title: "Tasks by task breakdown",
         subtitle: "The detailed task each request was read as",
     },
     action: {

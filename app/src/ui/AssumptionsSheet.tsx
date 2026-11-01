@@ -4,7 +4,7 @@ import { Sheet } from './Sheet'
 
 const CURRENCIES = ['£', '$', '€', '¥', 'A$', 'C$', 'CHF ', 'kr ', '₹']
 
-/** The report's editable parameters: Hourly Value, Assumptions (PPUPM, licence cost, penalty), Effort Scenario and Fit Grading. */
+/** The report's editable parameters: Hourly Value, Assumptions (licence price, penalty), Effort Scenario and Fit Grading. */
 export function AssumptionsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { assumptions: a, setAssumption } = useData()
   const num = (v: string, min = 0) => {
@@ -31,14 +31,9 @@ export function AssumptionsSheet({ open, onClose }: { open: boolean; onClose: ()
           </select>
         </div>
         <div className="field">
-          <label htmlFor="as-ppupm">Price per user per month</label>
+          <label htmlFor="as-ppupm">Licence price per user per month</label>
           <input id="as-ppupm" type="number" min={0} step={0.5} value={a.ppupm} onChange={(e) => setAssumption('ppupm', num(e.target.value))} />
-          <small>Copilot licence price used for investment and ROI.</small>
-        </div>
-        <div className="field">
-          <label htmlFor="as-cost">Licence cost for reclaim</label>
-          <input id="as-cost" type="number" min={0} step={0.5} value={a.licenceCost} onChange={(e) => setAssumption('licenceCost', num(e.target.value))} />
-          <small>Monthly cost per licence used on the Licence view. Leave at 0 to hide the cost line.</small>
+          <small>Prices the investment, the net return and the seats you could reclaim.</small>
         </div>
         <div className="field">
           <label htmlFor="as-penalty">Time-saved penalty</label>

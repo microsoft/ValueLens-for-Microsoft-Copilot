@@ -201,9 +201,9 @@ describe("work spec field references", () => {
         }
     });
 
-    it("names the detailed-task lens Task Breakdown", () => {
-        expect(taskDimensions.map(({ label }) => label)).toEqual(["Task Breakdown", "Workflow action", "Value outcome"]);
-        expect(taskBreakdown().title).toBe("Tasks by Task Breakdown");
+    it("names the detailed-task lens Task breakdown", () => {
+        expect(taskDimensions.map(({ label }) => label)).toEqual(["Task breakdown", "Workflow action", "Value outcome"]);
+        expect(taskBreakdown().title).toBe("Tasks by task breakdown");
     });
 
     it("does not let one variant's spec changes leak into the next", () => {
@@ -275,11 +275,11 @@ describe("leaderboard queries", () => {
         }
     });
 
-    it("names Cowork's levels Task Category then Task Breakdown, and every cohort's leaves Task Breakdown", () => {
+    it("names Cowork's levels task category then task breakdown, and every cohort's leaves task breakdown", () => {
         for (const { id } of leaderboardCohorts) {
-            expect(leaderboardTasks(id).levels.leafNoun, `cohort "${id}"`).toBe("Task Breakdown");
+            expect(leaderboardTasks(id).levels.leafNoun, `cohort "${id}"`).toBe("task breakdown");
         }
-        expect(leaderboardTasks("cowork").levels.groupNoun).toBe("Task Category");
+        expect(leaderboardTasks("cowork").levels.groupNoun).toBe("task category");
     });
 
     it("names every cohort's cards in its summary", () => {

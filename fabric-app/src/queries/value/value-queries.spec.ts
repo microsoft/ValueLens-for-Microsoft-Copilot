@@ -189,13 +189,13 @@ describe("value grids", () => {
         expect(valueByTask().query).toContain("ROLLUPADDISSUBTOTAL");
     });
 
-    it("labels the two task levels Task Category and Task Breakdown", () => {
+    it("labels the two task levels Task category and Task breakdown", () => {
         const { columnMetadata } = valueByTask();
         expect(columnMetadata["Chat + Agent Interactions (Audit Logs)[Task Breakdown Group]"]?.displayName).toBe(
-            "Task Category",
+            "Task category",
         );
         expect(columnMetadata["Chat + Agent Interactions (Audit Logs)[Task Breakdown Category]"]?.displayName).toBe(
-            "Task Breakdown",
+            "Task breakdown",
         );
     });
 });
@@ -248,10 +248,10 @@ describe("value task tree", () => {
         );
     });
 
-    it("labels the time-saved chart's levels Task Category and Task Breakdown", () => {
+    it("labels the time-saved chart's levels Task category and Task breakdown", () => {
         const labels = new Map(tree.tasks.columns.map((column) => [column.name, column.displayName]));
-        expect(labels.get("Chat + Agent Interactions (Audit Logs)Task Breakdown Group")).toBe("Task Category");
-        expect(labels.get("Chat + Agent Interactions (Audit Logs)Task Breakdown Category")).toBe("Task Breakdown");
+        expect(labels.get("Chat + Agent Interactions (Audit Logs)Task Breakdown Group")).toBe("Task category");
+        expect(labels.get("Chat + Agent Interactions (Audit Logs)Task Breakdown Category")).toBe("Task breakdown");
     });
 });
 

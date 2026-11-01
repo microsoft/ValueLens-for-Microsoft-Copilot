@@ -13,7 +13,7 @@ import taskDescriptions from "./task-descriptions.json";
 
 const columnMetadata: ColumnMetadataMap = {
     "[Signal]": { name: "Signal", displayName: "Signal" },
-    "[AI Tasks]": { name: "AI Tasks", displayName: "Task Breakdown" },
+    "[AI Tasks]": { name: "AI Tasks", displayName: "Task breakdown" },
     "[Use Case]": { name: "Use Case", displayName: "Use case" },
     "[Value Outcome]": { name: "Value Outcome", displayName: "Value outcome" },
     "[Human Equivalent (Minutes)]": {
@@ -24,7 +24,7 @@ const columnMetadata: ColumnMetadataMap = {
     "[Research Source]": { name: "Research Source", displayName: "Research source" },
     "[Source URL]": { name: "Source URL", displayName: "Source URL" },
     "[Confidence]": { name: "Confidence", displayName: "Confidence" },
-    "[Category]": { name: "Category", displayName: "Task Category" },
+    "[Category]": { name: "Category", displayName: "Task category" },
 };
 
 const descriptions = new Map<string, string>(Object.entries(taskDescriptions));

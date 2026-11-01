@@ -39,6 +39,16 @@ describe("BandPopover", () => {
         expect(screen.getByRole("button", { name: "Open a pack" })).toBeInTheDocument();
     });
 
+    it("opens a dialog named for its button, which the button controls", () => {
+        const button = renderPopover();
+        expect(button).toHaveAttribute("aria-haspopup", "dialog");
+
+        fireEvent.click(button);
+
+        const dialog = screen.getByRole("dialog", { name: "Reports" });
+        expect(button).toHaveAttribute("aria-controls", dialog.id);
+    });
+
     it("closes on Escape and returns focus to its button", () => {
         const button = renderPopover();
         fireEvent.click(button);

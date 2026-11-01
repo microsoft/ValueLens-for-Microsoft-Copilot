@@ -209,7 +209,6 @@ export function OverviewStage() {
                         <KpiCard
                             label="Cowork / Work IQ credits"
                             value={cowork?.credits}
-                            emphasis
                             detail={<KpiStat label="Cost" value={cowork?.cost} format="money" prefix={CREDIT_CURRENCY} />}
                         />
                         <KpiCard

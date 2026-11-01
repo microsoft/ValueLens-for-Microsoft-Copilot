@@ -46,10 +46,10 @@ export function SegmentedControl<T extends string>({
                     className={cn(
                         "h-[28px] shrink-0 rounded-md px-300 text-[13px] whitespace-nowrap transition-colors",
                         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                        "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted-foreground",
+                        "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-segment-foreground",
                         option.id === value
                             ? "bg-card font-semibold text-foreground shadow-[0_1px_2px_rgb(16_40_37/0.14)]"
-                            : "font-medium text-muted-foreground hover:text-foreground",
+                            : "font-medium text-segment-foreground hover:text-foreground",
                     )}
                 >
                     {option.label}

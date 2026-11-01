@@ -25,6 +25,7 @@ import {
     executiveWorkKinds,
     FADED_OPACITY,
     monthLabel,
+    PARTIAL_OPACITY,
     shapeMonthlyTrend,
     WORK_KINDS_SHOWN,
 } from "./index";
@@ -345,6 +346,15 @@ describe("shapeMonthlyTrend", () => {
     it("ignores a range month that is not an ISO date", () => {
         const emphasis = transformOf(shapeMonthlyTrend(hoursSpec, { rangeMonth: "May' ? 0 : 1 //" }));
         expect(emphasis?.calculate).toBe("1");
+    });
+
+    it("lightens and labels a month the data stops part-way through", () => {
+        const shaped = shapeMonthlyTrend(hoursSpec, { rangeMonth: "2026-05-01", partialMonth: "2026-10-01" });
+        expect(transformOf(shaped)?.calculate).toBe(
+            `datum['Month Start'] < '2026-05-01' ? ${FADED_OPACITY} : datum['Month Start'] >= '2026-10-01' ? ${PARTIAL_OPACITY} : 1`,
+        );
+        const axis = (shaped as unknown as { encoding: { x: { axis: { labelExpr?: string } } } }).encoding.x.axis;
+        expect(axis.labelExpr).toBe("datum.label === 'Oct 2026' ? 'Oct to date' : datum.label");
     });
 
     it("applies theme colours only when there is one per series", () => {

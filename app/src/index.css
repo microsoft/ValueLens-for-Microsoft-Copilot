@@ -404,6 +404,7 @@ input[type='search']::placeholder {
   margin-left: 6px;
 }
 .info-btn {
+  position: relative;
   display: grid;
   place-items: center;
   width: 17px;
@@ -413,10 +414,16 @@ input[type='search']::placeholder {
   border-radius: 50%;
   background: var(--surface);
   color: var(--ink-3);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
   cursor: help;
+}
+/* A 25px hit area around the 17px mark. */
+.info-btn::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
 }
 .info-btn:hover,
 .info-btn[aria-expanded='true'] {
@@ -480,20 +487,20 @@ input[type='search']::placeholder {
   height: 8px;
   margin-right: 8px;
   border-radius: 50%;
-  background: #9fb3af;
+  background: var(--kpi-dot, #9fb3af);
   vertical-align: 1px;
 }
-.tone-licensed .kpi-label > span:first-child::before {
-  background: var(--licensed);
+.tone-licensed {
+  --kpi-dot: var(--licensed);
 }
-.tone-unlicensed .kpi-label > span:first-child::before {
-  background: var(--unlicensed);
+.tone-unlicensed {
+  --kpi-dot: var(--unlicensed);
 }
-.tone-agent .kpi-label > span:first-child::before {
-  background: var(--agent);
+.tone-agent {
+  --kpi-dot: var(--agent);
 }
-.tone-cowork .kpi-label > span:first-child::before {
-  background: var(--cowork);
+.tone-cowork {
+  --kpi-dot: var(--cowork);
 }
 .kpi-value {
   font-family: var(--font-display);
@@ -704,9 +711,7 @@ input[type='search']::placeholder {
   font-weight: 500;
 }
 .axis-y-title {
-  position: absolute;
-  top: -6px;
-  left: 50px;
+  margin: 0 0 4px 44px;
   color: var(--ink-2);
   font-size: 11.5px;
   font-weight: 500;
@@ -1000,7 +1005,7 @@ input[type='search']::placeholder {
   flex: none;
   width: 1ch;
   color: var(--ink-3);
-  opacity: 0.45;
+  opacity: 0.75;
 }
 .sort.on {
   color: var(--accent);
@@ -1074,7 +1079,7 @@ input[type='search']::placeholder {
   padding: 0 6px;
   border-radius: 999px;
   background: #e8eeec;
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
@@ -1268,9 +1273,7 @@ input[type='search']::placeholder {
   min-width: 0;
   font-size: 13px;
   line-height: 1.25;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .s1-label small {
   color: var(--ink-3);
@@ -1399,6 +1402,7 @@ input[type='search']::placeholder {
 }
 .assume small {
   color: var(--ink-3);
+  font-size: 12px;
 }
 .band-actions {
   display: flex;
@@ -1631,6 +1635,11 @@ input[type='search']::placeholder {
 
 /* ---------- Guide ---------- */
 
+.gloss-group .section-note,
+.defs dd {
+  max-width: 75ch;
+}
+
 .gloss-group + .gloss-group {
   margin-top: 18px;
 }
@@ -1713,6 +1722,10 @@ input[type='search']::placeholder {
   .brand p,
   .source-dates {
     display: none;
+  }
+  .tabs {
+    padding-inline-end: 28px;
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
   }
   .tabs a {
     padding-inline: 10px;

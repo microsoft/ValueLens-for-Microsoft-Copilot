@@ -178,7 +178,7 @@ export const destinations = [
         filters: ["dateRange", "organizations"] as FilterKey[],
         stages: [
             { id: "license-readiness", label: "License readiness", ready: true },
-            { id: "habit-licence", label: "Heavy users without a licence", ready: true },
+            { id: "habit-licence", label: "Heavy users without a license", ready: true },
             { id: "cowork-readiness", label: "Cowork readiness", ready: true },
         ],
     },
@@ -234,7 +234,7 @@ export const destinations = [
     },
     {
         id: "appendix",
-        label: "Appendix",
+        label: "Guide",
         tab: "Guide",
         product: "valuelens",
         connection,

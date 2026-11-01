@@ -280,25 +280,31 @@ export function paretoTable(result: Concentration | undefined): DataTable {
  */
 export function paretoSpec(noun: string): VisualizationSpec {
     const label = `Share of ${noun}`;
+    // One legend for colour and dash: both encode the series, and Vega-Lite merges them.
+    const legend = {
+        orient: "top",
+        direction: "horizontal",
+        labelExpr: `datum.value === '${EQUAL_SHARE}' ? 'Equal share' : '${label}'`,
+    };
+    const fold = { fold: [TOTAL_SHARE, EQUAL_SHARE], as: ["Series", "Share"] };
     return {
         $schema: "https://vega.github.io/schema/vega-lite/v5.json",
         width: "container",
         height: "container",
-        transform: [{ fold: [TOTAL_SHARE, EQUAL_SHARE], as: ["Series", "Share"] }],
         encoding: {
             x: {
                 field: PEOPLE_SHARE,
                 type: "quantitative",
                 title: "Share of people, busiest first",
                 scale: { domain: [0, 1] },
-                axis: { format: ".0%" },
+                axis: { labelExpr: "format(datum.value, '.0%')" },
             },
             y: {
                 field: "Share",
                 type: "quantitative",
                 title: label,
                 scale: { domain: [0, 1] },
-                axis: { format: ".0%" },
+                axis: { labelExpr: "format(datum.value, '.0%')" },
             },
             color: {
                 field: "Series",
@@ -306,23 +312,21 @@ export function paretoSpec(noun: string): VisualizationSpec {
                 title: null,
                 sort: [TOTAL_SHARE, EQUAL_SHARE],
                 scale: { domain: [TOTAL_SHARE, EQUAL_SHARE] },
-                legend: {
-                    orient: "top",
-                    direction: "horizontal",
-                    labelExpr: `datum.value === '${EQUAL_SHARE}' ? 'Equal share' : '${label}'`,
-                },
+                legend,
             },
             strokeDash: {
                 field: "Series",
                 type: "nominal",
                 scale: { domain: [TOTAL_SHARE, EQUAL_SHARE], range: [[1, 0], [4, 4]] },
-                legend: null,
+                legend,
             },
         },
+        // The fold sits in each layer so the library's crosshair, whose unformatted
+        // axis clashes with the percent labels, leaves this chart alone; the point layer has the tooltip.
         layer: [
-            { mark: { type: "line", strokeWidth: 2 } },
+            { transform: [fold], mark: { type: "line", strokeWidth: 2 } },
             {
-                transform: [{ filter: `datum.Series === '${TOTAL_SHARE}'` }],
+                transform: [fold, { filter: `datum.Series === '${TOTAL_SHARE}'` }],
                 mark: { type: "point", filled: true, size: 30, opacity: 0 },
                 encoding: {
                     tooltip: [

@@ -7,6 +7,10 @@ import { DASH, dateLabel, dayLabel, int, pct } from './format'
 import { Sheet } from './Sheet'
 import { COLOR } from './theme'
 
+/** Registry lists come as "A;B" and statuses as enums like "AcquiredForAll": show them as plain words. */
+const list = (v: string) => v.split(';').map((x) => x.trim()).filter(Boolean).join(', ')
+const words = (v: string) => (/^[A-Z][a-z]+(?:[A-Z][a-z]+)+$/.test(v) ? v.replace(/(?<=[a-z])(?=[A-Z])/g, ' ').replace(/ \S/g, (c) => c.toLowerCase()) : v)
+
 /** Agent detail: the PBI "Agent Details" cards that react to a selected agent. */
 export function AgentDrawer({ name, onClose }: { name: string | null; onClose: () => void }) {
   return (
@@ -79,13 +83,13 @@ function AgentDetail({ name }: { name: string }) {
             <dt>Creator</dt>
             <dd>{reg.creator || DASH}</dd>
             <dt>Built in</dt>
-            <dd>{reg.createdIn || DASH}</dd>
+            <dd>{list(reg.createdIn) || DASH}</dd>
             <dt>Works in</dt>
-            <dd>{reg.supportedIn || DASH}</dd>
+            <dd>{list(reg.supportedIn) || DASH}</dd>
             <dt>Status</dt>
-            <dd>{reg.blocked ? 'Blocked by admin' : reg.status || DASH}</dd>
+            <dd>{reg.blocked ? 'Blocked by admin' : words(reg.status) || DASH}</dd>
             <dt>Features</dt>
-            <dd>{reg.features || DASH}</dd>
+            <dd>{list(reg.features) || DASH}</dd>
             <dt>Registry updated</dt>
             <dd>{reg.lastUpdated ? dateLabel(reg.lastUpdated) : DASH}</dd>
           </>

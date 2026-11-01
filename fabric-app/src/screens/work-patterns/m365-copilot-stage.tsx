@@ -215,7 +215,7 @@ function CopilotComparison() {
                 </div>
             )}
 
-            <div className="grid gap-400 2xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-400 2xl:grid-cols-3">
                 <div
                     className="h-[340px] 2xl:col-span-2"
                     style={

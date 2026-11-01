@@ -24,7 +24,7 @@ Screenshots use synthetic data. Every name in them is invented.
 | [Efficiency](#efficiency) | Is the right tool doing the job? |
 | [Feedback](#feedback) | What do people say about it? |
 | [Assumptions](#assumptions) | How long would each task take without Copilot? |
-| [Appendix](#appendix) | What does each metric mean? |
+| [Guide](#guide) | What does each metric mean? |
 
 ---
 
@@ -136,7 +136,7 @@ organisation.
 | Section | What it shows |
 |---|---|
 | License readiness | Who already reaches for Copilot without a licence, and which licences sit idle |
-| Heavy users without a licence | Last month's users, by how often they used Copilot and whether they had a licence |
+| Heavy users without a license | Last month's users, by how often they used Copilot and whether they had a licence |
 | Cowork readiness | Who to offer Cowork next, by how broad and deep their everyday use is |
 
 ## Consumption
@@ -208,9 +208,9 @@ minutes.
 
 **Reads:** the model's task times. **Settings:** change any time; **Use research** puts them back.
 
-## Appendix
+## Guide
 
-![Appendix](../media/pages/appendix.png)
+![Guide](../media/pages/appendix.png)
 
 **Answers:** what each metric means, and the assumptions behind value.
 

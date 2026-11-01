@@ -90,14 +90,14 @@ export function habitLicenceHeadline(matrix: HabitLicenceMatrix): string | undef
     const when = monthLabel(matrix.month);
     // With no licensed activity at all, the roster almost certainly didn't match the people using Copilot.
     if (matrix.licensed === 0) {
-        return "No activity matched a licence, so this can't yet tell licensed and unlicensed users apart.";
+        return "No activity matched a license, so this can't yet tell licensed and unlicensed users apart.";
     }
     if (total < MIN_PEOPLE) return `Too few people were active in ${when} to compare.`;
 
     const heavy = matrix.heavyLicensed + matrix.heavyUnlicensed;
     if (heavy === 0) return `Nobody was active on 11 or more days in ${when}.`;
-    if (matrix.heavyUnlicensed === 0) return `Everyone active on 11 or more days in ${when} had a licence.`;
+    if (matrix.heavyUnlicensed === 0) return `Everyone active on 11 or more days in ${when} had a license.`;
 
-    const lead = `${people(matrix.heavyUnlicensed)} without a licence ${matrix.heavyUnlicensed === 1 ? "was" : "were"} active on 11 or more days in ${when}`;
+    const lead = `${people(matrix.heavyUnlicensed)} without a license ${matrix.heavyUnlicensed === 1 ? "was" : "were"} active on 11 or more days in ${when}`;
     return heavy >= MIN_PEOPLE ? `${lead}, ${shareText(matrix.heavyUnlicensed, heavy)} of everyone that active.` : `${lead}.`;
 }

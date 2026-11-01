@@ -6,6 +6,7 @@
 //-----------------------------------------------------------------------
 
 import type { ReactNode } from "react";
+import { usePageTitle } from "@/hooks/page-title.context";
 import { cn } from "@/lib/utils";
 
 interface SectionProps {
@@ -25,6 +26,18 @@ interface SectionProps {
  * reader is looking at, as the CSV apps head each group on a page.
  */
 export function Section({ id, title, description, actions, children, className }: SectionProps) {
+    // A section named the same as the page would only repeat its h1, so it keeps the heading for screen readers alone.
+    const repeatsPage = usePageTitle() === title;
+    const heading = (
+        <h2
+            className={cn(
+                "font-heading text-[length:var(--text-400)] leading-400 font-semibold tracking-[-0.005em] text-foreground",
+                repeatsPage && "sr-only",
+            )}
+        >
+            {title}
+        </h2>
+    );
     return (
         <section
             id={id}
@@ -32,19 +45,21 @@ export function Section({ id, title, description, actions, children, className }
             tabIndex={id ? -1 : undefined}
             className={cn("flex scroll-mt-600 flex-col gap-400 outline-none", className)}
         >
-            <div className="flex flex-wrap items-end justify-between gap-300">
-                <div className="flex flex-col gap-100">
-                    <h2 className="font-heading text-[length:var(--text-400)] leading-400 font-semibold tracking-[-0.005em] text-foreground">
-                        {title}
-                    </h2>
-                    {description && (
-                        <p className="max-w-[68ch] text-[length:var(--text-300)] leading-300 text-muted-foreground">
-                            {description}
-                        </p>
-                    )}
+            {repeatsPage && !description && !actions ? (
+                heading
+            ) : (
+                <div className="flex flex-wrap items-end justify-between gap-300">
+                    <div className="flex flex-col gap-100">
+                        {heading}
+                        {description && (
+                            <p className="max-w-[68ch] text-[length:var(--text-300)] leading-300 text-muted-foreground">
+                                {description}
+                            </p>
+                        )}
+                    </div>
+                    {actions && <div className="flex max-w-full min-w-0 items-center gap-200">{actions}</div>}
                 </div>
-                {actions && <div className="flex items-center gap-200">{actions}</div>}
-            </div>
+            )}
             {children}
         </section>
     );

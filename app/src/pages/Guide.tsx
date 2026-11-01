@@ -17,7 +17,7 @@ const NOTES: { title: string; body: string }[] = [
   },
   {
     title: 'Assumptions',
-    body: 'Hourly rate, currency, licence price, effort scenario, Cowork grading and licence cost come from the Assumptions panel. They replace the report’s parameter tables and apply everywhere straight away.',
+    body: 'Hourly rate, currency, licence price, effort scenario and Cowork grading come from the Assumptions panel. They replace the report’s parameter tables and apply everywhere straight away.',
   },
   {
     title: 'Agent lifecycle without user counts',

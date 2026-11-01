@@ -361,7 +361,7 @@ export function LeaderboardStage() {
                 />
             ) : (
                 <div className="grid gap-300 md:grid-cols-2 xl:grid-cols-4">
-                    <KpiCard label="Active users" value={users} emphasis detail={extraStat(extras.users, row)} />
+                    <KpiCard label="Active users" value={users} detail={extraStat(extras.users, row)} />
                     <KpiCard label="Sessions" value={sessions} detail={extraStat(extras.sessions, row)} />
                     <KpiCard
                         label="Sessions / user"

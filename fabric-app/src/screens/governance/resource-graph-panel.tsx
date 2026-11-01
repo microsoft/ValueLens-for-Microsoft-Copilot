@@ -61,7 +61,6 @@ export function ResourceGraphPanel({ summary, className }: { summary: ResourceGr
                             label="No sign-in required"
                             value={agentValue("[No Sign In]")}
                             emptyValue={agentEmpty}
-                            emphasis
                             detail={
                                 <KpiStat label="Any agent, live or not" value={agentValue("[No Sign In Configured]")} />
                             }

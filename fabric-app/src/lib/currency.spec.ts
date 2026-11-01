@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import {
     CURRENCIES,
+    currencyLabel,
     currencyPrefix,
     currencySymbol,
     legacyCurrencyFromSymbol,
@@ -32,7 +33,13 @@ describe("currency", () => {
         expect(currencyPrefix("CHF")).toBe("CHF ");
         expect(currencyPrefix("HUF")).toBe("HUF ");
         expect(currencyPrefix(undefined)).toBe("");
+        expect(currencyPrefix("Azure currency 1")).toBe("");
         expect(currencySymbol("SEK")).toBe("SEK");
+    });
+
+    it("names a currency for a picker", () => {
+        expect(currencyLabel("gbp")).toBe("British pound");
+        expect(currencyLabel("HUF")).toBe("HUF");
     });
 
     it("reads the model's old symbol as a code, with the shipped £ as the fallback", () => {

@@ -94,7 +94,7 @@ function FitByTaskChart() {
                 <QueryEmpty
                     className="h-full"
                     title="No tasks to grade"
-                    description="No graded Cowork session in this selection carries a Task Breakdown."
+                    description="No graded Cowork session in this selection carries a task breakdown."
                 />
             ) : (
                 <Headlined text={headline}>
@@ -105,7 +105,7 @@ function FitByTaskChart() {
                         capabilities={NO_STACK_LABELS}
                         header={{
                             title: "What goes to Cowork",
-                            subtitle: "Graded sessions for each Task Breakdown, by fit. Busiest first.",
+                            subtitle: "Graded sessions for each task breakdown, by fit. Busiest first.",
                         }}
                     />
                 </Headlined>
@@ -211,7 +211,7 @@ export function CoworkFitStage() {
             ) : (
                 <>
                     <div className="grid gap-300 md:grid-cols-3 xl:grid-cols-6">
-                        <KpiCard label="Cowork sessions" value={sessions} emphasis />
+                        <KpiCard label="Cowork sessions" value={sessions} />
                         <KpiCard label="Tasks completed" value={readNumber(row, "[Tasks Completed]")} />
                         <KpiCard label="Active days per user" value={readNumber(row, "[Active Days Per User]")} format="hours" />
                         <KpiCard label="Expert equivalent hours" value={readNumber(row, "[Expert Hours]")} format="hours" />

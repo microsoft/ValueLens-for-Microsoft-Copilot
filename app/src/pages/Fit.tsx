@@ -244,9 +244,9 @@ export function FitModel() {
       <KpiRow>
         <Kpi label="Sessions" value={int(s.sessions)} sub={`${int(s.judged)} judged`} help={gloss('Depth signal', PM)} />
         <Kpi label="Model logged" value={pct(d.logged)} sub={`${pct(d.coverage)} of prompts attributed`} help={gloss('Attribution coverage', PM)} />
-        <Kpi tone="licensed" label="Good match" value={pct(share(s.well, s.judged))} help={gloss('Good match', PM)} />
-        <Kpi tone="unlicensed" label="Lighter model would do" value={pct(share(s.over, s.judged))} help={gloss('Lighter model may do', PM)} />
-        <Kpi tone="agent" label="Could use a stronger model" value={pct(share(s.under, s.judged))} help={gloss('Could have used (model)', PM)} />
+        <Kpi dot={MODEL_COLOR.well} label="Good match" value={pct(share(s.well, s.judged))} help={gloss('Good match', PM)} />
+        <Kpi dot={MODEL_COLOR.over} label="Lighter model would do" value={pct(share(s.over, s.judged))} help={gloss('Lighter model may do', PM)} />
+        <Kpi dot={MODEL_COLOR.under} label="Could use a stronger model" value={pct(share(s.under, s.judged))} help={gloss('Could have used (model)', PM)} />
       </KpiRow>
       <div className="grid grid-1-2">
         <div className="stack">

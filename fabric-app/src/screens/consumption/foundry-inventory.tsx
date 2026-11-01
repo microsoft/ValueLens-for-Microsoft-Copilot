@@ -84,7 +84,7 @@ export function FoundryInventoryView({ result, prefix }: { result: TableResult; 
                     value={inventory.accounts}
                     detail={<KpiStat label="Projects" value={inventory.projects} />}
                 />
-                <KpiCard label="Cost of those accounts" value={inventory.cost} format="money" prefix={prefix} emphasis />
+                <KpiCard label="Cost of those accounts" value={inventory.cost} format="money" prefix={prefix} />
                 <KpiCard
                     label="Open to the public network"
                     value={inventory.publicNetwork}

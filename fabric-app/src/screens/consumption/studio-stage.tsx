@@ -20,6 +20,7 @@ import { gridHeight, rowChartHeight } from "@/lib/chart-height";
 import { readConcentration } from "@/lib/concentration";
 import { listTotal } from "@/lib/list-total";
 import { columnHeat, heatRenderer } from "@/lib/heat";
+import { formatPeriod, readableDates } from "@/lib/format-period";
 import { readNumber, readText } from "@/lib/summary-row";
 import { formatCell } from "@/lib/tree-grid";
 import {
@@ -168,8 +169,8 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                     {periods.length > 1 && allPeriods && (
                         <ChoiceMenu
                             label="Period"
-                            allLabel={allPeriods}
-                            choices={periods.filter((value) => value !== allPeriods).map((value) => ({ value, label: value }))}
+                            allLabel={formatPeriod(allPeriods)}
+                            choices={periods.filter((value) => value !== allPeriods).map((value) => ({ value, label: formatPeriod(value) }))}
                             value={period}
                             onChange={setPeriod}
                         />
@@ -261,7 +262,7 @@ export function StudioStage({ options, rates }: StudioStageProps) {
                 <NoteCard
                     title="About these figures"
                     notes={[
-                        { term: "Billing period", text: readText(row, "[Billing Period]") },
+                        { term: "Billing period", text: readableDates(readText(row, "[Billing Period]")) },
                         { term: "Concentration", text: readText(row, "[Concentration]") },
                         { term: "User snapshot", text: readText(row, "[Snapshot Note]") },
                         { term: "Group by", text: canGroup ? undefined : readText(row, "[Org Filter Status]") },
