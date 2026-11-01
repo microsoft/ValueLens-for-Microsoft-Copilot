@@ -373,9 +373,23 @@ Three more tables written by `Ingest_Azure_AI` for the **Azure: Capacity & Healt
 Reconciliation** and Foundry solution spend pages. They're **best-effort**: the notebook writes
 `azure_ai_spend`, `azure_ai_tokens` and `copilot_payg_spend` first, then these. An account,
 deployment or metric that fails is logged as a `WARNING` and skipped. If a table's source fails
-entirely, that table is left as it was. The app registration's Reader, Cost Management Reader and
-Monitoring Reader roles on the subscription are enough. The column names, order and types match
-the [Local CSV sample data](../../../5.%20Local%20CSV/Add%20Credit%20Consumption/sample-data/).
+entirely, or its write fails, that table is left as it was. The app registration's Reader, Cost
+Management Reader and Monitoring Reader roles on the subscription are enough. The column names,
+order and types match the [Local CSV sample data](../../../5.%20Local%20CSV/Add%20Credit%20Consumption/sample-data/).
+
+**Each run keeps older rows.** `Ingest_Azure_AI` reads the last `DAYS` days (90 by default) and, in
+each of its six tables, replaces only the rows from the window's first day onwards, so the tables
+grow past 90 days and a smaller `DAYS` never shortens them. Rows with no date are replaced by every
+run, and a source that returns no rows still replaces its days.
+
+- `azure_deployment_health` and `azure_billing_reconciliation` hold a row per month. When the window
+  starts after the 1st, that month's stored rows are kept only if all of them were written after the
+  month ended. Otherwise the run's rows replace the whole month, so a month still in progress never
+  freezes at its first values.
+- `azure_ai_spend`, `azure_ai_tokens` and `copilot_payg_spend` are all checked before any of them is
+  written. If one can't be read, or one of its columns has changed type, the run stops with none of
+  them changed. A best-effort table with the same problem is left as it was, with a `WARNING`.
+- To start a table over, drop it and run the notebook again. Its older rows are lost.
 
 ### `azure_deployment_health`
 

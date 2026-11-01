@@ -152,7 +152,8 @@ export function firstLoadEstimate(days, scale) {
 const STUCK_MS = 24 * 3_600_000;
 
 /**
- * Starts the pipeline. With `backfillDays` it reloads that much audit history and rebuilds the curated table.
+ * Starts the pipeline. With `backfillDays` it reloads that much audit history, keeping older rows,
+ * and rebuilds the curated table.
  * It doesn't start a run while another is going: two at once overload a small capacity.
  * @param {Ctx} ctx
  * @param {{ backfillDays?: number, wait?: boolean, first?: boolean }} opts
