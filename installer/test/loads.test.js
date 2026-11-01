@@ -375,6 +375,19 @@ test('terminal: a warning shows amber, with its reason', () => {
   assert.match(text, /wasn't allowed to read arg_agent_config/);
 });
 
+test('prerequisites: a missing optional one is shown as neutral, not as a failure', () => {
+  /** @type {string[]} */
+  const out = [];
+  createUi({ write: (s) => out.push(s) }).prereqs([
+    { id: 'pa', label: 'Power Automate Premium licence', status: 'missing', optional: true, detail: 'None assigned.', neededFor: 'The flows.', howTo: 'Ask.' },
+    { id: 'pro', label: 'Power BI Pro', status: 'missing', detail: 'None assigned.', neededFor: 'The report.', howTo: 'Ask.' },
+  ]);
+  const text = out.join('').replace(/\x1b\[[0-9;]*m/g, '');
+  assert.match(text, /– Power Automate Premium licence \(optional\)/);
+  assert.match(text, /✗ Power BI Pro/);
+  assert.doesNotMatch(text, /✗ Power Automate/);
+});
+
 test('status tables and warnings: every kind has a plain text, and the notebook gets them', () => {
   const json = JSON.parse(statusConfigJson());
   assert.deepEqual(json.statusTables, STATUS_TABLES);

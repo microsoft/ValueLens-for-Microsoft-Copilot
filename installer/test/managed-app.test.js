@@ -32,6 +32,7 @@ import {
   deleteApp,
   deployApp,
   isGuid,
+  listApps,
   login,
   playUrl,
   readAppConfig,
@@ -273,6 +274,8 @@ function fakeMs(o = {}) {
     deployed: undefined,
     /** @type {string[]} */
     deleted: [],
+    /** The apps `app list` returns. @type {{ appId: string, displayName: string, appPlayUri?: string }[]} */
+    apps: [],
   };
   const events = o.events ?? [];
   /** @type {(Call & { key: string })[]} */
@@ -305,6 +308,7 @@ function fakeMs(o = {}) {
       if (!state.accounts.includes(state.loginAs)) state.accounts.push(state.loginAs);
       return { ok: true, exitCode: 0, data: undefined, stdout: '', stderr: '' };
     },
+    'app list': () => passed({ success: true, items: structuredClone(state.apps) }),
     'app init': ({ args, options }) => {
       const dir = String(options?.cwd);
       if (existsSync(join(dir, APP_CONFIG))) return failedWith('ms.config.json already exists in this folder.');
@@ -462,7 +466,7 @@ const deployedRecord = (distDir, more = {}) => ({
 });
 
 /** What a first deploy of a new app runs, and when it saves. */
-const NEW_APP = ['auth status', 'app init', 'save', 'app deploy', 'save', 'app share', 'app share list', 'save'];
+const NEW_APP = ['auth status', 'app list', 'app init', 'save', 'app deploy', 'save', 'app share', 'app share list', 'save'];
 
 test('managed app: the CLI runs as node and its pinned Bin.js, off screen with the JSON flags', async () => {
   process.env.VALUELENS_APP_TEST = 'from this process';
@@ -1479,11 +1483,42 @@ test("managed app: without the app's folder on this PC, a new app is made and th
   has(said, 'Power Apps Premium');
 });
 
+test('managed app: an app with the same name already in the tenant stops a second one being made', async () => {
+  const s = setup();
+  s.ms.state.apps.push(
+    { appId: OTHER_APP_ID, displayName: `${APP_NAME} `, appPlayUri: PLAY_URL },
+    { appId: '33333333-3333-4333-8333-333333333333', displayName: 'Something else' },
+  );
+  assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: true, state: 'skipped' });
+  assert.deepEqual(s.events, ['auth status', 'app list', 'save']);
+  assert.deepEqual(s.ms.call('app list').args, ['app', 'list', '--permission', 'edit']);
+  const said = s.said();
+  has(said, `  ! Skipped the ${APP_NAME} app: the tenant already has an app named ${APP_NAME} (${OTHER_APP_ID} (${PLAY_URL}))`);
+  has(said, `delete it at ${LINKS.portal}, then run: ${deployAgain()}`);
+  assert.equal(s.config.managedApp?.skipped?.steps.length, 2);
+
+  // A list the CLI can't give doesn't stop the app.
+  const unlisted = setup();
+  unlisted.ms.queue('app list', failedWith('Unknown command list'));
+  assert.deepEqual(await deployTheApp(unlisted.ctx, unlisted.deps), { ok: true, state: 'deployed', url: PLAY_URL });
+});
+
+test('managed app: listApps reads the apps the CLI lists', async () => {
+  const row = { appId: APP_ID, displayName: APP_NAME, appPlayUri: PLAY_URL, hasEditAccess: true };
+  assert.deepEqual(await listApps(async () => passed({ success: true, items: [row] })), { ok: true, apps: [{ appId: APP_ID, displayName: APP_NAME, url: PLAY_URL }] });
+  assert.deepEqual(await listApps(async () => passed({ success: true, items: [{ appId: 'not-a-guid' }, { appId: APP_ID }] })), { ok: true, apps: [{ appId: APP_ID, displayName: '' }] });
+  assert.deepEqual(await listApps(async () => passed({ success: true })), { ok: true, apps: [] });
+  /** @type {string[]} */
+  let args = [];
+  await listApps(async (a) => { args = a; return passed({ success: true, items: [] }); }, { environmentId: DEV_ENV });
+  assert.deepEqual(args, ['app', 'list', '--permission', 'edit', '--environment-id', DEV_ENV]);
+});
+
 test("managed app: a tenant that won't let the CLI make apps finishes at the report, naming the setting", async () => {
   const s = setup();
   s.ms.queue('app init', failedWith("You don't have permission to create an app in this environment."));
   assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: true, state: 'not-ready' });
-  assert.deepEqual(s.events, ['auth status', 'app init', 'save']);
+  assert.deepEqual(s.events, ['auth status', 'app list', 'app init', 'save']);
   assert.deepEqual(s.config.managedApp, { missing: ['createApps'] });
   const said = s.said();
   has(said, `  ! The ${APP_NAME} app can't be deployed until a Power Platform admin turns on ${NOT_READY_NAMES.createApps}. The report works without it.\n`);
@@ -1496,7 +1531,7 @@ test('managed app: external artifacts turned off is found at deploy, and a later
   const s = setup();
   s.ms.queue('app deploy', failedWith('Deployment failed.', { errorData: { serverErrorCode: 'CodeAppOperationNotAllowedInEnvironment' } }));
   assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: true, state: 'not-ready' });
-  assert.deepEqual(s.events, ['auth status', 'app init', 'save', 'app deploy', 'save']);
+  assert.deepEqual(s.events, ['auth status', 'app list', 'app init', 'save', 'app deploy', 'save']);
   assert.deepEqual(s.config.managedApp, { appId: APP_ID, environmentId: DEV_ENV, missing: ['externalArtifacts'] });
   has(s.said(), `turns on ${NOT_READY_NAMES.externalArtifacts}. The report works without it.\n`);
 
@@ -1543,7 +1578,7 @@ test('managed app: a deploy that fails says so, keeps what to do in the record, 
     failedWith('Upload failed: 500 Internal Server Error\nRequest ID: 1234', { errorData: { serverMessage: 'Something broke on our side.' } }),
   );
   assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: false, state: 'failed' });
-  assert.deepEqual(s.events, ['auth status', 'app init', 'save', 'app deploy', 'save']);
+  assert.deepEqual(s.events, ['auth status', 'app list', 'app init', 'save', 'app deploy', 'save']);
   const what = `Run ${deployAgain()}. If it fails the same way, open an issue with the message above.`;
   // Only the first line of what the CLI said is kept, and what was missing before is forgotten.
   assert.deepEqual(s.config.managedApp, {
@@ -1629,7 +1664,7 @@ test('managed app: a share the CLI refused leaves the app live, says what to do,
   const s = setup();
   s.ms.queue('app share', failedWith('The sharing request was rejected.'));
   assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: false, state: 'failed', url: PLAY_URL });
-  assert.deepEqual(s.events, [...NEW_APP.slice(0, 5), 'app share', 'save']);
+  assert.deepEqual(s.events, [...NEW_APP.slice(0, 6), 'app share', 'save']);
   const what = 'Check the viewer group is in your organisation, then share the app with it at managedapps.cloud.microsoft.';
   const live = deployedRecord(s.distDir);
   delete live.sharedWith;
@@ -1707,7 +1742,7 @@ test("managed app: the CLI's warnings on a deploy or a share are passed on", asy
 test('managed app: with no viewer group, the app is deployed and not shared', async () => {
   const s = setup({ group: null });
   assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: true, state: 'deployed', url: PLAY_URL });
-  assert.deepEqual(s.events, ['auth status', 'app init', 'save', 'app deploy', 'save', 'save']);
+  assert.deepEqual(s.events, ['auth status', 'app list', 'app init', 'save', 'app deploy', 'save', 'save']);
   const record = deployedRecord(s.distDir);
   delete record.sharedWith;
   assert.deepEqual(s.config.managedApp, record);
@@ -1728,7 +1763,7 @@ test("managed app: a viewer group without a name is called the viewer group", as
 test("managed app: the app's link is asked for when the deploy doesn't give it, and it's live without one", async () => {
   const s = setup({ ms: { deployUri: undefined, url: PLAY_URL } });
   assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: true, state: 'deployed', url: PLAY_URL });
-  assert.deepEqual(s.events, ['auth status', 'app init', 'save', 'app deploy', 'app play', 'save', 'app share', 'app share list', 'save']);
+  assert.deepEqual(s.events, ['auth status', 'app list', 'app init', 'save', 'app deploy', 'app play', 'save', 'app share', 'app share list', 'save']);
   assert.deepEqual(s.ms.call('app play').args, ['app', 'play', '--no-browser']);
   assert.deepEqual(s.config.managedApp, deployedRecord(s.distDir));
 
@@ -1791,7 +1826,7 @@ test('managed app: the CLI is used as the person running the installer, switchin
 
   const s = setup({ ms: { account: OTHER_USER, accounts: [OTHER_USER, USER] } });
   assert.equal((await deployTheApp(s.ctx, s.deps)).state, 'deployed');
-  assert.deepEqual(s.events.slice(0, 4), ['auth status', 'auth switch', 'auth status', 'app init']);
+  assert.deepEqual(s.events.slice(0, 5), ['auth status', 'auth switch', 'auth status', 'app list', 'app init']);
   assert.deepEqual(s.ms.call('auth switch').args, ['auth', 'switch', '--account', USER]);
   assert.equal(s.ms.state.account, USER);
   assert.deepEqual(s.asked, []);
@@ -1799,13 +1834,13 @@ test('managed app: the CLI is used as the person running the installer, switchin
   // Switching needs no browser, so it works with --yes.
   const yes = setup({ yes: true, ms: { account: undefined, accounts: [USER] } });
   assert.equal((await deployTheApp(yes.ctx, yes.deps)).state, 'deployed');
-  assert.deepEqual(yes.events.slice(0, 4), ['auth status', 'auth switch', 'auth status', 'app init']);
+  assert.deepEqual(yes.events.slice(0, 5), ['auth status', 'auth switch', 'auth status', 'app list', 'app init']);
 });
 
 test('managed app: a CLI that is not signed in opens a browser to sign in as the person running the installer', async () => {
   const s = setup({ ms: { account: undefined } });
   assert.equal((await deployTheApp(s.ctx, s.deps)).state, 'deployed');
-  assert.deepEqual(s.events.slice(0, 4), ['auth status', 'auth login', 'auth status', 'app init']);
+  assert.deepEqual(s.events.slice(0, 5), ['auth status', 'auth login', 'auth status', 'app list', 'app init']);
   const signing = s.ms.call('auth login');
   assert.deepEqual(signing.args, ['auth', 'login', '--account', USER]);
   assert.deepEqual(signing.options, { onScreen: true });
@@ -1832,7 +1867,7 @@ test('managed app: a browser sign-in as someone else is used only if you say so'
   const yes = setup({ ms: { account: undefined, loginAs: OTHER_USER }, answers: [true] });
   assert.equal((await deployTheApp(yes.ctx, yes.deps)).state, 'deployed');
   assert.deepEqual(yes.asked, [question]);
-  assert.deepEqual(yes.events.slice(0, 4), ['auth status', 'auth login', 'auth status', 'app init']);
+  assert.deepEqual(yes.events.slice(0, 5), ['auth status', 'auth login', 'auth status', 'app list', 'app init']);
 
   const no = setup({ ms: { account: undefined, loginAs: OTHER_USER } });
   assert.deepEqual(await deployTheApp(no.ctx, no.deps), { ok: true, state: 'skipped' });
@@ -1888,7 +1923,7 @@ test('managed app: a sign-in that expires during a step signs in again and carri
   s.ms.queue('app share', expired);
   assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: true, state: 'deployed', url: PLAY_URL });
   assert.deepEqual(s.events, [
-    'auth status', 'app init', 'save',
+    'auth status', 'app list', 'app init', 'save',
     'app deploy', 'auth login', 'app deploy', 'save',
     'app share', 'auth login', 'app share', 'app share list', 'save',
   ]);
@@ -1903,7 +1938,7 @@ test('managed app: with --yes, or when signing in again fails, an expired sign-i
   const s = setup({ yes: true });
   s.ms.queue('app deploy', expired);
   assert.deepEqual(await deployTheApp(s.ctx, s.deps), { ok: false, state: 'failed' });
-  assert.deepEqual(s.events, ['auth status', 'app init', 'save', 'app deploy', 'save']);
+  assert.deepEqual(s.events, ['auth status', 'app list', 'app init', 'save', 'app deploy', 'save']);
   assert.deepEqual(s.config.managedApp?.skipped?.steps, [what]);
   lacks(s.said(), 'Sign in again');
 
@@ -1911,7 +1946,7 @@ test('managed app: with --yes, or when signing in again fails, an expired sign-i
   failing.ms.queue('app init', expired);
   failing.ms.queue('auth login', failedWith('The browser sign-in was cancelled.'));
   assert.deepEqual(await deployTheApp(failing.ctx, failing.deps), { ok: false, state: 'failed' });
-  assert.deepEqual(failing.events, ['auth status', 'app init', 'auth login', 'save']);
+  assert.deepEqual(failing.events, ['auth status', 'app list', 'app init', 'auth login', 'save']);
   // What's said is the step's failure, not the sign-in's.
   assert.equal(failing.config.managedApp?.skipped?.why, 'The last attempt to deploy it failed: Your sign-in session has expired.');
   assert.deepEqual(failing.config.managedApp?.skipped?.steps, [what]);

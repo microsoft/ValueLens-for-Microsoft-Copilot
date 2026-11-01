@@ -74,6 +74,27 @@ export async function login(run, { account }) {
 }
 
 /**
+ * The apps the signed-in account can edit, in one environment or across the tenant.
+ * @param {RunCli} run
+ * @param {{ environmentId?: string }} [options]
+ * @returns {Promise<{ ok: true, apps: { appId: string, displayName: string, url?: string }[] } | Failed>}
+ */
+export async function listApps(run, { environmentId } = {}) {
+  const result = await run(['app', 'list', '--permission', 'edit', ...(environmentId ? ['--environment-id', environmentId] : [])]);
+  if (!result.ok) return failed('list', result);
+  // The CLI prints { success, items: [...] }.
+  const items = result.data?.items;
+  const apps = (Array.isArray(items) ? items : [])
+    .filter((/** @type {any} */ a) => isGuid(a?.appId))
+    .map((/** @type {any} */ a) => ({
+      appId: String(a.appId),
+      displayName: typeof a.displayName === 'string' ? a.displayName : '',
+      ...(typeof a.appPlayUri === 'string' ? { url: a.appPlayUri } : {}),
+    }));
+  return { ok: true, apps };
+}
+
+/**
  * Makes the folder a managed app that deploys the built files in ./dist, in your developer environment
  * unless you name another. The CLI refuses a folder that already has ms.config.json.
  * @param {RunCli} run

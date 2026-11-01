@@ -4,6 +4,7 @@
  * sign-in for the next command, the way one terminal run does for its steps.
  */
 import { existsSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { collectedLabels } from './catalog.js';
 import { archiveConfig, loadConfig, secretMode } from './config.js';
 import { connect as realConnect, createCtx, runCommand, showPrereqs } from './install.js';
@@ -17,10 +18,11 @@ import { defaultPaxHost, readState } from './steps/pax/local.js';
 import { endedSince } from './steps/pax/flow.js';
 import { paxCollectedLabels } from './steps/pax/plan.js';
 import { describeFolder } from './steps/pax/site.js';
-import { reportUrl } from './steps/report.js';
+import { reportUrl, tenantQuery } from './steps/report.js';
 import { isPax, TARGETS } from './target.js';
 import { routerWanted } from './uploads.js';
 import { SETUP_SECTIONS, setupRecovery } from './setup.js';
+import { attachRunLog, createSupportBundle, runLogFile } from './support.js';
 
 export const WEB_COMMANDS = ['install', 'update', 'run', 'rerun-failed', 'check', 'refresh', 'status', 'rotate-secret', 'access', 'upload', 'deploy-app', 'uninstall', 'prereqs'];
 /** Commands that work before anything is installed. */
@@ -45,11 +47,12 @@ export function describeRecord(config, local) {
     target: config.target,
     installed,
     workspace: f.workspaceName ?? f.workspaceId,
-    workspaceUrl: f.workspaceId ? `https://app.fabric.microsoft.com/groups/${f.workspaceId}` : undefined,
+    workspaceUrl: f.workspaceId ? `https://app.fabric.microsoft.com/groups/${f.workspaceId}${tenantQuery(config.tenantId)}` : undefined,
     lakehouse: f.lakehouseName,
     schedule: f.scheduleId ? describeSchedule(config.schedule) : undefined,
     data: collectedLabels(config.modules),
     model: sm.id ? sm.name : undefined,
+    reportUrl: f.workspaceId && sm.report?.id ? reportUrl(f.workspaceId, sm.report.id, config.tenantId) : undefined,
     secretExpires: config.app.secretExpires?.slice(0, 10),
     firstRun: config.firstRun?.status,
     historyDays: config.history?.days,
@@ -105,14 +108,14 @@ function describePaxRecord(config, local) {
     target: config.target,
     installed,
     workspace: config.fabric.workspaceName ?? wsId,
-    workspaceUrl: wsId ? `https://app.powerbi.com/groups/${wsId}` : undefined,
+    workspaceUrl: wsId ? `https://app.powerbi.com/groups/${wsId}${tenantQuery(config.tenantId)}` : undefined,
     lakehouse: undefined,
     files: sp ? describeFolder(sp) : undefined,
     filesUrl: sp?.folderUrl,
     schedule: task?.name ? `${task.name}, daily at ${task.at}${task.logonType === 'Interactive' ? ", while you're signed in to this PC" : ''}` : undefined,
     data: paxCollectedLabels(config),
     model: sm.id ? (signedIn ? sm.name : `${sm.name}, not signed in to SharePoint yet`) : undefined,
-    reportUrl: wsId && sm.report?.id ? reportUrl(wsId, sm.report.id) : undefined,
+    reportUrl: wsId && sm.report?.id ? reportUrl(wsId, sm.report.id, config.tenantId) : undefined,
     secretExpires: pax.secretExpires?.slice(0, 10),
     firstRun: paxFirstRun(pax.firstRun, local),
     historyDays: config.history?.days,
@@ -183,6 +186,7 @@ export function describeError(err) {
  */
 export function createSession(o) {
   const connect = o.connect ?? realConnect;
+  const runLog = attachRunLog(o.ui, runLogFile(o.configFile));
   /** @type {{ api: import('./install.js').Apis, user: import('./install.js').User, method: Method, tenant: string, getToken?: (resource: import('./auth.js').Resource) => Promise<string> } | null} */
   let signedIn = null;
   /** @type {string | null} */
@@ -267,6 +271,7 @@ export function createSession(o) {
     /** @type {import('./config.js').InstallConfig | undefined} */
     let currentConfig;
     ui.emit({ type: 'command', command, state: 'running' });
+    runLog.begin(command);
     try {
       const { config, existed } = loadConfig(o.configFile);
       currentConfig = config;
@@ -280,11 +285,13 @@ export function createSession(o) {
         ui.emit({ type: 'signin', state: 'started', method });
         const { api, user, getToken } = await connect({ tenantId: tenant || undefined, method, ui, debug: o.debug });
         signedIn = { api, user, method, tenant, getToken };
+        runLog.signedIn(user);
         if (command !== 'prereqs') checkInBackground(config, sources);
       }
       ui.emit({ type: 'signin', state: reuse ? 'reused' : 'done', user: { upn: signedIn.user.upn, displayName: signedIn.user.displayName, tenantId: signedIn.user.tenantId } });
       const gone = existed ? await checkRecord(config) : null;
       if (gone && command !== 'prereqs') {
+        runLog.end(false, staleRecordMessage(gone));
         ui.emit({ type: 'command', command, state: 'failed', stale: true, error: `${staleRecordMessage(gone)} Go back to the home page to start fresh, or keep the record.` });
         return;
       }
@@ -298,14 +305,21 @@ export function createSession(o) {
         const items = await showPrereqs(ctx);
         prereqs = prereqsSnapshot(signedIn.user.upn, items, config.target);
       } else ok = await runCommand(ctx, command, { wait: req.wait !== false, backfillDays: req.backfillDays });
+      runLog.end(ok);
       ui.emit({ type: 'command', command, state: ok ? 'done' : 'failed', ...(ok ? {} : { error: 'It didn\'t finish successfully. The details are above.' }) });
     } catch (err) {
-      if (/** @type {any} */ (err)?.name === 'ExitPromptError') ui.emit({ type: 'command', command, state: 'cancelled' });
-      else if (isResumeLater(err)) {
+      if (/** @type {any} */ (err)?.name === 'ExitPromptError') {
+        runLog.end(false, 'Cancelled.');
+        ui.emit({ type: 'command', command, state: 'cancelled' });
+      } else if (isResumeLater(err)) {
+        runLog.end(true);
         ui.warn(/** @type {Error} */ (err).message);
         ui.emit({ type: 'command', command, state: 'cancelled', paused: /** @type {Error} */ (err).message });
-      } else ui.emit({ type: 'command', command, state: 'failed', error: describeError(err),
-        ...(command === 'install' && currentConfig ? { recovery: setupRecovery(err, currentConfig) } : {}) });
+      } else {
+        runLog.end(false, describeError(err));
+        ui.emit({ type: 'command', command, state: 'failed', error: describeError(err),
+          ...(command === 'install' && currentConfig ? { recovery: setupRecovery(err, currentConfig) } : {}) });
+      }
     } finally {
       running = null;
     }
@@ -348,6 +362,18 @@ export function createSession(o) {
     keepRecord() {
       if (stale) stale.kept = true;
       return { ok: true };
+    },
+    /**
+     * Writes the support file beside the install record and returns it, with each file's text so the
+     * page can show what's inside before it's sent. Signed in, it adds live run statuses and row counts.
+     * @param {{ now?: Date }} [opts]
+     */
+    async supportBundle(opts = {}) {
+      const live = signedIn
+        ? { api: signedIn.api, user: signedIn.user, prereqs: prereqs?.items ?? null }
+        : null;
+      const out = await createSupportBundle({ configFile: o.configFile, version: o.version, live, outDir: dirname(o.configFile), now: opts.now, ...(o.paxHost ? { paxHost: o.paxHost } : {}) });
+      return { fileName: out.fileName, path: out.path, files: out.files, zipBase64: out.zip.toString('base64') };
     },
     /**
      * Starts a command and returns straight away; its progress arrives as events.

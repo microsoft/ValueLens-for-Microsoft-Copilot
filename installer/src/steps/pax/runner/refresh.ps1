@@ -237,6 +237,8 @@ function Read-RefreshConfig {
     runHours         = 10
     agent365         = $false
     deidentify       = $false
+    partitionHours   = $null
+    maxSearches      = $null
     repairHint       = $script:RepairHint
     acceptDropHint   = $script:AcceptDropHint
   }
@@ -305,6 +307,16 @@ function Read-RefreshConfig {
   if ($config.minDays -is [int] -and $config.maxDays -is [int] -and $config.minDays -gt $config.maxDays) {
     $problems.Add("minDays can't be more than maxDays.")
   }
+  # PAX's audit search sizing, which PAX picks for itself when they're absent.
+  foreach ($range in @(@('partitionHours', 1, 72), @('maxSearches', 1, 10))) {
+    $value = $config[$range[0]]
+    if ($null -eq $value) { continue }
+    if (($value -is [int] -or $value -is [long]) -and $value -ge $range[1] -and $value -le $range[2]) {
+      $config[$range[0]] = [int]$value
+    } else {
+      $problems.Add(('{0} must be a whole number from {1} to {2}.' -f $range[0], $range[1], $range[2]))
+    }
+  }
   $hours = $config.runHours
   if (($hours -is [int] -or $hours -is [long] -or $hours -is [double] -or $hours -is [decimal]) -and $hours -gt 0 -and $hours -le 23) {
     $config.runHours = [double]$hours
@@ -364,6 +376,12 @@ function ConvertTo-Progress {
       days  = [int]$window.days
       first = ($window.first -eq $true)
       early = ($window.early -eq $true)
+    }
+    # Which of the run's windows it is, for the installer's status.
+    if (($window.index -is [int] -or $window.index -is [long]) -and ($window.count -is [int] -or $window.count -is [long]) -and
+      $window.index -ge 1 -and $window.index -le $window.count) {
+      $pending.index = [int]$window.index
+      $pending.count = [int]$window.count
     }
   }
   return [ordered]@{
@@ -656,12 +674,16 @@ function Resolve-Drive {
   $byName = @($drives | Where-Object { [string]$_.name -eq $wanted })
   $match = @($byUrl + $byName) | Select-Object -First 1
   if (-not $match) {
+    if (-not $drives.Count) {
+      # With Sites.Selected and no grant on the site, Graph lists no libraries rather than refusing.
+      $script:LastGraphStatus = 403
+      throw "The app can see no document libraries on $siteUrl, so it hasn't been given access to the site yet. The app needs write access to the SharePoint site, through a Sites.Selected grant. $script:RepairHint"
+    }
     $known = @($drives | ForEach-Object {
         $leaf = Get-UrlLeaf ([string]$_.webUrl)
         if ($leaf -and $leaf -ne [string]$_.name) { "$($_.name) ($leaf)" } else { [string]$_.name }
       })
-    $list = if ($known) { 'Its libraries are: ' + ($known -join ', ') + '.' } else { 'The app can see no libraries there.' }
-    throw "$siteUrl has no document library called '$wanted'. $list $script:RepairHint"
+    throw "$siteUrl has no document library called '$wanted'. Its libraries are: $($known -join ', '). $script:RepairHint"
   }
   $cfg.siteId = $siteId
   $cfg.driveId = [string]$match.id
@@ -905,6 +927,10 @@ function Invoke-PaxChild {
   # The registry is a snapshot, so one window reads it.
   if ($cfg.agent365 -and $Window.Index -eq 1) { $arguments.Add('-IncludeAgent365Info') }
   if ($cfg.deidentify) { $arguments.Add('-Deidentify') }
+  if ($cfg.mode -ne 'userInfo') {
+    if ($cfg.partitionHours) { $arguments.AddRange([string[]]@('-PartitionHours', [string]$cfg.partitionHours)) }
+    if ($cfg.maxSearches) { $arguments.AddRange([string[]]@('-MaxConcurrency', [string]$cfg.maxSearches)) }
+  }
   $argv = $arguments.ToArray()
 
   # A file that an earlier window wrote can look new to this one, so each file's time is
@@ -925,6 +951,7 @@ function Invoke-PaxChild {
   $script:ZeroRows = $false
   $script:PaxExitCode = $null
   $script:RollupFailed = $null
+  $script:SearchDenied = $false
   $pwsh = (Get-Process -Id $PID).Path
   # Under Stop, PowerShell 7.0 and 7.1 can end this run on the child's first error line.
   $ErrorActionPreference = 'Continue'
@@ -937,6 +964,7 @@ function Invoke-PaxChild {
         $match = [regex]::Match($line, $script:RollupFailurePattern)
         if ($match.Success) { $script:RollupFailed = $line.Substring($match.Index).Trim() }
       }
+      if ($line -match 'Partition \d+/\d+ creation failed \(.*HTTP 401\b') { $script:SearchDenied = $true }
       if ($_ -is [System.Management.Automation.ErrorRecord]) {
         $script:ChildErrors.Add($line)
       } elseif ($line -match '^ {2}(Exported:\s+0 rows|Retained:\s+0 records)\s*$') {
@@ -984,6 +1012,10 @@ function Get-PaxFailure {
   # The error view can wrap a long message, so the rollup line is compared without spaces.
   if ($script:RollupFailed -and -not ($detail -and ($detail -replace '\s', '').Contains(($script:RollupFailed -replace '\s', '')))) {
     $text += " PAX's rollup step failed: $($script:RollupFailed)"
+  }
+  # Seen just after setup: Purview refused new audit searches until the app's new permissions applied.
+  if ($script:SearchDenied) {
+    $text += " Microsoft Purview refused to start the audit log searches (HTTP 401). Just after setup, that's usually because the app's new permissions haven't applied yet. Wait 15 minutes, then run the refresh again. If it keeps happening, check that the app has the AuditLogsQuery.Read.All application permission with admin consent."
   }
   if ($script:LogPath) { $text += " The log is $($script:LogPath)." }
   return $text
@@ -1303,6 +1335,8 @@ function Invoke-Refresh {
       days  = $window.Days
       first = ($window.Index -eq 1)
       early = $window.Early
+      index = $window.Index
+      count = $windows.Count
     }
     Save-Progress
     $started = [datetime]::UtcNow

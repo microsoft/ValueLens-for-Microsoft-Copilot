@@ -1006,12 +1006,12 @@ const PREREQ_STATE = { met: 'You have it', missing: 'Missing', eligible: 'Can be
 /** What the signed-in user has and lacks, each with what it's for and how to get it. */
 function renderPrereqs(items) {
   return h('ul', { class: 'prereqs', 'aria-label': 'Prerequisites' },
-    items.map((it) => h('li', { class: `prereq ${it.status}` },
-      h('span', { class: 'gl' }, icon(PREREQ_GLYPH[it.status] ?? 'circle')),
+    items.map((it) => h('li', { class: `prereq ${it.status}${it.optional ? ' optional' : ''}` },
+      h('span', { class: 'gl' }, icon(it.optional && it.status === 'missing' ? 'minus' : PREREQ_GLYPH[it.status] ?? 'circle')),
       h('div', null,
         h('span', { class: 'prereq-name' }, it.label),
         ' ',
-        h('span', { class: 'prereq-state' }, PREREQ_STATE[it.status] ?? it.status, it.optional ? ', optional' : ''),
+        h('span', { class: 'prereq-state' }, it.optional && it.status === 'missing' ? 'Not found, optional' : PREREQ_STATE[it.status] ?? it.status, it.optional && it.status !== 'missing' ? ', optional' : ''),
         h('p', null, linkify(it.detail ?? '')),
         (it.rows ?? []).length
           ? h('ul', { class: 'prereq-rows' }, it.rows.map((r) => h('li', { class: r.status },
@@ -1980,7 +1980,7 @@ function itemMarkdown(it, depth) {
       ]), ''];
     case 'prereqs':
       return it.items.flatMap((p) => [
-        `- ${{ met: '✓', missing: '✗', eligible: '◐', unknown: '?' }[p.status] ?? ''} ${p.label}: ${PREREQ_STATE[p.status] ?? p.status}${p.optional ? ' (optional)' : ''}`,
+        `- ${p.optional && p.status === 'missing' ? '–' : { met: '✓', missing: '✗', eligible: '◐', unknown: '?' }[p.status] ?? ''} ${p.label}: ${PREREQ_STATE[p.status] ?? p.status}${p.optional ? ' (optional)' : ''}`,
         `  - ${p.detail}`,
         ...(p.rows ?? []).map((r) => `  - ${r.name}: ${r.detail ?? PREREQ_STATE[r.status]}`),
         `  - Needed for: ${p.neededFor}`,
@@ -2046,9 +2046,49 @@ function savePlan(run) {
   download(`${PRODUCT_ID}-plan-${stamp(Date.now())}.md`, L);
 }
 
+/* ---------- Support file ---------- */
+
+// The footer link: makes the support file, lists what's in it (each file opens to its full text), and downloads it.
+async function supportFile() {
+  const link = byId('support-link');
+  const box = byId('support');
+  if (!box.hidden && box.dataset.ready) {
+    box.hidden = true;
+    link.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  box.hidden = false;
+  link.setAttribute('aria-expanded', 'true');
+  box.dataset.ready = '';
+  box.replaceChildren(h('p', { class: 'hint' }, 'Creating the support file…'));
+  const r = await post('/api/support-bundle');
+  if (!r.ok) {
+    box.replaceChildren(h('p', { class: 'err', role: 'alert' }, r.body?.error ?? 'Couldn\'t create the support file.'));
+    return;
+  }
+  const { fileName, path, files, zipBase64 } = r.body;
+  const save = () => {
+    const bytes = Uint8Array.from(atob(zipBase64), (ch) => ch.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }));
+    const a = h('a', { href: url, download: fileName, hidden: true });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+  box.dataset.ready = '1';
+  box.replaceChildren(
+    h('p', { class: 'hint' }, `Plain text, with secrets removed and people's names hashed. Check what's inside, then email it to us. A copy is saved at ${path}.`),
+    h('ul', { class: 'support-files' }, files.map((f) => h('li', {}, h('details', {}, h('summary', {}, f.name), h('pre', {}, f.text))))),
+    h('button', { type: 'button', class: 'btn', onclick: save }, 'Download'),
+  );
+  announce('The support file is ready.');
+}
+
 /* ---------- Start ---------- */
 
 function init() {
+  byId('support-link').addEventListener('click', supportFile);
   try {
     const saved = localStorage.getItem('valuelens-theme');
     if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;

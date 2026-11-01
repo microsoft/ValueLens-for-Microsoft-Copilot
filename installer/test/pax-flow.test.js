@@ -953,6 +953,31 @@ test('pax flow: the summary says when the set-up is partly done', { timeout: 10_
   assert.ok(text.includes(`Keep ${PRODUCT.recordFile}`), text);
 });
 
+test('pax flow: the summary links the report, and opens each link in the install\'s tenant', { timeout: 10_000 }, async () => {
+  const s = await installed();
+  s.config.fabric.workspaceId = 'ws-1';
+  s.config.semanticModel.id = 'ds-9';
+  s.config.semanticModel.report = { id: 'rep-1', name: PRODUCT.pax.report };
+  s.config.tenantId = 'tenant-1';
+  s.ctx.user = { ...(s.ctx.user ?? {}), tenantId: 'tenant-1' };
+  paxSummary(s.ctx, { ok: true });
+  const text = plain(s.ui.text());
+  assert.match(text, /Workspace: .*\/groups\/ws-1\?ctid=tenant-1/, text);
+  assert.match(text, /Model: +https:\/\/app\.powerbi\.com\/groups\/ws-1\/datasets\/ds-9\/details\?ctid=tenant-1/, text);
+  assert.match(text, /Report: +https:\/\/app\.powerbi\.com\/groups\/ws-1\/reports\/rep-1\?ctid=tenant-1/, text);
+});
+
+test('pax flow: the summary says the app shows sample data until the CSVs are picked, and which account to open it with', { timeout: 10_000 }, async () => {
+  const s = await installed();
+  s.config.managedApp = { ...(s.config.managedApp ?? {}), url: 'https://apps.example/play/app-1' };
+  s.ctx.user = { ...(s.ctx.user ?? {}), upn: 'admin@example.test' };
+  paxSummary(s.ctx, { ok: true });
+  const text = plain(s.ui.text());
+  assert.match(text, /App: +https:\/\/apps\.example\/play\/app-1/, text);
+  assert.match(text, /sample data, labelled Sample data, until you choose Change data and pick the CSV files from the SharePoint folder https:\/\//, text);
+  assert.match(text, /Open the app signed in as admin@example\.test/, text);
+});
+
 test('pax flow: commands that need the refresh set up say how to set it up', { timeout: 10_000 }, async () => {
   const s = await paxSetup();
   const before = { pc: s.pax.calls.length, graph: s.graph.calls.length, pbi: s.pbi.calls.length };
@@ -1072,9 +1097,31 @@ test('pax flow: a reload that stops part way says so, and status shows how far t
   delete state.progress.throughUtc;
   s.pax.writeState(state);
   assert.match(await status(), /^ +History: +loading 120 days of activity, none read yet\./m);
+  assert.doesNotMatch(await status(), /Window:/, 'no window is part way');
+  state.progress.pending = { from: state.progress.fromUtc, to: state.progress.fromUtc, days: 7, first: false, early: true, index: 2, count: 5 };
+  s.pax.writeState(state);
+  assert.match(await status(), /^ +Window: +2 of 5 \(7 days\), where the last run stopped$/m);
+  state.progress.pending = { ...state.progress.pending, index: 1, count: 1 };
+  s.pax.writeState(state);
+  assert.doesNotMatch(await status(), /Window:/, 'a run with one window has no window count');
+  delete state.progress.pending;
   state.progress.windowDays = 120;
   s.pax.writeState(state);
   assert.doesNotMatch(await status(), /History:/, 'a one-window load finishes in one run');
+});
+
+test('pax flow: install records the Copilot seats, and a small tenant gets a few large audit searches', { timeout: 10_000 }, async () => {
+  const s = await paxSetup({ by: { [Q.signIn]: 'set' } });
+  s.pre.seats = 40;
+  assert.equal(await paxInstall(s.ctx, s.pre), true, plain(s.ui.text()));
+  assert.equal(s.config.pax.seats, 40);
+  const refresh = JSON.parse(readFileSync(paxPaths(s.pax.host).config, 'utf8'));
+  assert.equal(refresh.partitionHours, 72);
+  assert.equal(refresh.maxSearches, 5);
+  // A repair whose seat count can't be read keeps the last one.
+  s.pre.seats = undefined;
+  assert.equal(await paxInstall(s.ctx, s.pre), true, plain(s.ui.text()));
+  assert.equal(s.config.pax.seats, 40);
 });
 
 test('pax flow: status warns while a history load reads its days without the day before', { timeout: 10_000 }, async () => {

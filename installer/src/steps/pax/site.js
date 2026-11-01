@@ -4,6 +4,7 @@
  * access to that one site (Sites.Selected), and checking the app can reach the folder the way the
  * scheduled task will. Product names come only from product.js, so other installers can copy it.
  */
+import { SITE_ADMIN_ROLES } from '../../clients/graph.js';
 import { HttpError } from '../../http.js';
 import { PRODUCT } from '../../product.js';
 import { appName } from '../../target.js';
@@ -216,9 +217,10 @@ const grantedTo = (permission, appId) =>
 
 /**
  * Gives the app write access to the folder's site, and to no other (Sites.Selected), when the
- * signed-in account can. That takes an administrator whose sign-in carries Sites.FullControl.All,
- * which the installer's usually doesn't, so this mostly records that an administrator still has
- * to do it and returns false. The check as the app is the proof either way.
+ * signed-in account can. That takes an administrator whose sign-in carries Sites.FullControl.All.
+ * The usual sign-in doesn't, so for a SharePoint or Global Administrator this asks for it on its
+ * own; anyone else gets the steps for an administrator, and this returns false. The check as the
+ * app is the proof either way.
  * @param {Ctx} ctx
  * @returns {Promise<boolean>}
  */
@@ -228,24 +230,36 @@ export async function ensureSiteGrant(ctx) {
   if (sp.granted) return true;
   const appId = appIdOf(config);
   const name = appLabel(config);
-  try {
+  /** @param {import('../../clients/graph.js').GraphApi} graph */
+  const grant = async (graph) => {
     if (!isGraphSiteId(sp.siteId)) {
-      sp.siteId = String((await api.graph.site(sp.sitePath)).id);
+      sp.siteId = String((await graph.site(sp.sitePath)).id);
       ctx.save();
     }
     const siteId = /** @type {string} */ (sp.siteId);
-    const mine = (await api.graph.sitePermissions(siteId)).find((p) => grantedTo(p, appId));
+    const mine = (await graph.sitePermissions(siteId)).find((p) => grantedTo(p, appId));
     if (mine) {
-      const roles = /** @type {string[]} */ ((await api.graph.sitePermission(siteId, mine.id))?.roles ?? []);
+      const roles = /** @type {string[]} */ ((await graph.sitePermission(siteId, mine.id))?.roles ?? []);
       if (roles.some(canWrite)) ui.ok(`${name} can already write to ${sp.siteUrl}`);
       else {
-        await api.graph.updateSitePermission(siteId, mine.id, 'write');
+        await graph.updateSitePermission(siteId, mine.id, 'write');
         ui.ok(`Changed ${name}'s access to ${sp.siteUrl} from read to write`);
       }
     } else {
-      const created = await api.graph.grantSitePermission(siteId, appId, name, 'write');
+      const created = await graph.grantSitePermission(siteId, appId, name, 'write');
       if (created?.id) sp.grantId = String(created.id);
       ui.ok(`Gave ${name} write access to ${sp.siteUrl}, and to no other site`);
+    }
+  };
+  try {
+    try {
+      await grant(api.graph);
+    } catch (err) {
+      // The usual Graph sign-in rarely carries Sites.FullControl.All. A site administrator can
+      // give the grant with one that asks for it on its own, so nobody has to run PowerShell.
+      if (!(err instanceof HttpError && (err.status === 401 || err.status === 403)) || !api.graphSites || !(await isSiteAdmin(ctx))) throw err;
+      ui.info('Your sign-in needs SharePoint\'s full control permission to give the app its site. Approve it in the browser if asked.');
+      await grant(api.graphSites);
     }
     sp.granted = true;
     delete sp.pendingAdminGrant;
@@ -260,6 +274,15 @@ export async function ensureSiteGrant(ctx) {
     ctx.save();
     return false;
   }
+}
+
+/**
+ * Whether the signed-in user is a SharePoint or Global Administrator. Unknown counts as no.
+ * @param {Ctx} ctx
+ */
+async function isSiteAdmin(ctx) {
+  const roles = await ctx.api.graph.myDirectoryRoles().catch(() => []);
+  return roles.some((r) => Object.hasOwn(SITE_ADMIN_ROLES, r.roleTemplateId));
 }
 
 /**

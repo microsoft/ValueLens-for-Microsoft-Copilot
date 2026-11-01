@@ -209,6 +209,26 @@ a {
   background: var(--band-accent);
 }
 
+.sample-banner {
+  background: #fdf1d8;
+  border-bottom: 1px solid #f0d49a;
+  color: #3a2603;
+}
+.sample-banner-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 8px 28px;
+}
+.sample-banner .link-btn {
+  flex: none;
+  font-weight: 600;
+}
+
 .toolbar {
   background: var(--surface);
   border-bottom: 1px solid var(--line);

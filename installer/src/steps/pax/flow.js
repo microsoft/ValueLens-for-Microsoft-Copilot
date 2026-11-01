@@ -5,7 +5,7 @@
 // tenant is ready for it.
 import { HttpError } from '../../http.js';
 import { commandLine } from '../../launch.js';
-import { deployTheApp, removeTheApp } from '../../managed-app/flow.js';
+import { appSampleNote, deployTheApp, removeTheApp } from '../../managed-app/flow.js';
 import { PRODUCT } from '../../product.js';
 import { c } from '../../ui.js';
 import {
@@ -26,6 +26,7 @@ import {
   confirmFolderAccess, describeFolder, ensureSiteGrant, removeRetiredGrants, removeSiteGrant,
 } from './site.js';
 import { paxUpload } from './upload.js';
+import { reportUrl } from '../report.js';
 
 /** @typedef {import('../../install.js').Ctx} Ctx */
 /** @typedef {Ctx['config']} Config */
@@ -487,7 +488,9 @@ async function acceptDrop(ctx) {
  */
 export async function paxInstall(ctx, pre, { wait = true } = {}) {
   const { config, ui } = ctx;
-  const { task } = paxOf(config);
+  const { pax, task } = paxOf(config);
+  // Sizes refresh.json's audit searches. A failed read keeps what the last install found.
+  if (pre.seats) pax.seats = pre.seats;
   const report = !!config.semanticModel?.enabled;
   const viewers = report && !!config.access;
   // Asked once: Power BI has no API to share a report, and the group gets no workspace role instead.
@@ -598,13 +601,19 @@ export function paxSummary(ctx, { ok }) {
     ui.info(`Secret:     Credential Manager, ${pax.credentialTarget}${expires}`);
   }
   if (ws?.workspaceId) {
-    ui.info(`Workspace:  ${ws.workspaceName ?? PRODUCT.pax.workspace}, ${workspaceUrl(ws.workspaceId, user?.tenantId)}`);
+    const tenant = user?.tenantId ?? config.tenantId;
+    ui.info(`Workspace:  ${ws.workspaceName ?? PRODUCT.pax.workspace}, ${workspaceUrl(ws.workspaceId, tenant)}`);
     if (sm?.id) {
       const at = [config.powerBi?.refreshAt ?? []].flat();
-      ui.info(`Model:      ${modelUrl(ws.workspaceId, sm.id)}${at.length ? `, refreshes at ${at.join(' and ')}` : ''}`);
+      ui.info(`Model:      ${modelUrl(ws.workspaceId, sm.id, tenant)}${at.length ? `, refreshes at ${at.join(' and ')}` : ''}`);
     }
+    if (sm?.report?.id) ui.info(`Report:     ${reportUrl(ws.workspaceId, sm.report.id, tenant)}`);
   }
-  if (config.managedApp?.url) ui.info(`App:        ${config.managedApp.url}`);
+  if (config.managedApp?.url) {
+    ui.info(`App:        ${config.managedApp.url}`);
+    ui.note(appSampleNote(config));
+    ui.note(`Open the app signed in as ${user?.upn ?? 'an account in this tenant'}. A browser signed in to another account opens it in that account's tenant, where it isn't.`);
+  }
   ui.info(`Keep ${c.bold(PRODUCT.recordFile)}. It holds no secrets; re-run the installer with it to change or repair the set-up.`);
 }
 
@@ -643,6 +652,12 @@ export async function paxStatus(ctx) {
     if (load?.days > load?.windowDays) {
       const read = load.throughUtc ? `read up to ${when(load.throughUtc)} so far` : 'none read yet';
       ui.info(`History:      loading ${load.days} days of activity, ${read}. Each run carries on where the last one stopped.`);
+    }
+    // Saved as each window starts, so it shows how far a long first load has got.
+    const pending = load?.pending;
+    if (pending?.count > 1 && pending.index >= 1) {
+      const running = info?.state === 'Running' || first === 'running';
+      ui.info(`Window:       ${pending.index} of ${pending.count} (${pending.days} ${pending.days === 1 ? 'day' : 'days'})${running ? ', reading now' : ', where the last run stopped'}`);
     }
     // The task stopped a one-day window that read the day before too, so the load reads without it.
     if (load?.noOverlap) {

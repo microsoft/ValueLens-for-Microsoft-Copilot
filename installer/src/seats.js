@@ -10,6 +10,9 @@ export const COPILOT_PLAN = 'M365_COPILOT_APPS';
 /** More assigned seats than this and a new install starts as a large tenant. */
 export const LARGE_TENANT_SEATS = 10_000;
 
+/** Up to this many assigned seats, PAX reads each window in a few large audit searches rather than many small ones. */
+export const SMALL_TENANT_SEATS = 1_000;
+
 /** From this many assigned seats, a capacity below F64 is likely to run the loads out of time or memory. */
 export const BIG_CAPACITY_SEATS = 30_000;
 

@@ -526,8 +526,8 @@ export function credentialSteps(url, privacyLevel = PAX.privacyLevel ?? 'None') 
   return [
     `Open the model's settings: ${url}`,
     'Expand Data source credentials, and select Edit credentials beside a source.',
-    `Choose OAuth2 and the privacy level ${privacyLevel}, then select Sign in and sign in with your work account.`,
-    'Do the same for each source it lists. If a site\'s address fails the connection test, edit it again and tick Skip test connection.',
+    `Choose OAuth2 and the privacy level ${privacyLevel}, and tick Skip test connection: the folder has no files until the first load writes them, so the test fails until then. Select Sign in and sign in with your work account.`,
+    'Do the same for each source it lists.',
   ];
 }
 
@@ -549,7 +549,7 @@ export async function askCredentials(ctx) {
   }
   ui.heading('Sign the report in to SharePoint');
   ui.info(`${sm.name} reads the files in the SharePoint folder as you. Power BI has no way for the installer to sign it in, so do it once:`);
-  credentialSteps(modelSettingsUrl(ws, sm.id)).forEach((s, i) => ui.info(`  ${i + 1}. ${s}`));
+  credentialSteps(modelSettingsUrl(ws, sm.id, ctx.user?.tenantId ?? config.tenantId)).forEach((s, i) => ui.info(`  ${i + 1}. ${s}`));
   if (ui.yes) {
     pbi.credentials = 'later';
     sm.bound = false;

@@ -119,6 +119,8 @@ See [`sample-data/README.md`](sample-data/README.md) for what the sample contain
 
 <br>
 
+<sub>Stuck? Create a support file and email it to us: [`scripts/support_file.py`](../scripts/support_file.py).</sub>
+
 | Issue | Fix |
 |---|---|
 | Power BI asks for SharePoint URLs or rejects a local path | Open `ValueLens - Local CSV.pbit`, not the SharePoint template. |

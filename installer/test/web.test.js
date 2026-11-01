@@ -790,14 +790,15 @@ test('describeRecord on the PAX route: the refresh on this PC, the folder, the r
   assert.equal(r.target, 'pax');
   assert.equal(r.installed, true);
   assert.equal(r.workspace, PRODUCT.pax.workspace);
-  assert.equal(r.workspaceUrl, 'https://app.powerbi.com/groups/ws-1', 'a Power BI workspace, not a Fabric one');
+  assert.equal(r.workspaceUrl, 'https://app.powerbi.com/groups/ws-1?ctid=tenant-1', 'a Power BI workspace, not a Fabric one, in the install\'s tenant');
   assert.equal(r.lakehouse, undefined);
   assert.equal(r.files, 'Shared Documents/ValueLens on https://contoso.sharepoint.com/sites/Analytics');
   assert.equal(r.filesUrl, 'https://contoso.sharepoint.com/sites/Analytics/Shared%20Documents/ValueLens');
   assert.equal(r.schedule, `${PRODUCT.pax.task}, daily at 02:00, while you're signed in to this PC`);
   assert.deepEqual(r.data, ['Copilot interactions', 'users']);
   assert.equal(r.model, PRODUCT.pax.model);
-  assert.equal(r.reportUrl, reportUrl('ws-1', 'rep-1'));
+  assert.equal(r.reportUrl, reportUrl('ws-1', 'rep-1', 'tenant-1'));
+  assert.ok(r.reportUrl.endsWith('/reports/rep-1?ctid=tenant-1'), r.reportUrl);
   assert.equal(r.secretExpires, '2027-06-01');
   assert.equal(r.viewers, PRODUCT.viewerGroup);
   assert.equal(r.app, 'Open the app');
@@ -975,5 +976,48 @@ test('web session: the home page reads the PAX refresh\'s state.json on the PC i
     assert.equal(s.state().record?.firstRun, 'Completed');
   } finally {
     done();
+  }
+});
+test('web: the support-file link posts to its route and gets the files back', async () => {
+  let calls = 0;
+  const { server, post } = await serve({
+    supportBundle: async () => {
+      calls++;
+      return { fileName: 'valuelens-support-20260101-000000.zip', path: 'x', files: [{ name: 'README.txt', text: 'hi' }], zipBase64: 'UEs=' };
+    },
+  });
+  try {
+    const r = await post('/api/support-bundle', {});
+    assert.equal(r.status, 200);
+    assert.equal(JSON.parse(r.body).fileName, 'valuelens-support-20260101-000000.zip');
+    assert.equal(calls, 1);
+    const cross = await post('/api/support-bundle', {}, { Origin: 'http://evil.example' });
+    assert.equal(cross.status, 403);
+    assert.equal(calls, 1);
+  } finally {
+    await server.close();
+  }
+});
+
+test('web: the page has one quiet footer link for the support file, and no new step', async () => {
+  const html = await readFile(new URL('web/index.html', SRC), 'utf8');
+  assert.match(html, /<footer class="page-foot">[\s\S]*>Having trouble\? Create a support file<\/button>/);
+  const js = await readFile(new URL('web/app.js', SRC), 'utf8');
+  assert.match(js, /post\('\/api\/support-bundle'\)/);
+});
+
+test('web: a session makes the support file beside the install record and records its runs', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'vl-web-support-'));
+  try {
+    const configFile = join(dir, 'valuelens-setup.json');
+    const ui = createWebUi();
+    const s = createSession({ ui, configFile, version: '9.9.9', connect: /** @type {any} */ (async () => { throw new Error('no'); }) });
+    const out = await s.supportBundle({ now: new Date(Date.UTC(2026, 0, 2, 3, 4, 5)) });
+    assert.equal(out.fileName, 'valuelens-support-20260102-030405.zip');
+    assert.ok(existsSync(join(dir, out.fileName)));
+    assert.deepEqual(out.files.map((/** @type {any} */ f) => f.name).slice(0, 2), ['README.txt', 'manifest.json']);
+    assert.ok(out.zipBase64.length > 100);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

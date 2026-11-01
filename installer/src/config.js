@@ -228,6 +228,7 @@ export const REPORT_NAME = PRODUCT.fabric.report;
  * @property {PaxTask} [task]  The scheduled task.
  * @property {boolean} [agent365]  Also export the Agent 365 registry.
  * @property {number} [seedDays]  How many days the first refresh asks PAX for.
+ * @property {number} [seats]  Copilot seats assigned when the installer last checked, which size PAX's audit searches.
  * @property {string} [scriptsHash]  What the installed scripts were copied from.
  * @property {FirstRun} [firstRun]  The first refresh, from when the installer starts it until a refresh succeeds.
  * @property {boolean} [deployApp]  Deploy the app. On when absent.
