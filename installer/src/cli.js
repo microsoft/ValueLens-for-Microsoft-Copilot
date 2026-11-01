@@ -12,6 +12,8 @@ import { adoptUploadedRecord, cloudShellKeepsFiles, cloudShellRecordMessage, com
 import { PRODUCT } from './product.js';
 import { runWizard } from './server.js';
 import { loadSources } from './sources.js';
+import { checkPrereqs } from './prereqs.js';
+import { attachRunLog, createSupportBundle, runLogFile } from './support.js';
 import { recordWorkspaceGone, staleRecordMessage } from './steps/fabric.js';
 import { isResumeLater, MAX_SECRET_DAYS, NOTEBOOK_SECRET_DAYS } from './steps/identity.js';
 import { isManagementGroupId, managementGroupId } from './steps/resource-graph.js';
@@ -96,7 +98,14 @@ Options:
                        Shell, run ${AZ_LOGIN} first
   --backfill-days <n>  With run: reload n days of audit history. Fabric rebuilds the curated
                        table; PAX adds the days to the SharePoint folder's files
-  --out <dir>          With preview: where to write (default ./valuelens-preview)
+  --out <dir>          With preview: where to write (default ./valuelens-preview). With
+                       --support-bundle: the folder for the support file (default: this folder)
+  --support-bundle     Write a support file to email us when something goes wrong: one zip of
+                       text files you can read first, with secrets removed and people's names
+                       hashed. Add --use-az or --device-code to include live run statuses
+  --log <file>         With --support-bundle: also summarise this collector or PAX log. Repeat it
+                       for more than one
+  --offline            With --support-bundle: don't sign in; use only the files on this PC
   --yes                Take saved answers and defaults without asking. It never lets Fabric clear a
                        model's data: add --allow-model-reset for that
   --no-wait            Don't wait for the first load or a refresh to finish
@@ -187,10 +196,18 @@ export function parseCli(argv, env = process.env) {
       'allow-model-reset': { type: 'boolean' },
       'environment-id': { type: 'string' },
       folder: { type: 'string' },
+      'support-bundle': { type: 'boolean' },
+      log: { type: 'string', multiple: true },
+      offline: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
     },
   });
+  const supportBundle = !!values['support-bundle'];
+  if (supportBundle && (positionals.length || values['dry-run'])) throw new Error('--support-bundle runs on its own. Leave out the command.');
+  if (supportBundle && values.ui) throw new Error('With --ui, use "Having trouble? Create a support file" at the foot of the page.');
+  if (!supportBundle && (values.log?.length || values.offline)) throw new Error(`${values.log?.length ? '--log' : '--offline'} goes with --support-bundle.`);
+  if (values.offline && (values['use-az'] || values['device-code'])) throw new Error(`--offline doesn't sign in, so leave out ${values['use-az'] ? '--use-az' : '--device-code'}.`);
   const command = values['dry-run'] ? 'preview' : positionals[0] ?? 'install';
   const files = command === 'upload' ? positionals.slice(1) : [];
   if (command !== 'upload' && positionals.length > 1) throw new Error(`Unexpected argument: ${positionals[1]}`);
@@ -280,7 +297,12 @@ export function parseCli(argv, env = process.env) {
     method: /** @type {'browser' | 'device-code' | 'azure-cli'} */ (values['use-az'] ? 'azure-cli' : values['device-code'] || cloudShell ? 'device-code' : 'browser'),
     cloudShell,
     backfillDays,
-    outDir: values.out ?? 'valuelens-preview',
+    outDir: values.out ?? (supportBundle ? '.' : 'valuelens-preview'),
+    supportBundle,
+    // The support file signs in only when asked to: without a flag it uses the files on this PC.
+    signInForSupport: !values.offline && (!!values['use-az'] || !!values['device-code']),
+    offline: !!values.offline,
+    supportLogs: (values.log ?? []).map((f) => resolve(f)),
     yes: !!values.yes,
     wait: !values['no-wait'],
     ui: !!values.ui,
@@ -355,11 +377,50 @@ export async function startFresh(o) {
 }
 
 /**
+ * --support-bundle: writes the support file. It signs in only with --use-az or --device-code, and
+ * makes the file from the files on this PC when it can't.
+ * @param {ReturnType<typeof parseCli>} args
+ * @param {((m: string) => void) | undefined} debug
+ * @returns {Promise<number>}
+ */
+async function supportBundle(args, debug) {
+  const ui = createUi({ yes: true });
+  ui.line(c.bold(`${PRODUCT.name} installer ${version()}`));
+  /** @type {import('./support.js').Live | null} */
+  let live = null;
+  if (args.signInForSupport) {
+    try {
+      const { config } = loadConfig(args.configFile);
+      ui.note(args.method === 'azure-cli' ? 'Using your Azure CLI sign-in…' : 'Signing in…');
+      const { api, user } = await connect({ tenantId: args.tenantId ?? config.tenantId, method: args.method, ui, debug });
+      const sources = loadSources(args.sourceDir);
+      live = { api, user, checkPrereqs: () => checkPrereqs({ api, user, config, sources }) };
+    } catch (err) {
+      ui.warn(`Couldn't sign in (${/** @type {any} */ (err)?.message ?? err}). The support file has what's on this PC.`);
+    }
+  } else ui.note(args.offline ? 'Making the support file from the files on this PC (--offline).' : 'Making the support file from the files on this PC. Add --use-az or --device-code to include live run statuses and row counts.');
+  const out = await createSupportBundle({
+    configFile: args.configFile,
+    version: version(),
+    live,
+    outDir: args.outDir,
+    logs: args.supportLogs,
+    ...(args.offline ? { offline: 'Offline: --offline skipped the sign-in, so this was made from the files on this PC.' } : {}),
+  });
+  ui.ok(`Support file: ${out.path}`);
+  for (const f of out.files) ui.info(`  ${f.name} (${Buffer.byteLength(f.text)} bytes)`);
+  ui.note('It\'s plain text, with secrets removed and people\'s names hashed. Open the zip to check it, then email it to us.');
+  return 0;
+}
+
+/**
  * @param {string[]} argv
  * @returns {Promise<number>} Exit code.
  */
 export async function main(argv) {
   let verbose = false;
+  /** @type {ReturnType<typeof attachRunLog> | undefined} */
+  let runLog;
   try {
     const args = parseCli(argv);
     verbose = args.verbose;
@@ -372,11 +433,16 @@ export async function main(argv) {
       return 0;
     }
     const debug = verbose ? (/** @type {string} */ m) => process.stderr.write(`${c.dim(m)}\n`) : undefined;
+    if (args.supportBundle) return await supportBundle(args, debug);
     if (args.ui) {
       await runWizard({ configFile: args.configFile, sourceDir: args.sourceDir, tenantId: args.tenantId, method: args.method, open: args.open, version: version(), debug });
       return 0;
     }
     const ui = createUi({ yes: args.yes });
+    if (args.command !== 'preview') {
+      runLog = attachRunLog(ui, runLogFile(args.configFile));
+      runLog.begin(args.command);
+    }
     const uploaded = args.cloudShell && args.command !== 'prereqs' ? adoptUploadedRecord(args.configFile) : undefined;
     const loaded = loadConfig(args.configFile);
     let config = loaded.config;
@@ -409,6 +475,7 @@ export async function main(argv) {
       debug,
       checkTokens: args.cloudShell && args.method === 'azure-cli',
     });
+    runLog?.signedIn(user);
     if (existed && args.command !== 'prereqs' && (await startFresh({ ui, config, file: args.configFile, fabric: api.fabric, tenantId: user.tenantId, command: args.command }))) {
       config = loadConfig(args.configFile).config;
       // The old record's route went with it.
@@ -426,6 +493,8 @@ export async function main(argv) {
     if (args.secretDays) config.app.secretDays = args.secretDays;
     try {
       const ok = await runCommand(ctx, args.command, { wait: args.wait, backfillDays: args.backfillDays, files: args.files, run: args.run, folder: args.folder });
+      runLog?.end(ok);
+      if (!ok) ui.note(`Need help? Run "${commandLine('--support-bundle')}" and email us the support file it writes.`);
       return ok ? 0 : 1;
     } finally {
       // Also after a failure part way: the record is what lets the next run carry on.
@@ -434,18 +503,22 @@ export async function main(argv) {
   } catch (err) {
     const e = /** @type {any} */ (err);
     if (e?.name === 'ExitPromptError') {
+      runLog?.end(false, 'Cancelled.');
       process.stderr.write('\nCancelled.\n');
       return 130;
     }
     if (isResumeLater(e)) {
+      runLog?.end(true);
       process.stderr.write(`\n${c.yellow('!')} ${e.message}\n`);
       return 0;
     }
+    runLog?.end(false, e);
     if (/device_code_expired|expired_token|code_expired/i.test(String(e?.message ?? e?.errorCode ?? ''))) {
       process.stderr.write(`\n${c.red('✗')} The sign-in code expired before it was used. Run the installer again and enter the new code within 15 minutes.\n`);
       return 1;
     }
     process.stderr.write(`\n${c.red('✗')} ${e?.message ?? String(err)}\n`);
+    if (runLog) process.stderr.write(`${c.dim(`Need help? Run "${commandLine('--support-bundle')}" and email us the support file it writes.`)}\n`);
     if (verbose && err instanceof HttpError && err.body) process.stderr.write(`${c.dim(JSON.stringify(err.body, null, 2))}\n`);
     else if (verbose && e?.stack) process.stderr.write(`${c.dim(e.stack)}\n`);
     return 1;

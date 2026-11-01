@@ -551,6 +551,8 @@ installed.
 
 ## Troubleshooting
 
+<sub>Stuck? Create a support file and email it to us: run the installer with `--support-bundle`, or use **Having trouble? Create a support file** at the foot of its page.</sub>
+
 - **"Release valuelens-installer-v… is no longer available".** That `install.ps1` is pinned to a
   release whose zip has gone. Get the current release's command from the
   [installer releases](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases?q=valuelens-installer-v).
@@ -631,7 +633,10 @@ started with: `& $env:LOCALAPPDATA\ValueLens\valuelens.cmd status`,
 | `--device-code` | Sign in with a code on another device instead of a browser. The default in Azure Cloud Shell |
 | `--use-az` | Use the account you're signed in to with the Azure CLI. In Cloud Shell, run `az login --use-device-code` first |
 | `--backfill-days <n>` | With `run`: reload `n` days of audit history, 1 to 180 |
-| `--out <dir>` | With `preview`: where to write (default `./valuelens-preview`) |
+| `--out <dir>` | With `preview`: where to write (default `./valuelens-preview`). With `--support-bundle`: the folder for the support file (default: this folder) |
+| `--support-bundle` | Write `valuelens-support-<UTC time>.zip` to email us: plain-text files with secrets removed and people's names hashed. Uses the files on this PC; add `--use-az` or `--device-code` for live run statuses and row counts |
+| `--log <file>` | With `--support-bundle`: a collector or PAX log to summarise (429s, 401s, time-outs, windows). Repeat for more |
+| `--offline` | With `--support-bundle`: don't sign in; use only the files on this PC |
 | `--yes` | Take saved answers and defaults without asking. It never lets Fabric clear a model's data: add `--allow-model-reset` for that |
 | `--no-wait` | Don't wait for the first load or a refresh to finish |
 | `--verbose` | Print each API call |
