@@ -874,7 +874,7 @@ score = 60 × min(median tasks per active week ÷ 30, 1) + 40 × min(median acti
   Their reclaim value is dormant seats × Monthly Licence Cost, which defaults to 0 (not costed).
 - **License Allocation** ranks organisations by unlicensed sessions per person per week, then by
   active unlicensed users.
-- **Heavy users without a licence** (Fabric App) splits everyone active in the last full month by
+- **Heavy users without a license** (Fabric App) splits everyone active in the last full month by
   habit, using the same active-day bands as [Habit Formation](#habit-formation-has-it-become-a-habit),
   and by licence. Anyone with any licensed activity that month counts as licensed. It then lists
   the ten unlicensed people active on the most days, among those active on 11 or more. Shares
