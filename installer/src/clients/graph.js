@@ -1,0 +1,384 @@
+// @ts-check
+/** Microsoft Graph calls for the app registration and the signed-in user's roles. */
+import { GRAPH_APP_ID } from '../catalog.js';
+import { HttpError } from '../http.js';
+import { PRODUCT } from '../product.js';
+
+/** Directory roles that can grant admin consent for Microsoft Graph application permissions. */
+export const CONSENT_ROLES = {
+  '62e90394-69f5-4237-9190-012177145e10': 'Global Administrator',
+  'e8611ab8-c189-46e8-94e1-60213ab1f814': 'Privileged Role Administrator',
+};
+
+/** Roles that can create app registrations even when users can't. */
+export const APP_ROLES = {
+  '9b895d92-2cd3-44c7-9d02-a6ac2d5ea5c3': 'Application Administrator',
+  '158c047a-c907-4556-b7ef-446551a6b5f7': 'Cloud Application Administrator',
+};
+
+/** Roles that can give an app access to one SharePoint site (Sites.Selected). */
+export const SITE_ADMIN_ROLES = {
+  '62e90394-69f5-4237-9190-012177145e10': 'Global Administrator',
+  'f28a1f50-f6e7-4571-818b-6a12f2af6b6c': 'SharePoint Administrator',
+};
+
+export const FABRIC_ADMIN_ROLE = 'a9ea8996-122f-4c74-9520-8edcd192826c';
+export const GLOBAL_READER_ROLE = 'f2ef992c-3afb-46b9-b7cf-a126ee74c451';
+export const AI_ADMIN_ROLE = 'd2562ede-74db-457e-a7b6-544e236ebb61';
+export const POWER_PLATFORM_ADMIN_ROLE = '11648597-926c-4cf3-9c36-bcebb0ba8dcc';
+
+/**
+ * Maps permission names to Graph app role IDs. A missing required permission is an
+ * error; a missing optional one is returned in `missing` so the caller can warn.
+ * @param {{ appRoles: { id: string, value: string }[] }} graphSp
+ * @param {string[]} permissions
+ * @param {string[]} [optional]  Names that may be absent in some tenants (e.g. preview permissions).
+ */
+export function resolveAppRoles(graphSp, permissions, optional = []) {
+  const byValue = new Map(graphSp.appRoles.map((r) => [r.value, r.id]));
+  const absent = permissions.filter((p) => !byValue.has(p));
+  const fatal = absent.filter((p) => !optional.includes(p));
+  if (fatal.length) throw new Error(`Microsoft Graph in this tenant has no application permission named ${fatal.join(', ')}.`);
+  const roles = permissions.filter((p) => byValue.has(p)).map((p) => ({ value: p, id: /** @type {string} */ (byValue.get(p)) }));
+  return { roles, missing: absent };
+}
+
+/**
+ * The Graph application permissions (app role IDs) an app registration lists on its API permissions page.
+ * @param {{ requiredResourceAccess?: { resourceAppId: string, resourceAccess: { id: string, type: string }[] }[] }} application
+ * @returns {Set<string>}
+ */
+export function declaredGraphRoles(application) {
+  return new Set((application.requiredResourceAccess ?? [])
+    .filter((r) => r.resourceAppId === GRAPH_APP_ID)
+    .flatMap((r) => (r.resourceAccess ?? []).filter((a) => a.type === 'Role').map((a) => a.id)));
+}
+
+/**
+ * Direct admin-consent link. Entra may show a reply-address error after approval
+ * because the app has no redirect URI; the consent still applies.
+ * @param {string} tenantId
+ * @param {string} appId
+ */
+export function adminConsentUrl(tenantId, appId) {
+  return `https://login.microsoftonline.com/${tenantId}/adminconsent?client_id=${appId}`;
+}
+
+/**
+ * The app's "API permissions" page in the Entra admin center, with the
+ * "Grant admin consent" button.
+ * @param {string} appId
+ */
+export function apiPermissionsUrl(appId) {
+  return `https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/CallAnAPI/appId/${appId}`;
+}
+
+/**
+ * Entra takes a little while to replicate a new app and service principal, so
+ * "not found" style 400/404 answers are retried for up to two minutes.
+ * @type {import('../http.js').RequestOptions}
+ */
+const replicationRetry = {
+  maxRetries: 20,
+  maxWaitMs: 120_000,
+  retryIf: (status, data) => (status === 400 || status === 404) && !/already exists/i.test(JSON.stringify(data ?? '')),
+};
+
+/** @param {import('../http.js').HttpClient} http */
+export function graphApi(http) {
+  /** @param {string} path */
+  async function getOrNull(path) {
+    try {
+      return await http.get(path);
+    } catch (err) {
+      if (err instanceof HttpError && err.status === 404) return null;
+      throw err;
+    }
+  }
+
+  /** @param {string} path @param {string} objectId */
+  async function addRef(path, objectId) {
+    try {
+      await http.post(path, { '@odata.id': `https://graph.microsoft.com/v1.0/directoryObjects/${objectId}` });
+      return true;
+    } catch (err) {
+      if (err instanceof HttpError && err.status === 400 && /already exist/i.test(JSON.stringify(err.body ?? err.message))) return false;
+      throw err;
+    }
+  }
+
+  return {
+    me: () => http.get('/me', { query: { $select: 'id,displayName,userPrincipalName' } }),
+    organization: async () => (await http.get('/organization', { query: { $select: 'id,displayName' } })).value?.[0],
+    /** @returns {Promise<{ roleTemplateId: string, displayName: string }[]>} */
+    myDirectoryRoles: () =>
+      http.list('/me/transitiveMemberOf/microsoft.graph.directoryRole', { query: { $select: 'roleTemplateId,displayName' } }),
+    /**
+     * A principal's tenant-wide directory role assignments.
+     * @param {string} principalId
+     * @returns {Promise<{ id: string, roleDefinitionId: string, directoryScopeId?: string }[]>}
+     */
+    directoryRoleAssignments: (principalId) =>
+      http.list('/roleManagement/directory/roleAssignments', { query: { $filter: `principalId eq '${principalId}'`, $select: 'id,roleDefinitionId,directoryScopeId' } }),
+    /**
+     * Gives a principal a directory role across the tenant.
+     * @param {string} principalId
+     * @param {string} roleDefinitionId
+     */
+    assignDirectoryRole: (principalId, roleDefinitionId) =>
+      http.post('/roleManagement/directory/roleAssignments', { principalId, roleDefinitionId, directoryScopeId: '/' }, replicationRetry),
+    /** Whether ordinary users may register apps. */
+    usersCanRegisterApps: async () => {
+      const policy = await http.get('/policies/authorizationPolicy');
+      return policy?.defaultUserRolePermissions?.allowedToCreateApps !== false;
+    },
+    /** IDs of the groups the signed-in user is in, directly or through other groups. */
+    myGroupIds: async () =>
+      (await http.list('/me/transitiveMemberOf/microsoft.graph.group', { query: { $select: 'id' } })).map((g) => String(g.id)),
+    /** @returns {Promise<{ skuPartNumber?: string, servicePlans?: { servicePlanName: string, provisioningStatus: string }[] }[]>} */
+    myLicenseDetails: () => http.list('/me/licenseDetails'),
+    /** @returns {Promise<{ skuPartNumber?: string, capabilityStatus?: string, consumedUnits?: number, prepaidUnits?: { enabled?: number }, servicePlans?: { servicePlanName: string, provisioningStatus?: string }[] }[]>} */
+    subscribedSkus: () => http.list('/subscribedSkus'),
+    /** The tenant's verified domain names, lower case. */
+    verifiedDomains: async () =>
+      /** @type {{ name?: string }[]} */ ((await http.get('/organization', { query: { $select: 'verifiedDomains' } })).value?.[0]?.verifiedDomains ?? [])
+        .map((d) => String(d.name ?? '').toLowerCase())
+        .filter(Boolean),
+    /**
+     * Directory roles the user could activate through PIM. Only rows for this principal are kept,
+     * whatever the filter returned.
+     * @param {string} principalId
+     * @returns {Promise<{ roleDefinitionId: string, principalId: string }[]>}
+     */
+    myEligibleRoles: async (principalId) =>
+      (await http.list('/roleManagement/directory/roleEligibilityScheduleInstances', {
+        query: { $filter: `principalId eq '${principalId}'`, $select: 'roleDefinitionId,principalId' },
+      })).filter((r) => r.principalId === principalId),
+
+    graphServicePrincipal: () =>
+      http.get(`/servicePrincipals(appId='${GRAPH_APP_ID}')`, { query: { $select: 'id,appId,appRoles' } }),
+    /** @param {string} appId */
+    servicePrincipalByAppId: (appId) =>
+      http.get(`/servicePrincipals(appId='${appId}')`, { query: { $select: 'id,appId,appRoles,oauth2PermissionScopes' } }),
+
+    /** @param {string} appId */
+    findApplication: (appId) => getOrNull(`/applications(appId='${appId}')`),
+    /** @param {string} appId */
+    findServicePrincipal: (appId) => getOrNull(`/servicePrincipals(appId='${appId}')`),
+
+    /**
+     * @param {string} displayName
+     * @param {{ id: string }[]} appRoles
+     */
+    createApplication: (displayName, appRoles) =>
+      http.post('/applications', {
+        displayName,
+        signInAudience: 'AzureADMyOrg',
+        notes: `Created by the ${PRODUCT.installer}. Reads Copilot audit, usage report and directory data for ${PRODUCT.name}.`,
+        requiredResourceAccess: appRoles.length ? [{ resourceAppId: GRAPH_APP_ID, resourceAccess: appRoles.map((r) => ({ id: r.id, type: 'Role' })) }] : [],
+      }),
+    /**
+     * Adds Graph app roles to the app's required permissions, keeping what is there.
+     * @param {any} application
+     * @param {{ id: string }[]} appRoles
+     */
+    async ensureRequiredAccess(application, appRoles) {
+      const current = /** @type {any[]} */ (application.requiredResourceAccess ?? []);
+      const graph = current.find((r) => r.resourceAppId === GRAPH_APP_ID) ?? { resourceAppId: GRAPH_APP_ID, resourceAccess: [] };
+      const have = new Set(graph.resourceAccess.map((/** @type {any} */ a) => a.id));
+      const add = appRoles.filter((r) => !have.has(r.id));
+      if (!add.length) return false;
+      graph.resourceAccess = [...graph.resourceAccess, ...add.map((r) => ({ id: r.id, type: 'Role' }))];
+      const others = current.filter((r) => r.resourceAppId !== GRAPH_APP_ID);
+      await http.patch(`/applications/${application.id}`, { requiredResourceAccess: [...others, graph] });
+      return true;
+    },
+    /**
+     * Takes Graph app roles off the app's required permissions, keeping the rest, and updates
+     * `application` to match. Their admin consent stays until revokeAppRole takes it back.
+     * @param {any} application
+     * @param {{ id: string }[]} appRoles
+     * @returns {Promise<boolean>}  Whether any were there.
+     */
+    async removeRequiredAccess(application, appRoles) {
+      const drop = new Set(appRoles.map((r) => r.id));
+      if (![...declaredGraphRoles(application)].some((id) => drop.has(id))) return false;
+      const current = /** @type {any[]} */ (application.requiredResourceAccess ?? []);
+      const next = current
+        .map((r) => (r.resourceAppId === GRAPH_APP_ID ? { ...r, resourceAccess: r.resourceAccess.filter((/** @type {any} */ a) => !(a.type === 'Role' && drop.has(a.id))) } : r))
+        .filter((r) => r.resourceAppId !== GRAPH_APP_ID || r.resourceAccess.length);
+      await http.patch(`/applications/${application.id}`, { requiredResourceAccess: next });
+      application.requiredResourceAccess = next;
+      return true;
+    },
+
+    /** New apps take a few seconds to replicate, so 400/404 are retried briefly. @param {string} appId */
+    createServicePrincipal: (appId) => http.post('/servicePrincipals', { appId }, replicationRetry),
+
+    /** @param {string} applicationObjectId */
+    deleteApplication: (applicationObjectId) => http.del(`/applications/${applicationObjectId}`),
+
+    /**
+     * @param {string} applicationObjectId
+     * @param {Date} endDateTime
+     * @param {string} [displayName]
+     * @returns {Promise<{ secretText: string, endDateTime: string, keyId: string }>}
+     */
+    addPassword: (applicationObjectId, endDateTime, displayName = PRODUCT.installer) =>
+      http.post(`/applications/${applicationObjectId}/addPassword`, {
+        passwordCredential: { displayName, endDateTime: endDateTime.toISOString() },
+      }, { once: true }),
+    /**
+     * The app's client secrets, without their values.
+     * @param {string} applicationObjectId
+     * @returns {Promise<{ keyId: string, displayName?: string, endDateTime?: string }[]>}
+     */
+    listPasswords: async (applicationObjectId) =>
+      (await http.get(`/applications/${applicationObjectId}`, { query: { $select: 'passwordCredentials' } })).passwordCredentials ?? [],
+    /** @param {string} applicationObjectId @param {string} keyId */
+    removePassword: (applicationObjectId, keyId) => http.post(`/applications/${applicationObjectId}/removePassword`, { keyId }),
+
+    /** A user by UPN or email-style sign-in name. Null when there's no such user. @param {string} upn */
+    getUser: (upn) => getOrNull(`/users/${encodeURIComponent(upn)}?$select=id,displayName,userPrincipalName`),
+
+    /** @param {string} id */
+    getGroup: (id) => getOrNull(`/groups/${encodeURIComponent(id)}?$select=id,displayName,securityEnabled`),
+    /** The first group with this exact display name, or null. @param {string} name */
+    findGroupByName: async (name) =>
+      (await http.list('/groups', { query: { $filter: `displayName eq '${name.replace(/'/g, "''")}'`, $select: 'id,displayName,securityEnabled' } }))[0] ?? null,
+    /**
+     * Creates a security group (not mail-enabled) owned by `ownerId`, the signed-in user. Entra doesn't make an admin
+     * an owner of a security group they create, so the request names them. It does make a user who isn't an admin
+     * one, and Graph refuses a request that names them as well, with 400 "Request contains a property with duplicate
+     * values". Then the group is created without naming them.
+     * @param {{ displayName: string, description: string, ownerId: string }} o
+     */
+    createSecurityGroup: async (o) => {
+      const group = {
+        displayName: o.displayName,
+        description: o.description,
+        mailEnabled: false,
+        mailNickname: o.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || PRODUCT.viewerGroupNickname,
+        securityEnabled: true,
+      };
+      try {
+        return await http.post('/groups', { ...group, 'owners@odata.bind': [`https://graph.microsoft.com/v1.0/users/${o.ownerId}`] });
+      } catch (err) {
+        if (!(err instanceof HttpError) || err.status !== 400 || !/property with duplicate values/i.test(JSON.stringify(err.body ?? err.message))) throw err;
+        // Graph created nothing, so sending it again can't make a second group.
+        return http.post('/groups', group);
+      }
+    },
+    /** Direct members of a group. @param {string} groupId @returns {Promise<{ id: string, displayName?: string, userPrincipalName?: string }[]>} */
+    groupMembers: (groupId) => http.list(`/groups/${groupId}/members`, { query: { $select: 'id,displayName,userPrincipalName' } }),
+    /**
+     * The users in a group, including through nested groups.
+     * @param {string} groupId
+     * @returns {Promise<{ id: string, displayName?: string, userPrincipalName?: string }[]>}
+     */
+    groupUsers: async (groupId) =>
+      (await http.list(`/groups/${groupId}/transitiveMembers`, { query: { $select: 'id,displayName,userPrincipalName' } }))
+        .filter((/** @type {any} */ m) => !m['@odata.type'] || m['@odata.type'] === '#microsoft.graph.user'),
+    /** @param {string} groupId @returns {Promise<{ id: string, displayName?: string, userPrincipalName?: string }[]>} */
+    groupOwners: (groupId) => http.list(`/groups/${groupId}/owners`, { query: { $select: 'id,displayName,userPrincipalName' } }),
+    /** Adds a user or group to a group. Already being a member is fine. @param {string} groupId @param {string} memberId */
+    addGroupMember: (groupId, memberId) => addRef(`/groups/${groupId}/members/$ref`, memberId),
+    /** @param {string} groupId @param {string} ownerId */
+    addGroupOwner: (groupId, ownerId) => addRef(`/groups/${groupId}/owners/$ref`, ownerId),
+    /**
+     * A user by UPN, or else a group by display name.
+     * @param {string} name
+     * @returns {Promise<{ id: string, displayName: string, kind: 'user' | 'group' } | null>}
+     */
+    async resolvePrincipal(name) {
+      if (name.includes('@')) {
+        const user = await getOrNull(`/users/${encodeURIComponent(name)}?$select=id,displayName,userPrincipalName`);
+        if (user) return { id: user.id, displayName: user.userPrincipalName ?? user.displayName, kind: 'user' };
+      }
+      const group = /^[0-9a-f-]{36}$/i.test(name)
+        ? await getOrNull(`/groups/${name}?$select=id,displayName`)
+        : (await http.list('/groups', { query: { $filter: `displayName eq '${name.replace(/'/g, "''")}'`, $select: 'id,displayName' } }))[0];
+      return group ? { id: group.id, displayName: group.displayName, kind: 'group' } : null;
+    },
+
+    /** Makes a user an owner of the app registration. @param {string} applicationObjectId @param {string} userId */
+    addOwner: (applicationObjectId, userId) =>
+      http.post(`/applications/${applicationObjectId}/owners/$ref`, { '@odata.id': `https://graph.microsoft.com/v1.0/directoryObjects/${userId}` }),
+
+    /** @param {string} servicePrincipalId */
+    appRoleAssignments: (servicePrincipalId) => http.list(`/servicePrincipals/${servicePrincipalId}/appRoleAssignments`),
+
+    /**
+     * Grants one application permission (admin consent for that role).
+     * @param {string} resourceId  Graph's service principal ID.
+     * @param {string} principalId  Our app's service principal ID.
+     * @param {string} appRoleId
+     */
+    grantAppRole: (resourceId, principalId, appRoleId) =>
+      http.post(`/servicePrincipals/${resourceId}/appRoleAssignedTo`, { principalId, resourceId, appRoleId }, replicationRetry),
+    /**
+     * Takes back one application permission's admin consent. Needs the same admin as granting it.
+     * @param {string} resourceId  Graph's service principal ID.
+     * @param {string} assignmentId  The app role assignment's ID.
+     */
+    revokeAppRole: (resourceId, assignmentId) => http.del(`/servicePrincipals/${resourceId}/appRoleAssignedTo/${assignmentId}`),
+
+    /**
+     * Admin consent for a delegated scope for all users. Reuses an existing grant, adding the scope if it's missing.
+     * @param {{ clientId: string, resourceId: string, scope: string }} o
+     */
+    async grantOauth2Permission(o) {
+      const existing = /** @type {any[]} */ (await http.list('/oauth2PermissionGrants', { query: { $filter: `clientId eq '${o.clientId}' and resourceId eq '${o.resourceId}'` } }).catch(() => [])).find((g) => g.consentType === 'AllPrincipals');
+      if (!existing) return http.post('/oauth2PermissionGrants', { clientId: o.clientId, consentType: 'AllPrincipals', resourceId: o.resourceId, scope: o.scope }, replicationRetry);
+      const scopes = String(existing.scope ?? '').split(' ').filter(Boolean);
+      if (scopes.includes(o.scope)) return existing;
+      return http.patch(`/oauth2PermissionGrants/${existing.id}`, { scope: [...scopes, o.scope].join(' ') });
+    },
+
+    /** @param {string} principalId @param {string} resourceId @param {string} appRoleId */
+    assignPrincipalToAppRole: (principalId, resourceId, appRoleId) =>
+      http.post(`/servicePrincipals/${resourceId}/appRoleAssignedTo`, { principalId, resourceId, appRoleId }, replicationRetry),
+
+    /** Users, groups and apps assigned to this service principal's app roles. @param {string} resourceId */
+    appRoleAssignedTo: (resourceId) => http.list(`/servicePrincipals/${resourceId}/appRoleAssignedTo`),
+
+    /** A SharePoint site by Graph ID or path form (contoso.sharepoint.com:/sites/Analytics). @param {string} siteId */
+    site: (siteId) => http.get(`/sites/${siteId}`, { query: { $select: 'id,webUrl,displayName' } }),
+
+    /**
+     * Gives an app read on one site, for apps holding Sites.Selected. Needs a SharePoint admin (Sites.FullControl.All).
+     * @param {string} siteId  Graph site ID.
+     * @param {string} appId
+     * @param {string} displayName
+     */
+    grantSiteRead: (siteId, appId, displayName) =>
+      http.post(`/sites/${siteId}/permissions`, { roles: ['read'], grantedToIdentities: [{ application: { id: appId, displayName } }] }),
+
+    /**
+     * Gives an app a role on one site, for apps holding Sites.Selected. Needs a SharePoint admin (Sites.FullControl.All).
+     * @param {string} siteId  Graph site ID.
+     * @param {string} appId
+     * @param {string} displayName
+     * @param {'read' | 'write'} role
+     */
+    grantSitePermission: (siteId, appId, displayName, role) =>
+      http.post(`/sites/${siteId}/permissions`, { roles: [role], grantedToIdentities: [{ application: { id: appId, displayName } }] }, { once: true }),
+
+    /** The apps granted access to one site, without their roles. Needs a SharePoint admin. @param {string} siteId @returns {Promise<any[]>} */
+    sitePermissions: (siteId) => http.list(`/sites/${siteId}/permissions`),
+
+    /** One app's access to a site, with its roles. @param {string} siteId @param {string} permissionId */
+    sitePermission: (siteId, permissionId) => http.get(`/sites/${siteId}/permissions/${permissionId}`),
+
+    /**
+     * Changes one app's role on a site.
+     * @param {string} siteId @param {string} permissionId @param {'read' | 'write'} role
+     */
+    updateSitePermission: (siteId, permissionId, role) => http.patch(`/sites/${siteId}/permissions/${permissionId}`, { roles: [role] }),
+
+    /** Takes back one app's access to a site. @param {string} siteId @param {string} permissionId */
+    deleteSitePermission: (siteId, permissionId) => http.del(`/sites/${siteId}/permissions/${permissionId}`),
+  };
+}
+
+/** @typedef {ReturnType<typeof graphApi>} GraphApi */

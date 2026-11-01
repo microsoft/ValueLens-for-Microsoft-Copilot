@@ -49,7 +49,7 @@ class AuditPassthroughTests(unittest.TestCase):
     def test_guard_precedes_write_and_join_helper_stays_private(self):
         code = sources()
         self.assertLess(code[15].index("validate_passthrough_columns(passthrough_source_columns"),
-                        code[15].index("write_strategy = write_curated_output(fact)"))
+                        code[15].index("write_strategy, PROCESS_PLAN = publish_curated_output(fact, PROCESS_PLAN)"))
         self.assertIn('"__lk_entra", "_NormUPN")', code[11])
         self.assertNotIn('withColumn("Audit_UserId_Norm"', "\n".join(code))
         self.assertIn("if not INCLUDE_RAW_PASSTHROUGH:", code[11])

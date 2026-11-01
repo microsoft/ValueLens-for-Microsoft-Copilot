@@ -159,6 +159,18 @@ export default function App() {
           </nav>
         </div>
       </header>
+      {ds.source === 'sample' && (
+        <div className="sample-banner" role="status">
+          <div className="sample-banner-inner">
+            <p>
+              <strong>Sample data.</strong> These people and agents are made up. To see your organisation, choose Change data and pick your own CSVs.
+            </p>
+            <button type="button" className="link-btn" onClick={() => setSourceOpen(true)}>
+              Change data
+            </button>
+          </div>
+        </div>
+      )}
       <div className="toolbar">
         <div className="toolbar-inner">
           <div className="page-head">

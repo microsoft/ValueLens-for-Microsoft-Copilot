@@ -1,0 +1,10 @@
+{
+  "name": "valuelens-managed-cli",
+  "version": "1.0.0",
+  "description": "Pins the Copilot managed apps CLI that deploys the ValueLens app. The installer runs it with the Node.js it ships.",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "@microsoft/managed-apps-cli": "0.29.0"
+  }
+}

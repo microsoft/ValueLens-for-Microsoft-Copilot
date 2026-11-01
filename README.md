@@ -76,7 +76,7 @@ Full list, by who does what: [Before you start](docs/PREREQUISITES.md) · [Permi
 ```mermaid
 flowchart LR
     start([Start]) --> q{Set it up for me?}
-    q -- "Yes" --> inst["<b>Installer</b><br/>Fabric or Azure"]
+    q -- "Yes" --> inst["<b>Installer</b><br/>Fabric or SharePoint"]
     q -- "No, step by step" --> man["<b>Manual</b><br/>Fabric, SharePoint<br/>or Local CSV"]
     inst --> done(["The app<br/>+ Power BI report"])
     man --> done
@@ -89,19 +89,24 @@ flowchart LR
 
 ## Installer
 
-> A ValueLens installer is [coming soon (#216)](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/pull/216).
-> Until then, use the Analytics Hub installer (work in progress: try a test tenant first).
+> Work in progress: try a test tenant first.
 
 1. **Send each admin** their part of the [checklist](docs/PREREQUISITES.md).
-2. **Download and open** [AnalyticsHubInstaller.exe](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/latest/download/AnalyticsHubInstaller.exe)
-   ([warning?](1.%20Fabric/installer/README.md#check-the-download)). It opens in your browser; keep its window open.
-3. **Choose Set up Analytics Hub** and sign in.
-4. **Answer the questions:** Fabric or Azure, then your data. **No** to advanced settings keeps the defaults.
-5. **Approve the plan.** Nothing is created until you do. Setup takes about 15 minutes.
-6. **Open the app link.** The first data arrives about 25 minutes later.
+2. **Get it.** In PowerShell, no admin rights needed:
 
-More: [Fabric](1.%20Fabric/README.md#installer) · [Azure](2.%20Azure/README.md#install-it) ·
-[installer reference](1.%20Fabric/installer/README.md)
+   ```powershell
+   irm https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/valuelens-installer-v0.1.0/install.ps1 | iex
+   ```
+
+   Or download and open [ValueLensInstaller.exe](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/valuelens-installer-v0.1.0/ValueLensInstaller.exe)
+   ([warning?](docs/INSTALL.md#check-the-download)). It opens in your browser; keep its window open.
+3. **Choose Set up ValueLens** and sign in.
+4. **Answer the questions:** Fabric or **No Fabric: PAX + SharePoint**, then your data. **No** to advanced settings keeps the defaults.
+5. **Approve the plan.** Nothing is created until you do.
+6. **Check the Done page** for your links. The first load can take an hour or more.
+
+More: [Fabric](1.%20Fabric/README.md#installer) · [SharePoint](4.%20SharePoint/README.md#installer) ·
+[installer reference](installer/README.md). Analytics Hub has [its own installer](https://github.com/microsoft/AnalyticsHub-Dashboard), which also covers Azure.
 
 <a id="where-your-data-comes-from"></a>
 <a id="pick-a-path"></a>
@@ -111,7 +116,7 @@ More: [Fabric](1.%20Fabric/README.md#installer) · [Azure](2.%20Azure/README.md#
 1. **Collect the data** with one path:
    **[1. Fabric](1.%20Fabric/)** (recommended) · **[4. SharePoint](4.%20SharePoint/)** ·
    **[5. Local CSV](5.%20Local%20CSV/)** (Power BI Desktop only, sample data included).
-   [2. Azure](2.%20Azure/) is installer only.
+   [2. Azure](2.%20Azure/) is set up by the Analytics Hub installer only.
 2. **[Deploy the app](app/README.md#as-a-copilot-managed-app)** with the `ms` tool, once an admin turns on two settings.
 3. **Share it.** Viewers choose **Change data** and pick [the CSV files](app/README.md#data) from step 1.
 4. **Optional:** publish the Power BI report (every path has it), or [add extras](1.%20Fabric/README.md#optional-extras).
@@ -210,7 +215,7 @@ The first two also need the **Semantic Model Execute Queries REST API** tenant s
 
 <br>
 
-- [Installer](1.%20Fabric/installer/README.md#troubleshooting)
+- [Installer](installer/README.md#troubleshooting)
 - [Fabric notebooks: an audit window keeps failing](1.%20Fabric/Manual%20setup/notebooks/README.md#an-audit-window-keeps-failing)
 - [SharePoint](4.%20SharePoint/README.md#troubleshooting) · [Local CSV](5.%20Local%20CSV/README.md#troubleshooting)
 - [The app](app/README.md#as-a-copilot-managed-app): admin settings, licences and timeouts
@@ -227,7 +232,7 @@ The first two also need the **Semantic Model Execute Queries REST API** tenant s
 - [Before you start](docs/PREREQUISITES.md) · [Permissions](docs/PERMISSIONS.md) ·
   [Analytics Hub app guide](docs/APP-GUIDE.md)
 - [Report interpretation guide (PDF)](docs/ValueLens-Report-Interpretation-Guide.pdf) ·
-  [Installer reference](1.%20Fabric/installer/README.md) (work in progress)
+  [Installer reference](installer/README.md) (work in progress)
 - [What changed](CHANGELOG.md) · [Support](SUPPORT.md) · [Security](SECURITY.md) ·
   [Contributing](CONTRIBUTING.md) · [MIT licence](LICENSE)
 

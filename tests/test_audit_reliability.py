@@ -223,7 +223,18 @@ class AuditReliabilityTests(unittest.TestCase):
             ns.update(namespace)
         ns.setdefault("RUN_DEADLINE", None)
         return exec_named_defs(
-            INGESTER, 8, {"AuditQueryFailed", "BudgetReached", "budget_exhausted", "_read_query_status", "wait_for_query"}, ns
+            INGESTER,
+            8,
+            {
+                "AuditQueryFailed",
+                "BudgetReached",
+                "budget_exhausted",
+                "LONG_THROTTLE",
+                "check_retry_after",
+                "_read_query_status",
+                "wait_for_query",
+            },
+            ns,
         )
 
     def checkpoint_helpers(self, namespace=None):
@@ -243,6 +254,7 @@ class AuditReliabilityTests(unittest.TestCase):
             "AuditQueryFailed": query["AuditQueryFailed"],
             "BudgetReached": query["BudgetReached"],
             "budget_exhausted": query["budget_exhausted"],
+            "LONG_THROTTLE": {},
             "RUN_DEADLINE": None,
             "TIME_BUDGET_MIN": 0,
             "RESUME_QUERY_HOURS": 12,
@@ -676,7 +688,7 @@ class AuditReliabilityTests(unittest.TestCase):
         for token in ["'Id'", "'Source_RecordKey'", "'Source_MessageKey'", "'Source_ResourceKey'"]:
             self.assertIn(token, self.ingester_cell16)
         self.assertIn("MERGE_KEYS       = [\"Id\"]", cells(PROCESSOR)[1])
-        self.assertIn("resolve_write_strategy", self.processor_cell15)
+        self.assertIn("resolve_write_strategy(WRITE_MODE, src_all.columns", cells(PROCESSOR)[3])
         self.assertIn("canonicalize_audit_record", cells(INGESTER)[10])
         self.assertIn("SourceRecordKey", cells(INGESTER)[12])
         self.assertIn("ArrayType", cells(INGESTER)[12])
@@ -684,6 +696,50 @@ class AuditReliabilityTests(unittest.TestCase):
         self.assertIn("res._StableKey", self.ingester_cell16)
         self.assertIn("ambiguous synthetic SourceRecordKey", self.ingester_cell16)
         self.assertIn("dropDuplicates(['Id'])", self.ingester_cell16)
+
+    def _request_with_session(self, statuses, tokens):
+        sent, sleeps = [], []
+
+        class Session:
+            def request(self, method, url, **kwargs):
+                sent.append(dict(kwargs.get("headers") or {}))
+                return type("R", (), {"status_code": statuses.pop(0)})()
+
+        token_iter = iter(tokens)
+        ns = {
+            "SESSION": Session(),
+            "_token": {"value": "t0", "ts": 0.0},
+            "_notify_throttle": lambda: None,
+            "_wait": sleeps.append,
+        }
+        ns["get_headers"] = lambda: {"Authorization": f"Bearer {ns['_token']['value'] or next(token_iter)}"}
+        exec_named_defs(INGESTER, 4, ["_TRANSIENT", "AUTH_RETRY_WAITS_SEC", "_request", "_send"], ns, include_imports=False)
+        return ns, sent, sleeps
+
+    def test_transient_401_gets_a_new_token_and_is_sent_again(self):
+        ns, sent, sleeps = self._request_with_session([401, 401, 200], ["t1", "t2"])
+        r = ns["_request"]("POST", "https://graph.microsoft.com/beta/security/auditLog/queries",
+                           headers={"Authorization": "Bearer t0", "Content-Type": "application/json"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual([h["Authorization"] for h in sent], ["Bearer t0", "Bearer t1", "Bearer t2"])
+        self.assertTrue(all(h["Content-Type"] == "application/json" for h in sent))
+        self.assertEqual(sleeps, list(ns["AUTH_RETRY_WAITS_SEC"][:2]))
+
+    def test_persistent_401_is_returned_after_the_auth_retries(self):
+        waits = 4
+        ns, sent, sleeps = self._request_with_session([401] * (waits + 1), [f"t{i}" for i in range(1, waits + 1)])
+        self.assertEqual(len(ns["AUTH_RETRY_WAITS_SEC"]), waits)
+        r = ns["_request"]("GET", "https://graph.microsoft.com/beta/security/auditLog/queries/q",
+                           headers={"Authorization": "Bearer t0"})
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(len(sent), waits + 1)
+        self.assertEqual(sleeps, list(ns["AUTH_RETRY_WAITS_SEC"]))
+
+    def test_401_without_a_graph_token_is_not_retried(self):
+        ns, sent, sleeps = self._request_with_session([401], [])
+        r = ns["_request"]("POST", "https://login.microsoftonline.com/t/oauth2/v2.0/token", data={})
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual((len(sent), sleeps), (1, []))
 
     def test_wait_for_query_distinguishes_success_failure_and_malformed_status(self):
         responses = iter(
@@ -900,14 +956,16 @@ class AgentIdentityTests(unittest.TestCase):
         self.assertTrue(re.search(pattern, "x@agents.contoso.com"))
         self.assertIsNone(re.search(pattern, "jane@contoso.com"))
 
-    def test_processor_filters_new_rows_and_cleans_merged_ones(self):
+    def test_processor_filters_new_rows_and_rebuilds_when_the_filter_changes(self):
         filter_cell = next(text for text in self.sources if "# 6b. AGENT IDENTITIES" in text)
         self.assertIn("AGENT_IDENTITY_REGEX = agent_identity_regex(EXCLUDE_AGENT_IDENTITIES, AGENT_IDENTITY_PATTERNS)", filter_cell)
         self.assertIn('F.lower(F.col("_NormUPN")).rlike(AGENT_IDENTITY_REGEX)', filter_cell)
         self.assertLess(filter_cell.index('fact = fact.withColumn("_NormUPN", norm)'), filter_cell.index("# 6b."))
-        writer = next(text for text in self.sources if "def write_curated_output" in text)
-        self.assertIn("if AGENT_IDENTITY_REGEX and \"Audit_UserId\" in target_columns:", writer)
-        self.assertIn(".rlike(AGENT_IDENTITY_REGEX))", writer)
+        # Switching the filter on (or changing the patterns) changes the settings
+        # fingerprint, so the next run rebuilds every month and drops rows written before.
+        planner = next(text for text in self.sources if "PROCESSOR_CONFIG = processor_config_fingerprint(" in text)
+        self.assertIn('"exclude_agent_identities": bool(EXCLUDE_AGENT_IDENTITIES)', planner)
+        self.assertIn('"agent_identity_patterns": list(AGENT_IDENTITY_PATTERNS or [])', planner)
 
 
 class FakeAuditGraph:
@@ -1088,6 +1146,229 @@ class FailedWindowRecoveryTests(unittest.TestCase):
             helpers["fetch_windows"]([self.WIN, self.NEXT])
         self.assertEqual(graph.created, [])
 
+    def test_throttled_run_stops_at_the_budget_instead_of_waiting_for_a_slot(self):
+        # A live 30-day backfill hung for the whole 2 h activity timeout: Purview throttled the
+        # audit searches, one window sat in retry waits and the rest waited for a limiter slot.
+        helpers, graph = self.run_helpers(lambda *a: "succeeded")
+        budget = helpers["BudgetReached"]
+        deadline = time.monotonic() + 0.3
+
+        def check():
+            if time.monotonic() >= deadline:
+                raise budget("Time budget reached while waiting on the audit service")
+
+        def throttled_create(ws, we):
+            while True:  # every request keeps getting HTTP 429; each retry wait checks the budget
+                check()
+                time.sleep(0.01)
+
+        helpers["create_query"] = throttled_create
+        helpers["QUERY_LIMITER"] = helpers["AdaptiveLimiter"](1, 1, check=check)
+        started = time.monotonic()
+        with self.assertRaisesRegex(RuntimeError, "Time budget of .* reached with 2 audit window"):
+            helpers["fetch_windows"]([self.WIN, self.NEXT])
+        self.assertLess(time.monotonic() - started, 10)
+        manifest = helpers["_load_manifest"]()
+        self.assertEqual({manifest[self.key(helpers, w)]["status"] for w in (self.WIN, self.NEXT)}, {"waiting"})
+
+    def test_limiter_wait_ends_when_the_check_raises(self):
+        limiter = self.ingester_helpers()["AdaptiveLimiter"](1, 1, check=lambda: None)
+        stop = [False]
+
+        def check():
+            if stop[0]:
+                raise TimeoutError("budget")
+
+        limiter._check = check
+        with limiter:
+            result = []
+
+            def waiter():
+                try:
+                    with limiter:
+                        result.append("entered")
+                except TimeoutError:
+                    result.append("stopped")
+
+            thread = threading.Thread(target=waiter)
+            thread.start()
+            stop[0] = True
+            thread.join(15)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(result, ["stopped"])
+        self.assertEqual(limiter.active, 0)
+
+    def test_http_retry_waits_stop_at_the_budget(self):
+        from urllib3.util.retry import Retry
+
+        ns = exec_named_defs(
+            INGESTER,
+            4,
+            {
+                "THROTTLE_LISTENERS",
+                "BUDGET_CHECKS",
+                "RETRY_AFTER_CHECKS",
+                "_check_retry_after",
+                "_notify_throttle",
+                "_wait",
+                "_ThrottleAwareRetry",
+            },
+            {"Retry": Retry},
+        )
+
+        class Spent(Exception):
+            pass
+
+        calls = []
+
+        def spent():
+            calls.append(1)
+            if len(calls) > 1:
+                raise Spent()
+
+        ns["BUDGET_CHECKS"][:] = [spent]
+        retry = ns["_ThrottleAwareRetry"](total=3, status_forcelist=(429,), respect_retry_after_header=True)
+        response = type(
+            "Resp", (), {"status": 429, "headers": {"Retry-After": "3600"}, "getheader": lambda self, name: "3600"}
+        )()
+        started = time.monotonic()
+        with self.assertRaises(Spent):
+            retry.sleep(response)  # urllib3 would sleep the full hour the service asked for
+        self.assertLess(time.monotonic() - started, 10)
+        ns["BUDGET_CHECKS"].clear()
+        ns["_wait"](0)
+
+    def test_retry_after_longer_than_the_time_left_stops_at_once(self):
+        query = self.query_helpers({"RUN_DEADLINE": 1000.0})
+        query["check_retry_after"](600, now=0.0)  # 10 min asked, ~16 min left: wait it out
+        self.assertEqual(query["LONG_THROTTLE"], {})
+        with self.assertRaisesRegex(query["BudgetReached"], "asked to wait 60 min, longer than the 17 min left"):
+            query["check_retry_after"](3600, now=0.0)
+        self.assertEqual(query["LONG_THROTTLE"], {"seconds": 3600.0})
+        unbounded = self.query_helpers({"RUN_DEADLINE": None})
+        unbounded["check_retry_after"](86400)
+
+    def http_layer(self, namespace=None):
+        from urllib3.util.retry import Retry
+
+        ns = {"Retry": Retry, "SESSION": None, "_token": {"value": None}, "get_headers": lambda: {}}
+        ns.update(namespace or {})
+        return exec_named_defs(
+            INGESTER,
+            4,
+            {
+                "THROTTLE_LISTENERS",
+                "BUDGET_CHECKS",
+                "RETRY_AFTER_CHECKS",
+                "_wait",
+                "_check_retry_after",
+                "_retry_after_seconds",
+                "_notify_throttle",
+                "_ThrottleAwareRetry",
+                "_TRANSIENT",
+                "AUTH_RETRY_WAITS_SEC",
+                "_request",
+                "_send",
+            },
+            ns,
+        )
+
+    def test_urllib3_retry_stops_before_sleeping_a_long_retry_after(self):
+        ns = self.http_layer()
+
+        class TooLong(Exception):
+            pass
+
+        asked = []
+
+        def refuse(seconds):
+            asked.append(seconds)
+            raise TooLong()
+
+        ns["RETRY_AFTER_CHECKS"][:] = [refuse]
+        retry = ns["_ThrottleAwareRetry"](total=3, status_forcelist=(429,), respect_retry_after_header=True)
+        response = type(
+            "Resp", (), {"status": 429, "headers": {"Retry-After": "3600"}, "getheader": lambda self, name: "3600"}
+        )()
+        started = time.monotonic()
+        with self.assertRaises(TooLong):
+            retry.sleep(response)
+        self.assertLess(time.monotonic() - started, 1)
+        self.assertEqual(asked, [3600])
+
+    def test_outer_retry_stops_on_a_long_retry_after_but_not_on_the_last_attempt(self):
+        class TooLong(Exception):
+            pass
+
+        class Throttled:
+            status_code = 429
+            headers = {"Retry-After": "7200"}
+
+        class Session:
+            calls = 0
+
+            def request(self, *a, **k):
+                Session.calls += 1
+                return Throttled()
+
+        ns = self.http_layer({"SESSION": Session(), "print": lambda *a, **k: None})
+        asked = []
+
+        def refuse(seconds):
+            asked.append(seconds)
+            raise TooLong()
+
+        ns["RETRY_AFTER_CHECKS"][:] = [refuse]
+        with self.assertRaises(TooLong):
+            ns["_send"]("POST", "https://graph.microsoft.com/beta/security/auditLog/queries", attempts=5)
+        self.assertEqual((Session.calls, asked), (1, [7200.0]))
+
+        # With no check registered, or a Retry-After that isn't a number, the old waits apply.
+        ns["RETRY_AFTER_CHECKS"].clear()
+        Throttled.headers = {"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}
+        self.assertIsNone(ns["_retry_after_seconds"](Throttled()))
+        Session.calls = 0
+        waits = []
+        ns["_wait"] = waits.append
+        self.assertEqual(ns["_send"]("GET", "https://x/y", attempts=3).status_code, 429)
+        self.assertEqual((Session.calls, waits), (3, [2, 4]))
+
+    def test_stop_on_a_long_retry_after_explains_the_throttling(self):
+        query = self.query_helpers({"RUN_DEADLINE": time.monotonic() + 600})
+        helpers, graph = self.run_helpers(
+            lambda *a: "succeeded",
+            TIME_BUDGET_MIN=90,
+            RUN_DEADLINE=query["RUN_DEADLINE"],
+            BudgetReached=query["BudgetReached"],
+            LONG_THROTTLE=query["LONG_THROTTLE"],
+        )
+
+        def throttled_create(ws, we):
+            query["check_retry_after"](3 * 3600)
+
+        helpers["create_query"] = throttled_create
+        started = time.monotonic()
+        with self.assertRaises(RuntimeError) as caught:
+            helpers["fetch_windows"]([self.WIN, self.NEXT])
+        self.assertLess(time.monotonic() - started, 10)
+        message = str(caught.exception)
+        self.assertIn("Time budget of 90 min reached with 2 audit window(s) still to fetch", message)
+        self.assertIn("asked to wait 180 min, longer than the time left, so the run stopped now", message)
+        self.assertIn("about 200 audit searches per tenant in 24 hours", message)
+        self.assertEqual(graph.created, [])
+
+    def test_budget_stop_without_a_long_retry_after_says_nothing_about_throttling(self):
+        helpers, _ = self.run_helpers(lambda *a: "succeeded", RUN_DEADLINE=time.monotonic() - 1, TIME_BUDGET_MIN=1)
+        with self.assertRaises(RuntimeError) as caught:
+            helpers["fetch_windows"]([self.WIN])
+        self.assertNotIn("throttling", str(caught.exception))
+
+    def test_http_layer_waits_only_through_the_budget_aware_sleep(self):
+        source = cells(INGESTER)[4]
+        self.assertNotIn("time.sleep(wait)", source)
+        self.assertEqual(source.count("_wait(wait)"), 3)
+        self.assertIn("def sleep(self, response=None):", source)
+
     def seed_waiting(self, helpers, created_at, qid="old-q"):
         key = self.key(helpers, self.WIN)
         helpers["_mark_window"](key, "waiting", query_id=qid, query_created_at=created_at.isoformat())
@@ -1264,9 +1545,14 @@ class FailedWindowRecoveryTests(unittest.TestCase):
     def test_main_loop_wires_the_gap_guard_limiter_and_throttle_hook(self):
         source = cells(INGESTER)[10]
         self.assertIn("if MODE == 'incremental' and not ALLOW_UNRECOVERED_GAPS:", source)
-        self.assertIn("QUERY_LIMITER = AdaptiveLimiter(MAX_CONCURRENT_QUERIES, MIN_CONCURRENT_QUERIES)", source)
+        self.assertIn(
+            "QUERY_LIMITER = AdaptiveLimiter(MAX_CONCURRENT_QUERIES, MIN_CONCURRENT_QUERIES, check=check_budget)", source
+        )
         self.assertIn("THROTTLE_LISTENERS[:] = [", source)
-        self.assertIn("ACTIVE_WINDOW_KEYS, total = fetch_windows(windows)", source)
+        self.assertIn("BUDGET_CHECKS[:] = [check_budget]", source)
+        self.assertIn("RETRY_AFTER_CHECKS[:] = [check_retry_after]", source)
+        self.assertIn("RETRY_AFTER_CHECKS.clear()", source)
+        self.assertIn("ACTIVE_WINDOW_KEYS, total = fetch_windows(windows)\nfinally:\n    BUDGET_CHECKS.clear()", source)
         self.assertNotIn("as_completed", source)
 
 

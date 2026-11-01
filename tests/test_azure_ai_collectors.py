@@ -5,11 +5,14 @@ import ast
 import csv
 import importlib.util
 import json
+import re
 from datetime import date
 
 import pytest
 
 import notebook_source
+from valuelens_jobs.collect import azure_ai as jobs_azure_ai
+from valuelens_jobs.sample import AZURE_SAMPLES
 
 ROOT = notebook_source.ROOT
 NOTEBOOK = "credit-consumption/Ingest_Azure_AI.ipynb"
@@ -77,7 +80,8 @@ def test_notebook_writes_every_new_table_with_matching_schema():
     for table, constant in (("azure_deployment_health", "HEALTH"), ("azure_solution_spend", "SOLUTION"),
                             ("azure_billing_reconciliation", "RECON")):
         assert f'LAKEHOUSE_{constant} = "{table}"' in " ".join(source.split())
-        assert f"saveAsTable(LAKEHOUSE_{constant})" in source
+        assert re.search(rf"write_windows\(\[\(spark\.createDataFrame\(\w+, schema={constant}_SCHEMA\), "
+                         rf"LAKEHOUSE_{constant},", source)
         schema = source.split(f'{constant}_SCHEMA = (', 1)[1].split(")\n", 1)[0]
         columns = [part.split()[0] for part in "".join(ast.literal_eval(f"({schema})")).split(", ")]
         assert columns == NOTEBOOK_NS[f"{constant}_HEADERS"]
@@ -349,3 +353,173 @@ def test_retail_prices_never_leave_the_public_host():
         CSV_MODULE.retail_prices(["not-a-uuid'"], "USD", fetch)
     with pytest.raises(CSV_MODULE.CollectionError):
         CSV_MODULE.retail_prices([meter], "usd'", fetch)
+
+
+# ---------------------------------------------------------------- reloads keep older rows
+JUNE_12, JUNE_END = date(2026, 6, 12), date(2026, 6, 30)
+SUBSCRIPTION = "11111111-1111-1111-1111-111111111111"
+SPEND_CSV, TOKENS_CSV, INVENTORY_CSV = "AzureAiSpendDaily.csv", "AzureAiTokensDaily.csv", "AzureAiDeployments.csv"
+HEALTH_CSV, SOLUTION_CSV, RECON_CSV = "AzureDeploymentHealth.csv", "AzureSolutionSpend.csv", "AzureBillingReconciliation.csv"
+CSV_HEADERS = {SPEND_CSV: CSV_MODULE.SPEND_HEADERS, TOKENS_CSV: CSV_MODULE.TOKEN_HEADERS,
+               INVENTORY_CSV: CSV_MODULE.DEPLOYMENT_HEADERS, HEALTH_CSV: CSV_MODULE.HEALTH_HEADERS,
+               SOLUTION_CSV: CSV_MODULE.SOLUTION_HEADERS, RECON_CSV: CSV_MODULE.RECON_HEADERS}
+
+
+@pytest.fixture(params=["notebook", "csv", "jobs"])
+def replace_from(request):
+    return {"notebook": NOTEBOOK_NS, "csv": vars(CSV_MODULE),
+            "jobs": vars(jobs_azure_ai)}[request.param]["monthly_replace_from"]
+
+
+@pytest.mark.parametrize("start, stored, expected", [
+    (date(2026, 6, 1), [(JUNE_END, JUNE_END)], date(2026, 6, 1)),  # the window covers all of June
+    (JUNE_12, [], date(2026, 6, 1)),  # nothing stored for June
+    (JUNE_12, [(JUNE_END, JUNE_END), (JUNE_END, JUNE_END)], date(2026, 7, 1)),  # stored after June ended
+    (JUNE_12, [(JUNE_END, JUNE_END), (JUNE_END, date(2026, 6, 20))], date(2026, 6, 1)),  # one row mid-June
+    (JUNE_12, [(date(2026, 5, 31), date(2026, 5, 20)), (date(2026, 7, 31), date(2026, 7, 5)), (JUNE_END, JUNE_END)],
+     date(2026, 7, 1)),  # other months don't count
+    (JUNE_12, [(JUNE_12, JUNE_END)], date(2026, 7, 1)),  # reconciliation: (PeriodStart, PeriodEnd)
+    (JUNE_12, [(JUNE_12, date(2026, 6, 20))], date(2026, 6, 1)),
+    (JUNE_12, [("2026-06-30", "2026-06-30")], date(2026, 7, 1)),  # as read from a CSV
+    (JUNE_12, [(JUNE_END, None)], date(2026, 6, 1)),  # no covered date: replace the month
+    (JUNE_12, [("2026-06-30", "")], date(2026, 6, 1)),
+    (JUNE_12, [(None, None), ("", ""), (JUNE_END, JUNE_END)], date(2026, 7, 1)),  # no month: not June's
+    (date(2026, 12, 5), [(date(2026, 12, 31), date(2026, 12, 31))], date(2027, 1, 1)),
+    (date(2026, 2, 3), [(date(2026, 2, 28), date(2026, 2, 28))], date(2026, 3, 1)),
+])
+def test_monthly_replace_from(replace_from, start, stored, expected):
+    assert replace_from(start, stored) == expected
+
+
+def test_csv_and_jobs_reload_by_the_same_columns():
+    assert set(CSV_MODULE.RELOAD) == set(AZURE_SAMPLES)
+    assert {AZURE_SAMPLES[f]: rule for f, rule in CSV_MODULE.RELOAD.items()} == {
+        table: jobs_azure_ai.RELOAD[table] for table in AZURE_SAMPLES.values()}
+    assert set(jobs_azure_ai.RELOAD) == set(jobs_azure_ai.SCHEMAS)
+    for table, (column, covered) in jobs_azure_ai.RELOAD.items():
+        names = [c for c, _ in jobs_azure_ai.SCHEMAS[table]]
+        assert column in names and covered in names + [None]
+    for filename, (column, covered) in CSV_MODULE.RELOAD.items():
+        assert column in CSV_HEADERS[filename] and covered in CSV_HEADERS[filename] + [None]
+    assert CSV_MODULE.STRICT == {SPEND_CSV, TOKENS_CSV, INVENTORY_CSV}
+
+
+def _csv_row(filename, **values):
+    return {h: values.get(h, "") for h in CSV_HEADERS[filename]}
+
+
+def _read(path):
+    with path.open(encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def test_csv_reload_keeps_older_rows(tmp_path):
+    CSV_MODULE.publish(tmp_path, {
+        SPEND_CSV: (CSV_HEADERS[SPEND_CSV], [_csv_row(SPEND_CSV, UsageDate=d, Meter=f"old {d or 'undated'}")
+                                     for d in ("2026-06-01", "2026-06-11", "2026-06-12", "")]),
+        INVENTORY_CSV: (CSV_HEADERS[INVENTORY_CSV], [_csv_row(INVENTORY_CSV, Deployment="retired")])})
+    datasets = {
+        SPEND_CSV: (CSV_HEADERS[SPEND_CSV], [_csv_row(SPEND_CSV, UsageDate="2026-06-12", Meter="new"),
+                                     _csv_row(SPEND_CSV, UsageDate="2026-06-10", Meter="before the window")]),
+        TOKENS_CSV: (CSV_HEADERS[TOKENS_CSV], [_csv_row(TOKENS_CSV, Date=JUNE_12, Metric="new")]),
+        INVENTORY_CSV: (CSV_HEADERS[INVENTORY_CSV], [_csv_row(INVENTORY_CSV, Deployment="current")])}
+    assert CSV_MODULE.keep_older(tmp_path, datasets, JUNE_12) == {SPEND_CSV: 2, TOKENS_CSV: 0}
+    assert [r["Meter"] for r in datasets[SPEND_CSV][1]] == ["old 2026-06-01", "old 2026-06-11", "new"]
+    assert [r["Metric"] for r in datasets[TOKENS_CSV][1]] == ["new"]
+    assert [r["Deployment"] for r in datasets[INVENTORY_CSV][1]] == ["current"]  # the inventory is replaced whole
+    CSV_MODULE.publish(tmp_path, datasets)
+    assert [(r["UsageDate"], r["Meter"]) for r in _read(tmp_path / SPEND_CSV)] == [
+        ("2026-06-01", "old 2026-06-01"), ("2026-06-11", "old 2026-06-11"), ("2026-06-12", "new")]
+    assert [r["Date"] for r in _read(tmp_path / TOKENS_CSV)] == ["2026-06-12"]
+
+
+def test_csv_reload_replaces_whole_months(tmp_path):
+    CSV_MODULE.publish(tmp_path, {
+        HEALTH_CSV: (CSV_HEADERS[HEALTH_CSV], [
+            _csv_row(HEALTH_CSV, MetricDate="2026-05-31", SnapshotDate="2026-05-31", DeploymentName="old"),
+            _csv_row(HEALTH_CSV, MetricDate="2026-06-30", SnapshotDate="2026-06-30", DeploymentName="old")]),
+        RECON_CSV: (CSV_HEADERS[RECON_CSV], [
+            _csv_row(RECON_CSV, Period="2026-06", PeriodStart="2026-06-01", PeriodEnd="2026-06-20", PoolName="old")])})
+    datasets = {
+        HEALTH_CSV: (CSV_HEADERS[HEALTH_CSV], [
+            _csv_row(HEALTH_CSV, MetricDate=JUNE_END, SnapshotDate=JUNE_END, DeploymentName="new"),
+            _csv_row(HEALTH_CSV, MetricDate=date(2026, 7, 31), SnapshotDate=date(2026, 7, 31), DeploymentName="new")]),
+        RECON_CSV: (CSV_HEADERS[RECON_CSV], [
+            _csv_row(RECON_CSV, Period="2026-06", PeriodStart=JUNE_12, PeriodEnd=JUNE_END, PoolName="new")])}
+    assert CSV_MODULE.keep_older(tmp_path, datasets, JUNE_12) == {HEALTH_CSV: 2, RECON_CSV: 0}
+    # June's health rows were stored after June ended, so they're kept. The reconciliation row
+    # was stored mid-June, so the new rows replace June.
+    assert [(str(r["MetricDate"]), r["DeploymentName"]) for r in datasets[HEALTH_CSV][1]] == [
+        ("2026-05-31", "old"), ("2026-06-30", "old"), ("2026-07-31", "new")]
+    assert [(str(r["PeriodStart"]), r["PoolName"]) for r in datasets[RECON_CSV][1]] == [("2026-06-12", "new")]
+
+
+@pytest.mark.parametrize("content, message", [
+    (b"\xff\xfeUsageDate\r\n", "AzureAiSpendDaily.csv can't be read ("),
+    (b"UsageDate,Meter\r\n06/12/2026,m\r\n", "AzureAiSpendDaily.csv line 2: UsageDate '06/12/2026' isn't a yyyy-mm-dd date"),
+    (b"UsageDate,Meter\r\n2026-06-01,m\r\n2026-06-02,m,extra\r\n", "AzureAiSpendDaily.csv line 3 has the wrong number of fields"),
+    (b"UsageDate,Meter\r\n2026-06-01\r\n", "AzureAiSpendDaily.csv line 2 has the wrong number of fields"),
+    (b"Day,Meter\r\n2026-06-01,m\r\n", "AzureAiSpendDaily.csv has no UsageDate column"),
+])
+def test_csv_reload_fails_on_an_unreadable_strict_csv(tmp_path, content, message):
+    (tmp_path / SPEND_CSV).write_bytes(content)
+    datasets = {SPEND_CSV: (CSV_HEADERS[SPEND_CSV], [_csv_row(SPEND_CSV, UsageDate="2026-06-12")])}
+    with pytest.raises(CSV_MODULE.CollectionError, match=re.escape(message)) as caught:
+        CSV_MODULE.keep_older(tmp_path, datasets, JUNE_12)
+    assert str(caught.value).endswith("nothing was published. Fix the file, or delete it to start it again, then rerun.")
+
+
+def test_csv_reload_leaves_an_unreadable_best_effort_csv(tmp_path, capsys):
+    path = tmp_path / HEALTH_CSV
+    path.write_bytes(b"SnapshotDate,MetricDate\r\n2026-05-31,2026-05-31,extra\r\n")
+    before = path.read_bytes()
+    datasets = {HEALTH_CSV: (CSV_HEADERS[HEALTH_CSV], []), SPEND_CSV: (CSV_HEADERS[SPEND_CSV], [_csv_row(SPEND_CSV, UsageDate="2026-06-12")])}
+    assert CSV_MODULE.keep_older(tmp_path, datasets, JUNE_12) == {SPEND_CSV: 0}
+    assert set(datasets) == {SPEND_CSV}
+    CSV_MODULE.publish(tmp_path, datasets)
+    assert path.read_bytes() == before
+    assert ("WARNING: AzureDeploymentHealth.csv not refreshed; the existing file is kept "
+            "(AzureDeploymentHealth.csv line 2 has the wrong number of fields)") in capsys.readouterr().err
+
+
+def test_csv_stored_rows(tmp_path):
+    path = tmp_path / SPEND_CSV
+    assert CSV_MODULE.stored_rows(path, CSV_HEADERS[SPEND_CSV], "UsageDate") == []  # no file yet
+    path.write_bytes(b"")
+    assert CSV_MODULE.stored_rows(path, CSV_HEADERS[SPEND_CSV], "UsageDate") == []
+    path.write_bytes("\ufeffUsageDate,Meter,Retired\r\n2026-06-01,m,x\r\n,blank,y\r\n".encode("utf-8"))
+    rows = CSV_MODULE.stored_rows(path, CSV_HEADERS[SPEND_CSV], "UsageDate")
+    assert [list(r) for r in rows] == [CSV_HEADERS[SPEND_CSV]] * 2  # a missing column is blank; extra ones go
+    assert [(r["UsageDate"], r["Meter"], r["Cost"]) for r in rows] == [("2026-06-01", "m", ""), ("", "blank", "")]
+
+
+def _patch_collector(monkeypatch, seen):
+    def collect(client, subscription, start, end):
+        assert subscription == SUBSCRIPTION
+        seen.append(start)
+        return {SPEND_CSV: (CSV_HEADERS[SPEND_CSV], [_csv_row(SPEND_CSV, UsageDate=start, Meter="new")]),
+                TOKENS_CSV: (CSV_HEADERS[TOKENS_CSV], []), INVENTORY_CSV: (CSV_HEADERS[INVENTORY_CSV], [])}
+
+    monkeypatch.setattr(CSV_MODULE, "AzureCLI", lambda: None)
+    monkeypatch.setattr(CSV_MODULE, "collect", collect)
+
+
+def test_csv_main_keeps_older_rows(tmp_path, monkeypatch, capsys):
+    CSV_MODULE.publish(tmp_path, {SPEND_CSV: (CSV_HEADERS[SPEND_CSV], [
+        _csv_row(SPEND_CSV, UsageDate="2000-01-03", Meter="older"), _csv_row(SPEND_CSV, UsageDate="2999-01-01", Meter="replaced")])})
+    seen = []
+    _patch_collector(monkeypatch, seen)
+    assert CSV_MODULE.main([str(tmp_path), "--subscription", SUBSCRIPTION]) == 0
+    out = capsys.readouterr().out
+    assert f"Wrote {SPEND_CSV}: 2 rows (1 older rows kept)\n" in out and f"Wrote {TOKENS_CSV}: 0 rows\n" in out
+    assert [(r["UsageDate"], r["Meter"]) for r in _read(tmp_path / SPEND_CSV)] == [("2000-01-03", "older"),
+                                                                                (str(seen[0]), "new")]
+
+
+def test_csv_main_publishes_nothing_when_a_strict_csv_is_unreadable(tmp_path, monkeypatch, capsys):
+    (tmp_path / TOKENS_CSV).write_bytes(b"Date,Metric\r\nyesterday,x\r\n")
+    _patch_collector(monkeypatch, [])
+    assert CSV_MODULE.main([str(tmp_path), "--subscription", SUBSCRIPTION]) == 1
+    assert ("ERROR: AzureAiTokensDaily.csv line 2: Date 'yesterday' isn't a yyyy-mm-dd date; nothing was "
+            "published.") in capsys.readouterr().err
+    assert [p.name for p in tmp_path.iterdir()] == [TOKENS_CSV]

@@ -69,7 +69,7 @@ class NotebookParity(unittest.TestCase):
 
     def test_installer_model_reads_the_tables_and_columns_the_core_writes(self):
         import re
-        js = (ROOT / "1. Fabric" / "installer" / "src" / "transform" / "defender.js").read_text(encoding="utf-8")
+        js = (ROOT / "installer" / "src" / "transform" / "defender.js").read_text(encoding="utf-8")
         found = {}
         for source, cols in re.findall(r"source: '(\w+)',\s*\n\s*description: [^\n]*\n\s*columns: \[(.*)\],\n", js):
             found[source] = re.findall(r"\['(\w+)', '(\w+)'\]", cols)

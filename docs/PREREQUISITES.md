@@ -4,6 +4,11 @@ Everything you need before you install Analytics Hub, on one page, by who does i
 takes another admin a few minutes. Send them their part before you start, so you don't have to
 stop halfway.
 
+**Using the ValueLens installer?** The installer in [`installer/`](../installer/README.md) has its
+own checklist, by person, for each of its routes: see
+[The ValueLens installer](#the-valuelens-installer). The rest of this page describes the manual
+setups and the older Analytics Hub installer in `1. Fabric/installer`.
+
 > The installer is a work in progress. For the [manual setup](../1.%20Fabric/Manual%20setup/README.md),
 > you need the Fabric capacity, the app registration and admin consent, the Key Vault and the
 > optional extras' permissions below, plus *Users can create Fabric items* and the Power BI visuals
@@ -17,6 +22,7 @@ most of this for you. For the detail behind each permission, see [PERMISSIONS.md
 - [Checklist, by person](#checklist-by-person)
 - [Optional extras](#optional-extras)
 - [What it costs](#what-it-costs)
+- [The ValueLens installer](#the-valuelens-installer)
 
 ## How long it takes
 
@@ -174,7 +180,7 @@ not switched on shows as **can be activated** in the Prerequisites panel.
 
 - [ ] [Power BI Pro or Premium Per User](https://learn.microsoft.com/power-bi/fundamentals/service-features-license-type),
       unless the workspace is on an [F64 or larger capacity](https://learn.microsoft.com/fabric/enterprise/licenses#per-user-or-individual-licenses).
-- [ ] Membership of the **Analytics Hub Viewers** group. See [Share it](../1.%20Fabric/README.md#use-it).
+- [ ] Membership of the **Analytics Hub Viewers** group. See [Share it](../1.%20Fabric/installer/README.md#after-it-finishes).
 
 ## Optional extras
 
@@ -229,3 +235,169 @@ region and agreement, so check the official pages:
   Estimate them with the [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/).
 
 Copilot credits aren't charged by Analytics Hub: it reads what you've already used.
+
+## The ValueLens installer
+
+The [ValueLens installer](../installer/README.md) has two routes: **Fabric**, and **No Fabric:
+PAX + SharePoint**. This is what each route needs, by person. One person can be several of these.
+
+Once you sign in, choose **Check prerequisites** in the browser, or run `prereqs` in the terminal
+(add `--target pax` for the PAX route). It checks most of this for you, and changes nothing. What
+each permission is for: [PERMISSIONS.md](PERMISSIONS.md#the-valuelens-installer).
+
+### Fabric route
+
+**You: the person who runs the installer**
+
+- [ ] **Windows**, for the exe or the PowerShell command. Otherwise, use Azure Cloud Shell or
+      Node.js: see [Install](INSTALL.md).
+- [ ] **Power BI Pro or Premium Per User**, to publish and share the semantic model and report.
+- [ ] **A Fabric capacity.** An active F2 or larger capacity, or a trial, that you can assign
+      workspaces to. Or a workspace on one where you're an Admin or Member. F64 or larger is
+      recommended for more than 10,000 people. Small and trial capacities work, but loads are
+      slower.
+- [ ] **Permission to register an app** in Microsoft Entra ID: users in your tenant can, or you're
+      an Application Administrator or Cloud Application Administrator. Or use an app registration
+      you already have. If you have neither, the installer writes an
+      [admin pack](../installer/README.md#if-you-cant-register-apps) for an admin.
+- [ ] Optional: **Azure Key Vault**, for the app's client secret. Without it, the secret goes in
+      the notebooks, where anyone with a role in the workspace can read it. To create a vault, you
+      need Contributor on a subscription. With Owner, or Contributor and User Access
+      Administrator, the vault uses Azure roles; with Contributor alone, access policies. Or use a
+      vault you can read secrets from (Key Vault Secrets User), and a vault admin adds the secret.
+      See [Where the secret goes](../installer/README.md#where-the-secret-goes).
+
+**Entra admin**
+
+- [ ] **Grant admin consent** for the app registration's Microsoft Graph permissions: a Global
+      Administrator or Privileged Role Administrator. If that isn't you, carry on: the installer
+      gives you a link to send them.
+- [ ] Optional, for agent configuration: an Entra role for the app registration, such as Global
+      Reader. The installer can't give Entra roles, so the Done page says what to ask for.
+
+**Fabric admin: only if a setting is off**
+
+If you're a Fabric administrator, the installer checks these for you. A setting delegated to
+capacity admins may still be on there.
+
+- [ ] *Service principals can call Fabric public APIs*. The model's connection signs in as the app
+      registration, so the model can't refresh without it.
+- [ ] *Allow visuals created using the Power BI SDK*. Without it, the report's Tornado chart and
+      Word cloud visuals stay blank.
+
+**Microsoft 365 admin**
+
+- [ ] Optional: **Microsoft 365 Copilot licences** assigned. Without them, only Copilot Chat usage
+      shows.
+- [ ] **Real names in usage reports.** In the Microsoft 365 admin center, under **Settings** >
+      **Org settings** > **Reports**, untick
+      **Display concealed user, group, and site names in all reports**. Otherwise no licence
+      matches Copilot activity.
+- [ ] Only for product feedback by flow: in the Microsoft 365 admin center, open **Health** >
+      **Product feedback**, choose **Export**, and schedule it to be emailed to the flow's mailbox,
+      with the subject `Copilot Product Feedback`.
+
+**Power Platform admin: only for the flows**
+
+Product feedback by flow, and agent configuration, use Power Automate flows.
+
+- [ ] An environment for the flows. Its data policy (DLP) must allow the
+      **HTTP with Microsoft Entra ID (preauthorized)** connector.
+- [ ] **Power Automate Premium** for whoever signs in to the flows. Without it, upload the CSV
+      exports instead.
+
+**Optional data sources**
+
+- [ ] **Agent 365 registry** by API: an Agent 365 licence. Without one, upload the export.
+- [ ] **Defender (shadow AI and agent risk):** Defender for Endpoint P2 for shadow AI on devices,
+      and Defender for Cloud Apps for Cloud Discovery. A part the tenant isn't licensed for is
+      skipped.
+- [ ] **Agent configuration and Foundry (Azure Resource Graph):** for Foundry, Reader for the app
+      registration on a management group or the tenant root group. The installer gives it if
+      you're an Owner or User Access Administrator there, and otherwise shows the command to send.
+      For agents, Global Reader, Power Platform Administrator or AI Administrator for the app
+      registration (see **Entra admin**).
+
+**People who view**
+
+- [ ] Membership of the **ValueLens Viewers** group, or the group you choose. See
+      [Viewer access](../installer/README.md#viewer-access).
+- [ ] Power BI Pro or Premium Per User, unless the workspace is on a paid F64 or larger Fabric
+      capacity, or a Power BI Premium capacity.
+
+### No Fabric: PAX + SharePoint route
+
+**You: the person who runs the installer**
+
+- [ ] **A Windows PC that's on each day** when the task runs, 02:00 by default. The refresh runs
+      there, as you, so a PC that stays on suits it better than a laptop. Run the installer on
+      that PC: Azure Cloud Shell can't set this route up. It needs:
+  - PowerShell 7.2 or later.
+  - An execution policy that runs local scripts: not **AllSigned** or **Restricted**. The
+    installer doesn't change or bypass it.
+  - No application control policy that limits PowerShell.
+  - Python 3.10 or later, for PAX's `-Rollup`.
+- [ ] **Stay signed in to the PC** when the task runs, or change the task to run while you're
+      signed out. That needs your Windows password, and maybe the "Log on as a batch job" right
+      from an administrator of the PC. See
+      [The daily refresh](../installer/README.md#the-daily-refresh).
+- [ ] **Power BI Pro or Premium Per User**, to publish and share the report.
+- [ ] **A Power BI workspace.** The installer makes a new one if the tenant setting
+      *Create workspaces* lets you. Or choose one where you're an Admin or Member. It needs no
+      capacity.
+- [ ] **A folder in a SharePoint document library** for the CSV files: SharePoint Online, not
+      OneDrive. The installer creates it if it's missing. The report signs in to it as you.
+- [ ] **Permission to register an app**, as for the Fabric route, or the
+      [admin pack](../installer/README.md#if-you-cant-register-apps).
+
+**Entra admin**
+
+- [ ] **Grant admin consent** for the app registration's Microsoft Graph permissions: a Global
+      Administrator or Privileged Role Administrator. If that isn't you, carry on: the installer
+      gives you a link to send them.
+
+**SharePoint admin**
+
+- [ ] **Give the app registration write access to the folder's site**, and to no other site
+      (Sites.Selected): a SharePoint Administrator or Global Administrator. If that isn't you,
+      carry on: the installer shows the commands to send, and waits. The admin pack has them too.
+
+**Microsoft Purview admin**
+
+- [ ] **Auditing on.** In the Microsoft Purview portal, open **Audit**. If it offers to start
+      recording user and admin activity, auditing is off: turn it on. Activity is audited from
+      then on.
+
+**Fabric admin: only if a setting is off**
+
+- [ ] *Allow visuals created using the Power BI SDK*. Without it, the report's Tornado chart and
+      Word cloud visuals stay blank. It's the only tenant setting this route checks: the model
+      signs in to SharePoint as you, not as the app.
+- [ ] *Create workspaces*, if you need a new workspace and can't make one.
+
+**Power Platform admin: for the app**
+
+The installer deploys the app unless you turn it off. Without these settings, setup finishes at
+the report and says what to turn on. They're in the Power Platform admin center, under
+**Copilot** > **Settings** > **Managed apps**, for the environment:
+
+- [ ] **Allow app creation with the Copilot Managed Runtime CLI**, and you can create apps in the
+      environment: your developer environment, or the one you pass with `--environment-id`.
+- [ ] **External artifacts in managed apps**. If the environment's group has a published rule,
+      change it in the group's rules.
+
+**Microsoft 365 admin**
+
+- [ ] Optional: **Microsoft 365 Copilot licences** assigned. Without them, only Copilot Chat usage
+      shows.
+- [ ] For the app: **Power Apps Premium or Copilot Credits** for each person who opens it. The
+      Power Apps rights in Microsoft 365 don't count. For Copilot Credits, turn on usage-based
+      billing and add the viewers to a spending policy for managed apps.
+
+**People who view**
+
+- [ ] Membership of the **ValueLens Viewers** group, or the group you choose.
+- [ ] Power BI Pro or Premium Per User, unless the workspace is on a paid F64 or larger Fabric
+      capacity, or a Power BI Premium capacity. A new workspace from the installer has no capacity.
+- [ ] For the app: Power Apps Premium or Copilot Credits, and read access to the SharePoint
+      folder. The installer doesn't give access to the folder.

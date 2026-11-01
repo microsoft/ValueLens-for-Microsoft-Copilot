@@ -1,0 +1,32 @@
+{
+  "name": "valuelens-installer",
+  "version": "0.1.0",
+  "description": "ValueLens installer. Sets up ValueLens for Microsoft Copilot on Microsoft Fabric (app registration and its client secret, workspace, Lakehouse, notebooks, pipeline, schedule and first load), or without Fabric with PAX and SharePoint.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "valuelens-installer": "bin/valuelens-installer.js"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node bin/valuelens-installer.js",
+    "build:exe": "node packaging/build-exe.js",
+    "test": "node --test",
+    "typecheck": "tsc -p jsconfig.json"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.13.3",
+    "@inquirer/prompts": "^8.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}

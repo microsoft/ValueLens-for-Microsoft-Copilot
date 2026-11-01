@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOKS = ROOT / "1. Fabric" / "Manual setup" / "notebooks"
-_SKIP_IMPORTS = {"pyspark", "notebookutils", "requests"}
+_SKIP_IMPORTS = {"pyspark", "notebookutils", "requests", "delta"}
 
 
 def _keep_import(node) -> bool:

@@ -1,0 +1,199 @@
+// @ts-check
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { askAdvanced, asksAdvanced } from '../src/steps/advanced.js';
+import { capacityLabel, defaultsToNoVault, plan } from '../src/steps/plan.js';
+import { planResourceGraph } from '../src/steps/resource-graph.js';
+import { fakeArm, fakeCtx, fakeFabric, fakeUi } from './fakes.js';
+
+const PRE = /** @type {any} */ ({
+  subscriptions: [{ subscriptionId: 'sub-1', displayName: 'Sub' }],
+  canConsent: true,
+  canCreateApps: true,
+  capacities: [{ id: 'cap-1', displayName: 'F64', sku: 'F64', region: 'UK South', state: 'Active' }],
+  tenantSettings: [],
+});
+
+/** The questions behind Advanced settings, which a default install doesn't ask. */
+const ADVANCED_QUESTIONS = [
+  'Deploy the semantic model?',
+  'Who can view ValueLens?',
+  'Who should people ask for access? (email)',
+  'How much audit history should the first load pull?',
+  'How many people are in the tenant?',
+  'Lakehouse name',
+  'How often should the pipeline run?',
+  'Run the first load as soon as setup finishes?',
+  'Which currency should the report show money in?',
+];
+
+test('advanced: one question, No by default, and asked about outside the plan', async () => {
+  const { ui, asked, text } = fakeUi();
+  const { ctx } = fakeCtx({ ui });
+  assert.equal(asksAdvanced(ctx), true, 'commands with no Advanced question still ask');
+  await askAdvanced(ctx, 'the schedule');
+  assert.deepEqual(asked, ['Change the advanced settings?']);
+  assert.match(text(), /Choose Yes to change the schedule/);
+  assert.equal(ctx.advanced, false);
+  assert.equal(asksAdvanced(ctx), false);
+
+  const yes = fakeCtx({ ui: fakeUi({ answers: [true] }).ui });
+  await askAdvanced(yes.ctx, 'x');
+  assert.equal(asksAdvanced(yes.ctx), true);
+
+  const quiet = fakeCtx({ ui: fakeUi({ yes: true }).ui });
+  await askAdvanced(quiet.ctx, 'x');
+  assert.equal(quiet.ctx.advanced, false, '--yes takes the defaults');
+});
+
+test('advanced: a Fabric plan with No asks only the essentials and keeps the defaults', async () => {
+  const { ui, asked } = fakeUi();
+  const { ctx, config } = fakeCtx({ ui, fabric: fakeFabric().api });
+  delete config.fabric.lakehouseId;
+  delete config.fabric.lakehouseName;
+  await plan(ctx, PRE);
+  assert.ok(asked.includes('Change the advanced settings?'));
+  assert.ok(asked.includes('Which capacity should run it?'));
+  for (const q of ADVANCED_QUESTIONS) assert.ok(!asked.some((a) => a.startsWith(q)), `didn't ask "${q}"`);
+  assert.equal(config.reporting, undefined, 'the Value page stays in US dollars');
+  assert.equal(config.history.days, 30);
+  assert.equal(config.scale, 'large', 'from the F64');
+  assert.equal(config.fabric.lakehouseName, 'ValueLens', 'a new install suggests the ValueLens name');
+  assert.equal(config.schedule.frequency, 'daily');
+  assert.equal(ctx.runFirstLoad, true);
+  assert.equal(config.access?.groupName, 'ValueLens Viewers');
+});
+
+test('plan: a new install suggests ValueLens names and says what capacity size suits', async () => {
+  const t = fakeUi();
+  const fabric = fakeFabric().api;
+  const { ctx, config } = fakeCtx({ ui: t.ui, fabric: { ...fabric, listWorkspaces: async () => [{ id: 'ws-x', type: 'Workspace', displayName: 'Other' }] } });
+    delete config.fabric.workspaceId;
+    delete config.fabric.workspaceName;
+  delete config.fabric.lakehouseId;
+  delete config.fabric.lakehouseName;
+  await plan(ctx, PRE);
+  assert.equal(config.fabric.workspaceName, 'ValueLens');
+  assert.equal(config.fabric.lakehouseName, 'ValueLens');
+  assert.match(t.text(), /F64 or larger is recommended for more than 10,000 people; small or trial capacities work but loads are slower\./);
+});
+
+test('plan: a workspace that holds an Analytics Hub install is refused and offered no more', async () => {
+  const workspaces = [
+    { id: 'ws-ah', type: 'Workspace', displayName: 'Analytics Hub' },
+    { id: 'ws-old', type: 'Workspace', displayName: 'Copilot reporting' },
+    { id: 'ws-mine', type: 'Workspace', displayName: 'Mine' },
+  ];
+  /** @type {Record<string, { id: string, type: string, displayName: string, description?: string }[]>} */
+  const held = {
+    'ws-ah': [{ id: 'nb-1', type: 'Notebook', displayName: 'AnalyticsHub_Data_Check' }],
+    'ws-old': [{ id: 'sm-1', type: 'SemanticModel', displayName: 'Copilot Model', description: 'Deployed by the Analytics Hub installer.' }],
+    'ws-mine': [{ id: 'nb-2', type: 'Notebook', displayName: 'Copilot_Audit_Log_Processor' }],
+  };
+  const t = fakeUi();
+  const select = t.ui.select;
+  /** @type {string[][]} */
+  const offered = [];
+  const picks = ['ws-ah', 'ws-old', 'ws-mine'];
+  /** @type {any} */ (t.ui).select = async (/** @type {string} */ message, /** @type {any[]} */ choices, /** @type {any} */ def) => {
+    if (message !== 'Workspace') return select(message, choices, def);
+    offered.push(choices.map((c) => c.value));
+    return picks.shift();
+  };
+  const fabric = {
+    ...fakeFabric().api,
+    listWorkspaces: async () => workspaces,
+    listItems: async (/** @type {string} */ ws, /** @type {string} */ type) => (held[ws] ?? []).filter((i) => !type || i.type === type),
+  };
+  const { ctx, config } = fakeCtx({ ui: t.ui, fabric });
+  delete config.fabric.workspaceId;
+  delete config.fabric.workspaceName;
+  delete config.fabric.lakehouseId;
+  delete config.fabric.lakehouseName;
+  await plan(ctx, PRE);
+  assert.deepEqual(offered, [['', 'ws-ah', 'ws-old', 'ws-mine'], ['', 'ws-old', 'ws-mine'], ['', 'ws-mine']]);
+  assert.equal(config.fabric.workspaceId, 'ws-mine', "a workspace with only ValueLens's manual setup in it is fine");
+  assert.equal(config.fabric.workspaceName, 'Mine');
+  assert.match(t.text(), /The workspace "Analytics Hub" holds an Analytics Hub install, which already includes the ValueLens report\. Choose another workspace or create a new one\./);
+  assert.match(t.text(), /The workspace "Copilot reporting" holds an Analytics Hub install/);
+});
+
+test('plan: an existing record keeps its names', async () => {
+  const { ui } = fakeUi();
+  const { ctx, config } = fakeCtx({ ui, fabric: fakeFabric().api });
+  delete config.fabric.lakehouseId;
+  config.fabric.lakehouseName = 'ValueLens';
+  await plan(ctx, PRE);
+  assert.equal(config.fabric.lakehouseName, 'ValueLens');
+});
+
+test('plan: a new Fabric install keeps the secret in the notebooks by default; Key Vault is a choice', async () => {
+  const fresh = (/** @type {any} */ u, /** @type {any} */ extra = {}) => {
+    const t = fakeCtx({ ui: u.ui, fabric: fakeFabric().api, arm: fakeArm().api, ...extra });
+    t.config.keyVault = { secretName: 'valuelens-client-secret' };
+    return t;
+  };
+  const u = fakeUi();
+  const t = fresh(u);
+  assert.equal(defaultsToNoVault(t.ctx), true);
+  await plan(t.ctx, PRE);
+  assert.equal(t.config.keyVault.mode, 'notebook');
+  assert.ok(u.asked.includes('Where should the app\'s client secret go?'));
+  assert.ok(u.asked.includes('Keep the client secret in the notebooks, with no Key Vault?'));
+  assert.ok(!u.asked.includes('Azure subscription'));
+  assert.match(u.text(), /Anyone with a role in the workspace, Viewer included/);
+
+  const quiet = fresh(fakeUi({ yes: true }));
+  await plan(quiet.ctx, PRE);
+  assert.equal(quiet.config.keyVault.mode, 'notebook', '--yes takes the default');
+
+  const v = fakeUi();
+  const select = v.ui.select;
+  v.ui.select = /** @type {any} */ (async (/** @type {string} */ m, /** @type {any[]} */ ch, /** @type {any} */ d) => (m === 'Where should the app\'s client secret go?' ? (v.asked.push(m), 'keyvault') : select(m, ch, d)));
+  const kv = fresh(v);
+  await plan(kv.ctx, PRE).catch(() => {});
+  assert.ok(v.asked.includes('Azure subscription'), 'Key Vault goes to the vault questions');
+  assert.notEqual(kv.config.keyVault.mode, 'notebook');
+
+  // --key-vault, flows that read the secret from the vault, or a vault already chosen skip the default.
+  const flagged = fresh(fakeUi());
+  flagged.ctx.useKeyVault = true;
+  assert.equal(defaultsToNoVault(flagged.ctx), false);
+  const flows = fresh(fakeUi());
+  flows.config.uploads.flowIdentity = 'app';
+  assert.equal(defaultsToNoVault(flows.ctx), false);
+  const chosen = fresh(fakeUi());
+  chosen.config.keyVault.name = 'kv-test';
+  assert.equal(defaultsToNoVault(chosen.ctx), false);
+});
+
+test('capacityLabel: the SKU and region when Fabric gives them', () => {
+  assert.equal(capacityLabel({ id: 'c', displayName: 'Prod', sku: 'F64', region: 'UK South' }), 'Prod (F64, UK South)');
+  assert.equal(capacityLabel({ id: 'c', displayName: 'Trial', sku: 'FT1' }), 'Trial (FT1)');
+  assert.equal(capacityLabel({ id: 'c', displayName: 'Bare' }), 'Bare');
+});
+
+test('advanced: a Fabric plan with Yes asks the settings behind it, currency last', async () => {
+  const { ui, asked } = fakeUi({ yesTo: ['Change the advanced settings?'] });
+  const { ctx, config } = fakeCtx({ ui, fabric: fakeFabric().api });
+  delete config.fabric.lakehouseId;
+  delete config.fabric.lakehouseName;
+  await plan(ctx, PRE);
+  for (const q of ADVANCED_QUESTIONS) assert.ok(asked.some((a) => a.startsWith(q)), `asked "${q}"`);
+  assert.ok(asked.at(-1)?.startsWith('Which currency'));
+  assert.deepEqual(config.reporting, { currency: 'USD' });
+});
+
+test('advanced: Resource Graph reads the saved scope, or the whole tenant, without asking', async () => {
+  const { ui, asked } = fakeUi();
+  const { ctx, config } = fakeCtx({ ui });
+  config.dataSources.resourceGraph = 'api';
+  ctx.advanced = false;
+  await planResourceGraph(ctx);
+  assert.deepEqual(asked, []);
+  assert.deepEqual(config.resourceGraph, { managementGroup: '', agents: true, foundry: true });
+
+  config.resourceGraph = { managementGroup: 'mg-1', agents: true, foundry: false };
+  await planResourceGraph(ctx);
+  assert.deepEqual(config.resourceGraph, { managementGroup: 'mg-1', agents: true, foundry: false });
+});

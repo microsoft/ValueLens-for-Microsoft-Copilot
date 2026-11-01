@@ -18,6 +18,176 @@ Deployment instructions do **not** live here. They live in the READMEs:
 
 ---
 
+## Unreleased — Azure AI tables keep older rows
+
+**Why.** The Fabric notebook `Ingest_Azure_AI`, the Azure route's `azure_ai` job and the Local CSV
+script `pull_azure_ai.py` (which the SharePoint add-on uses too) wrote each Azure AI table whole
+from the days they had just read, so a table never held more than the last 90 days. Each run now
+replaces only its own days and keeps the older rows.
+
+- **A run replaces its days.** Rows from the window's first day onwards are replaced, and older rows
+  are kept. Rows with no date are always replaced. A source that returns no rows still replaces its
+  days.
+- **The monthly tables replace whole months.** `azure_deployment_health` and
+  `azure_billing_reconciliation` (`AzureDeploymentHealth.csv` and `AzureBillingReconciliation.csv`)
+  hold a row per month. When the window starts after the 1st, that month's stored rows are kept only
+  if all of them were written after the month ended. Otherwise the run's rows replace them, so a
+  month still in progress never freezes at its first values.
+- **A stored table that can't be read isn't counted as empty.** A failed download or a corrupt file
+  fails that table's write and leaves it as it was: counting it as empty would cut it back to 90
+  days.
+  - The notebook and the job check all three strict tables (`azure_ai_spend`, `azure_ai_tokens` and
+    `copilot_payg_spend`) before they write any, so when one can't be read, none of them is
+    replaced. A best-effort table is left as it was, with a warning.
+  - The script publishes nothing when `AzureAiSpendDaily.csv` or `AzureAiTokensDaily.csv` can't be
+    read, and leaves a best-effort CSV as it was, with a warning. Fix the file, or delete it to
+    start it again.
+- **The notebook writes each table with Delta's `replaceWhere`.** That's one write per table, so a
+  write that fails leaves its table as it was. The six tables together aren't one transaction.
+  `mergeSchema` adds new columns. A column that has changed type stops the write and names the
+  column: the run stops if it's one of the three strict tables, and a best-effort table is left as
+  it was, with a warning. To start a table over, drop it and run the notebook again; its older rows
+  are lost.
+- **Otherwise the same.** A best-effort source that fails still leaves its table as it was.
+  `AzureAiDeployments.csv` is the current inventory, so it's still replaced whole. The SQL publish
+  copies the lake table, so SQL keeps the older days too.
+- The month rule is a helper in the block of shared helpers, which `tests/test_azure_ai_collectors.py`
+  keeps identical in all three copies, so the notebook, the job and the script decide the same way.
+
+For Fabric, import `Ingest_Azure_AI` again. Azure installs get this with the next `valuelens-jobs`
+image. For Local CSV and SharePoint, download `pull_azure_ai.py` again.
+
+---
+
+## Unreleased — Fabric: reloading audit history keeps older rows
+
+**Why.** A backfill wrote the parsed audit table whole, so a reload shorter than the history already
+loaded dropped the older days: a 30-day backfill after a 180-day first load left 30 days. Reloads
+now keep older rows.
+
+- **A backfill replaces from its first record onwards.** `Copilot_Audit_Log_Direct_Ingester` writes
+  a backfill with Delta's `replaceWhere`: parsed rows from the earliest `CreationDate` it read
+  onwards are replaced, and older rows are kept, including the older rows of that month. Rows with
+  no `CreationDate` are replaced by every backfill. `mergeSchema` adds new columns.
+- **An empty backfill writes nothing.** With no records, the table is left as it is: an empty write
+  with `replaceWhere` would delete the range.
+- **Otherwise the same.** A missing table is created. A table from before the stable key columns is
+  still replaced whole, once, which upgrades it. A table not yet stored by month is moved to month
+  partitions first, as incremental runs already do. Incremental runs merge by `Id`, and the
+  processor picks up the months a backfill changed, as it does after a merge.
+- **A column whose type changed** now fails a backfill, which used to rewrite the schema: drop the
+  table, then run a backfill.
+- The installer's `run --backfill-days` and **Run now** run this notebook, so they keep older
+  history too. The PAX route already did: it adds the days to the SharePoint files.
+
+Import the notebook again, or run the installer's `update`, to pick this up.
+
+---
+
+## Unreleased — ValueLens installer 0.1.0
+
+**Why.** Setting up ValueLens meant working through a path README by hand. The installer this repo
+shipped under `1. Fabric/installer` was the Analytics Hub's, and it stopped at installer-v0.4.2 when
+the Analytics Hub moved to its own repo. The new [`installer/`](installer/README.md) is a
+ValueLens-only port of the Analytics Hub installer at microsoft/AnalyticsHub-Dashboard@1af87db, with
+a second route that needs no Fabric.
+
+- **Two routes**, chosen on the first screen or with `--target fabric|pax`:
+  - **Fabric.** The Analytics Hub's Fabric route, cut to ValueLens: the `ValueLens (Fabric)` app
+    registration, with its client secret in the notebooks (the default) or in Key Vault, then the
+    workspace, Lakehouse, notebooks, pipeline, schedule, semantic model and report, and a first load
+    with checks. The Credit Consumption module, the Azure route and the Agent Evaluator aren't
+    ported. This route doesn't deploy the app yet.
+  - **No Fabric: PAX + SharePoint.** A daily task on the user's PC, `ValueLens - PAX refresh`, runs
+    PAX purview-v1.11.15, pinned by SHA-256. It uploads the rollups to a SharePoint folder as the
+    `ValueLens (PAX)` app registration, which has Sites.Selected on that one site. The installer
+    publishes `ValueLens - SharePoint.pbit` to a Power BI workspace through the item API, or through
+    Power BI Desktop where the service turns that down. The model is signed in to SharePoint once,
+    by hand, and refreshes after each PAX run. The installer then deploys the app as a Copilot
+    managed app. The app step is on by default. When the tenant isn't ready for it, the installer
+    says what's missing and finishes at the report.
+- **The task** runs as the signed-in user with limited rights. It never bypasses the execution
+  policy, and the installer stops with guidance when the policy is AllSigned or Restricted. The
+  client secret stays in Windows Credential Manager. PowerShell 7.2 and Python 3.10 or later are
+  checked up front, because PAX's rollup needs Python.
+- **Updates** come from the newest `valuelens-installer-v*` release in the release list, not from
+  GitHub's "Latest" release, which the dashboard releases take. The one-liner and every update hint
+  use a version-pinned `releases/download/<tag>/` URL.
+- **Viewers.** The `ValueLens Viewers` group gets Build on the semantic model, never a workspace
+  role, because workspace viewers can read the notebooks and any secret written into them. The
+  installer asks once to share the report with the group. "Later" leaves a card on the Done page,
+  and Repair asks again.
+- **Long loads on the PAX route.** The task reads history a week at a time, oldest first, and saves
+  its progress after each week. It stops before the task's 12-hour limit, and the next run carries
+  on. PAX reads days in the PC's time zone but keeps whole UTC days, so each week after the first
+  starts a day early, and PAX drops the rows it already has. If even one day read with the day
+  before can't finish inside the limit, the load reads on without the day before, and **Check
+  status** warns that each day can miss a few hours. A file copied down from SharePoint is used
+  only when its size matches SharePoint's. PAX 1.11.15 can exit 0 when its rollup step fails, so
+  the run reads PAX's log too, and fails when the rollup failed or PAX didn't write a file.
+- **The Power BI model.** When Power BI turns the model's refresh schedule off, the installer turns
+  it back on after the next refresh it waits for works. The installer never replaces or deletes a
+  model or report it didn't publish: its own get a free name, such as `ValueLens_2`. A model
+  deleted in Power BI is reported and forgotten, and **Update** publishes it again.
+- **Taking access back.** Turning a choice off takes the Graph permissions it needed off an app
+  registration the installer created, and takes back their consent when the user can. Choosing
+  another viewer group takes away the old group's Build on the model.
+- **Also:** repair and uninstall, a browser page (`--ui`) as well as the terminal, an admin pack
+  (`valuelens-admin-pack.md`) for the grants that need an admin, and a Windows exe,
+  `ValueLensInstaller.exe`, with Node, the app and the managed apps CLI inside. The
+  [exe workflow](.github/workflows/valuelens-installer-exe.yml) builds it. The install record is
+  `valuelens-setup.json`, and the installer leaves Analytics Hub records and workspaces alone.
+- **Supporting changes.** The Fabric notebooks now match the Analytics Hub ones the installer
+  deploys. `Run-PAX-AIBV.ps1` gains `-PaxSha256`, `-AppendUserInfo`, `-SkipVersionCheck`,
+  `-StartDate`, `-EndDate` and `-OnlyUserInfo`, which exports only the user directory. Its append
+  runs work on PAX 1.11.15, and a run whose rollup step failed now fails, even when PAX exits 0.
+  `Upload-Rollups-SharePoint.ps1` gains `-File` and `-RemoteName`. A contract test checks that the
+  notebooks write every Lakehouse column the Fabric template reads.
+- **The audit load's time budget now covers throttling.** It was checked only between polls, so
+  while the audit service was throttling, the retry waits and the wait for a free search slot ran
+  past it until the pipeline's 2-hour timeout stopped the run. Every wait now checks the budget
+  every few seconds. A run that reaches it saves its query ids and stops, and the pipeline's retry
+  carries on from there. The run also says when the service is throttling. The first-load estimate
+  is now one to two hours, not under an hour.
+- **The audit load stops at once when the service asks for a longer wait than the run has left.**
+  Microsoft allows about 200 audit searches per tenant in 24 hours, and other tools that search
+  the audit log count too. Once a tenant has used them, the service answers with a wait that can
+  run to hours. The load used to sit in that wait until its time budget ran out. Now it stops
+  straight away and says why, and the scheduled run carries on once the allowance frees up.
+- **Shared with Consumption Central.** Its installer copies the PAX route's code unchanged, so the
+  route has settings ValueLens leaves off: a folder parameter, parameter values from the install
+  record, a query read from a file, a privacy level, and a mode that exports only the user
+  directory, as one file replaced whole each run. In that mode, the run checks the file before it
+  uploads it, and holds back a file that looks wrong, such as one with under half the rows of the
+  last upload.
+
+`1. Fabric/installer` stays as it is for now. A follow-up removes it and points its links here.
+Nothing is released yet. The first tag will be `valuelens-installer-v0.1.0`.
+
+---
+
+## Unreleased — Org data: Department becomes Organization only when there's no Organization column
+
+**Why.** The org query renamed the first department-like column to Organization, even when the org
+data already had an Organization column. The Graph org data load always writes Organization, and
+Workday org data adds any column the table lacks. So a Workday export with a Department column, or
+an org data CSV with both columns, failed the refresh.
+
+- **The rename checks first.** *Chat + Agent Org Data* renames Department to Organization only when
+  there's no Organization column. With both, it leaves both as they are, and a blank Organization
+  stays blank rather than being filled from Department.
+- **Every active variant.** The Fabric, Fabric OneLake, SharePoint and Local CSV templates and the
+  Agent Evaluator get the same change. The installer builds its Fabric model from
+  `ValueLens - Fabric.pbit`, so it gets it too. The archived Power Automate + Dataverse template is
+  frozen, so it doesn't.
+- `scripts/Update-Org-Department-Rename.py` makes the change, and `--check` reports a stale
+  template. Nothing else in the templates changes.
+
+Download the template again to pick this up. The Analytics Hub made the same change in
+microsoft/AnalyticsHub-Dashboard#144.
+
+---
+
 ## Unreleased — Licensed users: check flags against today's licences in Microsoft Entra
 
 **Why.** The Microsoft 365 active-user report can run days behind licence changes. In a large tenant,

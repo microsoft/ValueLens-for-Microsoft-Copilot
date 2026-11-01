@@ -109,7 +109,9 @@ class RunnerSourceTests(unittest.TestCase):
         text = RUNNER.read_text(encoding="utf-8")
         self.assertIn("Dashboard = $paxDashboard", text)
         self.assertNotIn("Dashboard = 'AIBV'", text)
-        detect = text.index("$paxDashboard = Get-PaxDashboardValue -ScriptPath $pax.Path")
+        # -OnlyUserInfo builds no rollup, so it skips the check and passes PAX no -Dashboard.
+        detect = text.index(
+            "$paxDashboard = if ($OnlyUserInfo) { $null } else { Get-PaxDashboardValue -ScriptPath $pax.Path }")
         self.assertLess(text.index("$pax = Get-PaxReleaseScript"), detect)
         self.assertLess(detect, text.index("& $pax.Path @paxParams"))
         self.assertIn("pax_dashboard      = $paxDashboard", text)
