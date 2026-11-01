@@ -9,6 +9,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { pageStages } from "@/hooks/stage-filter.context";
 import { destinations, openStage, type StageId } from "./destinations";
+import { stageTabId } from "./stage-tab-id";
 import { StageTabs } from "./stage-tabs";
 
 const stages: { id: StageId; label: string }[] = [
@@ -19,7 +20,7 @@ const stages: { id: StageId; label: string }[] = [
 
 function renderTabs(open: StageId = "activation") {
     const onOpen = vi.fn();
-    render(<StageTabs label="Adoption stages" stages={stages} open={open} onOpen={onOpen} />);
+    render(<StageTabs label="Adoption stages" stages={stages} open={open} onOpen={onOpen} panelId="stage-panel" />);
     return { onOpen, tabs: screen.getAllByRole("tab") };
 }
 
@@ -29,6 +30,12 @@ describe("StageTabs", () => {
         expect(screen.getByRole("tablist", { name: "Adoption stages" })).toBeTruthy();
         expect(tabs.map((tab) => tab.getAttribute("aria-selected"))).toEqual(["false", "true", "false"]);
         expect(tabs.map((tab) => tab.tabIndex)).toEqual([-1, 0, -1]);
+    });
+
+    it("controls the panel, which its tab id can name", () => {
+        const { tabs } = renderTabs();
+        expect(tabs.every((tab) => tab.getAttribute("aria-controls") === "stage-panel")).toBe(true);
+        expect(tabs[1].id).toBe(stageTabId("stage-panel", "activation"));
     });
 
     it("opens a stage on click", () => {

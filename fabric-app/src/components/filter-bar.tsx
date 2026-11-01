@@ -6,7 +6,7 @@
 //-----------------------------------------------------------------------
 
 import { useId, useMemo, useState } from "react";
-import { Check, Info, LoaderCircle, X } from "lucide-react";
+import { Check, ChevronDown, Info, LoaderCircle, X } from "lucide-react";
 import { useFilterContext } from "@/hooks/filter.context";
 import {
     availablePresets,
@@ -30,6 +30,7 @@ import {
 import { describeOrgAttribute } from "@/lib/org-attribute";
 import { menuOptionClass as optionClass } from "@/lib/menu-option";
 import { useIsRefreshing } from "@/lib/refresh-tracker";
+import { cn } from "@/lib/utils";
 import { FilterMenu } from "./filter-menu";
 import { SegmentedControl } from "./segmented-control";
 
@@ -372,26 +373,15 @@ export function FilterBar({ destinationLabel }: { destinationLabel: string }) {
         };
     });
 
-    return (
-        <div
-            role="group"
-            aria-label="Filters"
-            data-print="hide"
-            className="flex flex-wrap items-center gap-x-400 gap-y-200 py-300"
-        >
-            {has("dateRange") && <DateFilter />}
-            {has("organizations") && orgAttributes.length > 1 && <GroupByFilter />}
-            {has("organizations") && (
-                // Not keyed by the column: once the org columns load, they may change it while its menu is open.
-                <MultiSelectFilter
-                    filterKey="organizations"
-                    label={orgAttribute.label}
-                    allLabel={`All ${orgAttribute.plural}`}
-                    noun={orgAttribute.plural}
-                    choices={orgValues}
-                    choicesOf={orgAttribute.column}
-                />
-            )}
+    // A long bar keeps the date and organization in view and folds the rest behind More filters.
+    const secondary = applicable.filter((key) => key !== "dateRange" && key !== "organizations");
+    const folded = applicable.length > 3 && secondary.length > 1;
+    const activeSecondary = secondary.filter((key) => isFilterInEffect(filters, key, options)).length;
+    const [moreOpen, setMoreOpen] = useState(false);
+    const moreId = useId();
+
+    const secondaryFilters = (
+        <>
             {has("licence") && (
                 <LabelledSegment
                     label={filterLabel("licence", "")}
@@ -426,6 +416,57 @@ export function FilterBar({ destinationLabel }: { destinationLabel: string }) {
                     choices={options?.agentNames}
                 />
             )}
+        </>
+    );
+
+    return (
+        <div
+            role="group"
+            aria-label="Filters"
+            data-print="hide"
+            className="flex flex-wrap items-center gap-x-400 gap-y-200 py-300"
+        >
+            {has("dateRange") && <DateFilter />}
+            {has("organizations") && orgAttributes.length > 1 && <GroupByFilter />}
+            {has("organizations") && (
+                // Not keyed by the column: once the org columns load, they may change it while its menu is open.
+                <MultiSelectFilter
+                    filterKey="organizations"
+                    label={orgAttribute.label}
+                    allLabel={`All ${orgAttribute.plural}`}
+                    noun={orgAttribute.plural}
+                    choices={orgValues}
+                    choicesOf={orgAttribute.column}
+                />
+            )}
+            {folded ? (
+                <button
+                    type="button"
+                    aria-expanded={moreOpen}
+                    aria-controls={moreId}
+                    onClick={() => setMoreOpen((open) => !open)}
+                    className={cn(
+                        "flex h-[32px] items-center gap-200 rounded-md border px-300 text-[length:var(--text-200)] leading-200 transition-colors",
+                        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                        activeSecondary > 0
+                            ? "border-primary/50 bg-accent text-accent-foreground"
+                            : "border-border bg-card text-foreground hover:bg-secondary",
+                    )}
+                >
+                    More filters{" "}
+                    {activeSecondary > 0 && (
+                        <span className="font-semibold">
+                            {activeSecondary} <span className="sr-only">active</span>
+                        </span>
+                    )}
+                    <ChevronDown
+                        className={cn("icon-size-100 shrink-0 opacity-70 transition-transform", moreOpen && "rotate-180")}
+                        aria-hidden="true"
+                    />
+                </button>
+            ) : (
+                secondaryFilters
+            )}
 
             <div className="ml-auto flex items-center gap-300">
                 {refreshing && (
@@ -445,6 +486,12 @@ export function FilterBar({ destinationLabel }: { destinationLabel: string }) {
                     </button>
                 )}
             </div>
+
+            {folded && (
+                <div id={moreId} hidden={!moreOpen} className="basis-full">
+                    <div className="flex flex-wrap items-center gap-x-400 gap-y-200">{secondaryFilters}</div>
+                </div>
+            )}
 
             {(notApplied.length > 0 || optionsError) && (
                 <p className="flex basis-full items-center gap-200 text-[length:var(--text-200)] leading-200 text-muted-foreground">

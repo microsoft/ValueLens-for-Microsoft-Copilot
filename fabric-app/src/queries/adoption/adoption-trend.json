@@ -38,7 +38,7 @@
   },
   "layer": [
     {
-      "mark": { "type": "line", "interpolate": "monotone", "strokeWidth": 2 }
+      "mark": { "type": "line", "interpolate": "linear", "strokeWidth": 2 }
     },
     {
       "mark": { "type": "point", "filled": true, "size": 40 },

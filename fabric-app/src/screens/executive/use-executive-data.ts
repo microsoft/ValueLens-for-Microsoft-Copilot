@@ -13,6 +13,7 @@ import { useHueColors } from "@/hooks/use-palette-theme";
 import { useSummaryQuery, useTableQuery, type SummaryResult, type TableResult } from "@/hooks/use-table-query";
 import { dateBetween } from "@/lib/dax-filters";
 import { isTenantDefaultRange, type FilterKey } from "@/lib/filters";
+import { monthEnd, monthOf } from "@/lib/month-over-month";
 import { withOrgAttribute } from "@/lib/org-attribute";
 import {
     CREDIT_PARTS,
@@ -87,7 +88,14 @@ export function useExecutiveData(): ExecutiveData {
     const trend = window && showTrend;
 
     const params = useMemo(
-        () => (window ? { months: window.months.map(monthLabel), rangeMonth: window.rangeMonth } : undefined),
+        () =>
+            window
+                ? {
+                      months: window.months.map(monthLabel),
+                      rangeMonth: window.rangeMonth,
+                      partialMonth: monthEnd(monthOf(window.to)) === window.to ? undefined : monthOf(window.to),
+                  }
+                : undefined,
         [window],
     );
     const monthsSource = useMemo(() => executiveMonths(params && { ...params, colors: hoursColors }), [params, hoursColors]);

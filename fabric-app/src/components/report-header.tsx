@@ -20,7 +20,10 @@ import { FreshnessLabel } from "./freshness-label";
 
 interface ReportHeaderProps {
     icon: LucideIcon;
+    /** The page's name, which its downloads carry. */
     title: string;
+    /** What the h1 shows when it is narrower than the page, such as the stage open. */
+    heading?: string;
     blurb?: string;
     /** The sources behind what is shown, and the dates they run to. */
     sources: readonly FreshnessSource[];
@@ -54,6 +57,7 @@ const LABELS: Record<ExportFormat, string> = { pdf: "Download PDF", pptx: "Downl
 export function ReportHeader({
     icon: Icon,
     title,
+    heading = title,
     blurb,
     sources,
     dates,
@@ -90,37 +94,45 @@ export function ReportHeader({
                         {crumb}
                     </span>
                 )}
-                <h1 className="font-heading text-[21px] leading-[28px] font-semibold tracking-[-0.01em]">{title}</h1>
+                <h1 className="font-heading text-[21px] leading-[28px] font-semibold tracking-[-0.01em]">{heading}</h1>
                 {blurb && <span className="text-[length:var(--text-300)] leading-300 text-muted-foreground">{blurb}</span>}
-                <FreshnessLabel sources={sources} dates={dates} />
-                {meta}
-            </span>
-            {downloadable && (
-                <span className="flex flex-col items-start gap-100 sm:items-end" data-print="hide">
-                    <span role="group" aria-label={`Download ${title}`} className="flex flex-wrap items-center gap-200 sm:justify-end">
-                        {(["pdf", "pptx"] as const).map((format) => {
-                            const FormatIcon = format === "pdf" ? FileDown : Presentation;
-                            return (
-                                <button
-                                    key={format}
-                                    type="button"
-                                    className={ACTION_BUTTON}
-                                    disabled={exporter.busy !== undefined}
-                                    aria-busy={exporter.busy === format || undefined}
-                                    onClick={() => start(format)}
-                                >
-                                    <FormatIcon className="icon-size-100 shrink-0" aria-hidden="true" />
-                                    {LABELS[format]}
-                                </button>
-                            );
-                        })}
-                        {actions}
-                    </span>
-                    <span role="status" className={cn(SMALL, "max-w-[48ch] text-muted-foreground sm:text-right")}>
+                <span className="flex flex-wrap items-center justify-between gap-x-400 gap-y-100">
+                    <FreshnessLabel sources={sources} dates={dates} />
+                    {downloadable && (
+                        <span
+                            role="group"
+                            aria-label={`Download ${title}`}
+                            className="flex flex-wrap items-center gap-200"
+                            data-print="hide"
+                        >
+                            {(["pdf", "pptx"] as const).map((format) => {
+                                const FormatIcon = format === "pdf" ? FileDown : Presentation;
+                                return (
+                                    <button
+                                        key={format}
+                                        type="button"
+                                        title={LABELS[format]}
+                                        className={ACTION_BUTTON}
+                                        disabled={exporter.busy !== undefined}
+                                        aria-busy={exporter.busy === format || undefined}
+                                        onClick={() => start(format)}
+                                    >
+                                        <FormatIcon className="icon-size-100 shrink-0" aria-hidden="true" />
+                                        <span className="max-sm:sr-only">{LABELS[format]}</span>
+                                    </button>
+                                );
+                            })}
+                            {actions}
+                        </span>
+                    )}
+                </span>
+                {downloadable && (
+                    <span role="status" data-print="hide" className={cn(SMALL, "text-muted-foreground empty:hidden")}>
                         {exporter.message}
                     </span>
-                </span>
-            )}
+                )}
+                {meta}
+            </span>
         </header>
     );
 }

@@ -56,6 +56,7 @@ export function BandPopover({ label, icon: Icon, current, children, className }:
                 ref={button}
                 type="button"
                 onClick={() => setOpen((value) => !value)}
+                aria-haspopup="dialog"
                 aria-expanded={open}
                 aria-controls={open ? panelId : undefined}
                 aria-current={current ? "page" : undefined}
@@ -67,6 +68,8 @@ export function BandPopover({ label, icon: Icon, current, children, className }:
             {open && (
                 <div
                     id={panelId}
+                    role="dialog"
+                    aria-label={label}
                     className={cn(
                         "absolute z-30 flex max-h-[min(70vh,560px)] flex-col overflow-y-auto rounded-xl border border-border bg-popover p-300 text-popover-foreground shadow-16",
                         "inset-x-300 top-[calc(100%-4px)] sm:inset-x-auto sm:top-[calc(100%+8px)] sm:right-0 sm:w-[360px]",

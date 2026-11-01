@@ -125,7 +125,7 @@ export function M365SuiteStage() {
 
     return (
         <Section id={stageAnchor("m365-suite")} title={TITLE} description={DESCRIPTION}>
-            <div className="grid gap-400 xl:grid-cols-2">
+            <div className="grid grid-cols-1 gap-400 xl:grid-cols-2">
                 <BarChart
                     query={apps}
                     spec={APPS.vegaLiteSpec}

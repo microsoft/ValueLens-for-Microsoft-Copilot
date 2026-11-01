@@ -33,7 +33,7 @@ export function costValueWindow() {
 
 const bySourceColumns: ColumnMetadataMap = {
     "[Source]": { name: "Source", displayName: "Activity" },
-    "[Licence]": { name: "Licence", displayName: "Licence" },
+    "[Licence]": { name: "Licence", displayName: "License" },
     "[Scenario]": { name: "Scenario", displayName: "Scenario" },
     "[Hours]": { name: "Hours", displayName: "Expert-equivalent hours", format: FORMAT_HOURS },
     "[Value]": { name: "Value", displayName: "Estimated value", format: FORMAT_WHOLE },
@@ -222,10 +222,10 @@ export type PairId = "licences" | "studio" | "cowork";
 export const PAIRS: readonly { id: PairId; cost: string; source: string; value: string; chart: string }[] = [
     {
         id: "licences",
-        cost: "Microsoft 365 Copilot licences",
+        cost: "Microsoft 365 Copilot licenses",
         source: "Copilot",
         value: "Licensed users' Copilot",
-        chart: "Licences → Licensed users' Copilot",
+        chart: "Licenses → Licensed users' Copilot",
     },
     { id: "studio", cost: "Copilot Studio credits", source: "Agents", value: "Agents", chart: "Studio credits → Agents" },
     { id: "cowork", cost: "Cowork / Work IQ credits", source: "Cowork", value: "Cowork", chart: "Cowork credits → Cowork" },

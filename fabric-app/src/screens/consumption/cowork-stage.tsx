@@ -13,6 +13,7 @@ import { NotFilteredHint } from "@/components/not-filtered-hint";
 import { OnDemand } from "@/components/on-demand";
 import { Section } from "@/components/section";
 import { SegmentedControl } from "@/components/segmented-control";
+import { formatPeriod } from "@/lib/format-period";
 import { readNumber, readText } from "@/lib/summary-row";
 import { formatCell } from "@/lib/tree-grid";
 import {
@@ -116,8 +117,8 @@ export function CoworkStage({ options, rates }: CoworkStageProps) {
                     {periods.length > 0 && (
                         <ChoiceMenu
                             label="Period"
-                            allLabel={periods[0]}
-                            choices={periods.slice(1).map((value) => ({ value, label: value }))}
+                            allLabel={formatPeriod(periods[0])}
+                            choices={periods.slice(1).map((value) => ({ value, label: formatPeriod(value) }))}
                             value={period}
                             onChange={setPeriod}
                         />

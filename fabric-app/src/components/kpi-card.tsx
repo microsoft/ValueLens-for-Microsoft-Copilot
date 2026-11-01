@@ -39,7 +39,7 @@ interface KpiCardProps {
     detail?: ReactNode;
     /** Text to show when the model returns BLANK for a deliberate, named state. */
     emptyValue?: string;
-    /** Emphasises the card as the lead figure of its group. */
+    /** Emphasises the one figure that answers the stage's question; never more than one card a stage. */
     emphasis?: boolean;
     className?: string;
 }

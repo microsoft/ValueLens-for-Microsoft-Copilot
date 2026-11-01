@@ -53,7 +53,15 @@ export function toCurrencyCode(value: unknown): string | undefined {
 export function currencyPrefix(currency: string | undefined): string {
     if (!currency) return "";
     const code = currency.trim().toUpperCase();
-    return BY_CODE.get(code)?.prefix ?? `${code} `;
+    const known = BY_CODE.get(code)?.prefix;
+    if (known) return known;
+    // Only an ISO code is printed; anything else would read as a label, not a currency.
+    return /^[A-Z]{3}$/.test(code) ? `${code} ` : "";
+}
+
+/** A currency's name for a picker: "US dollar", or its code when the app has no name for it. */
+export function currencyLabel(currency: string): string {
+    return BY_CODE.get(currency.trim().toUpperCase())?.name ?? currency;
 }
 
 /** The currency's prefix without a trailing space, for "per $1" and headers. */

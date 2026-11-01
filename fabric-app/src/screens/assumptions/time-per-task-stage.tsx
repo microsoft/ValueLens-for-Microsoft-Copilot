@@ -357,7 +357,7 @@ export function TimePerTaskStage() {
             </label>
             {categories.length > 1 && (
                 <ChoiceMenu
-                    label="Task Category"
+                    label="Task category"
                     allLabel="All task categories"
                     choices={categories}
                     value={selected}
@@ -458,7 +458,7 @@ export function TimePerTaskStage() {
                                 <thead className={cn(SMALL, "sticky top-0 z-[1] bg-background text-muted-foreground")}>
                                     <tr>
                                         <th scope="col" className={cn(HEAD, "pr-300 pl-300")}>
-                                            Task Breakdown
+                                            Task breakdown
                                         </th>
                                         {BANDS.map(({ band, label }) => (
                                             <th key={band} scope="col" className={cn(HEAD, "w-[96px] px-200 text-right")}>

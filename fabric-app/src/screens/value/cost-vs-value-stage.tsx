@@ -78,13 +78,13 @@ function creditsNote(data: CostVsValue): string {
         case "ready":
             return "Copilot Studio and Cowork / Work IQ, from Consumption Central at the rates set under Rates & packs on the Consumption page. Cowork credits use the Capacity Pack first, at the prepaid rate, then pay-as-you-go, as on the Consumption page's Cowork section. Unused pack credits aren't counted.";
         case "off":
-            return "Not counted: Consumption Central isn't set up for this app, so the cost is licences alone and the return reads high.";
+            return "Not counted: Consumption Central isn't set up for this app, so the cost is licenses alone and the return reads high.";
         case "apart":
             return data.credits.held
                 ? `Not counted: Consumption Central holds ${formatDateRange(data.credits.held.from, data.credits.held.to)}, which doesn't overlap the activity. The cost is licences alone, so the return reads high.`
-                : "Not counted: Consumption Central holds no dated credits yet. The cost is licences alone, so the return reads high.";
+                : "Not counted: Consumption Central holds no dated credits yet. The cost is licenses alone, so the return reads high.";
         case "error":
-            return `Not counted: Consumption Central couldn't be read (${data.credits.message}). The cost is licences alone, so the return reads high.`;
+            return `Not counted: Consumption Central couldn't be read (${data.credits.message}). The cost is licenses alone, so the return reads high.`;
         case "loading":
             return "Reading Consumption Central…";
     }
@@ -101,7 +101,7 @@ function howNotes(data: CostVsValue): Note[] {
                 : undefined,
         },
         {
-            term: "Licences",
+            term: "Licenses",
             text:
                 span && users !== undefined
                     ? `${formatKpi(users, "whole")} licensed users × ${dollars(licencePrice, 2)} a month${listPrice ? " (the US list price)" : ""} × ${spanMonths(span).toFixed(1)} months.`
@@ -115,14 +115,14 @@ function howNotes(data: CostVsValue): Note[] {
         {
             term: "Pairing",
             text: counted
-                ? "Licences pay for licensed users' Copilot chat and apps, Copilot Studio credits for agents, and Cowork credits for Cowork. Agents' value also covers built-in and Agent Builder agents a licence pays for, so that pair reads high."
-                : "Licences are set against licensed users' Copilot chat and apps.",
+                ? "Licenses pay for licensed users' Copilot chat and apps, Copilot Studio credits for agents, and Cowork credits for Cowork. Agents' value also covers built-in and Agent Builder agents a license pays for, so that pair reads high."
+                : "Licenses are set against licensed users' Copilot chat and apps.",
         },
         {
             term: "Left out",
             text: `${
                 data.comparison.unlicensedChat !== undefined && data.comparison.unlicensedChat > 0
-                    ? `Copilot Chat by people without a licence (${formatKpi(data.comparison.unlicensedChat, "currency", { prefix })} of value), as it's free with Microsoft 365 and no cost here pays for it. `
+                    ? `Copilot Chat by people without a license (${formatKpi(data.comparison.unlicensedChat, "currency", { prefix })} of value), as it's free with Microsoft 365 and no cost here pays for it. `
                     : ""
             }${
                 azure.cost !== undefined
@@ -133,10 +133,10 @@ function howNotes(data: CostVsValue): Note[] {
         {
             term: "Currency",
             text: dollar
-                ? "US dollars, as licences and credits are billed. Choose another reporting currency under Prices."
+                ? "US dollars, as licenses and credits are billed. Choose another reporting currency under Prices."
                 : exchangeRate !== undefined
-                  ? `${code}, at $1 = ${prefix}${exchangeRate}, set under Prices. Licences and credits are billed in US dollars and converted at that rate.`
-                  : `${code}. Licences and credits are billed in US dollars, so set how many ${currencySymbol(code)} make $1 under Prices.`,
+                  ? `${code}, at $1 = ${prefix}${exchangeRate}, set under Prices. Licenses and credits are billed in US dollars and converted at that rate.`
+                  : `${code}. Licenses and credits are billed in US dollars, so set how many ${currencySymbol(code)} make $1 under Prices.`,
         },
     ];
 }
@@ -187,7 +187,7 @@ function PricesMenu({ data }: { data: CostVsValue }) {
         () => [
             {
                 key: "licensePrice",
-                label: "Microsoft 365 Copilot licence",
+                label: "Microsoft 365 Copilot license",
                 hint: `$ per user per month. Empty uses the ${dollars(LICENSE_LIST_PRICE)} US list price.`,
                 placeholder: String(LICENSE_LIST_PRICE),
                 inputMode: "decimal",
@@ -218,7 +218,7 @@ function PricesMenu({ data }: { data: CostVsValue }) {
                 <TermsForm
                     fields={fields}
                     currency={{ value: code, choose: true }}
-                    intro="Microsoft 365 Copilot licences and Copilot credits are billed in US dollars. Value and cost here are shown in the reporting currency, converted at the exchange rate."
+                    intro="Microsoft 365 Copilot licenses and Copilot credits are billed in US dollars. Value and cost here are shown in the reporting currency, converted at the exchange rate."
                     resetLabel="Use defaults"
                     unavailableText="Prices can't be saved here right now, so the US list price applies."
                     note="They're used on the Value page only."
@@ -262,7 +262,7 @@ function RatePrompt({ code }: { code: string }) {
                 <TermsForm
                     fields={fields}
                     currency={{ value: code, choose: false }}
-                    intro={`Licences and credits are billed in US dollars and this page reports in ${code}. Type how many ${currencySymbol(code)} make $1, or choose US dollars under Prices.`}
+                    intro={`Licenses and credits are billed in US dollars and this page reports in ${code}. Type how many ${currencySymbol(code)} make $1, or choose US dollars under Prices.`}
                     resetLabel="Clear"
                     unavailableText="The exchange rate can't be saved here right now."
                     note="It's also under Prices, above."
@@ -430,7 +430,7 @@ export function CostVsValueStage() {
                                         <div className="flex flex-col gap-100">
                                             <KpiStat label="Conservative" value={comparison.low} format="multiple" />
                                             <KpiStat label="Optimistic" value={comparison.high} format="multiple" />
-                                            {!counted && <span>Licences only: credits aren't counted.</span>}
+                                            {!counted && <span>Licenses only: credits aren't counted.</span>}
                                         </div>
                                     )
                                 }
@@ -442,7 +442,7 @@ export function CostVsValueStage() {
                                 prefix={prefix}
                                 detail={
                                     comparison.unlicensedChat !== undefined && comparison.unlicensedChat > 0
-                                        ? `${scenario} effort at ${prefix}${formatKpi(rate, "whole")} an hour. Leaves out ${formatKpi(comparison.unlicensedChat, "currency", { prefix })} of free Copilot Chat by people without a licence.`
+                                        ? `${scenario} effort at ${prefix}${formatKpi(rate, "whole")} an hour. Leaves out ${formatKpi(comparison.unlicensedChat, "currency", { prefix })} of free Copilot Chat by people without a license.`
                                         : `${scenario} effort at ${prefix}${formatKpi(rate, "whole")} an hour`
                                 }
                             />
@@ -454,7 +454,7 @@ export function CostVsValueStage() {
                                     prefix={prefix}
                                     detail={
                                         <div className="flex flex-col gap-100">
-                                            <KpiStat label="Licences" value={costs.licences} format="currency" prefix={prefix} />
+                                            <KpiStat label="Licenses" value={costs.licences} format="currency" prefix={prefix} />
                                             {counted && (
                                                 <KpiStat label="Credits" value={comparison.credits} format="currency" prefix={prefix} />
                                             )}

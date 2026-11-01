@@ -97,9 +97,9 @@ describe("signal impact task descriptions", () => {
     const described = withTaskDescriptions(table);
     const last = described.columns.length - 1;
 
-    it("labels the two task levels Task Category and Task Breakdown", () => {
-        expect(columnMetadata["[Category]"]?.displayName).toBe("Task Category");
-        expect(columnMetadata["[AI Tasks]"]?.displayName).toBe("Task Breakdown");
+    it("labels the two task levels Task category and Task breakdown", () => {
+        expect(columnMetadata["[Category]"]?.displayName).toBe("Task category");
+        expect(columnMetadata["[AI Tasks]"]?.displayName).toBe("Task breakdown");
     });
 
     it("describes exactly the Task Breakdown the model holds", () => {

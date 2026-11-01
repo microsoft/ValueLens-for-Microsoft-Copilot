@@ -71,6 +71,7 @@
   --color-band-muted: #b9d3cf;
   --color-band-accent: #7fe0cf;
   --color-segment: #e8eeec;                                          /* segmented control track */
+  --color-segment-foreground: #556764;                               /* unchosen segments, 4.5:1 on the track */
 
   /* Outcome colours, shared by every destination so good and bad never
      change meaning between sections. Text-safe shades; the chart fills are
@@ -177,6 +178,11 @@
   height: --value(--icon-size-*);
 }
 
+/* A row that scrolls sideways fades at its end, so the tabs past the edge read as more. */
+@utility scroll-fade-x {
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+
 @layer base {
   .dark {
     /* Native controls (scrollbars, the <select> list) follow the theme too. */
@@ -214,11 +220,12 @@
     --color-input: #364946;
     --color-ring: #5fd0bd;
 
-    --color-band: #08201e;
+    --color-band: #11302c;
     --color-band-foreground: #ffffff;
     --color-band-muted: #a9c7c2;
     --color-band-accent: #7fe0cf;
     --color-segment: #1f2d2b;
+    --color-segment-foreground: #9fb3af;
 
     --color-brand:            #3cb8a5;
     --color-brand-foreground: #7fe0cf;
@@ -396,6 +403,17 @@ body,
   }
 }
 
+/* The grid's row toggles are drawn at the size of their triangle; give them a
+   24px target. Unlayered, as the grid's own styles are. */
+td[role="gridcell"] > button[aria-label="Expand row"],
+td[role="gridcell"] > button[aria-label="Collapse row"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  vertical-align: middle;
+}
 /* Exports (lib/report-export.ts). "Download PDF" prints a report built from
    the captured charts in place of the app, so the paper copy matches the
    slides and no chart has to re-flow to the page width. A plain Ctrl+P still

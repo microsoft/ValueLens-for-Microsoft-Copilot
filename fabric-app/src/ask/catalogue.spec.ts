@@ -15,7 +15,7 @@ const queries = import.meta.glob<string>("../queries/**/*.dax", { query: "?raw",
 const ISSUE_PROMPTS = [
     "What's the bottom line this month, and what changed?",
     "Which orgs have the lowest activation?",
-    "Who are heavy users without a licence?",
+    "Who are heavy users without a license?",
     "Will we stay within the Cowork budget?",
     "Which tasks deliver the most expert-equivalent hours?",
     "Where are we using a premium model for simple work?",

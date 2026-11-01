@@ -37,8 +37,8 @@ const views: readonly { id: View; label: string }[] = [
 ];
 
 const details: readonly { id: Detail; label: string }[] = [
-    { id: "categories", label: "Task Categories" },
-    { id: "tasks", label: "Task Breakdown" },
+    { id: "categories", label: "Task categories" },
+    { id: "tasks", label: "Task breakdown" },
 ];
 
 const MEASURES = [ACTIVITY_SHARE_COLUMN, HOURS_PER_WEEK_COLUMN, VALUE_PER_WEEK_COLUMN] as const;
@@ -149,7 +149,7 @@ export function TaskValueBreakdown({ extra, prefix, assumption }: TaskValueBreak
         () => [
             {
                 id: TASK_LABEL_COLUMN,
-                header: "Task Category / Task Breakdown",
+                header: "Task category / task breakdown",
                 minWidth: 260,
                 cellRenderer: (value, row): ReactNode =>
                     isGroup(row) ? <span className="font-semibold">{String(value ?? "")}</span> : String(value ?? ""),
@@ -194,7 +194,7 @@ export function TaskValueBreakdown({ extra, prefix, assumption }: TaskValueBreak
         <div className="flex flex-col gap-200">
             <div className="flex flex-wrap items-end justify-between gap-200">
                 <p className="max-w-[60ch] text-[length:var(--text-200)] leading-200 text-muted-foreground">
-                    Task Category and Task Breakdown come from rule-based labels, so they won’t line up with the
+                    Task category and task breakdown come from rule-based labels, so they won’t line up with the
                     AI-inferred categories in Copilot Analytics.
                 </p>
                 <div className="flex flex-wrap items-center gap-200">
@@ -214,7 +214,7 @@ export function TaskValueBreakdown({ extra, prefix, assumption }: TaskValueBreak
                     <QueryEmpty
                         className="h-full"
                         title="No value to break down"
-                        description="No recorded work carries both a Task Category and an estimated value for this slice."
+                        description="No recorded work carries both a task category and an estimated value for this slice."
                     />
                 ) : view === "table" ? (
                     <DataGrid
@@ -227,7 +227,7 @@ export function TaskValueBreakdown({ extra, prefix, assumption }: TaskValueBreak
                         theme={theme}
                         header={{
                             title: "Where the value comes from",
-                            subtitle: `Each Task Category, then its Task Breakdown. ${assumption}.`,
+                            subtitle: `Each task category, then its task breakdown. ${assumption}.`,
                         }}
                     />
                 ) : (
@@ -238,8 +238,8 @@ export function TaskValueBreakdown({ extra, prefix, assumption }: TaskValueBreak
                             capabilities={source.capabilities}
                             theme={theme}
                             header={{
-                                title: "Time saved by Task Breakdown",
-                                subtitle: `Expert-equivalent hours per week, coloured by Task Category. ${assumption}.`,
+                                title: "Time saved by task breakdown",
+                                subtitle: `Expert-equivalent hours per week, coloured by task category. ${assumption}.`,
                             }}
                         />
                     </Headlined>

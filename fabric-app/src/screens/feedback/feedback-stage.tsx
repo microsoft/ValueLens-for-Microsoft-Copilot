@@ -42,6 +42,18 @@ const ON_CALENDAR = { extra: [FEEDBACK_ON_CALENDAR] } as const;
 /** Automatic segment labels would print thumbs down as negative counts. */
 const NO_STACK_LABELS = { disableStackedDataLabels: true };
 
+/** The model's "Thumbs Up" values, shown with the summary's sentence-case display names. */
+const FEEDBACK_LABELS: Readonly<Record<string, string>> = Object.fromEntries(
+    Object.values(feedbackSummary().columnMetadata)
+        .filter((column) => column.name.startsWith("Thumbs "))
+        .map((column) => [column.name, column.displayName ?? column.name]),
+);
+
+const FEEDBACK_LABEL_EXPR = Object.entries(FEEDBACK_LABELS).reduceRight(
+    (otherwise, [name, label]) => `datum.label === ${JSON.stringify(name)} ? ${JSON.stringify(label)} : ${otherwise}`,
+    "datum.label",
+);
+
 function formatSubmitted(value: unknown): string {
     if (typeof value !== "string") return "";
     const date = new Date(value);
@@ -61,7 +73,7 @@ function commentColumns(colors: FeedbackColorRange | undefined): GridColumnDef[]
                 return (
                     <span className="inline-flex items-center gap-200">
                         {color && <span className="size-200 shrink-0 rounded-full" style={{ backgroundColor: color }} />}
-                        <span>{label}</span>
+                        <span>{FEEDBACK_LABELS[label] ?? label}</span>
                     </span>
                 );
             },
@@ -81,6 +93,7 @@ type FeedbackColorRange = readonly [string, string];
 interface MutableFeedbackSpec {
     encoding?: {
         color?: {
+            legend?: Record<string, unknown> | null;
             scale?: {
                 domain?: string[];
                 range?: string[];
@@ -101,16 +114,18 @@ function feedbackColorRange(
 }
 
 function withFeedbackColors(spec: VisualizationSpec, range: FeedbackColorRange | undefined): VisualizationSpec {
-    if (!range) return spec;
-
     const next = structuredClone(spec) as MutableFeedbackSpec;
-    if (!next.encoding?.color) return next as VisualizationSpec;
+    const color = next.encoding?.color;
+    if (!color) return next as VisualizationSpec;
 
-    next.encoding.color.scale = {
-        ...(next.encoding.color.scale ?? {}),
-        domain: ["Thumbs Up", "Thumbs Down"],
-        range: [...range],
-    };
+    if (color.legend !== null) color.legend = { ...(color.legend ?? {}), labelExpr: FEEDBACK_LABEL_EXPR };
+    if (range) {
+        color.scale = {
+            ...(color.scale ?? {}),
+            domain: ["Thumbs Up", "Thumbs Down"],
+            range: [...range],
+        };
+    }
     return next as VisualizationSpec;
 }
 
@@ -270,7 +285,7 @@ function FeedbackContent() {
                 </p>
             )}
 
-            <div className="grid gap-400 xl:grid-cols-2">
+            <div className="grid grid-cols-1 gap-400 xl:grid-cols-2">
                 <div className="h-[360px]" style={pairStyle}>
                     {trendResult.data?.status === "error" ? (
                         <QueryError
@@ -338,7 +353,7 @@ function FeedbackContent() {
                 items are left out of the satisfaction comparison so one or two comments do not set the rank.
             </p>
 
-            <div className="grid gap-400">
+            <div className="grid grid-cols-1 gap-400">
                 <div
                     className="h-[420px]"
                     style={

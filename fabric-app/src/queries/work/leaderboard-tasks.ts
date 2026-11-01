@@ -36,24 +36,24 @@ interface TaskLevels {
 const APP_ACTIVITY: TaskLevels = {
     group: "AppHost",
     leaf: "Behavior_Enriched_Full",
-    heading: "App / surface / Task Breakdown",
-    path: "App / surface → Task Breakdown",
+    heading: "App / surface / task breakdown",
+    path: "App / surface → task breakdown",
     groupNoun: "app or surface",
     groupPlural: "apps and surfaces",
-    leafNoun: "Task Breakdown",
-    leafPlural: "Task Breakdown",
+    leafNoun: "task breakdown",
+    leafPlural: "task breakdowns",
 };
 
 /** Cowork happens in one surface, so the report groups its sessions by what the work was instead. */
 const TASK_GROUP_CATEGORY: TaskLevels = {
     group: "Task Breakdown Group",
     leaf: "Task Breakdown Category",
-    heading: "Task Category / Task Breakdown",
-    path: "Task Category → Task Breakdown",
-    groupNoun: "Task Category",
-    groupPlural: "Task Categories",
-    leafNoun: "Task Breakdown",
-    leafPlural: "Task Breakdown",
+    heading: "Task category / task breakdown",
+    path: "Task category → task breakdown",
+    groupNoun: "task category",
+    groupPlural: "task categories",
+    leafNoun: "task breakdown",
+    leafPlural: "task breakdowns",
 };
 
 function taskLevels(cohort: LeaderboardCohort): TaskLevels {

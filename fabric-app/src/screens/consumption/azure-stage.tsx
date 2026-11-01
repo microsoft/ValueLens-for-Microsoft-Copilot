@@ -17,6 +17,8 @@ import { useThemeContext } from "@/hooks/theme.context";
 import { gridHeight, rowChartHeight } from "@/lib/chart-height";
 import { columnHeat, heatRenderer } from "@/lib/heat";
 import { withModelNames } from "@/lib/model-name";
+import { currencyLabel } from "@/lib/currency";
+import { readableDates } from "@/lib/format-period";
 import { readNumber, readText } from "@/lib/summary-row";
 import { formatCell } from "@/lib/tree-grid";
 import {
@@ -236,7 +238,7 @@ function SolutionView({ filters, prefix }: { filters: readonly string[]; prefix:
                     format="money"
                     prefix={prefix}
                     emphasis
-                    detail={readText(row, "[Spend Context]")}
+                    detail={readableDates(readText(row, "[Spend Context]"))}
                 />
                 <KpiCard label="Model share" value={readNumber(row, "[Model Share]")} format="percent" detail="Of the solution's cost" />
                 <KpiCard label="Supporting cost" value={readNumber(row, "[Supporting Cost]")} format="money" prefix={prefix} />
@@ -319,7 +321,7 @@ export function AzureStage({ options }: { options: ConsumptionOptions | undefine
                 {currencies.length > 1 && activeCurrency && (
                     <SegmentedControl
                         label="Currency"
-                        options={currencies.map((id) => ({ id, label: id }))}
+                        options={currencies.map((id) => ({ id, label: currencyLabel(id) }))}
                         value={activeCurrency}
                         onChange={setCurrency}
                     />

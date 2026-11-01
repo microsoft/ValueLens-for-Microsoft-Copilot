@@ -43,7 +43,7 @@ function MatrixTable({ matrix }: { matrix: HabitLicenceMatrix }) {
     return (
         <table className="w-full max-w-[720px] border-collapse text-left">
             <caption className="sr-only">
-                People active in {monthLabel(matrix.month)}, by habit and licence
+                People active in {monthLabel(matrix.month)}, by habit and license
             </caption>
             <thead className={cn(SMALL, "text-muted-foreground")}>
                 <tr className="border-b border-border">
@@ -129,8 +129,8 @@ export function HabitLicenceStage() {
     return (
         <Section
             id={stageAnchor("habit-licence")}
-            title="Heavy users without a licence"
-            description="People active last month, by how often they used Copilot and whether they had a licence."
+            title="Heavy users without a license"
+            description="People active last month, by how often they used Copilot and whether they had a license."
         >
             {matrixResult.data?.status === "error" ? (
                 <QueryError message={matrixResult.data.error.message} onRetry={matrixResult.refetch} />
@@ -150,7 +150,7 @@ export function HabitLicenceStage() {
                     <p className={cn(SMALL, "max-w-[90ch] text-muted-foreground")}>
                         Habits count the distinct days each person used Copilot in {monthLabel(matrix.month)}, as on
                         the Adoption page. Anyone with any licensed activity counts as licensed. This compares groups;
-                        it doesn&apos;t show what a licence would change.
+                        it doesn&apos;t show what a license would change.
                     </p>
                 </div>
             )}
@@ -165,7 +165,7 @@ export function HabitLicenceStage() {
                         <QueryEmpty
                             className="h-full"
                             title="No heavy unlicensed users"
-                            description={`Nobody without a licence was active on 11 or more days in ${monthLabel(matrix.month)}.`}
+                            description={`Nobody without a license was active on 11 or more days in ${monthLabel(matrix.month)}.`}
                         />
                     ) : (
                         <DataGrid
@@ -174,7 +174,7 @@ export function HabitLicenceStage() {
                             defaultSort={[{ columnId: "Active Days", direction: "desc" }]}
                             theme={theme}
                             header={{
-                                title: "Most active without a licence",
+                                title: "Most active without a license",
                                 subtitle: `The ${formatKpi(listTable.rows.length, "whole")} unlicensed ${
                                     listTable.rows.length === 1 ? "person" : "people"
                                 } active on the most days in ${monthLabel(matrix.month)}. The full ranked list is above, under Who to license next.`,

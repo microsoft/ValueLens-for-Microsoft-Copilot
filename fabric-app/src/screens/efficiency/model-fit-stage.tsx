@@ -46,7 +46,7 @@ type ModelFitView = "task" | "organization" | "person";
 /** The report's Model Fit View buttons, with the middle one following the Group by choice. */
 function viewOptions(orgLabel: string): readonly { id: ModelFitView; label: string }[] {
     return [
-        { id: "task", label: "Task Category" },
+        { id: "task", label: "Task category" },
         { id: "organization", label: orgLabel },
         { id: "person", label: "User" },
     ];
@@ -204,7 +204,7 @@ export function ModelFitStage() {
     // The model leaves the reason blank when nothing is over- or under-specified.
     const showReason = hasAnyText(verdictTable, "Main Reason");
     const views = useMemo(() => viewOptions(org.label), [org.label]);
-    const segmentLabel = view === "person" ? "User" : view === "organization" ? org.label : "Task Category";
+    const segmentLabel = view === "person" ? "User" : view === "organization" ? org.label : "Task category";
     // Mirrors the report's mm_table: verdict, main model and reason, then judged coverage and the three shares.
     const verdictColumns: GridColumnDef[] = useMemo(
         () => [
@@ -252,7 +252,7 @@ export function ModelFitStage() {
                 />
             ) : (
                 <div className="grid gap-300 md:grid-cols-2 xl:grid-cols-5">
-                    <KpiCard label="Sessions" value={readNumber(summaryRow, "[Sessions]")} emphasis />
+                    <KpiCard label="Sessions" value={readNumber(summaryRow, "[Sessions]")} />
                     <KpiCard
                         label="Model logged"
                         value={readNumber(summaryRow, "[Logged Share]")}

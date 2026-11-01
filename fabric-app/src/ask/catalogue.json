@@ -42,9 +42,9 @@
         {
             "destination": "readiness",
             "questions": [
-                "Who are heavy users without a licence?",
+                "Who are heavy users without a license?",
                 "Which orgs have the most active unlicensed users?",
-                "How many licences are in use?"
+                "How many licenses are in use?"
             ]
         },
         {
@@ -243,7 +243,7 @@
             "model": "vl",
             "query": "licensing/license-estate-summary.dax",
             "filters": ["dateRange", "organizations"],
-            "description": "Total licensed users, average days since last active, and notices on how complete the licence evidence is."
+            "description": "Total licensed users, average days since last active, and notices on how complete the license evidence is."
         },
         {
             "name": "licence_demand",
@@ -268,7 +268,7 @@
             "model": "vl",
             "query": "licensing/unlicensed-heavy-users.dax",
             "filters": ["organizations"],
-            "description": "The people who used Copilot Chat most in the last full month without a Copilot licence, as the Readiness page lists them."
+            "description": "The people who used Copilot Chat most in the last full month without a Copilot license, as the Readiness page lists them."
         },
         {
             "name": "consumption_by_product",

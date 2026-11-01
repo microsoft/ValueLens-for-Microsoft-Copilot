@@ -4,7 +4,7 @@
 //        Licensed under the MIT license. See LICENSE file in the project root for full license information.
 // </copyright>
 //-----------------------------------------------------------------------
-import type { ComponentProps } from "react";
+import { useEffect, useMemo, useRef, type ComponentProps } from "react";
 import { VegaVisual as EvalVegaVisual } from "@microsoft/fabric-visuals";
 import { EmbeddableVegaVisual } from "@microsoft/fabric-visuals/embeddable";
 import { useIsPrefetch } from "@/hooks/prefetch.context";
@@ -40,6 +40,33 @@ export type VegaVisualProps = ComponentProps<typeof HostVegaVisual>;
 export function VegaVisual(props: VegaVisualProps) {
     // A page fetched ahead of a visit only wants its data; drawing it would cost the open page.
     const prefetching = useIsPrefetch();
+    const frame = useRef<HTMLDivElement>(null);
+    const title = props.header?.title;
+    const spec = useMemo(() => named(props.spec, title), [props.spec, title]);
+
+    // The stock header draws its title as an h4, a level below the section's h2.
+    useEffect(() => {
+        const root = frame.current;
+        if (!root) return;
+        const level = () => {
+            for (const heading of root.querySelectorAll("h4")) heading.setAttribute("aria-level", "3");
+        };
+        level();
+        const observer = new MutationObserver(level);
+        observer.observe(root, { childList: true, subtree: true });
+        return () => observer.disconnect();
+    }, []);
+
     if (prefetching) return null;
-    return <HostVegaVisual key={rowCountKey(props.data)} {...props} />;
+    return (
+        <div ref={frame} className="contents">
+            <HostVegaVisual key={rowCountKey(props.data)} {...props} spec={spec} />
+        </div>
+    );
+}
+
+/** Vega reads a spec's description as the chart's accessible name; fall back to its title. */
+function named(spec: VegaVisualProps["spec"], title: string | undefined): VegaVisualProps["spec"] {
+    if (!title || !spec || typeof spec !== "object" || "description" in spec) return spec;
+    return { ...spec, description: title } as VegaVisualProps["spec"];
 }

@@ -58,19 +58,19 @@ describe("habit by licence", () => {
 
     it("says how many heavy users had no licence, with their share", () => {
         expect(habitLicenceHeadline(matrix({ Power: [10, 4], Habitual: [20, 6], Beginner: [30, 30] }))).toBe(
-            "10 people without a licence were active on 11 or more days in March 2025, 25% of everyone that active.",
+            "10 people without a license were active on 11 or more days in March 2025, 25% of everyone that active.",
         );
     });
 
     it("drops the share when the heavy group is small", () => {
         expect(habitLicenceHeadline(matrix({ Power: [2, 1], Beginner: [30, 30] }))).toBe(
-            "1 person without a licence was active on 11 or more days in March 2025.",
+            "1 person without a license was active on 11 or more days in March 2025.",
         );
     });
 
     it("says so when every heavy user had a licence", () => {
         expect(habitLicenceHeadline(matrix({ Power: [8, 0], Beginner: [10, 10] }))).toBe(
-            "Everyone active on 11 or more days in March 2025 had a licence.",
+            "Everyone active on 11 or more days in March 2025 had a license.",
         );
     });
 

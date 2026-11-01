@@ -17,7 +17,7 @@ const columnMetadata: ColumnMetadataMap = {
         displayName: "Active days per user",
         format: FORMAT_HOURS,
     },
-    "[Expert Hours]": { name: "Expert Hours", displayName: "Expert equivalent hours", format: FORMAT_HOURS },
+    "[Expert Hours]": { name: "Expert Hours", displayName: "Expert-equivalent hours", format: FORMAT_HOURS },
     "[Strong Fit Share]": { name: "Strong Fit Share", displayName: "Strong fit", format: FORMAT_PERCENT },
     "[Worth A Look Share]": { name: "Worth A Look Share", displayName: "Worth a look", format: FORMAT_PERCENT },
     "[Fit Notice]": { name: "Fit Notice", displayName: "Fit notice" },

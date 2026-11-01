@@ -258,7 +258,11 @@ export function BottomLineStage({ data }: { data: ExecutiveData }) {
                             label={habitMonth ? `Habit rate · ${habitMonth}` : "Habit rate"}
                             value={rates.habitRate}
                             format="percent"
-                            delta={cardDelta("rate", pair, monthRows, read("Habit Pct"))}
+                            delta={
+                                !habitMonth || (pair && formatMonth(pair.current) === habitMonth)
+                                    ? cardDelta("rate", pair, monthRows, read("Habit Pct"))
+                                    : undefined
+                            }
                             trend={cardTrend("rate", range.range, monthRows, read("Habit Pct"))}
                             detail={
                                 <Details>
