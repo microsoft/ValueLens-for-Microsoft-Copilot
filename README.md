@@ -44,8 +44,8 @@ All screenshots use synthetic sample data. Every name in them is invented.
 ## Videos
 
 - **[Watch the demo](https://youtu.be/P0uHJb13ZR0)** (2 minutes). What the dashboard shows, page by page.
-- **[Watch the Fabric setup](1.%20Fabric/README.md#video)**. From a new app registration to a self-refreshing report.
-  Or [download the video](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/installer-v0.2.2/ValueLens_Fabric_Setup.mp4).
+- **[Watch the Fabric setup](https://youtu.be/-pAuSQSP5pc)**. From a new app registration to a self-refreshing report.
+  Full written steps: [1. Fabric setup guide](1.%20Fabric/README.md#video). Or [download the video](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/installer-v0.2.2/ValueLens_Fabric_Setup.mp4).
 
 [![Watch the demo on YouTube](https://img.youtube.com/vi/P0uHJb13ZR0/maxresdefault.jpg)](https://youtu.be/P0uHJb13ZR0)
 

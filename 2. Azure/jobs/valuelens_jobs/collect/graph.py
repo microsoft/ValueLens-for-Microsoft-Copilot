@@ -35,15 +35,44 @@ def _replace_snapshot(store, prefix: str, columns, rows) -> int:
     return count
 
 
+def _live_licences(api):
+    """Today's Copilot plans from Entra (licensed.fetch_live_licences), or None when /users can't be read."""
+    def get_page(url):
+        r = api.get(url, timeout=120)
+        if r.status_code in (400, 403, 404):
+            log.warning("licensed: /users returned HTTP %s, so flags are not checked against today's licences "
+                        "this run. The jobs' managed identity needs User.Read.All.", r.status_code)
+            return None
+        raise_for_status(r, "/users licence check")
+        return r.json()
+
+    return licensed.fetch_live_licences(get_page)
+
+
 def collect_licensed(api, store, settings, *, allow_empty=False) -> int:
     prefix = f"raw/{licensed.TABLE}"
     r = api.get(LICENSED_URL, timeout=300)
     _permission(r, "getOffice365ActiveUserDetail", "Reports.Read.All")
     raise_for_status(r, "licensed users report")
     text = r.content.decode("utf-8-sig") if isinstance(r.content, bytes) else r.text
-    columns, rows = licensed.build_snapshot(text, table_exists=bool(store.list(prefix)), allow_empty=allow_empty)
+    live = _live_licences(api)
+    stats = {}
+    columns, rows = licensed.build_snapshot(text, table_exists=bool(store.list(prefix)), allow_empty=allow_empty,
+                                            live=live, stats=stats)
     count = _replace_snapshot(store, prefix, columns, rows)
     log.info("licensed: %s users written", count)
+    if stats["deleted"]:
+        log.info("licensed: %s deleted user(s) not counted", stats["deleted"])
+    if stats["live_checked"]:
+        log.info("licensed: %s user(s) unticked because Entra shows no enabled Copilot plan today",
+                 stats["live_removed"])
+        if stats["live_missed"]:
+            log.warning("licensed: %s user(s) have an enabled Copilot plan in Entra but no matching assigned "
+                        "product; they stay unlicensed. Check COPILOT_SKU_PATTERNS.", stats["live_missed"])
+    elif live is not None:
+        log.warning("licensed: none of the report's users are in Microsoft Entra, so flags were not checked "
+                    "against today's licences. If the report shows concealed names, untick 'Display concealed "
+                    "user, group, and site names in all reports' in the Microsoft 365 admin center.")
     return count
 
 

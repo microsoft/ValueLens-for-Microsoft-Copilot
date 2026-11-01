@@ -178,6 +178,11 @@ UPN_Normalized       (lower(trim(UPN)) — dedupe + join key)
 … plus all Office365ActiveUserDetail columns (sanitized)
 ```
 
+Rows the report marks `Is Deleted` are dropped. `Has_license` starts as an assigned-product match,
+then is unticked for users Microsoft Entra shows without an enabled `M365_COPILOT_APPS` service plan
+today (`/v1.0/users` `assignedPlans`). That check never ticks a flag, and is skipped when `/users`
+can't be read or the report's names are concealed.
+
 ### 3. `copilot_org_data` — Entra org / people data
 Dashboard normalizes dynamically (UPN/PersonId variants, `Department`→`Organization`) and adds
 `PersonId_Normalized` + `TotalEmployees` if missing.

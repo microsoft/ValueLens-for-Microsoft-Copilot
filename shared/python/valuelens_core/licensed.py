@@ -26,6 +26,9 @@ COPILOT_SKU_EXCLUDE = [
 ]
 TABLE = 'copilot_licensed_users'
 _INVALID = re.compile(r'[ ,;{}()\n\t=]')
+# M365_COPILOT_APPS: the service plan in every Microsoft 365 Copilot SKU, including EDU, Sales and E7.
+COPILOT_PLAN_ID = 'a62f8878-de10-42f3-b68f-6149a25ceb97'
+LIVE_USERS_URL = 'https://graph.microsoft.com/v1.0/users?$select=userPrincipalName,assignedPlans&$top=999'
 
 
 def _normalise_header(value):
@@ -104,6 +107,82 @@ def _validate_report_rows(rows, upn_col):
             )
 
 
+def drop_deleted_rows(rows):
+    """Remove report rows marked 'Is Deleted'. Returns (kept rows, number dropped)."""
+    kept = []
+    for row in rows:
+        col = _pick_report_column(list(row), 'Is Deleted', 'isDeleted')
+        if col is not None and str(row.get(col) or '').strip().lower() in ('true', 'yes', '1'):
+            continue
+        kept.append(row)
+    return kept, len(rows) - len(kept)
+
+
+def live_copilot_licences(users, known=None, enabled=None):
+    """Graph /users items (userPrincipalName, assignedPlans) -> (every UPN, UPNs with an enabled Copilot plan).
+
+    Pass the sets back in to add one page at a time. A removed licence stays in assignedPlans with
+    capabilityStatus 'Deleted', and a suspended one isn't 'Enabled', so neither counts.
+    """
+    known = set() if known is None else known
+    enabled = set() if enabled is None else enabled
+    for user in users or []:
+        upn = _normalise_identity((user or {}).get('userPrincipalName'))
+        if not upn:
+            continue
+        known.add(upn)
+        if any(str((plan or {}).get('servicePlanId') or '').strip().lower() == COPILOT_PLAN_ID
+               and (plan or {}).get('capabilityStatus') == 'Enabled'
+               for plan in user.get('assignedPlans') or []):
+            enabled.add(upn)
+    return known, enabled
+
+
+def fetch_live_licences(get_page, url=None):
+    """Page Graph /users. `get_page(url)` returns the JSON page, or None when /users can't be read
+    (HTTP 400, 403 or 404). Returns live_copilot_licences's (known, enabled), or None."""
+    known, enabled, seen = set(), set(), set()
+    url = url or LIVE_USERS_URL
+    while url:
+        if url in seen:
+            raise RuntimeError(f'Graph /users paging looped back to {url}.')
+        seen.add(url)
+        page = get_page(url)
+        if page is None:
+            return None
+        live_copilot_licences(page.get('value'), known, enabled)
+        url = page.get('@odata.nextLink')
+        if url and not url.startswith('https://graph.microsoft.com/'):
+            raise RuntimeError(f'Graph /users returned a non-Graph nextLink: {url}')
+    return known, enabled
+
+
+def apply_live_veto(rows, upn_col, live):
+    """Untick HasCopilot for report users Entra shows without an enabled Copilot plan today. Never ticks.
+
+    `live` is fetch_live_licences's (known, enabled), or None. Users Entra didn't return are left alone.
+    The check is skipped when `live` is None or none of the report's users are in Entra (concealed names).
+    """
+    stats = {'checked': False, 'removed': 0, 'missed': 0}
+    if live is None:
+        return stats
+    known, enabled = live
+    if not ({_normalise_identity(row.get(upn_col)) for row in rows} & known):
+        return stats
+    stats['checked'] = True
+    for row in rows:
+        upn = _normalise_identity(row.get(upn_col))
+        if upn not in known:
+            continue
+        if row.get('HasCopilot') == 'TRUE':
+            if upn not in enabled:
+                row['HasCopilot'] = 'FALSE'
+                stats['removed'] += 1
+        elif upn in enabled:
+            stats['missed'] += 1
+    return stats
+
+
 def _normalise_product(value):
     return ' '.join((value or '').upper().split())
 
@@ -138,13 +217,23 @@ def sanitize(name: str) -> str:
     return _INVALID.sub('_', name)
 
 
-def build_snapshot(csv_text, *, patterns=None, exclude=None, table_exists=False, allow_empty=False):
-    """CSV text -> (columns, rows) for `copilot_licensed_users`. Mirrors the notebook cells 2-4."""
+def build_snapshot(csv_text, *, patterns=None, exclude=None, table_exists=False, allow_empty=False,
+                   live=None, stats=None):
+    """CSV text -> (columns, rows) for `copilot_licensed_users`. Mirrors the notebook cells 2-4.
+
+    Rows the report marks 'Is Deleted' are dropped. `live` is fetch_live_licences's result, or None;
+    see apply_live_veto. Pass a dict as `stats` to receive the counts for the log.
+    """
     fieldnames, rows, upn_col, _products_col = _parse_active_user_report(csv_text)
+    rows, deleted = drop_deleted_rows(rows)
     _validate_report_rows(rows, upn_col)
     is_copilot = make_classifier(patterns, exclude)
     for row in rows:
         row['HasCopilot'] = 'TRUE' if is_copilot(row.get('Assigned Products') or '')[0] else 'FALSE'
+    veto = apply_live_veto(rows, upn_col, live)
+    if stats is not None:
+        stats.update(deleted=deleted, live_checked=veto['checked'], live_removed=veto['removed'],
+                     live_missed=veto['missed'])
 
     # spark.createDataFrame(list_of_dicts) orders the inferred columns by key.
     columns = sorted(rows[0].keys()) if rows else list(fieldnames)
