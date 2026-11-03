@@ -7,118 +7,255 @@ It runs in the browser. Your CSV files are read on your PC, and no data is sent 
 
 ![The ValueLens app's Adoption tab, showing the built-in synthetic sample data](../Images/ValueLens-App-Adoption.png)
 
-## Get the app
+## Choose a route
 
-None of these needs a Power BI licence.
+This app reads processed CSV files in your browser. You do not need a Power BI licence.
 
-| Option | Best for | How |
+| Route | Choose it when | What you need |
 |---|---|---|
-| **Copilot Managed App** (recommended, preview) | Sharing it across your organisation | [Deploy it once](#as-a-copilot-managed-app). Viewers need Power Apps Premium or Copilot Credits. |
-| **On your PC** | Trying it, or one person | Open [`download/ValueLens-App.html`](download/ValueLens-App.html), choose **Download raw file**, open it in Edge or Chrome. Works offline. |
-| **Fabric App** (alternative) | Tenants with Fabric capacity | [Host it in a workspace](#as-a-fabric-app-in-a-fabric-workspace). |
+| **On your PC** | You want to try it or use it by yourself | Edge or Chrome. Works offline. |
+| **Copilot Managed App** (preview) | You want to share the app with people | An admin to allow CLI apps; Node.js and Git; viewers need Power Apps Premium or Copilot Credits. |
+| **Fabric App** (preview) | You have a Fabric workspace and want to host the app there | Node.js and Git; a workspace on Fabric capacity (F2 or larger, or a trial); the **Fabric Apps (preview)** setting. |
+| **Azure** | You need the Azure-hosted Analytics Hub | Use the [installer](../2.%20Azure/README.md). Azure is not a manual hosting route for this CSV app; the installer deploys a different app. |
 
-It opens on labelled sample data. Choose **Change data** and drop in [your CSVs](#data) to see your own.
+## How setup works
 
-The Fabric installer deploys a different app, the [Analytics Hub app](../1.%20Fabric/Fabric%20App/),
-which reads your semantic model live instead of CSV files.
+```mermaid
+flowchart LR
+    A["Prepare processed CSVs"] --> B["Check permissions and licences"]
+    B --> C["Get the app code"]
+    C --> D{"Choose a route"}
+    D -->|"On your PC"| E["Open the downloaded HTML"]
+    D -->|"Copilot Managed App"| F["Build and deploy"]
+    D -->|"Fabric App"| G["Build and deploy"]
+    D -->|"Azure"| H["Use the installer"]
+    E --> I["Load CSVs in the app"]
+    F --> J["Share the app"]
+    G --> J
+```
 
-## Deploy
+## Before you start
 
-The same `npm run build` output runs in either host. Nothing in this repo deploys it automatically.
+- **Prepare the data.** Have the processed interactions CSV ready. Add the user, agent registry,
+  and feedback CSVs if you have them. See [which files the app reads](#which-files-the-app-reads).
+- **Choose who can open the app.** For the Managed App, each viewer needs Power Apps Premium or
+  Copilot Credits. Microsoft 365 Copilot by itself is not enough. For Fabric, the workspace admin
+  must enable **Fabric Apps (preview)** and the workspace must use Fabric capacity (F2 or larger,
+  or a trial). *My workspace* does not work.
+- **Get permission before you start.** Ask a Global or Power Platform Administrator to allow
+  Managed App creation for the Managed App route. For Fabric, use a workspace where you are allowed
+  to deploy and share an app.
+- **Install the tools for your route.** The Managed App route needs Node.js 24.11 or later and Git.
+  The Fabric route needs Node.js 24.15 or later (or 22.22 or later) and Git. The PC route needs no
+  developer tools.
 
-### As a Copilot Managed App
+## Set up the app
 
-The recommended host, on Copilot Managed Runtime (preview). You deploy it once with Microsoft's `ms`
-tool. Deploying needs no licence; opening the app does (step 2).
+### On your PC
 
-1. **An admin allows CLI apps.** A Global or Power Platform Administrator opens the
-   [Power Platform admin center](https://admin.powerplatform.microsoft.com) > **Copilot** >
-   **Settings** > **Managed apps**. For your environment (or its group), they turn on both:
-   - **Allow app creation with the Copilot Managed Runtime command line interface (CLI)**
-   - **External artifacts in managed apps** (the app is built on your PC, then uploaded)
+1. Open [`download/ValueLens-App.html`](download/ValueLens-App.html) in GitHub.
+2. Select **Download raw file** and save the file to your PC.
+   - **Success:** the saved file is named `ValueLens-App.html`.
+   - **If this fails:** choose **Download raw file**, not **Raw**; opening the raw view can show code instead of saving the app.
+3. Open the saved file in Edge or Chrome.
+   - **Success:** the app opens and shows labelled sample data. It works offline.
+   - **If this fails:** make sure the browser opened the downloaded `.html` file, not the GitHub page.
+4. In the app, select **Change data** and choose your CSV files.
+   - **Success:** the dashboard shows your data instead of the sample.
+   - **If this fails:** check that the interactions file is processed and matches the [required columns](#which-files-the-app-reads).
 
-   Both are off by default. The `ms` tool uses your personal developer environment unless you pick
-   another in step 5. See [Control whether apps can be created using the CLI](https://learn.microsoft.com/microsoft-365/admin/manage/apps/governance#control-whether-apps-can-be-created-using-the-cli).
+### Copilot Managed App
 
-2. **Check viewers' licences.** Each viewer needs **Power Apps Premium** or **Copilot Credits**.
-   The Power Apps rights in Microsoft 365 don't count, and no Microsoft 365 Copilot licence is needed.
-   <details><summary>Using Copilot Credits</summary>
-
-   An admin turns on usage-based billing in the [Microsoft 365 admin center](https://admin.microsoft.com)
-   and adds viewers to a spending policy for managed apps. Each call the app makes, such as opening
-   it, uses 0.1 credits. During the preview, someone with neither licence gets a warning, then is
-   blocked after 20 operations or five minutes. See the
-   [licensing FAQ](https://learn.microsoft.com/microsoft-365/admin/manage/apps/licensing-faq).
-
-   </details>
-
-3. **Install the tools:** [Node.js](https://nodejs.org/) 24.11 or later, [Git](https://git-scm.com/downloads),
-   and the `ms` tool (these steps were checked with 0.29.0):
+1. Ask a Global or Power Platform Administrator to open the
+   [Power Platform admin center](https://admin.powerplatform.microsoft.com) and go to **Copilot** >
+   **Settings** > **Managed apps**.
+2. Ask the administrator to turn on both settings for your environment or its group:
+   **Allow app creation with the Copilot Managed Runtime command line interface (CLI)** and
+   **External artifacts in managed apps**.
+   - **Success:** both settings show as on.
+   - **If this fails:** ask the administrator to check that they selected the environment you will use.
+     Both settings are off by default. See
+     [the CLI app settings](https://learn.microsoft.com/microsoft-365/admin/manage/apps/governance#control-whether-apps-can-be-created-using-the-cli).
+3. Install [Node.js 24.11 or later](https://nodejs.org/) and [Git](https://git-scm.com/downloads).
+   Check that both are ready:
 
    ```powershell
-   npm install -g @microsoft/managed-apps-cli@0.29.0
-   ms --version
+   node --version
+   git --version
    ```
 
-   If PowerShell says scripts are disabled, use `npm.cmd` and `ms.cmd` here and below.
-
-4. **Sign in** to your viewers' tenant. (No browser on this PC? Use `ms auth login --device-code`.)
+   - **Success:** Node.js shows version 24.11 or later, and Git prints its version.
+   - **If this fails:** install the missing tool, then close and reopen PowerShell.
+4. Open PowerShell and install the Microsoft `ms` tool:
 
    ```powershell
-   ms auth login
+   npm.cmd install -g @microsoft/managed-apps-cli@0.29.0
    ```
 
-5. **Get the code and set up the app.**
+5. Check that the tool is ready:
+
+   ```powershell
+   ms.cmd --version
+   ```
+
+   - **Success:** the version is `0.29.0`.
+   - **If this fails:** close and reopen PowerShell. If it still fails, check that Node.js installed
+     correctly. Using `npm.cmd` and `ms.cmd` avoids PowerShell script-policy errors.
+6. Sign in to the environment where the app will live:
+
+   ```powershell
+   ms.cmd auth login
+   ```
+
+   - **Success:** the browser confirms sign-in and PowerShell returns to the prompt.
+   - **If this fails:** complete the sign-in in the browser. If no browser can open, run
+     `ms.cmd auth login --device-code`.
+7. Download the app code:
 
    ```powershell
    git clone https://github.com/microsoft/ValueLens-for-Microsoft-Copilot.git
-   cd ValueLens-for-Microsoft-Copilot/app
-   npm ci
-   ms app init -n "ValueLens" --repo none -b ./dist -S "npm run build"
    ```
 
-   `--repo none` means you build on your PC, which is why step 1 needs the second setting.
-   `ms app init` saves your tenant's IDs in `ms.config.json` (git ignores it, so each deployer runs
-   it once). If it times out finding your environment, add `-e <environment-id>` from the
-   environment's page in the Power Platform admin center.
-
-6. **Deploy it.** This builds, uploads and publishes the app.
+   - **Success:** a `ValueLens-for-Microsoft-Copilot` folder appears in the current folder.
+   - **If this fails:** install Git, reopen PowerShell, and run the command again.
+8. Go to the app folder:
 
    ```powershell
-   ms app deploy
+   cd .\ValueLens-for-Microsoft-Copilot\app
    ```
 
-   To update later: `git pull`, `npm ci`, then `ms app deploy` again.
-
-7. **Share it** with people or groups (emails or Entra object IDs, comma-separated). Sharing gives
-   access, not a licence. Or run `ms app share link create` for an org-wide link.
+9. Install the app's required files:
 
    ```powershell
-   ms app share alice@contoso.com,valuelens-viewers@contoso.com
+   npm.cmd ci
    ```
 
-8. **Viewers open it** at [managedapps.cloud.microsoft](https://managedapps.cloud.microsoft), choose
-   **ValueLens**, then **Change data**, and pick their CSV files ([which files](#data),
-   [where to get them](#getting-the-files-from-each-variant)).
+   - **Success:** the command finishes and returns to the prompt.
+   - **If this fails:** check that PowerShell is in the `app` folder and Node.js is installed.
+10. Set up the app for local build and upload:
 
-> **Can Copilot do this for me?** A coding agent can run these steps, but it should deploy this code,
-> not rewrite it. Cowork, Copilot Studio and coding agents build a *new*, untested app from a prompt.
+    ```powershell
+    ms.cmd app init -n "ValueLens" --repo none -b .\dist -S "npm run build"
+    ```
 
-### As a Fabric App in a Fabric workspace
+    `--repo none` means the app is built on your PC and then uploaded. The **External artifacts**
+    setting in step 2 is needed for this. This uses your personal developer environment. If your
+    administrator gave you a different environment, use this command instead and paste its ID:
 
-An alternative host, also in preview. You need a workspace on Fabric capacity (F2 or larger, or a
-trial; not *My workspace*) and the **Fabric Apps (preview)** tenant setting. The config is
-[`rayfin/rayfin.yml`](rayfin/rayfin.yml); only auth and static hosting are on, as the app keeps no
-server-side data.
+    ```powershell
+    $environmentId = Read-Host "Paste the environment ID"
+    ms.cmd app init -n "ValueLens" --repo none -b .\dist -S "npm run build" -e $environmentId
+    ```
 
-```powershell
-npx rayfin up --dry-run
-npx rayfin up --tenant <tenant-id> --workspace-id <workspace-id> -y
-```
+    - **Success:** setup finishes without an error and creates a local `ms.config.json`.
+    - **If this fails:** check the sign-in, both admin settings, and that you are in the `app` folder.
+11. Build and deploy the app:
 
-It prints the item's portal link. Share the item (or give a workspace role) so people can open it.
-To update, run `npx rayfin up` again. Its deploy state (`rayfin/.deployments.json`, `rayfin/.env`)
-is gitignored.
+    ```powershell
+    ms.cmd app deploy
+    ```
+
+    - **Success:** the command finishes without an error. The app is available at
+      [managedapps.cloud.microsoft](https://managedapps.cloud.microsoft).
+    - **If this fails:** check that your account can create apps in the selected environment and
+      that you used the correct environment when setting up the app.
+12. Share the app with people or groups. Enter their email addresses, separated by commas, when
+    PowerShell asks:
+
+    ```powershell
+    $viewers = Read-Host "Enter viewer emails, separated by commas"
+    ms.cmd app share $viewers
+    ```
+
+    - **Success:** the command confirms the share. Viewers can find **ValueLens** at
+      [managedapps.cloud.microsoft](https://managedapps.cloud.microsoft).
+    - **If this fails:** check the email addresses and that you are signed in to the right environment.
+      Sharing gives access, not a licence.
+13. Ask viewers to open **ValueLens** and select **Change data** to load their CSV files.
+    Each viewer also needs Power Apps Premium or Copilot Credits.
+
+### Fabric App
+
+1. Ask a Fabric administrator to turn on **Fabric Apps (preview)** in the Fabric admin portal's
+   tenant settings.
+   - **Success:** the setting is on.
+   - **If this fails:** only a Fabric administrator can change tenant settings.
+2. Open the Fabric workspace where the app will live. Confirm it is assigned to Fabric capacity
+   (F2 or larger, or a trial); do not use *My workspace*.
+   - **Success:** the workspace shows its capacity.
+   - **If this fails:** ask the workspace or capacity administrator to assign a capacity.
+3. Install [Node.js 24.15 or later](https://nodejs.org/) (or 22.22 or later) and
+   [Git](https://git-scm.com/downloads). Check that both are ready:
+
+   ```powershell
+   node --version
+   git --version
+   ```
+
+   - **Success:** Node.js shows version 24.15 or later (or 22.22 or later), and Git prints its version.
+   - **If this fails:** install the missing tool, then close and reopen PowerShell.
+4. Open PowerShell and download the app code:
+
+   ```powershell
+   git clone https://github.com/microsoft/ValueLens-for-Microsoft-Copilot.git
+   ```
+
+5. Go to the app folder:
+
+   ```powershell
+   cd .\ValueLens-for-Microsoft-Copilot\app
+   ```
+
+6. Install the app's required files:
+
+   ```powershell
+   npm.cmd ci
+   ```
+
+   - **Success:** the command finishes and returns to the prompt.
+   - **If this fails:** check that you are in the `app` folder and Node.js is installed.
+7. Check what Rayfin plans to deploy. When prompted, sign in and enter the tenant and workspace
+   IDs. Copy the workspace ID from the workspace URL; ask your administrator for the tenant ID.
+
+   ```powershell
+   $tenantId = Read-Host "Paste your tenant ID"
+   $workspaceId = Read-Host "Paste your Fabric workspace ID"
+   npx.cmd rayfin up --tenant $tenantId --workspace-id $workspaceId --dry-run
+   ```
+
+   - **Success:** Rayfin shows the planned app without deploying it.
+   - **If this fails:** check the IDs, sign-in, workspace capacity, and the tenant setting in step 1.
+8. Build and deploy the app to the workspace:
+
+   ```powershell
+   npx.cmd rayfin up --tenant $tenantId --workspace-id $workspaceId
+   ```
+
+   Review and approve the deployment if prompted.
+   - **Success:** Rayfin prints a link to the app in the Fabric portal. Open it to see the sample data.
+   - **If this fails:** make sure your account can deploy apps to that workspace. Ask the Fabric
+     administrator to check the tenant setting and capacity.
+9. In the Fabric workspace, find the app, select **…** > **Share**, add the people or group, and
+   choose **Grant**.
+   - **Success:** a viewer can open the item link.
+   - **If this fails:** check that the viewer was added to the app item, not just sent the link.
+10. Ask viewers to select **Change data** and choose their CSV files.
+    - **Success:** the dashboard shows their data instead of the sample.
+    - **If this fails:** check that the interactions file is processed and has the
+      [required columns](#which-files-the-app-reads).
+
+To update the Fabric App after changing the code, run `npx.cmd rayfin up` again from the `app`
+folder. Rayfin keeps deployment state in gitignored local files.
+
+## What manual setup does not do
+
+These manual routes host only the CSV dashboard. They do not collect or process data, create a
+semantic model or Power BI report, schedule data refresh, or create a viewer group. You provide the
+processed CSV files, share the app yourself, and viewers load their own files in the browser.
+
+The [Analytics Hub installer](../1.%20Fabric/installer/README.md) sets up a different app with a
+data pipeline and a live semantic model. Use the [Azure setup guide](../2.%20Azure/README.md) for
+the Azure installer route.
 
 ## Data
 
