@@ -562,7 +562,11 @@ def sample_fixture(estimates: list[dict[str, str]]) -> dict[str, object]:
     model_index = {value: index for index, value in enumerate(models)}
     session_keys = sorted(
         {
-            (user_key(row), clean(row.get("AppHost")), clean(row.get("ThreadId")))
+            (
+                user_key(row),
+                "Teams" if clean(row.get("AppHost")) == "Microsoft Teams" else clean(row.get("AppHost")),
+                clean(row.get("ThreadId")),
+            )
             for row in interactions
             if user_key(row) and clean(row.get("ThreadId"))
         }
@@ -578,8 +582,17 @@ def sample_fixture(estimates: list[dict[str, str]]) -> dict[str, object]:
         agent_name = clean(row.get("AgentName"))
         tool = tool_index(row)
         license_index = 0 if clean(row.get("License Status")).lower() == "m365 copilot licensed" else 1
+        prompt_row = clean(row.get("Message_isPrompt")).upper() in ("TRUE", "1")
+        observed_prompt = (
+            prompt_row
+            and bool(key)
+            and bool(clean(row.get("Message_Id")))
+            and bool(clean(row.get("ThreadId")))
+        )
+        usage_row = prompt_row or "cowork" in clean(row.get("AppHost")).lower()
         task, task_detail = task_values(row)
-        session = (key, clean(row.get("AppHost")), clean(row.get("ThreadId")))
+        app_host = clean(row.get("AppHost"))
+        session = (key, "Teams" if app_host == "Microsoft Teams" else app_host, clean(row.get("ThreadId")))
         try:
             baseline = float(clean(row.get("Human_Baseline_Min")) or 0)
         except ValueError:
@@ -596,9 +609,11 @@ def sample_fixture(estimates: list[dict[str, str]]) -> dict[str, object]:
                 model_index.get(clean(row.get("AI_Model")), -1),
                 user_index[key],
                 session_index.get(session, -1),
-                1 if clean(row.get("Message_isPrompt")).upper() == "TRUE" else 0,
+                1 if prompt_row else 0,
                 baseline,
                 task_detail_index.get(task_detail, -1),
+                1 if observed_prompt else 0,
+                1 if usage_row else 0,
             ]
         )
 
@@ -664,11 +679,17 @@ def main() -> None:
         separators=(",", ":"),
         allow_nan=False,
     )
-    (OUTPUT_DIR / "report-data.js").write_text(
-        f"window.VALUE_LENS_REPORT_DEMO = {payload};\n",
-        encoding="utf-8",
-        newline="\n",
+    with (OUTPUT_DIR / "report-data.js").open("w", encoding="utf-8", newline="\n") as output:
+        output.write(f"window.VALUE_LENS_REPORT_DEMO = {payload};\n")
+    license_text = (ROOT / "LICENSE").read_text(encoding="utf-8").strip()
+    notice = (
+        "# License and third-party notices\n\n"
+        "This browser-native report port has no third-party runtime dependencies. "
+        "The source repository MIT license applies:\n\n"
+        f"## MIT License\n\n{license_text}\n"
     )
+    with (OUTPUT_DIR / "THIRD_PARTY_NOTICES.md").open("w", encoding="utf-8", newline="\n") as output:
+        output.write(notice)
     print(f"Built {len(metadata['pages'])} pages to {OUTPUT_DIR.relative_to(ROOT)}")
     print(f"Fixture: {len(fixture['rows'])} interactions, {fixture['peopleCount']} people, {fixture['agentCount']} agents")
     print(f"Feedback: {fixture['feedbackCount']} fabricated entries; no user identifiers are emitted")

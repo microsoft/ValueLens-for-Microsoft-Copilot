@@ -112,22 +112,24 @@
       state.tool = 2;
       state.agent = -1;
     }
+    syncBookmarkToFilters();
   }
 
   function syncBookmarkToFilters() {
-    const page = currentPage();
-    for (const group of page.views || []) {
-      const desired = state.license === 0
-        ? "licensed"
-        : state.license === 1
-          ? "unlicensed"
-          : state.tool === 1
-            ? "agents"
-            : state.tool === 2
-              ? "cowork"
-              : "overall";
-      const matching = group.views.find((view) => view.name.toLowerCase() === desired);
-      if (matching) state.bookmarks[group.id] = matching.id;
+    const desired = state.license === 0
+      ? "licensed"
+      : state.license === 1
+        ? "unlicensed"
+        : state.tool === 1
+          ? "agents"
+          : state.tool === 2
+            ? "cowork"
+            : "overall";
+    for (const page of report.pages) {
+      for (const group of page.views || []) {
+        const matching = group.views.find((view) => view.name.toLowerCase() === desired);
+        if (matching) state.bookmarks[group.id] = matching.id;
+      }
     }
   }
 
@@ -158,7 +160,9 @@
 
   function currentStats(rows = filteredRows()) {
     const promptRows = rows.filter((row) => row[10] === 1);
-    const people = new Set(promptRows.map((row) => row[8]));
+    const usageRows = rows.filter((row) => row[14] === 1);
+    const observedRows = rows.filter((row) => row[13] === 1);
+    const people = new Set(usageRows.map((row) => row[8]));
     const population = fixture.userTeams
       .map((team, user) => user)
       .filter((user) =>
@@ -172,7 +176,7 @@
     const agentPeople = new Set(promptRows.filter((row) => row[3] === 1 || row[3] === 2).map((row) => row[8]));
     const coworkPeople = new Set(promptRows.filter((row) => row[3] === 2).map((row) => row[8]));
     const copilotPeople = new Set(promptRows.filter((row) => row[3] === 0).map((row) => row[8]));
-    const sessions = new Set(promptRows.map((row) => row[9]));
+    const sessions = new Set(observedRows.map((row) => row[9]));
     const hours = promptRows.reduce((total, row) => total + Number(row[11] || 0) / 60, 0);
     const licensedByMonth = new Map();
     for (const row of promptRows) {
@@ -300,7 +304,7 @@
       const measureName = measureFields[0].name.toLowerCase();
       const activeByTeam = new Map();
       for (const row of rows) {
-        if (row[10] !== 1 || row[1] < 0) continue;
+        if (row[14] !== 1 || row[1] < 0) continue;
         if (!activeByTeam.has(row[1])) activeByTeam.set(row[1], new Set());
         activeByTeam.get(row[1]).add(row[8]);
       }
@@ -309,6 +313,7 @@
           .map((userTeam, user) => ({ userTeam, user }))
           .filter(({ userTeam, user }) =>
             userTeam === team &&
+            (state.team < 0 || userTeam === state.team) &&
             (state.license < 0 || fixture.userLicenses[user] === state.license));
         const active = activeByTeam.get(team) || new Set();
         const value = /inactive/.test(measureName)
@@ -342,13 +347,18 @@
       model: (row) => row[7],
     }[dimension];
     if (!getter) return [{ label: "All activity", value: rows.length }];
-    const counts = new Map();
+    const groups = new Map();
     for (const row of rows) {
       const index = getter(row);
-      if (index >= 0) counts.set(index, (counts.get(index) || 0) + 1);
+      if (index < 0) continue;
+      if (!groups.has(index)) groups.set(index, []);
+      groups.get(index).push(row);
     }
-    return [...counts.entries()]
-      .map(([index, value]) => ({ label: values[dimension]?.[index] || "Other", value }))
+    return [...groups.entries()]
+      .map(([index, groupRows]) => ({
+        label: values[dimension]?.[index] || "Other",
+        value: measureFields.length ? measureValue(measureFields[0].name, groupRows) : groupRows.length,
+      }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 7);
   }
@@ -598,10 +608,7 @@
     state.from = Math.max(0, fixture.months.findIndex((month) => month >= "2026-06"));
     state.to = fixture.months.length - 1;
     state.team = state.license = state.tool = state.agent = -1;
-    for (const group of currentPage().views || []) {
-      const overall = group.views.find((view) => view.name.toLowerCase() === "overall");
-      if (overall) state.bookmarks[group.id] = overall.id;
-    }
+    syncBookmarkToFilters();
     render();
   });
   window.addEventListener("resize", resizeCanvas);

@@ -11,6 +11,7 @@
     "prebuild:file": "node scripts/prepare-sample.mjs",
     "build:file": "tsc -b && vite build --mode file",
     "prebuild:demo": "node scripts/prepare-sample.mjs",
+    "postbuild:demo": "node scripts/write-demo-notices.mjs",
     "lint": "eslint .",
     "test": "node --test \"tests/*.test.ts\"",
     "preview": "vite preview",
