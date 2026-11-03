@@ -109,6 +109,7 @@ export default function App() {
   const { ds, filters, setFilter, openAssumptions, assumptions } = useData()
   const [route, go] = useRoute()
   const [sourceOpen, setSourceOpen] = useState(false)
+  const demoMode = import.meta.env.MODE === 'demo'
 
   // A filter only applies where its slicer is shown, so hidden ones are cleared on navigation.
   useEffect(() => {
@@ -141,13 +142,23 @@ export default function App() {
                 Assumptions · {assumptions.currency}
                 {assumptions.hourly}/h, {assumptions.scenario.toLowerCase()}
               </button>
-              <button type="button" className="source-chip" onClick={() => setSourceOpen(true)}>
-                {ds.source === 'sample' && <span className="tag">Sample data</span>}
-                <span className="source-dates">
-                  {dateLabel(ds.minDate)} – {dateLabel(ds.maxDate)}
-                </span>
-                <span className="source-action">Change data</span>
-              </button>
+              {demoMode ? (
+                <div className="source-chip" aria-label="Synthetic demo data; no sign-in or upload">
+                  <span className="tag">Demo data</span>
+                  <span className="source-dates">
+                    {dateLabel(ds.minDate)} – {dateLabel(ds.maxDate)}
+                  </span>
+                  <span>No sign-in or upload</span>
+                </div>
+              ) : (
+                <button type="button" className="source-chip" onClick={() => setSourceOpen(true)}>
+                  {ds.source === 'sample' && <span className="tag">Sample data</span>}
+                  <span className="source-dates">
+                    {dateLabel(ds.minDate)} – {dateLabel(ds.maxDate)}
+                  </span>
+                  <span className="source-action">Change data</span>
+                </button>
+              )}
             </div>
           </div>
           <nav className="tabs" aria-label="Sections">
@@ -163,11 +174,16 @@ export default function App() {
         <div className="sample-banner" role="status">
           <div className="sample-banner-inner">
             <p>
-              <strong>Sample data.</strong> These people and agents are made up. To see your organisation, choose Change data and pick your own CSVs.
+              <strong>{demoMode ? 'Synthetic demo data.' : 'Sample data.'}</strong>{' '}
+              {demoMode
+                ? 'People, organisations and agents are invented. Filters and assumptions run in this browser only.'
+                : 'These people and agents are made up. To see your organisation, choose Change data and pick your own CSVs.'}
             </p>
-            <button type="button" className="link-btn" onClick={() => setSourceOpen(true)}>
-              Change data
-            </button>
+            {!demoMode && (
+              <button type="button" className="link-btn" onClick={() => setSourceOpen(true)}>
+                Change data
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -194,8 +210,12 @@ export default function App() {
       >
         <Page route={route} />
       </main>
-      <footer className="foot">ValueLens. Everything is calculated in your browser and never leaves it.</footer>
-      <DataSourceDialog open={sourceOpen} onClose={() => setSourceOpen(false)} />
+      <footer className="foot">
+        {demoMode
+          ? 'ValueLens demo. Synthetic data only; no sign-in or external data connection.'
+          : 'ValueLens. Everything is calculated in your browser and never leaves it.'}
+      </footer>
+      {!demoMode && <DataSourceDialog open={sourceOpen} onClose={() => setSourceOpen(false)} />}
     </div>
   )
 }

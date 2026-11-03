@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="A no-sign-in browser demo of the ValueLens Power BI report, using invented sample data." />
+    <title>ValueLens report demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="ValueLens report demo home">
+        <span class="brand-mark" aria-hidden="true">V</span>
+        <span><strong>ValueLens</strong><small>Power BI report · browser demo</small></span>
+      </a>
+      <div class="top-meta">
+        <span class="demo-pill">Synthetic demo data</span>
+        <span class="no-signin">No sign-in · no external connection</span>
+      </div>
+    </header>
+    <div class="notice">
+      <strong>Demonstration only.</strong>
+      Values are recomputed from an invented sample; report pages, visual positions, field labels and metric definitions come from the checked-in Power BI template.
+    </div>
+    <nav id="page-nav" class="page-nav" aria-label="Report pages"></nav>
+    <main>
+      <section class="filter-panel" aria-label="Report filters">
+        <div class="filter-heading">
+          <div>
+            <h1 id="page-title">Loading report…</h1>
+          </div>
+          <button id="clear-filters" class="quiet-button" type="button">Clear filters</button>
+        </div>
+        <div id="filter-controls" class="filter-controls"></div>
+      </section>
+      <div id="page-summary" class="page-summary"></div>
+      <section class="report-viewport" aria-label="Power BI page layout">
+        <div id="report-canvas" class="report-canvas"></div>
+      </section>
+      <p class="report-note">This is an offline browser port, not Power BI Desktop or the Power BI service. Report measures are shown with their source definitions; demo values use the synthetic fixture and do not claim to execute the Power BI semantic model.</p>
+    </main>
+    <dialog id="definition-dialog" class="definition-dialog">
+      <form method="dialog">
+        <button class="dialog-close" aria-label="Close definition">×</button>
+      </form>
+      <h2 id="definition-title"></h2>
+      <p id="definition-copy"></p>
+      <details id="dax-details" hidden>
+        <summary>Show source measure expression</summary>
+        <pre id="definition-expression"></pre>
+      </details>
+    </dialog>
+    <script src="./report-data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -10,9 +10,11 @@
     "build": "tsc -b && vite build",
     "prebuild:file": "node scripts/prepare-sample.mjs",
     "build:file": "tsc -b && vite build --mode file",
+    "prebuild:demo": "node scripts/prepare-sample.mjs",
     "lint": "eslint .",
     "test": "node --test \"tests/*.test.ts\"",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:demo": "tsc -b && vite build --mode demo"
   },
   "dependencies": {
     "@microsoft/managed-apps": "^0.5.0",

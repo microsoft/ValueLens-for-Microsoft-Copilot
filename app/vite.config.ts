@@ -45,13 +45,31 @@ function singleFileFinish(): Plugin {
   };
 }
 
+function inlineFavicon(): Plugin {
+  return {
+    name: "inline-demo-favicon",
+    transformIndexHtml(html) {
+      const icon = `data:image/svg+xml;base64,${readFileSync("public/favicon.svg").toString("base64")}`;
+      return html.replace(/href="[^"]*favicon\.svg"/, `href="${icon}"`).replace(/\r\n?/g, "\n");
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const file = mode === "file";
+  const demo = mode === "demo";
   return {
+    base: file || demo ? "./" : undefined,
     plugins: file
       ? [react(), embeddedSample(true), viteSingleFile({ removeViteModuleLoader: true }), singleFileFinish()]
-      : [react(), embeddedSample(false), managedApps()],
-    build: file ? { outDir: FILE_OUT_DIR, copyPublicDir: false } : undefined,
+      : demo
+        ? [react(), embeddedSample(true), inlineFavicon(), viteSingleFile({ removeViteModuleLoader: true })]
+        : [react(), embeddedSample(false), managedApps()],
+    build: file
+      ? { outDir: FILE_OUT_DIR, copyPublicDir: false }
+      : demo
+        ? { outDir: "../demo/valuelens", emptyOutDir: true, copyPublicDir: false }
+        : undefined,
   };
 });

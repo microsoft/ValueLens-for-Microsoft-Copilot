@@ -195,11 +195,17 @@ npm run lint
 npm test            # unit tests for the upload checks (Node 24, no install needed)
 npm run build       # type-check and build to dist/ (Fabric App and Managed App hosting)
 npm run build:file  # build the single-file download to download/ValueLens-App.html
+npm run build:demo  # build the no-upload browser demo to ../demo/valuelens/index.html
 ```
 
 `download/ValueLens-App.html` is committed so people can download it. After any app change, run
 `npm run build:file` and commit the result. It inlines the code and styles and embeds the sample
 CSVs gzipped, so it needs no server and makes no network calls.
+
+`npm run build:demo` makes a separate static bundle for the browser demos site. It uses the same
+synthetic sample and app UI, embeds all code and sample data in `index.html`, and disables CSV
+uploads in that demo build. It does not change the normal `build`, `build:file` or Managed App
+behavior.
 
 `scripts/extract-model-tables.py` re-extracts the glossary, behaviour value map and human time
 estimates from the report into `src/data/*.json`. Run it when those tables change in the `.pbit`.
