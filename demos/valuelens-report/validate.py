@@ -152,11 +152,9 @@ require(
     "Unlicensed Group 01 chart values changed",
 )
 
-app_source = APP_SOURCE.read_text(encoding="utf-8")
-require(
-    "measureValue(measureFields[0].name, groupRows)" in app_source,
-    "Grouped charts must evaluate their source measure for each category",
-)
+from reference import verify
+
+verify(payload)
 
 print(f"Source chart: Adoption / {ai_tasks_visual['type']} / Behavior_Enriched_Full × AI Tasks")
 print("Source measure: AI Tasks = count rows where Is Prompt Row is true")

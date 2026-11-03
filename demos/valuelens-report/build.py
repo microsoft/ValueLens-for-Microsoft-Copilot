@@ -6,7 +6,6 @@ from __future__ import annotations
 import csv
 import json
 import re
-import shutil
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -182,6 +181,9 @@ def projection_fields(visual: dict[str, object]) -> list[dict[str, str]]:
             entity = ""
             property_name = ""
             if isinstance(field, dict):
+                aggregation = field.get("Aggregation", {})
+                if isinstance(aggregation, dict) and isinstance(aggregation.get("Expression"), dict):
+                    field = aggregation["Expression"]
                 for candidate in ("Measure", "Column", "Hierarchy"):
                     detail = field.get(candidate)
                     if isinstance(detail, dict):
@@ -207,8 +209,57 @@ def projection_fields(visual: dict[str, object]) -> list[dict[str, str]]:
                     "name": property_name or label,
                     "label": label,
                     "measure": "true" if field_kind == "measure" else "false",
+                    "aggregate": aggregation.get("Function") if isinstance(aggregation, dict) else None,
                 }
             )
+    return result
+
+
+def filter_predicates(container):
+    result = []
+    def scalar(value):
+        if value == "null":
+            return None
+        if value in ("true", "false"):
+            return value == "true"
+        if value.startswith("'"):
+            return value[1:-1].replace("''", "'")
+        return float(value.rstrip("LD"))
+    for entry in container.get("filterConfig", {}).get("filters", []):
+        query = entry.get("filter", {})
+        tables = {item["Name"]: item["Entity"] for item in query.get("From", [])}
+        for clause in query.get("Where", []):
+            condition = clause.get("Condition", {})
+            negate = "Not" in condition
+            condition = condition.get("Not", {}).get("Expression", condition) if negate else condition
+            if "In" in condition:
+                body = condition["In"]
+                field = body["Expressions"][0]
+                values = [item[0]["Literal"]["Value"] for item in body["Values"]]
+                operation = "notIn" if negate else "in"
+            elif "Comparison" in condition:
+                body = condition["Comparison"]
+                field = body["Left"]
+                values = [body["Right"]["Literal"]["Value"]]
+                operation = f"compare{body['ComparisonKind']}"
+            elif "Contains" in condition:
+                body = condition["Contains"]
+                field = body["Left"]
+                values = [body["Right"]["Literal"]["Value"]]
+                operation = "notContains" if negate else "contains"
+            else:
+                raise ValueError(f"Unimplemented source visual predicate: {condition}")
+            aggregate = field.get("Aggregation", {}).get("Function")
+            field = field.get("Aggregation", {}).get("Expression", field)
+            kind = "measure" if "Measure" in field else "column"
+            detail = field.get("Measure", field.get("Column", {}))
+            source = detail.get("Expression", {}).get("SourceRef", {})
+            result.append({
+                "table": source.get("Entity", tables.get(source.get("Source"), "")),
+                "name": detail["Property"], "kind": kind, "aggregate": aggregate,
+                "operation": operation,
+                "values": [scalar(value) for value in values],
+            })
     return result
 
 
@@ -293,6 +344,7 @@ def report_metadata() -> dict[str, object]:
         model = json.loads(archive.read("DataModelSchema").decode("utf-16-le").lstrip("\ufeff"))["model"]
         glossary: list[dict[str, object]] = []
         estimates: list[dict[str, str]] = []
+        behaviors = []
         measures: dict[str, dict[str, str]] = {}
         for table in model.get("tables", []):
             table_name = clean(table.get("name"))
@@ -303,6 +355,7 @@ def report_metadata() -> dict[str, object]:
                     "table": table_name,
                     "expression": expression_text(measure.get("expression")),
                     "description": clean(measure.get("description")),
+                    "format": clean(measure.get("formatString")),
                 }
             if table_name == "📖 Metric Glossary":
                 rows = parse_datatable_rows(table.get("partitions", [{}])[0].get("source", {}).get("expression"))
@@ -323,7 +376,11 @@ def report_metadata() -> dict[str, object]:
                 estimates = [
                     {
                         "behavior": clean(row[0]),
+                        "baseline": clean(row[1]),
+                        "source": clean(row[3]),
                         "category": clean(row[5]),
+                        "valueOutcome": clean(row[6]),
+                        "coworkCategory": clean(row[7]),
                         "low": clean(row[8]),
                         "typical": clean(row[9]),
                         "high": clean(row[10]),
@@ -331,6 +388,12 @@ def report_metadata() -> dict[str, object]:
                     }
                     for row in rows
                     if len(row) >= 12 and row[0] != "Behavior"
+                ]
+            if table_name == "Behavior Value Map":
+                rows = parse_datatable_rows(table.get("partitions", [{}])[0].get("source", {}).get("expression"))
+                behaviors = [
+                    dict(zip(("signal", "behavior", "useCase", "valueOutcome", "description"), row[:5]))
+                    for row in rows if len(row) >= 5 and row[0] != "Signal"
                 ]
 
         pages: list[dict[str, object]] = []
@@ -359,6 +422,16 @@ def report_metadata() -> dict[str, object]:
                         },
                         "fields": fields,
                         "hidden": bool(visual.get("isHidden") or container.get("isHidden")),
+                        "parent": clean(container.get("parentGroupName")),
+                        "isGroup": "visualGroup" in container,
+                        "predicates": filter_predicates(container),
+                        "sorts": [
+                            {
+                                "name": item.get("field", {}).get("Measure", item.get("field", {}).get("Column", {})).get("Property", ""),
+                                "direction": item.get("direction", "Ascending"),
+                            }
+                            for item in visual.get("query", {}).get("sortDefinition", {}).get("sort", [])
+                        ],
                         "bookmarkGroup": object_property(visual, "bookmarks", "bookmarkGroup"),
                         "selectedBookmark": object_property(visual, "bookmarks", "selectedBookmark"),
                         "bookmarkTarget": object_property(visual, "visualLink", "bookmark"),
@@ -385,11 +458,21 @@ def report_metadata() -> dict[str, object]:
                         if isinstance(visual_state, dict)
                         and visual_state.get("singleVisual", {}).get("display", {}).get("mode") == "hidden"
                     ] if isinstance(visual_states, dict) else []
+                    visibility = {
+                        visual_id: visual_state["singleVisual"].get("display", {}).get("mode") != "hidden"
+                        for visual_id, visual_state in visual_states.items()
+                        if isinstance(visual_state, dict) and "singleVisual" in visual_state
+                    } if isinstance(visual_states, dict) else {}
+                    visibility.update({
+                        group_id: not group_state.get("isHidden", False)
+                        for group_id, group_state in section_state.get("visualContainerGroups", {}).items()
+                    })
                     views.append(
                         {
                             "id": clean(bookmark_id),
                             "name": clean(bookmark.get("displayName")),
                             "hiddenVisualIds": hidden_ids,
+                            "visibility": visibility,
                         }
                     )
                 view_groups.append(
@@ -424,6 +507,7 @@ def report_metadata() -> dict[str, object]:
                     "width": int(page.get("width", 1280)),
                     "height": int(page.get("height", 720)),
                     "filters": slicer_fields,
+                    "predicates": filter_predicates(page),
                     "visuals": visuals,
                     "views": view_groups,
                 }
@@ -435,6 +519,7 @@ def report_metadata() -> dict[str, object]:
             "glossary": glossary,
             "measures": measures,
             "estimates": estimates,
+            "behaviors": behaviors,
         }
 
 
@@ -641,6 +726,7 @@ def sample_fixture(estimates: list[dict[str, str]]) -> dict[str, object]:
     ]
 
     return {
+        "sourceRecords": sanitized_records(interactions, users, registry, feedback),
         "months": months,
         "teams": [f"Group {index + 1:02d}" for index in range(len(org_names))],
         "userTeams": [team_index.get(org_by_user.get(key, ""), -1) for key in user_ids],
@@ -665,6 +751,86 @@ def sample_fixture(estimates: list[dict[str, str]]) -> dict[str, object]:
     }
 
 
+def sanitized_records(interactions, users, agents, feedback):
+    user_ids = sorted({clean(r.get("Audit_UserId")).lower() for r in interactions} |
+                      {clean(r.get("PersonId")).lower() for r in users})
+    person = {key: f"person{index + 1:03d}" for index, key in enumerate(user_ids) if key}
+    org = {key: f"Group {index + 1:02d}" for index, key in enumerate(
+        sorted({clean(r.get("Organization")) for r in users if clean(r.get("Organization"))}))}
+    names = sorted({clean(r.get("AgentName")) for r in interactions if clean(r.get("AgentName"))} |
+                   {clean(r.get("Agent name")) for r in agents if clean(r.get("Agent name"))})
+    agent_names = {key: f"Agent {index + 1:03d}" for index, key in enumerate(names)}
+    creators = {key: f"Creator {index + 1:03d}" for index, key in enumerate(
+        sorted({clean(r.get("Agent creator")) for r in agents if clean(r.get("Agent creator"))}))}
+    source_ids = {
+        clean(row.get(key)) for row in interactions
+        for key in ("ThreadId", "Message_Id", "AgentId", "Agent_TitleID", "Agent_EntraId")
+    } | {clean(row.get(key)) for row in agents for key in ("Title ID", "Entra Agent ID")}
+    ids = {value: f"synthetic-{index + 1:06d}" for index, value in enumerate(sorted(source_ids - {""}))}
+
+    def identifier(value):
+        value = clean(value)
+        if not value:
+            return ""
+        if value not in ids:
+            ids[value] = f"synthetic-{len(ids) + 1:06d}"
+        return ids[value]
+
+    interaction_fields = (
+        "CreationDate", "AppHost", "Context_Type", "Message_isPrompt", "AccessedResource_Type",
+        "AccessedResource_Action", "Behavior_Enriched_Full", "Behavior_Category", "Value_Outcome",
+        "WeekStart", "InteractionDate", "MonthStart", "Usage_Mode", "Expertise_Role", "Efficiency_Breakdown",
+        "License Status", "Environment", "AI_Model", "Behavior_Plausible", "Is_Agent_Activity", "Agent_Type",
+    )
+    safe_interactions = []
+    for row in interactions:
+        safe = {key: clean(row.get(key)) for key in interaction_fields}
+        safe["Audit_UserId"] = person.get(clean(row.get("Audit_UserId")).lower(), "")
+        safe["AgentName"] = agent_names.get(clean(row.get("AgentName")), "")
+        for key in ("ThreadId", "Message_Id", "AgentId", "Agent_TitleID", "Agent_EntraId"):
+            safe[key] = identifier(row.get(key))
+        safe_interactions.append(safe)
+    safe_users = [{
+        "PersonId": person[clean(row["PersonId"]).lower()],
+        "Organization": org.get(clean(row.get("Organization")), ""),
+        "Has license": clean(row.get("Has license")),
+    } for row in users if clean(row.get("PersonId"))]
+    agent_fields = (
+        "Supported in", "Created in", "Last updated", "Can read OneDrive files",
+        "Can read Sharepoint sites and files", "Can extend to Graph connector",
+        "Can generate images using user prompt", "Can use code interpreter", "Contains uploaded files",
+        "Can read OneDrive and Sharepoint items", "Status", "Is Blocked", "Agent creator source",
+        "Agent type (A365)",
+    )
+    safe_agents = []
+    agent_users = {}
+    for row in interactions:
+        agent_users.setdefault(clean(row.get("AgentName")), set()).add(clean(row.get("Audit_UserId")).lower())
+    for row in agents:
+        safe = {key: clean(row.get(key)) for key in agent_fields}
+        safe.update({
+            "Agent name": agent_names.get(clean(row.get("Agent name")), ""),
+            "Agent creator": creators.get(clean(row.get("Agent creator")), ""),
+            "Agent description": "Invented agent for the offline demonstration.",
+            "Title ID": identifier(row.get("Title ID")),
+            "Entra Agent ID": identifier(row.get("Entra Agent ID")),
+            "Total Users": str(len(agent_users.get(clean(row.get("Agent name")), set()))),
+        })
+        safe_agents.append(safe)
+    # Generate local, non-identifying feedback text instead of exporting free-form comments.
+    safe_feedback = []
+    for index, row in enumerate(feedback):
+        safe_feedback.append({
+            "Date Submitted UTC": clean(row.get("Date Submitted UTC")),
+            "Feedback Type": clean(row.get("Feedback Type")),
+            "App": clean(row.get("App")),
+            "Comment": ("Useful reporting dashboard" if index % 3 == 0 else
+                        "Email draft was helpful" if index % 3 == 1 else "Training answer needs improvement"),
+        })
+    return {"interactions": safe_interactions, "users": safe_users,
+            "agents": safe_agents, "feedback": safe_feedback}
+
+
 def main() -> None:
     metadata = report_metadata()
     fixture = sample_fixture(metadata["estimates"])
@@ -672,7 +838,8 @@ def main() -> None:
         raise SystemExit(f"Expected 16 report pages; found {len(metadata['pages'])}")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     for name in ("index.html", "styles.css", "app.js"):
-        shutil.copyfile(SOURCE_DIR / name, OUTPUT_DIR / name)
+        with (OUTPUT_DIR / name).open("w", encoding="utf-8", newline="\n") as output:
+            output.write((SOURCE_DIR / name).read_text(encoding="utf-8"))
     payload = json.dumps(
         {"report": metadata, "fixture": fixture},
         ensure_ascii=False,

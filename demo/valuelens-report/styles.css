@@ -56,9 +56,26 @@ h1 { margin: 0; color: var(--ink); font-size: 20px; font-weight: 650; }
 .visual-head { height: 23px; display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 2px 6px; color: #465461; font-size: 9px; font-weight: 600; }
 .visual-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .info-button { flex: none; width: 17px; height: 17px; padding: 0; border: 1px solid #bac8d4; border-radius: 50%; background: #fff; color: #406482; font-size: 10px; line-height: 15px; }
-.visual-body { height: calc(100% - 24px); padding: 2px 7px 5px; overflow: hidden; }
-.visual.metric-card .visual-head { display: none; }
-.visual.metric-card .visual-body { height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 7px 9px; }
+.visual-body { height: calc(100% - 24px); padding: 2px 7px 5px; overflow: auto; }
+.visual.control-visual .visual-head { display: none; }
+.visual.control-visual .visual-body { height: 100%; }
+.visual.metric-card .visual-body { display: flex; flex-direction: column; justify-content: center; padding: 7px 9px; }
+.card-metrics { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.card-metrics > div { flex: 1 1 90px; min-width: 0; }
+.metric-value.narrative { font-size: 13px; font-weight: 500; white-space: pre-line; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 9px; padding: 0 4px 5px; }
+.chart-legend i { display: inline-block; width: 7px; height: 7px; margin-right: 4px; }
+.chart-scroll { overflow: auto; height: calc(100% - 20px); }
+.treemap { position: relative; height: 100%; min-height: 160px; }
+.treemap button { position: absolute; left: 0; width: 100%; border: 1px solid white; color: white; text-align: left; padding: 0 6px; font-size: 10px; overflow: hidden; }
+.treemap button:hover { filter: brightness(.9); }
+.word-cloud { display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 5px 12px; min-height: 100%; }
+.visual [data-cross-field] { cursor: pointer; }
+.heatmap th, .heatmap td { white-space: nowrap; text-align: center; }
+.data-table thead { position: sticky; top: 0; z-index: 1; }
+#detail-data { max-height: 42vh; overflow: auto; margin-block: 12px; }
+#detail-data .data-table { font-size: 12px; }
+.visual:not(.has-frame) { border: 0; background: transparent; pointer-events: none; }
 .metric-label { overflow: hidden; color: #5c6e7c; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .metric-value { color: #1b3853; font-size: clamp(13px, 1.4vw, 22px); font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .mini-chart { width: 100%; height: 100%; display: block; }

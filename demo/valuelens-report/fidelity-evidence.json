@@ -1,0 +1,1314 @@
+{
+  "pages": 16,
+  "sourceMeasures": 148,
+  "numericAssertions": 4064,
+  "visualEvaluations": 1380,
+  "mappings": [
+    {
+      "name": "Active Licensed Users (Verified Inventory)",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "59cc26f5d3d4b6659a7d6419466eb389dfa5bc4e795262e3a791f4c987750386",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Inactive Licensed Users (Filter-Aware)",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "b9f7e958384d8c397e84298ffba7d549c4f7c8acffcdcf1bd5a7912aa4050cad",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Activation Overall Headline",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "84ba106674cfd188e546b9477311b4d23ba5d277af4f4b559a2ac45e3577b4e0",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Activation Agents Headline",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "2d17b75d7f566dc4550dab3a8c4986bb379619058c123f28557e7bc1d99f54f8",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "All Active Users",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "c2f6858e9eba1b9faf0213166cfb421cb0101c54bf6811436f111a247b3d9956",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Active Agent Users",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "de20118c81ba07590f94e8cfee8b56a354c59f56bbd34c43976d69196aba5395",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "% Active Users Using Agents",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "2c8eed1538160090cf516adac2b7dfc9e74580fda627843085c4fffe3633fbcb",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Active Unlicensed Users (Verified Inventory)",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "c1578578d4785c58803b1e43faf98a6e8303bae763e1766715cd9b85836878ec",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Inactive Unlicensed Users (Filter-Aware)",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "19c84c0794ded721187faa3573333084f4e33c13ca83076a3a31a3fe23cb4199",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Inactive Users (Filter-Aware)",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "252570d4bdb1bf396822d9a49f13d7374affdb961a4c497152edc4ee01b3efb3",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Using Copilot / Not Using Agents",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "78cb2427ce8b3e5f199e188744ecd917ef6dfc1f53dfdfc73bb89d887066efe0",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "% of Users by Activity",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "9fa7e5515286d9c840994536db98f553c92c2b74f336fc68ff7b13c108bc8081",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Unlicensed Users (Filter-Aware)",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "048143698f74f1e7cbc8b81ef77a3b1742a130887b6588b8d75b72f56872ddcc",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Active Unlicensed Users",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "5f700f8636f91fde19dd57389f65e3fe286ad419512f63e956ff8e29309eabf0",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "% Active Unlicensed Users",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "7701250ad90f84e6063c44970dd39046b4cb59ef2847ea3968a7c5d75d57e4a7",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Total Users (Filter-Aware)",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "86d15ca7b11ea11447903ffa67e7d5d37ac49e4268affdfe9166b50b772f4475",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "% Active Users (of Total)",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "0e026a92827ef0b83e423566d416e5bd67d42e070046c1ba9a17625312c7756f",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "% Inactive Users (of Total)",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "9b57eb44a33558199f97714984ac75fd4c7d9955e9077c958785a88981d9852a",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Activation Licensed Headline",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "4421c2d789e26b3051d6d9311860d8df66ff59fa5992a4d593bcc29c28b72f7f",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Activation Unlicensed Headline",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "ec1d02ef3aa1290e142b8c3d76e4a0a70da574a268528bc0dd61070c1e1bf74c",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Licensed Users (Filter-Aware)",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "8891b162538feefb51bdfe9715f202fe49d0a6cce1887e2cb9531a258b6bfe22",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Active Licensed Users",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "b5fc4dec47ed86285960280e0530d0f1f3dfac403427f9495306209506215e68",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "% Active Licensed Users",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "236a11668c36ea23ad5e200bee32f42b870d9ebcf34acaf9abbf9d90a70090da",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Sessions",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "de98dece54c4432375228524f114de5aead402b6d69973b9b62222833bce78e2",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Sessions per User",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "0c850f57cd7e0055eb8fa09c69068eeb0b40c79df7da5ad8f43739ca782f2512",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Licensed Sessions per User",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "395a6b2b1f0be02420f7060ca34f373e58b320894fd0bae935065c1e410b9800",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Cowork AI Tasks",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "0ccd309551d19540607691966630df9ae25e6757188bc1f44c9b55ca1504c69d",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Agent Description (Selected)",
+      "table": "Agents 365",
+      "sourceExpressionSha256": "1367282a1356b8d7ac525406c3afdb0d21aed40ed2dace0484c8b7ac621962f8",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Agent Sessions per User",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "8429a28321ab082ebb64558128459ea74d43494f44f208f8caedde12fc9516ea",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "AI Tasks",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "f55d71b609bf516355805d3bc9ef4fdd0ea046ee0798e64255d815e7041e577f",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Agent Sessions per User per Week",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "db645392ae5cbcfe3a315e982031e053cfc6b28070e519487ec3584c6e2a3eae",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Agent Return Rate",
+      "table": "Agents 365",
+      "sourceExpressionSha256": "d7864878cee593d88ccad36a4160c2db49f48ac203fc270d00b592dfebe9f700",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Cowork Top Value Outcome",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "c13e72e1352f59f56d68a994a85e46bca1d93e3ca0a3680e4dab254cf7e4f650",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Cowork Users",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "6e398173e9cb1fb54d1612401b35ad72a0401aec01d579b9ad0b5ad53a1fe16d",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Cowork Sessions per User per Week",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "da54147fc6a4167b7b86dc9cebc367e7be3a13de1e9166b6df3cd78f51b1cb4d",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Cowork Expert Equivalent Hours Per Week",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "3703f47351898427a6ff2ae59109466b6395e6c96328f187a5054a898061a96d",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Unlicensed AI Tasks",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "e89ee950c3f0db9690034a503d2123824d76e13faa4a2febb0aa97f7b9c73233",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Cowork Sessions per User",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "e942a11c121e43b8310d6a1e29b6f9ec403df9f57d2c98aedd4ad980dec4ecfd",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Unlicensed Sessions per User",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "53f954da0e67cfab7af62a0fd68ad9c1178c6cfe5d07c7ab1d655fdbc01d4f3e",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Top Value Outcome",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "a6a2d4886773e9705ae8907dbc3e3e005358343533fc46f439c64b749b2b466e",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Sessions per User per Week",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "fb250fe31536697b2ac35b6373239ae876d6b9aaa3fb1c565eec5cdb9f17f9c6",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Expert Equivalent Hours Per Week",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "da1868bfee19d1198b5098b87cc6f962b26ae04738942a95d8038e4d29710937",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Agent AI Tasks",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "502e26c82d2c67acf8e0eed4b8fdb60023cc52865aa4f2641a3b2c07b79fb0f4",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Unlicensed Sessions per User per Week",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "d52c8d8284f117419145d04c5cc9c369dcdc1ffcd99145198b018d25e1e6e5c8",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Most Popular Agent Creator (Shared - Agent Builder)",
+      "table": "Agents 365",
+      "sourceExpressionSha256": "db740b3d642f356bebe55d4db6e437c2710b213c0aba59e7a5b38858cf937b72",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Licensed Sessions per User per Week",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "8944a324d6650bd985145cc4e4d559e7fd9482d73a6f2a1d1e6b3fce2e58193f",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Inactive Users, Last Month",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "e5e54c99916a6756d15a10a5e4d850a615e02e344b1bbd512e5180d83f24eddd",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Beginner Users, Last Month",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "0baf63db03defffef9a4e64e073d8bb1fed67e5ddc03dd9a48cdf2a64e802231",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Developing Users, Last Month",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "116a79540f3e9b4671e9b191845576ba14e2f6758ca97ff67c880dbeca1b00a4",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Habitual Users, Last Month",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "2c090f83e312aa96b1b4e7e688f44a12298a4a339d3aa07142097bfeaafe7145",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Power Users, Last Month",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "24cd6144aad9fdadfae9d18fec48128d923a82ff4ed275d3c8681d3b4d498681",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Power Users %, Last Month",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "ecee8f4cdc09ce7b28029999a12e21cfc64016f09cb5319d9ccdc8ba121b27f6",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Developing Users %, Last Month",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "076628ea2c1a4fbbaa84bbe7b58a8a92f113a5d1855ef57c4daf8e3ecbf7bc67",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Beginner Users %, Last Month",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "207d5d04b88cd020642b8eaf9794f6a1c701e32a7f65583e2354c286e38cd345",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Inactive Users %, Last Month",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "aa54294acd3303655059822527f1a7da904f6b844b198668f4ea6d76fd6bfd8c",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "User Stage, Last Month",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "e8e8cd4bbe2b499031a74973cb3f60fe74c8e5e55d4f218a3b80c36e996e7fb0",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "User Active Days, Last Month",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "94b054ce43a9d8260cce1fd5b7cc53501cdb8d4e4f227831bb143e6276daab0d",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Agent Sessions",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "5e8c3c9a52df73b2a7b2587f5c81d4f205ab05c1a9c2d8408546aad8b4679ae4",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Stage Users, Last Month",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "c2585b717a2397d55d3a164398be8f35b2b0575fef2c3328dc4b74af41225015",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Stage Users (Monthly)",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "edb57f99241a9fb21e0e875b5a7866a96e92704e508e1c7a4775516e96e54a9f",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Habitual Users %, Last Month",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "21bd70abcbdbab861b59af2c489e49ba3daca36ae714aaceeadd1ffa8590ce81",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Agent Orgs",
+      "table": "Agents 365",
+      "sourceExpressionSha256": "6203b805d7b67e5003ba880b665f07cf1d9320d7efb61400a8d964ffec68f9f1",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Agent Last Observed Activity",
+      "table": "Agents 365",
+      "sourceExpressionSha256": "0590f746e4db9cde98c6a77f27a4204afa6278a5122675d2e5571edcd337eff7",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Agent Registry Freshness",
+      "table": "Agents 365",
+      "sourceExpressionSha256": "4dd7924768ab313fd35b2e33850a9ee97a24c3ab672744f0af52bd8321b39463",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Agent Registry Records",
+      "table": "Agents 365",
+      "sourceExpressionSha256": "36cc91c736cde4197f84d33c42cee5dcd8ebda085c6ccdde3ff393cb1336d6cf",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Agents Built In Tenant",
+      "table": "Agents 365",
+      "sourceExpressionSha256": "975c8a23c85b9433aacfab17425c065bb7365d785315f705618b44e7725b25f4",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Agents With Observed Activity",
+      "table": "Agents 365",
+      "sourceExpressionSha256": "6923e34e435b7ce2a5d0ff248b43d874fedc0c45c0dfec121bd6a0d3c473abf1",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Agent Audit Linkage Note",
+      "table": "Agents 365",
+      "sourceExpressionSha256": "41f53cf7541109ac4044c23109760bd3370290df099fa5a5c679dbc643e346c8",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "% of Users in Stage",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "d0f66c404bd1706cf1620ae03ae5549bdc24b063bcd0688e6ea4296331fc9c88",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "AI Assisted Value",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "d7a6332fc51e72b57aa38118040dfd4ead1fe5b1076d1514d87cfcb1098bfeb6",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Copilot License Investment",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "aad6e83be97fcfa2e5f9a54d005aa677084891fe827cef39a79fa2fcbccef8b3",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Executive Headline",
+      "table": "Headlines",
+      "sourceExpressionSha256": "85e8842bf0e207e3ac32f68fb02695fa1a0cd52305447b286e43cc22289dc5d1",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Stage Top Org",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "847f469ed371812a30b2941c50ee9ef4a63e560c2d45a5076983813bd06509c8",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Mode Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "020e5be6a874bb15cb5a4c087b7842c83b4a11a8a826c2217c4bee726255b633",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Activity Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "22ba8786e8a3c02cd10fde59e19e64cea593a8aa8c224c691d3564984092157c",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "AI Assisted Value Per Week",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "f6632c188e1dc7dcf8ac49c8aa8e6678a8e283cca72984d1a63af3b206398c02",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Skills Headline",
+      "table": "Headlines",
+      "sourceExpressionSha256": "7ec84ae43a84496eae4ad10488f05f3ba2caed61da9f66005f2cfa5c758825ec",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Expert Equivalent Hours",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "91e56300cb8f9c94ecb5557a5d53c0aa8e55eff0353c97ec3f273fe63f4b6445",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Projected Annualised Value",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "1950a1e5e70fa666d708abefd76a1351c47d400aaef417942c199cda6f9070e5",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Net ROI",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "3f77481230c3619893d4ed3ef055d5f3399fece12f77d28381b32e4f326cce2a",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Coverage Notice",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "b73f8530310fd7a64a83e6c1db816af7d06558a25c7f2afc1572cb283784b3a4",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Sessions",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "1c67beb223b6851aca4ea291d64c6da84cb2cbccbb0d51a9668679a8d8f19119",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Logged Session Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "81e3d646d1f74cfba1edddf11b7f15a8394094c3345e2b99dd8f6b798e984541",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Well-matched Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "961d2050858720e8177750f96d7b9549c2069c2d506356f40297e022f72f23e8",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Over-specified Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "541b9cea6232aba54e21675ac9f0973416c2e2289fb08d54728ec503685403cb",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Under-specified Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "777a9023581154ee5b1a7a0dfe557e0cd682481544cbb67bd5f4b0c935b87e1b",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Well-matched Sessions",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "d5b305efd81fec79846fb28a883f654b543d29494940534d32ac0e606c4a19b4",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Over-specified Sessions",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "513f9b3262445429a28ca12739a99dc9ceb131bfa2884d5b85fd5d381c69b8c2",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Under-specified Sessions",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "eea368b0ad417265083deac994c7d963cfee4229e30d0430ce970c4435848693",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Not Judged Sessions",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "8076204d0fcb648f5646fbd0c6215e8ebfed49e1af84a28051a34ac6c6d5f3ab",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Verdict Icon",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "38f789f5d6fb55e045db8ac8c55769c2c010d68baa64c73c49545ebc76cf5fff",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Main Model",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "b775a75791610ddaf96785d33ebe2a2ec9c7148a75ac19fdba2861bd004024ce",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Main Reason",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "24797db71ec2572fd2fd5d85520b063aad8179144a7ab62349f15ca0233dce62",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Judged Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "8a6584555d8a3bf6e70bcaec88f7f5ec15b88c21982e24097af5f825516bb192",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Model: Usage Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "25e9f49cad56a504bf71668d5d277377af08b0fb9b4f4cad9381e187cff4eeda",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Fit Rule Notice",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "6ce0f0d3d4e8cda9b1c173a3f944adf27f9305744e883a6489e30c752fc0942e",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Consumption Sessions",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "15d5bb0b3ec9f4b26ac486ddbd0f261057c60d78230e72388734ca807b248c0e",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Consumption Tasks",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "630b64eeed13f58717e3be9a0775e0c93d41ba7a2a0e4b31e3c1334924254e6f",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Active Days Per User",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "b8d34204c71b08854c8c3e8c59d0d07d7fee63b8be6b0c2656100bf6d4b36f65",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Cowork Hours (Task Category Basis)",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "d2ee68d1dbb1179915d312a31b299818adde659931bd632b23707e42266397ca",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: High Fit Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "2e854423fd2a2594e047d0aaf7ee1683ae636d88a652ab9a189701725efb1eba",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Low Fit Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "204ce68cc2c78400cc7ef270e81eebc0532a2b19bf5c354f39859c3cc185f82c",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Fit Icon",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "bfd1fa22266d42121818391c9cc31a5dd826bcca68b7c0c867a6f02aa209245a",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Fit Basis",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "ea21866e2dfefd2fb00bfb3720f45fc92047088b4ab6563ec2222182fe7ca510",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Alternative Tool",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "a3600c34d95a66957257f483221c756dc60d4f39b84ce03335a5e957fe6325e1",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Share Of Work",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "ed67dd9dca8ed212271dce787510dc88f193603cc9df243e61e3f931d2503e9f",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Evidence Files",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "aa535f143c0327373c0cd201c8c55dc3e26602eccb35097e759af0733bba13e2",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Evidence Kinds",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "d5990cf09de90fd2763fa833f6a247edb58f8670b00f24fb0e5cef2f994a84ae",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Task Grade Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "04c40269adcf1d54800cd37e9d64e04d93085eaff7f14038dc89b48c0835e5a4",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Graded Tasks",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "09da8894f6523f863248d162317936c885f962df62d06dd99de4060d3cf4bda3",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Who People",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "604479eca37c25ece9e436ccfeb844f55c0336ae739c6a82ae605d2990a38aaa",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Who Graded Sessions",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "a5019e76743c68424bab31b2366c2e219922d5062d7543b26ed424f94af2b4c8",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Who Mix",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "dbe89e63be55d46a5e93f4668986801e6e5278c3686a22eee6c0a9978c0c2698",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Who High Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "98c5b96bb394e31e80c415357db54a799b094e1c887c588aa0d8aca084fffa99",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Who Medium Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "17f3da98574a759ab5b9c0dc4004ad78bd24cb2ad41c3e52b12650b259340ced",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Who Low Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "113f99fcfc0ca0f3bb0d9f8eaeea4cb7232f74699a77ac3209fc01f156cb06ae",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Usage Efficiency: Who Flag",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "55f7902de55281e42146d003ed3fb8e92dfc0a84ca4477c098682068423c7377",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Cowork Fit: Session Depth",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "e3eabc06806e46f53e5d8ba18d3f59edd89ff685fcaabe055f1c9a5fd10ebb38",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Cowork Fit: Surfaces Per Active Day",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "d7f818879f690781d043f1d0896f8ad6ddd1f2bf7bc7cd9caa26c4316b68c713",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Cowork Fit: Agent User Share",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "ee313a1e293578fa42424308e0e05aaee48007b158838cc807d8c0f1ffad94c1",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Cowork Fit: Eligible Users",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "d9cb7e58861b81f41c0e8af393d1695e4b7c705b41b1e4fc2eedb6a624a436ab",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Cowork Readiness Rank (Dynamic)",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "97cfba7e9d79fc4fc3c213e5f0f9acdaa261cfe3fc42b14d6cf2305f9e9d852e",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Cowork Readiness: Surfaces Per Day",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "3c08cded708ed8f3a948af2e2dff84b5e7a5a577f11e12873824644d0f243f66",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Cowork Readiness: Prompts Per Session",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "e32fff0de7df34a4bd6d5c57e8452fb4d0c86088b5f997cd1f368e0138f05221",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Average Active Days Per User Per Week (Unlicensed Chat)",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "b115d5027a2cddb0c907f3fdcca27f95c322a7333d3afb68dd1d8ed071009222",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Licensed Seats by Dormancy (Verified)",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "a2476ba0434a930a23b62d426d5ebb9323efe6353d13d153adde232fb3dbf5e9",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Median Unlicensed Sessions Per User Per Week",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "ca3f4085ecebe531cfbf264c698c60de6de028c750d1ae496c8ca4fb5d90424a",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "License Priority Rank (Dynamic)",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "d9cdc24ec958da0fd603eb75fe855a1b9db72db50c04078a28685e08be05bca4",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "📊 Feedback Theme Summary",
+      "table": "ProductFeedback",
+      "sourceExpressionSha256": "2d435bc26aaf68d56d362a5a5aefbd966e2122e0b10cad397ee07d503111f926",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Satisfaction Rate",
+      "table": "ProductFeedback",
+      "sourceExpressionSha256": "d14a946b314016eacf87a999a64509d5d5edae466944012821063f6b0f835ce5",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Total Feedback",
+      "table": "ProductFeedback",
+      "sourceExpressionSha256": "acba5532100aed1df6d97c2c375b2aec21792f9ad1393d20448a4cb0067a0096",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Thumbs Up Count",
+      "table": "ProductFeedback",
+      "sourceExpressionSha256": "956aa167f3bf4643f18530bebf9ef52ddc36530185b602b1f14705e16e5b943a",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Thumbs Down Count",
+      "table": "ProductFeedback",
+      "sourceExpressionSha256": "0571212cba130a4c77762bbc00a5cec6ed6361b443ea9b11d6f3cc226d3f9fcb",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Cowork Sessions",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "eb36056afb9d8077b0413ea8e5871153897b8f6474ea3f845bfc6f7d66ac823f",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Licensed Sessions",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "de06422c817957e69ca16755d88de048d7bf7f22620bf77ea5a55a828d60acfa",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Most Versatile Agent",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "4b1c5af513ea34e31dc996d6835018fcbffa1bdf5d4996faba18134c6b0d05b4",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Observed Unlicensed Sessions",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "44b77e9388427febf2362517e1a91650cde546ef0e7752051fa3c36188ba526b",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Average Active Days Per User (Chat + Agents)",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "38c623406f08620be8ae199f57cad483ed1cbcd6884b9074bccbebdbe4513e16",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Efficiency - Hours Per User Per Week",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "9cace7c6eca5ac54bc2a24b07e11a8aeb4de20f7d163395be43ea65ced2a6b5b",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Heatmap Headline",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "d63fac0fc32abfa81c8c5a6bd33bfa13f06faf70945e71c0fea57c34875398de",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Page Description (Selected)",
+      "table": "📖 Metric Glossary",
+      "sourceExpressionSha256": "db7fb1f4733b8c91c7cecdccb3c7842af2d252ec56e9f6e5680fe5bbae86ffc6",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "License Priority Score (User)",
+      "table": "Chat + Agent Interactions (Audit Logs)",
+      "sourceExpressionSha256": "13e6e3bcdf7db15cbe679f74ee05a552e989c6f1c7a44be3673ebf2067116871",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Reclaim Cost Notice",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "c04b957235376d26e1a21fd48f7a4ac89d228ec6237927a9319f894816fa7c36",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "License Evidence Notice",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "26c57df9fe3c47027ddae990ef6bb46459249084113f041819d9ea22cce426e0",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Unlicensed Share of Active Users",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "ceed8798a71746ec1249ae3839b3ec1b6c6debf2e8ff0f41f4342e0580b4ba2b",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Total Licensed Users",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "1920aeabfbc37b69460e03558110dafc9e5640915aeedbd2a6b0439efcd4b391",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Licensed Inactive 30d+",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "3dfbe99f8d5be4d85c1af29be08d58793c0c6debc55c08e0c3c05c03eb186118",
+      "implementation": "demos/valuelens-report/engine.ts"
+    },
+    {
+      "name": "Avg Days Since Last Active",
+      "table": "Copilot Licensed",
+      "sourceExpressionSha256": "aade17f922c29295252c2a8943d02ea8ef1fd26a6b55d0a904b99aaa83dcf440",
+      "implementation": "demos/valuelens-report/engine.ts"
+    }
+  ],
+  "results": [
+    {
+      "name": "overall",
+      "metrics": {
+        "AI Tasks": 13337,
+        "All Active Users": 151,
+        "Active Licensed Users": 108,
+        "Active Unlicensed Users": 43,
+        "Active Agent Users": 134,
+        "Licensed Users (Filter-Aware)": 112,
+        "Inactive Licensed Users (Filter-Aware)": 4,
+        "Observed Sessions": 3716,
+        "Observed Agent Sessions": 763,
+        "Observed Cowork Sessions": 172,
+        "Observed Sessions per User per Week": 2.5765539168917875,
+        "Expert Equivalent Hours": 2689.6166666666913,
+        "AI Assisted Value": 134480.83333333457,
+        "Copilot License Investment": 9150,
+        "Net ROI": 125330.83333333457,
+        "Model: Sessions": 3716,
+        "Model: Well-matched Sessions": 2608,
+        "Model: Over-specified Sessions": 31,
+        "Model: Under-specified Sessions": 276,
+        "Model: Not Judged Sessions": 801,
+        "Usage Efficiency: Consumption Sessions": 172,
+        "Usage Efficiency: Consumption Tasks": 496,
+        "Usage Efficiency: High Fit Share": 0.35,
+        "Cowork Fit: Eligible Users": 122,
+        "Cowork Fit: Session Depth": 2.36938622754491,
+        "Cowork Fit: Surfaces Per Active Day": 1.1781582600647849,
+        "Cowork Fit: Agent User Share": 0.860655737704918,
+        "Total Feedback": 538,
+        "Satisfaction Rate": 0.5390334572490706,
+        "Beginner Users, Last Month": 38,
+        "Developing Users, Last Month": 47,
+        "Habitual Users, Last Month": 27,
+        "Power Users, Last Month": 27,
+        "Inactive Users, Last Month": 9,
+        "Avg Days Since Last Active": 7.5625,
+        "Licensed Inactive 30d+": 9
+      },
+      "charts": 16
+    },
+    {
+      "name": "licensed",
+      "metrics": {
+        "AI Tasks": 11721,
+        "All Active Users": 108,
+        "Active Licensed Users": 108,
+        "Active Unlicensed Users": 0,
+        "Active Agent Users": 101,
+        "Licensed Users (Filter-Aware)": 112,
+        "Inactive Licensed Users (Filter-Aware)": 4,
+        "Observed Sessions": 3274,
+        "Observed Agent Sessions": 687,
+        "Observed Cowork Sessions": 172,
+        "Observed Sessions per User per Week": 2.760112847781625,
+        "Expert Equivalent Hours": 2319.2223571658897,
+        "AI Assisted Value": 115961.11785829448,
+        "Copilot License Investment": 9150,
+        "Net ROI": 106811.11785829448,
+        "Model: Sessions": 3274,
+        "Model: Well-matched Sessions": 2240,
+        "Model: Over-specified Sessions": 31,
+        "Model: Under-specified Sessions": 270,
+        "Model: Not Judged Sessions": 733,
+        "Usage Efficiency: Consumption Sessions": 172,
+        "Usage Efficiency: Consumption Tasks": 496,
+        "Usage Efficiency: High Fit Share": 0.35,
+        "Cowork Fit: Eligible Users": 79,
+        "Cowork Fit: Session Depth": 2.350224215246637,
+        "Cowork Fit: Surfaces Per Active Day": 1.2014714204867005,
+        "Cowork Fit: Agent User Share": 0.9113924050632911,
+        "Total Feedback": 538,
+        "Satisfaction Rate": 0.5390334572490706,
+        "Beginner Users, Last Month": 14,
+        "Developing Users, Last Month": 37,
+        "Habitual Users, Last Month": 25,
+        "Power Users, Last Month": 27,
+        "Inactive Users, Last Month": 9,
+        "Avg Days Since Last Active": 7.5625,
+        "Licensed Inactive 30d+": 9
+      },
+      "charts": 16
+    },
+    {
+      "name": "unlicensed",
+      "metrics": {
+        "AI Tasks": 1616,
+        "All Active Users": 43,
+        "Active Licensed Users": 0,
+        "Active Unlicensed Users": 43,
+        "Active Agent Users": 33,
+        "Licensed Users (Filter-Aware)": 112,
+        "Inactive Licensed Users (Filter-Aware)": 112,
+        "Observed Sessions": 442,
+        "Observed Agent Sessions": 76,
+        "Observed Cowork Sessions": 0,
+        "Observed Sessions per User per Week": 1.7599851667244413,
+        "Expert Equivalent Hours": 370.3943095008008,
+        "AI Assisted Value": 18519.715475040037,
+        "Copilot License Investment": 0,
+        "Net ROI": 18519.715475040037,
+        "Model: Sessions": 442,
+        "Model: Well-matched Sessions": 368,
+        "Model: Over-specified Sessions": 0,
+        "Model: Under-specified Sessions": 6,
+        "Model: Not Judged Sessions": 68,
+        "Usage Efficiency: Consumption Sessions": 0,
+        "Usage Efficiency: Consumption Tasks": 0,
+        "Usage Efficiency: High Fit Share": null,
+        "Cowork Fit: Eligible Users": 43,
+        "Cowork Fit: Session Depth": 2.4660633484162897,
+        "Cowork Fit: Surfaces Per Active Day": 1.0736040609137056,
+        "Cowork Fit: Agent User Share": 0.7674418604651163,
+        "Total Feedback": 538,
+        "Satisfaction Rate": 0.5390334572490706,
+        "Beginner Users, Last Month": 24,
+        "Developing Users, Last Month": 10,
+        "Habitual Users, Last Month": 2,
+        "Power Users, Last Month": 0,
+        "Avg Days Since Last Active": 7.5625,
+        "Licensed Inactive 30d+": 9
+      },
+      "charts": 16
+    },
+    {
+      "name": "licensed Group 01",
+      "metrics": {
+        "AI Tasks": 593,
+        "All Active Users": 5,
+        "Active Licensed Users": 5,
+        "Active Unlicensed Users": 0,
+        "Active Agent Users": 4,
+        "Licensed Users (Filter-Aware)": 6,
+        "Inactive Licensed Users (Filter-Aware)": 1,
+        "Observed Sessions": 180,
+        "Observed Agent Sessions": 23,
+        "Observed Cowork Sessions": 8,
+        "Observed Sessions per User per Week": 2.9714285714285715,
+        "Expert Equivalent Hours": 117.87449182992425,
+        "AI Assisted Value": 5893.724591496212,
+        "Copilot License Investment": 450,
+        "Net ROI": 5443.724591496212,
+        "Model: Sessions": 180,
+        "Model: Well-matched Sessions": 126,
+        "Model: Over-specified Sessions": 1,
+        "Model: Under-specified Sessions": 14,
+        "Model: Not Judged Sessions": 39,
+        "Usage Efficiency: Consumption Sessions": 8,
+        "Usage Efficiency: Consumption Tasks": 29,
+        "Usage Efficiency: High Fit Share": 0.5,
+        "Cowork Fit: Eligible Users": 4,
+        "Cowork Fit: Session Depth": 2.4583333333333335,
+        "Cowork Fit: Surfaces Per Active Day": 1.2234042553191489,
+        "Cowork Fit: Agent User Share": 0.75,
+        "Total Feedback": 538,
+        "Satisfaction Rate": 0.5390334572490706,
+        "Beginner Users, Last Month": 0,
+        "Developing Users, Last Month": 3,
+        "Habitual Users, Last Month": 0,
+        "Power Users, Last Month": 2,
+        "Inactive Users, Last Month": 1,
+        "Avg Days Since Last Active": 17,
+        "Licensed Inactive 30d+": 1
+      },
+      "charts": 16
+    },
+    {
+      "name": "unlicensed Group 01",
+      "metrics": {
+        "AI Tasks": 287,
+        "All Active Users": 8,
+        "Active Licensed Users": 0,
+        "Active Unlicensed Users": 8,
+        "Active Agent Users": 6,
+        "Licensed Users (Filter-Aware)": 6,
+        "Inactive Licensed Users (Filter-Aware)": 6,
+        "Observed Sessions": 83,
+        "Observed Agent Sessions": 12,
+        "Observed Cowork Sessions": 0,
+        "Observed Sessions per User per Week": 1.7011904761904761,
+        "Expert Equivalent Hours": 65.5113190441614,
+        "AI Assisted Value": 3275.56595220807,
+        "Copilot License Investment": 0,
+        "Net ROI": 3275.56595220807,
+        "Model: Sessions": 83,
+        "Model: Well-matched Sessions": 67,
+        "Model: Over-specified Sessions": 0,
+        "Model: Under-specified Sessions": 1,
+        "Model: Not Judged Sessions": 15,
+        "Usage Efficiency: Consumption Sessions": 0,
+        "Usage Efficiency: Consumption Tasks": 0,
+        "Usage Efficiency: High Fit Share": null,
+        "Cowork Fit: Eligible Users": 8,
+        "Cowork Fit: Session Depth": 2.433734939759036,
+        "Cowork Fit: Surfaces Per Active Day": 1.0533333333333332,
+        "Cowork Fit: Agent User Share": 0.75,
+        "Total Feedback": 538,
+        "Satisfaction Rate": 0.5390334572490706,
+        "Beginner Users, Last Month": 2,
+        "Developing Users, Last Month": 4,
+        "Habitual Users, Last Month": 1,
+        "Power Users, Last Month": 0,
+        "Avg Days Since Last Active": 17,
+        "Licensed Inactive 30d+": 1
+      },
+      "charts": 16
+    },
+    {
+      "name": "June only",
+      "metrics": {
+        "AI Tasks": 3414,
+        "All Active Users": 129,
+        "Active Licensed Users": 100,
+        "Active Unlicensed Users": 29,
+        "Active Agent Users": 88,
+        "Licensed Users (Filter-Aware)": 112,
+        "Inactive Licensed Users (Filter-Aware)": 12,
+        "Observed Sessions": 920,
+        "Observed Agent Sessions": 178,
+        "Observed Cowork Sessions": 29,
+        "Observed Sessions per User per Week": 2.112546403906652,
+        "Expert Equivalent Hours": 698.596009281711,
+        "AI Assisted Value": 34929.80046408555,
+        "Copilot License Investment": 3000,
+        "Net ROI": 31929.80046408555,
+        "Model: Sessions": 920,
+        "Model: Well-matched Sessions": 642,
+        "Model: Over-specified Sessions": 9,
+        "Model: Under-specified Sessions": 60,
+        "Model: Not Judged Sessions": 209,
+        "Usage Efficiency: Consumption Sessions": 29,
+        "Usage Efficiency: Consumption Tasks": 69,
+        "Usage Efficiency: High Fit Share": 0.4230769230769231,
+        "Cowork Fit: Eligible Users": 103,
+        "Cowork Fit: Session Depth": 2.393323657474601,
+        "Cowork Fit: Surfaces Per Active Day": 1.190127970749543,
+        "Cowork Fit: Agent User Share": 0.6601941747572816,
+        "Total Feedback": 152,
+        "Satisfaction Rate": 0.4868421052631579,
+        "Beginner Users, Last Month": 68,
+        "Developing Users, Last Month": 52,
+        "Habitual Users, Last Month": 9,
+        "Power Users, Last Month": 0,
+        "Inactive Users, Last Month": 12,
+        "Avg Days Since Last Active": 7.5625,
+        "Licensed Inactive 30d+": 9
+      },
+      "charts": 16
+    },
+    {
+      "name": "agents",
+      "metrics": {
+        "AI Tasks": 2149,
+        "All Active Users": 134,
+        "Active Licensed Users": 101,
+        "Active Unlicensed Users": 33,
+        "Active Agent Users": 134,
+        "Licensed Users (Filter-Aware)": 112,
+        "Inactive Licensed Users (Filter-Aware)": 11,
+        "Observed Sessions": 763,
+        "Observed Agent Sessions": 763,
+        "Observed Cowork Sessions": 0,
+        "Observed Sessions per User per Week": 1.302889858620585,
+        "Expert Equivalent Hours": 682.6963470319636,
+        "AI Assisted Value": 34134.817351598176,
+        "Copilot License Investment": 7080,
+        "Net ROI": 27054.817351598176,
+        "Model: Sessions": 763,
+        "Model: Well-matched Sessions": 547,
+        "Model: Over-specified Sessions": 0,
+        "Model: Under-specified Sessions": 51,
+        "Model: Not Judged Sessions": 165,
+        "Usage Efficiency: Consumption Sessions": 0,
+        "Usage Efficiency: Consumption Tasks": 0,
+        "Usage Efficiency: High Fit Share": null,
+        "Cowork Fit: Eligible Users": 105,
+        "Cowork Fit: Session Depth": 2.0245746691871456,
+        "Cowork Fit: Surfaces Per Active Day": 1.0196850393700787,
+        "Cowork Fit: Agent User Share": 1,
+        "Total Feedback": 538,
+        "Satisfaction Rate": 0.5390334572490706,
+        "Beginner Users, Last Month": 95,
+        "Developing Users, Last Month": 13,
+        "Habitual Users, Last Month": 1,
+        "Power Users, Last Month": 0,
+        "Avg Days Since Last Active": 7.5625,
+        "Licensed Inactive 30d+": 9
+      },
+      "charts": 16
+    },
+    {
+      "name": "Cowork",
+      "metrics": {
+        "AI Tasks": 1027,
+        "All Active Users": 29,
+        "Active Licensed Users": 29,
+        "Active Unlicensed Users": 0,
+        "Active Agent Users": 0,
+        "Licensed Users (Filter-Aware)": 112,
+        "Inactive Licensed Users (Filter-Aware)": 83,
+        "Observed Sessions": 172,
+        "Observed Agent Sessions": 0,
+        "Observed Cowork Sessions": 172,
+        "Observed Sessions per User per Week": 1.232495502188116,
+        "Expert Equivalent Hours": 69.48333333333336,
+        "AI Assisted Value": 3474.1666666666683,
+        "Copilot License Investment": 2010,
+        "Net ROI": 1464.1666666666683,
+        "Model: Sessions": 172,
+        "Model: Well-matched Sessions": 84,
+        "Model: Over-specified Sessions": 31,
+        "Model: Under-specified Sessions": 7,
+        "Model: Not Judged Sessions": 50,
+        "Usage Efficiency: Consumption Sessions": 172,
+        "Usage Efficiency: Consumption Tasks": 496,
+        "Usage Efficiency: High Fit Share": 0.35,
+        "Cowork Fit: Eligible Users": 0,
+        "Cowork Fit: Session Depth": null,
+        "Cowork Fit: Surfaces Per Active Day": null,
+        "Cowork Fit: Agent User Share": null,
+        "Total Feedback": 538,
+        "Satisfaction Rate": 0.5390334572490706,
+        "Beginner Users, Last Month": 26,
+        "Developing Users, Last Month": 2,
+        "Habitual Users, Last Month": 0,
+        "Power Users, Last Month": 0,
+        "Avg Days Since Last Active": 7.5625,
+        "Licensed Inactive 30d+": 9
+      },
+      "charts": 16
+    },
+    {
+      "name": "one agent",
+      "metrics": {
+        "AI Tasks": 0,
+        "All Active Users": 0,
+        "Active Licensed Users": 0,
+        "Active Unlicensed Users": 0,
+        "Active Agent Users": 0,
+        "Licensed Users (Filter-Aware)": 112,
+        "Inactive Licensed Users (Filter-Aware)": 112,
+        "Observed Sessions": 0,
+        "Observed Agent Sessions": 0,
+        "Observed Cowork Sessions": 0,
+        "Observed Sessions per User per Week": null,
+        "Expert Equivalent Hours": 0,
+        "AI Assisted Value": 0,
+        "Copilot License Investment": 0,
+        "Net ROI": 0,
+        "Model: Sessions": 0,
+        "Model: Well-matched Sessions": 0,
+        "Model: Over-specified Sessions": 0,
+        "Model: Under-specified Sessions": 0,
+        "Model: Not Judged Sessions": 0,
+        "Usage Efficiency: Consumption Sessions": 0,
+        "Usage Efficiency: Consumption Tasks": 0,
+        "Usage Efficiency: High Fit Share": null,
+        "Cowork Fit: Eligible Users": 0,
+        "Cowork Fit: Session Depth": null,
+        "Cowork Fit: Surfaces Per Active Day": null,
+        "Cowork Fit: Agent User Share": null,
+        "Total Feedback": 538,
+        "Satisfaction Rate": 0.5390334572490706,
+        "Beginner Users, Last Month": 0,
+        "Developing Users, Last Month": 0,
+        "Habitual Users, Last Month": 0,
+        "Power Users, Last Month": 0,
+        "Inactive Users, Last Month": 112,
+        "Avg Days Since Last Active": 7.5625,
+        "Licensed Inactive 30d+": 9
+      },
+      "charts": 16
+    },
+    {
+      "name": "empty audit window",
+      "metrics": {
+        "AI Tasks": 0,
+        "All Active Users": 0,
+        "Active Licensed Users": 0,
+        "Active Unlicensed Users": 0,
+        "Active Agent Users": 0,
+        "Licensed Users (Filter-Aware)": 112,
+        "Inactive Licensed Users (Filter-Aware)": 112,
+        "Observed Sessions": 0,
+        "Observed Agent Sessions": 0,
+        "Observed Cowork Sessions": 0,
+        "Observed Sessions per User per Week": null,
+        "Expert Equivalent Hours": 0,
+        "AI Assisted Value": 0,
+        "Copilot License Investment": 0,
+        "Net ROI": 0,
+        "Model: Sessions": 0,
+        "Model: Well-matched Sessions": 0,
+        "Model: Over-specified Sessions": 0,
+        "Model: Under-specified Sessions": 0,
+        "Model: Not Judged Sessions": 0,
+        "Usage Efficiency: Consumption Sessions": 0,
+        "Usage Efficiency: Consumption Tasks": 0,
+        "Usage Efficiency: High Fit Share": null,
+        "Cowork Fit: Eligible Users": 0,
+        "Cowork Fit: Session Depth": null,
+        "Cowork Fit: Surfaces Per Active Day": null,
+        "Cowork Fit: Agent User Share": null,
+        "Total Feedback": 28,
+        "Satisfaction Rate": 0.32142857142857145,
+        "Beginner Users, Last Month": 0,
+        "Developing Users, Last Month": 0,
+        "Habitual Users, Last Month": 0,
+        "Power Users, Last Month": 0,
+        "Inactive Users, Last Month": 112,
+        "Avg Days Since Last Active": 7.5625,
+        "Licensed Inactive 30d+": 9
+      },
+      "charts": 16
+    }
+  ]
+}

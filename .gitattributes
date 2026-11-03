@@ -1,2 +1,5 @@
 # Built single-file app download: generated, so hide it from diffs and language stats
 app/download/*.html -diff linguist-generated
+
+# Preserve byte-exact report distribution hashes across Windows and Unix checkouts.
+demo/valuelens-report/* text eol=lf

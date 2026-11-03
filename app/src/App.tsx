@@ -138,6 +138,7 @@ export default function App() {
               </div>
             </div>
             <div className="band-actions">
+              {demoMode && <a className="assume-chip" href="/#solutions">All dashboard demos</a>}
               <button type="button" className="assume-chip" onClick={openAssumptions}>
                 Assumptions · {assumptions.currency}
                 {assumptions.hourly}/h, {assumptions.scenario.toLowerCase()}

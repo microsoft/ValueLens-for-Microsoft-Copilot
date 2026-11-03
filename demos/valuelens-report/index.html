@@ -9,7 +9,7 @@
   </head>
   <body>
     <header class="topbar">
-      <a class="brand" href="#" aria-label="ValueLens report demo home">
+      <a class="brand" href="/#solutions" aria-label="Back to dashboard demos">
         <span class="brand-mark" aria-hidden="true">V</span>
         <span><strong>ValueLens</strong><small>Power BI report · browser demo</small></span>
       </a>
@@ -37,7 +37,8 @@
       <section class="report-viewport" aria-label="Power BI page layout">
         <div id="report-canvas" class="report-canvas"></div>
       </section>
-      <p class="report-note">This is an offline browser port, not Power BI Desktop or the Power BI service. Report measures are shown with their source definitions; demo values use the synthetic fixture and do not claim to execute the Power BI semantic model.</p>
+      <p class="report-note">Source-backed calculations run locally in the browser; this is not the Power BI semantic engine. Use each visual's information button for its complete current values and original DAX. Source custom visuals are recreated with native charts; expanded matrices retain every bound column. Scroll the report horizontally on narrow screens.</p>
+      <p id="report-help" class="report-note" hidden>Select a report page, a saved cohort view, or filters. Click a chart category to filter and click it again to clear that category. Clear filters resets all selections. Value scenarios and hourly assumptions recompute the value measures. Everything uses invented data and stays in this browser.</p>
     </main>
     <dialog id="definition-dialog" class="definition-dialog">
       <form method="dialog">
@@ -45,12 +46,14 @@
       </form>
       <h2 id="definition-title"></h2>
       <p id="definition-copy"></p>
+      <div id="detail-data"></div>
       <details id="dax-details" hidden>
         <summary>Show source measure expression</summary>
         <pre id="definition-expression"></pre>
       </details>
     </dialog>
     <script src="./report-data.js"></script>
+    <script src="./engine.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

@@ -1,0 +1,37 @@
+{
+  "sourceRepository": "microsoft/ValueLens-for-Microsoft-Copilot",
+  "baseRevision": "8ea817cc7129d46eaf0d230abbf448ea1f39c22c",
+  "sourceReport": "5. Local CSV/ValueLens - Local CSV.pbit",
+  "sourceReportSha256": "acb141f8da07511ac503cbc33e68e8bc63f4c62931a92399e14b4fcd5fa459a2",
+  "mountPath": "/demo/valuelens-report/",
+  "files": [
+    {
+      "name": "index.html",
+      "sha256": "f1424306b37bcad29af4793c7832af828e0ecb72ff0c7daeffbcc6b98adc9015"
+    },
+    {
+      "name": "styles.css",
+      "sha256": "96242fdbcb10c29219bafc401dae78983b46fb25333bafe8d2851a4b6a328aa7"
+    },
+    {
+      "name": "app.js",
+      "sha256": "51072d1a69182614ec51a345afe7539992d06aa020dd8afb5b146ddaa9a435c5"
+    },
+    {
+      "name": "engine.js",
+      "sha256": "6c658a7cd427b15876b08f143a9c8981b5064400829bafada36339984065387e"
+    },
+    {
+      "name": "report-data.js",
+      "sha256": "0a30c464b3e28f21e0f24c3686a9affff468f059690b9960ab1ec07097b2764a"
+    },
+    {
+      "name": "THIRD_PARTY_NOTICES.md",
+      "sha256": "e77564a3566335704f50bb80a29eb75e70018cceac61688586c581096071b159"
+    },
+    {
+      "name": "fidelity-evidence.json",
+      "sha256": "516576e3647013610846b13abeab2505c45ecfeb64f5a295f7d006f959283e3a"
+    }
+  ]
+}
