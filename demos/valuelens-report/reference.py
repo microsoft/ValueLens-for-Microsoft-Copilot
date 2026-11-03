@@ -263,11 +263,14 @@ def verify(payload):
         # The registry lifecycle matrix's ID is selected by its source bindings, not the unrelated estate table.
         result[1]["id"] = next(v["id"] for v in payload["report"]["pages"][3]["visuals"] if any(f["name"] == "Agent Lifecycle" and f["role"] == "Rows" for f in v["fields"]))
         return result
+    active_agents = Counter(r["AgentName"] for r in rows
+                            if r["prompt"] and r["AgentName"] and "2026-06" <= r["InteractionDate"][:7] <= "2026-08")
+    one_agent = payload["fixture"]["agents"].index(active_agents.most_common(1)[0][0])
     cases = []
     for name, state in [
         ("overall", {}), ("licensed", {"license": 0}), ("unlicensed", {"license": 1}),
         ("licensed Group 01", {"license": 0, "team": 0}), ("unlicensed Group 01", {"license": 1, "team": 0}),
-        ("June only", {"to": 12}), ("agents", {"tool": 1}), ("Cowork", {"tool": 2}), ("one agent", {"agent": 1}),
+        ("June only", {"to": 12}), ("agents", {"tool": 1}), ("Cowork", {"tool": 2}), ("one agent", {"agent": one_agent}),
         ("empty audit window", {"from": 0, "to": 0}),
     ]:
         selected = [r for r in rows if payload["fixture"]["months"][state.get("from", 12)] <= r["InteractionDate"][:7] <= payload["fixture"]["months"][state.get("to", 14)]
@@ -283,7 +286,7 @@ def verify(payload):
                         for category, total in Counter(r["category"] for r in selected if r["prompt"]).items()}},
         ]})
     result = subprocess.run(["node", str(Path(__file__).with_name("test-engine.mjs"))],
-                            input=json.dumps({"cases": cases, "scenarios": {s: hours(rows, s) for s in ("Conservative", "Typical", "Optimistic")}}),
+                            input=json.dumps({"cases": cases, "scenarios": {s: hours(rows, s) for s in ("Conservative", "Typical", "Optimistic")}}, sort_keys=True),
                             encoding="utf-8", capture_output=True, check=False)
     if result.returncode:
         raise SystemExit(result.stdout + result.stderr)

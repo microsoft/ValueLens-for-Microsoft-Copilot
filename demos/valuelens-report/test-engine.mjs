@@ -30,6 +30,8 @@ const results = [];
 for (const test of reference.cases) {
   const state = { ...baseState, ...test.state };
   const engine = context.ValueLensReportEngine.create(payload, state);
+  const chartEvidence = [];
+  if (test.name === "one agent") assert.ok(test.metrics["AI Tasks"] > 0, "Agent selection must exercise nonempty numerical recomputation");
   for (const [name, expected] of Object.entries(test.metrics)) close(engine.measure(name), expected, `${test.name} / ${name}`);
   for (const chart of test.charts || []) {
     const page = payload.report.pages[chart.page];
@@ -41,6 +43,7 @@ for (const test of reference.cases) {
     const actual = Object.fromEntries(data.data.map(row => [indices.map(i => String(row[i])).join(" | "), row[mi]]));
     close(Object.keys(actual).length, Object.keys(chart.values).length, `${test.name} / page ${chart.page} ${chart.measure} / chart category count`);
     for (const [category, expected] of Object.entries(chart.values)) close(actual[category], expected, `${test.name} / page ${chart.page} / ${category}`);
+    chartEvidence.push({ page: chart.page, pageName: page.name, sourceVisualId: visual.id, type: visual.type, dimensions, measure: chart.measure, expected: chart.values });
   }
   for (const page of payload.report.pages) {
     for (const visual of page.visuals) {
@@ -54,7 +57,7 @@ for (const test of reference.cases) {
       visualEvaluations++;
     }
   }
-  results.push({ name: test.name, metrics: test.metrics, charts: (test.charts || []).length });
+  results.push({ name: test.name, state, metrics: test.metrics, charts: chartEvidence });
 }
 const engine = context.ValueLensReportEngine.create(payload, baseState);
 for (const name of measures) assert.ok(engine.supported(name), `Unimplemented source measure ${name}`);

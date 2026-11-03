@@ -29,14 +29,15 @@ the complete selected values, tooltip fields and original DAX.
 
 `python demos\valuelens-report\validate.py` independently computes reference results from the
 sanitized raw records in Python, then compares them to the compiled JavaScript engine. Its
-4,064 numerical/category assertions cover all 16 pages: activation inventory; adoption behaviors;
+4,218 numerical/category assertions cover all 16 pages: activation inventory; adoption behaviors;
 habit stages; registry lifecycle; task-category shares; effort and cost scenarios; model-fit splits;
 within-category Cowork grades; Cowork eligibility and dense user ranks; licence priority and ranks;
 feedback trends; leaderboards; weekly heatmap cells; glossary descriptions; source impact baselines;
 and licence allocation/dormancy. It also evaluates 1,380 complete visual projections over ten
 selections: overall, licensed, unlicensed, each licence in Group 01, June only, Agents, Cowork,
-one agent, and an empty audit window. The generated `fidelity-evidence.json` records numerical
-results and source-expression SHA-256 mappings. `bundle-manifest.json` hashes every distribution
+one active agent, and an empty audit window. The generated `fidelity-evidence.json` records filter
+states, numerical results, source visual IDs and asserted category values, plus source-expression
+SHA-256 mappings. `bundle-manifest.json` hashes every distribution
 file and the source PBIT.
 
 Browser verification rendered all 16 pages without invalid numeric text or interaction errors.
