@@ -11,11 +11,11 @@
     },
     {
       "name": "styles.css",
-      "sha256": "96242fdbcb10c29219bafc401dae78983b46fb25333bafe8d2851a4b6a328aa7"
+      "sha256": "d284eee35edf231b589f94d9e20bdb3efee3f526206cf1424fb734c64ee0d1d9"
     },
     {
       "name": "app.js",
-      "sha256": "51072d1a69182614ec51a345afe7539992d06aa020dd8afb5b146ddaa9a435c5"
+      "sha256": "9613f639e65a19c857a49c658fe72c50e3c075d56c0a28710484f19c67119bd1"
     },
     {
       "name": "engine.js",

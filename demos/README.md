@@ -57,6 +57,33 @@ Source parent-group offsets and explicit bookmark visibility overrides are honor
 the Unlicensed activation group is visible even though its base group is hidden. Visibility is not
 guessed from a visual's title.
 
+### Renderer readability regression
+
+The renderer uses pixel-sized SVGs and 12px chart/table text instead of shrinking a chart's text to
+fit a narrow source rectangle. Chart axes, complete category labels and all table rows/columns
+remain reachable using the visual's own scrollbars. Organisation columns reserve space for their
+full rotated labels; scatter charts have numeric ticks, gridlines and padded data domains. Small
+treemap tiles retain accessible names and tooltips, with a readable complete category key below
+the map rather than overlapping labels. Short source slicers place their label beside a full-height
+select. The source-visible 55px Activation donut is represented as a compact percentage legend,
+with reserved space above the tornado's rows; its two measures are preserved, not hidden.
+
+`demos/valuelens-report/verify-renderer.mjs` exports `verifyRenderer(window, [0, 1, -1])` for a
+browser loaded at the report route. It checks all 16 pages in each licence cohort, SVG text bounds
+and unscaled text geometry, chart/table scroll reachability, 12px tables, fully contained select
+controls, numeric scatter ticks, the compact Activation legend and its non-overlapping rows, and
+the value-table bookmark. Run cohorts separately when browser tooling has a short action timeout.
+The same checks run against a same-origin narrow iframe's `contentWindow` to exercise a real
+narrow CSS viewport, not merely a constrained body. Visual confirmation covers the affected
+Activation, Adoption, Cowork Readiness and Estimated Value renderers; numerical parity is checked
+separately by the independent oracle above. The default Activation chart now fits all 14
+organisation rows within its source-height panel; the turns chart fits its labels and values
+without requiring scrolling. The wider organisation-column chart deliberately scrolls horizontally
+to preserve all groups and their full labels rather than shrinking them. The corrected renderer
+passed 1,317 layout assertions across 48 desktop page/cohort views and 442 more across all 16
+pages in a 389px iframe viewport, with no failures. These are geometry/readability regressions,
+not replacements for the 4,218 independent numerical assertions.
+
 ### Deliberate browser-port differences
 
 This is not a general DAX engine or a pixel-identical Power BI renderer. Matrices are fully expanded

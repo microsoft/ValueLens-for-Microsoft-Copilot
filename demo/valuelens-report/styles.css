@@ -53,22 +53,36 @@ h1 { margin: 0; color: var(--ink); font-size: 20px; font-weight: 650; }
 .report-canvas { position: relative; width: 1280px; height: 720px; overflow: hidden; background: #fff; border: 1px solid #cfd7df; box-shadow: 0 2px 8px #132e4a12; transform-origin: top left; }
 .visual { position: absolute; overflow: hidden; border: 1px solid #e0e5e9; background: #fff; color: #293846; }
 .visual.has-frame { border-color: #e0e5e9; }
-.visual-head { height: 23px; display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 2px 6px; color: #465461; font-size: 9px; font-weight: 600; }
+.visual-head { height: 27px; display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 2px 6px; color: #465461; font-size: 12px; font-weight: 600; }
 .visual-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .info-button { flex: none; width: 17px; height: 17px; padding: 0; border: 1px solid #bac8d4; border-radius: 50%; background: #fff; color: #406482; font-size: 10px; line-height: 15px; }
-.visual-body { height: calc(100% - 24px); padding: 2px 7px 5px; overflow: auto; }
+.visual-body { height: calc(100% - 28px); padding: 2px 7px 5px; overflow: auto; display: flex; flex-direction: column; min-height: 0; }
 .visual.control-visual .visual-head { display: none; }
 .visual.control-visual .visual-body { height: 100%; }
 .visual.metric-card .visual-body { display: flex; flex-direction: column; justify-content: center; padding: 7px 9px; }
 .card-metrics { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .card-metrics > div { flex: 1 1 90px; min-width: 0; }
 .metric-value.narrative { font-size: 13px; font-weight: 500; white-space: pre-line; }
-.chart-legend { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 9px; padding: 0 4px 5px; }
+.chart-legend { flex: none; display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 12px; padding: 0 4px 5px; }
 .chart-legend i { display: inline-block; width: 7px; height: 7px; margin-right: 4px; }
-.chart-scroll { overflow: auto; height: calc(100% - 20px); }
-.treemap { position: relative; height: 100%; min-height: 160px; }
-.treemap button { position: absolute; left: 0; width: 100%; border: 1px solid white; color: white; text-align: left; padding: 0 6px; font-size: 10px; overflow: hidden; }
+.chart-scroll { overflow: auto; flex: 1 1 auto; min-height: 0; min-width: 0; scrollbar-gutter: stable; }
+.chart-scroll svg { display: block; flex: none; max-width: none; }
+.axis-tick { font-size: 12px; fill: #41515f; }
+.treemap-content { flex: 1; min-height: 0; overflow: auto; }
+.treemap { position: relative; height: 220px; flex: none; }
+.treemap button { position: absolute; left: 0; width: 100%; border: 1px solid white; color: white; text-align: left; padding: 4px 6px; font-size: 12px; overflow: hidden; }
 .treemap button:hover { filter: brightness(.9); }
+.treemap button > span { background: #fffffff0; color: #14365d; padding: 2px 3px; box-decoration-break: clone; }
+.treemap-key { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 4px 12px; padding: 10px 0; }
+.treemap-key button { border: 0; background: white; color: #293846; font-size: 12px; text-align: left; padding: 4px; }
+.treemap-key i, .donut-values i, .compact-status i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; }
+.donut-chart { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; min-height: 230px; gap: 12px; }
+.donut-chart svg { flex: none; }
+.donut-values { display: grid; gap: 6px; font-size: 12px; }
+.compact-summary .visual-head { position: absolute; right: 3px; top: 3px; width: 18px; height: 18px; padding: 0; z-index: 1; }
+.compact-summary .visual-title { display: none; }
+.compact-summary .visual-body { height: 100%; padding: 4px 24px 4px 8px; }
+.compact-status { display: flex; flex-direction: column; justify-content: center; flex: 1; gap: 2px; font-size: 12px; }
 .word-cloud { display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 5px 12px; min-height: 100%; }
 .visual [data-cross-field] { cursor: pointer; }
 .heatmap th, .heatmap td { white-space: nowrap; text-align: center; }
@@ -83,15 +97,19 @@ h1 { margin: 0; color: var(--ink); font-size: 20px; font-weight: 650; }
 .chart-bar { fill: var(--chart); }
 .chart-bar.alt { fill: #64a7d2; }
 .chart-grid { stroke: #e8edf1; stroke-width: 1; }
-.data-table { width: 100%; border-collapse: collapse; color: #41515f; font-size: 8px; }
+.data-table { width: 100%; border-collapse: collapse; color: #41515f; font-size: 12px; }
 .data-table th { background: #f2f6f9; color: #44596c; font-weight: 650; text-align: left; }
-.data-table th, .data-table td { border-bottom: 1px solid #e5eaee; padding: 3px 4px; }
+.data-table th, .data-table td { border-bottom: 1px solid #e5eaee; padding: 6px 8px; white-space: nowrap; }
 .data-table td:last-child, .data-table th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
-.table-wrap { height: 100%; overflow: auto; }
+.table-wrap { flex: 1; min-height: 0; overflow: auto; }
 .text-visual { padding: 7px 9px; color: #34495c; font-size: 11px; line-height: 1.35; }
-.slicer-control { max-width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 2px 6px; }
-.slicer-control label { color: #566a7b; font-size: 9px; }
-.slicer-control select { min-width: 0; width: 100%; height: 27px; padding: 2px 5px; border: 1px solid #c7d0d8; border-radius: 2px; background: #fff; color: #263b4e; font-size: 10px; }
+.slicer-control { max-width: 100%; height: 100%; flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 2px 6px; }
+.slicer-control > span { color: #41515f; font-size: 12px; }
+.slicer-control select { flex: none; min-width: 0; width: 100%; height: 28px; padding: 2px 5px; border: 1px solid #c7d0d8; border-radius: 2px; background: #fff; color: #263b4e; font-size: 12px; }
+.short-slicer .visual-body { padding: 2px 6px; overflow: hidden; }
+.short-slicer .slicer-control { flex-direction: row; align-items: center; gap: 8px; padding: 0; }
+.short-slicer .slicer-control > span { flex: none; }
+.short-slicer .slicer-control select { flex: 1; width: 0; }
 .bookmark-options { height: 100%; display: flex; align-items: center; gap: 5px; overflow-x: auto; }
 .bookmark-option { flex: 0 0 auto; border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 5px 9px; color: #42505d; font-size: 9px; white-space: nowrap; }
 .bookmark-option[aria-pressed="true"] { border-bottom-color: var(--chart); color: #0c65b8; font-weight: 700; }

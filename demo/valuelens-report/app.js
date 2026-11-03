@@ -118,9 +118,15 @@
     const legend = labels.length > 1 ? `<div class="chart-legend">${labels.map(label => `<span><i style="background:${color(label)}"></i>${esc(label)}</span>`).join("")}</div>` : "";
     const cross = (g) => category < 0 || !engine.canFilter(data.fields[0]) ? "" : `data-cross-field="${esc(`${data.fields[0].table}|${data.fields[0].name}`)}" data-cross-value="${esc(g.label)}" tabindex="0" role="button" aria-label="Filter ${esc(g.label)}"`;
     const title = (g, p) => `<title>${esc(g.label)} / ${esc(p.label)}: ${esc(format(p.field, p.value))}</title>`;
+    const svg = (width, height, content) => `<div class="chart-scroll"><svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(v.title)}">${content}</svg></div>`;
+    const ticks = (maximum, left, top, width, height, percent = false) => Array.from({ length: 5 }, (_, i) => {
+      const value = maximum * i / 4, y = top + height * (1 - i / 4);
+      return `<line x1="${left}" x2="${left + width}" y1="${y}" y2="${y}" class="chart-grid"/><text class="axis-tick" x="${left - 8}" y="${y + 4}" text-anchor="end">${percent ? `${number(value * 100)}%` : number(value)}</text>`;
+    }).join("");
     if (/donut|pie/.test(type)) {
       const points = groups.flatMap(g => g.points.map(p => ({ ...p, label: category < 0 ? p.label : g.label })));
       const total = points.reduce((s, p) => s + p.value, 0);
+      if (v.position.height < 90) return `<div class="compact-status" aria-label="${esc(v.title)}">${points.map((p, i) => `<span><i style="background:${colors[i % colors.length]}"></i>${esc(p.label)} <strong>${number(total ? p.value / total * 100 : 0)}%</strong></span>`).join("")}</div>`;
       let angle = -Math.PI / 2;
       const paths = points.map((p, i) => {
         const next = angle + (total ? p.value / total * Math.PI * 2 : 0);
@@ -130,14 +136,15 @@
         angle = next;
         return `<g>${path}<title>${esc(p.label)}: ${esc(format(p.field, p.value))}</title></g>`;
       }).join("");
-      return `<svg class="mini-chart" viewBox="0 0 310 180" role="img" aria-label="${esc(v.title)}">${paths}${type.includes("donut") ? '<circle cx="100" cy="85" r="43" fill="white"/>' : ""}${points.map((p, i) => `<text x="185" y="${16 + i * 19}" font-size="9" fill="${colors[i % colors.length]}">${esc(p.label)}: ${esc(format(p.field, p.value))}</text>`).join("")}</svg>`;
+      return `<div class="donut-chart"><svg width="200" height="170" viewBox="0 0 200 170" role="img" aria-label="${esc(v.title)}">${paths}${type.includes("donut") ? '<circle cx="100" cy="85" r="43" fill="white"/>' : ""}</svg><div class="donut-values">${points.map((p, i) => `<span><i style="background:${colors[i % colors.length]}"></i>${esc(p.label)}: <strong>${esc(format(p.field, p.value))}</strong></span>`).join("")}</div></div>`;
     }
     if (type.includes("treemap")) {
       function pack(items, x, y, w, h) {
         if (!items.length) return "";
         if (items.length === 1) {
           const g = items[0], i = groups.indexOf(g);
-          return `<button type="button" ${cross(g)} title="${esc(g.label)}: ${esc(format(g.points[0].field, g.points[0].value))}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;background:${colors[i % colors.length]}">${esc(g.label)} <strong>${esc(format(g.points[0].field, g.points[0].value))}</strong></button>`;
+          const labelFits = w * (v.position.width - 18) / 100 >= 100 && h * 220 / 100 >= 42;
+          return `<button type="button" ${cross(g)} aria-label="${esc(g.label)}: ${esc(format(g.points[0].field, g.points[0].value))}" title="${esc(g.label)}: ${esc(format(g.points[0].field, g.points[0].value))}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;background:${colors[i % colors.length]}">${labelFits ? `<span>${esc(g.label)} <strong>${esc(format(g.points[0].field, g.points[0].value))}</strong></span>` : ""}</button>`;
         }
         const total = items.reduce((s, g) => s + g.points[0].value, 0);
         let split = 1, sum = items[0].points[0].value;
@@ -146,7 +153,7 @@
         return w >= h ? pack(items.slice(0, split), x, y, w * fraction, h) + pack(items.slice(split), x + w * fraction, y, w * (1 - fraction), h)
           : pack(items.slice(0, split), x, y, w, h * fraction) + pack(items.slice(split), x, y + h * fraction, w, h * (1 - fraction));
       }
-      return `<div class="treemap">${pack(groups.filter(g => g.points[0].value > 0), 0, 0, 100, 100)}</div>`;
+      return `<div class="treemap-content"><div class="treemap">${pack(groups.filter(g => g.points[0].value > 0), 0, 0, 100, 100)}</div><div class="treemap-key">${groups.map((g, i) => `<button type="button" ${cross(g)}><i style="background:${colors[i % colors.length]}"></i>${esc(g.label)} <strong>${esc(format(g.points[0].field, g.points[0].value))}</strong></button>`).join("")}</div></div>`;
     }
     if (type.includes("wordcloud")) {
       const words = new Map(), stop = new Set(["the", "and", "was", "a", "to", "of", "is", "in", "for"]);
@@ -156,57 +163,80 @@
     }
     if (type.includes("scatter")) {
       const x = data.fields.findIndex(f => f.role === "X"), y = data.fields.findIndex(f => f.role === "Y"), size = data.fields.findIndex(f => f.role === "Size");
-      const mx = Math.max(1, ...data.data.map(r => Number(r[x]) || 0)), my = Math.max(1, ...data.data.map(r => Number(r[y]) || 0));
-      return `<svg class="mini-chart" viewBox="0 0 460 210" role="img" aria-label="${esc(v.title)}"><path d="M35 10V180H445" fill="none" stroke="#9aa9b5"/>${data.data.map(r => `<circle cx="${35 + (Number(r[x]) || 0) / mx * 400}" cy="${180 - (Number(r[y]) || 0) / my * 160}" r="${Math.min(16, 3 + Math.sqrt(Number(r[size]) || 0))}" fill="#1683c5" opacity=".65"><title>${esc(r.slice(0, dims).join(" / "))}: ${esc(data.columns[x])} ${number(r[x])}, ${esc(data.columns[y])} ${number(r[y])}</title></circle>`).join("")}<text x="160" y="205" font-size="10">${esc(data.columns[x])}</text><text x="40" y="10" font-size="10">${esc(data.columns[y])}</text></svg>`;
+      const rows = data.data.filter(r => Number.isFinite(r[x]) && Number.isFinite(r[y]));
+      if (!rows.length) return '<div class="chart-empty">No data in this selection</div>';
+      const domain = (index) => {
+        const values = rows.map(r => r[index]), low = Math.min(...values), high = Math.max(...values);
+        const pad = (high - low || Math.abs(high) || 1) * .15;
+        return [Math.max(0, low - pad), high + pad];
+      };
+      const [x0, x1] = domain(x), [y0, y1] = domain(y);
+      const width = Math.max(480, v.position.width - 36), height = Math.max(280, v.position.height - 48);
+      const left = 74, top = 24, pw = width - 110, ph = height - 90;
+      const px = n => left + (n - x0) / (x1 - x0) * pw, py = n => top + ph - (n - y0) / (y1 - y0) * ph;
+      const axes = Array.from({ length: 5 }, (_, i) => {
+        const a = x0 + (x1 - x0) * i / 4, b = y0 + (y1 - y0) * i / 4;
+        return `<line x1="${px(a)}" x2="${px(a)}" y1="${top}" y2="${top + ph}" class="chart-grid"/><line x1="${left}" x2="${left + pw}" y1="${py(b)}" y2="${py(b)}" class="chart-grid"/><text class="axis-tick" x="${px(a)}" y="${top + ph + 20}" text-anchor="middle">${number(a)}</text><text class="axis-tick" x="${left - 8}" y="${py(b) + 4}" text-anchor="end">${number(b)}</text>`;
+      }).join("");
+      return svg(width, height, `${axes}${rows.map((r, i) => `<circle cx="${px(r[x])}" cy="${py(r[y])}" r="${Math.min(12, 3 + Math.sqrt(Number(r[size]) || 0))}" fill="${colors[i % colors.length]}" opacity=".75"><title>${esc(r.slice(0, dims).join(" / "))}: ${esc(data.columns[x])} ${number(r[x])}, ${esc(data.columns[y])} ${number(r[y])}${size < 0 ? "" : `, ${esc(data.columns[size])} ${number(r[size])}`}</title></circle>`).join("")}<text x="${left + pw / 2}" y="${height - 10}" text-anchor="middle" font-size="12">${esc(data.columns[x])}</text><text transform="translate(16 ${top + ph / 2}) rotate(-90)" text-anchor="middle" font-size="12">${esc(data.columns[y])}</text>`);
     }
     if (/column/.test(type)) {
       const combo = type.includes("combo"), stacked = type.includes("stacked");
       const barLabels = labels.filter(label => !combo || groups.some(g => g.points.some(p => p.label === label && p.field.role !== "Y2")));
       const lineLabels = combo ? labels.filter(label => groups.some(g => g.points.some(p => p.label === label && p.field.role === "Y2"))) : [];
-      const maximum = Math.max(1, ...groups.map(g => stacked ? g.points.filter(p => barLabels.includes(p.label)).reduce((s, p) => s + p.value, 0) : Math.max(...g.points.map(p => p.value))));
-      const width = Math.max(450, groups.length * 52), plot = width - 65;
+      const maximum = Math.max(1, ...groups.map(g => stacked ? g.points.filter(p => barLabels.includes(p.label)).reduce((s, p) => s + p.value, 0) : Math.max(0, ...g.points.filter(p => barLabels.includes(p.label)).map(p => p.value))));
+      const width = Math.max(v.position.width - 36, 480, groups.length * 76 + 100), plot = width - 110;
+      const labelDepth = Math.max(70, ...groups.map(g => String(g.label).length * 6));
+      const height = Math.max(labelDepth + 130, v.position.height - 58);
+      const bottom = height - labelDepth - 20, plotHeight = bottom - 28;
       const bars = groups.map((g, i) => {
-        const x = 35 + i * plot / Math.max(1, groups.length), slot = plot / Math.max(1, groups.length) * .75;
-        let top = 170;
+        const x = 65 + i * plot / Math.max(1, groups.length), slot = plot / Math.max(1, groups.length) * .75;
+        let top = bottom;
         return `<g ${cross(g)}>${g.points.filter(p => barLabels.includes(p.label)).map((p, j) => {
-          const h = p.value / maximum * 145, px = stacked ? x : x + j * slot / Math.max(1, barLabels.length);
-          const py = stacked ? top - h : 170 - h;
+          const h = p.value / maximum * plotHeight, px = stacked ? x : x + j * slot / Math.max(1, barLabels.length);
+          const py = stacked ? top - h : bottom - h;
           if (stacked) top -= h;
           return `<rect x="${px}" y="${py}" width="${stacked ? slot : slot / Math.max(1, barLabels.length)}" height="${h}" fill="${color(p.label)}">${title(g, p)}</rect>`;
-        }).join("")}<text x="${x}" y="187" font-size="9" transform="rotate(25 ${x} 187)">${esc(String(g.label).slice(0, 17))}</text></g>`;
+        }).join("")}<text class="category-label" x="${x + slot / 2}" y="${bottom + 18}" font-size="12" text-anchor="end" transform="rotate(-45 ${x + slot / 2} ${bottom + 18})">${esc(g.label)}</text></g>`;
       }).join("");
       const lines = lineLabels.map(label => {
-        const points = groups.map((g, i) => ({ g, p: g.points.find(p => p.label === label), x: 35 + (i + .4) * plot / Math.max(1, groups.length) }));
-        return `<polyline points="${points.map(x => `${x.x},${170 - (x.p?.value || 0) * 145}`).join(" ")}" fill="none" stroke="${color(label)}" stroke-width="2"/>${points.map(x => `<circle cx="${x.x}" cy="${170 - (x.p?.value || 0) * 145}" r="3" fill="${color(label)}">${x.p ? title(x.g, x.p) : ""}</circle>`).join("")}`;
+        const points = groups.map((g, i) => ({ g, p: g.points.find(p => p.label === label), x: 65 + (i + .375) * plot / Math.max(1, groups.length) }));
+        return `<polyline points="${points.map(x => `${x.x},${bottom - (x.p?.value || 0) * plotHeight}`).join(" ")}" fill="none" stroke="${color(label)}" stroke-width="2"/>${points.map(x => `<circle cx="${x.x}" cy="${bottom - (x.p?.value || 0) * plotHeight}" r="3" fill="${color(label)}">${x.p ? title(x.g, x.p) : ""}</circle>`).join("")}`;
       }).join("");
-      return `${legend}<div class="chart-scroll"><svg viewBox="0 0 ${width} 225" style="width:100%;min-width:${width}px;min-height:180px" role="img" aria-label="${esc(v.title)}"><path d="M30 15V170H${width - 10}" fill="none" stroke="#c7d0d8"/>${bars}${lines}<text x="0" y="12" font-size="9">${number(maximum)}</text>${combo ? `<text x="${width - 25}" y="12" font-size="9">100%</text>` : ""}</svg></div>`;
+      return `${legend}${svg(width, height, `${ticks(maximum, 65, bottom - plotHeight, plot, plotHeight)}${bars}${lines}${combo ? `<text x="${width - 40}" y="16" font-size="12">100%</text>` : ""}`)}`;
     }
     if (/line|area/.test(type)) {
       const max = Math.max(1, ...groups.flatMap(g => g.points.map(p => p.value)));
+      const width = Math.max(480, v.position.width - 36), plot = width - 110;
+      const height = Math.max(200, v.position.height - 58), bottom = height - 45, plotHeight = bottom - 28;
       const lines = labels.map(label => {
-        const points = groups.map((g, i) => ({ x: 40 + i * 400 / Math.max(1, groups.length - 1), y: 170 - (g.points.find(p => p.label === label)?.value || 0) / max * 145, g, p: g.points.find(p => p.label === label) }));
+        const points = groups.map((g, i) => ({ x: 65 + i * plot / Math.max(1, groups.length - 1), y: bottom - (g.points.find(p => p.label === label)?.value || 0) / max * plotHeight, g, p: g.points.find(p => p.label === label) }));
         return `<polyline points="${points.map(p => `${p.x},${p.y}`).join(" ")}" fill="none" stroke="${color(label)}" stroke-width="2"/>${points.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="${color(label)}">${p.p ? title(p.g, p.p) : ""}</circle>`).join("")}`;
       }).join("");
-      return `${legend}<svg class="mini-chart" viewBox="0 0 480 210" role="img" aria-label="${esc(v.title)}"><path d="M35 15V175H455" fill="none" stroke="#c7d0d8"/>${lines}${groups.map((g, i) => i % Math.max(1, Math.ceil(groups.length / 6)) ? "" : `<text x="${40 + i * 400 / Math.max(1, groups.length - 1)}" y="193" font-size="9">${esc(String(g.label).slice(0, 10))}</text>`).join("")}</svg>`;
+      return `${legend}${svg(width, height, `${ticks(max, 65, 28, plot, plotHeight)}${lines}${groups.map((g, i) => i % Math.max(1, Math.ceil(groups.length / 5)) ? "" : `<text x="${65 + i * plot / Math.max(1, groups.length - 1)}" y="${height - 15}" font-size="12" text-anchor="middle">${esc(String(g.label).slice(0, 10))}</text>`).join("")}`)}`;
     }
     const tornado = type.includes("tornado");
     const hundred = type.includes("hundredpercent");
     const stacked = type.includes("stacked");
     const max = Math.max(1, ...groups.map(g => stacked ? g.points.reduce((s, p) => s + p.value, 0) : Math.max(...g.points.map(p => p.value))));
-    const height = Math.max(100, groups.length * 31 + 16);
+    const labelWidth = Math.max(110, Math.min(250, Math.max(...groups.map(g => String(g.label).length)) * 7 + 12));
+    const width = Math.max(v.position.width - 36, labelWidth + 100), plot = width - labelWidth - 60;
+    const rowHeight = Math.max(32, stacked || tornado ? 32 : series.length * 22);
+    const height = Math.max(80, groups.length * rowHeight + 20);
     const bars = groups.map((g, index) => {
-      const y = index * 31 + 9;
-      let start = 140;
+      const y = index * rowHeight + 9;
+      let start = labelWidth;
       const total = g.points.reduce((s, p) => s + p.value, 0);
-      return `<g ${cross(g)}><text x="2" y="${y + 10}" font-size="10">${esc(String(g.label).slice(0, 25))}</text>${g.points.map((p, j) => {
-        const width = Math.max(0, p.value / (hundred ? total || 1 : max) * (tornado ? 138 : 280));
-        const x = tornado ? j === 0 ? 285 - width : 285 : start;
-        const by = stacked || tornado ? y : y + j * 18 / Math.max(1, g.points.length);
-        if (stacked) start += width;
-        return `<rect x="${x}" y="${by}" width="${width}" height="${stacked || tornado ? 14 : 16 / g.points.length}" fill="${color(p.label)}">${title(g, p)}</rect><text x="${tornado ? j ? x + width + 3 : x - 30 : stacked ? x + 3 : x + width + 3}" y="${by + 11}" font-size="9">${esc(format(p.field, p.value))}</text>`;
+      return `<g ${cross(g)}><text class="category-label" x="2" y="${y + 13}" font-size="12">${esc(g.label)}</text>${g.points.map((p, j) => {
+        const barWidth = Math.max(0, p.value / (hundred ? total || 1 : max) * (tornado ? plot / 2 : plot));
+        const center = labelWidth + plot / 2, x = tornado ? j === 0 ? center - barWidth : center : start;
+        const by = stacked || tornado ? y : y + j * 22;
+        if (stacked) start += barWidth;
+        const showValue = !stacked || barWidth >= 48;
+        return `<rect x="${x}" y="${by}" width="${barWidth}" height="18" fill="${color(p.label)}">${title(g, p)}</rect>${showValue ? `<text x="${tornado ? j ? x + barWidth + 4 : x - 4 : stacked ? x + 4 : x + barWidth + 4}" text-anchor="${tornado && !j ? "end" : "start"}" y="${by + 13}" font-size="12">${esc(format(p.field, p.value))}</text>` : ""}`;
       }).join("")}</g>`;
     }).join("");
-    return `${legend}<div class="chart-scroll"><svg viewBox="0 0 490 ${height}" style="width:100%;min-height:${height}px" role="img" aria-label="${esc(v.title)}">${bars}</svg></div>`;
+    return `${legend}${svg(width, height, bars)}`;
   }
   function showDetails(id) {
     const v = report.pages[state.page].visuals.find(x => x.id === id);
@@ -240,7 +270,9 @@
       else body = chart(v, data);
     }
     const button = data ? `<button class="info-button" data-details="${v.id}" aria-label="Show values and source definitions: ${esc(v.title)}">i</button>` : "";
-    return `<article data-visual="${v.id}" class="visual${framed ? " has-frame" : ""}${/card/.test(type) ? " metric-card" : ""}${/slicer|bookmarknavigator|actionbutton|shape|image|textbox/.test(type) ? " control-visual" : ""}" style="left:${p.x}px;top:${p.y}px;width:${p.width}px;height:${p.height}px;z-index:${p.z || 0}" aria-label="${esc(v.title)}"><div class="visual-head"><span class="visual-title">${esc(v.title)}</span>${button}</div><div class="visual-body">${body}</div></article>`;
+    const compact = /donut|pie/.test(type) && p.height < 90;
+    const overlayInset = type.includes("tornado") ? Math.max(0, ...page.visuals.filter(x => visible(x) && /donut|pie/i.test(x.type) && x.position.height < 90).map(x => position(x, page)).filter(x => x.x < p.x + p.width && x.x + x.width > p.x && x.y >= p.y && x.y < p.y + 90).map(x => x.y + x.height - p.y - 24 + 8)) : 0;
+    return `<article data-visual="${v.id}" class="visual${framed ? " has-frame" : ""}${/card/.test(type) ? " metric-card" : ""}${/slicer|bookmarknavigator|actionbutton|shape|image|textbox/.test(type) ? " control-visual" : ""}${compact ? " compact-summary" : ""}${/slicer/.test(type) && p.height < 55 ? " short-slicer" : ""}" style="left:${p.x}px;top:${p.y}px;width:${p.width}px;height:${p.height}px;z-index:${p.z || 0}" aria-label="${esc(v.title)}"><div class="visual-head"><span class="visual-title">${esc(v.title)}</span>${button}</div><div class="visual-body"${overlayInset ? ` style="padding-top:${overlayInset}px"` : ""}>${body}</div></article>`;
   }
   function render() {
     dataCache.clear();
