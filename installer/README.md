@@ -9,6 +9,11 @@ It covers ValueLens only. [Analytics Hub](https://github.com/microsoft/Analytics
 which covers ValueLens plus Consumption Central, Agent Evaluator and an Azure route, has its own
 installer.
 
+## Video
+
+[Watch the installer walkthrough](../media/valuelens-installer-walkthrough-v3.mp4).
+The narration is AI-generated; sign-in and deployment are simulated.
+
 ## Install
 
 Paste this into PowerShell. It needs no admin rights: it downloads installer 0.1.0 as a zip,

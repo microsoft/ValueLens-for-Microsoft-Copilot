@@ -43,6 +43,7 @@ All screenshots use synthetic sample data. Every name in them is invented.
 
 ## Videos
 
+- **[Watch the installer walkthrough](media/valuelens-installer-walkthrough-v3.mp4)**. AI-generated narration; sign-in and deployment are simulated.
 - **[Watch the demo](https://youtu.be/P0uHJb13ZR0)** (2 minutes). What the dashboard shows, page by page.
 - **[Watch the Fabric setup](https://youtu.be/-pAuSQSP5pc)**. From a new app registration to a self-refreshing report.
   Full written steps: [1. Fabric setup guide](1.%20Fabric/README.md#video). Or [download the video](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/releases/download/installer-v0.2.2/ValueLens_Fabric_Setup.mp4).
