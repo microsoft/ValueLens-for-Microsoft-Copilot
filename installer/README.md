@@ -11,8 +11,9 @@ installer.
 
 ## Video
 
-[Watch the installer walkthrough](../media/valuelens-installer-walkthrough-v3.mp4).
 The narration is AI-generated; sign-in and deployment are simulated.
+
+https://github.com/user-attachments/assets/7ffd13f7-3053-430d-b7ce-815446c52f0a
 
 ## Install
 
