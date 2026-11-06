@@ -38,8 +38,8 @@ def objects(model, table_name):
 
 class TemplatesAreCurrent(unittest.TestCase):
     def test_every_template_is_current_and_the_patcher_is_idempotent(self):
-        self.assertEqual(len(PATCHER.VALUELENS), 4)
-        self.assertEqual(len(PATCHER.CONSUMPTION), 3)
+        self.assertEqual(len(PATCHER.VALUELENS), 3)
+        self.assertEqual(len(PATCHER.CONSUMPTION), 2)
         for relative, specs in PATCHER.TARGETS:
             original = (ROOT / relative).read_bytes()
             rebuilt, changed = PATCHER.build(original, specs)
@@ -267,7 +267,7 @@ class UserMonthMetricsKeys(unittest.TestCase):
         return text(PATCHER.find_table(model, "UserMonthMetrics")["partitions"][0]["source"]["expression"])
 
     def test_only_the_power_query_templates_have_the_table(self):
-        self.assertEqual(len(PATCHER.USER_MONTH_TEMPLATES), 2)
+        self.assertEqual(len(PATCHER.USER_MONTH_TEMPLATES), 1)
         for relative in PATCHER.VALUELENS:
             names = {t["name"] for t in load(relative)["tables"]}
             self.assertEqual("UserMonthMetrics" in names, relative in PATCHER.USER_MONTH_TEMPLATES, relative)

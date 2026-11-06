@@ -11,7 +11,6 @@ ADDON = "Add Credit Consumption"
 # Folder that holds each active path's add-on folder. The archived Power Automate + Dataverse
 # add-on is frozen, so it isn't checked.
 PBITS = {
-    "5. Local CSV": "Consumption Central - Local CSV.pbit",
     "4. SharePoint": "Consumption Central - Viva Direct.pbit",
     "1. Fabric/Manual setup": "Consumption Central - Fabric.pbit",
 }
@@ -53,8 +52,8 @@ class CreditConsumptionAddon(unittest.TestCase):
 
     def test_fabric_sample_seeder_points_at_shared_sample(self):
         source = (ROOT / "1. Fabric" / "Manual setup" / ADDON / "seed_sample_data.py").read_text(encoding="utf-8")
-        self.assertIn('"..", "..", "..", "5. Local CSV", "Add Credit Consumption", "sample-data"', source)
-        self.assertTrue((ROOT / "5. Local CSV" / ADDON / "sample-data" / "README.md").is_file())
+        self.assertIn('"..", "..", "..", "shared", "sample-data", "consumption"', source)
+        self.assertTrue((ROOT / "shared" / "sample-data" / "consumption" / "README.md").is_file())
 
     def test_viva_load_writes_its_row_counts(self):
         # A Viva load with no Dataflow rows mustn't look loaded, so the notebook writes its row counts.

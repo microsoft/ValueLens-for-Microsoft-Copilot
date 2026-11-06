@@ -1,8 +1,9 @@
 # Customer data — never commit
 *.csv
 !**/sample-data/*.csv
+!shared/sample-data/consumption/*.csv
 !docs/*.csv
-!1. SharePoint/scripts/OrgData-Template.csv
+!shared/scripts/OrgData-Template.csv
 !1. Fabric/Manual setup/notebooks/workday-org-data/**/*.csv
 
 # Power BI workspace artefacts

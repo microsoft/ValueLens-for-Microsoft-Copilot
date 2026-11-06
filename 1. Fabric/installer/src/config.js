@@ -64,7 +64,7 @@ export const DEFAULT_CONFIG_FILE = 'valuelens-install.json';
  * @typedef {object} RlsConfig
  * @property {boolean} enabled
  * @property {'department' | 'country'} [orgAttribute]  What an org scope matches. Defaults to department.
- * @property {string[]} [applied]  Models whose role members were applied since they were last deployed. A deploy drops members.
+ * @property {string[]} [applied]  Models whose access tables were loaded since redeploy. Does not certify portal role membership.
  */
 
 /**

@@ -1,12 +1,14 @@
-# scripts — manual extract toolchain
+# Shared CSV export and org-data helpers
 
-What turns a **raw Purview audit export** into the two CSVs the template reads.
+Maintained helpers used by SharePoint exports, sample generation and legacy installations.
+They are not a standalone setup route: start with [SharePoint, Fabric or Azure](../../README.md#choose-your-path).
 
 | File | Purpose |
 |---|---|
 | `Purview_CopilotInteraction_Processor_v4.0.0.py` | The processor. Raw audit CSV + users → the two rollup CSVs. |
 | `Adapt-OrgFile-To-EntraUsers.py` | Optional. Normalises a custom HR/org export into the shape the processor's `--entra` input expects. |
 | `OrgData-Template.csv` | Sample bring-your-own org file — copy it, fill in your users, pass as `--entra`. |
+| `pull_azure_ai.py` | Optional Azure AI Foundry exports for credit-consumption reports. Run `python pull_azure_ai.py --help` for options. |
 
 ---
 

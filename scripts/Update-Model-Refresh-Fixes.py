@@ -4,7 +4,7 @@ Consumption Central (Fabric):
   * The partitions that read a Lakehouse table column by column buffer it first. Unbuffered, the
     SQL endpoint is queried once per column, which on a large tenant exhausts the connection pool.
 
-Consumption Central (all three active variants: Fabric, Viva Direct, Local CSV; the archived
+Consumption Central (both active variants: Fabric and Viva Direct; the archived
 Power Automate + Dataverse variant is frozen and not patched):
   * Refresh-time DAX that ranked every user against every other user is rewritten to give the
     same results. The Group By table finds each percentile cut once with TOPN instead of RANKX
@@ -54,7 +54,6 @@ CONSUMPTION = Path("1. Fabric") / "Manual setup" / "Add Credit Consumption" / "C
 # ending, but not its Lakehouse queries.
 CONSUMPTION_VARIANTS = (
     Path("4. SharePoint") / "Add Credit Consumption" / "Consumption Central - Viva Direct.pbit",
-    Path("5. Local CSV") / "Add Credit Consumption" / "Consumption Central - Local CSV.pbit",
 )
 MEMBERS = ("DataModelSchema", "UnappliedChanges")
 ZIP_METADATA = (

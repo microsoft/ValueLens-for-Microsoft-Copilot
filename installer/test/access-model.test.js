@@ -10,7 +10,6 @@ import {
   ORG_VALUE_COLUMN,
   PATH_COLUMN,
   rlsSettings,
-  roleDefinitions,
   SCOPED_ROLE,
   scopedFilter,
 } from '../src/transform/access.js';
@@ -176,24 +175,8 @@ test('the lookup columns read the access tables by lower-case UPN', () => {
   );
 });
 
-test('roleDefinitions: Viewers in the scoped role; everyone-scope people (and Viewers, when that is the default) in Everyone', () => {
+test('model roles have filters but never portal-managed membership', () => {
   const on = build.valuelens({});
-  const roles = roleDefinitions(on.model, { groupId: 'g1', tenantId: 't1', everyone: ['B@x.com', 'a@x.com', 'a@x.com', '*', ''] });
-  assert.deepEqual(
-    roles.map((r) => [r.name, r.members]),
-    [
-      [
-        EVERYONE_ROLE,
-        [
-          { memberName: 'a@x.com', identityProvider: 'AzureAD', memberType: 'user' },
-          { memberName: 'b@x.com', identityProvider: 'AzureAD', memberType: 'user' },
-        ],
-      ],
-      [SCOPED_ROLE, [{ memberName: 'obj:g1@t1', identityProvider: 'AzureAD', memberType: 'group' }]],
-    ],
-  );
-  const open = roleDefinitions(on.model, { groupId: 'g1', tenantId: 't1', everyone: [], defaultAll: true });
-  assert.deepEqual(open[0].members, [{ memberName: 'obj:g1@t1', identityProvider: 'AzureAD', memberType: 'group' }]);
-  assert.ok(open[1].tablePermissions.length > 1, 'the scoped role keeps its filters');
-  assert.throws(() => roleDefinitions(build.valuelens().model, { groupId: 'g', tenantId: 't', everyone: [] }), /without org-scoped access/);
+  assert.ok(on.model.roles?.every((r) => !('members' in r)));
+  assert.ok(on.model.roles?.find((r) => r.name === SCOPED_ROLE)?.tablePermissions.length > 1);
 });

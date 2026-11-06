@@ -5,9 +5,8 @@ running the query. The base URL must be a parameter (or literal) with a value. A
 (Text.Trim, if/else, concatenation) or a blank parameter, even in an unused branch, makes the
 source dynamic and blocks scheduled refresh with "Data source for Query1".
 
-This script owns the M that reads web sources in the SharePoint template, and the matching
-optional-file read in the Local CSV template. The archived Power Automate + Dataverse template is
-frozen, so it's no longer patched:
+This script owns the M that reads web sources in the SharePoint template. The archived
+Power Automate + Dataverse and Local CSV templates are frozen, so they are not patched:
 
 * Optional SharePoint files (Feedback File, Agent 365) are read through a SharePoint Site URL
   parameter and the SharePoint REST API (ValueLensSharePointFile), so a blank file parameter no
@@ -30,7 +29,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 SHAREPOINT = Path("4. SharePoint") / "ValueLens - SharePoint.pbit"
-LOCAL_CSV = Path("5. Local CSV") / "ValueLens - Local CSV.pbit"
+LOCAL_CSV = Path("archive") / "5. Local CSV" / "ValueLens - Local CSV.pbit"
 ZIP_METADATA = (
     "filename", "orig_filename", "date_time", "compress_type", "comment", "extra",
     "create_system", "create_version", "extract_version", "reserved", "flag_bits",
@@ -122,14 +121,8 @@ SHAREPOINT_EDITS = (
     feedback_read("Web.Contents"),
 )
 
-LOCAL_CSV_EDITS = (
-    FEEDBACK_FILE_PATH,
-    feedback_read("File.Contents"),
-)
-
 TARGETS = (
     (SHAREPOINT, SHAREPOINT_EDITS),
-    (LOCAL_CSV, LOCAL_CSV_EDITS),
 )
 
 

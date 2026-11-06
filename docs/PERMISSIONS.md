@@ -143,6 +143,11 @@ The installer creates one Entra security group, **Analytics Hub Viewers**, with 
 
 ## Org-scoped access (row-level security)
 
+For the administrator walkthrough, deployment-path support matrix and user-ID hashing status,
+see [Security and privacy setup](SECURITY-PRIVACY-SETUP.md). The CSV app and SharePoint/Local CSV
+routes do not gain model RLS from app sharing or filters. No active path currently supports
+end-to-end user-ID pseudonymization.
+
 By default everyone in **Analytics Hub Viewers** sees every org. Org-scoped access is **opt-in**: turn it on from the installer's `access` command (**Org-scoped access: who sees which orgs**). Each viewer then sees only the orgs they've been given a **scope** for:
 
 | Scope | Sees |
@@ -158,13 +163,18 @@ A person can have several scopes; they see the union. People without a scope of 
 - **Everyone** filters nothing but the scope table. Its members are the people with an `all` scope.
 - **Scoped viewers** has the viewer group as its member and filters the model's org table (and the person-level tables it doesn't reach) to the person's scopes. Tenant-wide tables (Azure and pay-as-you-go spend, agent inventory, Defender, Resource Graph, product feedback) show only to `all`, so those pages drop out of a scoped viewer's sidebar.
 
-A model definition deploy drops role members, so after every deploy the installer runs the **AnalyticsHub_Access_Scope** notebook, which applies the members through the XMLA endpoint, and then checks the result by querying as a seeded viewer.
+A model definition deploy can drop role members. After every deploy an administrator must review
+and restore membership on each semantic model's **Security** page in the Power BI portal. The
+installer loads scopes and requests refresh only; it never assigns role members. Add the viewer
+group to **Scoped viewers**. Assign **Everyone** only to explicitly approved all-data readers,
+never a restricted viewer/group: Power BI unions roles. The scoped role also handles `all`
+dynamically. An administrator query is not proof of viewer isolation.
 
 | What | Role / requirement |
 |---|---|
 | Turn it on, change scopes | A workspace **Admin** or **Member** running the installer. On Azure also **Storage Blob Data Contributor** on the storage account (the installer assigns it if you can) |
-| Apply role members | The tenant setting **Allow XMLA endpoints**, and a Fabric, Premium or Premium Per User capacity with the XMLA endpoint set to **Read Write**. A Pro workspace can't have role members applied, so the installer won't turn it on there |
-| Azure | The Power BI workspace on a capacity, as above. The notebook runs in that workspace. Installs with private networking aren't supported yet, because the notebook can't reach the storage account |
+| Assign role members | An administrator uses **workspace > semantic model > ... > Security** in the Power BI portal, then tests with real non-workspace viewers. Build and app sharing alone do not assign an RLS role |
+| Azure | The older installer's setup still requires a capacity-backed Power BI workspace and public networking. Pro-only and private-network setup remain blocked pending route validation. Scope loading uses the Azure jobs, not an XMLA membership notebook |
 | "Below a person" scopes | Manager data in the org data. The installer warns when fewer than half the people have a manager |
 | Who skips it | Workspace **Admins, Members and Contributors** see every row whatever their scope. The installer lists them when you turn it on, and the app shows them "Showing: everyone (your workspace role)" |
 | Who can give scopes | Analytics Hub admins, from the installer's `access` command. On Azure also from **Share** in the app: see below |
@@ -174,8 +184,8 @@ A model definition deploy drops role members, so after every deploy the installe
 | Situation | What happens |
 |---|---|
 | Upgrade or Repair, org-scoped access off (the default) | Nothing changes. The models deploy exactly as before, with no roles and no access tables. On Azure the database gets an empty `access_scope` table. The org data gains an `OrgPath` column, which models without org-scoped access ignore |
-| You turn it on | Everyone in the viewer group now, and you, get an `all` scope, so nobody loses anything. The models are redeployed with the roles, the members are applied, the models refresh and the installer checks a seeded person sees everyone |
-| Upgrade or Repair with it on | Any model redeploy is followed by applying the members again and checking. The scopes are untouched |
+| You turn it on | Current viewers and you get an `all` scope to preserve prior visibility; review/remove these seeds before restricting viewers. Models are redeployed with role definitions and access tables load. An administrator assigns portal membership, waits for refresh and verifies real-viewer access |
+| Upgrade or Repair with it on | Scopes are retained and tables reload; after any model redeploy an administrator reviews/restores portal membership and retests |
 | Someone joins the viewer group later | They see nothing until you give them a scope (or you add a default `*` scope) |
 | You turn it off | The models are redeployed without the roles or access tables. The scopes are kept for if you turn it on again |
 
@@ -187,7 +197,7 @@ A model definition deploy drops role members, so after every deploy the installe
 | A leader: someone with a **can share** scope | Give someone **My org**: the people below themselves. Only when that sits inside a scope they were given with can share (an `all` scope, or a **Below a person** scope for themselves or someone above them). They can't pass on can share, and they take back only what they gave |
 | Everyone else | Sees "Only an Analytics Hub admin can choose what people see", with who to ask |
 
-- Nobody gives **Everyone** (`all`) from the app. That changes the Everyone role's members, so it stays in the installer's `access` command.
+- Nobody gives **Everyone** (`all`) from the app. Manage that scope in the installer's `access` command; any Everyone role membership is separately managed by an administrator in the Power BI portal.
 - A delegate also needs to be in the viewer group. The app adds them as the signed-in person, so it only works for owners of the group and directory admins. For anyone else the scope is saved as **Waiting for an admin** and has no effect until an admin approves it in the Share panel, which adds them to the group. No extra Graph permissions are needed.
 - The web app writes scopes to `dbo.access_scope` (marked `share`) as its managed identity. The jobs' scheduled load replaces only the installer's scopes from the CSV, so these stay. Remove them in the app, not the CSV.
 - After a change the app refreshes the models' **Access Scope** table as the managed identity, so it usually applies within a few minutes. Changes close together share a refresh. When Power BI is busy or won't take another refresh, the change applies at the next scheduled refresh. Org-scoped access needs a capacity, so Pro's 8 refreshes a day don't apply, but these refreshes count towards the capacity's load.
@@ -196,7 +206,7 @@ A model definition deploy drops role members, so after every deploy the installe
 On Fabric, scopes are given only by admins, from the installer. The Share panel says so, and who to ask.
 
 Caveats:
-- Scopes other than `all` change at the next scheduled load. **Apply now** in `access` reloads and refreshes straight away; a new `all` scope needs it, since it changes role members.
+- Scope changes take effect after load and model refresh. **Apply now** reloads and requests refresh, not role assignment. Removing/narrowing an `all` scope does not revoke an existing **Everyone** role assignment: an administrator must remove that membership in the portal too.
 - Totals on a scoped viewer's pages, licence counts included, are for the people they can see.
 - Hiding names from scoped viewers isn't part of this. The app's minimum-group-size rules still apply.
 
@@ -347,5 +357,5 @@ commands for the site grant. See
 - **+ Agents 365:** add `CopilotPackages.Read.All` + `Application.Read.All` (+ `User.Read.All`) to the same app reg, and confirm the tenant has an Agent 365 licence.
 
 See the README for what you're deploying for the step-by-step —
-[the app](../app/README.md) · [1](../1.%20Fabric/README.md) · [2](../2.%20Azure/README.md) ·
-[4](../4.%20SharePoint/README.md) · [5](../5.%20Local%20CSV/README.md).
+[4. SharePoint](../4.%20SharePoint/README.md) · [1. Fabric](../1.%20Fabric/README.md) ·
+[2. Azure](../2.%20Azure/README.md). App hosting is covered in [the app guide](../app/README.md).

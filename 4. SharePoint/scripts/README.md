@@ -13,12 +13,12 @@ reference.
 | `Get-Agents365Registry.ps1` | Optional. Exports the Agent 365 registry as the canonical 48-column CSV every template's `Agent 365` parameter reads (same shape as the Fabric notebook's `agents_365`). `Run-PAX-AIBV.ps1 -IncludeAgent365Info` calls it for you. | Ad-hoc, or every refresh via the extract. |
 
 > **Looking for the manual Python processor?** It moved to
-> [`../../5. Local CSV/scripts/`](../../5.%20Local%20CSV/scripts/) along with the org-data helpers,
+> [`shared/scripts`](../../shared/scripts/) along with the org-data helpers,
 > because the manual route is now its own path. `Run-PAX-AIBV.ps1` doesn't use it — PAX embeds the
 > same v4.0.0 rollup internally.
 >
 > Supplying your own org data here via `-UserInfoFile`? The sample template lives at
-> [`../../5. Local CSV/scripts/OrgData-Template.csv`](../../5.%20Local%20CSV/scripts/OrgData-Template.csv).
+> [shared org-data template](../../shared/scripts/OrgData-Template.csv).
 
 ---
 
@@ -215,7 +215,7 @@ Point the template's `Agent 365` parameter at the output (Local CSV) or upload i
 (SharePoint, or the archived Dataverse path's CSV fallback).
 
 `-UserInfoFile` (optional, BYOD): supply your own user directory CSV instead of pulling it live from
-Entra — copy [`OrgData-Template.csv`](../../5.%20Local%20CSV/scripts/OrgData-Template.csv) as a
+Entra — copy [`OrgData-Template.csv`](../../shared/scripts/OrgData-Template.csv) as a
 starting point. `UserPrincipalName`
 is required (header
 aliases `UPN` / `PersonId` also accepted, values must be UPNs not GUIDs); other columns
@@ -309,7 +309,7 @@ runtime via the resolution chain above.
 
 `Purview_CopilotInteraction_Processor_v4.0.0.py`, `Adapt-OrgFile-To-EntraUsers.py` and
 `OrgData-Template.csv` now live in
-**[`../../5. Local CSV/scripts/`](../../5.%20Local%20CSV/scripts/)** — with their own parameter
+**[`shared/scripts`](../../shared/scripts/)** — with their own parameter
 reference — because the manual route is now its own deployment path.
 
 Nothing here depends on them: `Run-PAX-AIBV.ps1` calls Microsoft PAX, which embeds the same v4.0.0

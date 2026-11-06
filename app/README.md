@@ -5,6 +5,10 @@ with the same DAX rules ported to TypeScript, in seven tabs instead of sixteen p
 
 It runs in the browser. Your CSV files are read on your PC, and no data is sent anywhere.
 
+**Security and privacy:** the app can read every row in a supplied CSV; filters and hosting
+permissions are not row-level security. See the [administrator setup guide](../docs/SECURITY-PRIVACY-SETUP.md)
+for file-sharing boundaries and why a user-ID hashing switch is not currently supported.
+
 ![The ValueLens app's Adoption tab, showing the built-in synthetic sample data](../Images/ValueLens-App-Adoption.png)
 
 ## Choose a route
@@ -261,10 +265,11 @@ the Azure installer route.
 
 ### Which files the app reads
 
-The same CSV files as the **Local CSV** and **SharePoint** paths. Choose **Change data** and drop
+Processed CSV files from your [SharePoint, Fabric or Azure route](../README.md#choose-your-path).
+Choose **Change data** and drop
 them in. The app tells each file's type from its column headers.
 
-| File | Detected by | Needed? | Local CSV / SharePoint file |
+| File | Detected by | Needed? | Processed / SharePoint file |
 |---|---|---|---|
 | Copilot interactions | `ThreadId` plus `Audit_UserId` or `Message_isPrompt` | **Required** | `*_Interactions_*.csv` or `copilot_interactions_rollup.csv` |
 | Organisation and licences | A user key (`PersonId` or `UserPrincipalName`), plus `Organization` or `Has License` | Recommended: organisation filter, licensed counts, Readiness tab | `*_Users_*.csv` or `copilot_users_rollup.csv` |
@@ -280,17 +285,19 @@ share the processor, so every active path has one input format.
 
 | Path | How to get the CSVs |
 |---|---|
-| 5. Local CSV | The processor's `*_Interactions_*.csv` and `*_Users_*.csv`, plus the optional agent and feedback exports. |
 | 4. SharePoint + PAX | `copilot_interactions_rollup.csv`, `copilot_users_rollup.csv` and `agents_365.csv` from the folder `Upload-Rollups-SharePoint.ps1` writes to. |
 | 1. Fabric | Export the Lakehouse tables from a notebook, e.g. `spark.table("copilot_interactions_curated").toPandas().to_csv(...)`. For users, export org data with a UPN, `Organization` and `Has License`. |
-| 2. Azure | The run job writes the same curated table to `curated/copilot_interactions_curated` and Azure SQL. Export it the same way, or run the Local CSV processor on a Purview export. |
-| 3. Power Automate + Dataverse ([archived](../archive/3.%20Power%20Automate%20%2B%20Dataverse/README.md)) | Its Dataverse columns are prefixed. Run [`Purview_CopilotInteraction_Processor`](../5.%20Local%20CSV/scripts/) on a Purview audit export instead, and add `agents_365.csv` if you use one. |
+| 2. Azure | The run job writes the same curated table to `curated/copilot_interactions_curated` and Azure SQL. Export it the same way, or run the [shared CSV processor](../shared/scripts/README.md) on a Purview export. |
+
+Existing Local CSV reports can still use the maintained [shared processor](../shared/scripts/README.md)
+and optional agent/feedback exports. Local CSV and Power Automate + Dataverse are archived,
+not new installation choices.
 
 ### Sample data
 
 The app shows a synthetic sample, labelled **Sample data**, until you load your own files.
 `npm run dev`, `build` and `build:file` first run `scripts/prepare-sample.mjs`, which builds it in
-`public/sample/` from `5. Local CSV/sample-data` (git ignores the output, so build from a full clone).
+`public/sample/` from `shared/sample-data` (git ignores the output, so build from a full clone).
 
 The sample registry has no `Total Users` column, so agent lifecycle and usage review fall back to
 users seen in the audit log. Your own registry export does the same if it lacks that column.

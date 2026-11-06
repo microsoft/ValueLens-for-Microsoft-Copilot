@@ -18,7 +18,7 @@ compatibility, validation and any limitations. Follow the
 ## Run the tests
 
 Run from the repository root with **Python 3.12** (the CI version) and
-**PowerShell 7** (`pwsh` on `PATH`). Python 3.12 satisfies both the Local CSV
+**PowerShell 7** (`pwsh` on `PATH`). Python 3.12 satisfies both the shared CSV
 processor's documented 3.9+ baseline and the 3.10+ prerequisites of the SharePoint
 path and the archived Power Automate + Dataverse path; those path-specific minimums
 are not a whole-repository test matrix.
@@ -78,11 +78,14 @@ signature. A release that fails goes back to being a draft.
 - Keep the numbered folder names stable: installers, tests and links depend on them.
   Put setup details in the relevant README and shared column contracts in the
   [data dictionary](docs/DATA-DICTIONARY.md).
-- Make each report or app change in every active variant: [the app](app/), `1. Fabric`
-  (including the Fabric App), `2. Azure`, `4. SharePoint` and `5. Local CSV`. Leave
-  [`archive/`](archive/) alone. The Power Automate + Dataverse path has been frozen since
-  23 October 2026: the patch scripts in [`scripts/`](scripts/) and the template tests skip
-  its templates, but tests still cover its scripts.
+- The active data routes, in getting-started order, are `4. SharePoint`, `1. Fabric`
+  and `2. Azure`. Make each report or app change in all relevant active variants,
+  including [the app](app/) and the Fabric App. Power Automate + Dataverse and Local CSV
+  are archived: template patch scripts and active-template tests skip their frozen templates.
+  Keep shared helper and legacy-script regression coverage.
+- Active CSV helpers live in [`shared/scripts`](shared/scripts/README.md); synthetic data
+  lives in [`shared/sample-data`](shared/sample-data/README.md), with consumption fixtures in
+  its `consumption` subfolder. Active builds must not read assets from archived routes.
 - Preserve existing names, formatting and README tone. Separate measured signals
   from estimates, and document optional sources, toggles and blank-data behaviour.
 - Use fabricated fixtures only. Never commit tenant exports, user identities,

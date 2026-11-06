@@ -224,7 +224,7 @@ class AgentLinkTests(unittest.TestCase):
             self.assertIn(f'"{column}"', code[12])
 
 
-CSV_PROCESSOR = ROOT / "5. Local CSV" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
+CSV_PROCESSOR = ROOT / "shared" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
 
 
 def load_csv_processor():

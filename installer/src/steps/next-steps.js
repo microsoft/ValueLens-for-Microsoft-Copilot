@@ -71,8 +71,26 @@ export function nextSteps(config, user = {}) {
         taskLogonStep(config),
         retiredGrantsStep(config, user),
       ]
-    : [shareReportStep(config, user), flowsStep(config, user), entraRoleStep(config, user), m365ExportStep(config, user)];
+    : [rlsPortalStep(config), shareReportStep(config, user), flowsStep(config, user), entraRoleStep(config, user), m365ExportStep(config, user)];
   return steps.filter(/** @returns {s is NextStep} */ (s) => !!s);
+}
+
+/** @param {import('../config.js').InstallConfig} config @returns {NextStep | null} */
+function rlsPortalStep(config) {
+  if (!config.access?.rls?.enabled) return null;
+  return {
+    id: 'rls-portal',
+    title: 'Review Power BI RLS role membership and test viewer access',
+    who: 'A Power BI workspace administrator',
+    why: 'Loading access tables does not assign roles. Model redeploys can remove membership. This reminder remains while RLS is on because the installer cannot certify portal membership or viewer isolation.',
+    link: config.fabric.workspaceId ? workspaceUrl(config.fabric.workspaceId) : undefined,
+    linkText: 'Open the workspace',
+    steps: [
+      `On each semantic model, open ... > Security. Add "${config.access.groupName ?? VIEWER_GROUP_NAME}" to Scoped viewers, then Save.`,
+      'Keep restricted viewers out of Everyone and workspace Admin, Member or Contributor roles. Review Everyone membership separately after any all-scope change.',
+      'Use Test as role, then real non-workspace viewer sign-ins for an allowed org, another org and no scope. Check details, totals and exports after refresh.',
+    ],
+  };
 }
 
 /**

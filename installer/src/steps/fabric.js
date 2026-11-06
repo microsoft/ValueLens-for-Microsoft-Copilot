@@ -539,7 +539,7 @@ export function notebookSettings(ctx, nb) {
   if (nb.key === 'refreshModel') values = { WORKSPACE_ID: /** @type {string} */ (f.workspaceId), SEMANTIC_MODEL_ID: /** @type {string} */ (config.semanticModel.id) };
   if (nb.key === 'uploadRouter') values = routerValues(config);
   if (nb.key === 'loadStatus') values = { STATUS_JSON: statusConfigJson() };
-  // The pipeline loads the tables only; the installer passes roles when it applies membership.
+  // Both scheduled and installer runs load access tables only; membership stays in the portal.
   if (nb.key === 'accessScope') values = { WORKSPACE_ID: /** @type {string} */ (f.workspaceId), MODE: 'all', ROLES_B64: '', ROLES_FILE: '' };
   /** @type {Record<string, string> | undefined} */
   let expressions = nb.expressions;

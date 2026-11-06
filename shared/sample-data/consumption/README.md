@@ -1,7 +1,7 @@
 # Sample data
 
-A synthetic dataset so you can see Consumption Central working before you go and collect your own
-exports. Set **`DataFolder`** to this folder and everything loads.
+A synthetic dataset used by Azure demo mode and the Fabric sample seeder.
+For file-based Consumption Central reports, set **`DataFolder`** to this folder.
 
 **None of this is real.** It is generated data for a fictional insurance company — invented people,
 invented departments, invented usage. It carries no tenant's information and nothing here should be

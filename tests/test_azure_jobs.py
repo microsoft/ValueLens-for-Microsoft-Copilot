@@ -731,7 +731,7 @@ def test_sample_load_runs_through_processor(tmp_path):
 
     from valuelens_jobs import sample
 
-    folder = Path(__file__).resolve().parents[1] / "5. Local CSV" / "sample-data"
+    folder = Path(__file__).resolve().parents[1] / "shared" / "sample-data"
     store = LocalStore(tmp_path)
     info = sample.load(store, folder=folder, today=date(2026, 10, 6))
     assert info["people"] == 170 and info["shift_days"] == 35

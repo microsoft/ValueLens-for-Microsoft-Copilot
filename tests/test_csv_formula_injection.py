@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-PROCESSOR = ROOT / "5. Local CSV" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
+PROCESSOR = ROOT / "shared" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
 REGISTRY = ROOT / "4. SharePoint" / "scripts" / "Get-Agents365Registry.ps1"
 
 PAYLOAD = '=HYPERLINK("http://example.test/x","click")'

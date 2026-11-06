@@ -1,11 +1,17 @@
 # ValueLens installer
 
+**Administrator setup:** run `access` and choose **Security and privacy setup guide** for
+the RLS checklist and manual Power BI portal steps. See
+[the support matrix and identity cutover guide](../docs/SECURITY-PRIVACY-SETUP.md).
+No end-to-end user-ID hashing switch is currently available.
+
 Sets up [ValueLens](../README.md) in your tenant, loads the first data and checks it. You answer
 its questions in your browser, or in the terminal. This page is the reference. To get going:
 [Prerequisites](../docs/PREREQUISITES.md#the-valuelens-installer) →
 [Install](../docs/INSTALL.md) → [Check it worked](../docs/INSTALL.md#check-it-worked).
 
-It covers ValueLens only. [Analytics Hub](https://github.com/microsoft/AnalyticsHub-Dashboard),
+It covers ValueLens only.
+[DataHub App for Microsoft Copilot, Agents, Cowork and Autopilots](https://github.com/microsoft/DataHub-App-for-Microsoft-Copilot-Agents-Cowork-and-Autopilots),
 which covers ValueLens plus Consumption Central, Agent Evaluator and an Azure route, has its own
 installer.
 
@@ -426,7 +432,7 @@ week at a time like the first load. If it stops part way, the scheduled runs rea
   model or report it didn't publish: its own get the next free name.
 - **Analytics Hub.** The installer won't use a workspace that holds an Analytics Hub install, or
   an Analytics Hub install record (`valuelens-install.json`). Manage those with the
-  [Analytics Hub installer](https://github.com/microsoft/AnalyticsHub-Dashboard).
+  [DataHub installer](https://github.com/microsoft/DataHub-App-for-Microsoft-Copilot-Agents-Cowork-and-Autopilots).
 
 ## Update, repair or change
 
@@ -571,7 +577,7 @@ installed.
   route.
 - **`valuelens.cmd` says this copy has been removed or replaced.** Run the command it prints.
 - **The installer won't use a workspace or an install record.** It holds an Analytics Hub
-  install. Use the [Analytics Hub installer](https://github.com/microsoft/AnalyticsHub-Dashboard).
+  install. Use the [DataHub installer](https://github.com/microsoft/DataHub-App-for-Microsoft-Copilot-Agents-Cowork-and-Autopilots).
 - **"This install record is for the … route".** See [Changing route](#update-repair-or-change).
 - **The first load was skipped.** Admin consent wasn't granted. Once it is, run the command the
   installer printed: `run --backfill-days <days>` (Fabric) or `run` (PAX).

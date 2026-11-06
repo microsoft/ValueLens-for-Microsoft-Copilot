@@ -37,7 +37,7 @@ export const MANAGED_CLI_DIR = 'managed-cli';
  * The sample data the app opens with isn't committed: `app/scripts/prepare-sample.mjs` builds it
  * into the app's public folder from this one, which it finds two folders above itself.
  */
-export const APP_SAMPLE_DATA = '5. Local CSV/sample-data';
+export const APP_SAMPLE_DATA = 'shared/sample-data';
 /** The sample files the built app fetches when it opens (app/src/data/load.ts). */
 export const APP_SAMPLE_FILES = Object.freeze(['interactions', 'users', 'agents', 'feedback'].map((f) => `sample/${f}.csv`));
 export { MIRROR_REGISTRY, PUBLIC_REGISTRY, publicRegistry } from './registry.js';

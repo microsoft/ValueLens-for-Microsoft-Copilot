@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "5. Local CSV" / "scripts" / "Adapt-OrgFile-To-EntraUsers.py"
+SCRIPT = ROOT / "shared" / "scripts" / "Adapt-OrgFile-To-EntraUsers.py"
 
 
 @pytest.fixture(scope="module")

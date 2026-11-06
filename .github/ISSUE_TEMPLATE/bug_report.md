@@ -12,12 +12,11 @@ Use fabricated examples and redact screenshots. -->
 
 ### Deployment path
 
-- [ ] The app (preview)
-- [ ] 1. Fabric (SQL endpoint or OneLake? Specify below.)
-- [ ] 1. Fabric/Fabric App (preview)
-- [ ] 2. Azure
 - [ ] 4. SharePoint
-- [ ] 5. Local CSV
+- [ ] 1. Fabric (SQL endpoint or OneLake? Specify below.)
+- [ ] 2. Azure
+
+If relevant, specify app hosting (managed app, Fabric App or local sample) below.
 
 ### Environment
 

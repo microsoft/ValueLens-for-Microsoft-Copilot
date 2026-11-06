@@ -1,5 +1,10 @@
 # Analytics Hub installer
 
+**Administrator setup:** run `access` and choose **Security and privacy setup guide** for
+the RLS checklist and manual Power BI portal steps. See
+[the support matrix and identity cutover guide](../../docs/SECURITY-PRIVACY-SETUP.md).
+No end-to-end user-ID hashing switch is currently available.
+
 > **Work in progress.** The installer is still changing. Try it in a test or demo tenant first, and
 > use the [manual setup](../Manual%20setup/README.md) for production.
 

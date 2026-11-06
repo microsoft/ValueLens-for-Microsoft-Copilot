@@ -1,11 +1,11 @@
 """Apply the shared DAX fixes to every active ValueLens and Consumption Central PBIT.
 
-The four active ValueLens templates and the three active Consumption Central add-ons carry the
+The three active ValueLens templates and the two active Consumption Central add-ons carry the
 same model, so a DAX fix has to land in all of them byte-for-byte; UserMonthMetrics is only
-in the two ValueLens templates that build the audit table in Power Query. This script
+in the SharePoint template that builds the audit table in Power Query. This script
 owns those objects: it sets each one's expression (adding the object when a template lacks it),
 leaves every other model field and ZIP member untouched, and is idempotent. The archived Power
-Automate + Dataverse templates are frozen, so it doesn't patch them.
+Automate + Dataverse and Local CSV templates are frozen, so it doesn't patch them.
 
     python scripts/Update-Template-Dax.py           # patch the templates in place
     python scripts/Update-Template-Dax.py --check   # exit 1 if any template is stale
@@ -25,13 +25,11 @@ ROOT = Path(__file__).resolve().parents[1]
 VALUELENS = (
     Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
     Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
-    Path("5. Local CSV") / "ValueLens - Local CSV.pbit",
     Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
 )
 CONSUMPTION = (
     Path("1. Fabric") / "Manual setup" / "Add Credit Consumption" / "Consumption Central - Fabric.pbit",
     Path("4. SharePoint") / "Add Credit Consumption" / "Consumption Central - Viva Direct.pbit",
-    Path("5. Local CSV") / "Add Credit Consumption" / "Consumption Central - Local CSV.pbit",
 )
 ZIP_METADATA = (
     "filename", "orig_filename", "date_time", "compress_type", "comment", "extra",

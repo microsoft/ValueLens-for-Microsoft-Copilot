@@ -163,7 +163,7 @@ test('rlsBlockers: no model deployed yet', () => {
   assert.deepEqual(rlsBlockers(ctx), []);
 });
 
-test('apply on Fabric: lands the list, applies the roles with members, then records them', async () => {
+test('apply on Fabric: loads scopes without passing role membership to the notebook', async () => {
   const { ctx, config, fabric, lakeFiles, powerBi } = fabricInstall();
   lakeFiles.map.set(FABRIC_SCOPE_FILE, scopeCsv([...seedRows(['ana@contoso.com'], by), newRow({ upn: 'ben@contoso.com', type: 'org', value: 'Sales' }, by)]));
   deployedRoles(ctx).set('ds-vl', builtRoles());
@@ -173,16 +173,16 @@ test('apply on Fabric: lands the list, applies the roles with members, then reco
 
   const [params] = notebookRuns(fabric.calls);
   assert.equal(params.MODE.value, 'all');
-  assert.equal(params.ROLES_FILE.value, FABRIC_ROLES_FILE);
+  assert.equal(params.ROLES_FILE.value, '');
+  assert.equal(params.ROLES_B64.value, '');
   const roles = JSON.parse(/** @type {string} */ (lakeFiles.map.get(FABRIC_ROLES_FILE)));
   assert.deepEqual(roles.map((/** @type {any} */ i) => [i.dataset, i.datasetId, i.role.name]), [[config.semanticModel.name, 'ds-vl', EVERYONE_ROLE], [config.semanticModel.name, 'ds-vl', SCOPED_ROLE]]);
-  assert.deepEqual(roles[0].role.members.map((/** @type {any} */ m) => m.memberName), ['ana@contoso.com']);
-  assert.deepEqual(roles[1].role.members, [{ memberName: 'obj:g-1@tenant-1', identityProvider: 'AzureAD', memberType: 'group' }]);
+  assert.ok(roles.every((/** @type {any} */ i) => !('members' in i.role)));
   assert.deepEqual(config.access?.rls?.applied, ['ds-vl']);
   assert.deepEqual(powerBi.calls, [], 'refresh: false leaves the refresh to the caller');
 });
 
-test('apply on Fabric: a model not deployed this run takes its roles from the last roles file, with members from the list now', async () => {
+test('apply on Fabric: legacy stored definitions have membership removed, never replayed', async () => {
   const { ctx, config, fabric, lakeFiles, powerBi } = fabricInstall();
   const old = builtRoles().map((role) => ({ dataset: 'ValueLens', datasetId: 'ds-vl', role: { ...role, members: [{ memberName: 'gone@contoso.com' }] } }));
   lakeFiles.map.set(FABRIC_ROLES_FILE, JSON.stringify(old));
@@ -192,7 +192,8 @@ test('apply on Fabric: a model not deployed this run takes its roles from the la
   assert.equal(await applyOrgAccess(ctx), true);
 
   const roles = JSON.parse(/** @type {string} */ (lakeFiles.map.get(FABRIC_ROLES_FILE)));
-  assert.deepEqual(roles[0].role.members.map((/** @type {any} */ m) => m.memberName), ['ben@contoso.com']);
+  assert.ok(roles.every((/** @type {any} */ i) => !('members' in i.role)));
+  assert.equal(notebookRuns(fabric.calls)[0].ROLES_FILE.value, '');
   assert.deepEqual(config.access?.rls?.applied, ['ds-vl']);
   assert.ok(powerBi.calls.some((c) => c.startsWith('refresh ds-vl')), 'refreshes the model');
 });
@@ -206,7 +207,7 @@ test('apply on Fabric: a failed notebook leaves the models unapplied and says wh
   assert.equal(await ensureOrgAccess(ctx, { refresh: false }), false);
   assert.deepEqual(config.access?.rls?.applied, []);
   assert.match(ui.text(), /XMLA endpoint is read only/);
-  assert.match(ui.text(), /Allow XMLA endpoints/);
+  assert.match(ui.text(), /Role membership is assigned in the Power BI portal/);
 });
 
 test('ensureOrgAccess: a blocker is a failure that says how to get past it', async () => {
@@ -237,7 +238,7 @@ test('ensureOrgAccess: nothing to do when off, or when every model has its membe
   /** @type {any} */ (on.config.access).rls.applied = ['ds-vl'];
   assert.equal(await ensureOrgAccess(on.ctx), true);
   assert.deepEqual(notebookRuns(on.fabric.calls), []);
-  assert.match(on.ui.text(), /Org-scoped access is in place/);
+  assert.match(on.ui.text(), /administrator must verify Power BI portal role membership/);
 });
 
 test('deployModel: a redeploy drops the model from applied, and records its roles for this run', async () => {

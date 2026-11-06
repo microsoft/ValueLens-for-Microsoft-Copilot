@@ -1,7 +1,7 @@
 """Synthetic demo data in place of the tenant collectors.
 
 With VALUELENS_SAMPLE_DATA=true the run "collects" the repo's fabricated sample
-(`5. Local CSV/sample-data`: 170 people at contoso-demo.com, three months of Copilot use) into a
+(`shared/sample-data`: 170 people at contoso-demo.com, three months of Copilot use) into a
 throwaway local store, then processes, publishes and refreshes as usual. The people go through the
 same `org` and `licensed` builders as Graph data, and the interactions are given in the parsed
 audit shape, so the curated tables come out of the shared processor exactly as real data would.
@@ -12,7 +12,7 @@ Dates move forward by whole weeks so the latest sample day falls in the past wee
 patterns are kept, and the "last 30 days" measures have data).
 
 With the `consumption` module on, the synthetic Consumption Central sample
-(`5. Local CSV/Add Credit Consumption/sample-data`, bundled at /app/sample-data/consumption) goes
+(`shared/sample-data/consumption`, bundled at /app/sample-data/consumption) goes
 through the same Studio and Viva ingest as drop-folder files, and its Azure AI CSVs become the
 Azure AI tables. Its dates are left as they are.
 """

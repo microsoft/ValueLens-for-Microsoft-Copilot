@@ -1,4 +1,4 @@
-# Sample data — try ValueLens with no tenant setup
+# Shared ValueLens sample data
 
 Four CSVs that populate the dashboard end to end, so you can see how the numbers
 land before wiring anything up to your own tenant.
@@ -10,16 +10,16 @@ land before wiring anything up to your own tenant.
 | `agents_365_sample.csv` | **Agent 365** *(optional)* | 104 |
 | `product_feedback_sample.csv` | **Feedback File** *(optional)* | 1,215 |
 
-## Quick start
+## Where it is used
 
-1. Open **[`../ValueLens - Local CSV.pbit`](../)** in Power BI Desktop.
-2. When prompted for parameters, point each at the matching file above (full local paths).
-3. **Load**.
+The [app build](../../app/README.md#develop), ValueLens installer payload and
+[Azure demo mode](../../2.%20Azure/README.md#install-it) use these maintained fixtures.
+Credit-consumption samples are in [`consumption`](consumption/README.md).
 
-That's it — no export, no app registration, no Fabric capacity, no Purview access.
-
-> Use the template in **[`5. Local CSV/`](../)** — not `4. SharePoint/ValueLens - SharePoint.pbit`,
-> which deliberately accepts SharePoint URLs only.
+For a quick look without installing anything, download the
+[sample app](../../app/download/ValueLens-App.html) and open it locally.
+The archived [Local CSV template](../../archive/5.%20Local%20CSV/README.md) can still read
+these files; the active SharePoint template accepts SharePoint URLs, not local paths.
 
 ## This data is fabricated
 

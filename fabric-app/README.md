@@ -6,6 +6,11 @@ figure comes from the models' own DAX measures, queried at the grain each view n
 person viewing it, so row-level security applies. The app keeps no copy of your data and never
 pulls raw rows.
 
+**Administrator setup:** [RLS and identity privacy](../docs/SECURITY-PRIVACY-SETUP.md).
+The app's filters are not access controls. RLS requires configured model roles and
+administrator-assigned membership in the Power BI portal; no end-to-end user-ID hashing switch
+is currently supported.
+
 One codebase deploys as three apps. Each is its own Fabric item, so all three can sit in one
 workspace:
 

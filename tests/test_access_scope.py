@@ -1,7 +1,6 @@
 """Org-scoped access: the scope CSV, access_people, the Fabric notebook's parity and the Azure publish sync."""
 from __future__ import annotations
 
-import base64
 import json
 import sqlite3
 from datetime import datetime, timezone
@@ -113,18 +112,15 @@ def test_notebook_merge_keeps_app_grants():
                     ("bob@contoso.com", "installer")]
 
 
-def test_notebook_role_scripts():
+def test_notebook_rejects_automated_membership():
     ns = nb()
-    assert ns["role_scripts"]("") == []
-    role = {"name": "Scoped viewers", "modelPermission": "read", "members": [{"memberName": "obj:g@t"}]}
-    b64 = base64.b64encode(json.dumps([{"dataset": "ValueLens", "role": role}]).encode()).decode()
-    [(dataset, script)] = ns["role_scripts"](b64)
-    assert dataset == "ValueLens"
-    assert script == {"createOrReplace": {"object": {"database": "ValueLens", "role": "Scoped viewers"}, "role": role}}
-    # The installer writes the same JSON to a file when the member list is large; extra fields are ignored.
-    text = json.dumps([{"dataset": "ValueLens", "datasetId": "ds-1", "role": role}])
-    assert ns["role_scripts_json"](text) == [(dataset, script)]
-    assert ns["role_scripts_json"]("  ") == []
+    ns["validate_access_mode"]("all", "", "")
+    for mode, encoded, path in [("membership", "", ""), ("all", "e30=", ""),
+                                ("all", "", "Files/legacy-roles.json"), ("unknown", "", "")]:
+        with pytest.raises(ValueError, match="administrator in the Power BI portal"):
+            ns["validate_access_mode"](mode, encoded, path)
+    notebook = (notebook_source.NOTEBOOKS / NB).read_text(encoding="utf-8")
+    assert "execute_tmsl" not in notebook
 
 
 # ---------------------------------------------------------------- Azure sync

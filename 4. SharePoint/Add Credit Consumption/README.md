@@ -14,8 +14,8 @@ Cowork data comes straight from Viva Insights, with no files and no extract task
 |---|---|
 | `Consumption Central - Viva Direct.pbit` | The report, connected directly to Viva Insights. |
 
-Want to try it on sample data first? Use the
-[Local CSV add-on](../../5.%20Local%20CSV/Add%20Credit%20Consumption/).
+Shared [synthetic sample exports](../../shared/sample-data/consumption/README.md)
+are available for file-based inputs.
 
 ---
 
@@ -41,8 +41,8 @@ dialog point at a multi-table result this template can't read, and fail with
 ### Other products *(optional)*
 
 Set **`DataFolder`** to a folder of Copilot Studio, GitHub or Azure AI exports (file names as in the
-[Local CSV add-on](../../5.%20Local%20CSV/Add%20Credit%20Consumption/)). Its
-[`pull_azure_ai.py`](../../5.%20Local%20CSV/Add%20Credit%20Consumption/pull_azure_ai.py) writes the
+[shared sample reference](../../shared/sample-data/consumption/README.md)). The shared
+[`pull_azure_ai.py`](../../shared/scripts/pull_azure_ai.py) writes the
 Azure AI files, including deployment health, solution spend and billing reconciliation; each run
 keeps the older rows. Add
 `M365SpendingPolicyMetaData.csv` from the Viva query download to show policy names instead of IDs.

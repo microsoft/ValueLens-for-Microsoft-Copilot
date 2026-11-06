@@ -1,4 +1,4 @@
-// Builds the bundled synthetic sample from the Local CSV variant's sample-data folder.
+// Builds the bundled synthetic sample from the shared sample-data folder.
 // Usage: node scripts/prepare-sample.mjs
 import fs from 'node:fs'
 import path from 'node:path'
@@ -7,7 +7,7 @@ import Papa from 'papaparse'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..', '..')
-const src = path.join(root, '5. Local CSV', 'sample-data')
+const src = path.join(root, 'shared', 'sample-data')
 const out = path.resolve(here, '..', 'public', 'sample')
 fs.mkdirSync(out, { recursive: true })
 

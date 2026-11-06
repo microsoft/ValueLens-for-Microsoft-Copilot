@@ -27,7 +27,7 @@ on:
       - 'installer/**'
       # What the payload carries: the app, the sample it opens with, and the templates and scripts.
       - 'app/**'
-      - '5. Local CSV/sample-data/**'
+      - 'shared/sample-data/**'
       - '1. Fabric/Manual setup/**'
       - '4. SharePoint/scripts/**'
       - '4. SharePoint/*.pbit'

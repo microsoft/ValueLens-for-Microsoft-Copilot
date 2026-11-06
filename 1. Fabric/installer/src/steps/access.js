@@ -8,6 +8,7 @@ import { HttpError } from '../http.js';
 import { rlsOn, rlsSettings } from '../transform/access.js';
 import { asksAdvanced } from './advanced.js';
 import { orgAccessCommand } from './org-access.js';
+import { showPrivacyGuide } from './privacy-guide.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
 /** @typedef {{ workspaceId: string, datasetId: string, name: string }} ModelRef */
@@ -244,6 +245,7 @@ export async function accessCommand(ctx, models, redeploy) {
     const action = await ui.select(
       'What next?',
       [
+        { name: 'Security and privacy setup guide', value: 'privacy', description: 'Administrator RLS checklist, portal steps and hashing support status. Changes nothing.' },
         { name: 'Add viewers', value: 'members', description: 'People or groups, by email or group name.' },
         { name: 'Add an owner', value: 'owner', description: 'Owners can add and remove viewers themselves.' },
         { name: 'Give the group Build on the models again', value: 'grants', description: 'Repairs access to the models the app queries.' },
@@ -255,6 +257,10 @@ export async function accessCommand(ctx, models, redeploy) {
       'done',
     );
     if (action === 'done') return;
+    if (action === 'privacy') {
+      showPrivacyGuide(ctx);
+      continue;
+    }
     if (action === 'orgs' && redeploy) {
       await orgAccessCommand(ctx, redeploy);
       continue;

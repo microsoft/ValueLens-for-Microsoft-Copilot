@@ -1,11 +1,21 @@
 # 2. Azure
 
-Analytics Hub in **your own Azure subscription**, without Microsoft Fabric. It has the same data,
+The model-backed app in **your own Azure subscription**, without Microsoft Fabric. It has the same data,
 the same ValueLens Model and measures, and the same app pages as `1. Fabric`.
+
+**Administrator setup:** [RLS and identity privacy](../docs/SECURITY-PRIVACY-SETUP.md).
+Backend app access and Power BI model RLS are separate controls. Role membership is an
+administrator portal step; user-ID hashing is not currently supported end to end.
+
+[All routes](../README.md#choose-your-path): **4. SharePoint**, **1. Fabric**, **2. Azure**.
 
 > **Work in progress.** Only the [installer](../1.%20Fabric/installer/) sets this path up, and
 > it's also a work in progress. Try it in a demo or test tenant first. There's no manual path.
 > The design and roadmap are in [`docs/plans/AZURE-HOSTED-PLAN.md`](../docs/plans/AZURE-HOSTED-PLAN.md).
+
+Use the separate [DataHub installer](https://github.com/microsoft/DataHub-App-for-Microsoft-Copilot-Agents-Cowork-and-Autopilots),
+not the root ValueLens installer, which supports only SharePoint and Fabric.
+The existing installer download is named `AnalyticsHubInstaller.exe`.
 
 ## What you get
 

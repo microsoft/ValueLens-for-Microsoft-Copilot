@@ -71,7 +71,7 @@ class ModelRefreshFixes(unittest.TestCase):
         targets = {(ROOT / relative).resolve() for relative, _, _, dax in script.TARGETS if dax == "consumption"}
         shipped = {path.resolve() for path in ROOT.glob("*/**/Consumption Central - *.pbit")
                    if "archive" not in path.relative_to(ROOT).parts}
-        self.assertEqual(len(shipped), 3)
+        self.assertEqual(len(shipped), 2)
         self.assertEqual(targets, shipped)
 
     def test_pending_query_copies_match_the_model(self):

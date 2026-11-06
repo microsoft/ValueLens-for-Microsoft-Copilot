@@ -13,7 +13,7 @@ Deployment instructions do **not** live here. They live in the READMEs:
 [1. Fabric/Fabric App](1.%20Fabric/Fabric%20App/README.md) ·
 [2. Azure](2.%20Azure/README.md) ·
 [4. SharePoint](4.%20SharePoint/README.md) ·
-[5. Local CSV](5.%20Local%20CSV/README.md). The archived
+[5. Local CSV](archive/5.%20Local%20CSV/README.md). The archived
 [Power Automate + Dataverse](archive/3.%20Power%20Automate%20%2B%20Dataverse/README.md) path keeps its own.
 
 ---

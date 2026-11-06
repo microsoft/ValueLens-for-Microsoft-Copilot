@@ -26,7 +26,7 @@ from valuelens_jobs.storage import LocalStore
 
 ROOT = Path(__file__).resolve().parents[1]
 V002 = ROOT / "2. Azure" / "sql" / "migrations" / "V002__consumption.sql"
-SAMPLES = ROOT / "5. Local CSV" / "Add Credit Consumption" / "sample-data"
+SAMPLES = ROOT / "shared" / "sample-data" / "consumption"
 TODAY = date(2026, 9, 10)  # snapshot month 2026-09
 G = "https://graph.microsoft.com/v1.0"
 SUB = "11111111-1111-1111-1111-111111111111"

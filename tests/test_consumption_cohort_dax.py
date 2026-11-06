@@ -6,7 +6,7 @@ ascending with the default Skip ties, is 1 + the number of smaller values. The n
 replayed step by step in Python with DAX's blank and DIVIDE rules (and, for UsageCohortRank, the
 steps of CoworkBilling's query), over generated values with ties, blanks, zeros, negatives and
 fractions, and table sizes from 0 up. Every active Consumption Central variant (Fabric, Viva
-Direct, Local CSV) ships the same DAX and query steps, so each is checked. The archived Power
+Direct) ships the same DAX and query steps, so each is checked. The archived Power
 Automate + Dataverse variant is frozen, so it isn't.
 """
 import bisect
@@ -266,7 +266,7 @@ class ShippedCohortDax(unittest.TestCase):
         return joined(table["partitions"][0]["source"]["expression"])
 
     def test_every_variant_is_checked(self):
-        self.assertEqual(len(TEMPLATES), 3)
+        self.assertEqual(len(TEMPLATES), 2)
 
     def test_columns_ship_the_new_expressions(self):
         for _ in self.variants():

@@ -1,4 +1,4 @@
-"""Portable structural release checks for the four active templates.
+"""Portable structural release checks for the three active templates.
 
 The archived Power Automate + Dataverse template is frozen, so it isn't checked here.
 Desktop refresh and rendering still need live QA.
@@ -11,7 +11,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = (
-    Path("5. Local CSV") / "ValueLens - Local CSV.pbit",
     Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
     Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
     Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
@@ -86,7 +85,7 @@ class CoreTemplateTests(unittest.TestCase):
                     if n.startswith("Report/definition/") and n.endswith(".json")}
             cls.templates.append((str(relative), members, model, docs))
 
-    def test_exactly_four_active_templates(self):
+    def test_exactly_three_active_templates(self):
         active = {p.relative_to(ROOT) for p in ROOT.rglob("*.pbit")
                   if "archive" not in p.parts and not ADDONS & set(p.parts)}
         self.assertEqual(active, set(TEMPLATES))
