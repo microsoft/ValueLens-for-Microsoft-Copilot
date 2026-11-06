@@ -154,6 +154,12 @@ a second route that needs no Fabric.
   the audit log count too. Once a tenant has used them, the service answers with a wait that can
   run to hours. The load used to sit in that wait until its time budget ran out. Now it stops
   straight away and says why, and the scheduled run carries on once the allowance frees up.
+- **A first load that stops early now finishes on the next scheduled run.** The scheduled run
+  loads only the last week, so it used to refuse to start while the first load's older windows
+  were unfinished, and the report stayed empty. A history load now leaves a marker in the staging
+  folder until it writes the table. While the marker is there, or the table doesn't exist yet,
+  the scheduled run carries on the history load from the same start and reuses the windows it
+  already fetched.
 - **Shared with Consumption Central.** Its installer copies the PAX route's code unchanged, so the
   route has settings ValueLens leaves off: a folder parameter, parameter values from the install
   record, a query read from a file, a privacy level, and a mode that exports only the user

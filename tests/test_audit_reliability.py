@@ -305,6 +305,10 @@ class AuditReliabilityTests(unittest.TestCase):
                 "_write_stage_jsonl",
                 "_move_stage_file",
                 "_read_stage_json",
+                "PENDING_BACKFILL",
+                "read_pending_backfill",
+                "write_pending_backfill",
+                "clear_pending_backfill",
                 "list_window_files",
                 "purge_window_files",
                 "list_active_stage_files",
@@ -366,6 +370,68 @@ class AuditReliabilityTests(unittest.TestCase):
             ns["determine_incremental_start"](end_dt, end_dt - timedelta(days=30), 7),
             end_dt - timedelta(days=30),
         )
+
+    def test_incremental_run_carries_on_an_unfinished_history_load(self):
+        resume = self.ingester_helpers()["resume_first_load"]
+        end = datetime(2026, 11, 1, 2, 0, tzinfo=timezone.utc)
+        week = end - timedelta(days=7)
+        pending = datetime(2026, 9, 26, 21, 0, tzinfo=timezone.utc)
+        mode, start, why = resume("incremental", week, end, pending.isoformat(), True, 30)
+        self.assertEqual((mode, start), ("backfill", pending))
+        self.assertIn("has not finished yet", why)
+        # No table and no marker (a load from before the marker existed): load the history.
+        mode, start, why = resume("incremental", week, end, None, False, 30)
+        self.assertEqual((mode, start), ("backfill", end - timedelta(days=30)))
+        self.assertIn("no audit table yet", why)
+        # A finished load leaves incremental runs alone.
+        self.assertEqual(resume("incremental", week, end, None, True, 30), ("incremental", week, None))
+        # A new backfill keeps the earlier unfinished start, so its window keys stay stable.
+        mode, start, why = resume("backfill", end - timedelta(days=30), end, pending, True, 30)
+        self.assertEqual((mode, start), ("backfill", pending))
+        self.assertIn("carries on", why)
+        later = end - timedelta(days=60)
+        self.assertEqual(resume("backfill", later, end, pending, True, 30), ("backfill", later, None))
+
+    def test_plan_windows_anchors_to_chunk_hours(self):
+        plan = self.ingester_helpers()["plan_windows"]
+        start = datetime(2026, 9, 26, 21, 30, tzinfo=timezone.utc)
+        end = datetime(2026, 9, 27, 12, 0, tzinfo=timezone.utc)
+        self.assertEqual(
+            plan(start, end),
+            [
+                (datetime(2026, 9, 26, 16, tzinfo=timezone.utc), datetime(2026, 9, 27, 0, tzinfo=timezone.utc)),
+                (datetime(2026, 9, 27, 0, tzinfo=timezone.utc), datetime(2026, 9, 27, 8, tzinfo=timezone.utc)),
+                (datetime(2026, 9, 27, 8, tzinfo=timezone.utc), end),
+            ],
+        )
+
+    def test_pending_history_marker_round_trips_and_clears(self):
+        helpers = self.checkpoint_helpers()
+        self.assertIsNone(helpers["read_pending_backfill"]())
+        start = datetime(2026, 9, 26, 21, 0, tzinfo=timezone.utc)
+        helpers["write_pending_backfill"](start)
+        self.assertEqual(helpers["read_pending_backfill"](), start)
+        helpers["clear_pending_backfill"]()
+        self.assertIsNone(helpers["read_pending_backfill"]())
+        helpers["clear_pending_backfill"]()
+        Path(helpers["PENDING_BACKFILL"]).write_text("not json", encoding="utf-8")
+        self.assertIsNone(helpers["read_pending_backfill"]())
+
+    def test_history_marker_is_wired_before_the_gap_guard_and_cleared_after_the_write(self):
+        main = cells(INGESTER)[10]
+        resume_at = main.index("MODE, _resumed_start, _why = resume_first_load(")
+        self.assertLess(main.index("    manifest = _load_manifest()\nMODE, _resumed_start"), resume_at)
+        self.assertLess(resume_at, main.index("if WRITE_MODE == 'replace':\n    write_pending_backfill(start_date)"))
+        self.assertLess(
+            main.index("    write_pending_backfill(start_date)"),
+            main.index("if MODE == 'incremental' and not ALLOW_UNRECOVERED_GAPS:"),
+        )
+        self.assertIn("windows = plan_windows(start_date, end_date)", main)
+        self.assertIn(
+            "write_strategy = write_output(flat)\nif WRITE_MODE == 'replace':\n    clear_pending_backfill()",
+            cells(INGESTER)[21],
+        )
+        self.assertIn("start_date, WRITE_MODE = _resumed_start, 'replace'", main)
 
     def test_manifest_updates_preserve_memory_when_mounted_reads_are_stale(self):
         # Lakehouse mount reads can lag a successful atomic rename. A worker must
