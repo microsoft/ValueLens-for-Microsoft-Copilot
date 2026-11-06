@@ -16,7 +16,7 @@ name: valuelens-installer-exe
 # The repo's Latest release is the dashboard's, so an installer release is never marked Latest and
 # every installer link names its version. Publishing one warns if it became Latest anyway.
 #
-# installer-exe.yml builds the older installer in 1. Fabric/installer, on installer-v* tags.
+# installer-exe.yml builds the older installer in 2. Fabric/installer, on installer-v* tags.
 
 on:
   workflow_dispatch:
@@ -28,9 +28,9 @@ on:
       # What the payload carries: the app, the sample it opens with, and the templates and scripts.
       - 'app/**'
       - 'shared/sample-data/**'
-      - '1. Fabric/Manual setup/**'
-      - '4. SharePoint/scripts/**'
-      - '4. SharePoint/*.pbit'
+      - '2. Fabric/Manual setup/**'
+      - '1. SharePoint/scripts/**'
+      - '1. SharePoint/*.pbit'
       - '.github/workflows/valuelens-installer-exe.yml'
   release:
     types: [published]

@@ -59,15 +59,15 @@ The installer has two routes. Choose one in the browser, or with `--target fabri
 | **Fabric** | Notebooks and a pipeline in a Fabric workspace load the data | A Lakehouse | A Fabric capacity (F2 or larger, or a trial) |
 | **No Fabric: PAX + SharePoint** | A scheduled task on a Windows PC runs PAX | CSV files in a SharePoint folder | Power BI Pro, PowerShell 7.2 or later and Python 3.10 or later |
 
-To set it up by hand instead, follow [1. Fabric](../1.%20Fabric/README.md) or
-[4. SharePoint](../4.%20SharePoint/README.md).
+To set it up by hand instead, follow [2. Fabric](../2.%20Fabric/README.md) or
+[1. SharePoint](../1.%20SharePoint/README.md).
 
 ## What it sets up
 
 ### Fabric route
 
-It sets up what [1. Fabric](../1.%20Fabric/README.md) describes, from
-`1. Fabric/Manual setup`:
+It sets up what [2. Fabric](../2.%20Fabric/README.md) describes, from
+`2. Fabric/Manual setup`:
 
 | What | Default name |
 |---|---|
@@ -145,7 +145,7 @@ no workspace role: see [Viewer access](#viewer-access).
 ### No Fabric: PAX + SharePoint route
 
 [PAX](https://github.com/microsoft/PAX) (Portable Audit eXporter) exports Copilot audit records.
-This route automates [4. SharePoint](../4.%20SharePoint/README.md):
+This route automates [1. SharePoint](../1.%20SharePoint/README.md):
 
 | What | Name or place |
 |---|---|
@@ -155,7 +155,7 @@ This route automates [4. SharePoint](../4.%20SharePoint/README.md):
 | Local folder | `%LOCALAPPDATA%\ValueLens\pax\`: the scripts, settings, logs and working files |
 | SharePoint folder | The CSV files the report and the app read |
 | Power BI workspace | A new one, `ValueLens` by default, or one you're in |
-| Semantic model and report | Both `ValueLens`, from the template in [4. SharePoint](../4.%20SharePoint/README.md) |
+| Semantic model and report | Both `ValueLens`, from the template in [1. SharePoint](../1.%20SharePoint/README.md) |
 | Refresh schedule | Twice a day, after the task |
 | Viewer group | `ValueLens Viewers`, with Build on the model. See [Viewer access](#viewer-access) |
 | The app | `ValueLens`, a Copilot Managed App, unless you turn it off. See [The app](#the-app) |
@@ -210,7 +210,7 @@ Each run:
 
 | Where | What |
 |---|---|
-| `%LOCALAPPDATA%\ValueLens\pax\scripts\` | `refresh.ps1`, and the scripts from `4. SharePoint/scripts` it runs: `Run-PAX-AIBV.ps1`, `Get-Agents365Registry.ps1` and `Upload-Rollups-SharePoint.ps1` |
+| `%LOCALAPPDATA%\ValueLens\pax\scripts\` | `refresh.ps1`, and the scripts from `1. SharePoint/scripts` it runs: `Run-PAX-AIBV.ps1`, `Get-Agents365Registry.ps1` and `Upload-Rollups-SharePoint.ps1` |
 | `…\pax\refresh.json` | The task's settings |
 | `…\pax\state.json` | The last run |
 | `…\pax\logs\` | A log for each run, kept 30 days |
@@ -425,7 +425,7 @@ week at a time like the first load. If it stops part way, the scheduled runs rea
   has ValueLens items, its own items get the next free names, so you have two copies. Use a new
   workspace, or delete the hand-made items first.
 - **No Fabric: PAX + SharePoint.** The installer's task, secret and local folder have their own
-  names, so a hand set-up from [4. SharePoint](../4.%20SharePoint/README.md) keeps running. If
+  names, so a hand set-up from [1. SharePoint](../1.%20SharePoint/README.md) keeps running. If
   both write to the same SharePoint folder, the installer's refresh won't overwrite files it
   didn't write: it sets its own copy aside (see [The SharePoint folder](#the-sharepoint-folder)).
   Give it its own folder. In the Power BI workspace, the installer never replaces or deletes a
@@ -716,7 +716,7 @@ choose this route.
 - **A new version.** Change `version` in `package.json`, and the pinned links in this README's
   [Install](#install) section and in [docs/INSTALL.md](../docs/INSTALL.md). `test/script.test.js`
   checks they match. Then push a `valuelens-installer-v<version>` tag.
-- **The older installer.** `1. Fabric/installer` is the older Analytics Hub installer. It's built
+- **The older installer.** `2. Fabric/installer` is the older Analytics Hub installer. It's built
   by `installer-exe.yml` on `installer-v*` tags.
 
 Ported from the Analytics Hub installer at

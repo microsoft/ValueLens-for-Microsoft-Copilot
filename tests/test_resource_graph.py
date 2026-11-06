@@ -21,8 +21,8 @@ from valuelens_jobs.config import Settings
 from valuelens_jobs.storage import LocalStore
 
 ROOT = notebook_source.ROOT
-V004 = ROOT / "2. Azure" / "sql" / "migrations" / "V004__resource_graph.sql"
-COLLECTOR = ROOT / "2. Azure" / "jobs" / "valuelens_jobs" / "collect" / "resource_graph.py"
+V004 = ROOT / "3. Azure" / "sql" / "migrations" / "V004__resource_graph.sql"
+COLLECTOR = ROOT / "3. Azure" / "jobs" / "valuelens_jobs" / "collect" / "resource_graph.py"
 NOTEBOOK = "Copilot_Resource_Graph_Ingester.ipynb"
 SHARED_START = "# --- Shared with the Fabric notebook Copilot_Resource_Graph_Ingester.ipynb (section 2); keep identical. ---\n"
 SHARED_END = "# --- End of shared block. ---\n"

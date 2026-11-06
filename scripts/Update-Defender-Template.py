@@ -27,8 +27,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = (
-    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
-    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
+    Path("2. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
+    Path("2. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
 )
 ZIP_METADATA = (
     "filename", "orig_filename", "date_time", "compress_type", "comment", "extra",

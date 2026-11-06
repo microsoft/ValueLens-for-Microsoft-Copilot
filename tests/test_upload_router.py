@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-NOTEBOOK = ROOT / "1. Fabric" / "Manual setup" / "notebooks" / "AnalyticsHub_Upload_Router.ipynb"
+NOTEBOOK = ROOT / "2. Fabric" / "Manual setup" / "notebooks" / "AnalyticsHub_Upload_Router.ipynb"
 INSTALLER = ROOT / "installer"
 
 # Header rows as each export has them (made-up columns only, no tenant data).

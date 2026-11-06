@@ -13,14 +13,15 @@ Use the Power BI report, with an optional app. Find reports and walkthroughs on
 
 ## Choose your path
 
-Start with SharePoint if you do not have Fabric. The numbers below are the existing route
-names, not a sequence of steps.
+Pick one. Start with SharePoint if you don't have Fabric.
 
 | Route | What you need | Start here |
 |---|---|---|
-| **[4. SharePoint](4.%20SharePoint/README.md)** | Power BI Pro, a SharePoint library and a Windows PC for the scheduled PAX export | ValueLens installer, or manual setup |
-| **[1. Fabric](1.%20Fabric/README.md)** | Fabric capacity and a workspace | ValueLens installer, or manual setup |
-| **[2. Azure](2.%20Azure/README.md)** | Azure subscription and Power BI workspace; no Fabric | DataHub installer only; work in progress |
+| **[1. SharePoint](1.%20SharePoint/README.md)** | Power BI Pro, a SharePoint library and a Windows PC for the scheduled PAX export | ValueLens installer, or manual setup |
+| **[2. Fabric (or another data platform)](2.%20Fabric/README.md)** | Fabric capacity and a workspace. On another platform, adapt the same notebooks and report; only Fabric is tested | ValueLens installer, or manual setup |
+| **[3. Azure](3.%20Azure/README.md)** | Azure subscription and Power BI workspace; no Fabric | DataHub installer only; work in progress |
+
+Older Power Automate + Dataverse and Local CSV setups are in [`archive/`](archive/).
 
 <a id="before-you-start"></a>
 <a id="installer"></a>

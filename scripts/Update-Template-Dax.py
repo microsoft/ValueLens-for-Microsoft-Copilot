@@ -23,13 +23,13 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 VALUELENS = (
-    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
-    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
-    Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
+    Path("2. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
+    Path("2. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
+    Path("1. SharePoint") / "ValueLens - SharePoint.pbit",
 )
 CONSUMPTION = (
-    Path("1. Fabric") / "Manual setup" / "Add Credit Consumption" / "Consumption Central - Fabric.pbit",
-    Path("4. SharePoint") / "Add Credit Consumption" / "Consumption Central - Viva Direct.pbit",
+    Path("2. Fabric") / "Manual setup" / "Add Credit Consumption" / "Consumption Central - Fabric.pbit",
+    Path("1. SharePoint") / "Add Credit Consumption" / "Consumption Central - Viva Direct.pbit",
 )
 ZIP_METADATA = (
     "filename", "orig_filename", "date_time", "compress_type", "comment", "extra",
@@ -368,7 +368,7 @@ VALUELENS_OBJECTS = (
 # from the Lakehouse.
 # ---------------------------------------------------------------------------
 
-USER_MONTH_TEMPLATES = tuple(path for path in VALUELENS if path.parts[0] != "1. Fabric")
+USER_MONTH_TEMPLATES = tuple(path for path in VALUELENS if path.parts[0] != "2. Fabric")
 USER_MONTH_METRICS = "\n".join((
     "VAR Base =",
     "    SUMMARIZE(",

@@ -9,12 +9,37 @@ worse record than pointing you at the commits themselves.
 
 Deployment instructions do **not** live here. They live in the READMEs:
 [the app](app/README.md) ·
-[1. Fabric](1.%20Fabric/README.md) ·
-[1. Fabric/Fabric App](1.%20Fabric/Fabric%20App/README.md) ·
-[2. Azure](2.%20Azure/README.md) ·
-[4. SharePoint](4.%20SharePoint/README.md) ·
+[2. Fabric](2.%20Fabric/README.md) ·
+[2. Fabric/Fabric App](2.%20Fabric/Fabric%20App/README.md) ·
+[3. Azure](3.%20Azure/README.md) ·
+[1. SharePoint](1.%20SharePoint/README.md) ·
 [5. Local CSV](archive/5.%20Local%20CSV/README.md). The archived
 [Power Automate + Dataverse](archive/3.%20Power%20Automate%20%2B%20Dataverse/README.md) path keeps its own.
+
+---
+
+## Unreleased — Paths renumbered: SharePoint first
+
+The repository now shows only the three supported paths, in the order most people should try them.
+Power Automate + Dataverse and Local CSV live only in `archive/`; their pointer folders are gone.
+
+| Was | Now |
+|---|---|
+| `4. SharePoint` | `1. SharePoint` |
+| `1. Fabric` | `2. Fabric` |
+| `2. Azure` | `3. Azure` |
+| `3. Power Automate + Dataverse` | `archive/3. Power Automate + Dataverse` |
+| `5. Local CSV` | `archive/5. Local CSV` |
+
+Only paths changed: links, the CI workflows, the Dockerfiles, the tests and the installers point at the
+new folders, and the older entries below use the new paths so their links keep working. Released
+installers are unaffected, because they bundle what they deploy. Links from outside the repo to the old
+folder names will break, because GitHub doesn't redirect renamed folders.
+
+- **Running the SharePoint export on a schedule from a clone?** After you pull, register the task again
+  from `1. SharePoint\scripts\Register-TaskScheduler.ps1`, because the old task points at `4. SharePoint`.
+- **Leftover run output stays put.** Ignored files that earlier runs wrote under an old folder name are
+  not moved, and the root `.gitignore` keeps those folders out of git. Move what you need, then delete them.
 
 ---
 
@@ -87,7 +112,7 @@ Import the notebook again, or run the installer's `update`, to pick this up.
 ## Unreleased — ValueLens installer 0.1.0
 
 **Why.** Setting up ValueLens meant working through a path README by hand. The installer this repo
-shipped under `1. Fabric/installer` was the Analytics Hub's, and it stopped at installer-v0.4.2 when
+shipped under `2. Fabric/installer` was the Analytics Hub's, and it stopped at installer-v0.4.2 when
 the Analytics Hub moved to its own repo. The new [`installer/`](installer/README.md) is a
 ValueLens-only port of the Analytics Hub installer at microsoft/AnalyticsHub-Dashboard@1af87db, with
 a second route that needs no Fabric.
@@ -167,7 +192,7 @@ a second route that needs no Fabric.
   uploads it, and holds back a file that looks wrong, such as one with under half the rows of the
   last upload.
 
-`1. Fabric/installer` stays as it is for now. A follow-up removes it and points its links here.
+`2. Fabric/installer` stays as it is for now. A follow-up removes it and points its links here.
 Nothing is released yet. The first tag will be `valuelens-installer-v0.1.0`.
 
 ---
@@ -238,7 +263,7 @@ key both rows were added together.
 - **A tenant export's day with no environment now replaces the flow's figures for it**, as it does
   for a named environment, rather than both being counted.
 - **Updating** leaves the copies earlier versions stored; there's no cleanup step. See
-  [Credit consumption](2.%20Azure/README.md). Ported from the Analytics Hub repository's fix
+  [Credit consumption](3.%20Azure/README.md). Ported from the Analytics Hub repository's fix
   (microsoft/AnalyticsHub-Dashboard#211).
 
 ---
@@ -437,7 +462,7 @@ agent, unlicensed-use and Cowork pages, and 17 other measures use them.
 from `AIBV` to `ValueLens` and rejects `AIBV`. `Run-PAX-AIBV.ps1` downloads the latest release by
 default and passed `-Dashboard AIBV`, so the SharePoint refresh stopped before PAX started.
 
-- [`Run-PAX-AIBV.ps1`](4.%20SharePoint/scripts/Run-PAX-AIBV.ps1) now reads the `-Dashboard` values
+- [`Run-PAX-AIBV.ps1`](1.%20SharePoint/scripts/Run-PAX-AIBV.ps1) now reads the `-Dashboard` values
   from the downloaded PAX script without running it. It passes `ValueLens` to v1.11.15 and later and
   `AIBV` to v1.11.5 to v1.11.14, so a pinned `-PaxReleaseTag` still works. A release before v1.11.5
   stops with a clear error. The run prints the value, and `rollup-manifest.json` records it as
@@ -445,7 +470,7 @@ default and passed `-Dashboard AIBV`, so the SharePoint refresh stopped before P
 - Both names build the same rollup (`--profile aibv`), so the output files, the uploaded file names and
   the templates don't change. The script, the `AIBV-Rollup-Refresh` task and the output files keep
   their names.
-- The [Azure Container Apps notes](4.%20SharePoint/azure-container/README.md) and the
+- The [Azure Container Apps notes](1.%20SharePoint/azure-container/README.md) and the
   [Azure-hosted plan](docs/plans/AZURE-HOSTED-PLAN.md) now say `-Dashboard ValueLens`, and the worked
   example uses a 1.11.15 image.
 - `tests/test_sharepoint_pax_dashboard.py` checks the choice against param blocks shaped like each
@@ -476,10 +501,10 @@ slow on a large tenant. 21 measures use them directly and 41 in all, so most pag
 
 **Why.** The installer is still changing, so production setups should use the manual steps.
 
-- [1. Fabric](1.%20Fabric/README.md) leads with the manual setup: the notebooks, the pipeline and the
+- [2. Fabric](2.%20Fabric/README.md) leads with the manual setup: the notebooks, the pipeline and the
   Power BI report. The installer has its own section, marked as a work in progress.
 - The root README, the manual setup and notebooks READMEs, the installer README, the
-  [checklist](docs/PREREQUISITES.md) and [2. Azure](2.%20Azure/README.md) say the same. Azure is set
+  [checklist](docs/PREREQUISITES.md) and [3. Azure](3.%20Azure/README.md) say the same. Azure is set
   up only by the installer, so it's a work in progress too.
 
 ---
@@ -489,7 +514,7 @@ slow on a large tenant. 21 measures use them directly and 41 in all, so most pag
 **Why.** Analytics Hub (paths 1 and 2) moved to its own repo, `microsoft/AnalyticsHub-Dashboard`,
 for installer 0.5.0. It's back here, in its original folders, with everything made there since.
 
-- [1. Fabric](1.%20Fabric/) and [2. Azure](2.%20Azure/) are back, with the installer, the Fabric App,
+- [2. Fabric](2.%20Fabric/) and [3. Azure](3.%20Azure/) are back, with the installer, the Fabric App,
   the Azure jobs and web app, and `shared/python`, as they were before the move.
 - They're up to date with installer 0.5.1 and the changes below.
 - The installer's update check and the Azure web app's update banner read this repo's releases.
@@ -739,7 +764,7 @@ install pulls.
 ### Changed: Azure is no longer in preview
 
 - The READMEs, prerequisites and the installer no longer call the Azure target a preview. The
-  installer README section is now [Azure target](1.%20Fabric/installer/README.md#azure-target), so
+  installer README section is now [Azure target](2.%20Fabric/installer/README.md#azure-target), so
   links to `#azure-target-preview` open the top of that README instead.
 
 ### Changed
@@ -762,9 +787,9 @@ builds reputation by its hash, so each new version starts again from nothing.
 
 - **Release notes** now list the exe's SHA-256, show the PowerShell command that checks it, and
   say what to click past the warnings. For a signed exe they say how to see the signature instead.
-- **READMEs.** A new [Check the download](1.%20Fabric/installer/README.md#check-the-download)
+- **READMEs.** A new [Check the download](2.%20Fabric/installer/README.md#check-the-download)
   section, linked from every download link, has the same steps and points to
-  [running it with Node.js](1.%20Fabric/installer/README.md#without-the-exe) for organisations that
+  [running it with Node.js](2.%20Fabric/installer/README.md#without-the-exe) for organisations that
   block the download.
 
 ### Added: the release is ready for ESRP signing
@@ -912,7 +937,7 @@ Now, on both the Fabric and the Azure path, who can view is one Entra security g
 - **Azure web app.** Lets in members of the group (through the `groups` claim, or
   `checkMemberGroups` when someone is in too many groups to fit it) as well as the
   `AnalyticsHub.User` app role. New `/api/access` endpoints back the Share panel.
-- **Teams.** The install summary and `2. Azure/teams/README.md` cover publishing the package to the
+- **Teams.** The install summary and `3. Azure/teams/README.md` cover publishing the package to the
   org app catalog and pinning it for the group with a setup policy.
 - **Fabric.** The app item still has to be shared with the group once, by hand; there is no API
   for it. After that, membership is enough.
@@ -1429,7 +1454,7 @@ The new ones are:
   the consent link, and the choice to **Check again** or **Carry on anyway**.
 
 Both the terminal and the web UI support all of these. See
-[Where the secret goes](1.%20Fabric/installer/README.md#where-the-secret-goes).
+[Where the secret goes](2.%20Fabric/installer/README.md#where-the-secret-goes).
 
 ---
 
@@ -1470,7 +1495,7 @@ rejected by older copies of the notebook, so don't switch back after a split.
 
 Other variants:
 
-- **Azure jobs** (`2. Azure/jobs`, also used by the SharePoint Azure container): the same retry,
+- **Azure jobs** (`3. Azure/jobs`, also used by the SharePoint Azure container): the same retry,
   split and concurrency behaviour, using the shared `valuelens_core.audit` helpers. As before,
   windows that finished are merged and the high-water mark holds until every window succeeds.
   The job now lists the failed windows (up to 10).
@@ -1480,7 +1505,7 @@ Other variants:
 - Not affected: the Power Automate / PAX collector flows, SharePoint without Azure, and Local
   CSV. They export audit data with Microsoft's tools rather than run these queries.
 
-See [An audit window keeps failing](1.%20Fabric/Manual%20setup/notebooks/README.md#an-audit-window-keeps-failing).
+See [An audit window keeps failing](2.%20Fabric/Manual%20setup/notebooks/README.md#an-audit-window-keeps-failing).
 
 ---
 
@@ -1550,7 +1575,7 @@ Every Azure install with the default settings (images pulled from the public
 The template's optional private-registry step (the AcrPull role assignment) took its
 subscription and resource group by splitting `imageRegistryResourceId`, and the Container Apps
 deployment always depends on it. ARM evaluates those expressions while validating, even when
-the step is switched off, so an empty registry id broke the deployment. `2. Azure/infra/main.bicep`
+the step is switched off, so an empty registry id broke the deployment. `3. Azure/infra/main.bicep`
 now parses a well-formed stand-in id when no private registry is set; installs that use a private
 Azure Container Registry are unchanged.
 
@@ -1676,7 +1701,7 @@ A new installer version that brings a changed report asks before replacing it, b
 replaces edits made in Power BI. A report that can't be published is reported, and the rest of the
 install carries on. If you're a Fabric administrator, the installer also checks the tenant setting
 *Allow visuals created using the Power BI SDK*, which the Tornado chart, Word cloud and Deneb
-visuals need. See [Power BI reports](1.%20Fabric/installer/README.md#power-bi-reports).
+visuals need. See [Power BI reports](2.%20Fabric/installer/README.md#power-bi-reports).
 
 An earlier install gets the reports offered the next time you choose **Repair or change**.
 Installer users get this in the next installer release.
@@ -1686,7 +1711,7 @@ Installer users get this in the next installer release.
 ## 2026-10-07 — Analytics Hub installer 0.3.0: the Azure target, and demo mode
 
 This is the first release that can install Analytics Hub in **your own Azure subscription**
-instead of Fabric (preview, see [2. Azure](2.%20Azure/README.md)). Pick **Your Azure subscription**
+instead of Fabric (preview, see [3. Azure](3.%20Azure/README.md)). Pick **Your Azure subscription**
 as the first wizard answer. The tag also publishes the `valuelens-jobs` and `valuelens-web`
 images to `ghcr.io/microsoft` with the same version, which the Azure install pulls.
 
@@ -1925,8 +1950,8 @@ it didn't create. If one of its names is taken, its own item gets the next free 
 
 ## 2026-10-05 — Fabric: one folder for setting up by hand
 
-`1. Fabric` now holds only its README, the installer, the Fabric App and a new
-[`Manual setup`](1.%20Fabric/Manual%20setup/) folder. Everything for setting up by hand moved into
+`2. Fabric` now holds only its README, the installer, the Fabric App and a new
+[`Manual setup`](2.%20Fabric/Manual%20setup/) folder. Everything for setting up by hand moved into
 it: the two report templates, `notebooks/`, `pipelines/`, `flows/` and both add-ons. The add-ons'
 notebooks now sit with the others, in `notebooks/credit-consumption/` and
 `notebooks/agent-evaluator/`, and the Workday overlay moved from `notebooks/optional/` to
@@ -1942,8 +1967,8 @@ Every path README is now just the steps to follow. The root README is a short pa
 the Fabric README walks through the installer exe. The notebooks, pipeline, flows, add-on and
 Fabric App READMEs cover only the manual steps they're needed for.
 
-Removed: the archived Fabric templates and extended references (`1. Fabric/archive/`), the
-Dataverse path's archive, the Fabric design docs and checker (`1. Fabric/docs/`), the architecture
+Removed: the archived Fabric templates and extended references (`2. Fabric/archive/`), the
+Dataverse path's archive, the Fabric design docs and checker (`2. Fabric/docs/`), the architecture
 diagrams, page screenshots, `scripts/sync-shared.ps1` and its workflow, and two one-off fix
 scripts. The old Power BI templates are kept, flat, in [`archive/`](archive/). The retired credit
 cost table is gone from the [data dictionary](docs/DATA-DICTIONARY.md); its ingester was already
@@ -1964,7 +1989,7 @@ pipeline, semantic models and a ready-built Analytics Hub app, and keeps the ins
 next to it, so one build serves every tenant; deploys from a clone still use `fabric.yaml`.
 Messages name `AnalyticsHubInstaller.exe` when it started the installer. A new `installer-exe`
 workflow builds and smoke-tests the exe, and drafts a release for each `installer-v*` tag. See
-[Download and run](1.%20Fabric/installer/README.md#run-it).
+[Download and run](2.%20Fabric/installer/README.md#run-it).
 
 ---
 
@@ -1982,7 +2007,7 @@ Lakehouse, notebooks, pipeline and models) still say ValueLens.
 The data check isn't part of the pipeline, so the scheduled runs never updated it, and `status`
 went on showing what the first load found. `status` now says when the pipeline has run since the
 last check, and `npx valuelens-install check` (or **Check the data** in the browser) runs the check
-again on its own, without the pipeline. See [Commands](1.%20Fabric/installer/README.md#without-the-exe).
+again on its own, without the pipeline. See [Commands](2.%20Fabric/installer/README.md#without-the-exe).
 
 ---
 
@@ -1998,7 +2023,7 @@ phone-sized window too.
 The page is served on `127.0.0.1` only and opens from the link the installer prints; every request
 needs the key in that link. Pasted secrets never reach the page's history or the saved record. The
 terminal mirrors the page and must stay open. See
-[In your browser](1.%20Fabric/installer/README.md#run-it).
+[In your browser](2.%20Fabric/installer/README.md#run-it).
 
 ---
 
@@ -2020,7 +2045,7 @@ In the Analytics Hub, the Copilot Studio stage has a **Pay-as-you-go billed in A
 cost or credits by product for the same period, with totals, the subscriptions and how the bill
 compares with the export. The Cowork stage notes what Azure billed for Cowork. Billing can lag usage
 by a day or more, and no currency conversion is done. Without the table, both stay hidden. See the
-[data dictionary](1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/DATA-DICTIONARY.md#copilot_payg_spend).
+[data dictionary](2.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/DATA-DICTIONARY.md#copilot_payg_spend).
 
 ---
 
@@ -2052,7 +2077,7 @@ setting is off. See the [methodology](docs/METHODOLOGY.md#84-work-patterns).
 
 ## 2026-10-03 — Fabric App: renamed Analytics Hub
 
-The [Fabric App](1.%20Fabric/Fabric%20App/) is now called **Analytics Hub**: the browser tab, the
+The [Fabric App](2.%20Fabric/Fabric%20App/) is now called **Analytics Hub**: the browser tab, the
 sidebar title, the page that points visitors to Fabric, and the installer's prompts. The data side
 keeps the ValueLens name: workspace, Lakehouse, models, pipeline and app registration.
 
@@ -2064,7 +2089,7 @@ runs, even if you don't rebuild the app. A name you gave it yourself is kept. A 
 
 ## 2026-10-03 — Fabric installer: Agent Evaluator
 
-The installer can now set up the [Agent Evaluator](1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/) from
+The installer can now set up the [Agent Evaluator](2.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/) from
 [AgentEvaluator-for-Copilot-Studio](https://github.com/microsoft/AgentEvaluator-for-Copilot-Studio),
 so the app's Agent Evaluation pages show how Copilot Studio agents perform. It's off by default.
 
@@ -2141,7 +2166,7 @@ Links in this repo, the CI workflows, the tests and the installer all point at t
 and the older entries below use the new paths so their links keep working. Bookmarks and links
 from outside the repo to the old folder names will break, because GitHub doesn't redirect renamed
 folders. Local CSV is still the place to start if you just want to see the dashboard. If you run
-the app from a clone, `cd "1. Fabric/Fabric App"` instead of `cd "5. Fabric App"`.
+the app from a clone, `cd "2. Fabric/Fabric App"` instead of `cd "5. Fabric App"`.
 
 ## 2026-10-03 — Fabric App: small costs
 
@@ -2156,16 +2181,16 @@ real spend under half a cent as "<$0.01" instead of "$0.00", which read as free.
 billed per 1K, so 212 tokens showed as 0.2 million. The measure now reads the unit from the meter
 name: meters with "1M Token" are per million, other token meters are per thousand, and meters that
 aren't tokens (pages, images, hours) count as zero. `[Foundry Cost per 1M Tokens]` is corrected by
-the same change. Fixed in all four [Consumption Central](1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/)
+the same change. Fixed in all four [Consumption Central](2.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/)
 templates. The sample data only uses per-1M meters, so its figures don't change.
 
-The [Fabric App](1.%20Fabric/Fabric%20App/) now shows token counts at their own scale (212, 45K, 1.3M)
+The [Fabric App](2.%20Fabric/Fabric%20App/) now shows token counts at their own scale (212, 45K, 1.3M)
 instead of in millions, where small counts rounded to 0.0.
 
 ## 2026-10-02 — Fabric installer: credit consumption
 
-The [installer](1.%20Fabric/installer/#credit-consumption) has a new optional module, *Credit
-consumption*, that sets up [Consumption Central](1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/) in the
+The [installer](2.%20Fabric/installer/#credit-consumption) has a new optional module, *Credit
+consumption*, that sets up [Consumption Central](2.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/) in the
 same Lakehouse. It deploys the Azure AI, Copilot Studio and Cowork notebooks into the pipeline. It
 gives the app registration read-only Azure roles on the subscription you choose, and makes the
 upload folders. It also deploys `ValueLens Consumption Model` and adds it to the app, which turns
@@ -2175,7 +2200,7 @@ the installer's copy only.
 
 ## 2026-10-02 — Fabric: installer
 
-New [`1. Fabric/installer`](1.%20Fabric/installer/): run `npx valuelens-install` to set up the
+New [`2. Fabric/installer`](2.%20Fabric/installer/): run `npx valuelens-install` to set up the
 Fabric path in one go. It checks the tenant and asks a few questions. It then creates the app
 registration, with its secret in Azure Key Vault, and grants admin consent, or gives you a link
 for an admin. It also sets up the workspace, Lakehouse, notebooks, pipeline and schedule. Last,
@@ -2192,7 +2217,7 @@ repairs what is missing. Other commands: `update`, `run`, `status`, `rotate-secr
 of each as it deploys.
 
 It can also deploy the semantic model from `ValueLens - Fabric.pbit` and the ValueLens app
-(`1. Fabric/Fabric App`) on top of it, so nothing has to be published from Power BI Desktop. The model
+(`2. Fabric/Fabric App`) on top of it, so nothing has to be published from Power BI Desktop. The model
 reads the Lakehouse through a cloud connection that signs in as the app registration. A new
 notebook, `ValueLens_Refresh_Model`, refreshes the model as the pipeline's last step. New
 commands: `refresh` and `deploy-app`.
@@ -2206,14 +2231,14 @@ screen rather than reloading again.
 
 ## 2026-10-02 — Fabric App: renamed AI in One 2.0
 
-The [Fabric App](1.%20Fabric/Fabric%20App/) is now called **AI in One 2.0**: the browser tab, the sidebar
+The [Fabric App](2.%20Fabric/Fabric%20App/) is now called **AI in One 2.0**: the browser tab, the sidebar
 title and the page that points visitors to Fabric all use the new name. The data model is still
 ValueLens, and nothing else in the app changes. A new deploy still creates an item called
 `valuelens`; rename it in the workspace to match.
 
 ## 2026-10-02 — Fabric App: change the task times
 
-The [Fabric App](1.%20Fabric/Fabric%20App/) has a new reference page, **Assumptions**. Its **Time per
+The [Fabric App](2.%20Fabric/Fabric%20App/) has a new reference page, **Assumptions**. Its **Time per
 task** stage lists the Conservative, Typical and Optimistic minutes behind each task's hours, with
 the research link and confidence for each, and the hours each task gives at Typical.
 
@@ -2227,7 +2252,7 @@ paths, keep the model's `Human Time Estimates`.
 
 ## 2026-10-02 — Fabric App: the hosting address points to Fabric
 
-Opening the [Fabric App](1.%20Fabric/Fabric%20App/) at its `…fabricapps.net` hosting address used to offer
+Opening the [Fabric App](2.%20Fabric/Fabric%20App/) at its `…fabricapps.net` hosting address used to offer
 a sign-in, then fail every visual with *Not running inside a Fabric iframe*, because the app's
 data only loads through Fabric. That address now shows an **Open in Fabric** button that goes to
 the app's Fabric item, in the tenant it was deployed to.
@@ -2236,7 +2261,7 @@ the app's Fabric item, in the tenant it was deployed to.
 
 ## 2026-10-02 — Fabric App: cost vs value
 
-The [Fabric App](1.%20Fabric/Fabric%20App/)'s Value page ends with a new stage, **Cost vs value**. It sets
+The [Fabric App](2.%20Fabric/Fabric%20App/)'s Value page ends with a new stage, **Cost vs value**. It sets
 Microsoft 365 Copilot licences, Copilot Studio credits and Cowork / Work IQ credits against the
 estimated value of the work each pays for, over the days ValueLens and Consumption Central both
 hold. It shows the return on cost, with a conservative-to-optimistic range, and the break-even
@@ -2259,7 +2284,7 @@ section prices them: Capacity Pack first at the prepaid rate, then pay-as-you-go
 
 ## 2026-10-01 — Fabric App: set-up checked from a fresh clone
 
-A clean Windows clone of `1. Fabric/Fabric App` now passes every README step: `npm install`, build, test,
+A clean Windows clone of `2. Fabric/Fabric App` now passes every README step: `npm install`, build, test,
 lint and a `rayfin up` dry run. Two query tests failed when Git checked the `.dax` files out with
 Windows line endings, and `npm run lint` reported one error in the query hook; both are fixed. The
 README now asks for Node.js 22.13 or later, the oldest 22.x release the build tools support.
@@ -2290,7 +2315,7 @@ actually uses.
 
 ## 2026-09-30 — Fabric App: a Consumption page from Consumption Central
 
-The [Fabric App](1.%20Fabric/Fabric%20App/) has an eighth page, **Consumption**. It reads a published
+The [Fabric App](2.%20Fabric/Fabric%20App/) has an eighth page, **Consumption**. It reads a published
 Consumption Central model, bound as a second connection (`cc`), and rebuilds that report's
 consumption and cost pages. There are four sections: all products side by side, Cowork / Work IQ,
 Copilot Studio and Azure. The Cowork and Studio sections each switch between a Consumption view
@@ -2303,12 +2328,12 @@ opens in light mode by default again.
 
 ## 2026-09-30 — path 5: the ValueLens Fabric App (preview)
 
-A new top-level folder, [`1. Fabric/Fabric App`](1.%20Fabric/Fabric%20App/), holds ValueLens rebuilt as a web
+A new top-level folder, [`2. Fabric/Fabric App`](2.%20Fabric/Fabric%20App/), holds ValueLens rebuilt as a web
 app. It's hosted as an item in a Fabric workspace and queries the published ValueLens model live,
 as the viewer. It runs on the model from any of paths 1–4, because all five templates carry the
 fields it uses. It has seven pages: Adoption, Leaderboards, Readiness, Value, Efficiency,
 Feedback and Appendix. Deploy it with `npx rayfin up`; see the folder README. The app was
-developed under `1. Fabric/app` and has moved here unchanged.
+developed under `2. Fabric/app` and has moved here unchanged.
 
 ---
 
@@ -2351,9 +2376,9 @@ templates are unchanged and don't read it.
 
 - **5. Local CSV** — the Local CSV template, `pull_azure_ai.py` and the shared synthetic sample
   data.
-- **4. SharePoint** — the Viva Direct template, which reads Cowork data straight from Viva
+- **1. SharePoint** — the Viva Direct template, which reads Cowork data straight from Viva
   Insights. Consumption Central has no SharePoint template.
-- **1. Fabric** — the Fabric template, seven ingestion notebooks, `seed_sample_data.py` and the
+- **2. Fabric** — the Fabric template, seven ingestion notebooks, `seed_sample_data.py` and the
   data dictionary. It can share the ValueLens Lakehouse; no table names overlap.
 - **3. Power Automate + Dataverse** — the Dataverse template, flow package, schema deploy script
   and permissions. Tables use the `cc_` prefix, so they sit beside ValueLens's `poc_` tables.
@@ -2467,8 +2492,8 @@ is about 1.2 MB (previously 4.7–10.5 MB) because it no longer carries pending 
 
 - **Fabric:** the pipeline runs `Copilot_Agent365_Registry_Ingester` (Graph API) and, only if it
   fails, `Copilot_Agent365_Lander` (admin-centre CSV). See the
-  [pipelines README](1.%20Fabric/Manual%20setup/pipelines/README.md) for the migration steps.
-- **Other paths:** [`Get-Agents365Registry.ps1`](4.%20SharePoint/scripts/Get-Agents365Registry.ps1)
+  [pipelines README](2.%20Fabric/Manual%20setup/pipelines/README.md) for the migration steps.
+- **Other paths:** [`Get-Agents365Registry.ps1`](1.%20SharePoint/scripts/Get-Agents365Registry.ps1)
   writes the same 48-column registry as the Fabric notebook. `Run-PAX-AIBV.ps1
   -IncludeAgent365Info` runs it after PAX; add `-Agents365Csv` to fall back to the admin-centre
   export, or use `-Agents365Csv` alone in tenants without an Agent 365 licence.
@@ -2481,7 +2506,7 @@ is about 1.2 MB (previously 4.7–10.5 MB) because it no longer carries pending 
   `Credit Unit Cost` tables and the `Cost Consumption File` parameter left the SharePoint and
   Dataverse templates.
   `Copilot_Cost_Consumption_Ingester` moved to
-  `1. Fabric/archive/notebooks/`; seven shared notebooks remain.
+  `2. Fabric/archive/notebooks/`; seven shared notebooks remain.
 - Power Automate + Dataverse: the `SharePoint Agents` table and the `Include SharePoint agent
   inventory` parameter were dropped (no page used them), and `Use SharePoint CSV fallback` now
   defaults to `false`. The template is built from the same project as the other four, so its old
@@ -2510,8 +2535,8 @@ Agent 365 run. Validate those in your own deployment before switching production
 ## 2026-09-15 — reviewed Fabric notebook set
 
 These notes describe what changed in the notebooks under
-[`1. Fabric/notebooks/`](1.%20Fabric/Manual%20setup/notebooks/). The guidance you need in order to *run* them
-is in the [Fabric README](1.%20Fabric/README.md) and
+[`2. Fabric/notebooks/`](2.%20Fabric/Manual%20setup/notebooks/). The guidance you need in order to *run* them
+is in the [Fabric README](2.%20Fabric/README.md) and
 `INGESTION-STRATEGY.md`.
 
 ### Audit ingester — `Copilot_Audit_Log_Direct_Ingester`
@@ -2525,7 +2550,7 @@ is in the [Fabric README](1.%20Fabric/README.md) and
 - Parsed output still derives `InteractionDate`, `WeekStart` and `MonthStart` from `CreationDate`.
 - Legacy parsed tables missing the stable key columns now fail clearly and require a deliberate
   fresh backfill before incremental resumes. The upgrade procedure is operational guidance and
-  lives in the [Fabric README](1.%20Fabric/README.md) and
+  lives in the [Fabric README](2.%20Fabric/README.md) and
   `INGESTION-STRATEGY.md`.
 
 ### Audit processor — `Copilot_Audit_Log_Processor`

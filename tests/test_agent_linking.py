@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-NOTEBOOKS = ROOT / "1. Fabric" / "Manual setup" / "notebooks"
+NOTEBOOKS = ROOT / "2. Fabric" / "Manual setup" / "notebooks"
 INGESTER = NOTEBOOKS / "Copilot_Audit_Log_Direct_Ingester.ipynb"
 PROCESSOR = NOTEBOOKS / "Copilot_Audit_Log_Processor.ipynb"
 

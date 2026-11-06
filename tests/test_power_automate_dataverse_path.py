@@ -147,30 +147,18 @@ class PowerAutomateDataversePathTests(unittest.TestCase):
         self.assertEqual(gaps["C"], "Implemented with raw-payload extension")
 
 
-class ArchiveStubTests(unittest.TestCase):
-    """The old path keeps a pointer to the archive, so existing links and clones still work."""
+class RetiredFolderTests(unittest.TestCase):
+    """The old root folder is gone; leftover run output in an existing clone stays out of git."""
 
-    def test_old_path_holds_only_the_stub(self):
-        # Ignored run output (CSV, JSONL, ZIP) may remain in an existing clone; nothing that ships may.
-        leftovers = sorted(
-            path.relative_to(OLD_PATH).as_posix() for path in OLD_PATH.rglob("*")
-            if path.is_file() and path.suffix.lower() in {".pbit", ".py", ".ps1", ".md", ".example"}
-            and path.relative_to(OLD_PATH).as_posix() != "README.md"
-        )
-        self.assertEqual(leftovers, [])
-        self.assertTrue((OLD_PATH / "README.md").is_file())
+    def test_old_path_is_removed_and_ignored(self):
+        self.assertFalse(OLD_PATH.exists())
+        lines = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+        self.assertIn("/3. Power Automate + Dataverse/", lines)
 
-    def test_stub_links_to_the_archive(self):
-        stub = (OLD_PATH / "README.md").read_text(encoding="utf-8")
-        link = "../archive/3.%20Power%20Automate%20%2B%20Dataverse/README.md"
-        self.assertIn(f"]({link})", stub)
-        self.assertTrue((OLD_PATH / unquote(link)).resolve().is_file())
-
-    def test_old_path_still_ignores_runtime_data(self):
-        for folder in (OLD_PATH, PATHWAY):
-            lines = (folder / ".gitignore").read_text(encoding="utf-8").splitlines()
-            for pattern in RUNTIME_IGNORES:
-                self.assertIn(pattern, lines, (folder.relative_to(ROOT).as_posix(), pattern))
+    def test_archive_still_ignores_runtime_data(self):
+        lines = (PATHWAY / ".gitignore").read_text(encoding="utf-8").splitlines()
+        for pattern in RUNTIME_IGNORES:
+            self.assertIn(pattern, lines, pattern)
 
 
 class DataverseCoreBridgeTests(unittest.TestCase):

@@ -12,9 +12,9 @@ import { CLI_PACKAGE, CLI_PACKAGE_DIR, pinnedVersion } from '../src/managed-app/
 
 test('packaging: ships every template the installer reads, and they exist', () => {
   const files = sourceFiles();
-  assert.ok(files.includes('1. Fabric/Manual setup/pipelines/CopilotAdoptionPipeline.DataPipeline/pipeline-content.json'));
-  assert.ok(files.includes('1. Fabric/Manual setup/ValueLens - Fabric.pbit'));
-  assert.ok(files.includes('1. Fabric/Manual setup/notebooks/Copilot_Audit_Log_Processor.ipynb'));
+  assert.ok(files.includes('2. Fabric/Manual setup/pipelines/CopilotAdoptionPipeline.DataPipeline/pipeline-content.json'));
+  assert.ok(files.includes('2. Fabric/Manual setup/ValueLens - Fabric.pbit'));
+  assert.ok(files.includes('2. Fabric/Manual setup/notebooks/Copilot_Audit_Log_Processor.ipynb'));
   assert.ok(files.every((f) => !f.includes('\\')));
   for (const f of files) assert.ok(existsSync(join(DEFAULT_SOURCE_DIR, f)), `${f} is missing`);
 });

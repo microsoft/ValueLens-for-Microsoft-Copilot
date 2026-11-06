@@ -4,7 +4,7 @@
 !shared/sample-data/consumption/*.csv
 !docs/*.csv
 !shared/scripts/OrgData-Template.csv
-!1. Fabric/Manual setup/notebooks/workday-org-data/**/*.csv
+!2. Fabric/Manual setup/notebooks/workday-org-data/**/*.csv
 
 # Power BI workspace artefacts
 *.pbip.local
@@ -32,3 +32,11 @@ Thumbs.db
 
 __pycache__/
 *.pyc
+
+# Old route folder names. After a pull, an existing clone can still hold ignored run output
+# (audit exports, settings) under them; keep it out of git.
+/1. Fabric/
+/2. Azure/
+/3. Power Automate + Dataverse/
+/4. SharePoint/
+/5. Local CSV/

@@ -2,6 +2,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-for p in (ROOT / "shared" / "python", ROOT / "tests", ROOT / "2. Azure" / "jobs"):
+for p in (ROOT / "shared" / "python", ROOT / "tests", ROOT / "3. Azure" / "jobs"):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))

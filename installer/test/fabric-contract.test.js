@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The contract between the Fabric template and the notebooks the installer deploys from `1. Fabric/Manual setup`.
+ * The contract between the Fabric template and the notebooks the installer deploys from `2. Fabric/Manual setup`.
  * Every Lakehouse table the built model reads must have a deployed notebook that writes it, and every column the
  * model takes from that table must be named in one of its writers, unless the template makes the column itself.
  * The column check is textual, like the M365 one in m365.test.js: it catches a column dropped or renamed throughout

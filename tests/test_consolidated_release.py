@@ -7,7 +7,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SETUP = ROOT / "1. Fabric" / "Manual setup"
+SETUP = ROOT / "2. Fabric" / "Manual setup"
 CORE = SETUP / "notebooks"
 
 # DataModelSchema bytes stay pinned (the templates ship no UnappliedChanges part);

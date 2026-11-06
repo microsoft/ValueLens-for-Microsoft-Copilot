@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-NOTEBOOK = ROOT / "1. Fabric" / "Manual setup" / "notebooks" / "ValueLens_Refresh_Model.ipynb"
+NOTEBOOK = ROOT / "2. Fabric" / "Manual setup" / "notebooks" / "ValueLens_Refresh_Model.ipynb"
 WS = "00000000-0000-0000-0000-0000000000aa"
 FABRIC = f"https://api.fabric.microsoft.com/v1/workspaces/{WS}"
 

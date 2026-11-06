@@ -121,7 +121,7 @@ export const OPTIONAL_MODULES = /** @type {const} */ (['m365Activity', 'agent365
  */
 
 /** The files for setting Fabric up by hand, which the installer deploys from, under the source folder. */
-export const SETUP_DIR = '1. Fabric/Manual setup';
+export const SETUP_DIR = '2. Fabric/Manual setup';
 export const NOTEBOOKS_DIR = `${SETUP_DIR}/notebooks`;
 export const WORKDAY_NOTEBOOKS_DIR = `${NOTEBOOKS_DIR}/workday-org-data`;
 

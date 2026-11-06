@@ -139,7 +139,7 @@ Open `ValueLens - Power Automate + Dataverse.pbit` and set:
 | `Use SharePoint CSV fallback` | `false`. |
 | `Copilot Interactions File` | Leave blank unless you intentionally use CSV fallback. |
 | `Org Data File` | Leave blank unless you intentionally use CSV fallback. |
-| `Agent 365` | Optional SharePoint URL to `agents_365.csv` from [`Get-Agents365Registry.ps1`](../../4.%20SharePoint/scripts/Get-Agents365Registry.ps1) or [`Upload-Rollups-SharePoint.ps1 -Agents365Csv`](../../4.%20SharePoint/scripts/Upload-Rollups-SharePoint.ps1). |
+| `Agent 365` | Optional SharePoint URL to `agents_365.csv` from [`Get-Agents365Registry.ps1`](../../1.%20SharePoint/scripts/Get-Agents365Registry.ps1) or [`Upload-Rollups-SharePoint.ps1 -Agents365Csv`](../../1.%20SharePoint/scripts/Upload-Rollups-SharePoint.ps1). |
 | `Feedback File` | Optional SharePoint URL to the Microsoft 365 admin centre feedback export. |
 
 For scheduled refresh in the Power BI service, set both `Dataverse URL` and `SharePoint Site URL`. The service needs a value for every data source URL, even one a refresh doesn't read. With CSV fallback and no Dataverse, set `Dataverse URL` to the `SharePoint Site URL` value. Then one credential covers both.

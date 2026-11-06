@@ -57,7 +57,7 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: '1. Fabric/installer'
+        working-directory: '2. Fabric/installer'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -103,9 +103,9 @@ jobs:
         with:
           node-version: '24'
       - name: Use the public npm registry
-        run: node "1. Fabric/installer/packaging/public-registry.js" "2. Azure/web/package-lock.json"
+        run: node "2. Fabric/installer/packaging/public-registry.js" "3. Azure/web/package-lock.json"
       - name: Install and test
-        working-directory: '2. Azure/web'
+        working-directory: '3. Azure/web'
         run: |
           npm ci --no-audit --no-fund
           npm test
@@ -126,7 +126,7 @@ jobs:
         run: npm test
 
   arm-drift:
-    # The installer ships a compiled copy of 2. Azure/infra; it must match the Bicep source.
+    # The installer ships a compiled copy of 3. Azure/infra; it must match the Bicep source.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -136,7 +136,7 @@ jobs:
       - name: Build the Bicep template
         run: |
           az bicep install
-          az bicep build --file "2. Azure/infra/main.bicep" --outfile "$RUNNER_TEMP/main.arm.json"
+          az bicep build --file "3. Azure/infra/main.bicep" --outfile "$RUNNER_TEMP/main.arm.json"
       - name: Compare with the installer's copy
         shell: python
         run: |
@@ -155,7 +155,7 @@ jobs:
           def load(p):
               return strip(json.load(open(p, encoding="utf-8")))
           built = load(os.path.join(os.environ["RUNNER_TEMP"], "main.arm.json"))
-          shipped = load("1. Fabric/installer/src/azure/main.arm.json")
+          shipped = load("2. Fabric/installer/src/azure/main.arm.json")
           if built != shipped:
-              sys.exit("1. Fabric/installer/src/azure/main.arm.json is out of date: rebuild it from 2. Azure/infra/main.bicep.")
+              sys.exit("2. Fabric/installer/src/azure/main.arm.json is out of date: rebuild it from 3. Azure/infra/main.bicep.")
           print("ARM template matches the Bicep source.")

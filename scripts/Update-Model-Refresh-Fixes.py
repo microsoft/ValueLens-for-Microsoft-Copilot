@@ -48,12 +48,12 @@ import uuid
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-AGENT_EVALUATOR = Path("1. Fabric") / "Manual setup" / "Add Agent Evaluator" / "Agent Evaluator.pbit"
-CONSUMPTION = Path("1. Fabric") / "Manual setup" / "Add Credit Consumption" / "Consumption Central - Fabric.pbit"
+AGENT_EVALUATOR = Path("2. Fabric") / "Manual setup" / "Add Agent Evaluator" / "Agent Evaluator.pbit"
+CONSUMPTION = Path("2. Fabric") / "Manual setup" / "Add Credit Consumption" / "Consumption Central - Fabric.pbit"
 # The other Consumption Central variants share the Fabric model's DAX and CoworkBilling's query
 # ending, but not its Lakehouse queries.
 CONSUMPTION_VARIANTS = (
-    Path("4. SharePoint") / "Add Credit Consumption" / "Consumption Central - Viva Direct.pbit",
+    Path("1. SharePoint") / "Add Credit Consumption" / "Consumption Central - Viva Direct.pbit",
 )
 MEMBERS = ("DataModelSchema", "UnappliedChanges")
 ZIP_METADATA = (

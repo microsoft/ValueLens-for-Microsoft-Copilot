@@ -111,7 +111,7 @@ export const PRODUCT = deepFreeze({
     report: 'ValueLens',
     /**
      * The files the refresh keeps in the SharePoint folder, which the report reads. The same
-     * names as a manual setup with 4. SharePoint/scripts.
+     * names as a manual setup with 1. SharePoint/scripts.
      */
     files: {
       interactions: 'copilot_interactions_rollup.csv',

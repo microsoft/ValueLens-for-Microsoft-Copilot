@@ -13,8 +13,8 @@ from pathlib import Path
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-PBIT = ROOT / "1. Fabric" / "Manual setup" / "Add Agent Evaluator" / "Agent Evaluator.pbit"
-NOTEBOOK = ROOT / "1. Fabric" / "Manual setup" / "notebooks" / "agent-evaluator" / "Copilot_Agent_Transcript_Parser.ipynb"
+PBIT = ROOT / "2. Fabric" / "Manual setup" / "Add Agent Evaluator" / "Agent Evaluator.pbit"
+NOTEBOOK = ROOT / "2. Fabric" / "Manual setup" / "notebooks" / "agent-evaluator" / "Copilot_Agent_Transcript_Parser.ipynb"
 AGENT_TABLES = [
     "dbo.agent_sessions",
     "dbo.agent_turns",

@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import unittest
 
-FLOW = (Path(__file__).resolve().parents[1] / "1. Fabric" / "Manual setup" / "flows"
+FLOW = (Path(__file__).resolve().parents[1] / "2. Fabric" / "Manual setup" / "flows"
         / "Copilot_ProductFeedback_Email_to_OneLake.json")
 
 

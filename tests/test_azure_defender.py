@@ -19,7 +19,7 @@ from valuelens_jobs.storage import LocalStore
 from valuelens_jobs.tables import parquet_glob
 
 ROOT = Path(__file__).resolve().parents[1]
-V003 = ROOT / "2. Azure" / "sql" / "migrations" / "V003__defender.sql"
+V003 = ROOT / "3. Azure" / "sql" / "migrations" / "V003__defender.sql"
 NOW = datetime(2026, 10, 9, 6, 30)
 TODAY = date(2026, 10, 9)
 FORBIDDEN = (403, {"error": {"code": "Forbidden", "message": "Missing role ThreatHunting.Read.All"}})

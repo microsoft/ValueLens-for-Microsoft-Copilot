@@ -5,9 +5,9 @@ is counted, how each interaction is classified, how value is estimated, and the 
 the assumptions.
 
 It applies to the Power BI template, where all four data paths share one model, and to the
-[Fabric App](../1.%20Fabric/Fabric%20App/). The app reads the same model and adds three pages and a Value
+[Fabric App](../2.%20Fabric/Fabric%20App/). The app reads the same model and adds three pages and a Value
 stage of its own ([§8](#8-fabric-app-only-consumption-agent-evaluation-cost-vs-value-and-work-patterns)). Every rule here is taken from
-`1. Fabric/Manual setup/ValueLens - Fabric.pbit` and the `Copilot_Audit_Log_Processor` notebook. If this page
+`2. Fabric/Manual setup/ValueLens - Fabric.pbit` and the `Copilot_Audit_Log_Processor` notebook. If this page
 and the model ever disagree, the model is right. The template's **📖 Metric Glossary** page
 carries the same caveats inside the report.
 
@@ -73,7 +73,7 @@ flowchart LR
 | **4. Date** | `InteractionDate`, `WeekStart` (Monday) and `MonthStart`, all from the record's UTC timestamp. |
 | **5. Licence** | The user ID is lower-cased and trimmed, then matched to the licensed-users table. `Has license` of YES, TRUE, Y or 1 gives **M365 Copilot Licensed**; anything else, including no match, gives **Unlicensed**. |
 | **6. Link agents** | Each agent row is linked to the Agent 365 registry by Title ID, then Copilot Studio Bot Id, then Entra agent ID. The first match wins. Agents are never matched by name ([§2.2](#22-how-agents-are-linked-to-the-registry)). |
-| **7. Classify** | The rules in [§3](#3-how-each-interaction-is-classified). On Fabric the `Copilot_Audit_Log_Processor` notebook runs them in Spark and writes `copilot_interactions_curated`. On Azure, the `valuelens_core` DuckDB port runs the same rules. The other paths run [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../shared/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py), which classifies agents less finely ([§3.2](#paths-3-4-and-5)). |
+| **7. Classify** | The rules in [§3](#3-how-each-interaction-is-classified). On Fabric the `Copilot_Audit_Log_Processor` notebook runs them in Spark and writes `copilot_interactions_curated`. On Azure, the `valuelens_core` DuckDB port runs the same rules. The other paths run [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../shared/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py), which classifies agents less finely ([§3.2](#sharepoint-and-archived-paths)). |
 | **8. Model** | The model reads the curated rows without reclassifying them. It joins org data (organisation, department, location) on the normalised person ID, and computes the measures. On Fabric, refresh is incremental by `CreationDate`. |
 
 Table and column contracts are in the [data dictionary](DATA-DICTIONARY.md).
@@ -121,7 +121,7 @@ most recently updated), so the agent's distinct users are counted once. `Agent_M
 the Title ID that actually matched. Agent Builder agents and Microsoft agents are never merged,
 because their copies can be different agents.
 
-The Local CSV processor (Path 5, also run by the archived Power Automate path) drops the same records and
+The shared processor (run by the archived Local CSV and Power Automate paths) drops the same records and
 keeps the same runtime records. The SharePoint path processes audit data with the PAX script's own
 copy of that processor, which does so only once PAX takes the same change. On all three paths agent
 linking runs in the template, not the processor.
@@ -289,7 +289,7 @@ band. The model reaches it through the `Behavior Value Map`. Every behaviour the
 processors can produce has a row, so no Copilot or agent row is left without a category.
 The `Behavior Value Map` also gives each behaviour a one-line **Description**, shown beside its use
 case on the **🧬 Appendix: Signal → Impact** page and in the Fabric App. All 48 are listed in
-[`task-descriptions.json`](../1.%20Fabric/Fabric%20App/src/queries/appendix/task-descriptions.json),
+[`task-descriptions.json`](../2.%20Fabric/Fabric%20App/src/queries/appendix/task-descriptions.json),
 which the Fabric App reads. A test keeps that file and every template the same. [§3.4](#34-signal--impact-reference)
 lists each description with its signal and time band.
 
@@ -322,7 +322,7 @@ lists each description with its signal and time band.
 Order decides the last one. Rule 6 (a connector with an active action) comes before rule 25 (a
 ServiceNow site), so the ticket counts as a workflow, not a service desk question.
 
-#### Paths 3, 4 and 5
+#### SharePoint and archived paths
 
 These paths classify with
 [`Purview_CopilotInteraction_Processor_v4.0.0.py`](../shared/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py).
@@ -407,7 +407,7 @@ agent name, `AppIdentity`, `PlatformAgentType` and the workload. The first match
 What each Task Breakdown means, the audit signal that produces it, and the time a person would
 otherwise spend on it. This matches the **🧬 Appendix: Signal → Impact** page. The Description is
 taken word for word from
-[`task-descriptions.json`](../1.%20Fabric/Fabric%20App/src/queries/appendix/task-descriptions.json).
+[`task-descriptions.json`](../2.%20Fabric/Fabric%20App/src/queries/appendix/task-descriptions.json).
 The signal summarises the rules in [§3.2](#32-from-signal-to-task-category), where the full order is
 set out. *Typical min* is the default effort scenario. The low and high ends of each band, its grain
 and its research source are in the [appendix](#appendix-time-bands-and-sources).
@@ -525,8 +525,8 @@ and its research source are in the [appendix](#appendix-time-bands-and-sources).
 | IT & Service Desk | An agent named or described for support, help desks or tickets, or a ServiceNow site | Using an IT or service desk agent to fix a problem or raise a ticket. | 20 | Medium-High |
 | Sales & Customer | An agent named or described for sales, customers or CRM, or a Dynamics site | Using a sales or customer agent for accounts, deals or customer insight. | 35 | Medium |
 
-Agent keywords and the workflow split run only on the Fabric and Azure paths. On paths 3, 4 and 5 those rows
-stay General Chat or Running a Workflow ([§3.2](#paths-3-4-and-5)).
+Agent keywords and the workflow split run only on the Fabric and Azure paths. On the SharePoint and archived paths those rows
+stay General Chat or Running a Workflow ([§3.2](#sharepoint-and-archived-paths)).
 
 ### 3.5 App host reference
 
@@ -927,7 +927,7 @@ reads an optional table the installer adds to the ValueLens model.
 
 ### 8.1 Consumption
 
-Reads a published [Consumption Central](../1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/) model and
+Reads a published [Consumption Central](../2.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/) model and
 rebuilds its consumption and cost pages.
 
 | Section | Source | How cost is worked out |
@@ -1038,7 +1038,7 @@ cost is licences alone, so the return reads high.
 
 ### 8.4 Work patterns
 
-Reads the `M365 Activity` table, which the [installer](../1.%20Fabric/installer/README.md#microsoft-365-activity)
+Reads the `M365 Activity` table, which the [installer](../2.%20Fabric/installer/README.md#microsoft-365-activity)
 adds to the ValueLens model. `Copilot_M365_Activity_Ingester` fills it from the Microsoft 365 usage
 reports in Graph: one row per person per day they were active in Teams, Outlook, SharePoint,
 OneDrive, Viva Engage or the Microsoft 365 apps. Microsoft keeps 28 days of these reports and
@@ -1129,8 +1129,8 @@ as it can inside Fabric, the image downloads as a PNG instead.
 - **Tasks are rows, not prompts.** Use prompts or sessions when you need a per-interaction count.
 - **Categories are rule-based.** They are deterministic and explainable, but they won't match
   Copilot Analytics' AI-inferred categories, and agent categories are only as good as agent names
-  and descriptions. Paths 3, 4 and 5 don't read the agent registry or split workflows
-  ([§3.2](#paths-3-4-and-5)).
+  and descriptions. The SharePoint and archived paths don't read the agent registry or split workflows
+  ([§3.2](#sharepoint-and-archived-paths)).
 - **Some time bands are provisional.** Rows marked *Low* confidence or *Provisional* in the
   appendix are estimates waiting for a better source.
 - **Habit and readiness thresholds are design choices**, not research results.

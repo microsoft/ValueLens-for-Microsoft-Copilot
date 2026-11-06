@@ -2,11 +2,11 @@
 
 The ValueLens installer sets ValueLens up in your tenant, then you check it worked. It has two
 routes: **No Fabric: PAX + SharePoint**, and **Fabric**. To set it up by hand instead, follow
-[4. SharePoint](../4.%20SharePoint/README.md) or [1. Fabric](../1.%20Fabric/README.md). What each
+[1. SharePoint](../1.%20SharePoint/README.md) or [2. Fabric](../2.%20Fabric/README.md). What each
 route sets up, the commands and troubleshooting are in the
 [installer's README](../installer/README.md).
 
-For **[2. Azure](../2.%20Azure/README.md)**, use the separate
+For **[3. Azure](../3.%20Azure/README.md)**, use the separate
 [DataHub installer](https://github.com/microsoft/DataHub-App-for-Microsoft-Copilot-Agents-Cowork-and-Autopilots)
 linked in that route guide. Azure is not a target of the ValueLens installer described here.
 

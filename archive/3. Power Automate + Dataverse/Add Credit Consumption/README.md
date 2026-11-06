@@ -91,7 +91,7 @@ the [Viva Insights export ↗](https://github.com/microsoft/ConsumptionCentral-f
 and map `Session count`, `Spending policy limit`, `Total Copilot Credits used` and `User limit` by
 hand. An import adds rows rather than replacing them, so delete the old rows before loading a newer
 export. Org columns aren't carried on this path; for Cowork by org, add the
-[Viva Direct report](../../../4.%20SharePoint/Add%20Credit%20Consumption/) alongside.
+[Viva Direct report](../../../1.%20SharePoint/Add%20Credit%20Consumption/) alongside.
 
 ---
 

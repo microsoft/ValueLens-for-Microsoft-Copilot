@@ -15,10 +15,10 @@ on:
     tags: ['installer-v*']
   pull_request:
     paths:
-      - '1. Fabric/installer/packaging/**'
+      - '2. Fabric/installer/packaging/**'
       # The exe bundles the app with the rayfin version from its lock file.
-      - '1. Fabric/Fabric App/package.json'
-      - '1. Fabric/Fabric App/package-lock.json'
+      - '2. Fabric/Fabric App/package.json'
+      - '2. Fabric/Fabric App/package-lock.json'
       - '.github/workflows/installer-exe.yml'
   release:
     types: [published]
@@ -44,7 +44,7 @@ jobs:
 
       - name: Check the tag matches the installer's version
         if: startsWith(github.ref, 'refs/tags/installer-v')
-        working-directory: '1. Fabric/installer'
+        working-directory: '2. Fabric/installer'
         env:
           TAG: ${{ github.ref_name }}
         run: |
@@ -53,27 +53,27 @@ jobs:
 
       # The lock files may resolve through Microsoft's internal mirror of npm, which runners can't reach.
       - name: Use the public npm registry
-        working-directory: '1. Fabric/installer'
+        working-directory: '2. Fabric/installer'
         run: node packaging/public-registry.js "../Fabric App/package-lock.json" package-lock.json
 
       - name: Install the app's dependencies
-        working-directory: '1. Fabric/Fabric App'
+        working-directory: '2. Fabric/Fabric App'
         run: npm ci --no-audit --no-fund
 
       - name: Install the installer's dependencies
-        working-directory: '1. Fabric/installer'
+        working-directory: '2. Fabric/installer'
         run: npm ci --no-audit --no-fund
 
       - name: Test the installer
-        working-directory: '1. Fabric/installer'
+        working-directory: '2. Fabric/installer'
         run: npm test
 
       - name: Type-check the installer
-        working-directory: '1. Fabric/installer'
+        working-directory: '2. Fabric/installer'
         run: npm run typecheck
 
       - name: Build the exe
-        working-directory: '1. Fabric/installer'
+        working-directory: '2. Fabric/installer'
         run: npm run build:exe -- --release --out "$env:RUNNER_TEMP\exe"
 
       - name: Smoke-test the exe
@@ -88,7 +88,7 @@ jobs:
 
       # Run on the exe that gets published, after any signing: signing changes the hash.
       - name: Check the signature, write the hash and the release notes
-        working-directory: '1. Fabric/installer'
+        working-directory: '2. Fabric/installer'
         run: node packaging/finish-exe.js "$env:RUNNER_TEMP\exe\AnalyticsHubInstaller.exe" --notes "$env:RUNNER_TEMP\release-notes.md"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -153,7 +153,7 @@ jobs:
         run: gh release download $env:TAG --repo $env:GITHUB_REPOSITORY --dir "$env:RUNNER_TEMP\published" --pattern AnalyticsHubInstaller.exe --pattern AnalyticsHubInstaller.exe.sha256
 
       - name: Check its signature and hash
-        working-directory: '1. Fabric/installer'
+        working-directory: '2. Fabric/installer'
         env:
           REQUIRE_SIGNED: ${{ vars.REQUIRE_SIGNED_INSTALLER }}
         run: |
