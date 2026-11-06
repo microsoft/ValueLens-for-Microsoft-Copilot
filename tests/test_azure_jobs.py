@@ -1,4 +1,4 @@
-"""Offline tests for `2. Azure/jobs` (valuelens_jobs): collectors, publish, migrate, refresh, orchestration.
+"""Offline tests for `3. Azure/jobs` (valuelens_jobs): collectors, publish, migrate, refresh, orchestration.
 
 Graph and Power BI are faked at the HTTP-session level; Azure SQL is stood in for by sqlite3, which
 accepts the bracket-quoted DDL/DML that publish emits.

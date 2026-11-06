@@ -11,7 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
-CORE = ROOT / "1. Fabric" / "Manual setup" / "notebooks"
+CORE = ROOT / "2. Fabric" / "Manual setup" / "notebooks"
 NOTEBOOK = "Copilot_Licensed_Users_Direct_Ingester.ipynb"
 COPIES = (CORE / NOTEBOOK,)
 E7 = (
@@ -196,7 +196,7 @@ class LicenseClassificationTests(unittest.TestCase):
                 self.assertNotIn("Assigned Products", read)
                 self.assertNotIn("Assigned_Products", read)
                 self.assertIn('"Has license"', expression)
-                if "1. Fabric" in path.parts:
+                if "2. Fabric" in path.parts:
                     self.assertIn('FabricTable("copilot_licensed_users")', expression)
                     self.assertIn('"Has_license"', expression)
                     self.assertIn('"HasCopilot"', expression)

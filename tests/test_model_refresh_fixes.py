@@ -9,8 +9,8 @@ from pathlib import Path
 from m_eval import evaluate
 
 ROOT = Path(__file__).resolve().parents[1]
-AGENT_EVALUATOR = ROOT / "1. Fabric" / "Manual setup" / "Add Agent Evaluator" / "Agent Evaluator.pbit"
-CONSUMPTION = ROOT / "1. Fabric" / "Manual setup" / "Add Credit Consumption" / "Consumption Central - Fabric.pbit"
+AGENT_EVALUATOR = ROOT / "2. Fabric" / "Manual setup" / "Add Agent Evaluator" / "Agent Evaluator.pbit"
+CONSUMPTION = ROOT / "2. Fabric" / "Manual setup" / "Add Credit Consumption" / "Consumption Central - Fabric.pbit"
 SCRIPT = ROOT / "scripts" / "Update-Model-Refresh-Fixes.py"
 CREDIT_TABLES = {
     "Credit Consumption (Agent)": "agent",

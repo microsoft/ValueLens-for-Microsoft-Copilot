@@ -92,7 +92,7 @@ container registry is needed in the customer's subscription.
 
 **Orchestration.** A single `valuelens-jobs` image has an entry point like
 `valuelens run --steps collect,process,publish,refresh`. It reproduces the step order and the `Enable*` switches of
-`CopilotAdoptionPipeline` (`1. Fabric/Manual setup/pipelines/.../pipeline-content.json`). The image is
+`CopilotAdoptionPipeline` (`2. Fabric/Manual setup/pipelines/.../pipeline-content.json`). The image is
 python:3.12-slim plus DuckDB: no JVM, a few hundred MB, and 2–4 GiB is enough for the daily run (DuckDB
 spills to disk for a large backfill). The bottleneck is Purview audit API throttling, not compute. The ingesters run
 in parallel within the process, then the processor, then publish, then the model refresh. The installer's
@@ -120,7 +120,7 @@ reader SP (section 3.3).
 
 ### 2.4 Semantic model and query layer options
 
-Today the app runs **101 DAX queries** (`1. Fabric/Fabric App/src/queries/**/*.dax`), wrapped by
+Today the app runs **101 DAX queries** (`2. Fabric/Fabric App/src/queries/**/*.dax`), wrapped by
 `dax-filters.ts`, against a model with **19 tables and about 200 measures**
 (`ValueLens - Fabric.pbit`, all Import). Rewriting them is the biggest risk in this project, so
 the plan keeps DAX.
@@ -157,7 +157,7 @@ Variants: App Service B1 Linux for the web app (+$13), or B1 Windows as in PnP (
 
 ## 3. How the app gets data without the Fabric bridge
 
-### 3.1 Code changes in the app (`1. Fabric/Fabric App`)
+### 3.1 Code changes in the app (`2. Fabric/Fabric App`)
 
 1. **Introduce a `DataHost` seam.** `getFabricClient()` (`src/lib/fabric-client.ts`) becomes
    `getQueryClient()`. It returns either the existing `FabricClient` (Fabric iframe) or an
@@ -208,7 +208,7 @@ Variants: App Service B1 Linux for the web app (+$13), or B1 Windows as in PnP (
 
 ### 4.1 What there is to port
 
-| Notebook (`1. Fabric/Manual setup/notebooks`) | What it does | Azure notes |
+| Notebook (`2. Fabric/Manual setup/notebooks`) | What it does | Azure notes |
 |---|---|---|
 | `Copilot_Audit_Log_Direct_Ingester` | Runs Graph audit log queries (create, poll, page) with retries and a backfill or incremental mode | Pure Python plus Spark writes. Easy to port |
 | `Copilot_Audit_Log_Processor` | **The core**: about 300 `F.` calls, windows and Delta `MERGE` into `copilot_interactions_curated` | The hard part |
@@ -253,7 +253,7 @@ Why DuckDB: one engine runs everywhere, single-node scale reaches hundreds of mi
 is readable for reviewers.
 ---
 
-## 5. Installer changes (`1. Fabric/installer`)
+## 5. Installer changes (`2. Fabric/installer`)
 
 ### 5.1 Flow (unchanged UX, new first question)
 
@@ -279,7 +279,7 @@ workspace, dataset and refresh schedule, the web URL and app ID, the MI, and the
 
 ### 5.2 Provisioning mechanics
 
-- **Bicep modules** live in `2. Azure/infra/` and are compiled to ARM JSON in CI. The JSON ships inside the exe.
+- **Bicep modules** live in `3. Azure/infra/` and are compiled to ARM JSON in CI. The JSON ships inside the exe.
   The installer deploys them at resource-group scope in **incremental** mode through ARM REST
   (it extends `clients/azure.js`, and the user's sign-in already includes ARM).
   The same templates support a *Deploy to Azure* button and `azd up` for IT teams that prefer IaC.
@@ -383,8 +383,8 @@ the installer wizard, plan, record and Graph identity steps; the module catalogu
 ### Proposed repo layout
 
 ```
-1. Fabric/            unchanged (app and installer stay here until Phase 3, then move to /app and /installer)
-2. Azure/
+2. Fabric/            unchanged (app and installer stay here until Phase 3, then move to /app and /installer)
+3. Azure/
   infra/              Bicep modules -> ARM JSON (CI)
   jobs/               Dockerfile, valuelens_jobs orchestrator (collect, process, publish, refresh)
   web/                Node API server (query proxy, settings, version) + Dockerfile (serves the app's dist)
@@ -417,7 +417,7 @@ tests/fixtures/valuelens-golden/
 1. Is per-viewer Power BI Pro acceptable for the MVP (option A), or is a Power BI-free tier (C) required from the start?
 2. ~~Spark-in-a-box or DuckDB for the MVP?~~ **Resolved: DuckDB.** The processor port is done and matches the notebook (section 4.2).
 3. Should private networking be in Phase 2 or the MVP (how many target customers have SQL public-access deny policies)?
-4. Repo layout: should the app and installer move out of `1. Fabric/` in Phase 3? (Decided: the Azure path is `2. Azure/`, second after Fabric.)
+4. Repo layout: should the app and installer move out of `2. Fabric/` in Phase 3? (Decided: the Azure path is `3. Azure/`, second after Fabric.)
 
 ## 10. Progress
 
@@ -425,17 +425,17 @@ tests/fixtures/valuelens-golden/
 |---|---|---|
 | Golden fixtures, Spark-generated expected outputs, parity harness | `tests/valuelens_golden.py`, `tests/fixtures/valuelens-golden/` | Done: 7 cases |
 | DuckDB processor port (`curate()`) plus CLI | `shared/python/valuelens_core` | Done: matches the notebook exactly; tested in CI |
-| Bicep: MI, monitoring, ADLS, SQL serverless, Container Apps env, jobs, web | `2. Azure/infra` | Done: builds and lints cleanly; what-if is not yet run against a subscription |
-| SQL `V001` (curated fact, columnstore, schema_version) | `2. Azure/sql/migrations` | Done: checked against the golden contract in tests |
-| Jobs image and orchestrator | `2. Azure/jobs` | Done (Phase 1): collect (licensed users, Purview audit, org, M365 activity), process, publish (incremental per-day DELETE + INSERT into Azure SQL), Power BI refresh, and `migrate`. Tested offline with fakes and sqlite |
+| Bicep: MI, monitoring, ADLS, SQL serverless, Container Apps env, jobs, web | `3. Azure/infra` | Done: builds and lints cleanly; what-if is not yet run against a subscription |
+| SQL `V001` (curated fact, columnstore, schema_version) | `3. Azure/sql/migrations` | Done: checked against the golden contract in tests |
+| Jobs image and orchestrator | `3. Azure/jobs` | Done (Phase 1): collect (licensed users, Purview audit, org, M365 activity), process, publish (incremental per-day DELETE + INSERT into Azure SQL), Power BI refresh, and `migrate`. Tested offline with fakes and sqlite |
 | Collector logic in the shared core (`audit`, `licensed`, `org`, `m365`) | `shared/python/valuelens_core` | Done: the audit flatten matches the notebook on Spark-generated goldens |
-| Web API: `/app.config.json`, `/api/query` (OBO `executeQueries` with a model allowlist), settings | `2. Azure/web` | Done: 10 tests |
-| App seams: runtime host detection, MSAL sign-in, `HttpFabricProxy`, `SettingsStore` | `1. Fabric/Fabric App` | Done: the Fabric build is unchanged; 1,664 tests pass |
-| Teams manifest and package builder | `2. Azure/teams` (vendored into the installer) | Done: built by the installer; SSO through the web app registration |
-| Installer Azure target: wizard choice, preflight, what-if, ARM deploy, app registrations, Graph roles, Power BI model, migrate, `run`, `status`, `refresh`, `update`, `rotate-secret`, `uninstall` | `1. Fabric/installer/src/azure`, `src/steps/azure` | Done: 218 tests pass |
+| Web API: `/app.config.json`, `/api/query` (OBO `executeQueries` with a model allowlist), settings | `3. Azure/web` | Done: 10 tests |
+| App seams: runtime host detection, MSAL sign-in, `HttpFabricProxy`, `SettingsStore` | `2. Fabric/Fabric App` | Done: the Fabric build is unchanged; 1,664 tests pass |
+| Teams manifest and package builder | `3. Azure/teams` (vendored into the installer) | Done: built by the installer; SSO through the web app registration |
+| Installer Azure target: wizard choice, preflight, what-if, ARM deploy, app registrations, Graph roles, Power BI model, migrate, `run`, `status`, `refresh`, `update`, `rotate-secret`, `uninstall` | `2. Fabric/installer/src/azure`, `src/steps/azure` | Done: 218 tests pass |
 | CI: installer, web, ARM drift, and image builds (pushed to GHCR on `installer-v*` tags) | `.github/workflows/tests.yml`, `azure-images.yml` | Done |
-| End-to-end deployment to a real tenant and the 101-query parity check | Contoso demo tenant | **Done for core.** Deployed end to end in private networking mode: migrate, a 30-day first load, publish to SQL, and a Power BI refresh through the VNet data gateway. Parity (`2. Azure/tools/parity.mjs`) against the Fabric install: 25 match and 29 empty on both sides. The 7 diffs are Agent 365 registry data (Phase 2) and a one-day difference in the M365 activity report window. 35 queries target the separate consumption and Agent Evaluator models and 5 are templates. The demo tenant has very little Copilot activity, so re-run parity on a busier tenant before GA |
-| Private networking (VNet, private endpoints, VNet data gateway) | `2. Azure/infra/modules/network.bicep`, `src/steps/azure` | Done: pulled forward from Phase 2 because MCAPS policy forces public access off |
+| End-to-end deployment to a real tenant and the 101-query parity check | Contoso demo tenant | **Done for core.** Deployed end to end in private networking mode: migrate, a 30-day first load, publish to SQL, and a Power BI refresh through the VNet data gateway. Parity (`3. Azure/tools/parity.mjs`) against the Fabric install: 25 match and 29 empty on both sides. The 7 diffs are Agent 365 registry data (Phase 2) and a one-day difference in the M365 activity report window. 35 queries target the separate consumption and Agent Evaluator models and 5 are templates. The demo tenant has very little Copilot activity, so re-run parity on a busier tenant before GA |
+| Private networking (VNet, private endpoints, VNet data gateway) | `3. Azure/infra/modules/network.bicep`, `src/steps/azure` | Done: pulled forward from Phase 2 because MCAPS policy forces public access off |
 | Phase 2 modules (Agent 365, feedback, credit consumption, Agent Evaluator, Workday) | | **Credit consumption done** (#149): Studio by the licensing API flow (signed in as the user, into `landing/studio` or a SharePoint folder with private networking), Cowork by CSV, Azure AI and PAYG through Cost Management, and the Consumption Central model. GitHub, the dated Agent Daily table and Viva automation follow. The rest not started |
 
 ### 10.1 Findings from the first real deployment (Contoso, MCAPS subscription)

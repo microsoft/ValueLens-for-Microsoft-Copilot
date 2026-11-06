@@ -43,7 +43,7 @@ rely on CI or install PowerShell 7.
 
 ## Work on the installer
 
-From `1. Fabric/installer`:
+From `2. Fabric/installer`:
 
 ```text
 npm test                       # unit tests with fakes, no sign-in
@@ -52,7 +52,7 @@ npx valuelens-install preview  # writes ./valuelens-preview (ignored by git)
 npm run build:exe              # builds dist-exe/AnalyticsHubInstaller.exe (Windows, about 10 minutes)
 ```
 
-`npm run build:exe` builds the [Analytics Hub app](1.%20Fabric/Fabric%20App/) once, stages it
+`npm run build:exe` builds the [Analytics Hub app](2.%20Fabric/Fabric%20App/) once, stages it
 with the installer and the notebooks, pipeline and templates it deploys, and zips them with a
 portable Node.js into a small C# launcher, compiled with the `csc` that comes with the .NET
 Framework. Run `npm ci` in the installer and in the app first. `--release` fails rather than warns
@@ -60,14 +60,14 @@ when something a published download needs is missing; `--out <dir>` writes the e
 
 The [`installer-exe`](.github/workflows/installer-exe.yml) workflow builds, tests and smoke-tests
 the exe on pull requests that touch `packaging/`. To publish one, set the version in
-`1. Fabric/installer/package.json` and push a tag `installer-v<version>`. The workflow drafts a
+`2. Fabric/installer/package.json` and push a tag `installer-v<version>`. The workflow drafts a
 release with the exe, its SHA-256 and the release notes from `packaging/finish-exe.js`. The same
 tag makes [`azure-images`](.github/workflows/azure-images.yml) push
 `ghcr.io/microsoft/valuelens-jobs` and `valuelens-web` with that version, which Azure installs pull.
 Run by hand, it pushes only when run on an `installer-v*` tag; on a branch it just builds.
 
 Signing happens in CI, never on your computer. Run the ESRP pipeline
-([`packaging/sign-installer.azure-pipelines.yml`](1.%20Fabric/installer/packaging/sign-installer.azure-pipelines.yml))
+([`packaging/sign-installer.azure-pipelines.yml`](2.%20Fabric/installer/packaging/sign-installer.azure-pipelines.yml))
 with the tag. It signs the draft's exe with the Microsoft Corporation certificate and replaces its
 exe, hash and notes. Then review the draft and publish it. Publishing checks the exe against its
 hash. With the repo variable `REQUIRE_SIGNED_INSTALLER` set to `true`, it also requires the
@@ -78,8 +78,8 @@ signature. A release that fails goes back to being a draft.
 - Keep the numbered folder names stable: installers, tests and links depend on them.
   Put setup details in the relevant README and shared column contracts in the
   [data dictionary](docs/DATA-DICTIONARY.md).
-- The active data routes, in getting-started order, are `4. SharePoint`, `1. Fabric`
-  and `2. Azure`. Make each report or app change in all relevant active variants,
+- The active data routes, in getting-started order, are `1. SharePoint`, `2. Fabric`
+  and `3. Azure`. Make each report or app change in all relevant active variants,
   including [the app](app/) and the Fabric App. Power Automate + Dataverse and Local CSV
   are archived: template patch scripts and active-template tests skip their frozen templates.
   Keep shared helper and legacy-script regression coverage.
@@ -91,7 +91,7 @@ signature. A release that fails goes back to being a draft.
 - Use fabricated fixtures only. Never commit tenant exports, user identities,
   prompts, credentials, private solution packages or populated report files.
   Review notebook outputs and screenshots before attaching them.
-- Edit Fabric notebooks in `1. Fabric/Manual setup/notebooks/`. There are no mirrored copies to keep in sync.
+- Edit Fabric notebooks in `2. Fabric/Manual setup/notebooks/`. There are no mirrored copies to keep in sync.
 - Old templates live, flat, in [`archive/`](archive/). A retired path keeps its folder name
   there, such as `archive/3. Power Automate + Dataverse/`, and a stub README stays at its old
   path so links keep working. Nothing in `archive/` is maintained.

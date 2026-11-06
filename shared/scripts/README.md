@@ -62,7 +62,7 @@ Matching rows get that type and `Agent_Type_Basis` `override`.
 **Large tenant** — the UI export caps out well before millions of rows. Use
 [microsoft/PAX ↗](https://github.com/microsoft/PAX), which partitions the query and runs unattended.
 PAX now embeds this same v4.0.0 rollup, so it can emit the processed CSVs directly — that is exactly
-what the scheduled [`../../4. SharePoint/`](../../4.%20SharePoint/) path automates.
+what the scheduled [`../../1. SharePoint/`](../../1.%20SharePoint/) path automates.
 
 So: this Python processor is the **manual** route, PAX is the **automated** one, and both produce the
 same two files.
@@ -125,7 +125,7 @@ UPNs, not GUIDs. Everything else (DisplayName, Department, Manager, License…) 
 alias-aware. If you include a licence column, `HasLicense` must be the literal `TRUE` or `FALSE` —
 `Yes/No` and `1/0` are **not** recognised.
 
-The scheduled [`../../4. SharePoint/`](../../4.%20SharePoint/) path accepts the same file via
+The scheduled [`../../1. SharePoint/`](../../1.%20SharePoint/) path accepts the same file via
 `-UserInfoFile`.
 
 ---

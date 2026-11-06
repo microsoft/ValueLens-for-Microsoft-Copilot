@@ -28,7 +28,7 @@ import uuid
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-SHAREPOINT = Path("4. SharePoint") / "ValueLens - SharePoint.pbit"
+SHAREPOINT = Path("1. SharePoint") / "ValueLens - SharePoint.pbit"
 LOCAL_CSV = Path("archive") / "5. Local CSV" / "ValueLens - Local CSV.pbit"
 ZIP_METADATA = (
     "filename", "orig_filename", "date_time", "compress_type", "comment", "extra",

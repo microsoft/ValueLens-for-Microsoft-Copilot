@@ -27,12 +27,12 @@ import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-FABRIC = Path("1. Fabric") / "Manual setup"
+FABRIC = Path("2. Fabric") / "Manual setup"
 TEMPLATES = (
     FABRIC / "ValueLens - Fabric.pbit",
     FABRIC / "ValueLens - Fabric OneLake.pbit",
     FABRIC / "Add Agent Evaluator" / "Agent Evaluator.pbit",
-    Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
+    Path("1. SharePoint") / "ValueLens - SharePoint.pbit",
 )
 QUERY = "Chat + Agent Org Data"
 ZIP_METADATA = (

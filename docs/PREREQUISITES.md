@@ -1,11 +1,11 @@
 # Before you start
 
-Choose **[4. SharePoint](../4.%20SharePoint/README.md)**,
-**[1. Fabric](../1.%20Fabric/README.md)** or **[2. Azure](../2.%20Azure/README.md)** first.
+Choose **[1. SharePoint](../1.%20SharePoint/README.md)**,
+**[2. Fabric](../2.%20Fabric/README.md)** or **[3. Azure](../3.%20Azure/README.md)** first.
 For SharePoint or Fabric with the ValueLens installer, jump to
 [its route-specific checklist](#the-valuelens-installer).
 Azure requires the separate Analytics Hub installer and an Azure subscription; follow
-[the Azure prerequisites](../2.%20Azure/README.md#before-you-start).
+[the Azure prerequisites](../3.%20Azure/README.md#before-you-start).
 
 Everything you need before you install Analytics Hub, on one page, by who does it. Most of it
 takes another admin a few minutes. Send them their part before you start, so you don't have to
@@ -14,9 +14,9 @@ stop halfway.
 **Using the ValueLens installer?** The installer in [`installer/`](../installer/README.md) has its
 own checklist, by person, for each of its routes: see
 [The ValueLens installer](#the-valuelens-installer). The rest of this page describes the manual
-setups and the older Analytics Hub installer in `1. Fabric/installer`.
+setups and the older Analytics Hub installer in `2. Fabric/installer`.
 
-> The installer is a work in progress. For the [manual setup](../1.%20Fabric/Manual%20setup/README.md),
+> The installer is a work in progress. For the [manual setup](../2.%20Fabric/Manual%20setup/README.md),
 > you need the Fabric capacity, the app registration and admin consent, the Key Vault and the
 > optional extras' permissions below, plus *Users can create Fabric items* and the Power BI visuals
 > setting. The *Three tenant settings* are only for the installer and the Analytics Hub app.
@@ -41,7 +41,7 @@ most of this for you. For the detail behind each permission, see [PERMISSIONS.md
 | First data in the app, with 180 days of history | About 2 hours after **Go ahead** |
 | Copilot Studio credits | After the Studio flow's first run. Run it straight away, or it runs the next day |
 
-A tenant with more than 10,000 people takes longer: see [A large tenant](../1.%20Fabric/installer/README.md#a-large-tenant).
+A tenant with more than 10,000 people takes longer: see [A large tenant](../2.%20Fabric/installer/README.md#a-large-tenant).
 
 **Keep this PC awake and plugged in** until the installer says it's finished, and keep the
 installer window open. If the PC sleeps, setup stops until it wakes.
@@ -79,7 +79,7 @@ items below give it access.
 
 ### You: the person who runs the installer
 
-- [ ] **Windows 10 or 11** (64-bit). Or [Node.js](../1.%20Fabric/installer/README.md#without-the-exe) on
+- [ ] **Windows 10 or 11** (64-bit). Or [Node.js](../2.%20Fabric/installer/README.md#without-the-exe) on
       another system.
 - [ ] **A Fabric capacity you can use.** You're a Contributor on a capacity, or an Admin or Member of
       a workspace that's on one. The Fabric admin can give you this (see below).
@@ -87,10 +87,10 @@ items below give it access.
       [Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/privileged#contributor)
       on an Azure subscription, or on one resource group, so the installer can create a
       [Key Vault](https://learn.microsoft.com/azure/key-vault/general/overview). Or access to a
-      vault you already have. See [Where the secret goes](../1.%20Fabric/installer/README.md#where-the-secret-goes).
+      vault you already have. See [Where the secret goes](../2.%20Fabric/installer/README.md#where-the-secret-goes).
 - [ ] **Permission to register an app** in Microsoft Entra ID. Everyone can by default
       ([who can](https://learn.microsoft.com/entra/identity/role-based-access-control/delegate-app-roles#restrict-who-can-create-applications)).
-      If you can't, an admin registers it with the [admin pack](../1.%20Fabric/installer/README.md#if-you-cant-register-apps).
+      If you can't, an admin registers it with the [admin pack](../2.%20Fabric/installer/README.md#if-you-cant-register-apps).
 - [ ] **About 45 minutes**, with the PC awake and plugged in.
 
 ### Fabric admin: about 5 minutes
@@ -148,7 +148,7 @@ Only if you want **Copilot Cowork credits** from Viva Insights. Send them
       role.
 - [ ] Builds the query and sends you its partition ID and query ID, **before you start**.
 - [ ] After the install, signs in to the `AnalyticsHub_Cowork_Credits` Dataflow once. See
-      [Credit consumption](../1.%20Fabric/installer/README.md#credit-consumption).
+      [Credit consumption](../2.%20Fabric/installer/README.md#credit-consumption).
 
 ### Entra admin: about 2 minutes
 
@@ -187,7 +187,7 @@ not switched on shows as **can be activated** in the Prerequisites panel.
 
 - [ ] [Power BI Pro or Premium Per User](https://learn.microsoft.com/power-bi/fundamentals/service-features-license-type),
       unless the workspace is on an [F64 or larger capacity](https://learn.microsoft.com/fabric/enterprise/licenses#per-user-or-individual-licenses).
-- [ ] Membership of the **Analytics Hub Viewers** group. See [Share it](../1.%20Fabric/installer/README.md#after-it-finishes).
+- [ ] Membership of the **Analytics Hub Viewers** group. See [Share it](../2.%20Fabric/installer/README.md#after-it-finishes).
 
 ## Optional extras
 
@@ -208,9 +208,9 @@ nothing fails.
 | **Agent Evaluator** | [System Administrator](https://learn.microsoft.com/power-platform/admin/database-security) in each Power Platform environment you pick, to add the app with the [Bot Transcript Viewer](https://learn.microsoft.com/microsoft-copilot-studio/analytics-transcripts-powerapps) role. Fabric only. |
 | **Defender (shadow AI and agent risk)** | [Defender for Endpoint P2](https://learn.microsoft.com/defender-endpoint/minimum-requirements) or [Defender XDR](https://learn.microsoft.com/defender-xdr/prerequisites) for devices and agents, and [Defender for Cloud Apps](https://learn.microsoft.com/defender-cloud-apps/set-up-cloud-discovery) for Cloud Discovery. A part you aren't licensed for is skipped. |
 | **Agent configuration and Foundry (Azure Resource Graph)** | Azure [Reader](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/general#reader) for the app on the [tenant root group](https://learn.microsoft.com/azure/governance/management-groups/overview) or a management group (someone who's an Owner there), and **Global Reader** for the app (Entra admin). The agent inventory flow needs the Power Platform admin items above. |
-| **Ask data agent** (advanced settings) | A paid F2 or larger capacity, not a trial, and the Fabric tenant settings for data agents and Copilot. See [Ask](../1.%20Fabric/installer/README.md#ask). |
-| **Your Azure subscription instead of Fabric** | [Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/privileged#contributor) plus [User Access Administrator](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/privileged#user-access-administrator), or Owner, on the subscription or resource group, and Power BI Pro. Agent 365, product feedback, Agent Evaluator, GitHub Copilot credits and Cowork credits through the Dataflow aren't on Azure yet. See [Azure target](../1.%20Fabric/installer/README.md#azure-target). |
-| **GitHub Copilot credits** | Not in the installer. A GitHub [personal access token](https://docs.github.com/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) with `manage_billing:enterprise`, or the AI usage report export. See [Add Credit Consumption](../1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/README.md). |
+| **Ask data agent** (advanced settings) | A paid F2 or larger capacity, not a trial, and the Fabric tenant settings for data agents and Copilot. See [Ask](../2.%20Fabric/installer/README.md#ask). |
+| **Your Azure subscription instead of Fabric** | [Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/privileged#contributor) plus [User Access Administrator](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/privileged#user-access-administrator), or Owner, on the subscription or resource group, and Power BI Pro. Agent 365, product feedback, Agent Evaluator, GitHub Copilot credits and Cowork credits through the Dataflow aren't on Azure yet. See [Azure target](../2.%20Fabric/installer/README.md#azure-target). |
+| **GitHub Copilot credits** | Not in the installer. A GitHub [personal access token](https://docs.github.com/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) with `manage_billing:enterprise`, or the AI usage report export. See [Add Credit Consumption](../2.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/README.md). |
 
 The Microsoft Graph permissions each extra adds, such as
 [`ThreatHunting.Read.All`](https://learn.microsoft.com/graph/permissions-reference#threathuntingreadall)

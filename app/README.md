@@ -20,7 +20,7 @@ This app reads processed CSV files in your browser. You do not need a Power BI l
 | **On your PC** | You want to try it or use it by yourself | Edge or Chrome. Works offline. |
 | **Copilot Managed App** (preview) | You want to share the app with people | An admin to allow CLI apps; Node.js and Git; viewers need Power Apps Premium or Copilot Credits. |
 | **Fabric App** (preview) | You have a Fabric workspace and want to host the app there | Node.js and Git; a workspace on Fabric capacity (F2 or larger, or a trial); the **Fabric Apps (preview)** setting. |
-| **Azure** | You need the Azure-hosted Analytics Hub | Use the [installer](../2.%20Azure/README.md). Azure is not a manual hosting route for this CSV app; the installer deploys a different app. |
+| **Azure** | You need the Azure-hosted Analytics Hub | Use the [installer](../3.%20Azure/README.md). Azure is not a manual hosting route for this CSV app; the installer deploys a different app. |
 
 ## How setup works
 
@@ -257,8 +257,8 @@ These manual routes host only the CSV dashboard. They do not collect or process 
 semantic model or Power BI report, schedule data refresh, or create a viewer group. You provide the
 processed CSV files, share the app yourself, and viewers load their own files in the browser.
 
-The [Analytics Hub installer](../1.%20Fabric/installer/README.md) sets up a different app with a
-data pipeline and a live semantic model. Use the [Azure setup guide](../2.%20Azure/README.md) for
+The [Analytics Hub installer](../2.%20Fabric/installer/README.md) sets up a different app with a
+data pipeline and a live semantic model. Use the [Azure setup guide](../3.%20Azure/README.md) for
 the Azure installer route.
 
 ## Data
@@ -285,9 +285,9 @@ share the processor, so every active path has one input format.
 
 | Path | How to get the CSVs |
 |---|---|
-| 4. SharePoint + PAX | `copilot_interactions_rollup.csv`, `copilot_users_rollup.csv` and `agents_365.csv` from the folder `Upload-Rollups-SharePoint.ps1` writes to. |
-| 1. Fabric | Export the Lakehouse tables from a notebook, e.g. `spark.table("copilot_interactions_curated").toPandas().to_csv(...)`. For users, export org data with a UPN, `Organization` and `Has License`. |
-| 2. Azure | The run job writes the same curated table to `curated/copilot_interactions_curated` and Azure SQL. Export it the same way, or run the [shared CSV processor](../shared/scripts/README.md) on a Purview export. |
+| 1. SharePoint + PAX | `copilot_interactions_rollup.csv`, `copilot_users_rollup.csv` and `agents_365.csv` from the folder `Upload-Rollups-SharePoint.ps1` writes to. |
+| 2. Fabric | Export the Lakehouse tables from a notebook, e.g. `spark.table("copilot_interactions_curated").toPandas().to_csv(...)`. For users, export org data with a UPN, `Organization` and `Has License`. |
+| 3. Azure | The run job writes the same curated table to `curated/copilot_interactions_curated` and Azure SQL. Export it the same way, or run the [shared CSV processor](../shared/scripts/README.md) on a Purview export. |
 
 Existing Local CSV reports can still use the maintained [shared processor](../shared/scripts/README.md)
 and optional agent/feedback exports. Local CSV and Power Automate + Dataverse are archived,

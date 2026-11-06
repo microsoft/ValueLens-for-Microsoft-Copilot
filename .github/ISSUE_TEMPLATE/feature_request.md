@@ -12,9 +12,9 @@ What decision or deployment task is difficult today? Do not include tenant data.
 
 ### Affected deployment paths
 
-- [ ] 4. SharePoint
-- [ ] 1. Fabric
-- [ ] 2. Azure
+- [ ] 1. SharePoint
+- [ ] 2. Fabric
+- [ ] 3. Azure
 
 If relevant, specify app hosting (managed app, Fabric App or local sample) below.
 

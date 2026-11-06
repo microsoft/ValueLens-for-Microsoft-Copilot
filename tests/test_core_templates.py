@@ -11,9 +11,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = (
-    Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
-    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
-    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
+    Path("1. SharePoint") / "ValueLens - SharePoint.pbit",
+    Path("2. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
+    Path("2. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
 )
 PAGE_COUNT = 16
 # Separate Consumption Central report shipped as an optional add-on in each path.
@@ -38,10 +38,10 @@ FORBIDDEN_PARTS = ("DataModel", "SecurityBindings", "UnappliedChanges")
 LOCAL_PATH = re.compile(r"[a-z]:\\{1,2}users\\{1,2}|onedrive - ", re.IGNORECASE)
 # The Fabric App shows the same task descriptions as the Signal - Impact Table.
 APP_TASK_DESCRIPTIONS = (
-    ROOT / "1. Fabric" / "Fabric App" / "src" / "queries" / "appendix" / "task-descriptions.json"
+    ROOT / "2. Fabric" / "Fabric App" / "src" / "queries" / "appendix" / "task-descriptions.json"
 )
 # The Fabric App adds these glossary entries when a model lacks them, so the templates carry them too.
-APP_GLOSSARY = ROOT / "1. Fabric" / "Fabric App" / "src" / "queries" / "appendix" / "app-glossary.json"
+APP_GLOSSARY = ROOT / "2. Fabric" / "Fabric App" / "src" / "queries" / "appendix" / "app-glossary.json"
 M_STRING = re.compile(r'"((?:[^"]|"")*)"')
 GLOSSARY_ORDERS = re.compile(r",(-?\d+),(-?\d+)\},?$")
 
@@ -133,7 +133,7 @@ class CoreTemplateTests(unittest.TestCase):
                                  (name, expression["name"]))
 
     def test_optional_fabric_tables_load_empty_when_missing(self):
-        fabric = [(name, model) for name, _, model, _ in self.templates if name.startswith("1. Fabric")]
+        fabric = [(name, model) for name, _, model, _ in self.templates if name.startswith("2. Fabric")]
         self.assertEqual(len(fabric), 2)
         for name, model in fabric:
             queries = {t["name"]: text(t["partitions"][0]["source"]["expression"])

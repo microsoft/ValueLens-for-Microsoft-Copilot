@@ -69,14 +69,14 @@ See [`sample-data/README.md`](../../shared/sample-data/README.md) for what the s
 
    Use `EntraUsers_adapted.csv` as the `--entra` file.
 
-5. Optional: export Agent 365 data. With an Agent 365 licence, run this from `4. SharePoint\scripts`:
+5. Optional: export Agent 365 data. With an Agent 365 licence, run this from `1. SharePoint\scripts`:
 
    ```powershell
    .\Get-Agents365Registry.ps1 -OutputCsv .\Agents365Registry.csv `
        [-Auth Auto|AppRegistration|Interactive] [-TenantId <id>] [-ClientId <id>] [-ClientSecret <secret>]
    ```
 
-   Without an Agent 365 licence, use the Microsoft 365 Admin Center **Agents** export and save it as `agents_365.csv`. See [`../4.%20SharePoint/scripts/README.md#get-agents365registryps1-on-its-own`](../../4.%20SharePoint/scripts/README.md#get-agents365registryps1-on-its-own) for details.
+   Without an Agent 365 licence, use the Microsoft 365 Admin Center **Agents** export and save it as `agents_365.csv`. See [`../1.%20SharePoint/scripts/README.md#get-agents365registryps1-on-its-own`](../../1.%20SharePoint/scripts/README.md#get-agents365registryps1-on-its-own) for details.
 
 6. Optional: export product feedback from Microsoft 365 Admin Center > Health > Product feedback > Export, and save it as `product_feedback.csv`.
 

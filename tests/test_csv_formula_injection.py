@@ -4,7 +4,7 @@ registry script write.
 Agent names and descriptions are whatever their makers typed, profile fields whatever the
 directory holds, and admins open these files in Excel. Text Excel would run as a formula
 gets a leading apostrophe, unless it's just a signed number: the rule the Fabric App's CSV
-download uses (1. Fabric/Fabric App/src/lib/table-csv.ts).
+download uses (2. Fabric/Fabric App/src/lib/table-csv.ts).
 
 The registry test dot-sources the PowerShell script, so it needs a PowerShell whose
 execution policy allows scripts (CI's pwsh on Linux does); where the policy blocks scripts
@@ -22,7 +22,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 PROCESSOR = ROOT / "shared" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
-REGISTRY = ROOT / "4. SharePoint" / "scripts" / "Get-Agents365Registry.ps1"
+REGISTRY = ROOT / "1. SharePoint" / "scripts" / "Get-Agents365Registry.ps1"
 
 PAYLOAD = '=HYPERLINK("http://example.test/x","click")'
 

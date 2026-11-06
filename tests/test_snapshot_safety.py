@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-NOTEBOOKS = ROOT / "1. Fabric" / "Manual setup" / "notebooks"
+NOTEBOOKS = ROOT / "2. Fabric" / "Manual setup" / "notebooks"
 
 
 def notebook(name):

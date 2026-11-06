@@ -11,8 +11,8 @@ ADDON = "Add Credit Consumption"
 # Folder that holds each active path's add-on folder. The archived Power Automate + Dataverse
 # add-on is frozen, so it isn't checked.
 PBITS = {
-    "4. SharePoint": "Consumption Central - Viva Direct.pbit",
-    "1. Fabric/Manual setup": "Consumption Central - Fabric.pbit",
+    "1. SharePoint": "Consumption Central - Viva Direct.pbit",
+    "2. Fabric/Manual setup": "Consumption Central - Fabric.pbit",
 }
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})")
@@ -51,13 +51,13 @@ class CreditConsumptionAddon(unittest.TestCase):
                     self.assertNotIn("Text.Proper(Text.Combine(List.FirstN(ws, i)", text, (name, member))
 
     def test_fabric_sample_seeder_points_at_shared_sample(self):
-        source = (ROOT / "1. Fabric" / "Manual setup" / ADDON / "seed_sample_data.py").read_text(encoding="utf-8")
+        source = (ROOT / "2. Fabric" / "Manual setup" / ADDON / "seed_sample_data.py").read_text(encoding="utf-8")
         self.assertIn('"..", "..", "..", "shared", "sample-data", "consumption"', source)
         self.assertTrue((ROOT / "shared" / "sample-data" / "consumption" / "README.md").is_file())
 
     def test_viva_load_writes_its_row_counts(self):
         # A Viva load with no Dataflow rows mustn't look loaded, so the notebook writes its row counts.
-        notebook = json.loads((ROOT / "1. Fabric" / "Manual setup" / "notebooks" / "credit-consumption" / "Ingest_Viva_Consumption.ipynb").read_text(encoding="utf-8"))
+        notebook = json.loads((ROOT / "2. Fabric" / "Manual setup" / "notebooks" / "credit-consumption" / "Ingest_Viva_Consumption.ipynb").read_text(encoding="utf-8"))
         code = "\n".join("".join(c["source"]) for c in notebook["cells"] if c["cell_type"] == "code")
         self.assertIn('LOAD_SUMMARY = "Files/valuelens_installer/viva_load.json"', code)
         self.assertIn("'dataflowRows':", code)

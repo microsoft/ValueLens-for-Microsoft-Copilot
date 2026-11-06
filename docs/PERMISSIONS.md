@@ -13,7 +13,7 @@ Fabric-specific. Three kinds of permission are involved:
 **Using the ValueLens installer?** What the installer in [`installer/`](../installer/README.md)
 creates and grants, including both its app registrations' permissions, is in
 [The ValueLens installer](#the-valuelens-installer). The rest of this page describes the manual
-setups and the older Analytics Hub installer in `1. Fabric/installer`.
+setups and the older Analytics Hub installer in `2. Fabric/installer`.
 
 ---
 
@@ -71,13 +71,13 @@ projects. Used by `Copilot_Resource_Graph_Ingester` (Fabric, as the app registra
 
 No per-project agent sweep: Foundry is read at account and project level only.
 
-> **Add-ons.** [Agent Evaluator](../1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/README.md) needs the app
+> **Add-ons.** [Agent Evaluator](../2.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/README.md) needs the app
 > registration as a Dataverse **application user**.
-> [Credit consumption](../1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/README.md) lists its own roles.
+> [Credit consumption](../2.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/README.md) lists its own roles.
 
 ---
 
-## Fabric workspace & capacity (path 1 only)
+## Fabric workspace & capacity (Fabric path only)
 
 | What | Role / requirement |
 |---|---|
@@ -95,7 +95,7 @@ No per-project agent sweep: Foundry is read at account and project level only.
 
 ---
 
-## Credit consumption on Azure (path 2)
+## Credit consumption on Azure (Azure path)
 
 | What | Role / requirement |
 |---|---|
@@ -108,7 +108,7 @@ No per-project agent sweep: Foundry is read at account and project level only.
 
 ---
 
-## Ask (paths 1 and 2)
+## Ask (Fabric and Azure paths)
 
 The app's Ask page always lists suggested questions. What answers them needs:
 
@@ -123,7 +123,7 @@ The app's Ask page always lists suggested questions. What answers them needs:
 
 ---
 
-## Viewing Analytics Hub (paths 1 and 2)
+## Viewing Analytics Hub (Fabric and Azure paths)
 
 The installer creates one Entra security group, **Analytics Hub Viewers**, with you as its owner (or uses a group you name). Sharing is adding people to it, from the installer's `access` command, **Share** in the app, or [My Groups](https://myaccount.microsoft.com/groups).
 
@@ -132,8 +132,8 @@ The installer creates one Entra security group, **Analytics Hub Viewers**, with 
 | Create the viewer group | The installing person can create security groups (users can by default; some tenants turn it off). Otherwise an Entra admin creates one and you pick it with `access` |
 | Query the models | The group gets **Build** (ReadExplore) on each model the app reads: `Analytics Hub Model`, and Consumption Central and Agent Evaluator when they're on. The installer grants it as a workspace Admin or Member |
 | Open the Power BI models below F64 | Viewers need a **Power BI Pro** (or PPU) licence unless the workspace is on an F64 or larger capacity |
-| Open the Fabric app (path 1) | Share the app item with the group once (**Share** on the item). After that, membership is enough |
-| Open the Azure web app (path 2) | Membership of the group (the token's `groups` claim, checked with `checkMemberGroups` when a user is in too many groups), or the **AnalyticsHub.User** app role |
+| Open the Fabric app (Fabric path) | Share the app item with the group once (**Share** on the item). After that, membership is enough |
+| Open the Azure web app (Azure path) | Membership of the group (the token's `groups` claim, checked with `checkMemberGroups` when a user is in too many groups), or the **AnalyticsHub.User** app role |
 | Add and remove viewers in the Azure app | Group **owners** and **AnalyticsHub.Admin**. The web app calls Graph as the signed-in person with the delegated **GroupMember.ReadWrite.All** scope (admin-consented by the installer); Graph still only lets owners and admins change the group |
 | Add and remove viewers on Fabric | Group owners, in My Groups |
 
@@ -357,5 +357,5 @@ commands for the site grant. See
 - **+ Agents 365:** add `CopilotPackages.Read.All` + `Application.Read.All` (+ `User.Read.All`) to the same app reg, and confirm the tenant has an Agent 365 licence.
 
 See the README for what you're deploying for the step-by-step —
-[4. SharePoint](../4.%20SharePoint/README.md) · [1. Fabric](../1.%20Fabric/README.md) ·
-[2. Azure](../2.%20Azure/README.md). App hosting is covered in [the app guide](../app/README.md).
+[1. SharePoint](../1.%20SharePoint/README.md) · [2. Fabric](../2.%20Fabric/README.md) ·
+[3. Azure](../3.%20Azure/README.md). App hosting is covered in [the app guide](../app/README.md).

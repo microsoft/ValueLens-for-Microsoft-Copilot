@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-NOTEBOOK = ROOT / "1. Fabric" / "Manual setup" / "notebooks" / "Copilot_Audit_Log_Processor.ipynb"
+NOTEBOOK = ROOT / "2. Fabric" / "Manual setup" / "notebooks" / "Copilot_Audit_Log_Processor.ipynb"
 MODULES = [ROOT / "shared" / "python" / "valuelens_core" / name
            for name in ("agent_link.py", "agent_type.py", "incremental.py")]
 

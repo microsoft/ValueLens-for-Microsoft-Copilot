@@ -14,8 +14,8 @@ producer (notebook or script) is "compatible" **iff** the Delta table / CSV it w
 exact column names below (casing and spaces matter).
 
 > Copilot Studio transcripts and credit consumption are add-ons with their own tables: see
-> [Add Agent Evaluator](../1.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/README.md) and
-> [Add Credit Consumption](../1.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/DATA-DICTIONARY.md).
+> [Add Agent Evaluator](../2.%20Fabric/Manual%20setup/Add%20Agent%20Evaluator/README.md) and
+> [Add Credit Consumption](../2.%20Fabric/Manual%20setup/Add%20Credit%20Consumption/DATA-DICTIONARY.md).
 
 ---
 
@@ -129,7 +129,7 @@ columns `AppIdentity_Raw`, `AccessedResources_Raw` and `AISystemPlugin_Raw`; the
 keys remain in these complete raw payloads, not dynamically flattened columns. Canonical
 values and resource-row grain do not change. The entire resource array is repeated for
 each exploded row, and the raw plugin array includes elements after the first.
-See [settings you might change](../1.%20Fabric/Manual%20setup/notebooks/README.md#settings-you-might-change)
+See [settings you might change](../2.%20Fabric/Manual%20setup/notebooks/README.md#settings-you-might-change)
 before enabling this default-off option.
 
 ```
@@ -197,7 +197,7 @@ officeLocation, city, country, accountEnabled, managerUPN
 
 #### Optional Workday / HRIS enrichment or standalone source
 
-`Copilot_Org_Data_Workday_Lander` ([`notebooks/workday-org-data/`](../1.%20Fabric/Manual%20setup/notebooks/workday-org-data/README.md))
+`Copilot_Org_Data_Workday_Lander` ([`notebooks/workday-org-data/`](../2.%20Fabric/Manual%20setup/notebooks/workday-org-data/README.md))
 lands a worker extract from `Files/org_workday/` as a user-level org table. Default `MODE='auto'`
 uses additive enrichment if `BASE_TABLE` exists, or standalone mode if it is absent. An invalid
 existing baseline is rejected, not silently replaced. It remains an optional source, not a
@@ -306,7 +306,7 @@ contract and not written to `agents_365_history`.
 
 **Local CSV, SharePoint and Dataverse templates** read the same contract from a CSV set in the
 `Agent 365` parameter (blank = the page loads empty). Produce it with
-[`Get-Agents365Registry.ps1`](../4.%20SharePoint/scripts/Get-Agents365Registry.ps1), which calls the
+[`Get-Agents365Registry.ps1`](../1.%20SharePoint/scripts/Get-Agents365Registry.ps1), which calls the
 same Graph endpoints as the ingester and writes the same **48 columns in the same order**, with the
 same value rules; a parity test runs one mocked Graph response through both. `Run-PAX-AIBV.ps1
 -IncludeAgent365Info` runs it for you and `Upload-Rollups-SharePoint.ps1` lands it as

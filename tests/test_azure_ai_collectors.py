@@ -17,7 +17,7 @@ from valuelens_jobs.sample import AZURE_SAMPLES
 ROOT = notebook_source.ROOT
 NOTEBOOK = "credit-consumption/Ingest_Azure_AI.ipynb"
 CSV_SCRIPT = ROOT / "shared" / "scripts" / "pull_azure_ai.py"
-JOBS_COLLECTOR = ROOT / "2. Azure" / "jobs" / "valuelens_jobs" / "collect" / "azure_ai.py"
+JOBS_COLLECTOR = ROOT / "3. Azure" / "jobs" / "valuelens_jobs" / "collect" / "azure_ai.py"
 SAMPLES = ROOT / "shared" / "sample-data" / "consumption"
 SHARED_START = "# --- Shared with the Fabric notebook Ingest_Azure_AI.ipynb (section 4); keep identical. ---\n"
 SHARED_END = "# --- End of shared block. ---\n"

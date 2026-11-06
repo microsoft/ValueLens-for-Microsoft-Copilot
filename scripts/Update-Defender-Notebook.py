@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE = ROOT / "shared" / "python" / "valuelens_core" / "defender.py"
-NOTEBOOK = ROOT / "1. Fabric" / "Manual setup" / "notebooks" / "Copilot_Defender_Ingester.ipynb"
+NOTEBOOK = ROOT / "2. Fabric" / "Manual setup" / "notebooks" / "Copilot_Defender_Ingester.ipynb"
 MARKER = "# Shared Defender logic, copied from shared/python/valuelens_core/defender.py"
 HEADER = [
     MARKER,

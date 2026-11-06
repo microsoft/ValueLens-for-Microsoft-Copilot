@@ -20,7 +20,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-RUNNER = REPO / "4. SharePoint" / "scripts" / "Run-PAX-AIBV.ps1"
+RUNNER = REPO / "1. SharePoint" / "scripts" / "Run-PAX-AIBV.ps1"
 
 
 def _find_pwsh():

@@ -17,7 +17,7 @@ from urllib.parse import urlsplit, urlunsplit
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
-NOTEBOOK = ROOT / "1. Fabric" / "Manual setup" / "notebooks" / "Copilot_Audit_Log_Processor.ipynb"
+NOTEBOOK = ROOT / "2. Fabric" / "Manual setup" / "notebooks" / "Copilot_Audit_Log_Processor.ipynb"
 COLUMNS = [
     "Id", "CreationDate", "Audit_UserId", "AppHost", "ThreadId", "Message_Id",
     "Message_isPrompt", "AccessedResource_Type", "AccessedResource_Action",

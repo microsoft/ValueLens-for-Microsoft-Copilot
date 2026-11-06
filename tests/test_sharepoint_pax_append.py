@@ -22,7 +22,7 @@ from datetime import date
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-SCRIPTS = REPO / "4. SharePoint" / "scripts"
+SCRIPTS = REPO / "1. SharePoint" / "scripts"
 RUNNER = SCRIPTS / "Run-PAX-AIBV.ps1"
 UPLOADER = SCRIPTS / "Upload-Rollups-SharePoint.ps1"
 

@@ -21,7 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures" / "valuelens-golden"
 INPUTS, EXPECTED = FIXTURES / "inputs", FIXTURES / "expected"
-NOTEBOOK = ROOT / "1. Fabric" / "Manual setup" / "notebooks" / "Copilot_Audit_Log_Processor.ipynb"
+NOTEBOOK = ROOT / "2. Fabric" / "Manual setup" / "notebooks" / "Copilot_Audit_Log_Processor.ipynb"
 sys.path.insert(0, str(ROOT / "shared" / "python"))
 
 # name -> (interactions, licensed, agents, options)

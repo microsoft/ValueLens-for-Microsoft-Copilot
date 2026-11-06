@@ -13,7 +13,7 @@ land before wiring anything up to your own tenant.
 ## Where it is used
 
 The [app build](../../app/README.md#develop), ValueLens installer payload and
-[Azure demo mode](../../2.%20Azure/README.md#install-it) use these maintained fixtures.
+[Azure demo mode](../../3.%20Azure/README.md#install-it) use these maintained fixtures.
 Credit-consumption samples are in [`consumption`](consumption/README.md).
 
 For a quick look without installing anything, download the

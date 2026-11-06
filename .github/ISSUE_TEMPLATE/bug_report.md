@@ -12,9 +12,9 @@ Use fabricated examples and redact screenshots. -->
 
 ### Deployment path
 
-- [ ] 4. SharePoint
-- [ ] 1. Fabric (SQL endpoint or OneLake? Specify below.)
-- [ ] 2. Azure
+- [ ] 1. SharePoint
+- [ ] 2. Fabric (SQL endpoint or OneLake? Specify below.)
+- [ ] 3. Azure
 
 If relevant, specify app hosting (managed app, Fabric App or local sample) below.
 

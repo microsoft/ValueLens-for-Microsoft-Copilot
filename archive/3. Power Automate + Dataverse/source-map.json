@@ -49,7 +49,7 @@
       "modelTable": "Agents 365",
       "required": false,
       "sourceType": "SharePoint CSV",
-      "producer": "4. SharePoint\\scripts\\Get-Agents365Registry.ps1",
+      "producer": "1. SharePoint\\scripts\\Get-Agents365Registry.ps1",
       "sourceContract": "Canonical 48-column registry CSV (Get-Agents365Registry.ps1, the same columns as the Fabric agents_365 table) in the 'Agent 365' parameter; the PAX -IncludeAgent365Info 28-column export and the admin centre export are also accepted",
       "reason": "Optional registry feed. Paging, detail calls and creator resolution run in the script; Power Query only reads the file once through the hidden 'Agents 365 Staging' query."
     },

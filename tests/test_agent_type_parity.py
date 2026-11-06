@@ -23,11 +23,11 @@ FACT = "Chat + Agent Interactions (Audit Logs)"
 AGENT_TYPE_COLS = ["Agent_Key", "Agent_Type", "Agent_Type_Basis", "Agent_Publisher",
                    "Agent_Is_Published", "Agent_Consolidated_Name"]
 FABRIC_TEMPLATES = (
-    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
-    Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
+    Path("2. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
+    Path("2. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
 )
 M_TEMPLATES = (
-    Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
+    Path("1. SharePoint") / "ValueLens - SharePoint.pbit",
 )
 AGENTS_PAGE = "93c52bc8ecf242b91ee4"
 

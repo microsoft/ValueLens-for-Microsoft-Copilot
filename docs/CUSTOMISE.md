@@ -12,7 +12,7 @@ The CSV app and shared CSV helpers remain maintained.
 2. **Model-backed Fabric/Azure app:** use the header's light/dark button. For your
    own branding, a developer edits the matching app's `src/global.css` and header
    in `src/components/app-shell.tsx`: [Fabric app](../fabric-app/) or
-   [installer/Azure app](../1.%20Fabric/Fabric%20App/). There is no logo-upload setting.
+   [installer/Azure app](../2.%20Fabric/Fabric%20App/). There is no logo-upload setting.
 3. **CSV app:** a developer edits [colours](../app/src/index.css) and the
    [header](../app/src/App.tsx). Rebuild using the [app instructions](../app/README.md#develop);
    downloaded HTML copies do not update themselves.

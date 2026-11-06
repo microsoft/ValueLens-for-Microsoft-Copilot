@@ -11,9 +11,9 @@ export const DEFAULT_SOURCE_DIR = resolve(dirname(fileURLToPath(import.meta.url)
 export const PIPELINE_TEMPLATE = join(SETUP_DIR, 'pipelines', 'CopilotAdoptionPipeline.DataPipeline', 'pipeline-content.json');
 
 /** The PAX route's report, which reads the CSV files in the SharePoint folder. */
-export const PAX_MODEL_TEMPLATE = '4. SharePoint/ValueLens - SharePoint.pbit';
+export const PAX_MODEL_TEMPLATE = '1. SharePoint/ValueLens - SharePoint.pbit';
 /** The PAX route's scripts, which the scheduled refresh runs. */
-export const PAX_SCRIPTS_DIR = '4. SharePoint/scripts';
+export const PAX_SCRIPTS_DIR = '1. SharePoint/scripts';
 export const PAX_SCRIPTS = Object.freeze(['Run-PAX-AIBV.ps1', 'Get-Agents365Registry.ps1', 'Upload-Rollups-SharePoint.ps1']);
 
 /**
