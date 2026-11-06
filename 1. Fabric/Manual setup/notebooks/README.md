@@ -89,7 +89,10 @@ The audit ingester recovers by itself:
 
 If it still ends with `N audit window(s) still failed`, nothing was written. Rerun it with
 `MODE = 'backfill'` and the same `BACKFILL_DAYS`. Windows that succeeded are reused, so only the
-listed windows are queried again. Don't switch to `'incremental'` until a backfill finishes: an
+listed windows are queried again. A history load that stops early, for example at its time
+budget, is carried on by the next run even in `'incremental'` mode: the ingester keeps
+`_audit_staging/_backfill_pending.json` until the load writes the table, and an incremental run
+that finds it, or finds no table yet, runs as a backfill from the same start. Otherwise an
 incremental run refuses to start while an older window was never recovered. To accept that gap,
 set `ALLOW_UNRECOVERED_GAPS = True`.
 
