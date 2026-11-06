@@ -215,14 +215,15 @@ test("install: an export that fails to upload leaves it partly set up; a drop fo
 });
 
 test('install: org-scoped access that fails leaves it partly set up; a busy capacity it waits out does not', async (t) => {
-  const run = await runInstall(t, { access: [failed('The XMLA endpoint is read-only.')] });
-  assert.match(run.text, /✗ The roles weren't applied: The XMLA endpoint is read-only\./);
-  assert.match(run.text, /Then try again from "access"\./);
+  const run = await runInstall(t, { access: [failed('The Lakehouse is unavailable.')] });
+  assert.match(run.text, /✗ The access tables weren't loaded: The Lakehouse is unavailable\./);
+  assert.match(run.text, /then try again from "access"\./);
   partlySetUp(run);
 
   const retried = await runInstall(t, { access: [busy] });
   assert.match(retried.text, /! Org-scoped access: the capacity is busy\. Trying again in 5 minutes\./);
-  assert.match(retried.text, /✓ Org-scoped access applied to/);
+  assert.match(retried.text, /✓ Access tables loaded for/);
+  assert.match(retried.text, /Review Power BI RLS role membership and test viewer access/);
   assert.doesNotMatch(retried.text, /✗/);
   setUp(retried);
 });

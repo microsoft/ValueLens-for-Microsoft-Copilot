@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 
 PATHWAY = Path(__file__).resolve().parents[1]
 ROOT = Path(__file__).resolve().parents[3]
-PROCESSOR = ROOT / "5. Local CSV" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
+PROCESSOR = ROOT / "shared" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
 CORE_SCHEMA = PATHWAY / "dataverse-core-schema.json"
 DEFAULT_RAW_TABLE = "poc_valuelensrawaudits"
 INTERACTIONS_TABLE = "poc_valuelensinteractions"

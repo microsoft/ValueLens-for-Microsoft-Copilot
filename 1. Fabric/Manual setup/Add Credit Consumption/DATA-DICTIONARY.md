@@ -375,7 +375,7 @@ Reconciliation** and Foundry solution spend pages. They're **best-effort**: the 
 deployment or metric that fails is logged as a `WARNING` and skipped. If a table's source fails
 entirely, or its write fails, that table is left as it was. The app registration's Reader, Cost
 Management Reader and Monitoring Reader roles on the subscription are enough. The column names,
-order and types match the [Local CSV sample data](../../../5.%20Local%20CSV/Add%20Credit%20Consumption/sample-data/).
+order and types match the [Local CSV sample data](../../../shared/sample-data/consumption/).
 
 **Each run keeps older rows.** `Ingest_Azure_AI` reads the last `DAYS` days (90 by default) and, in
 each of its six tables, replaces only the rows from the window's first day onwards, so the tables

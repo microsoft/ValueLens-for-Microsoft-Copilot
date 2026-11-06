@@ -1,5 +1,12 @@
 # Before you start
 
+Choose **[4. SharePoint](../4.%20SharePoint/README.md)**,
+**[1. Fabric](../1.%20Fabric/README.md)** or **[2. Azure](../2.%20Azure/README.md)** first.
+For SharePoint or Fabric with the ValueLens installer, jump to
+[its route-specific checklist](#the-valuelens-installer).
+Azure requires the separate Analytics Hub installer and an Azure subscription; follow
+[the Azure prerequisites](../2.%20Azure/README.md#before-you-start).
+
 Everything you need before you install Analytics Hub, on one page, by who does it. Most of it
 takes another admin a few minutes. Send them their part before you start, so you don't have to
 stop halfway.

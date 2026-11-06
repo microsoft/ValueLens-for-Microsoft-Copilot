@@ -3,55 +3,46 @@
 ValueLens in Power BI Pro, without Fabric. A daily script exports the data to a SharePoint library,
 and the Power BI report refreshes from it. The app can read the same CSV files.
 
-<a id="installer"></a>
+[All routes](../README.md#choose-your-path): **4. SharePoint**, **1. Fabric**, **2. Azure**.
 
-## Let the installer set it up
-
-The [ValueLens installer](../installer/README.md) can do this page for you. Its
-**No Fabric: PAX + SharePoint** route runs on the Windows PC that will run the daily refresh. It:
-
-- Creates an app registration, `ValueLens (PAX)`, with the Microsoft Graph permissions PAX needs.
-  It can write to your SharePoint site and no other (`Sites.Selected`), once a SharePoint
-  Administrator or Global Administrator grants that. The installer shows the commands to send.
-- Adds a daily scheduled task on the PC, `ValueLens - PAX refresh`. It runs a pinned PAX release
-  and keeps the CSVs in your SharePoint folder.
-- Publishes the SharePoint report to a Power BI Pro workspace. You sign the model in to
-  SharePoint once, then it refreshes each day.
-- Deploys the app, if your tenant is ready for it.
-
-To start, see [Install](../installer/README.md#install). What it sets up, in detail:
-[No Fabric: PAX + SharePoint route](../installer/README.md#no-fabric-pax--sharepoint-route). The
-manual steps below still work.
+**Security and privacy:** file/folder sharing is not row-level security. This route has no
+installer-managed scoped RLS or end-to-end user-ID hashing switch. Follow the
+[administrator setup guide](../docs/SECURITY-PRIVACY-SETUP.md) before sharing files or a report.
 
 <a id="you-need"></a>
 
 ## Before you start
 
-- [ ] **Power BI Pro**, PPU or Premium, and a workspace where you can publish and schedule refresh.
-- [ ] **Power BI Desktop**, June 2024 or later, to open the template.
-- [ ] **On the PC that runs the export:** PowerShell 7 (`pwsh`), Python 3.10 or later, and access to GitHub Releases.
-- [ ] **An Entra app registration** with a tenant ID, client ID and client secret.
-- [ ] **Admin consent and SharePoint access** for that app, as listed in [Permissions](../docs/PERMISSIONS.md).
-- [ ] **A SharePoint library and folder** for the CSV files. The examples use `/AIBV`.
-- [ ] **Read the [disclaimer](../README.md#disclaimer).** You're responsible for the CSV files once they're in SharePoint.
+You need Power BI Pro (or PPU/Premium), a report workspace, a SharePoint library/folder,
+and a Windows PC for the daily export. That PC needs PowerShell 7.2+, Python 3.10+ and access
+to GitHub Releases. Manual setup also needs Power BI Desktop (June 2024+) and an app registration.
+An administrator must approve Graph permissions and access to the selected SharePoint site.
 
-Optional: an Agent 365 licence for `-IncludeAgent365Info`, or an admin center Agents export for
-`-Agents365Csv`.
+[Installer prerequisites](../docs/PREREQUISITES.md#no-fabric-pax--sharepoint-route) ·
+[Permissions](../docs/PERMISSIONS.md) · [Data responsibility](../README.md#disclaimer)
 
-<details>
-<summary>Why June 2024 or later?</summary>
+<a id="installer"></a>
+<a id="let-the-installer-set-it-up"></a>
 
-In older releases, the habit-stage charts and cards on the Habit Formation page can show errors,
-because their measures use `SUMMARIZECOLUMNS` in ways those releases don't fully support. Reports
-in the Power BI service aren't affected.
+## Installer
 
-</details>
+**Work in progress: try a test environment first.**
+Follow [Install](../docs/INSTALL.md), choose **Set up ValueLens**, then
+**No Fabric: PAX + SharePoint**. Run it on the PC that will run the daily refresh.
+It registers the app, guides the administrator's site-access grant, schedules PAX,
+publishes the report and can deploy the app. You sign the model in to SharePoint once.
+
+[What it sets up](../installer/README.md#no-fabric-pax--sharepoint-route) ·
+[Installer reference](../installer/README.md)
 
 <a id="setup"></a>
+<a id="steps"></a>
 
-## Steps
+## Manual
 
 Run every script from PowerShell 7, not Windows PowerShell. Every parameter is in [`scripts/README.md`](scripts/README.md).
+Agent 365 is optional: use an Agent 365 licence for `-IncludeAgent365Info`, or an admin center
+Agents export for `-Agents365Csv`.
 
 1. Create the Entra app registration, add the permissions from [`../docs/PERMISSIONS.md`](../docs/PERMISSIONS.md), grant admin consent, create a client secret, and copy the tenant ID, client ID, and secret.
 
@@ -81,7 +72,7 @@ Run every script from PowerShell 7, not Windows PowerShell. Every parameter is i
    .\Run-PAX-AIBV.ps1 -TenantId <tenant-id> -ClientId <client-id> -Days 30 -WorkRoot 'C:\AIBV'
    ```
 
-   Add `-UserInfoFile <path|SharePoint-URL|OneLake-path>` if you use your own org file; start from [`../5. Local CSV/scripts/OrgData-Template.csv`](../5.%20Local%20CSV/scripts/OrgData-Template.csv). Add `-IncludeAgent365Info` or `-Agents365Csv <admin-centre-agents-export.csv>` for Agent 365. The script writes `C:\AIBV\processed\rollup-manifest.json`.
+   Add `-UserInfoFile <path|SharePoint-URL|OneLake-path>` if you use your own org file; start from the [shared org-data template](../shared/scripts/OrgData-Template.csv). Add `-IncludeAgent365Info` or `-Agents365Csv <admin-centre-agents-export.csv>` for Agent 365. The script writes `C:\AIBV\processed\rollup-manifest.json`.
 
 5. Upload the seeded files to SharePoint.
 

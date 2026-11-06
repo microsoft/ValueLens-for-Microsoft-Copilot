@@ -3,7 +3,7 @@
 Generate the ValueLens sample dataset.
 
 Produces four CSVs that satisfy the exact column contract of
-`5. Local CSV/ValueLens - Local CSV.pbit`:
+the CSV app and the archived `archive/5. Local CSV/ValueLens - Local CSV.pbit`:
 
     copilot_interactions_sample.csv   -> "Copilot Interactions File"
     copilot_users_sample.csv          -> "Org Data File"
@@ -57,7 +57,7 @@ Expertise_Role, Efficiency_Breakdown, Environment, Autonomy_Pattern, AI_Model,
 Human_Baseline_Min, ...) are NOT re-implemented here. They are computed by
 importing the production classifier:
 
-    5. Local CSV/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py
+    shared/scripts/Purview_CopilotInteraction_Processor_v4.0.0.py
 
 so the sample data cannot drift away from what the processor would emit for the
 same raw interaction, and every behaviour name used here resolves through the

@@ -15,7 +15,7 @@ These users know Microsoft 365 well and often know the Power BI report already. 
 This is the app version of the ValueLens Power BI report. It keeps **the same information as the report**: every measure, chart and table, with the same DAX definitions. Navigation is simpler: seven data tabs plus a Guide, with short sub-views, instead of sixteen report pages. The report's parameter tables become an Assumptions sheet: hourly rate, scenario, licence price and grading strictness.
 
 ## Data
-- The input is the ValueLens CSVs: the processed Copilot interactions, the organisation and licence user list, and optionally the Agent 365 registry and the product feedback export. These are the same files that the Local CSV and SharePoint variants use. The other variants can export them.
+- The input is the ValueLens CSVs: the processed Copilot interactions, the organisation and licence user list, and optionally the Agent 365 registry and the product feedback export. SharePoint produces these files; Fabric and Azure can export them. Shared helpers and synthetic samples remain maintained independently of the archived Local CSV route.
 - All parsing and calculation happens in the browser. Data never leaves the tenant.
 - The app bundles a synthetic sample, which is always clearly labelled as sample data.
 

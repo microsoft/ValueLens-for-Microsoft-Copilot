@@ -11,6 +11,7 @@ import { isPax } from '../target.js';
 import { rlsOn } from '../transform/access.js';
 import { asksAdvanced } from './advanced.js';
 import { orgAccessCommand } from './org-access.js';
+import { showPrivacyGuide } from './privacy-guide.js';
 import { reportsOn } from './report.js';
 
 /** @typedef {import('../install.js').Ctx} Ctx */
@@ -408,6 +409,7 @@ export async function accessCommand(ctx, models, redeploy) {
     const action = await ui.select(
       'What next?',
       [
+        { name: 'Security and privacy setup guide', value: 'privacy', description: 'Administrator RLS checklist, portal steps and hashing support status. Changes nothing.' },
         { name: 'Add viewers', value: 'members', description: 'People or groups, by email or group name.' },
         { name: 'Add an owner', value: 'owner', description: 'Owners can add and remove viewers themselves.' },
         ...(shareReportPending(config) ? [{ name: 'Share the report with the group', value: 'share', description: 'Once, in Power BI, so members can open the report.' }] : []),
@@ -420,6 +422,10 @@ export async function accessCommand(ctx, models, redeploy) {
       'done',
     );
     if (action === 'done') return;
+    if (action === 'privacy') {
+      showPrivacyGuide(ctx);
+      continue;
+    }
     if (action === 'orgs' && redeploy) {
       await orgAccessCommand(ctx, redeploy);
       continue;

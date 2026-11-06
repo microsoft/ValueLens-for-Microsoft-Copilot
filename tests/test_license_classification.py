@@ -183,7 +183,7 @@ class LicenseClassificationTests(unittest.TestCase):
         paths = [p for p in ROOT.rglob("*.pbit")
                  if "archive" not in p.parts
                  and not {"Add Credit Consumption", "Add Agent Evaluator"} & set(p.parts)]
-        self.assertEqual(len(paths), 4)
+        self.assertEqual(len(paths), 3)
         for path in paths:
             with self.subTest(path=path), zipfile.ZipFile(path) as archive:
                 self.assertIsNone(archive.testzip())
@@ -205,7 +205,7 @@ class LicenseClassificationTests(unittest.TestCase):
                     self.assertIn("Csv.Document", expression)
 
     def test_supplied_flags_feed_optional_processor_without_sku_inference(self):
-        path = ROOT / "5. Local CSV" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
+        path = ROOT / "shared" / "scripts" / "Purview_CopilotInteraction_Processor_v4.0.0.py"
         tree = ast.parse(path.read_text(encoding="utf-8-sig"))
         nodes = [
             node for node in tree.body

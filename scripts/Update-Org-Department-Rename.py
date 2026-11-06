@@ -33,7 +33,6 @@ TEMPLATES = (
     FABRIC / "ValueLens - Fabric OneLake.pbit",
     FABRIC / "Add Agent Evaluator" / "Agent Evaluator.pbit",
     Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
-    Path("5. Local CSV") / "ValueLens - Local CSV.pbit",
 )
 QUERY = "Chat + Agent Org Data"
 ZIP_METADATA = (

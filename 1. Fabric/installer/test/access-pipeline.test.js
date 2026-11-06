@@ -35,7 +35,7 @@ test('access notebook: deployed only with org-scoped access on, and it ships', (
   assert.equal(notebookOptions(setRls(config, true)).access, true);
 });
 
-test('access notebook: the pipeline loads tables only; the installer passes roles when it applies membership', () => {
+test('access notebook: runs load tables only and leave membership to the portal', () => {
   const { ctx, config } = fakeCtx();
   setRls(config, true);
   config.fabric.workspaceId = 'ws-1';

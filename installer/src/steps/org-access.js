@@ -2,12 +2,12 @@
 /**
  * Org-scoped access: opt-in row-level security on the semantic model. Who sees what lives in a
  * scope list (a CSV the installer writes in the Lakehouse), never in the model, so it survives
- * redeploys. The model gets two roles when it's on; their members are applied over XMLA by the
- * Access Scope notebook after every deploy, because a definition deploy drops role members.
+ * redeploys. Role membership is reviewed and assigned by an administrator in the Power BI portal.
  */
 import { notebookJobParameters } from '../clients/fabric.js';
 import { commandLine } from '../launch.js';
-import { ACCESS_INVENTORY, ACCESS_PEOPLE_TABLE, ORG_ATTRIBUTES, rlsOn, roleDefinitions } from '../transform/access.js';
+import { ACCESS_INVENTORY, ACCESS_PEOPLE_TABLE, ORG_ATTRIBUTES, rlsOn } from '../transform/access.js';
+import { showPrivacyGuide } from './privacy-guide.js';
 import { ensureViewerGroup } from './access.js';
 import { deployedRoles, refreshModel } from './model.js';
 import { BUSY_RETRIES, BUSY_WAIT_MS, capacityBusy, waitForJob } from './run.js';
@@ -203,7 +203,7 @@ export function addScope(rows, row) {
 export const removeScope = (rows, key) => rows.filter((r) => scopeKey(r) !== key);
 
 /**
- * People with an active `all` scope: the Everyone role's members.
+ * People with an active `all` scope; this does not assign portal role membership.
  * @param {ScopeRow[]} rows
  */
 export const everyoneUpns = (rows) => [...new Set(rows.filter((r) => r.ScopeType === 'all' && r.Status === 'active' && r.UserPrincipalName !== '*').map((r) => r.UserPrincipalName))].sort();
@@ -308,13 +308,13 @@ async function showBypass(ctx) {
 }
 
 /**
- * The roles each model should have, members included, for the notebook.
+ * Role definitions retained for redeploy detection only; never include membership.
  * @param {Ctx} ctx
  * @param {ScopeRow[]} rows
  * @returns {Promise<{ items: { dataset: string, datasetId: string, role: any }[], missing: RlsModel[] }>}
  */
 export async function roleItems(ctx, rows) {
-  const { config, user } = ctx;
+  const { config } = ctx;
   const groupId = config.access?.groupId;
   if (!groupId) throw new Error('There is no viewer group. Run "access" to choose one.');
   /** @type {{ dataset: string, datasetId: string, role: any }[]} */
@@ -346,8 +346,7 @@ export async function roleItems(ctx, rows) {
       missing.push(m);
       continue;
     }
-    const defs = roleDefinitions(/** @type {any} */ ({ roles }), { groupId, tenantId: user.tenantId, everyone: everyoneUpns(rows), defaultAll: defaultAll(rows) });
-    for (const role of defs) items.push({ dataset: m.name, datasetId: m.datasetId, role });
+    for (const { members, ...role } of roles) items.push({ dataset: m.name, datasetId: m.datasetId, role });
   }
   return { items, missing };
 }
@@ -371,13 +370,13 @@ async function runAccessNotebook(ctx, workspaceId, notebookId, params) {
     await ctx.sleep(BUSY_WAIT_MS);
   }
   if (job?.status === 'Completed') return true;
-  ui.fail(`The roles weren't applied: ${job?.failureReason?.message ?? `the notebook ended as ${job?.status ?? 'unknown'}`}`);
-  ui.info('Check that the tenant setting "Allow XMLA endpoints" is on and the workspace capacity\'s XMLA endpoint is Read Write. Then try again from "access".');
+  ui.fail(`The access tables weren't loaded: ${job?.failureReason?.message ?? `the notebook ended as ${job?.status ?? 'unknown'}`}`);
+  ui.info('Check the Access Scope notebook run and Lakehouse permissions, then try again from "access". Role membership is assigned in the Power BI portal.');
   return false;
 }
 
 /**
- * Lands the scope list, applies the model's role members and, when asked, refreshes the model.
+ * Lands and loads the scope list and, when asked, refreshes the model. Never assigns role members.
  * The install carries on whatever happens, and the model stays closed to scoped viewers until it's
  * applied.
  * @param {Ctx} ctx
@@ -409,20 +408,20 @@ export async function applyOrgAccess(ctx, opts = {}) {
     ui.fail(`The Access Scope notebook isn't deployed. Run "${commandLine('update')}".`);
     return false;
   }
-  const ok = await runAccessNotebook(ctx, ws, id, { MODE: 'all', ROLES_B64: '', ROLES_FILE: s.rolesPath, WORKSPACE_ID: ws });
+  const ok = await runAccessNotebook(ctx, ws, id, { MODE: 'all', ROLES_B64: '', ROLES_FILE: '', WORKSPACE_ID: ws });
   if (ok && opts.refresh !== false) {
     for (const m of rlsModels(config)) if (m.model) await refreshModel(ctx, { model: m.model, wait: false });
   }
   if (!ok) return false;
   rls.applied = [...new Set(items.map((i) => i.datasetId))];
   ctx.save();
-  ui.ok(`Org-scoped access applied to ${[...new Set(items.map((i) => i.dataset))].join(', ')}`);
+  ui.ok(`Access tables loaded for ${[...new Set(items.map((i) => i.dataset))].join(', ')}`);
+  showPrivacyGuide(ctx);
   return true;
 }
 
 /**
- * Whether org-scoped access is on and a deployed model still needs its role members applied, so
- * ensureOrgAccess applies them (and refreshes, when asked).
+ * Whether a deployed model still needs access tables loaded since its last deploy.
  * @param {import('../config.js').InstallConfig} config
  */
 export function orgAccessPending(config) {
@@ -433,8 +432,7 @@ export function orgAccessPending(config) {
 }
 
 /**
- * After a deploy: applies role members to any model that was redeployed since they were last
- * applied. Nothing to do when org-scoped access is off.
+ * After a deploy: loads access tables. Role membership remains a portal administrator step.
  * @param {Ctx} ctx
  * @param {{ refresh?: boolean }} [opts]
  * @returns {Promise<boolean | null>} As applyOrgAccess: false when it failed; null when it only warned.
@@ -443,7 +441,8 @@ export async function ensureOrgAccess(ctx, opts = {}) {
   const { ui, config } = ctx;
   if (!rlsOn(config)) return true;
   if (!orgAccessPending(config)) {
-    ui.ok('Org-scoped access is in place');
+    ui.ok('Access tables are in place; an administrator must verify Power BI portal role membership');
+    showPrivacyGuide(ctx);
     return true;
   }
   try {
@@ -496,7 +495,7 @@ export async function verifyOrgAccess(ctx) {
       .catch(() => null);
     if (seen === null) ui.note(`Couldn't query ${m.name} as ${probe} to check what they see.`);
     else if (seen >= people) ui.ok(`${m.name}: ${probe} sees all ${people.toLocaleString('en-GB')} people`);
-    else ui.warn(`${m.name}: ${probe} has an "everyone" scope but sees ${seen.toLocaleString('en-GB')} of ${people.toLocaleString('en-GB')} people. The roles may not have applied: try "Apply now" from "access".`);
+    else ui.warn(`${m.name}: ${probe} has an "everyone" scope but sees ${seen.toLocaleString('en-GB')} of ${people.toLocaleString('en-GB')} people. Check scope refresh and have an administrator review role membership in the Power BI portal.`);
   }
 }
 
@@ -569,16 +568,17 @@ async function addFlow(ctx, rows) {
 async function turnOn(ctx, redeploy) {
   const { ui, config, api, user } = ctx;
   ui.heading('Org-scoped access');
+  showPrivacyGuide(ctx);
   ui.info('Each viewer then sees only the orgs you give them: everyone, everyone below a person, or one department or country.');
   ui.info('Pages for tenant-wide data (spend, agents, security) show only to people who see everyone.');
-  ui.info('People in the viewer group now keep seeing everything. Anyone added later sees nothing until you give them a scope.');
+  ui.info('Current viewers are seeded with all scopes, but portal role membership and verification are still required. New viewers need a scope unless an active default applies.');
   const blockers = rlsBlockers(ctx);
   if (blockers.length) {
     for (const b of blockers) ui.fail(b);
     return false;
   }
   await showBypass(ctx);
-  ui.note('It needs the tenant setting "Allow XMLA endpoints" and a capacity whose XMLA endpoint is Read Write.');
+  ui.note('Enabling prepares model roles, not their membership. Complete the Power BI portal Security steps after the model redeploy.');
   const group = await ensureViewerGroup(ctx);
   if (!group) return false;
   const existing = await readScopes(ctx);
@@ -588,7 +588,7 @@ async function turnOn(ctx, redeploy) {
     const members = await api.graph.groupUsers(group.id).catch(() => null);
     if (!members) ui.warn(`Couldn't list the members of ${group.displayName}, so only you keep seeing everything.`);
     rows = seedRows([...(members ?? []).map((m) => m.userPrincipalName ?? ''), user.upn], { grantedBy: user.upn, now: ctx.now() });
-    ui.info(`${rows.length} ${rows.length === 1 ? 'person keeps' : 'people keep'} seeing everything.`);
+    ui.info(`${rows.length} ${rows.length === 1 ? 'person receives' : 'people receive'} an all scope. Review portal roles and unmatched org rows before relying on visibility.`);
   } else ui.info(`Using the ${existing.length} scope${existing.length === 1 ? '' : 's'} saved from before.`);
   if (!(await ui.confirm('Turn on org-scoped access? The models are redeployed and refreshed.', false))) return false;
   await writeScopes(ctx, rows);
@@ -625,7 +625,7 @@ export async function orgAccessCommand(ctx, redeploy) {
       [
         { name: 'Give someone a scope', value: 'add' },
         ...(rows.length ? [{ name: 'Remove a scope', value: 'remove' }] : []),
-        { name: changed ? 'Apply the changes now' : 'Apply now', value: 'apply', description: 'Reloads the scopes, re-applies the roles and refreshes the models. Takes a few minutes.' },
+        { name: changed ? 'Apply the changes now' : 'Apply now', value: 'apply', description: 'Reloads scopes and refreshes models. Role membership remains an administrator portal step.' },
         { name: `Match org scopes on ${attribute === 'department' ? 'country' : 'department'} instead`, value: 'attribute', description: 'Redeploys the models.' },
         { name: 'Turn off org-scoped access', value: 'off', description: 'Everyone in the viewer group sees everything again. The scopes are kept.' },
         { name: 'Done', value: 'done' },
@@ -633,7 +633,7 @@ export async function orgAccessCommand(ctx, redeploy) {
       changed ? 'apply' : 'done',
     );
     if (action === 'done') {
-      if (changed) ui.warn('The changes are saved but not applied yet. They take effect when you apply them, or for scopes other than "everyone", at the next scheduled load.');
+      if (changed) ui.warn('The changes are saved but not loaded yet. Apply now or wait for the next scheduled load and model refresh. Review any Everyone role membership in the Power BI portal separately.');
       return;
     }
     if (action === 'add') {

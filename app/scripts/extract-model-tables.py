@@ -5,7 +5,7 @@ Reads the DataModelSchema inside a ValueLens .pbit and writes:
   behaviors.json  - the Behavior Value Map #table
   estimates.json  - the Human Time Estimates #table
 
-Usage: python scripts/extract-model-tables.py "../5. Local CSV/ValueLens - Local CSV.pbit"
+Usage: python scripts/extract-model-tables.py "../1. Fabric/Manual setup/ValueLens - Fabric.pbit"
 Re-run whenever the report's glossary or time estimates change.
 """
 import json

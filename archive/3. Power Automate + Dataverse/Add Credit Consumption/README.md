@@ -80,9 +80,9 @@ Flows fill `studio_tenant_daily`, `studio_agent`, `azure_ai_spend` and `github_a
 eight tables the script creates (Cowork credits, Studio per-user, GitHub seat map, spending policies
 and four Azure detail tables) have no flow. Import them by hand with **Data → Import** in
 [make.powerapps.com](https://make.powerapps.com); the files in the
-[Local CSV sample data](../../../5.%20Local%20CSV/Add%20Credit%20Consumption/sample-data/) show the
+[Local CSV sample data](../../../shared/sample-data/consumption/) show the
 columns. For the Azure detail tables, the Local CSV
-[`pull_azure_ai.py`](../../../5.%20Local%20CSV/Add%20Credit%20Consumption/pull_azure_ai.py) writes
+[`pull_azure_ai.py`](../../../shared/scripts/pull_azure_ai.py) writes
 `AzureAiTokensDaily.csv`, `AzureDeploymentHealth.csv`, `AzureSolutionSpend.csv` and
 `AzureBillingReconciliation.csv` in those columns.
 

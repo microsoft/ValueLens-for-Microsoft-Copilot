@@ -1,5 +1,8 @@
 # ➕ Add Credit Consumption — Local CSV
 
+**Archived.** This standalone template is frozen. Shared sample data and export helpers
+remain maintained; use the [active routes](../../../README.md#choose-your-path) for new setups.
+
 **Optional.** A second, separate Power BI report — **Consumption Central** — covering Copilot
 credit consumption and cost across **Cowork / Work IQ**, **Copilot Studio**, **GitHub Copilot** and
 **Azure AI Foundry**. ValueLens shows adoption and value; this shows what it costs. Skip it and
@@ -12,8 +15,8 @@ No product is required. Load what you have; the other pages stay empty.
 | Item | Purpose |
 |---|---|
 | `Consumption Central - Local CSV.pbit` | The report. One parameter that matters: `DataFolder`. |
-| [`sample-data/`](sample-data/) | Synthetic dataset for all four products. Every path's add-on uses it. |
-| [`pull_azure_ai.py`](pull_azure_ai.py) | *Optional.* Writes the Azure AI Foundry CSVs into your folder, including deployment health, solution spend and billing reconciliation. Each run replaces the days it reads (the last 90 by default) and keeps the older rows. |
+| [`sample-data/`](../../../shared/sample-data/consumption/) | Synthetic dataset for all four products. Every path's add-on uses it. |
+| [`pull_azure_ai.py`](../../../shared/scripts/pull_azure_ai.py) | *Optional.* Writes the Azure AI Foundry CSVs into your folder, including deployment health, solution spend and billing reconciliation. Each run replaces the days it reads (the last 90 by default) and keeps the older rows. |
 
 ---
 
@@ -22,7 +25,7 @@ No product is required. Load what you have; the other pages stay empty.
 ### A — Sample data (~2 min)
 
 Open **`Consumption Central - Local CSV.pbit`**, set **`DataFolder`** to the full path of
-[`sample-data/`](sample-data/), click **Load**.
+[`sample-data/`](../../../shared/sample-data/consumption/), click **Load**.
 
 ### B — Your own data (~10 min)
 
@@ -34,12 +37,12 @@ Open **`Consumption Central - Local CSV.pbit`**, set **`DataFolder`** to the ful
    | Cowork / Work IQ | Viva Insights → **Analysis** → build a query with the Copilot credit metrics → download CSV |
    | Copilot Studio | Power Platform admin centre → **Licensing** → **Copilot Studio** |
    | GitHub Copilot | GitHub → **Billing** → AI usage report |
-   | Azure AI Foundry | Azure Cost Analysis export, or `python pull_azure_ai.py "<your folder>"` |
+   | Azure AI Foundry | Azure Cost Analysis export, or run `python "..\..\..\shared\scripts\pull_azure_ai.py" "<your folder>"` from this folder |
 
 3. **Open the template**, paste the folder path into `DataFolder`, click **Load**.
 
 Copilot Studio figures here come from admin centre exports. To read them daily from the Power
-Platform licensing API instead, use the [Fabric](../../1.%20Fabric/installer/README.md#power-automate-flows)
+Platform licensing API instead, use the [Fabric](../../../1.%20Fabric/installer/README.md#power-automate-flows)
 path.
 
 Everything else has a default. List price is **$0.01 per credit**; change `CreditRate` only if your

@@ -67,7 +67,7 @@ def base_parameter(m, argument):
 
 class TemplatesAreCurrent(unittest.TestCase):
     def test_every_template_is_current_and_the_patcher_is_idempotent(self):
-        self.assertEqual(len(PATCHER.TARGETS), 2)
+        self.assertEqual(len(PATCHER.TARGETS), 1)
         for relative, edits in PATCHER.TARGETS:
             original = (ROOT / relative).read_bytes()
             rebuilt, changed = PATCHER.build(original, edits)

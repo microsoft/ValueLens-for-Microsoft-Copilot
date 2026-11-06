@@ -27,7 +27,6 @@ FABRIC_TEMPLATES = (
     Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
 )
 M_TEMPLATES = (
-    Path("5. Local CSV") / "ValueLens - Local CSV.pbit",
     Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
 )
 AGENTS_PAGE = "93c52bc8ecf242b91ee4"

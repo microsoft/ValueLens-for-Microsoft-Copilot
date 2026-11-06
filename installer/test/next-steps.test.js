@@ -35,6 +35,21 @@ test('next steps: none left for an install with nothing to do', () => {
   assert.equal(stepsLeftTitle([]), '0 optional steps');
 });
 
+test('next steps: portal membership reminder remains while RLS is enabled, even after tables load', () => {
+  const { config } = installed();
+  assert.ok(config.access);
+  config.access.rls = { enabled: true, applied: ['sm-1'] };
+  const [step] = nextSteps(config, USER);
+  assert.equal(step.id, 'rls-portal');
+  assert.match(step.why, /cannot certify portal membership/);
+  assert.ok(step.steps);
+  assert.match(step.steps.join('\n'), /Security.*Scoped viewers/);
+  assert.match(step.steps.join('\n'), /real non-workspace viewer/);
+  assert.equal(step.link, `https://app.fabric.microsoft.com/groups/${config.fabric.workspaceId}`);
+  config.access.rls.enabled = false;
+  assert.deepEqual(nextSteps(config, USER), []);
+});
+
 test('next steps: in order, flows, then hand-offs; each says who and why', () => {
   const t = installed();
   const config = t.config;
