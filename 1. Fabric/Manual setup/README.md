@@ -3,6 +3,8 @@
 The main way to set up the Fabric path. The [ValueLens installer](../../installer/) (work in progress) automates
 the same steps with these same files.
 
+For the separate Databricks notebook route, see [Databricks setup](Databricks/README.md).
+
 ## Steps
 
 1. **[Notebooks](notebooks/README.md).** Register an app, create a Lakehouse, load the data and
