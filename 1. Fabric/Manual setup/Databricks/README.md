@@ -6,10 +6,8 @@ in the manual Fabric folder and the optional Workday org-data lander. The separa
 Consumption Central and Agent Evaluator notebook sets are not included. Managed App integration
 is a later phase.
 
-**Power BI template status:** a Databricks-connected `.pbit` is not included. The existing report
-source is a `.pbit`, and the supported modeling path available in this worktree requires PBIP
-source or a modeling MCP. Neither is available, so the existing report has not been rewritten
-or relabeled as a Databricks template. See [Power BI connection guidance](#power-bi-connection-guidance).
+**Power BI template:** [`ValueLens - Databricks.pbit`](ValueLens%20-%20Databricks.pbit) is the
+Fabric report with only its data source changed. See [Power BI report](#power-bi-report).
 
 No Databricks workspace, compute, credentials, or live Power BI refresh was used to validate
 this route. The offline checks do not replace a workspace run.
@@ -139,20 +137,41 @@ lets the load-status logic treat a successful CSV lander as coverage for a faile
 load. The notebooks publish start/success status, attempt count, and timing through task values;
 the Workflow run remains the authoritative source for detailed task errors.
 
-## Power BI connection guidance
+## Power BI report
 
-The adapted report template is **blocked**, not included. The existing report file is a `.pbit`;
-the supported authoring route available here requires a PBIP project or a Power BI modeling MCP.
-Neither is available in this worktree. No existing report pages, measures, relationships, or
-visuals have been changed, and the Fabric `.pbit` is not a Databricks template.
+[`ValueLens - Databricks.pbit`](ValueLens%20-%20Databricks.pbit) has the same pages, visuals,
+tables, measures, relationships, Import mode and incremental refresh policy as
+`ValueLens - Fabric.pbit`. Only the source changes: every table is read through one
+Databricks SQL warehouse connection.
 
-When a supported report-authoring source is available, the intended route is to preserve Import
-mode and the report model while replacing its source with the Microsoft Databricks connector.
-Parameterize the Databricks **Server Hostname**, SQL Warehouse **HTTP Path**, catalog, and schema;
-do not embed tokens or passwords. Configure the connector's data-source credentials in Power BI
-Desktop and Power BI Service. The `ValueLens_Refresh_Model` notebook separately uses a
-service-principal client secret from a Databricks secret scope to request a Power BI REST refresh.
-That REST identity does not configure the model's Databricks source credentials.
+1. Start a Databricks **SQL warehouse** and copy its **Server Hostname** and **HTTP Path** from
+   **Connection details**.
+2. Open the template in Power BI Desktop and enter:
+
+   | Parameter | Value |
+   |---|---|
+   | Databricks Server Hostname | For example `adb-1234567890123456.7.azuredatabricks.net`. |
+   | Databricks HTTP Path | For example `/sql/1.0/warehouses/abc123`. |
+   | Databricks Catalog, Databricks Schema | The notebooks' `catalog` and `schema`; defaults `main` and `dbo`. |
+   | Enable_ProductFeedback, Enable_Agent365, RangeStart, RangeEnd | As in the Fabric template. |
+
+3. When prompted, sign in with **Microsoft Entra ID** (or a personal access token, if your
+   workspace requires one). Desktop stores the credential; the template holds none.
+4. Publish, then set the same data-source credentials in the semantic model's settings in Power
+   BI Service before the first scheduled or notebook-triggered refresh.
+
+The `ValueLens_Refresh_Model` notebook uses a separate service principal, read from a Databricks
+secret scope, only to request the Power BI REST refresh. It does not set the model's Databricks
+credentials. The template uses the Azure Databricks connector; for a workspace on another cloud,
+change `Databricks.Catalogs` to `DatabricksMultiCloud.Catalogs` in the `FabricTable` query.
+
+The template is generated from the Fabric template, so report changes are made there. Rebuild with
+`python scripts/Build-Databricks-Template.py`, or add `--pbip <folder>` to also export a PBIP
+project. The source helper is [`scripts/databricks/FabricTable.pq`](../../../scripts/databricks/FabricTable.pq).
+
+Offline checks: the template opened in Power BI Desktop with the Databricks parameter prompt,
+and its model loaded into Desktop's local engine (19 tables, 202 measures, 7 relationships, all
+measures evaluated after a calculate refresh). No Databricks data refresh has been run.
 
 ## References
 

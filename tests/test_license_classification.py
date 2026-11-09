@@ -183,7 +183,7 @@ class LicenseClassificationTests(unittest.TestCase):
         paths = [p for p in ROOT.rglob("*.pbit")
                  if "archive" not in p.parts
                  and not {"Add Credit Consumption", "Add Agent Evaluator"} & set(p.parts)]
-        self.assertEqual(len(paths), 3)
+        self.assertEqual(len(paths), 4)
         for path in paths:
             with self.subTest(path=path), zipfile.ZipFile(path) as archive:
                 self.assertIsNone(archive.testzip())

@@ -37,8 +37,8 @@ Before installing, check [prerequisites](docs/PREREQUISITES.md) and
 [permissions](docs/PERMISSIONS.md). The [ValueLens installer](docs/INSTALL.md) covers
 SharePoint and Fabric; Azure uses the separate installer linked in its route guide.
 Installers are experimental: try a test environment first.
-Databricks is not an installer target; the separate [Databricks notebook route](1.%20Fabric/Manual%20setup/Databricks/README.md)
-is available, but its connected Power BI template is not yet included.
+Databricks is not an installer target; use the separate [Databricks route](1.%20Fabric/Manual%20setup/Databricks/README.md),
+with its notebooks and Databricks-connected Power BI template.
 
 <a id="after-setup"></a>
 <a id="the-power-bi-report"></a>

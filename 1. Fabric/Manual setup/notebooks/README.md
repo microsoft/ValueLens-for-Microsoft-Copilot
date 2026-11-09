@@ -7,8 +7,7 @@ automates the same steps.
 
 The notebooks in this folder are the Fabric versions. They do not run unchanged on Databricks;
 use the separate [Databricks notebook route](../Databricks/README.md), which includes
-all 15 root notebooks and the optional Workday lander. Its Databricks-connected Power BI template
-is not included yet because the required PBIP source or modeling MCP is unavailable.
+all 15 root notebooks, the optional Workday lander and a Databricks-connected Power BI template.
 
 Without Fabric, start with [SharePoint](../../../4.%20SharePoint/README.md) for a scheduled
 report, or [the CSV app](../../../app/README.md) without Power BI.
