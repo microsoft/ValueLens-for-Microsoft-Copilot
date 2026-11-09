@@ -1,9 +1,11 @@
-# 1. Fabric
+<a id="1-fabric"></a>
+
+# Fabric
 
 Notebooks collect the data into a Lakehouse; a pipeline runs them on a schedule.
 The ValueLens Power BI report reads the result.
 
-[All routes](../README.md#choose-your-path): **4. SharePoint**, **1. Fabric**, **2. Azure**.
+[All setup choices](../README.md#choose-your-path) · [SharePoint](../4.%20SharePoint/README.md) · [Azure](../2.%20Azure/README.md)
 
 ## Before you start
 

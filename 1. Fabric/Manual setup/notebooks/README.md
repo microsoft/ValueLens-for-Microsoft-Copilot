@@ -1,7 +1,24 @@
 # Fabric notebooks (set up by hand)
 
-The main way to set up the Fabric path. The [installer](../../installer/) (work in progress)
+The main way to set up the Fabric path. The [ValueLens installer](../../../installer/) (work in progress)
 automates the same steps.
+
+## Databricks
+
+These are Fabric notebooks, not a Databricks-native deployment. They do not run unchanged on
+Databricks, and the ValueLens installer has no Databricks target.
+
+The Spark/Delta transformations are a starting point for a custom port, but the
+[audit ingester](Copilot_Audit_Log_Direct_Ingester.ipynb) uses Fabric Lakehouse paths and
+`notebookutils.fs` for remote staging, the [processor](Copilot_Audit_Log_Processor.ipynb)
+enables V-Order and runs `OPTIMIZE ... VORDER`, and
+[model refresh](ValueLens_Refresh_Model.ipynb) obtains a Power BI token through
+`notebookutils.credentials`. A port must adapt storage paths and catalog/table names,
+credentials, compaction, scheduling and the report's data connection. Databricks data access
+alone does not provide app hosting or a Power BI semantic model.
+
+Without Fabric, start with [SharePoint](../../../4.%20SharePoint/README.md) for a scheduled
+report, or [the CSV app](../../../app/README.md) without Power BI.
 
 ## Before you start
 

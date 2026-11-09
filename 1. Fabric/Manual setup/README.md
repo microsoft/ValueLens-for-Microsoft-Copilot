@@ -1,6 +1,6 @@
 # Manual setup
 
-The main way to set up the Fabric path. The [installer](../installer/) (work in progress) automates
+The main way to set up the Fabric path. The [ValueLens installer](../../installer/) (work in progress) automates
 the same steps with these same files.
 
 ## Steps

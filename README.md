@@ -2,7 +2,7 @@
 
 **Understand the hours and value Microsoft 365 Copilot and agents deliver.**
 
-Use the Power BI report, with an optional app. Find reports and walkthroughs on
+Use the app or the Power BI report. Find reports and walkthroughs on
 [DataHub site](https://ai-datalab.github.io/).
 
 <a id="start-here-the-app-preview"></a>
@@ -13,14 +13,20 @@ Use the Power BI report, with an optional app. Find reports and walkthroughs on
 
 ## Choose your path
 
-Start with SharePoint if you do not have Fabric. The numbers below are the existing route
-names, not a sequence of steps.
+**Start with the app** if you want to explore ValueLens without Fabric or Power BI.
+[Download the sample app](app/download/ValueLens-App.html) using **Download raw file**, then
+open it in Edge or Chrome. To use your own data, load processed CSVs from
+[PAX or the shared processor](shared/scripts/README.md#getting-the-raw-export), not raw audit logs.
+No Power BI licence or Azure subscription is needed for this browser app.
+[App setup and sharing](app/README.md) covers the preview Managed App option and its separate licences.
 
-| Route | What you need | Start here |
+**For a scheduled Power BI report**, choose by the services you have:
+
+| Data route | What you need | Start here |
 |---|---|---|
-| **[4. SharePoint](4.%20SharePoint/README.md)** | Power BI Pro, a SharePoint library and a Windows PC for the scheduled PAX export | ValueLens installer, or manual setup |
-| **[1. Fabric](1.%20Fabric/README.md)** | Fabric capacity and a workspace | ValueLens installer, or manual setup |
-| **[2. Azure](2.%20Azure/README.md)** | Azure subscription and Power BI workspace; no Fabric | DataHub installer only; work in progress |
+| **[SharePoint](4.%20SharePoint/README.md)** | No Fabric or Azure subscription. Power BI Pro/PPU, a SharePoint library and a Windows PC for the daily PAX export | ValueLens installer, or manual setup |
+| **[Fabric](1.%20Fabric/README.md)** | Fabric capacity (F2+) and a workspace; Power BI Pro/PPU to publish | ValueLens installer, or manual setup |
+| **[Azure](2.%20Azure/README.md)** | Azure subscription, Power BI Pro and a workspace; no Fabric | Separate DataHub installer; work in progress |
 
 <a id="before-you-start"></a>
 <a id="installer"></a>
@@ -29,6 +35,7 @@ Before installing, check [prerequisites](docs/PREREQUISITES.md) and
 [permissions](docs/PERMISSIONS.md). The [ValueLens installer](docs/INSTALL.md) covers
 SharePoint and Fabric; Azure uses the separate installer linked in its route guide.
 Installers are experimental: try a test environment first.
+Databricks is not an installer target; the [Fabric notebooks need adaptation](1.%20Fabric/Manual%20setup/notebooks/README.md#databricks).
 
 <a id="after-setup"></a>
 <a id="the-power-bi-report"></a>
@@ -41,9 +48,8 @@ Installers are experimental: try a test environment first.
 [Customise ValueLens](docs/CUSTOMISE.md) ·
 [Administrator security and privacy setup](docs/SECURITY-PRIVACY-SETUP.md)
 
-For app hosting and sharing, follow your route guide. To look around without connecting data,
-[download the sample app](app/download/ValueLens-App.html) using **Download raw file**,
-then open it in Edge or Chrome. Its data is synthetic; it is not another setup route.
+For app hosting and sharing, follow [the app guide](app/README.md). The downloaded app starts
+with labelled synthetic data; it does not collect tenant data or set up a scheduled report.
 
 <a id="watch-first"></a>
 

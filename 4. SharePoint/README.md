@@ -1,9 +1,14 @@
-# 4. SharePoint
+<a id="4-sharepoint"></a>
+
+# SharePoint
 
 ValueLens in Power BI Pro, without Fabric. A daily script exports the data to a SharePoint library,
 and the Power BI report refreshes from it. The app can read the same CSV files.
 
-[All routes](../README.md#choose-your-path): **4. SharePoint**, **1. Fabric**, **2. Azure**.
+[All setup choices](../README.md#choose-your-path) · [Fabric](../1.%20Fabric/README.md) · [Azure](../2.%20Azure/README.md)
+
+No Fabric capacity or Azure subscription is needed. If you only want the browser app, not a
+scheduled Power BI report, use [the app guide](../app/README.md) and processed CSV exports instead.
 
 **Security and privacy:** file/folder sharing is not row-level security. This route has no
 installer-managed scoped RLS or end-to-end user-ID hashing switch. Follow the
@@ -168,6 +173,6 @@ Agents export for `-Agents365Csv`.
 | "You can't schedule refresh for this semantic model because the following data sources currently don't support refresh: Data source for Query1" | The model was published from a template older than this fix, which built the feedback file URL in M. Republish from the current `ValueLens - SharePoint.pbit` and set **SharePoint Site URL**, then set credentials for each listed source. |
 | Refresh error `FileOutsideSharePointSite` or `MissingSharePointSiteUrl` | Set **SharePoint Site URL** to the https site that holds the `Agent 365` and `Feedback File` files, with no spaces around it. |
 | Agent 365 export returns `403` | Add the Agent 365 licence and permissions, or use `-Agents365Csv <admin-centre-agents-export.csv>`. |
-| Refresh hits the 1 GB or 2-hour Power BI Pro limit | Move to [`../1. Fabric/README.md`](../1.%20Fabric/README.md). |
+| Refresh hits the 1 GB or 2-hour Power BI Pro limit | Review the [Fabric route](../1.%20Fabric/README.md) and its capacity requirements. |
 
 </details>

@@ -42,6 +42,9 @@ flowchart LR
 
 - **Prepare the data.** Have the processed interactions CSV ready. Add the user, agent registry,
   and feedback CSVs if you have them. See [which files the app reads](#which-files-the-app-reads).
+  Without Fabric, Power BI or an Azure subscription, use
+  [PAX or the shared CSV processor](../shared/scripts/README.md#getting-the-raw-export) with
+  authorised audit and user exports. The app does not collect them for you.
 - **Choose who can open the app.** For the Managed App, each viewer needs Power Apps Premium or
   Copilot Credits. Microsoft 365 Copilot by itself is not enough. For Fabric, the workspace admin
   must enable **Fabric Apps (preview)** and the workspace must use Fabric capacity (F2 or larger,
@@ -285,9 +288,9 @@ share the processor, so every active path has one input format.
 
 | Path | How to get the CSVs |
 |---|---|
-| 4. SharePoint + PAX | `copilot_interactions_rollup.csv`, `copilot_users_rollup.csv` and `agents_365.csv` from the folder `Upload-Rollups-SharePoint.ps1` writes to. |
-| 1. Fabric | Export the Lakehouse tables from a notebook, e.g. `spark.table("copilot_interactions_curated").toPandas().to_csv(...)`. For users, export org data with a UPN, `Organization` and `Has License`. |
-| 2. Azure | The run job writes the same curated table to `curated/copilot_interactions_curated` and Azure SQL. Export it the same way, or run the [shared CSV processor](../shared/scripts/README.md) on a Purview export. |
+| SharePoint + PAX | `copilot_interactions_rollup.csv`, `copilot_users_rollup.csv` and `agents_365.csv` from the folder `Upload-Rollups-SharePoint.ps1` writes to. |
+| Fabric | Export the Lakehouse tables from a notebook, e.g. `spark.table("copilot_interactions_curated").toPandas().to_csv(...)`. For users, export org data with a UPN, `Organization` and `Has License`. |
+| Azure | The run job writes the same curated table to `curated/copilot_interactions_curated` and Azure SQL. Export it the same way, or run the [shared CSV processor](../shared/scripts/README.md) on a Purview export. |
 
 Existing Local CSV reports can still use the maintained [shared processor](../shared/scripts/README.md)
 and optional agent/feedback exports. Local CSV and Power Automate + Dataverse are archived,
