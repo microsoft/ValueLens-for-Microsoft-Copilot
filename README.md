@@ -54,6 +54,7 @@ with labelled synthetic data; it does not collect tenant data or set up a schedu
 <a id="watch-first"></a>
 
 [Watch the demo](https://youtu.be/P0uHJb13ZR0) ·
+[App explainer](https://ai-datalab.github.io/#/watch/valuelens-explainer) ·
 [Get help](SUPPORT.md) ·
 [Report an issue](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues)
 

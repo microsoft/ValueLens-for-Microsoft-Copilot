@@ -44,7 +44,10 @@ export function Guide() {
   }, [q])
   return (
     <div className="grid grid-1-2">
-      <Panel title="About this app">
+      <Panel
+        title="About this app"
+        actions={<a className="link-btn" href="https://ai-datalab.github.io/#/watch/valuelens-explainer" target="_blank" rel="noopener noreferrer">Explainer</a>}
+      >
         <dl className="defs">
           {NOTES.map((n) => (
             <div key={n.title}>
