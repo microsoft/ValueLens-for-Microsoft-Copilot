@@ -1,2 +1,5 @@
 # Built single-file app download: generated, so hide it from diffs and language stats
 app/download/*.html -diff linguist-generated
+
+# Generated Databricks PBIP project: keep bytes identical to the .pbit so the builder's --check passes
+6.?Other?Data?Lake/Databricks/pbip/** -text -diff linguist-generated

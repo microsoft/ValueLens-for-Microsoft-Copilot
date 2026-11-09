@@ -1,0 +1,2309 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/bookmark/2.1.0/schema.json",
+  "displayName": "Overall",
+  "name": "e76349e7c0e12cbc3ce7",
+  "options": {
+    "targetVisualNames": []
+  },
+  "explorationState": {
+    "version": "1.3",
+    "activeSection": "0de458c0c6d004399dee",
+    "filters": {
+      "byExpr": [
+        {
+          "name": "e2f0d797f0afd325a216",
+          "type": "Categorical",
+          "expression": {
+            "Column": {
+              "Expression": {
+                "SourceRef": {
+                  "Entity": "Chat + Agent Interactions (Audit Logs)"
+                }
+              },
+              "Property": "Environment"
+            }
+          },
+          "howCreated": 1
+        }
+      ]
+    },
+    "sections": {
+      "0de458c0c6d004399dee": {
+        "filters": {
+          "byExpr": [
+            {
+              "name": "30146948861aa62f999e",
+              "type": "Categorical",
+              "expression": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Chat + Agent Interactions (Audit Logs)"
+                    }
+                  },
+                  "Property": "Environment"
+                }
+              },
+              "howCreated": 1
+            },
+            {
+              "name": "94235be0cd41591566ee",
+              "type": "Categorical",
+              "expression": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Chat + Agent Interactions (Audit Logs)"
+                    }
+                  },
+                  "Property": "Agent Filter (Normalized)"
+                }
+              },
+              "howCreated": 1
+            },
+            {
+              "name": "5ecc0917a8e1e2d0b7f3",
+              "type": "Advanced",
+              "filter": {
+                "Version": 2,
+                "From": [
+                  {
+                    "Name": "c",
+                    "Entity": "Chat + Agent Interactions (Audit Logs)",
+                    "Type": 0
+                  }
+                ],
+                "Where": [
+                  {
+                    "Condition": {
+                      "Not": {
+                        "Expression": {
+                          "Contains": {
+                            "Left": {
+                              "Column": {
+                                "Expression": {
+                                  "SourceRef": {
+                                    "Source": "c"
+                                  }
+                                },
+                                "Property": "AppHost"
+                              }
+                            },
+                            "Right": {
+                              "Literal": {
+                                "Value": "'SecurityCopilot'"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "expression": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Chat + Agent Interactions (Audit Logs)"
+                    }
+                  },
+                  "Property": "AppHost"
+                }
+              },
+              "howCreated": 1
+            }
+          ]
+        },
+        "visualContainers": {
+          "0504c461dc4fcec45bce": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "87fa5780ace207718007",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Cowork Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "14156d92a66a6cc0bd00",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Cowork AI Tasks"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "76d4f3e21d8597d20483",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Cowork Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "1088ece92e57a5b05798",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Cowork Sessions per User"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "21721b90ee493e4b0510",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Cowork Sessions per User per Week"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "135c1be4d3019481581b": {
+            "singleVisual": {
+              "visualType": "textbox",
+              "objects": {}
+            }
+          },
+          "22e825f0ae16b77aeb00": {
+            "singleVisual": {
+              "visualType": "shape",
+              "objects": {}
+            }
+          },
+          "3a4905e39631f254446c": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "3483c1e08e7c25037008",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "AppHost"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "aa6272b36b67205b9553",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Behavior_Enriched_Full"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "3140ea43609570d7dddc",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "All Active Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "dc9d5761067700334e71",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "5fcf0b6b85725edbd796",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Sessions per User per Week"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "pivotTable",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Sessions"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Rows": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "AppHost"
+                    }
+                  }
+                ]
+              },
+              "expansionStates": [
+                {
+                  "roles": [
+                    "Rows"
+                  ],
+                  "levels": [
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Interactions (Audit Logs).AppHost"
+                      ],
+                      "isCollapsed": true,
+                      "identityKeys": [
+                        {
+                          "Column": {
+                            "Expression": {
+                              "SourceRef": {
+                                "Entity": "Chat + Agent Interactions (Audit Logs)"
+                              }
+                            },
+                            "Property": "AppHost"
+                          }
+                        }
+                      ],
+                      "isPinned": true
+                    },
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Interactions (Audit Logs).Behavior_Enriched_Full"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    }
+                  ],
+                  "root": {
+                    "identityValues": null
+                  }
+                }
+              ]
+            }
+          },
+          "3f0775be40add5c1702e": {
+            "singleVisual": {
+              "visualType": "image",
+              "objects": {}
+            }
+          },
+          "454f1fcc4752804e1692": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "18b2a426ec0405596888",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Licensed Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "c1f445580276d2d4a035",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "% Active Licensed Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "2fef83dd9863420b881c",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Copilot AI Tasks"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "484ee2cbd56583e2309c",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Licensed Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "9073796d0260ca7008c7",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Licensed Sessions per User"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "82b70b94c6dd08b88455",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Licensed Sessions per User per Week"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 1,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Top Value Outcome"
+                    }
+                  }
+                }
+              ],
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "45708eff53955a835fe5": {
+            "singleVisual": {
+              "visualType": "bookmarkNavigator",
+              "objects": {}
+            }
+          },
+          "49af6aceed77e40cefb3": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "e6a209302b6e2580256e",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "15ab3ccdad5c61c19303",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Audit_UserId"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "0449d01f183832e40a56",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Cowork Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e1dd1d68a3459707a4c0",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Cowork Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "64577d69bbd6eea64480",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Cowork Sessions per User per Week"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "pivotTable",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Cowork Sessions"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Rows": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  },
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Audit_UserId"
+                    }
+                  }
+                ]
+              },
+              "expansionStates": [
+                {
+                  "roles": [
+                    "Rows"
+                  ],
+                  "levels": [
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Org Data.Organization"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    },
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Interactions (Audit Logs).Audit_UserId"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    }
+                  ],
+                  "root": {
+                    "identityValues": null
+                  }
+                }
+              ],
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "4e0718a28f7ec1429d72": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "2d59f1dca25bbce5b27b",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "44f048b920a6beddc0d5",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Audit_UserId"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "029593ac3d153503aec7",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Agent Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "ad6415ff0a13c0c0de3a",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Agent Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "30b61f70c74e30c839ac",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Agent Sessions per User per Week"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "pivotTable",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Agent Sessions"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Rows": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  },
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Audit_UserId"
+                    }
+                  }
+                ]
+              },
+              "expansionStates": [
+                {
+                  "roles": [
+                    "Rows"
+                  ],
+                  "levels": [
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Org Data.Organization"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    },
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Interactions (Audit Logs).Audit_UserId"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    }
+                  ],
+                  "root": {
+                    "identityValues": null
+                  }
+                }
+              ],
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "504d4cf1a471deec4ed5": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "32a7291bb300cb34a650",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "2274b5f106d05e503080",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Audit_UserId"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "964749b3a009a4617a0d",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "All Active Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "751ba9c2a09db02101e0",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "69186f6fd9670a705cce",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Sessions per User per Week"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "pivotTable",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Sessions"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Rows": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  }
+                ]
+              },
+              "expansionStates": [
+                {
+                  "roles": [
+                    "Rows"
+                  ],
+                  "levels": [
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Org Data.Organization"
+                      ],
+                      "isCollapsed": true,
+                      "identityKeys": [
+                        {
+                          "Column": {
+                            "Expression": {
+                              "SourceRef": {
+                                "Entity": "Chat + Agent Org Data"
+                              }
+                            },
+                            "Property": "Organization"
+                          }
+                        }
+                      ],
+                      "isPinned": true
+                    },
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Interactions (Audit Logs).Audit_UserId"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    }
+                  ],
+                  "root": {
+                    "identityValues": null
+                  }
+                }
+              ]
+            }
+          },
+          "5892fa2e6167de0b71e2": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "de9490730dbebd10370a",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "ef7a76030d0971c32848",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Audit_UserId"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "a6744255c25a34470b51",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Licensed Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "a1bd7b4a721a776322a6",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Licensed Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "a6cf726f4c9da8966305",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Licensed Sessions per User per Week"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "pivotTable",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Licensed Sessions"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Rows": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  },
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Audit_UserId"
+                    }
+                  }
+                ]
+              },
+              "expansionStates": [
+                {
+                  "roles": [
+                    "Rows"
+                  ],
+                  "levels": [
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Org Data.Organization"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    },
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Interactions (Audit Logs).Audit_UserId"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    }
+                  ],
+                  "root": {
+                    "identityValues": null
+                  }
+                }
+              ],
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "5d8c77012d808bb6e000": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {}
+            }
+          },
+          "61d47e6000d480e49563": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "a07096dd5de057a03bb0",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Most Versatile Agent"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "c396827802ce91151b0d",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Agents 365"
+                        }
+                      },
+                      "Property": "Most Popular Agent Creator (Shared - Agent Builder)"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "624d5213bf5648833d40": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "816df965d98caa4bc86e",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "AppHost"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "6ef2169501701deaa0cc",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Behavior_Enriched_Full"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "bb715e802e6232b1a4e3",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Licensed Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "4339ef94ab9e178a1414",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Licensed Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e5f71aa0757c97b55ea8",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Licensed Sessions per User per Week"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "pivotTable",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Licensed Sessions"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Rows": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "AppHost"
+                    }
+                  },
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Behavior_Enriched_Full"
+                    }
+                  }
+                ]
+              },
+              "expansionStates": [
+                {
+                  "roles": [
+                    "Rows"
+                  ],
+                  "levels": [
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Interactions (Audit Logs).AppHost"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    },
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Interactions (Audit Logs).Behavior_Enriched_Full"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    }
+                  ],
+                  "root": {
+                    "identityValues": null
+                  }
+                }
+              ],
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "62b9089ff1eff3c90a50": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "185f1223c456a0c62cd8",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Calendar"
+                        }
+                      },
+                      "Property": "Date"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "slicer",
+              "objects": {
+                "merge": {
+                  "data": [
+                    {
+                      "properties": {
+                        "mode": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "'Between'"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "activeProjections": {
+                "Values": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Calendar"
+                        }
+                      },
+                      "Property": "Date"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "6de28a8f0d91d4f02373": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "68c936e16b0b34a61042",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Task Breakdown Group"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e80718ef4a6ebbb55028",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Task Breakdown Category"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "7b293e31a063b93ae526",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Cowork Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "8a935a7cbc5a00c96314",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Cowork Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "00b9e40d133853537a29",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Cowork Sessions per User per Week"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "pivotTable",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Cowork Sessions"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Rows": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Task Breakdown Group"
+                    }
+                  },
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Task Breakdown Category"
+                    }
+                  }
+                ]
+              },
+              "expansionStates": [
+                {
+                  "roles": [
+                    "Rows"
+                  ],
+                  "levels": [
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Interactions (Audit Logs).Task Breakdown Group"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    },
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Interactions (Audit Logs).Task Breakdown Category"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    }
+                  ],
+                  "root": {
+                    "identityValues": null
+                  }
+                }
+              ],
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "712b73188bd68dd0e9a5": {
+            "singleVisual": {
+              "visualType": "textbox",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "776b50d9c69ab9a52cb9": {
+            "singleVisual": {
+              "visualType": "textbox",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "915cb6b3e00e29b64ba5": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "f88bb7c880302c3cee42",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "AppHost"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e39529d414884003d720",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Behavior_Enriched_Full"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "d565183c20c9ae587026",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Unlicensed Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "a447b018d60bcc0d5d8e",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Unlicensed Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "9e674e3921641a0cd5b3",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Unlicensed Sessions per User per Week"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "pivotTable",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Unlicensed Sessions"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Rows": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "AppHost"
+                    }
+                  },
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Behavior_Enriched_Full"
+                    }
+                  }
+                ]
+              },
+              "expansionStates": [
+                {
+                  "roles": [
+                    "Rows"
+                  ],
+                  "levels": [
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Interactions (Audit Logs).AppHost"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    },
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Interactions (Audit Logs).Behavior_Enriched_Full"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    }
+                  ],
+                  "root": {
+                    "identityValues": null
+                  }
+                }
+              ],
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "93b20f1d41e3b9c272e8": {
+            "singleVisual": {
+              "visualType": "textbox",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "a0ce7033e8d0a48e176a": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "fa3d0effe9d47a0cd649",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "b8a7c3af21b2378144cb",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Audit_UserId"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "dba19530851130ccb429",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Unlicensed Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "2e2b2088e2c0154d1413",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Unlicensed Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "4c4529007c009e048039",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Unlicensed Sessions per User per Week"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "pivotTable",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Unlicensed Sessions"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Rows": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  },
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Audit_UserId"
+                    }
+                  }
+                ]
+              },
+              "expansionStates": [
+                {
+                  "roles": [
+                    "Rows"
+                  ],
+                  "levels": [
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Org Data.Organization"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    },
+                    {
+                      "queryRefs": [
+                        "Chat + Agent Interactions (Audit Logs).Audit_UserId"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    }
+                  ],
+                  "root": {
+                    "identityValues": null
+                  }
+                }
+              ],
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "a3a7f3a77a48e65f9cc9": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {}
+            }
+          },
+          "c45e3d332aeb8fb878b0": {
+            "singleVisual": {
+              "visualType": "textbox",
+              "objects": {}
+            }
+          },
+          "d217e2c753869a36981c": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "ca353c96570a652dae04",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "AgentName"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "110c8b90d180a68b9c5a",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Agent Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "a9d573e55b1171900032",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Agent Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e25e4d329bc09e50784c",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Agent Sessions per User"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "dcc2f9b62d40e103c07c",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Agents 365"
+                        }
+                      },
+                      "Property": "Agent Return Rate"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "a10aa593e8100169817a",
+                  "type": "Advanced",
+                  "expression": {
+                    "Aggregation": {
+                      "Expression": {
+                        "Column": {
+                          "Expression": {
+                            "SourceRef": {
+                              "Entity": "Agents 365"
+                            }
+                          },
+                          "Property": "Creator"
+                        }
+                      },
+                      "Function": 3
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ],
+              "byType": [
+                {
+                  "name": "ef4eab26604404218076",
+                  "type": "Exclude",
+                  "howCreated": 4
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "pivotTable",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Agent Sessions"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Rows": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "AgentName"
+                    }
+                  }
+                ]
+              },
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "d5c90f1a6cac07e0a2be": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "11643a8c4011e18e9823",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Agent Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "162bcd76cd5323bc43a8",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Agent AI Tasks"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "b08be9bdd391adca9813",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Agent Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "f61a2162303c684c3bb4",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Agent Sessions per User"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "d32bca303151ea615061",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Agents 365"
+                        }
+                      },
+                      "Property": "Agent Return Rate"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "e854d066fbdd453c69ec": {
+            "singleVisual": {
+              "visualType": "textbox",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "e89d2ab2abbac4ab96fb": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "be8e942a3b38aec56429",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "All Active Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "7b3faac7100ac3b3c00b",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e2bbbb20d653808286e8",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Sessions per User"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "56c61ae3388836dbb9e9",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Sessions per User per Week"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 1,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Top Value Outcome"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "ef5b1800051d3a7e1e00": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "b7ea20c565a20d5bd795",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Unlicensed Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "ae1ad88337310e6ec790",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Unlicensed AI Tasks"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "31c98b4c1adeeb43ebaa",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Unlicensed Sessions"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "a143d27ae40de7899754",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Unlicensed Sessions per User"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "b28ab57a932b058c1d97",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Observed Unlicensed Sessions per User per Week"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          }
+        }
+      }
+    },
+    "objects": {
+      "merge": {
+        "outspacePane": [
+          {
+            "properties": {
+              "expanded": {
+                "expr": {
+                  "Literal": {
+                    "Value": "false"
+                  }
+                }
+              },
+              "visible": {
+                "expr": {
+                  "Literal": {
+                    "Value": "false"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

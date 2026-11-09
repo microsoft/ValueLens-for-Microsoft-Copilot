@@ -1,0 +1,1286 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/bookmark/2.1.0/schema.json",
+  "displayName": "Licensed",
+  "name": "3be2ad87bebb7c4036ed",
+  "options": {
+    "applyOnlyToTargetVisuals": true,
+    "targetVisualNames": [
+      "027999d53dc37e72ea16",
+      "0294f813a93b5e855f9e",
+      "174f58a314b1738f330c",
+      "3d51a3b221781f9c3b18",
+      "3e3db0d232ef9f63d9c4",
+      "3ee1be70af7af1290d89",
+      "42a563f42ee853735b35",
+      "47e61c6fbef96ed3e6bc",
+      "543636ceb70a7241b726",
+      "56ecd1263d8acf41ffe2",
+      "574663e5bd8a3b979fa2",
+      "57837ce82476f7409ba7",
+      "5848e7888dbb911625dc",
+      "6130720123a40061c0cb",
+      "669d4384bcff5c4c8cc1",
+      "67b24f4a2760eb687d24",
+      "6c3dc099bf7c2846e7db",
+      "725c99f2815d681e7d35",
+      "772d49496a350d10bf79",
+      "7cb37d41db95dfb0fc10",
+      "81876ee3f4b5b19d66f4",
+      "99c25e15879f4d2a9f75",
+      "9a5526c0dc7be8f21a6b",
+      "a799f96445eed41d1615",
+      "ae61f14bcf044eb5dc71",
+      "b3427c10f74f204433d5",
+      "b4215ea2952f3f8aa951",
+      "b904553ae23f42006709",
+      "c48f906e28878fb53634",
+      "e331cf52136e9cac7ed1"
+    ]
+  },
+  "explorationState": {
+    "version": "1.3",
+    "activeSection": "2668084b705002f7615d",
+    "filters": {
+      "byExpr": [
+        {
+          "name": "e2f0d797f0afd325a216",
+          "type": "Categorical",
+          "expression": {
+            "Column": {
+              "Expression": {
+                "SourceRef": {
+                  "Entity": "Chat + Agent Interactions (Audit Logs)"
+                }
+              },
+              "Property": "Environment"
+            }
+          },
+          "howCreated": 1
+        }
+      ]
+    },
+    "sections": {
+      "2668084b705002f7615d": {
+        "filters": {
+          "byExpr": [
+            {
+              "name": "ac71f0e2d5b34a0c9e11",
+              "type": "Categorical",
+              "filter": {
+                "Version": 2,
+                "From": [
+                  {
+                    "Name": "c",
+                    "Entity": "Chat + Agent Interactions (Audit Logs)",
+                    "Type": 0
+                  }
+                ],
+                "Where": [
+                  {
+                    "Condition": {
+                      "In": {
+                        "Expressions": [
+                          {
+                            "Column": {
+                              "Expression": {
+                                "SourceRef": {
+                                  "Source": "c"
+                                }
+                              },
+                              "Property": "Environment"
+                            }
+                          }
+                        ],
+                        "Values": [
+                          [
+                            {
+                              "Literal": {
+                                "Value": "'Licensed'"
+                              }
+                            }
+                          ]
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              "expression": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Chat + Agent Interactions (Audit Logs)"
+                    }
+                  },
+                  "Property": "Environment"
+                }
+              },
+              "howCreated": 1
+            },
+            {
+              "name": "ee7465e59df45f43ae21",
+              "type": "Categorical",
+              "expression": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Chat + Agent Interactions (Audit Logs)"
+                    }
+                  },
+                  "Property": "Agent Filter (Normalized)"
+                }
+              },
+              "howCreated": 1
+            }
+          ]
+        },
+        "visualContainers": {
+          "027999d53dc37e72ea16": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "5c8494847ac010a53866",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Active Licensed Users (Verified Inventory)"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "c059afa1414f7d28c2cf",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Inactive Licensed Users (Filter-Aware)"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "donutChart",
+              "objects": {}
+            }
+          },
+          "0294f813a93b5e855f9e": {
+            "singleVisual": {
+              "visualType": "shape",
+              "objects": {}
+            }
+          },
+          "174f58a314b1738f330c": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "68c4597328e613b3adaa",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Activation Overall Headline"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "3d51a3b221781f9c3b18": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "a8055afb5e4bedc44c63",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Activation Agents Headline"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "3e3db0d232ef9f63d9c4": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "f89e1a429de12b1f192d",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "All Active Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "c7930be69ea6ec077c08",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Agent Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e170406e5c59c6bdbe9f",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "% Active Users Using Agents"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "3ee1be70af7af1290d89": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "d2277fe9b4adfee2ab43",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Active Unlicensed Users (Verified Inventory)"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "2494d027b0cdf34005a8",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Inactive Unlicensed Users (Filter-Aware)"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "donutChart",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "42a563f42ee853735b35": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "d90871a9be81193b52f0",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "f950c23456e497318034",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Inactive Users (Filter-Aware)"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "d82723637d4119aca3e9",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "All Active Users"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "TornadoChart1452517688218",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "47e61c6fbef96ed3e6bc": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "5fb5665eb80a112991c1",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Agent Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e4c38ed0576f0580dd11",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Using Copilot / Not Using Agents"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "donutChart",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "543636ceb70a7241b726": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "54cff5fc189a6dadef3e",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Activity (Legend)"
+                        }
+                      },
+                      "Property": "Value1"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "90140155b8d5200043f5",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "% of Users by Activity"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "donutChart",
+              "objects": {},
+              "activeProjections": {
+                "Category": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Activity (Legend)"
+                        }
+                      },
+                      "Property": "Value1"
+                    }
+                  }
+                ]
+              },
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "574663e5bd8a3b979fa2": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "a966337987a18d18bace",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "c",
+                        "Entity": "Chat + Agent Org Data",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Not": {
+                            "Expression": {
+                              "In": {
+                                "Expressions": [
+                                  {
+                                    "Column": {
+                                      "Expression": {
+                                        "SourceRef": {
+                                          "Source": "c"
+                                        }
+                                      },
+                                      "Property": "Organization"
+                                    }
+                                  }
+                                ],
+                                "Values": [
+                                  [
+                                    {
+                                      "Literal": {
+                                        "Value": "null"
+                                      }
+                                    }
+                                  ]
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "57ec64431fcb51adb1f6",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Inactive Licensed Users (Filter-Aware)"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "b835f675b25d2c0b7d89",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Active Licensed Users (Verified Inventory)"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "TornadoChart1452517688218",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Active Licensed Users (Verified Inventory)"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "5848e7888dbb911625dc": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {}
+            }
+          },
+          "6130720123a40061c0cb": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "39200961d98b31de16a7",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Active Licensed Users (Verified Inventory)"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "579e9f0993564adb0c19",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Inactive Licensed Users (Filter-Aware)"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "donutChart",
+              "objects": {}
+            }
+          },
+          "669d4384bcff5c4c8cc1": {
+            "singleVisual": {
+              "visualType": "shape",
+              "objects": {}
+            }
+          },
+          "67b24f4a2760eb687d24": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "c3432b212cccfd429c11",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Activity (Legend)"
+                        }
+                      },
+                      "Property": "Value1"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "f1610db5f0794373a216",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "% of Users by Activity"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "donutChart",
+              "objects": {},
+              "activeProjections": {
+                "Category": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Activity (Legend)"
+                        }
+                      },
+                      "Property": "Value1"
+                    }
+                  }
+                ]
+              },
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "6c3dc099bf7c2846e7db": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "1f1b2fb10df87e9d0a31",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Unlicensed Users (Filter-Aware)"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "3ab996a173e1f7ae9a32",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Unlicensed Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "d593d92680bdd723016e",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "% Active Unlicensed Users"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Unlicensed Users"
+                    }
+                  }
+                }
+              ],
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "725c99f2815d681e7d35": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "a966337987a18d18bace",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "c",
+                        "Entity": "Chat + Agent Org Data",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Not": {
+                            "Expression": {
+                              "In": {
+                                "Expressions": [
+                                  {
+                                    "Column": {
+                                      "Expression": {
+                                        "SourceRef": {
+                                          "Source": "c"
+                                        }
+                                      },
+                                      "Property": "Organization"
+                                    }
+                                  }
+                                ],
+                                "Values": [
+                                  [
+                                    {
+                                      "Literal": {
+                                        "Value": "null"
+                                      }
+                                    }
+                                  ]
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "acc55010ab2fcd461b4c",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Inactive Unlicensed Users (Filter-Aware)"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "52186fbe367aff8b13d3",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Active Unlicensed Users (Verified Inventory)"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "TornadoChart1452517688218",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "% Active Unlicensed Users (of Total)"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "772d49496a350d10bf79": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "7d1a48d0572b1221143f",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Total Users (Filter-Aware)"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "7cec7a235cadd121e1da",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "% Active Users (of Total)"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e5f5e57765fad2088f15",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "% Inactive Users (of Total)"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "7cb37d41db95dfb0fc10": {
+            "singleVisual": {
+              "visualType": "image",
+              "objects": {}
+            }
+          },
+          "81876ee3f4b5b19d66f4": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "28e125b9a6436135cfa1",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Org Data"
+                        }
+                      },
+                      "Property": "Organization"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "343050bd8f3d5c714416",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Using Copilot / Not Using Agents"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e69b7a831dbdc1fa3178",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Agent Users"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "TornadoChart1452517688218",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "99c25e15879f4d2a9f75": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "8cbf55652d6f217bca9c",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Agent Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "27aa482ce626fe119354",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Using Copilot / Not Using Agents"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "donutChart",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "a799f96445eed41d1615": {
+            "singleVisual": {
+              "visualType": "shape",
+              "objects": {}
+            }
+          },
+          "ae61f14bcf044eb5dc71": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "b9f80de6fe36948a9c84",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Activation Licensed Headline"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {}
+            }
+          },
+          "b3427c10f74f204433d5": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "a0cef467fcf92760fab9",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Activation Unlicensed Headline"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "b4215ea2952f3f8aa951": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "ed61a28a0f30a858bec2",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Licensed Users (Filter-Aware)"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "89b486c25fc9fec8463c",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Chat + Agent Interactions (Audit Logs)"
+                        }
+                      },
+                      "Property": "Active Licensed Users"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "2b7d091892352b5b9556",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "% Active Licensed Users"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Licensed Users (Filter-Aware)"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "b904553ae23f42006709": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "06cdafb35c22d200048d",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Active Unlicensed Users (Verified Inventory)"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "48d7e4f851935af6c602",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Copilot Licensed"
+                        }
+                      },
+                      "Property": "Inactive Unlicensed Users (Filter-Aware)"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "donutChart",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "e331cf52136e9cac7ed1": {
+            "singleVisual": {
+              "visualType": "textbox",
+              "objects": {}
+            }
+          }
+        },
+        "visualContainerGroups": {
+          "56ecd1263d8acf41ffe2": {
+            "isHidden": true
+          },
+          "57837ce82476f7409ba7": {
+            "isHidden": false
+          }
+        }
+      }
+    },
+    "objects": {
+      "merge": {
+        "outspacePane": [
+          {
+            "properties": {
+              "expanded": {
+                "expr": {
+                  "Literal": {
+                    "Value": "false"
+                  }
+                }
+              },
+              "visible": {
+                "expr": {
+                  "Literal": {
+                    "Value": "false"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

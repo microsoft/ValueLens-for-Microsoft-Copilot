@@ -5,22 +5,24 @@ connection parameters become four Databricks parameters, and the FabricTable hel
 by scripts/databricks/FabricTable.pq. Every table, column, measure, relationship, refresh policy
 and report part is carried over unchanged, and the build refuses to write if anything else moved.
 
-    python scripts/Build-Databricks-Template.py            # write the .pbit
-    python scripts/Build-Databricks-Template.py --check    # fail if the .pbit is stale
-    python scripts/Build-Databricks-Template.py --pbip DIR # also write a PBIP project to DIR
+    python scripts/Build-Databricks-Template.py            # write the .pbit and the pbip/ PBIP project
+    python scripts/Build-Databricks-Template.py --check    # fail if either is stale
+    python scripts/Build-Databricks-Template.py --pbip DIR # also write a PBIP project to another DIR
 """
 import argparse
 import copy
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_TEMPLATE = ROOT / "1. Fabric" / "Manual setup" / "ValueLens - Fabric.pbit"
-TEMPLATE = ROOT / "1. Fabric" / "Manual setup" / "Databricks" / "ValueLens - Databricks.pbit"
+TEMPLATE = ROOT / "6. Other Data Lake" / "Databricks" / "ValueLens - Databricks.pbit"
+PBIP_DIR = ROOT / "6. Other Data Lake" / "Databricks" / "pbip"
 HELPER = ROOT / "scripts" / "databricks" / "FabricTable.pq"
 NAME = "ValueLens - Databricks"
 FABRIC_PARAMETERS = ("Fabric SQL Endpoint", "Lakehouse Name")
@@ -166,14 +168,26 @@ def validate_rebuild(original, rebuilt):
         raise ValueError("unrelated model fields changed")
 
 
-def write_pbip(template, directory):
-    """Write the template as a PBIP project: model.bim plus the enhanced PBIR report folder."""
+def platform(item_type, logical_id):
+    return {
+        "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+        "metadata": {"type": item_type, "displayName": NAME},
+        "config": {"version": "2.0", "logicalId": logical_id},
+    }
+
+
+def pbip_files(template):
+    """Return the PBIP project for the template as {relative path: bytes}.
+
+    The model is DataModelSchema as model.bim. The report is already in the enhanced PBIR format
+    (Report/definition/...), so its parts are copied byte for byte rather than converted to the
+    legacy single-file report.json.
+    """
     _, payloads, _ = read_archive(template)
-    directory = Path(directory)
-    model_dir = directory / f"{NAME}.SemanticModel"
-    report_dir = directory / f"{NAME}.Report"
-    files = {
-        directory / f"{NAME}.pbip": {
+    model_dir = Path(f"{NAME}.SemanticModel")
+    report_dir = Path(f"{NAME}.Report")
+    documents = {
+        Path(f"{NAME}.pbip"): {
             "$schema": "https://developer.microsoft.com/json-schemas/fabric/pbip/pbipProperties/1.0.0/schema.json",
             "version": "1.0",
             "artifacts": [{"report": {"path": f"{NAME}.Report"}}],
@@ -191,31 +205,81 @@ def write_pbip(template, directory):
         },
         model_dir / "model.bim": decode(payloads["DataModelSchema"]),
         model_dir / "diagramLayout.json": decode(payloads["DiagramLayout"]),
+        model_dir / ".platform": platform("SemanticModel", "1a2b3c4d-db01-4001-8001-0000000000a1"),
+        report_dir / ".platform": platform("Report", "1a2b3c4d-db01-4001-8001-0000000000a2"),
+        Path(".gitignore"): None,
     }
-    for path, document in files.items():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    files = {}
+    for path, document in documents.items():
+        if document is None:
+            files[path.as_posix()] = b"**/.pbi/localSettings.json\n**/.pbi/cache.abf\n"
+        else:
+            files[path.as_posix()] = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     for member, payload in payloads.items():
         if member.startswith("Report/"):
-            path = report_dir / member[len("Report/"):]
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(payload)
-    return directory / f"{NAME}.pbip"
+            files[(report_dir / member[len("Report/"):]).as_posix()] = payload
+    return files
+
+
+def long_path(path):
+    """Prefix an absolute Windows path so deep PBIR parts work past MAX_PATH."""
+    path = os.path.abspath(path)
+    if os.name == "nt" and not path.startswith("\\\\?\\"):
+        return "\\\\?\\" + path
+    return path
+
+
+def existing_pbip(directory):
+    root = long_path(directory)
+    if not os.path.isdir(root):
+        return {}
+    files = {}
+    for folder, subfolders, names in os.walk(root):
+        subfolders[:] = [name for name in subfolders if name != ".pbi"]
+        for name in names:
+            full = os.path.join(folder, name)
+            with open(full, "rb") as handle:
+                files[os.path.relpath(full, root).replace(os.sep, "/")] = handle.read()
+    return files
+
+
+def write_pbip(template, directory):
+    """Write the template as a PBIP project, removing generated files that no longer exist."""
+    root = long_path(directory)
+    expected = pbip_files(template)
+    existing = existing_pbip(directory)
+    for relative in set(existing) - set(expected):
+        os.remove(os.path.join(root, *relative.split("/")))
+    for relative, payload in expected.items():
+        if existing.get(relative) == payload:
+            continue
+        path = os.path.join(root, *relative.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as handle:
+            handle.write(payload)
+    return Path(directory) / f"{NAME}.pbip"
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check", action="store_true", help="fail if the Databricks template is stale")
-    parser.add_argument("--pbip", metavar="DIR", help="also write a PBIP project to DIR")
+    parser.add_argument("--pbip", metavar="DIR", help="also write a PBIP project to another DIR")
     args = parser.parse_args(argv)
     original = SOURCE_TEMPLATE.read_bytes()
     rebuilt = build_template(original, HELPER.read_bytes())
     current = TEMPLATE.read_bytes() if TEMPLATE.exists() else None
     if args.check:
+        stale = []
         if current != rebuilt:
-            print(f"Databricks template is stale: {TEMPLATE.relative_to(ROOT)}", file=sys.stderr)
+            stale.append(TEMPLATE)
+        if existing_pbip(PBIP_DIR) != pbip_files(rebuilt):
+            stale.append(PBIP_DIR)
+        for path in stale:
+            print(f"Databricks template is stale: {path.relative_to(ROOT)}", file=sys.stderr)
+        if stale:
             return 1
-        print("Databricks template: current")
+        print("Databricks template and PBIP project: current")
+        return 0
     elif current != rebuilt:
         if SOURCE_TEMPLATE.read_bytes() != original:
             raise ValueError("Fabric template changed during the build; refusing to write")
@@ -223,6 +287,7 @@ def main(argv=None):
         print("Databricks template: written")
     else:
         print("Databricks template: current")
+    print(f"PBIP project: {write_pbip(rebuilt, PBIP_DIR).relative_to(ROOT)}")
     if args.pbip:
         print(f"PBIP project: {write_pbip(rebuilt, args.pbip)}")
     print("PBIT SHA256: " + hashlib.sha256(rebuilt).hexdigest())

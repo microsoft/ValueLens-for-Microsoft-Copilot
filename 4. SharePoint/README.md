@@ -5,7 +5,7 @@
 ValueLens in Power BI Pro, without Fabric. A daily script exports the data to a SharePoint library,
 and the Power BI report refreshes from it. The app can read the same CSV files.
 
-[All setup choices](../README.md#choose-your-path) · [Fabric](../1.%20Fabric/README.md) · [Azure](../2.%20Azure/README.md)
+[All setup choices](../README.md#choose-your-path) · [Fabric](../1.%20Fabric/README.md) · [Azure](../2.%20Azure/README.md) · [Other data lakes](../6.%20Other%20Data%20Lake/README.md)
 
 No Fabric capacity or Azure subscription is needed. If you only want the browser app, not a
 scheduled Power BI report, use [the app guide](../app/README.md) and processed CSV exports instead.

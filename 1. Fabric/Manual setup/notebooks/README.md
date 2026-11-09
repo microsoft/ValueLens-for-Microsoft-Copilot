@@ -6,7 +6,7 @@ automates the same steps.
 ## Databricks
 
 The notebooks in this folder are the Fabric versions. They do not run unchanged on Databricks;
-use the separate [Databricks notebook route](../Databricks/README.md), which includes
+use the separate [Databricks notebook route](../../../6.%20Other%20Data%20Lake/Databricks/README.md), which includes
 all 15 root notebooks, the optional Workday lander and a Databricks-connected Power BI template.
 
 Without Fabric, start with [SharePoint](../../../4.%20SharePoint/README.md) for a scheduled

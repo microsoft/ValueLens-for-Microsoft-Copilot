@@ -1,0 +1,80 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/bookmarksMetadata/1.0.0/schema.json",
+  "items": [
+    {
+      "name": "252aaafbe90508b822fe",
+      "displayName": "Activity",
+      "children": [
+        "5bca4a2f703e53628139",
+        "5a53fb50e1de1a51d053"
+      ]
+    },
+    {
+      "name": "2ce1c7f5a0d89a99f09e",
+      "displayName": "Value",
+      "children": [
+        "14a420d331a634ef1cfc",
+        "9a87a788cb853eadd648"
+      ]
+    },
+    {
+      "name": "2b17192ef1fb723cebee",
+      "displayName": "Habit Formation",
+      "children": [
+        "c18cb8124ae0501d9882",
+        "44f9c421eee858ccf120",
+        "b9c9b3b11d894ed43ca5"
+      ]
+    },
+    {
+      "name": "8fc3cfcd35533f11edaa",
+      "displayName": "Adoption & Reach",
+      "children": [
+        "2db75232903467b6e423",
+        "28e7f8e677e70ab3f744",
+        "9c71ff329fb694f0ed35",
+        "fb15c331f7f8a29f07c2",
+        "4aa4c98544e6155ac27f"
+      ]
+    },
+    {
+      "name": "0b6c7a5bd94ff227efe7",
+      "displayName": "Leaderboards",
+      "children": [
+        "e76349e7c0e12cbc3ce7",
+        "40554a13a73134cb3c5c",
+        "8d0bf5d29a54516483b0",
+        "44017ad7777495fef799",
+        "7ac614de8c438cc12cf6"
+      ]
+    },
+    {
+      "name": "bfec546ccf032ebc084a",
+      "displayName": "Activation",
+      "children": [
+        "d7a30e5734db9482b310",
+        "3be2ad87bebb7c4036ed",
+        "7c0332ec33cc1b87c507",
+        "d2eab60f07f71d075dfe"
+      ]
+    },
+    {
+      "name": "25b8f786c00c59e0be8c",
+      "displayName": "Glossary",
+      "children": [
+        "f09d8eab6654a60a73bd",
+        "90d4a946f08ef053a060",
+        "ff5cb170d3f42e92a535",
+        "f485053f897beafac707",
+        "a7900de0e66a0ff5dc82",
+        "7d120db044d0931efaab",
+        "30ae17508052576a838e",
+        "c8cd8b2cb483a3e48902",
+        "a20a56e9e145012560d4",
+        "6e532657b149ac86d714",
+        "b71c4e9a02f85d63aa10",
+        "b71c4e9a02f85d63aa11"
+      ]
+    }
+  ]
+}

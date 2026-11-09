@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ROUTE = ROOT / "1. Fabric" / "Manual setup" / "Databricks"
+ROUTE = ROOT / "6. Other Data Lake" / "Databricks"
 NOTEBOOKS = ROUTE / "notebooks"
 
 

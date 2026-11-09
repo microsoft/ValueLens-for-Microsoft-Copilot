@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "1. Fabric" / "Manual setup" / "notebooks"
-TARGET = ROOT / "1. Fabric" / "Manual setup" / "Databricks" / "notebooks"
+TARGET = ROOT / "6. Other Data Lake" / "Databricks" / "notebooks"
 
 NOTEBOOKS = (
     "Copilot_Audit_Log_Direct_Ingester.ipynb",

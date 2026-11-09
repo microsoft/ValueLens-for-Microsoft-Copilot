@@ -196,7 +196,7 @@ class LicenseClassificationTests(unittest.TestCase):
                 self.assertNotIn("Assigned Products", read)
                 self.assertNotIn("Assigned_Products", read)
                 self.assertIn('"Has license"', expression)
-                if "1. Fabric" in path.parts:
+                if {"1. Fabric", "6. Other Data Lake"} & set(path.parts):
                     self.assertIn('FabricTable("copilot_licensed_users")', expression)
                     self.assertIn('"Has_license"', expression)
                     self.assertIn('"HasCopilot"', expression)

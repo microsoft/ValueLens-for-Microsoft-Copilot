@@ -1,0 +1,30 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.1.0/schema.json",
+  "name": "53bb2d9ca4600a723662",
+  "displayName": "💬 User Feedback",
+  "displayOption": "FitToPage",
+  "height": 720,
+  "width": 1280,
+  "visualInteractions": [
+    {
+      "source": "943f453587bfece498ff",
+      "target": "a640feae9de1665cf069",
+      "type": "DataFilter"
+    },
+    {
+      "source": "943f453587bfece498ff",
+      "target": "e072698271c17b5b4126",
+      "type": "DataFilter"
+    },
+    {
+      "source": "5389114c435e1e88b583",
+      "target": "e072698271c17b5b4126",
+      "type": "DataFilter"
+    },
+    {
+      "source": "5389114c435e1e88b583",
+      "target": "a640feae9de1665cf069",
+      "type": "DataFilter"
+    }
+  ]
+}

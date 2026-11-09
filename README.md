@@ -29,6 +29,7 @@ No Power BI licence or Azure subscription is needed for this browser app.
 | **[SharePoint](4.%20SharePoint/README.md)** | No Fabric or Azure subscription. Power BI Pro/PPU, a SharePoint library and a Windows PC for the daily PAX export | ValueLens installer, or manual setup |
 | **[Fabric](1.%20Fabric/README.md)** | Fabric capacity (F2+) and a workspace; Power BI Pro/PPU to publish | ValueLens installer, or manual setup |
 | **[Azure](2.%20Azure/README.md)** | Azure subscription, Power BI Pro and a workspace; no Fabric | Separate DataHub installer; work in progress |
+| **[Other data lakes](6.%20Other%20Data%20Lake/README.md)** | Databricks: Unity Catalog and a SQL warehouse; Power BI Pro/PPU to publish | Manual setup: notebooks and Power BI template |
 
 <a id="before-you-start"></a>
 <a id="installer"></a>
@@ -37,8 +38,7 @@ Before installing, check [prerequisites](docs/PREREQUISITES.md) and
 [permissions](docs/PERMISSIONS.md). The [ValueLens installer](docs/INSTALL.md) covers
 SharePoint and Fabric; Azure uses the separate installer linked in its route guide.
 Installers are experimental: try a test environment first.
-Databricks is not an installer target; use the separate [Databricks route](1.%20Fabric/Manual%20setup/Databricks/README.md),
-with its notebooks and Databricks-connected Power BI template.
+Databricks is not an installer target; follow its route guide.
 
 <a id="after-setup"></a>
 <a id="the-power-bi-report"></a>

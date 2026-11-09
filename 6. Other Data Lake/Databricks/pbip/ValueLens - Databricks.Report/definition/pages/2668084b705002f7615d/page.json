@@ -1,0 +1,20 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.1.0/schema.json",
+  "name": "2668084b705002f7615d",
+  "displayName": "◆ Activation ",
+  "displayOption": "FitToPage",
+  "height": 720,
+  "width": 1280,
+  "visualInteractions": [
+    {
+      "source": "725c99f2815d681e7d35",
+      "target": "b904553ae23f42006709",
+      "type": "DataFilter"
+    },
+    {
+      "source": "81876ee3f4b5b19d66f4",
+      "target": "47e61c6fbef96ed3e6bc",
+      "type": "DataFilter"
+    }
+  ]
+}

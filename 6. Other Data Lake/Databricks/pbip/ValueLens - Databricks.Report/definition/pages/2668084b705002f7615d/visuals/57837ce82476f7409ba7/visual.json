@@ -1,0 +1,16 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.13.0/schema.json",
+  "name": "57837ce82476f7409ba7",
+  "position": {
+    "x": 303.6144578313253,
+    "y": 138.17555938037864,
+    "z": 14000,
+    "height": 571.91049913941481,
+    "width": 770.80895008605853,
+    "tabOrder": 37000
+  },
+  "visualGroup": {
+    "displayName": "Stacked Column Chart",
+    "groupMode": "ScaleMode"
+  }
+}

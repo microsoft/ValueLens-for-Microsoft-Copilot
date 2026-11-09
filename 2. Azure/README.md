@@ -9,7 +9,7 @@ the same ValueLens Model and measures, and the same app pages as the Fabric-host
 Backend app access and Power BI model RLS are separate controls. Role membership is an
 administrator portal step; user-ID hashing is not currently supported end to end.
 
-[All setup choices](../README.md#choose-your-path) · [SharePoint](../4.%20SharePoint/README.md) · [Fabric](../1.%20Fabric/README.md)
+[All setup choices](../README.md#choose-your-path) · [SharePoint](../4.%20SharePoint/README.md) · [Fabric](../1.%20Fabric/README.md) · [Other data lakes](../6.%20Other%20Data%20Lake/README.md)
 
 > **Work in progress.** Only the [installer](../1.%20Fabric/installer/) sets this path up, and
 > it's also a work in progress. Try it in a demo or test tenant first. There's no manual path.

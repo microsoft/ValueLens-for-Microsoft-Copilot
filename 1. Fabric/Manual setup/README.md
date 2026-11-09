@@ -3,7 +3,7 @@
 The main way to set up the Fabric path. The [ValueLens installer](../../installer/) (work in progress) automates
 the same steps with these same files.
 
-For the separate Databricks notebook route, see [Databricks setup](Databricks/README.md).
+For the separate Databricks notebook route, see [Databricks setup](../../6.%20Other%20Data%20Lake/Databricks/README.md).
 
 ## Steps
 

@@ -101,6 +101,18 @@ class DatabricksTemplateTests(unittest.TestCase):
                     path = root / f"{BUILDER.NAME}.Report" / member[len("Report/"):]
                     self.assertEqual(path.read_bytes(), payload, member)
 
+    def test_committed_pbip_project_matches_the_template(self):
+        committed = BUILDER.existing_pbip(BUILDER.PBIP_DIR)
+        self.assertEqual(committed, BUILDER.pbip_files(self.template),
+                         "run python scripts/Build-Databricks-Template.py")
+        name = BUILDER.NAME
+        for part in (f"{name}.pbip", f"{name}.SemanticModel/model.bim",
+                     f"{name}.SemanticModel/definition.pbism", f"{name}.Report/definition.pbir",
+                     f"{name}.Report/definition/report.json", f"{name}.Report/definition/version.json"):
+            self.assertIn(part, committed)
+        project = json.loads(committed[f"{name}.pbip"])
+        self.assertEqual(project["artifacts"], [{"report": {"path": f"{name}.Report"}}])
+
 
 if __name__ == "__main__":
     unittest.main()

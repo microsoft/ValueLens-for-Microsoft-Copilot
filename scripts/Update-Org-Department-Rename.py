@@ -31,7 +31,7 @@ FABRIC = Path("1. Fabric") / "Manual setup"
 TEMPLATES = (
     FABRIC / "ValueLens - Fabric.pbit",
     FABRIC / "ValueLens - Fabric OneLake.pbit",
-    FABRIC / "Databricks" / "ValueLens - Databricks.pbit",
+    Path("6. Other Data Lake") / "Databricks" / "ValueLens - Databricks.pbit",
     FABRIC / "Add Agent Evaluator" / "Agent Evaluator.pbit",
     Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
 )
