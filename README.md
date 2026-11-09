@@ -48,6 +48,7 @@ then open it in Edge or Chrome. Its data is synthetic; it is not another setup r
 <a id="watch-first"></a>
 
 [Watch the demo](https://youtu.be/P0uHJb13ZR0) ·
+[App explainer](https://ai-datalab.github.io/#/watch/valuelens-explainer) ·
 [Get help](SUPPORT.md) ·
 [Report an issue](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues)
 
