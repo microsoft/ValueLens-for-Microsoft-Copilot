@@ -1,20 +1,26 @@
 # Before you start
 
-Choose **[4. SharePoint](../4.%20SharePoint/README.md)**,
-**[1. Fabric](../1.%20Fabric/README.md)** or **[2. Azure](../2.%20Azure/README.md)** first.
-For SharePoint or Fabric with the ValueLens installer, jump to
-[its route-specific checklist](#the-valuelens-installer).
-Azure requires the separate Analytics Hub installer and an Azure subscription; follow
-[the Azure prerequisites](../2.%20Azure/README.md#before-you-start).
+Start with [the setup choices](../README.md#choose-your-path), then use only the checklist for
+your choice. Fabric, Azure and Power BI are not prerequisites for every way to use ValueLens.
 
-Everything you need before you install Analytics Hub, on one page, by who does it. Most of it
-takes another admin a few minutes. Send them their part before you start, so you don't have to
-stop halfway.
+| Choice | Checklist |
+|---|---|
+| Browser app, with processed CSVs | [App prerequisites](../app/README.md#before-you-start). No Power BI licence or Azure subscription for local use; Managed App sharing has separate licences and admin settings. |
+| SharePoint report, no Fabric | [ValueLens installer checklist](#no-fabric-pax--sharepoint-route), or [manual prerequisites](../4.%20SharePoint/README.md#before-you-start). Needs Power BI and a Windows export PC, not an Azure subscription. |
+| Fabric report | [ValueLens installer checklist](#fabric-route), or [manual prerequisites](../1.%20Fabric/README.md#before-you-start). Needs Fabric capacity and Power BI. |
+| Azure-hosted app and models | [Azure prerequisites](../2.%20Azure/README.md#before-you-start). Needs an Azure subscription and Power BI; uses the separate DataHub installer. |
 
-**Using the ValueLens installer?** The installer in [`installer/`](../installer/README.md) has its
-own checklist, by person, for each of its routes: see
-[The ValueLens installer](#the-valuelens-installer). The rest of this page describes the manual
-setups and the older Analytics Hub installer in `1. Fabric/installer`.
+The [ValueLens installer](../installer/README.md) targets only SharePoint and Fabric, not
+Databricks. Installers and app hosting options are experimental; try a test environment first.
+
+For source permissions, see [PERMISSIONS.md](PERMISSIONS.md). Send the relevant admin their part
+before you start.
+
+## Combined app and older installer reference
+
+The sections below, up to [The ValueLens installer](#the-valuelens-installer), describe the
+manual Fabric setup and the older Analytics Hub installer in `1. Fabric/installer`. They are
+not a combined checklist for the browser app or SharePoint route.
 
 > The installer is a work in progress. For the [manual setup](../1.%20Fabric/Manual%20setup/README.md),
 > you need the Fabric capacity, the app registration and admin consent, the Key Vault and the

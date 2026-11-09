@@ -6,9 +6,18 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 ROUTES = ("4. SharePoint", "1. Fabric", "2. Azure")
+ROUTE_LABELS = ("SharePoint", "Fabric", "Azure")
 GUIDES = (
     "README.md",
+    "SUPPORT.md",
     *(f"{route}/README.md" for route in ROUTES),
+    "docs/INSTALL.md",
+    "docs/PREREQUISITES.md",
+    "docs/PERMISSIONS.md",
+    "installer/README.md",
+    "app/README.md",
+    "1. Fabric/Manual setup/README.md",
+    "1. Fabric/Manual setup/notebooks/README.md",
     "5. Local CSV/README.md",
     "archive/5. Local CSV/README.md",
     "archive/5. Local CSV/Add Credit Consumption/README.md",
@@ -22,12 +31,39 @@ GUIDES = (
 
 def test_root_route_order_and_brevity():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    choices = re.findall(r"^\| \*\*\[([124]\. [^\]]+)\]", readme, re.MULTILINE)
-    assert tuple(choices) == ROUTES
+    choices = re.findall(r"^\| \*\*\[([^\]]+)\]\(([^)]+)\)", readme, re.MULTILINE)
+    assert tuple(label for label, _ in choices) == ROUTE_LABELS
+    assert tuple(unquote(target) for _, target in choices) == tuple(
+        f"{route}/README.md" for route in ROUTES
+    )
     assert len(readme.splitlines()) <= 90
     assert "5. Local CSV" not in readme
     assert "3. Power Automate" not in readme
     assert len((ROOT / "1. Fabric" / "README.md").read_text(encoding="utf-8").splitlines()) <= 100
+
+
+def test_setup_navigation_uses_service_names_not_folder_numbers():
+    for guide in GUIDES:
+        if guide.startswith(("archive/", "5. Local CSV/")):
+            continue
+        text = (ROOT / guide).read_text(encoding="utf-8")
+        assert not re.search(r"\[(?:[124]\. (?:SharePoint|Fabric|Azure))\]", text), guide
+    for route, label in zip(ROUTES, ROUTE_LABELS):
+        text = (ROOT / route / "README.md").read_text(encoding="utf-8")
+        assert f"# {label}\n" in text
+        assert f'<a id="{route.lower().replace(". ", "-")}"></a>' in text
+
+
+def test_app_only_and_installer_choices_are_distinct():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert readme.index("**Start with the app**") < readme.index("**For a scheduled Power BI report**")
+    assert "No Power BI licence or Azure subscription is needed for this browser app." in readme
+    install = (ROOT / "docs" / "INSTALL.md").read_text(encoding="utf-8")
+    assert "The installer sets up a report on both routes" in install
+    assert "Azure is not a target of the ValueLens installer" in install
+    notebooks = (ROOT / "1. Fabric" / "Manual setup" / "notebooks" / "README.md").read_text(encoding="utf-8")
+    assert "They do not run unchanged on" in notebooks
+    assert "OPTIMIZE ... VORDER" in notebooks
 
 
 def test_route_and_shared_guide_links_resolve():
