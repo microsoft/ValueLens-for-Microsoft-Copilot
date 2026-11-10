@@ -58,6 +58,15 @@ with labelled synthetic data; it does not collect tenant data or set up a schedu
 [Get help](SUPPORT.md) ·
 [Report an issue](https://github.com/microsoft/ValueLens-for-Microsoft-Copilot/issues)
 
+<details>
+<summary>Power BI demo explainer</summary>
+
+[Watch the Power BI demo](https://ai-datalab.github.io/#/watch/valuelens-explainer)
+
+Demo data. AI-generated narration. Caption timing is approximate.
+
+</details>
+
 **Also see [DataHub App for Microsoft Copilot, Agents, Cowork and Autopilots](https://github.com/microsoft/DataHub-App-for-Microsoft-Copilot-Agents-Cowork-and-Autopilots):**
 one app for adoption, value, consumption and governance, including the ValueLens report.
 

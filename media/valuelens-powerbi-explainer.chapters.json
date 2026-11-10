@@ -1,0 +1,32 @@
+[
+  {
+    "time": 0,
+    "label": "Start with activation",
+    "duration": 23.25
+  },
+  {
+    "time": 23.25,
+    "label": "Read adoption over time",
+    "duration": 25.5
+  },
+  {
+    "time": 48.75,
+    "label": "Understand the work",
+    "duration": 24.917
+  },
+  {
+    "time": 73.667,
+    "label": "Treat value as an estimate",
+    "duration": 26.25
+  },
+  {
+    "time": 99.917,
+    "label": "Find the next conversation",
+    "duration": 25.167
+  },
+  {
+    "time": 125.083,
+    "label": "Check the assumptions",
+    "duration": 27.667
+  }
+]

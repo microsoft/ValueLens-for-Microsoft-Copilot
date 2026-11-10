@@ -1,0 +1,19 @@
+Demo data. AI-generated narration. Caption timing is approximate.
+
+Start with activation
+This is a short tour of ValueLens in Power BI, using demo data. Start with Activation: how many licensed people are actually active? The headline cards give the overall picture, and the department chart shows where enablement may help. Check the date range and organisation filter before comparing teams. The figures shown here are examples, not customer results.
+
+Read adoption over time
+Next, open Adoption. The trend separates licensed, unlicensed, agent and Cowork sessions per user. This helps distinguish a sustained habit from a one-off spike. Use the audience buttons and date slicer to keep comparisons consistent. The activity mix adds context about what people do; a high session count alone does not demonstrate better work or answer quality.
+
+Understand the work
+Task Breakdown moves from how much activity to what kind of activity. The chart groups work from asking and finding through producing and delegating. The activity breakdown and model mix provide another angle. These are rule-based categories, not the same classification used by Copilot Analytics. Read them as directional evidence, rather than a judgement about individual performance.
+
+Treat value as an estimate
+Estimated Value translates observed work into expert-equivalent hours and a modelled value. Check the effort scenario, hourly salary and reporting period. The bar chart shows which task categories contribute most. These are assumption-driven estimates, not measured time saved or realised cash savings. Annualised value is a projection; it should not be read as a financial outcome already achieved.
+
+Find the next conversation
+License Readiness highlights observed unlicensed use and ranks potential candidates. Compare frequency and active days, then look at dormant licensed seats before expanding. A blank score means no observed unlicensed activity, not necessarily low readiness. Use the ranking to start a conversation about needs and access, not as an automatic licence-allocation rule.
+
+Check the assumptions
+Finally, open the Signal to Impact appendix. It exposes the human-time assumptions behind the value estimates, with category controls for your context. The glossary helps decode unfamiliar measures. A simple reading order is activation, adoption, tasks, value, then readiness. Keep the date and audience consistent, challenge the assumptions, and use the report to choose one practical follow-up.

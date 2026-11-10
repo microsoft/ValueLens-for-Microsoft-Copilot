@@ -1,0 +1,196 @@
+WEBVTT
+
+NOTE Approximate sentence/phrase timings within each matching narration segment.
+
+1
+00:00:00.200 --> 00:00:04.107 line:76% position:50% size:90%
+This is a short tour of ValueLens in Power
+BI, using demo data.
+
+2
+00:00:04.107 --> 00:00:08.323 line:76% position:50% size:90%
+Start with Activation: how many licensed
+people are actually active?
+
+3
+00:00:08.323 --> 00:00:12.974 line:76% position:50% size:90%
+The headline cards give the overall
+picture, and the department chart shows
+
+4
+00:00:12.974 --> 00:00:14.587 line:76% position:50% size:90%
+where enablement may help.
+
+5
+00:00:14.587 --> 00:00:18.803 line:76% position:50% size:90%
+Check the date range and organisation
+filter before comparing teams.
+
+6
+00:00:18.803 --> 00:00:22.400 line:76% position:50% size:90%
+The figures shown here are examples, not
+customer results.
+
+7
+00:00:23.450 --> 00:00:24.811 line:76% position:50% size:90%
+Next, open Adoption.
+
+8
+00:00:24.811 --> 00:00:30.051 line:76% position:50% size:90%
+The trend separates licensed, unlicensed,
+agent and Cowork sessions per user.
+
+9
+00:00:30.051 --> 00:00:34.271 line:76% position:50% size:90%
+This helps distinguish a sustained habit
+from a one-off spike.
+
+10
+00:00:34.271 --> 00:00:39.171 line:76% position:50% size:90%
+Use the audience buttons and date slicer
+to keep comparisons consistent.
+
+11
+00:00:39.171 --> 00:00:44.819 line:76% position:50% size:90%
+The activity mix adds context about what
+people do; a high session count alone does
+
+12
+00:00:44.819 --> 00:00:47.950 line:76% position:50% size:90%
+not demonstrate better work or answer
+quality.
+
+13
+00:00:48.950 --> 00:00:53.281 line:76% position:50% size:90%
+Task Breakdown moves from how much
+activity to what kind of activity.
+
+14
+00:00:53.281 --> 00:00:58.239 line:76% position:50% size:90%
+The chart groups work from asking and
+finding through producing and delegating.
+
+15
+00:00:58.239 --> 00:01:01.942 line:76% position:50% size:90%
+The activity breakdown and model mix
+provide another angle.
+
+16
+00:01:01.942 --> 00:01:06.712 line:76% position:50% size:90%
+These are rule-based categories, not the
+same classification used by Copilot
+
+17
+00:01:06.712 --> 00:01:07.340 line:76% position:50% size:90%
+Analytics.
+
+18
+00:01:07.340 --> 00:01:12.047 line:76% position:50% size:90%
+Read them as directional evidence, rather
+than a judgement about individual
+
+19
+00:01:12.047 --> 00:01:12.800 line:76% position:50% size:90%
+performance.
+
+20
+00:01:13.867 --> 00:01:18.688 line:76% position:50% size:90%
+Estimated Value translates observed work
+into expert-equivalent hours and a
+
+21
+00:01:18.688 --> 00:01:19.652 line:76% position:50% size:90%
+modelled value.
+
+22
+00:01:19.652 --> 00:01:23.638 line:76% position:50% size:90%
+Check the effort scenario, hourly salary
+and reporting period.
+
+23
+00:01:23.638 --> 00:01:27.367 line:76% position:50% size:90%
+The bar chart shows which task categories
+contribute most.
+
+24
+00:01:27.367 --> 00:01:32.445 line:76% position:50% size:90%
+These are assumption-driven estimates, not
+measured time saved or realised cash
+
+25
+00:01:32.445 --> 00:01:32.960 line:76% position:50% size:90%
+savings.
+
+26
+00:01:32.960 --> 00:01:37.974 line:76% position:50% size:90%
+Annualised value is a projection; it
+should not be read as a financial outcome
+
+27
+00:01:37.974 --> 00:01:39.067 line:76% position:50% size:90%
+already achieved.
+
+28
+00:01:40.117 --> 00:01:44.947 line:76% position:50% size:90%
+License Readiness highlights observed
+unlicensed use and ranks potential
+
+29
+00:01:44.947 --> 00:01:45.685 line:76% position:50% size:90%
+candidates.
+
+30
+00:01:45.685 --> 00:01:50.850 line:76% position:50% size:90%
+Compare frequency and active days, then
+look at dormant licensed seats before
+
+31
+00:01:50.850 --> 00:01:51.521 line:76% position:50% size:90%
+expanding.
+
+32
+00:01:51.521 --> 00:01:57.089 line:76% position:50% size:90%
+A blank score means no observed unlicensed
+activity, not necessarily low readiness.
+
+33
+00:01:57.089 --> 00:02:01.986 line:76% position:50% size:90%
+Use the ranking to start a conversation
+about needs and access, not as an
+
+34
+00:02:01.986 --> 00:02:04.267 line:76% position:50% size:90%
+automatic licence-allocation rule.
+
+35
+00:02:05.283 --> 00:02:08.284 line:76% position:50% size:90%
+Finally, open the Signal to Impact
+appendix.
+
+36
+00:02:08.284 --> 00:02:13.673 line:76% position:50% size:90%
+It exposes the human-time assumptions
+behind the value estimates, with category
+
+37
+00:02:13.673 --> 00:02:15.446 line:76% position:50% size:90%
+controls for your context.
+
+38
+00:02:15.446 --> 00:02:18.583 line:76% position:50% size:90%
+The glossary helps decode unfamiliar
+measures.
+
+39
+00:02:18.583 --> 00:02:23.835 line:76% position:50% size:90%
+A simple reading order is activation,
+adoption, tasks, value, then readiness.
+
+40
+00:02:23.835 --> 00:02:29.087 line:76% position:50% size:90%
+Keep the date and audience consistent,
+challenge the assumptions, and use the
+
+41
+00:02:29.087 --> 00:02:31.883 line:76% position:50% size:90%
+report to choose one practical follow-up.
