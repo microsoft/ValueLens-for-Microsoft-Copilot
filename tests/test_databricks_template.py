@@ -101,6 +101,45 @@ class DatabricksTemplateTests(unittest.TestCase):
                     path = root / f"{BUILDER.NAME}.Report" / member[len("Report/"):]
                     self.assertEqual(path.read_bytes(), payload, member)
 
+    def test_pbip_export_refuses_nonempty_unowned_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            existing = root / ".gitignore"
+            existing.write_text("important\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "non-empty"):
+                BUILDER.write_pbip(self.template, directory)
+            self.assertEqual(existing.read_text(encoding="utf-8"), "important\n")
+            self.assertFalse((root / f"{BUILDER.NAME}.pbip").exists())
+
+    def test_pbip_export_refuses_unexpected_project_files_without_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = BUILDER.write_pbip(self.template, directory)
+            project.write_text("outdated", encoding="utf-8")
+            extra = root / f"{BUILDER.NAME}.Report" / "notes.txt"
+            extra.write_text("keep this", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unexpected file"):
+                BUILDER.write_pbip(self.template, directory)
+            self.assertEqual(extra.read_text(encoding="utf-8"), "keep this")
+            self.assertEqual(project.read_text(encoding="utf-8"), "outdated")
+
+    def test_pbip_export_preserves_user_gitignore_and_desktop_cache(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = BUILDER.write_pbip(self.template, directory)
+            cache = root / f"{BUILDER.NAME}.Report" / ".pbi" / "localSettings.json"
+            cache.parent.mkdir()
+            cache.write_text("local settings", encoding="utf-8")
+            project.write_text("outdated", encoding="utf-8")
+            BUILDER.write_pbip(self.template, directory)
+            self.assertEqual(cache.read_text(encoding="utf-8"), "local settings")
+            self.assertEqual(project.read_bytes(), BUILDER.pbip_files(self.template)[f"{BUILDER.NAME}.pbip"])
+            ignore = root / ".gitignore"
+            ignore.write_text("custom rules\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "gitignore was modified"):
+                BUILDER.write_pbip(self.template, directory)
+            self.assertEqual(ignore.read_text(encoding="utf-8"), "custom rules\n")
+
     def test_committed_pbip_project_matches_the_template(self):
         committed = BUILDER.existing_pbip(BUILDER.PBIP_DIR)
         self.assertEqual(committed, BUILDER.pbip_files(self.template),

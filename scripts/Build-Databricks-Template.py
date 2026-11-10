@@ -244,12 +244,19 @@ def existing_pbip(directory):
 
 
 def write_pbip(template, directory):
-    """Write the template as a PBIP project, removing generated files that no longer exist."""
+    """Write the template as a PBIP project without removing unrelated files."""
     root = long_path(directory)
     expected = pbip_files(template)
+    if os.path.isdir(root) and not os.path.isfile(os.path.join(root, f"{NAME}.pbip")):
+        with os.scandir(root) as entries:
+            if next(entries, None) is not None:
+                raise ValueError(f"PBIP export directory is non-empty and has no {NAME}.pbip: {directory}")
     existing = existing_pbip(directory)
-    for relative in set(existing) - set(expected):
-        os.remove(os.path.join(root, *relative.split("/")))
+    unexpected = sorted(set(existing) - set(expected))
+    if unexpected:
+        raise ValueError(f"PBIP export contains unexpected file; no files were changed: {unexpected[0]}")
+    if ".gitignore" in existing and existing[".gitignore"] != expected[".gitignore"]:
+        raise ValueError("PBIP export .gitignore was modified; refusing to overwrite it")
     for relative, payload in expected.items():
         if existing.get(relative) == payload:
             continue

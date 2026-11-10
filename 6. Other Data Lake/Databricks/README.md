@@ -171,7 +171,9 @@ change `Databricks.Catalogs` to `DatabricksMultiCloud.Catalogs` in the `FabricTa
 
 The template is generated from the Fabric template, so report changes are made there.
 `python scripts/Build-Databricks-Template.py` rebuilds both the `.pbit` and the [`pbip/`](pbip/)
-project, and `--check` fails if either is stale. The PBIP holds the model as
+project, and `--check` fails if either is stale. To export elsewhere, use `--pbip <folder>` with
+an empty folder or an existing generated project. The builder refuses unexpected files rather
+than deleting them. The PBIP holds the model as
 `ValueLens - Databricks.SemanticModel/model.bim` and the report in the enhanced PBIR format
 (`ValueLens - Databricks.Report/definition/`), copied unchanged from the template; the source
 report has no legacy `report.json` layout to convert. The source helper is
