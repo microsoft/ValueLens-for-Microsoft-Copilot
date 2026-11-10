@@ -1,0 +1,55 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.1.0/schema.json",
+  "name": "coworkfit",
+  "displayName": "🧭 Cowork Fit",
+  "displayOption": "FitToPage",
+  "height": 720,
+  "width": 1280,
+  "visualInteractions": [
+    {
+      "source": "cf_what",
+      "target": "cf_kpi1",
+      "type": "NoFilter"
+    },
+    {
+      "source": "cf_what",
+      "target": "cf_definition",
+      "type": "NoFilter"
+    },
+    {
+      "source": "cf_today",
+      "target": "cf_what",
+      "type": "NoFilter"
+    },
+    {
+      "source": "cf_today",
+      "target": "cf_who",
+      "type": "NoFilter"
+    },
+    {
+      "source": "cf_today",
+      "target": "cf_kpi1",
+      "type": "NoFilter"
+    },
+    {
+      "source": "cf_today",
+      "target": "cf_definition",
+      "type": "NoFilter"
+    },
+    {
+      "source": "cf_who",
+      "target": "cf_kpi1",
+      "type": "NoFilter"
+    },
+    {
+      "source": "cf_who",
+      "target": "cf_definition",
+      "type": "NoFilter"
+    },
+    {
+      "source": "cf_who",
+      "target": "cf_what",
+      "type": "DataFilter"
+    }
+  ]
+}

@@ -1,0 +1,141 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.1.0/schema.json",
+  "name": "0de458c0c6d004399dee",
+  "displayName": "🏅 Leaderboard",
+  "displayOption": "FitToPage",
+  "height": 720,
+  "width": 1280,
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "30146948861aa62f999e",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Chat + Agent Interactions (Audit Logs)"
+              }
+            },
+            "Property": "Environment"
+          }
+        },
+        "type": "Categorical",
+        "howCreated": "User"
+      },
+      {
+        "name": "94235be0cd41591566ee",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Chat + Agent Interactions (Audit Logs)"
+              }
+            },
+            "Property": "Agent Filter (Normalized)"
+          }
+        },
+        "type": "Categorical",
+        "howCreated": "User",
+        "objects": {
+          "general": [
+            {
+              "properties": {
+                "isInvertedSelectionMode": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "true"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "5ecc0917a8e1e2d0b7f3",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Chat + Agent Interactions (Audit Logs)"
+              }
+            },
+            "Property": "AppHost"
+          }
+        },
+        "type": "Advanced",
+        "filter": {
+          "Version": 2,
+          "From": [
+            {
+              "Name": "c",
+              "Entity": "Chat + Agent Interactions (Audit Logs)",
+              "Type": 0
+            }
+          ],
+          "Where": [
+            {
+              "Condition": {
+                "Not": {
+                  "Expression": {
+                    "Contains": {
+                      "Left": {
+                        "Column": {
+                          "Expression": {
+                            "SourceRef": {
+                              "Source": "c"
+                            }
+                          },
+                          "Property": "AppHost"
+                        }
+                      },
+                      "Right": {
+                        "Literal": {
+                          "Value": "'SecurityCopilot'"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "howCreated": "User"
+      }
+    ]
+  },
+  "visualInteractions": [
+    {
+      "source": "624d5213bf5648833d40",
+      "target": "93b20f1d41e3b9c272e8",
+      "type": "DataFilter"
+    },
+    {
+      "source": "5892fa2e6167de0b71e2",
+      "target": "93b20f1d41e3b9c272e8",
+      "type": "DataFilter"
+    },
+    {
+      "source": "5892fa2e6167de0b71e2",
+      "target": "712b73188bd68dd0e9a5",
+      "type": "DataFilter"
+    },
+    {
+      "source": "624d5213bf5648833d40",
+      "target": "712b73188bd68dd0e9a5",
+      "type": "DataFilter"
+    },
+    {
+      "source": "4e0718a28f7ec1429d72",
+      "target": "93b20f1d41e3b9c272e8",
+      "type": "DataFilter"
+    },
+    {
+      "source": "d217e2c753869a36981c",
+      "target": "93b20f1d41e3b9c272e8",
+      "type": "DataFilter"
+    }
+  ]
+}

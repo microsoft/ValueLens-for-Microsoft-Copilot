@@ -5,7 +5,7 @@
 Notebooks collect the data into a Lakehouse; a pipeline runs them on a schedule.
 The ValueLens Power BI report reads the result.
 
-[All setup choices](../README.md#choose-your-path) · [SharePoint](../4.%20SharePoint/README.md) · [Azure](../2.%20Azure/README.md)
+[All setup choices](../README.md#choose-your-path) · [SharePoint](../4.%20SharePoint/README.md) · [Azure](../2.%20Azure/README.md) · [Other data lakes](../6.%20Other%20Data%20Lake/README.md)
 
 ## Before you start
 

@@ -1,0 +1,492 @@
+{
+  "version": "1.1.0",
+  "diagrams": [
+    {
+      "ordinal": 0,
+      "scrollPosition": {
+        "x": 0,
+        "y": 18154.32626574279
+      },
+      "nodes": [
+        {
+          "location": {
+            "x": 1682.4327917350863,
+            "y": 28334.676978778814
+          },
+          "nodeIndex": "Copilot Licensed",
+          "nodeLineageTag": "d2642023-4b65-422e-b87e-2db288a27359",
+          "size": {
+            "height": 128,
+            "width": 234
+          },
+          "zIndex": 12
+        },
+        {
+          "location": {
+            "x": 4544,
+            "y": 28404.36359741124
+          },
+          "nodeIndex": "ActiveDaysSummary",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 4828,
+            "y": 28404.36359741124
+          },
+          "nodeIndex": "Calendar",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 0,
+            "y": 28043.864363509358
+          },
+          "nodeIndex": "Chat + Agent Interactions (Audit Logs)",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 1777.9474869495155,
+            "y": 28764.862831313123
+          },
+          "nodeIndex": "Chat + Agent Org Data",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 5680,
+            "y": 28404.36359741124
+          },
+          "nodeIndex": "Unlicensed Chat User Rankings",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 6532,
+            "y": 28404.36359741124
+          },
+          "nodeIndex": "Licensed Chat User Summary",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 7100,
+            "y": 28404.36359741124
+          },
+          "nodeIndex": "Licensed Chat User Rankings",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 7384,
+            "y": 28354.36359741124
+          },
+          "nodeIndex": "Agents 365",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 8804,
+            "y": 28379.86359741124
+          },
+          "nodeIndex": "📖 Metric Glossary",
+          "nodeLineageTag": "8b71f88c-7524-4ba0-a81d-f7ca7ef45b64",
+          "size": {
+            "height": 224,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 9088,
+            "y": 28385.61359741124
+          },
+          "nodeIndex": "Behavior Value Map",
+          "nodeLineageTag": "ff050001-0001-0001-0001-000000000001",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 9372,
+            "y": 28400.23859741124
+          },
+          "nodeIndex": "Heatmap Toggle",
+          "nodeLineageTag": "ce4f0437-8490-4e73-97e0-47a1a27b8c22",
+          "size": {
+            "height": 152,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 10224,
+            "y": 28341.08234741124
+          },
+          "nodeIndex": "Augmented Skills Map",
+          "nodeLineageTag": "ff080001-0001-0001-0001-000000000001",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 10508,
+            "y": 28341.08234741124
+          },
+          "nodeIndex": "Human Time Estimates",
+          "nodeLineageTag": "ff060001-0001-0001-0001-000000000001",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 10792,
+            "y": 28341.08234741124
+          },
+          "nodeIndex": "UserMonthMetrics",
+          "nodeLineageTag": "ff090001-0001-0001-0001-000000000010",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 11360,
+            "y": 28259.44172241124
+          },
+          "nodeIndex": "Headlines",
+          "nodeLineageTag": "ff0a0001-0001-0001-0001-000000000001",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 11928,
+            "y": 28297.44172241124
+          },
+          "nodeIndex": "Penalty Factor",
+          "nodeLineageTag": "ff0b0001-0001-0001-0001-000000000030",
+          "size": {
+            "height": 224,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 12212,
+            "y": 28249.98078491124
+          },
+          "nodeIndex": "AI PPUPM",
+          "nodeLineageTag": "ad544143-3002-42e4-888b-6eda41b83c04",
+          "size": {
+            "height": 224,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 12496,
+            "y": 28178.78937866124
+          },
+          "nodeIndex": "Hourly Value",
+          "size": {
+            "height": 224,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 12780,
+            "y": 28084.00226928624
+          },
+          "nodeIndex": "Task Value Mapping",
+          "nodeLineageTag": "ff0c0001-0001-0001-0001-000000000030",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 13064,
+            "y": 27959.82160522374
+          },
+          "nodeIndex": "License Status (Legend)",
+          "size": {
+            "height": 128,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 13348,
+            "y": 27407.186873274983
+          },
+          "nodeIndex": "Activity (Legend)",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 14771.292956493331,
+            "y": 27155.926566752638
+          },
+          "nodeIndex": "ProductFeedback",
+          "nodeLineageTag": "ae4ffe2b-b5f0-4f3f-a016-54252c132081",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 15907.292956493331,
+            "y": 26696.824205490706
+          },
+          "nodeIndex": "Feedback Words",
+          "nodeLineageTag": "fbword01-0001-0001-0001-000000000001",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 16191.292956493331,
+            "y": 26236.275092064963
+          },
+          "nodeIndex": "Agent Bridge",
+          "nodeLineageTag": "c1d45881-ae77-4a7b-a1e6-cf6c30518b09",
+          "size": {
+            "height": 128,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 17043.29295649333,
+            "y": 24255.219151871377
+          },
+          "nodeIndex": "Currency",
+          "nodeLineageTag": "cur00001-curr-0001-0001-000000000001",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 17327.29295649333,
+            "y": 23302.78306924243
+          },
+          "nodeIndex": "Monthly Licence Cost",
+          "nodeLineageTag": "alc00001-alc0-0001-0001-000000000001",
+          "size": {
+            "height": 224,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 17611.29295649333,
+            "y": 22229.37214938199
+          },
+          "nodeIndex": "Heatmap Metric",
+          "nodeLineageTag": "340f5fa2-4376-4bde-9ded-bef0aeb6873f",
+          "size": {
+            "height": 128,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 17895.29295649333,
+            "y": 20797.85220886432
+          },
+          "nodeIndex": "Adj: Agents",
+          "nodeLineageTag": "5d000005-0000-0000-0000-000000000001",
+          "size": {
+            "height": 224,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 18179.29295649333,
+            "y": 20797.85220886432
+          },
+          "nodeIndex": "Adj: Comms",
+          "nodeLineageTag": "5d000001-0000-0000-0000-000000000001",
+          "size": {
+            "height": 224,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 18463.29295649333,
+            "y": 20797.85220886432
+          },
+          "nodeIndex": "Adj: Content",
+          "nodeLineageTag": "5d000003-0000-0000-0000-000000000001",
+          "size": {
+            "height": 224,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 18747.29295649333,
+            "y": 20797.85220886432
+          },
+          "nodeIndex": "Adj: Meetings",
+          "nodeLineageTag": "5d000002-0000-0000-0000-000000000001",
+          "size": {
+            "height": 224,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 19031.29295649333,
+            "y": 20797.85220886432
+          },
+          "nodeIndex": "Adj: Search",
+          "nodeLineageTag": "5d000004-0000-0000-0000-000000000001",
+          "size": {
+            "height": 224,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 20735.29295649333,
+            "y": 14839.256059536438
+          },
+          "nodeIndex": "Stage Legend",
+          "nodeLineageTag": "20ca3be6-eb77-4eb4-9590-83990e2bb3ee",
+          "size": {
+            "height": 128,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 21019.29295649333,
+            "y": 11859.22207240049
+          },
+          "nodeIndex": "Benchmark Metric",
+          "nodeLineageTag": "ff050001-0001-0001-0001-000000000000",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 21303.29295649333,
+            "y": 11933.22207240049
+          },
+          "nodeIndex": "Cowork Fit Grade",
+          "nodeLineageTag": "cf000001-0000-0000-0000-000000000001",
+          "size": {
+            "height": 152,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 21587.29295649333,
+            "y": 11885.22207240049
+          },
+          "nodeIndex": "Surface Spread Band",
+          "nodeLineageTag": "cf000002-0000-0000-0000-000000000001",
+          "size": {
+            "height": 248,
+            "width": 234
+          },
+          "zIndex": 0
+        }
+      ],
+      "name": "All tables",
+      "zoomValue": 60.54314566359255,
+      "pinKeyFieldsToTop": false,
+      "showExtraHeaderInfo": false,
+      "hideKeyFieldsWhenCollapsed": false,
+      "tablesLocked": false
+    }
+  ],
+  "selectedDiagram": "All tables",
+  "defaultDiagram": "All tables"
+}

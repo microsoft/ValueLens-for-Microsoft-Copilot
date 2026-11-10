@@ -1,4 +1,4 @@
-"""Portable structural release checks for the three active templates.
+"""Portable structural release checks for the four active templates.
 
 The archived Power Automate + Dataverse template is frozen, so it isn't checked here.
 Desktop refresh and rendering still need live QA.
@@ -14,6 +14,7 @@ TEMPLATES = (
     Path("4. SharePoint") / "ValueLens - SharePoint.pbit",
     Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric.pbit",
     Path("1. Fabric") / "Manual setup" / "ValueLens - Fabric OneLake.pbit",
+    Path("6. Other Data Lake") / "Databricks" / "ValueLens - Databricks.pbit",
 )
 PAGE_COUNT = 16
 # Separate Consumption Central report shipped as an optional add-on in each path.
@@ -30,6 +31,8 @@ PARAMETER_DEFAULTS = {
     "RangeStart": "#datetime(2025, 1, 1, 0, 0, 0)",
     "RangeEnd": "#datetime(2027, 1, 1, 0, 0, 0)",
     "Use SharePoint CSV fallback": "false",
+    "Databricks Catalog": '"main"',
+    "Databricks Schema": '"dbo"',
 }
 # Optional Fabric tables default to Include, so a tenant that has not landed them must load empty.
 OPTIONAL_FABRIC_TABLES = {"Agents 365": "agents_365", "ProductFeedback": "user_feedback"}
@@ -85,7 +88,7 @@ class CoreTemplateTests(unittest.TestCase):
                     if n.startswith("Report/definition/") and n.endswith(".json")}
             cls.templates.append((str(relative), members, model, docs))
 
-    def test_exactly_three_active_templates(self):
+    def test_exactly_the_active_templates(self):
         active = {p.relative_to(ROOT) for p in ROOT.rglob("*.pbit")
                   if "archive" not in p.parts and not ADDONS & set(p.parts)}
         self.assertEqual(active, set(TEMPLATES))
@@ -133,8 +136,9 @@ class CoreTemplateTests(unittest.TestCase):
                                  (name, expression["name"]))
 
     def test_optional_fabric_tables_load_empty_when_missing(self):
-        fabric = [(name, model) for name, _, model, _ in self.templates if name.startswith("1. Fabric")]
-        self.assertEqual(len(fabric), 2)
+        fabric = [(name, model) for name, _, model, _ in self.templates
+                  if name.startswith(("1. Fabric", "6. Other Data Lake"))]
+        self.assertEqual(len(fabric), 3)
         for name, model in fabric:
             queries = {t["name"]: text(t["partitions"][0]["source"]["expression"])
                        for t in model["tables"] if t.get("partitions")}

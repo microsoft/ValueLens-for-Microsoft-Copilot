@@ -183,7 +183,7 @@ class LicenseClassificationTests(unittest.TestCase):
         paths = [p for p in ROOT.rglob("*.pbit")
                  if "archive" not in p.parts
                  and not {"Add Credit Consumption", "Add Agent Evaluator"} & set(p.parts)]
-        self.assertEqual(len(paths), 3)
+        self.assertEqual(len(paths), 4)
         for path in paths:
             with self.subTest(path=path), zipfile.ZipFile(path) as archive:
                 self.assertIsNone(archive.testzip())
@@ -196,7 +196,7 @@ class LicenseClassificationTests(unittest.TestCase):
                 self.assertNotIn("Assigned Products", read)
                 self.assertNotIn("Assigned_Products", read)
                 self.assertIn('"Has license"', expression)
-                if "1. Fabric" in path.parts:
+                if {"1. Fabric", "6. Other Data Lake"} & set(path.parts):
                     self.assertIn('FabricTable("copilot_licensed_users")', expression)
                     self.assertIn('"Has_license"', expression)
                     self.assertIn('"HasCopilot"', expression)

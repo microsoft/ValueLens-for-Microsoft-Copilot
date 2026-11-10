@@ -1,0 +1,33 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.1.0/schema.json",
+  "name": "hs_logo",
+  "position": {
+    "width": 73.296089385474872,
+    "y": 0,
+    "z": 3000,
+    "x": 0,
+    "tabOrder": 3000,
+    "height": 58.100558659217882
+  },
+  "visual": {
+    "drillFilterOtherVisuals": true,
+    "objects": {
+      "general": [
+        {
+          "properties": {
+            "imageUrl": {
+              "expr": {
+                "ResourcePackageItem": {
+                  "ItemName": "Microsoft_365_Copilot_Icon.svg2955444540328378.png",
+                  "PackageType": 1,
+                  "PackageName": "RegisteredResources"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "visualType": "image"
+  }
+}

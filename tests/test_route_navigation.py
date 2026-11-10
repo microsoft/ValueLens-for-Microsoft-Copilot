@@ -5,8 +5,8 @@ from pathlib import Path
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
-ROUTES = ("4. SharePoint", "1. Fabric", "2. Azure")
-ROUTE_LABELS = ("SharePoint", "Fabric", "Azure")
+ROUTES = ("4. SharePoint", "1. Fabric", "2. Azure", "6. Other Data Lake")
+ROUTE_LABELS = ("SharePoint", "Fabric", "Azure", "Other data lakes")
 GUIDES = (
     "README.md",
     "SUPPORT.md",
@@ -18,6 +18,7 @@ GUIDES = (
     "app/README.md",
     "1. Fabric/Manual setup/README.md",
     "1. Fabric/Manual setup/notebooks/README.md",
+    "6. Other Data Lake/Databricks/README.md",
     "5. Local CSV/README.md",
     "archive/5. Local CSV/README.md",
     "archive/5. Local CSV/Add Credit Consumption/README.md",
@@ -51,7 +52,7 @@ def test_setup_navigation_uses_service_names_not_folder_numbers():
     for route, label in zip(ROUTES, ROUTE_LABELS):
         text = (ROOT / route / "README.md").read_text(encoding="utf-8")
         assert f"# {label}\n" in text
-        assert f'<a id="{route.lower().replace(". ", "-")}"></a>' in text
+        assert f'<a id="{route.lower().replace(". ", "-").replace(" ", "-")}"></a>' in text
 
 
 def test_app_only_and_installer_choices_are_distinct():
