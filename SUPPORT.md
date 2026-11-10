@@ -11,9 +11,9 @@ there is no guaranteed response time or support service-level agreement.
 Start with the [README](README.md), then follow the setup and troubleshooting
 guidance for what you deployed:
 
-- [4. SharePoint](4.%20SharePoint/README.md)
-- [1. Fabric](1.%20Fabric/README.md), including the [Fabric App](1.%20Fabric/Fabric%20App/README.md)
-- [2. Azure](2.%20Azure/README.md)
+- [SharePoint](4.%20SharePoint/README.md)
+- [Fabric](1.%20Fabric/README.md), including the [Fabric App](1.%20Fabric/Fabric%20App/README.md)
+- [Azure](2.%20Azure/README.md)
 
 For app hosting, see [the app guide](app/README.md). The
 [Power Automate + Dataverse](archive/3.%20Power%20Automate%20%2B%20Dataverse/README.md) and
